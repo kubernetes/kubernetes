@@ -35,11 +35,14 @@ import (
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/authorization/union"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/filesystem"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	webhookmetrics "k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -153,12 +156,12 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			if r.initialConfig.WebhookRetryBackoff == nil {
 				return nil, nil, errors.New("retry backoff parameters for authorization webhook has not been specified")
 			}
-			clientConfig, err := webhookutil.LoadKubeconfig(*configuredAuthorizer.Webhook.ConnectionInfo.KubeConfigFile, r.initialConfig.CustomDial)
+			sarClientConfig, err := webhookutil.LoadKubeconfig(*configuredAuthorizer.Webhook.ConnectionInfo.KubeConfigFile, r.initialConfig.CustomDial)
 			if err != nil {
 				return nil, nil, err
 			}
 			if configuredAuthorizer.Webhook.Timeout.Duration != 0 {
-				clientConfig.Timeout = configuredAuthorizer.Webhook.Timeout.Duration
+				sarClientConfig.Timeout = configuredAuthorizer.Webhook.Timeout.Duration
 			}
 			var decisionOnError authorizer.Decision
 			switch configuredAuthorizer.Webhook.FailurePolicy {
@@ -177,7 +180,23 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			if !configuredAuthorizer.Webhook.CacheUnauthorizedRequests {
 				unauthorizedTTL = 0
 			}
-			webhookAuthorizer, err := webhook.New(clientConfig,
+			var conditionsReviewConfig *rest.Config
+			var conditionsReviewVersion string
+			if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+				if cr := configuredAuthorizer.Webhook.ConditionsReview; cr != nil {
+					conditionsReviewConfig, err = webhookutil.LoadKubeconfigWithContext(
+						*configuredAuthorizer.Webhook.ConnectionInfo.KubeConfigFile,
+						cr.KubeConfigContextName,
+						r.initialConfig.CustomDial,
+					)
+					if err != nil {
+						return nil, nil, fmt.Errorf("failed to load conditions review kubeconfig context %q: %w", cr.KubeConfigContextName, err)
+					}
+					conditionsReviewVersion = cr.Version
+				}
+			}
+
+			webhookAuthorizer, err := webhook.New(sarClientConfig,
 				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
 				authorizedTTL,
 				unauthorizedTTL,
@@ -187,6 +206,8 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 				configuredAuthorizer.Name,
 				kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: authorizationcel.NewMatcherMetrics()},
 				r.compiler,
+				conditionsReviewConfig,
+				conditionsReviewVersion,
 			)
 			if err != nil {
 				return nil, nil, err

@@ -87,6 +87,15 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					opts = append(opts, WithSubResources(subresource))
 				}
 
+				// TODO(luxas): Find a better place for this configuration, as per the comment above.
+				if gvk.Group == "authorization.k8s.io" {
+					opts = append(opts,
+						WithOptions(map[string]bool{
+							"ConditionalAuthorization": true,
+						}),
+					)
+				}
+
 				VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
 
 				old, err := legacyscheme.Scheme.New(gvk)

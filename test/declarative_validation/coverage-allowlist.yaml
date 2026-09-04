@@ -22,3 +22,38 @@
   errorType: '*'
   origin: '*'
   reason: Not served by kube-apiserver.
+
+# The discriminated-union check on ConditionsAwareDecision emits errors at
+# child member paths (e.g. status.conditionalDecision.deny) rather than at the
+# struct itself (status.conditionalDecision), so the declared rule at the
+# parent path is unreachable at runtime. See k8s.io/apimachinery/pkg/api/validate.DiscriminatedUnion.
+- apiVersion: authorization.k8s.io/v1
+  kind: SubjectAccessReview
+  path: status.conditionalDecision
+  errorType: FieldValueInvalid
+  origin: union
+  reason: DiscriminatedUnion emits errors at child paths, not the parent struct path.
+- apiVersion: authorization.k8s.io/v1
+  kind: SelfSubjectAccessReview
+  path: status.conditionalDecision
+  errorType: FieldValueInvalid
+  origin: union
+  reason: DiscriminatedUnion emits errors at child paths, not the parent struct path.
+- apiVersion: authorization.k8s.io/v1
+  kind: LocalSubjectAccessReview
+  path: status.conditionalDecision
+  errorType: FieldValueInvalid
+  origin: union
+  reason: DiscriminatedUnion emits errors at child paths, not the parent struct path.
+- apiVersion: authorization.k8s.io/v1alpha1
+  kind: AuthorizationConditionsReview
+  path: request.decision
+  errorType: FieldValueInvalid
+  origin: union
+  reason: DiscriminatedUnion emits errors at child paths, not the parent struct path.
+- apiVersion: authorization.k8s.io/v1alpha1
+  kind: AuthorizationConditionsReview
+  path: response.decision
+  errorType: FieldValueInvalid
+  origin: union
+  reason: DiscriminatedUnion emits errors at child paths, not the parent struct path.
