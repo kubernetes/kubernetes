@@ -79,15 +79,15 @@ func observePodGroupScheduleAttemptAndLatency(result, profile string, duration f
 	podGroupScheduleAttempts.WithLabelValues(result, profile).Inc()
 }
 
-// RecordGeneratedPlacements records the number of candidate placements generated for a
-// pod group in a single scheduling cycle.
-func RecordGeneratedPlacements(profile string, count int) {
-	GeneratedPlacementsTotal.WithLabelValues(profile).Add(float64(count))
+// RecordGeneratedPlacements records the number of candidate placements generated for an
+// entity in a single scheduling cycle.
+func RecordGeneratedPlacements(profile, entityType string, count int) {
+	GeneratedPlacementsTotal.WithLabelValues(profile, entityType).Add(float64(count))
 }
 
 // ObservePlacementEvaluation records a single candidate placement evaluation and the
 // duration, by result.
-func ObservePlacementEvaluation(result, profile string, duration float64) {
-	PlacementEvaluations.WithLabelValues(result, profile).Inc()
-	PlacementEvaluationDuration.WithLabelValues(result, profile).Observe(duration)
+func ObservePlacementEvaluation(result, profile, entityType string, duration float64) {
+	PlacementEvaluations.WithLabelValues(result, profile, entityType).Inc()
+	PlacementEvaluationDuration.WithLabelValues(result, profile, entityType).Observe(duration)
 }

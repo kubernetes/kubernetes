@@ -99,7 +99,7 @@ const (
 	QueueingHintResultError     = "Error"
 )
 
-// Entity label values used for queued_entities and queue_incoming_entities metrics.
+// Entity label values used for scheduling, queued_entities, and queue_incoming_entities metrics.
 const (
 	Pod               = "pod"
 	PodGroup          = "podgroup"
@@ -675,24 +675,24 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "generated_placements_total",
-			Help:           "Number of candidate placements generated when scheduling pod groups, by scheduler profile.",
+			Help:           "Number of candidate placements generated when scheduling pod groups, by scheduler profile and entity type.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"profile"})
+		}, []string{"profile", "type"})
 	PlacementEvaluations = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "placement_evaluations_total",
-			Help:           "Number of candidate placements evaluated when scheduling pod groups, by result and scheduler profile. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.",
+			Help:           "Number of candidate placements evaluated when scheduling pod groups, by result, scheduler profile, and entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result", "profile"})
+		}, []string{"result", "profile", "type"})
 	PlacementEvaluationDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "placement_evaluation_duration_seconds",
-			Help:           "Latency in seconds of evaluating a single candidate placement when scheduling pod groups, by result and scheduler profile. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.",
+			Help:           "Latency in seconds of evaluating a single candidate placement when scheduling pod groups, by result, scheduler profile, and entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result", "profile"})
+		}, []string{"result", "profile", "type"})
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
