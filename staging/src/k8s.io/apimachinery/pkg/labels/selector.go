@@ -18,6 +18,7 @@ package labels
 
 import (
 	"fmt"
+	"math/big"
 	"slices"
 	"sort"
 	"strconv"
@@ -267,10 +268,14 @@ func (r *Requirement) Matches(ls Labels) bool {
 		if !exists {
 			return false
 		}
-		lsValue, err := strconv.ParseInt(val, 10, 64)
-		if err != nil {
+		// Parse as an arbitrary-precision integer: a label value is allowed to be
+		// up to 63 characters, so it can exceed int64 range even though the
+		// requirement operand is constrained to int64. Parsing the label value as
+		// int64 would make such a value fail to match instead of comparing it.
+		lsValue, ok := new(big.Int).SetString(val, 10)
+		if !ok {
 			//nolint:logcheck // Extending the API is not worth it for contextual, structured logging of this.
-			klog.V(10).InfoS("ParseInt failed", "value", val, "label", ls, "err", err)
+			klog.V(10).InfoS("ParseInt failed", "value", val, "label", ls)
 			return false
 		}
 
@@ -281,16 +286,14 @@ func (r *Requirement) Matches(ls Labels) bool {
 			return false
 		}
 
-		var rValue int64
-		for i := range r.strValues {
-			rValue, err = strconv.ParseInt(r.strValues[i], 10, 64)
-			if err != nil {
-				//nolint:logcheck // Extending the API is not worth it for contextual, structured logging of this.
-				klog.V(10).InfoS("ParseInt failed: for 'Gt', 'Lt' operators, the value must be an integer", "value", r.strValues[i], "requirement", r, "err", err)
-				return false
-			}
+		rValue, ok := new(big.Int).SetString(r.strValues[0], 10)
+		if !ok {
+			//nolint:logcheck // Extending the API is not worth it for contextual, structured logging of this.
+			klog.V(10).InfoS("ParseInt failed: for 'Gt', 'Lt' operators, the value must be an integer", "value", r.strValues[0], "requirement", r)
+			return false
 		}
-		return (r.operator == selection.GreaterThan && lsValue > rValue) || (r.operator == selection.LessThan && lsValue < rValue)
+		cmp := lsValue.Cmp(rValue)
+		return (r.operator == selection.GreaterThan && cmp > 0) || (r.operator == selection.LessThan && cmp < 0)
 	default:
 		return false
 	}
