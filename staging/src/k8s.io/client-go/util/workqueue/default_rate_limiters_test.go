@@ -17,6 +17,7 @@ limitations under the License.
 package workqueue
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -96,6 +97,30 @@ func TestItemExponentialFailureRateLimiterOverFlow(t *testing.T) {
 
 }
 
+func TestTypedItemExponentialFailureRateLimiterBound(t *testing.T) {
+	limiter := NewTypedItemExponentialFailureRateLimiter[string](
+		1*time.Millisecond,
+		1*time.Second,
+	)
+
+	// Fill internal tracking capacity with unique items.
+	for i := 0; i < DefaultMaxFailureEntries; i++ {
+		limiter.When(fmt.Sprintf("item-%d", i))
+	}
+
+	// Existing tracked item should continue exponential behavior.
+	if delay := limiter.When("item-0"); delay != 2*time.Millisecond {
+		t.Errorf("expected 2ms for second failure of item-0, got %v", delay)
+	}
+
+	// A new item when full should always get maxDelay (it cannot be tracked).
+	for i := 0; i < 3; i++ {
+		if delay := limiter.When("overflow-item"); delay != 1*time.Second {
+			t.Errorf("expected maxDelay 1s for overflow-item, got %v", delay)
+		}
+	}
+}
+
 func TestItemFastSlowRateLimiter(t *testing.T) {
 	limiter := NewItemFastSlowRateLimiter(5*time.Millisecond, 10*time.Second, 3)
 
@@ -138,6 +163,36 @@ func TestItemFastSlowRateLimiter(t *testing.T) {
 
 }
 
+func TestTypedItemFastSlowRateLimiterBound(t *testing.T) {
+	limiter := NewTypedItemFastSlowRateLimiter[string](
+		5*time.Millisecond,
+		10*time.Minute,
+		3,
+	)
+
+	// Fill internal tracking capacity with unique items.
+	for i := 0; i < DefaultMaxFailureEntries; i++ {
+		limiter.When(fmt.Sprintf("item-%d", i))
+	}
+
+	// Existing tracked item should transition from fast to slow.
+	if delay := limiter.When("item-0"); delay != 5*time.Millisecond {
+		t.Errorf("expected fastDelay 5ms for second failure of item-0, got %v", delay)
+	}
+	if delay := limiter.When("item-0"); delay != 5*time.Millisecond {
+		t.Errorf("expected fastDelay 5ms for third failure of item-0, got %v", delay)
+	}
+	if delay := limiter.When("item-0"); delay != 10*time.Minute {
+		t.Errorf("expected slowDelay 10m for fourth failure of item-0, got %v", delay)
+	}
+
+	// A new item when full should always get fastDelay (it cannot be tracked).
+	for i := 0; i < 5; i++ {
+		if delay := limiter.When("overflow-item"); delay != 5*time.Millisecond {
+			t.Errorf("expected fastDelay 5ms for overflow-item, got %v", delay)
+		}
+	}
+}
 func TestMaxOfRateLimiter(t *testing.T) {
 	limiter := NewMaxOfRateLimiter(
 		NewItemFastSlowRateLimiter(5*time.Millisecond, 3*time.Second, 3),
