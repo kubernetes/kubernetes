@@ -182,15 +182,8 @@ func isSemver(arg ref.Val) ref.Val {
 	return isSemverNormalize(arg, types.Bool(false))
 }
 func isSemverNormalize(arg ref.Val, normalizeArg ref.Val) ref.Val {
-	str, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	normalize, ok := normalizeArg.Value().(bool)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	str := arg.Value().(string)
+	normalize := normalizeArg.Value().(bool)
 
 	// Using semver/v4 here is okay because this function isn't
 	// used to validate the Kubernetes API. In the CEL base library
@@ -213,15 +206,8 @@ func stringToSemver(arg ref.Val) ref.Val {
 	return stringToSemverNormalize(arg, types.Bool(false))
 }
 func stringToSemverNormalize(arg ref.Val, normalizeArg ref.Val) ref.Val {
-	str, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	normalize, ok := normalizeArg.Value().(bool)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	str := arg.Value().(string)
+	normalize := normalizeArg.Value().(bool)
 
 	// Using semver/v4 here is okay because this function isn't
 	// used to validate the Kubernetes API. In the CEL base library
@@ -243,68 +229,35 @@ func stringToSemverNormalize(arg ref.Val, normalizeArg ref.Val) ref.Val {
 }
 
 func semverMajor(arg ref.Val) ref.Val {
-	v, ok := arg.Value().(semver.Version)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	v := arg.Value().(semver.Version)
 	return types.Int(v.Major)
 }
 
 func semverMinor(arg ref.Val) ref.Val {
-	v, ok := arg.Value().(semver.Version)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	v := arg.Value().(semver.Version)
 	return types.Int(v.Minor)
 }
 
 func semverPatch(arg ref.Val) ref.Val {
-	v, ok := arg.Value().(semver.Version)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	v := arg.Value().(semver.Version)
 	return types.Int(v.Patch)
 }
 
 func semverIsGreaterThan(arg ref.Val, other ref.Val) ref.Val {
-	v, ok := arg.Value().(semver.Version)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	v2, ok := other.Value().(semver.Version)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	v := arg.Value().(semver.Version)
+	v2 := other.Value().(semver.Version)
 	return types.Bool(v.Compare(v2) == 1)
 }
 
 func semverIsLessThan(arg ref.Val, other ref.Val) ref.Val {
-	v, ok := arg.Value().(semver.Version)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	v2, ok := other.Value().(semver.Version)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	v := arg.Value().(semver.Version)
+	v2 := other.Value().(semver.Version)
 	return types.Bool(v.Compare(v2) == -1)
 }
 
 func semverCompareTo(arg ref.Val, other ref.Val) ref.Val {
-	v, ok := arg.Value().(semver.Version)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	v2, ok := other.Value().(semver.Version)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	v := arg.Value().(semver.Version)
+	v2 := other.Value().(semver.Version)
 	return types.Int(v.Compare(v2))
 }
 

@@ -80,10 +80,7 @@ func escapeKey(k string) string {
 }
 
 func escape(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	s := arg.Value().(string)
 	escaped := escapeKey(s)
 	return types.String(escaped)
 }
