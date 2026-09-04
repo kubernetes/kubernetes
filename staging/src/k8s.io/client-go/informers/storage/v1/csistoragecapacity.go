@@ -116,7 +116,7 @@ func NewCSIStorageCapacityInformerWithOptions(client kubernetes.Interface, names
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedCSIStorageCapacityInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) CSIStorageCapacityIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1", Resource: "csistoragecapacitys"}
+	gvr := schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1", Resource: "csistoragecapacities"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apistoragev1.CSIStorageCapacity](cache.NewSharedIndexInformerWithOptions(
