@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -2081,6 +2082,50 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 			if errs := ValidateCSIDriverUpdate(new, &old); len(errs) == 0 {
 				t.Errorf("Expected failure for test: %+v", new)
 			}
+		})
+	}
+}
+
+// TestCSIDriverAttachRequiredFieldPath pins the field path reported for
+// spec.attachRequired. Both call sites used to report "spec.attachedRequired",
+// which is not a field in the API; TestCSIDriverValidation and
+// TestCSIDriverValidationUpdate only assert whether an error was returned, so
+// nothing caught it.
+func TestCSIDriverAttachRequiredFieldPath(t *testing.T) {
+	driver := func(attachRequired *bool) *storage.CSIDriver {
+		return &storage.CSIDriver{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-driver", ResourceVersion: "1"},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired:                attachRequired,
+				PodInfoOnMount:                ptr.To(false),
+				StorageCapacity:               ptr.To(true),
+				SELinuxMount:                  ptr.To(false),
+				PreventPodSchedulingIfMissing: ptr.To(false),
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+		errs field.ErrorList
+	}{{
+		name: "immutable on update",
+		errs: ValidateCSIDriverUpdate(driver(ptr.To(true)), driver(ptr.To(false))),
+	}, {
+		name: "required on create",
+		errs: ValidateCSIDriver(driver(nil)),
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var got []string
+			for _, err := range test.errs {
+				got = append(got, err.Field)
+				if err.Field == "spec.attachRequired" {
+					return
+				}
+			}
+			t.Errorf("no error on spec.attachRequired, got errors on %v", got)
 		})
 	}
 }
