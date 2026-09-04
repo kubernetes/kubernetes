@@ -33,6 +33,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2478,4 +2479,499 @@ func TestLifecycleAllocatePod(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- Socket-level endpoint lifecycle tests ---
+//
+// The tests below exercise PluginConnected / PluginDisconnected at the
+// socket-path level, bypassing real gRPC connections. They use
+// fakeDevicePluginAPI (a minimal pluginapi.DevicePluginClient) and operate
+// directly on the manager's endpointStore to verify connect/disconnect
+// semantics, race conditions, and endpoint identity.
+
+// fakeDevicePluginAPI satisfies pluginapi.DevicePluginClient enough for
+// ManagerImpl.PluginConnected to capture device-plugin options without a
+// real gRPC connection. PluginConnected only calls GetDevicePluginOptions
+// before storing the endpoint; the other methods are not exercised by the
+// manager's connect/disconnect paths and so are left to the embedded nil
+// interface to panic if a future change starts calling them — that panic
+// is intentional, a signal that the test needs updating.
+type fakeDevicePluginAPI struct {
+	pluginapi.DevicePluginClient
+	opts           *pluginapi.DevicePluginOptions
+	allocateCalled int
+}
+
+func (f *fakeDevicePluginAPI) GetDevicePluginOptions(_ context.Context, _ *pluginapi.Empty, _ ...grpc.CallOption) (*pluginapi.DevicePluginOptions, error) {
+	return f.opts, nil
+}
+
+func (f *fakeDevicePluginAPI) Allocate(_ context.Context, _ *pluginapi.AllocateRequest, _ ...grpc.CallOption) (*pluginapi.AllocateResponse, error) {
+	f.allocateCalled++
+	return &pluginapi.AllocateResponse{
+		ContainerResponses: []*pluginapi.ContainerAllocateResponse{{}},
+	}, nil
+}
+
+// fakeDevicePlugin is a minimal plugin.DevicePlugin that the manager treats
+// as a device-plugin handle. Each test owns its own fakes so identity
+// comparisons (api pointer equality) are meaningful.
+type fakeDevicePlugin struct {
+	api      pluginapi.DevicePluginClient
+	resource string
+	socket   string
+}
+
+func (f *fakeDevicePlugin) API() pluginapi.DevicePluginClient { return f.api }
+func (f *fakeDevicePlugin) Resource() string                  { return f.resource }
+func (f *fakeDevicePlugin) SocketPath() string                { return f.socket }
+
+func newFakeDevicePlugin(resource, socket string) *fakeDevicePlugin {
+	return &fakeDevicePlugin{
+		api:      &fakeDevicePluginAPI{opts: &pluginapi.DevicePluginOptions{}},
+		resource: resource,
+		socket:   socket,
+	}
+}
+
+// newSameSocketTestManager builds a ManagerImpl in the same way the existing
+// TestEndpointSyncOnDisconnect does (real mutex / endpointStore behavior),
+// but parameterised so each same-socket test gets a fresh scratch directory.
+func newSameSocketTestManager(t *testing.T) (*ManagerImpl, func()) {
+	t.Helper()
+	logger, _ := ktesting.NewTestContext(t)
+	socketDir, socketName, _, err := tmpSocketDir()
+	require.NoError(t, err)
+	manager, err := newManagerImpl(logger, socketName, nil, nil)
+	require.NoError(t, err)
+	cleanup := func() {
+		if err := os.RemoveAll(socketDir); err != nil {
+			logger.Error(err, "unable to remove socket directory", "dir", socketDir)
+		}
+	}
+	return manager, cleanup
+}
+
+// makeEndpointAt is the hand-rolled endpointImpl helper that the plan calls
+// for — mirrors the construction inside TestEndpointSyncOnDisconnect so the
+// PluginDisconnected path operates on a real endpointImpl whose socketPath()
+// returns the expected value.
+func makeEndpointAt(resourceName, socketPath string) *endpointImpl {
+	return &endpointImpl{
+		resourceName: resourceName,
+		socket:       socketPath,
+	}
+}
+
+// installEndpoint atomically populates both the primary endpoints map and
+// the per-endpoint store for one (resource, socket) pair, matching what
+// PluginConnected would do without exercising the connect path.
+func installEndpoint(m *ManagerImpl, resourceName string, ep *endpointImpl) {
+	info := endpointInfo{e: ep, opts: &pluginapi.DevicePluginOptions{}}
+	m.endpoints[resourceName] = info
+	if m.endpointStore[resourceName] == nil {
+		m.endpointStore[resourceName] = map[string]*endpointInfo{}
+	}
+	m.endpointStore[resourceName][ep.socketPath()] = &endpointInfo{e: ep, opts: info.opts}
+}
+
+// TestPluginConnected_SameResourceSameSocketRejected verifies that a second
+// PluginConnected for the same (resource, socket) is rejected without mutating
+// the existing endpoint state.
+func TestPluginConnectedSameResourceSameSocketRejected(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+	p1 := newFakeDevicePlugin(resourceName, socketA)
+	p2 := newFakeDevicePlugin(resourceName, socketA)
+
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p1),
+		"first PluginConnected for (resource, socketA) must succeed")
+
+	err := manager.PluginConnected(tCtx, resourceName, p2)
+	require.Error(t, err, "second PluginConnected at the same socket must be rejected")
+	require.Contains(t, err.Error(), "device plugin already connected",
+		"rejection error must use the documented prefix from manager.go")
+	require.Contains(t, err.Error(), socketA,
+		"rejection error must include the offending socket path")
+
+	require.Len(t, manager.endpointStore[resourceName], 1,
+		"endpointStore must still contain exactly one entry after rejection")
+	stored, ok := manager.endpointStore[resourceName][socketA]
+	require.True(t, ok, "stored entry must be at socketA")
+	storedImpl, ok := stored.e.(*endpointImpl)
+	require.True(t, ok, "stored endpoint must be *endpointImpl")
+	require.Same(t, p1.api, storedImpl.api,
+		"first endpoint's api pointer must survive the rejected second register")
+	primaryImpl, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.Same(t, p1.api, primaryImpl.api,
+		"primary m.endpoints slot must also still reference the first endpoint")
+}
+
+// TestPluginConnected_SameResourceDifferentSocketsCoexist verifies that two
+// endpoints for the same resource at different socket paths can coexist.
+func TestPluginConnectedSameResourceDifferentSocketsCoexist(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+	const socketB = "/var/lib/kubelet/plugins/socketB.sock"
+	pA := newFakeDevicePlugin(resourceName, socketA)
+	pB := newFakeDevicePlugin(resourceName, socketB)
+
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, pA))
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, pB),
+		"two endpoints at different socket paths for the same resource must coexist")
+
+	require.Len(t, manager.endpointStore[resourceName], 2,
+		"endpointStore must record both endpoints")
+	require.Contains(t, manager.endpointStore[resourceName], socketA)
+	require.Contains(t, manager.endpointStore[resourceName], socketB)
+
+	// The manager does not promise which sibling is the primary when more
+	// than one is registered — Go map iteration order is unspecified
+	// (manager.go's promote-survivor branch in PluginDisconnected), and
+	// PluginConnected's last-write-wins is an implementation detail that
+	// callers must not depend on. Assert only that the primary is one of
+	// the two registered plugins.
+	primaryImpl, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.True(t, primaryImpl.api == pA.api || primaryImpl.api == pB.api,
+		"primary endpoint must be one of the two registered plugins")
+}
+
+// TestPluginDisconnected_WrongSocketIsNoop verifies that PluginDisconnected
+// for a non-matching or unknown socket path does not mutate any state.
+func TestPluginDisconnectedWrongSocketIsNoop(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+	const socketB = "/var/lib/kubelet/plugins/socketB.sock"
+	ep := makeEndpointAt(resourceName, socketA)
+	installEndpoint(manager, resourceName, ep)
+	manager.healthyDevices[resourceName] = sets.New("dev1", "dev2")
+
+	manager.PluginDisconnected(logger, resourceName, socketB)
+
+	require.Len(t, manager.endpointStore[resourceName], 1,
+		"PluginDisconnected for a non-matching socket must not remove the existing entry")
+	require.Contains(t, manager.endpointStore[resourceName], socketA,
+		"existing socketA entry must survive")
+	require.True(t, manager.endpoints[resourceName].e.(*endpointImpl).stopTime.IsZero(),
+		"a no-op disconnect must not call setStopTime on the surviving endpoint")
+	require.Equal(t, 2, manager.healthyDevices[resourceName].Len(),
+		"healthy devices must remain healthy when no endpoint actually disconnected")
+
+	// Also exercise the resourceName-unknown branch.
+	manager.PluginDisconnected(logger, "unknown.com/resource", socketA)
+	require.Len(t, manager.endpointStore[resourceName], 1,
+		"PluginDisconnected for an unknown resource must not touch unrelated state")
+}
+
+// TestPluginDisconnected_PromotesSurvivor verifies that when one of multiple
+// endpoints for a resource disconnects, an arbitrary survivor is promoted to
+// the primary slot and healthy devices remain healthy. Three endpoints are
+// registered so the promote loop genuinely chooses among more than one
+// candidate; epA and epC are then disconnected, leaving epB as the sole
+// deterministic survivor that must end up in m.endpoints.
+func TestPluginDisconnectedPromotesSurvivor(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+	const socketB = "/var/lib/kubelet/plugins/socketB.sock"
+	const socketC = "/var/lib/kubelet/plugins/socketC.sock"
+	epA := makeEndpointAt(resourceName, socketA)
+	epB := makeEndpointAt(resourceName, socketB)
+	epC := makeEndpointAt(resourceName, socketC)
+	installEndpoint(manager, resourceName, epA)
+	installEndpoint(manager, resourceName, epB)
+	installEndpoint(manager, resourceName, epC)
+	// installEndpoint sets the primary to whichever was inserted last; pin
+	// the primary to epA so the test specifically removes the primary and
+	// observes a survivor being promoted into m.endpoints.
+	manager.endpoints[resourceName] = endpointInfo{e: epA, opts: &pluginapi.DevicePluginOptions{}}
+	manager.healthyDevices[resourceName] = sets.New("dev1")
+
+	// Disconnect the primary epA. With epB and epC still registered the
+	// promoted survivor is arbitrary (map iteration order is unspecified),
+	// so only assert it is one of the two remaining siblings.
+	manager.PluginDisconnected(logger, resourceName, socketA)
+
+	require.Len(t, manager.endpointStore[resourceName], 2,
+		"only the disconnected endpoint must be removed from endpointStore")
+	require.NotContains(t, manager.endpointStore[resourceName], socketA,
+		"socketA must be gone")
+	require.Contains(t, manager.endpointStore[resourceName], socketB,
+		"the surviving sibling at socketB must remain in endpointStore")
+	require.Contains(t, manager.endpointStore[resourceName], socketC,
+		"the surviving sibling at socketC must remain in endpointStore")
+	primaryAfterFirst, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.Contains(t, []string{socketB, socketC}, primaryAfterFirst.socketPath(),
+		"the promoted primary must be one of the two remaining siblings")
+	require.False(t, epA.stopTime.IsZero(),
+		"the removed endpoint must have setStopTime called")
+
+	// Now disconnect epC as well, leaving epB as the only remaining endpoint.
+	// The promote loop has a single candidate, so epB is deterministically
+	// the survivor chosen for m.endpoints.
+	manager.PluginDisconnected(logger, resourceName, socketC)
+
+	require.Len(t, manager.endpointStore[resourceName], 1,
+		"epB must be the only endpoint left in endpointStore")
+	require.Contains(t, manager.endpointStore[resourceName], socketB,
+		"epB at socketB must remain in endpointStore")
+	primary, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.Equal(t, socketB, primary.socketPath(),
+		"epB must be the survivor promoted into m.endpoints")
+	require.Equal(t, 1, manager.healthyDevices[resourceName].Len(),
+		"healthy devices must stay healthy when this was NOT the last endpoint")
+	require.False(t, epC.stopTime.IsZero(),
+		"the removed endpoint must have setStopTime called")
+}
+
+// TestPluginDisconnected_LastEndpointMarksUnhealthy verifies that when the
+// last endpoint for a resource disconnects, all its devices are marked
+// unhealthy and the resource is removed from endpointStore.
+func TestPluginDisconnectedLastEndpointMarksUnhealthy(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+	ep := makeEndpointAt(resourceName, socketA)
+	installEndpoint(manager, resourceName, ep)
+	manager.healthyDevices[resourceName] = sets.New("dev1", "dev2")
+
+	manager.PluginDisconnected(logger, resourceName, socketA)
+
+	require.NotContains(t, manager.endpointStore, resourceName,
+		"the resource entry must be fully removed from endpointStore on last disconnect")
+	require.Equal(t, 0, manager.healthyDevices[resourceName].Len(),
+		"markResourceUnhealthy must zero healthyDevices on last disconnect")
+	require.Equal(t, 2, manager.unhealthyDevices[resourceName].Len(),
+		"markResourceUnhealthy must migrate the previously healthy IDs into unhealthyDevices")
+	require.False(t, ep.stopTime.IsZero(),
+		"setStopTime must have been called on the removed endpoint")
+}
+
+// TestSameSocketRace_LateDisconnectAfterReconnect verifies that a stale
+// PluginDisconnected callback for an old endpoint evicts a fresh endpoint
+// that reused the same socket path. This is current behavior, but it is not
+// the best practice to reuse socket paths. It is also a recoverable
+// state as ListAndWatch will fail and the plugin will be reconnecting.
+func TestSameSocketRaceLateDisconnectAfterReconnect(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+
+	// Step 1: register e1 at socketA via the real connect path.
+	p1 := newFakeDevicePlugin(resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p1))
+	manager.healthyDevices[resourceName] = sets.New("dev1")
+
+	// Step 2: disconnect e1 — this is the last endpoint so the resource
+	// transitions to unhealthy and the resource key is removed from
+	// endpointStore.
+	manager.PluginDisconnected(logger, resourceName, socketA)
+	require.NotContains(t, manager.endpointStore, resourceName,
+		"after disconnecting the only endpoint, the resource key must be gone")
+
+	// Step 3: register e2 at the same socketA — the store is empty for
+	// this socket so the connect succeeds.
+	p2 := newFakeDevicePlugin(resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p2),
+		"reconnecting at the same socket after a clean disconnect must succeed")
+
+	// e2's connect doesn't repopulate healthyDevices on its own (that
+	// would normally come from the device plugin's ListAndWatch stream).
+	// Repopulate it so the assertion below ("devices remain healthy")
+	// has something to observe.
+	manager.healthyDevices[resourceName] = sets.New("dev1")
+
+	// Step 4: a *second*, late PluginDisconnected for socketA arrives —
+	// this is the stale callback for e1 from the kubelet plugin server.
+	// Snapshot state, fire the callback, and assert what happens.
+	primaryBefore, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.Same(t, p2.api, primaryBefore.api,
+		"sanity: e2 must be the primary endpoint before the late callback")
+
+	manager.PluginDisconnected(logger, resourceName, socketA)
+
+	// this is mostly for documentation purposes. Plugin will be rediscovered if
+	// socket stays open. And it is also not the best practice to reuse socket path.
+	require.NotContains(t, manager.endpointStore, resourceName,
+		"current behavior: late disconnect callback keyed on socket path evicts the fresh endpoint (I4 regression risk)")
+	require.Equal(t, 0, manager.healthyDevices[resourceName].Len(),
+		"current behavior: late callback also drives the resource unhealthy because it counts as the last-endpoint disconnect")
+}
+
+// TestSameSocketRace_DisconnectBeforeReconnectAttempt verifies that a connect
+// attempt at an occupied socket is rejected, but succeeds after the old
+// endpoint disconnects — the expected recovery path.
+func TestSameSocketRaceDisconnectBeforeReconnectAttempt(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+
+	p1 := newFakeDevicePlugin(resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p1))
+
+	// Attempt to reconnect WITHOUT first disconnecting — must be rejected.
+	p2 := newFakeDevicePlugin(resourceName, socketA)
+	err := manager.PluginConnected(tCtx, resourceName, p2)
+	require.Error(t, err, "second connect without an intervening disconnect must be rejected")
+	require.Contains(t, err.Error(), "device plugin already connected",
+		"rejection error must match the documented prefix")
+
+	// Sanity: the rejected register must not corrupt state.
+	stored, ok := manager.endpointStore[resourceName][socketA]
+	require.True(t, ok)
+	require.Same(t, p1.api, stored.e.(*endpointImpl).api,
+		"rejected register must leave the original endpoint untouched")
+
+	// Now disconnect the original endpoint and try again — must succeed.
+	manager.PluginDisconnected(logger, resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p2),
+		"after disconnect, reconnect at the same socket must succeed")
+
+	primary, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.Same(t, p2.api, primary.api,
+		"the fresh p2 endpoint must be installed as the primary after a clean reconnect")
+}
+
+// TestSameSocketRace_FastTakeoverMayResultInInfiniteRetries emulates a fast
+// socket takeover: plugin1 triggers registration, but by the time its
+// Connect() dials the socket, plugin2 is already listening there. Plugin1's
+// PluginConnected succeeds first (it connected to plugin2's server). When
+// plugin2 then tries to register itself at the same (resourceName,
+// socketPath), it is rejected — the duplicate check in PluginConnected
+// prevents two endpoints from coexisting at the same socket path.
+//
+// This is not ideal behaviour: plugin2 is the rightful owner of the socket,
+// yet it cannot register. Plugin1 holds the endpointStore slot and runs
+// ListAndWatch against plugin2's gRPC server — which is alive and serving —
+// so plugin1's stream never breaks and PluginDisconnected is never called to
+// clear the slot. Plugin2's retries will be rejected indefinitely. Recovery
+// requires plugin2 to restart its gRPC server (which severs plugin1's stream,
+// triggering disconnect and clearing the slot) or external intervention
+// (e.g. kubelet restart).
+//
+// This corrupted state is otherwise silent. PluginConnected logs every
+// rejection with the incumbent's stopped flag so it is detectable from kubelet
+// logs — see TestPluginConnectedDuplicateRejectionIsDetectable.
+func TestSameSocketRaceFastTakeoverMayResultInInfiniteRetries(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+
+	// p1 represents plugin1 whose dial connected to plugin2's server
+	// (fast takeover — plugin2 took over the socket before plugin1 dialed).
+	p1 := newFakeDevicePlugin(resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p1))
+
+	// p2 represents plugin2 — the rightful owner of the socket — trying to
+	// register. It is rejected because p1 already occupies that slot.
+	p2 := newFakeDevicePlugin(resourceName, socketA)
+	err := manager.PluginConnected(tCtx, resourceName, p2)
+	require.Error(t, err, "plugin2 is rejected even though it owns the socket")
+	require.Contains(t, err.Error(), "device plugin already connected")
+
+	// Simulate plugin2 retrying registration — it keeps failing because
+	// plugin1's entry is never cleared (its ListAndWatch stream is alive).
+	for retry := range 3 {
+		p2Retry := newFakeDevicePlugin(resourceName, socketA)
+		err = manager.PluginConnected(tCtx, resourceName, p2Retry)
+		require.Error(t, err, "retry %d: plugin2 still cannot register", retry)
+		require.Contains(t, err.Error(), "device plugin already connected")
+	}
+
+	// Plugin1's stale registration remains — this is the problematic state.
+	require.Len(t, manager.endpointStore[resourceName], 1)
+	stored := manager.endpointStore[resourceName][socketA]
+	require.Same(t, p1.api, stored.e.(*endpointImpl).api,
+		"plugin1's stale endpoint persists; plugin2 cannot take over")
+
+	// Verify that Allocate calls go to plugin1's API — which in the real
+	// scenario is plugin2's gRPC server (since plugin1's dial connected
+	// to plugin2's listener). The kubelet thinks it's talking to plugin1,
+	// but the RPC actually reaches plugin2.
+	p1API := p1.api.(*fakeDevicePluginAPI)
+	p2API := p2.api.(*fakeDevicePluginAPI)
+	ep := stored.e.(*endpointImpl)
+	resp, err := ep.allocate(tCtx, []string{"dev1"})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, 1, p1API.allocateCalled,
+		"Allocate must reach plugin1's API (which is really plugin2's server in the real race)")
+	require.Equal(t, 0, p2API.allocateCalled,
+		"plugin2's own API is never called — it was never registered")
+}
+
+// TestPluginConnectedDuplicateRejectionIsDetectable verifies that the manager
+// makes the otherwise-silent same-socket corrupted state observable: when a
+// registration is rejected because the (resourceName, socketPath) slot is
+// already occupied, PluginConnected logs the rejection along with whether the
+// incumbent endpoint is already stopped. This is the detection signal that
+// answers the review question — without it the stuck fast-takeover state
+// (plugin retrying registration forever against a live incumbent) leaves no
+// trace in kubelet logs.
+func TestPluginConnectedDuplicateRejectionIsDetectable(t *testing.T) {
+	// A buffering logger lets the test read back what the manager logged and
+	// assert the corrupted state is observable. The manager retrieves this
+	// logger via klog.FromContext(tCtx).
+	tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+	logger := tCtx.Logger()
+	underlier, ok := logger.GetSink().(ktesting.Underlier)
+	require.True(t, ok, "expected a ktesting LogSink to capture emitted logs, got %T", logger.GetSink())
+
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+
+	// The incumbent is live (never disconnected) — this is the stuck-takeover
+	// shape where the rejection would otherwise be invisible.
+	p1 := newFakeDevicePlugin(resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p1))
+
+	p2 := newFakeDevicePlugin(resourceName, socketA)
+	err := manager.PluginConnected(tCtx, resourceName, p2)
+	require.Error(t, err, "second connect at the occupied socket must be rejected")
+
+	logs := underlier.GetBuffer().String()
+	require.Contains(t, logs, "possible same-socket race",
+		"the rejection must be logged so the corrupted state is detectable from kubelet logs")
+	require.Contains(t, logs, socketA,
+		"the detection log must name the contended socket path")
+	require.Contains(t, logs, "incumbentStopped",
+		"the detection log must report whether the incumbent endpoint is already draining")
+	require.Contains(t, logs, "incumbentStopped=false",
+		"a live incumbent (the stuck-takeover shape) must be reported as not stopped")
 }
