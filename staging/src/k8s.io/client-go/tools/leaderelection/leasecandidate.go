@@ -175,8 +175,7 @@ func (c *LeaseCandidate) enqueueLease() {
 	c.queue.Add(0)
 }
 
-// ensureLease creates the lease if it does not exist and renew it if it exists. Returns the lease and
-// a bool (true if this call created the lease), or any error that occurs.
+// ensureLease creates the lease if it does not exist and renews it if it exists.
 func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 	lease, err := c.leaseCandidateLister.LeaseCandidates(c.namespace).Get(c.name)
@@ -189,17 +188,15 @@ func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 		}
 		logger.V(2).Info("Created lease candidate")
 		return nil
-	} else if err != nil {
+	}
+	if err != nil {
 		return err
 	}
 	logger.V(2).Info("Lease candidate exists. Renewing.")
 	clone := lease.DeepCopy()
 	clone.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
 	_, err = c.leaseClient.Update(ctx, clone, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (c *LeaseCandidate) newLeaseCandidate() *v1beta1.LeaseCandidate {
