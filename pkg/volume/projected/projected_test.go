@@ -17,6 +17,7 @@ limitations under the License.
 package projected
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clitesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	pkgauthenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	pkgcorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -53,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/ptr"
 )
+
 
 func TestCollectDataWithSecret(t *testing.T) {
 	caseMappingMode := int32(0400)
@@ -2081,6 +2084,211 @@ func TestCollectDataWithPodCertificate(t *testing.T) {
 		})
 	}
 }
+
+// TestCollectDataPathCollisionWarning verifies that collectData emits a klog
+// warning when two projected sources produce the same output path.  The test
+// covers secret, configMap, and downwardAPI source types and additionally
+// asserts last-write-wins payload semantics are preserved.
+func TestCollectDataPathCollisionWarning(t *testing.T) {
+	testNamespace := "test_projected_namespace"
+	testPodUID := types.UID("test_pod_uid")
+	defaultMode := int32(0644)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: testNamespace,
+			UID:       testPodUID,
+			Annotations: map[string]string{
+				"shared-annotation": "annotation-value-2",
+			},
+		},
+	}
+
+	cases := []struct {
+		name        string
+		source      *v1.ProjectedVolumeSource
+		client      func() clientset.Interface
+		plugin      func(host volume.VolumeHost) *projectedPlugin
+		pod         *v1.Pod
+		wantKey     string
+		wantData    []byte
+		wantWarning string
+	}{
+		{
+			name: "secret-secret collision",
+			source: &v1.ProjectedVolumeSource{
+				DefaultMode: &defaultMode,
+				Sources: []v1.VolumeProjection{
+					{Secret: &v1.SecretProjection{LocalObjectReference: v1.LocalObjectReference{Name: "first-secret"}}},
+					{Secret: &v1.SecretProjection{LocalObjectReference: v1.LocalObjectReference{Name: "second-secret"}}},
+				},
+			},
+			client: func() clientset.Interface {
+				return fake.NewSimpleClientset(
+					&v1.Secret{
+						ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: "first-secret"},
+						Data:       map[string][]byte{"shared-key": []byte("first-value")},
+					},
+					&v1.Secret{
+						ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: "second-secret"},
+						Data:       map[string][]byte{"shared-key": []byte("second-value")},
+					},
+				)
+			},
+			plugin: func(host volume.VolumeHost) *projectedPlugin {
+				return &projectedPlugin{host: host, getSecret: host.GetSecretFunc()}
+			},
+			pod:         pod,
+			wantKey:     "shared-key",
+			wantData:    []byte("second-value"),
+			wantWarning: `overwrites a path projected by an earlier source`,
+		},
+		{
+			name: "configMap-configMap collision",
+			source: &v1.ProjectedVolumeSource{
+				DefaultMode: &defaultMode,
+				Sources: []v1.VolumeProjection{
+					{ConfigMap: &v1.ConfigMapProjection{LocalObjectReference: v1.LocalObjectReference{Name: "first-cm"}}},
+					{ConfigMap: &v1.ConfigMapProjection{LocalObjectReference: v1.LocalObjectReference{Name: "second-cm"}}},
+				},
+			},
+			client: func() clientset.Interface {
+				return fake.NewSimpleClientset(
+					&v1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: "first-cm"},
+						Data:       map[string]string{"shared-key": "cm-first-value"},
+					},
+					&v1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: "second-cm"},
+						Data:       map[string]string{"shared-key": "cm-second-value"},
+					},
+				)
+			},
+			plugin: func(host volume.VolumeHost) *projectedPlugin {
+				return &projectedPlugin{host: host, getConfigMap: host.GetConfigMapFunc()}
+			},
+			pod:         pod,
+			wantKey:     "shared-key",
+			wantData:    []byte("cm-second-value"),
+			wantWarning: `overwrites a path projected by an earlier source`,
+		},
+		{
+			name: "downwardAPI-downwardAPI collision",
+			source: &v1.ProjectedVolumeSource{
+				DefaultMode: &defaultMode,
+				Sources: []v1.VolumeProjection{
+					{
+						DownwardAPI: &v1.DownwardAPIProjection{
+							Items: []v1.DownwardAPIVolumeFile{
+								{Path: "shared-path", FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.name"}},
+							},
+						},
+					},
+					{
+						DownwardAPI: &v1.DownwardAPIProjection{
+							Items: []v1.DownwardAPIVolumeFile{
+								{Path: "shared-path", FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.namespace"}},
+							},
+						},
+					},
+				},
+			},
+			client: func() clientset.Interface { return fake.NewSimpleClientset() },
+			plugin: func(host volume.VolumeHost) *projectedPlugin {
+				return &projectedPlugin{host: host}
+			},
+			pod:         pod,
+			wantKey:     "shared-path",
+			wantData:    []byte(testNamespace), // second downwardAPI item (namespace) wins
+			wantWarning: `overwrites a path projected by an earlier source`,
+		},
+		{
+			name: "secret-serviceAccountToken collision",
+			source: &v1.ProjectedVolumeSource{
+				DefaultMode: &defaultMode,
+				Sources: []v1.VolumeProjection{
+					{Secret: &v1.SecretProjection{LocalObjectReference: v1.LocalObjectReference{Name: "first-secret"}}},
+					{ServiceAccountToken: &v1.ServiceAccountTokenProjection{Path: "token"}},
+				},
+			},
+			client: func() clientset.Interface {
+				client := fake.NewSimpleClientset(
+					&v1.Secret{
+						ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: "first-secret"},
+						Data:       map[string][]byte{"token": []byte("secret-token-value")},
+					},
+				)
+				client.AddReactor("create", "serviceaccounts", clitesting.ReactionFunc(func(action clitesting.Action) (bool, runtime.Object, error) {
+					tr := action.(clitesting.CreateAction).GetObject().(*authenticationv1.TokenRequest)
+					tr.Status.Token = "jwt-token-value"
+					return true, tr, nil
+				}))
+				return client
+			},
+			plugin: func(host volume.VolumeHost) *projectedPlugin {
+				return &projectedPlugin{
+					host:                   host,
+					getSecret:              host.GetSecretFunc(),
+					getServiceAccountToken: host.GetServiceAccountTokenFunc(),
+				}
+			},
+			pod:         pod,
+			wantKey:     "token",
+			wantData:    []byte("jwt-token-value"),
+			wantWarning: `overwrites a path projected by an earlier source`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := tc.client()
+			tempDir, host := newTestHost(t, client)
+			defer os.RemoveAll(tempDir)
+
+			myVolumeMounter := projectedVolumeMounter{
+				projectedVolume: &projectedVolume{
+					sources: tc.source.Sources,
+					podUID:  tc.pod.UID,
+					plugin:  tc.plugin(host),
+				},
+				source: *tc.source,
+				pod:    tc.pod,
+			}
+
+			// Capture klog output to assert the warning fires.
+			var buf bytes.Buffer
+			klog.SetOutput(&buf)
+			klog.LogToStderr(false)
+			defer klog.LogToStderr(true)
+
+			payload, err := myVolumeMounter.collectData(volume.MounterArgs{})
+
+			klog.Flush()
+			klog.SetOutput(&bytes.Buffer{}) // stop further writes into buf
+			captured := buf.String()
+
+			if err != nil {
+				t.Fatalf("collectData() unexpected error: %v", err)
+			}
+
+			// Assert warning was actually logged.
+			if !strings.Contains(captured, tc.wantWarning) {
+				t.Errorf("expected warning %q in klog output, got:\n%s", tc.wantWarning, captured)
+			}
+
+			// Assert last-write-wins semantics: the later source's value is in the payload.
+			got, ok := payload[tc.wantKey]
+			if !ok {
+				t.Fatalf("payload missing expected key %q", tc.wantKey)
+			}
+			if string(got.Data) != string(tc.wantData) {
+				t.Errorf("payload[%q] = %q, want %q", tc.wantKey, got.Data, tc.wantData)
+			}
+		})
+	}
+}
+
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
 	tempDir, err := os.MkdirTemp("", "projected_volume_test.")
