@@ -25,6 +25,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -34,6 +35,25 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 
 	if kc.CgroupsPerQOS {
 		klog.Warningf(message, "CgroupsPerQOS", "--cgroups-per-qos", kc.CgroupsPerQOS)
+	}
+
+	// Inode-based eviction signals cannot be enforced on Windows (NTFS has no POSIX
+	// inodes and winstats.GetDirFsInfo reports no inode counters); reject them
+	// explicitly instead of silently accepting a threshold that can never fire.
+	for _, signal := range []evictionapi.Signal{
+		evictionapi.SignalNodeFsInodesFree,
+		evictionapi.SignalImageFsInodesFree,
+		evictionapi.SignalContainerFsInodesFree,
+	} {
+		if _, ok := kc.EvictionHard[string(signal)]; ok {
+			return fmt.Errorf("invalid configuration: %s is not supported on Windows", signal)
+		}
+		if _, ok := kc.EvictionSoft[string(signal)]; ok {
+			return fmt.Errorf("invalid configuration: %s is not supported on Windows", signal)
+		}
+		if _, ok := kc.EvictionMinimumReclaim[string(signal)]; ok {
+			return fmt.Errorf("invalid configuration: %s is not supported on Windows", signal)
+		}
 	}
 
 	if kc.SingleProcessOOMKill != nil {
