@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -817,7 +818,7 @@ func (al *Allocators) updateNodePorts(after After, before Before, nodePortOp *po
 		}
 		nodePort := ServiceNodePort{Protocol: servicePort.Protocol, NodePort: servicePort.NodePort}
 		if nodePort.NodePort != 0 {
-			if !containsNumber(oldNodePortsNumbers, int(nodePort.NodePort)) && !portAllocated[int(nodePort.NodePort)] {
+			if !slices.Contains(oldNodePortsNumbers, int(nodePort.NodePort)) && !portAllocated[int(nodePort.NodePort)] {
 				err := nodePortOp.Allocate(int(nodePort.NodePort))
 				if err != nil {
 					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort.NodePort, err.Error())}
@@ -836,7 +837,7 @@ func (al *Allocators) updateNodePorts(after After, before Before, nodePortOp *po
 			servicePort.NodePort = int32(nodePortNumber)
 			nodePort.NodePort = servicePort.NodePort
 		}
-		if containsNodePort(newNodePorts, nodePort) {
+		if slices.Contains(newNodePorts, nodePort) {
 			return fmt.Errorf("duplicate nodePort: %v", nodePort)
 		}
 		newNodePorts = append(newNodePorts, nodePort)
@@ -847,7 +848,7 @@ func (al *Allocators) updateNodePorts(after After, before Before, nodePortOp *po
 	// The comparison loops are O(N^2), but we don't expect N to be huge
 	// (there's a hard-limit at 2^16, because they're ports; and even 4 ports would be a lot)
 	for _, oldNodePortNumber := range oldNodePortsNumbers {
-		if containsNumber(newNodePortsNumbers, oldNodePortNumber) {
+		if slices.Contains(newNodePortsNumbers, oldNodePortNumber) {
 			continue
 		}
 		nodePortOp.ReleaseDeferred(int(oldNodePortNumber))
@@ -934,28 +935,6 @@ func (al *Allocators) Destroy() {
 	for _, a := range al.serviceIPAllocatorsByFamily {
 		a.Destroy()
 	}
-}
-
-// This is O(N), but we expect haystack to be small;
-// so small that we expect a linear search to be faster
-func containsNumber(haystack []int, needle int) bool {
-	for _, v := range haystack {
-		if v == needle {
-			return true
-		}
-	}
-	return false
-}
-
-// This is O(N), but we expect serviceNodePorts to be small;
-// so small that we expect a linear search to be faster
-func containsNodePort(serviceNodePorts []ServiceNodePort, serviceNodePort ServiceNodePort) bool {
-	for _, snp := range serviceNodePorts {
-		if snp == serviceNodePort {
-			return true
-		}
-	}
-	return false
 }
 
 // Loop through the service ports list, find one with the same port number and
