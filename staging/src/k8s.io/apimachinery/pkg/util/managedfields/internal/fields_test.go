@@ -58,7 +58,7 @@ func TestFieldsToSetError(t *testing.T) {
 			fields: *metav1.NewFieldsV1(
 				`{"k:{invalid json}":{"f:name":{},".":{}}}`,
 			),
-			errString: "ReadObjectCB",
+			errString: "json:",
 		},
 	}
 
