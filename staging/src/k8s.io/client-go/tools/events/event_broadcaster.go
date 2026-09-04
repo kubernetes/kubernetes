@@ -72,6 +72,11 @@ type eventBroadcasterImpl struct {
 	sleepDuration time.Duration
 	sink          EventSink
 
+	// housekeepingMu serializes refreshExistingEventSeries and finishSeries
+	// so their API calls for the same event cannot interleave.
+	// It must be acquired before mu and is not used by recordToSink.
+	housekeepingMu sync.Mutex
+
 	// startMu guards started and cancel.
 	startMu sync.Mutex
 	started bool
@@ -137,17 +142,47 @@ func (e *eventBroadcasterImpl) Shutdown() {
 
 // refreshExistingEventSeries refresh events TTL
 func (e *eventBroadcasterImpl) refreshExistingEventSeries(ctx context.Context) {
-	// TODO: Investigate whether lock contention won't be a problem
+	e.housekeepingMu.Lock()
+	defer e.housekeepingMu.Unlock()
 	e.mu.Lock()
-	defer e.mu.Unlock()
+	toRefresh := make([]eventKey, 0, len(e.eventCache))
 	for isomorphicKey, event := range e.eventCache {
 		if event.Series != nil {
-			if recordedEvent, retry := recordEvent(ctx, e.sink, event); !retry {
-				if recordedEvent != nil {
-					e.eventCache[isomorphicKey] = recordedEvent
-				}
-			}
+			toRefresh = append(toRefresh, isomorphicKey)
 		}
+	}
+	e.mu.Unlock()
+
+	for _, key := range toRefresh {
+		// Deep-copy the event just before recording it, so the API call
+		// carries the most recent observations without holding the lock
+		// during the call.
+		e.mu.Lock()
+		cachedEvent, ok := e.eventCache[key]
+		if !ok || cachedEvent.Series == nil {
+			e.mu.Unlock()
+			continue
+		}
+		event := cachedEvent.DeepCopy()
+		e.mu.Unlock()
+
+		recordedEvent, retry := recordEvent(ctx, e.sink, event)
+		if retry || recordedEvent == nil || recordedEvent.Series == nil {
+			continue
+		}
+		e.mu.Lock()
+		// The cached event may have been updated, finished, or replaced by a
+		// new isomorphic series while the lock was released. Compare the
+		// event identity so only an entry that still belongs to the same
+		// series is refreshed, and keep the most recent observations.
+		if cachedEvent, ok := e.eventCache[key]; ok && cachedEvent.Name == event.Name && cachedEvent.Series != nil {
+			if cachedEvent.Series.Count > recordedEvent.Series.Count {
+				recordedEvent.Series.Count = cachedEvent.Series.Count
+				recordedEvent.Series.LastObservedTime = cachedEvent.Series.LastObservedTime
+			}
+			e.eventCache[key] = recordedEvent
+		}
+		e.mu.Unlock()
 	}
 }
 
@@ -155,19 +190,48 @@ func (e *eventBroadcasterImpl) refreshExistingEventSeries(ctx context.Context) {
 // - write final count to the apiserver
 // - delete a singleton event (i.e. series field is nil) from the cache
 func (e *eventBroadcasterImpl) finishSeries(ctx context.Context) {
-	// TODO: Investigate whether lock contention won't be a problem
+	e.housekeepingMu.Lock()
+	defer e.housekeepingMu.Unlock()
 	e.mu.Lock()
-	defer e.mu.Unlock()
+	toFinish := make([]eventKey, 0, len(e.eventCache))
 	for isomorphicKey, event := range e.eventCache {
 		eventSerie := event.Series
 		if eventSerie != nil {
 			if eventSerie.LastObservedTime.Time.Before(time.Now().Add(-finishTime)) {
-				if _, retry := recordEvent(ctx, e.sink, event); !retry {
-					delete(e.eventCache, isomorphicKey)
-				}
+				toFinish = append(toFinish, isomorphicKey)
 			}
 		} else if event.EventTime.Time.Before(time.Now().Add(-finishTime)) {
 			delete(e.eventCache, isomorphicKey)
+		}
+	}
+	e.mu.Unlock()
+
+	for _, key := range toFinish {
+		// Deep-copy the event just before recording it, so the final count
+		// is as recent as possible without holding the lock during the call.
+		e.mu.Lock()
+		cachedEvent, ok := e.eventCache[key]
+		if !ok || cachedEvent.Series == nil ||
+			!cachedEvent.Series.LastObservedTime.Time.Before(time.Now().Add(-finishTime)) {
+			// The entry was removed, replaced by a singleton event, or the
+			// series was observed again while the lock was released.
+			e.mu.Unlock()
+			continue
+		}
+		event := cachedEvent.DeepCopy()
+		e.mu.Unlock()
+
+		if _, retry := recordEvent(ctx, e.sink, event); !retry {
+			e.mu.Lock()
+			// The cached event may have been replaced by a new isomorphic
+			// series while the lock was released. Compare the event identity
+			// and only delete an entry that still belongs to the same series
+			// and was not observed again, otherwise keep aggregating it.
+			if cachedEvent, ok := e.eventCache[key]; ok && cachedEvent.Name == event.Name &&
+				cachedEvent.Series != nil && cachedEvent.Series.Count <= event.Series.Count {
+				delete(e.eventCache, key)
+			}
+			e.mu.Unlock()
 		}
 	}
 }
