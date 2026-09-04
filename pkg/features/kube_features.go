@@ -776,13 +776,6 @@ const (
 	// Enables the DeclaredFeatures API in the NodeStatus, populated by the Kubelet. Also enables the scheduler filter using DeclaredFeatures.
 	NodeDeclaredFeatures featuregate.Feature = "NodeDeclaredFeatures"
 
-	// owner: @kerthcet
-	// kep: https://kep.k8s.io/3094
-	//
-	// Allow users to specify whether to take nodeAffinity/nodeTaint into consideration when
-	// calculating pod topology spread skew.
-	NodeInclusionPolicyInPodTopologySpread featuregate.Feature = "NodeInclusionPolicyInPodTopologySpread"
-
 	// owner: @rthallisey
 	// kep: https://kep.k8s.io/5683
 	//
@@ -1841,12 +1834,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
-	NodeInclusionPolicyInPodTopologySpread: {
-		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	NodeLifecycleConditions: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2677,8 +2664,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	NodeControllerLeaseCircuitBreaker: {featuregate.Feature(clientfeatures.AtomicFIFO)},
 
 	NodeDeclaredFeatures: {},
-
-	NodeInclusionPolicyInPodTopologySpread: {},
 
 	NodeLifecycleConditions: {},
 
