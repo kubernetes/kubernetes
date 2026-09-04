@@ -3459,6 +3459,54 @@ func TestReasonAndFldPath(t *testing.T) {
 	}
 }
 
+func TestValidationErrorsForPropertiesAreDeterministic(t *testing.T) {
+	properties := map[string]schema.Structural{
+		"alpha":   withRuleMessageAndMessageExpression(stringType, `self == "ok"`, "alpha must be ok", ""),
+		"bravo":   withRuleMessageAndMessageExpression(stringType, `self == "ok"`, "bravo must be ok", ""),
+		"charlie": withRuleMessageAndMessageExpression(stringType, `self == "ok"`, "charlie must be ok", ""),
+		"delta":   withRuleMessageAndMessageExpression(stringType, `self == "ok"`, "delta must be ok", ""),
+		"echo":    withRuleMessageAndMessageExpression(stringType, `self == "ok"`, "echo must be ok", ""),
+		"foxtrot": withRuleMessageAndMessageExpression(stringType, `self == "ok"`, "foxtrot must be ok", ""),
+		"golf":    withRuleMessageAndMessageExpression(stringType, `self == "ok"`, "golf must be ok", ""),
+		"hotel":   withRuleMessageAndMessageExpression(stringType, `self == "ok"`, "hotel must be ok", ""),
+	}
+	s := objectType(properties)
+	celValidator := NewValidator(&s, false, celconfig.PerCallLimit)
+	require.NotNil(t, celValidator)
+
+	obj := map[string]interface{}{
+		"alpha":   "bad",
+		"bravo":   "bad",
+		"charlie": "bad",
+		"delta":   "bad",
+		"echo":    "bad",
+		"foxtrot": "bad",
+		"golf":    "bad",
+		"hotel":   "bad",
+	}
+	expectedFields := []string{
+		"root.alpha",
+		"root.bravo",
+		"root.charlie",
+		"root.delta",
+		"root.echo",
+		"root.foxtrot",
+		"root.golf",
+		"root.hotel",
+	}
+
+	for i := range 100 {
+		errs, _ := celValidator.Validate(context.TODO(), field.NewPath("root"), &s, obj, nil, celconfig.RuntimeCELCostBudget)
+		require.Len(t, errs, len(expectedFields))
+
+		fields := make([]string, 0, len(errs))
+		for _, err := range errs {
+			fields = append(fields, err.Field)
+		}
+		require.Equal(t, expectedFields, fields, "iteration %d", i)
+	}
+}
+
 func TestValidateFieldPath(t *testing.T) {
 	sts := schema.Structural{
 		Generic: schema.Generic{
