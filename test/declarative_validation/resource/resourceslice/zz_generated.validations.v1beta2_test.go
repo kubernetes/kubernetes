@@ -110,6 +110,7 @@ func init() {
 			"spec.partitionTypeAttribute": {
 				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
 			},
 			"spec.sharedCounters": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},

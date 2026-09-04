@@ -298,6 +298,16 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
 					},
 				},
+				"invalid: partitionTypeAttribute name too long": {
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakPartitionTypeAttribute(resource.FullyQualifiedName("gpu.example.com/"+strings.Repeat("a", 33))),
+					),
+					enablePartitionTypeAttr: true,
+					expectedErrs: field.ErrorList{
+						field.TooLong(field.NewPath("spec", "partitionTypeAttribute"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name"),
+					},
+				},
 				// A bare name is a valid attribute key but not a valid reference:
 				// the domain is required so the attribute is unambiguous.
 				"invalid: partitionTypeAttribute without domain": {

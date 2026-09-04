@@ -83,9 +83,11 @@ func init() {
 			},
 			"spec.devices.constraints[*].distinctAttribute": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
 			},
 			"spec.devices.constraints[*].matchAttribute": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
 			},
 			"spec.devices.constraints[*].requests": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -111,6 +113,7 @@ func init() {
 			"spec.devices.requests[*].derivedAttributes[*].name": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
 				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
 			},
 			"spec.devices.requests[*].firstAvailable": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -130,6 +133,7 @@ func init() {
 			"spec.devices.requests[*].firstAvailable[*].derivedAttributes[*].name": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
 				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
 			},
 			"spec.devices.requests[*].firstAvailable[*].deviceClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
@@ -199,6 +203,7 @@ func init() {
 			"status.allocation.devices.results[*].pool": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-pool-name"},
 				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-pool-name"},
 			},
 			"status.allocation.devices.results[*].shareID": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-uuid"},

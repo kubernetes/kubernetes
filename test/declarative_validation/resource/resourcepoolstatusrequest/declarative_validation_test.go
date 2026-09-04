@@ -74,6 +74,11 @@ func TestDeclarativeValidate(t *testing.T) {
 			input:        mkValidRPSR(setPoolName("invalid pool!")),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "poolName"), nil, "").WithOrigin("format=k8s-resource-pool-name")},
 		},
+		"pool name too long": {
+			// +k8s:format=k8s-resource-pool-name (standard DV)
+			input:        mkValidRPSR(setPoolName(strings.Repeat("a", 126) + "/" + strings.Repeat("b", 127))),
+			expectedErrs: field.ErrorList{field.TooLong(field.NewPath("spec", "poolName"), "", 253).WithOrigin("format=k8s-resource-pool-name")},
+		},
 		"valid partitionTypeAttribute": {
 			// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
 			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
@@ -88,6 +93,14 @@ func TestDeclarativeValidate(t *testing.T) {
 			}),
 			enablePartitionTypeAttr: true,
 			expectedErrs:            field.ErrorList{field.Invalid(field.NewPath("spec", "defaultPartitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
+		},
+		"partitionTypeAttribute name too long": {
+			// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
+			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
+				r.Spec.DefaultPartitionTypeAttribute = new("gpu.example.com/" + strings.Repeat("a", 33))
+			}),
+			enablePartitionTypeAttr: true,
+			expectedErrs:            field.ErrorList{field.TooLong(field.NewPath("spec", "defaultPartitionTypeAttribute"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name")},
 		},
 		"partitionTypeAttribute without domain": {
 			// A bare name is a valid attribute key but not a valid reference:
@@ -249,6 +262,16 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 				s.Pools = []resource.PoolStatus{pool}
 			})),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("poolName"), nil, "").WithOrigin("format=k8s-resource-pool-name")},
+		},
+		"pool poolName too long": {
+			// +k8s:format=k8s-resource-pool-name (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PoolName = strings.Repeat("a", 126) + "/" + strings.Repeat("b", 127)
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.TooLong(field.NewPath("status", "pools").Index(0).Child("poolName"), "", 253).WithOrigin("format=k8s-resource-pool-name")},
 		},
 		"pool nil optional fields valid": {
 			// Device count fields are optional (may be unset when validationError is set)
