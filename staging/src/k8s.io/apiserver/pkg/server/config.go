@@ -1051,6 +1051,8 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
 	}
 
+	handler = genericapifilters.WithStreamingCollectionEncoding(handler, streamingCollectionNegotiationSerializer())
+
 	handler = filterlatency.TrackCompleted(handler)
 	if c.FeatureGate.Enabled(genericfeatures.ConstrainedImpersonation) {
 		handler = impersonation.WithConstrainedImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
