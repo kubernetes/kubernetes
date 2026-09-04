@@ -357,11 +357,12 @@ func TestPullWithSecrets(t *testing.T) {
 			t.Fatal("failed to setup an file pull records accessor")
 		}
 
-		const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
+		const intentsRecordsCacheSize, preloadedRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 100, 10
 		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
 			logger,
 			fsRecordAccessor,
 			intentsRecordsCacheSize,
+			preloadedRecordsCacheSize,
 			pulledRecordsCacheSize,
 			stripedLocksSetSize,
 		)
@@ -449,11 +450,12 @@ func TestPullWithSecretsWithError(t *testing.T) {
 				t.Fatal("failed to setup an file pull records accessor")
 			}
 
-			const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
+			const intentsRecordsCacheSize, preloadedRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 100, 10
 			memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
 				logger,
 				fsRecordAccessor,
 				intentsRecordsCacheSize,
+				preloadedRecordsCacheSize,
 				pulledRecordsCacheSize,
 				stripedLocksSetSize,
 			)

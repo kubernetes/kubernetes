@@ -41,6 +41,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&SerializedNodeConfigSource{},
 		&CredentialProviderConfig{},
 		&ImagePullIntent{},
+		&ImagePreloadedRecord{},
 		&ImagePulledRecord{},
 	)
 	return nil

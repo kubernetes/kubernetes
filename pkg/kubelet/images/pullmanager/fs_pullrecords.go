@@ -49,8 +49,9 @@ var _ PullRecordsAccessor = &fsPullRecordsAccessor{}
 // fsPullRecordsAccessor uses the filesystem to read/write ImagePullIntent/ImagePulledRecord
 // records.
 type fsPullRecordsAccessor struct {
-	pullingDir string
-	pulledDir  string
+	pullingDir   string
+	preloadedDir string
+	pulledDir    string
 
 	encoder runtime.Encoder
 	decoder runtime.Decoder
@@ -65,8 +66,9 @@ func NewFSPullRecordsAccessor(logger klog.Logger, kubeletDir string) (PullRecord
 	}
 
 	accessor := &fsPullRecordsAccessor{
-		pullingDir: filepath.Join(kubeletDir, "image_manager", "pulling"),
-		pulledDir:  filepath.Join(kubeletDir, "image_manager", "pulled"),
+		pullingDir:   filepath.Join(kubeletDir, "image_manager", "pulling"),
+		preloadedDir: filepath.Join(kubeletDir, "image_manager", "observed-preloaded"),
+		pulledDir:    filepath.Join(kubeletDir, "image_manager", "pulled"),
 
 		encoder: kubeletConfigEncoder,
 		decoder: kubeletConfigDecoder,
@@ -76,12 +78,16 @@ func NewFSPullRecordsAccessor(logger klog.Logger, kubeletDir string) (PullRecord
 		return nil, err
 	}
 
+	if err := os.MkdirAll(accessor.preloadedDir, 0700); err != nil {
+		return nil, err
+	}
+
 	if err := os.MkdirAll(accessor.pulledDir, 0700); err != nil {
 		return nil, err
 	}
 
 	accessor.recordsVersionMigration(logger)
-	return NewMeteringRecordsAccessor(accessor, fsPullIntentsSize, fsPulledRecordsSize), nil
+	return NewMeteringRecordsAccessor(accessor, fsPullIntentsSize, fsPreloadedRecordsSize, fsPulledRecordsSize), nil
 }
 
 func (f *fsPullRecordsAccessor) recordsVersionMigration(logger klog.Logger) {
@@ -100,6 +106,22 @@ func (f *fsPullRecordsAccessor) recordsVersionMigration(logger klog.Logger) {
 		})
 	if err != nil {
 		logger.Error(err, "Error migrating image pull intents")
+	}
+	err = processDirFiles(f.preloadedDir,
+		func(filePath string, fileContent []byte) error {
+			preloadedRecord, isCurrentVersion, err := decodePreloadedRecord(f.decoder, fileContent)
+			if err != nil {
+				return fmt.Errorf("failed to decode ImagePreloadedRecord from file %q: %w", filePath, err)
+			}
+			if !isCurrentVersion {
+				if err := f.WriteImagePreloadedRecord(logger, preloadedRecord); err != nil {
+					return fmt.Errorf("failed to migrate ImagePreloadedRecord for image ref %q to the current version: %w", preloadedRecord.ImageRef, err)
+				}
+			}
+			return nil
+		})
+	if err != nil {
+		logger.Error(err, "Error migrating image preloaded records")
 	}
 	err = processDirFiles(f.pulledDir,
 		func(filePath string, fileContent []byte) error {
@@ -174,6 +196,84 @@ func (f *fsPullRecordsAccessor) DeleteImagePullIntent(logger klog.Logger, image 
 	return err
 }
 
+func (f *fsPullRecordsAccessor) GetImagePreloadedRecord(imageRef string) (*kubeletconfiginternal.ImagePreloadedRecord, error) {
+	recordBytes, err := os.ReadFile(filepath.Join(f.preloadedDir, cacheFilename(imageRef)))
+	if os.IsNotExist(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	preloadedRecord, _, err := decodePreloadedRecord(f.decoder, recordBytes)
+	if err != nil {
+		return nil, err
+	}
+	if preloadedRecord.ImageRef != imageRef {
+		return nil, nil
+	}
+	return preloadedRecord, nil
+}
+
+func (f *fsPullRecordsAccessor) ListImagePreloadedRecords() ([]*kubeletconfiginternal.ImagePreloadedRecord, error) {
+	var preloadedRecords []*kubeletconfiginternal.ImagePreloadedRecord
+	err := processDirFiles(f.preloadedDir,
+		func(filePath string, fileContent []byte) error {
+			preloadedRecord, _, err := decodePreloadedRecord(f.decoder, fileContent)
+			if err != nil {
+				return fmt.Errorf("failed to deserialize content of file %q into ImagePreloadedRecord: %w", filePath, err)
+			}
+			preloadedRecords = append(preloadedRecords, preloadedRecord)
+			return nil
+		})
+
+	return preloadedRecords, err
+}
+
+func (f *fsPullRecordsAccessor) WriteImagePreloadedRecord(logger klog.Logger, record *kubeletconfiginternal.ImagePreloadedRecord) error {
+	recordBytes := bytes.NewBuffer([]byte{})
+	if err := f.encoder.Encode(record, recordBytes); err != nil {
+		return fmt.Errorf("failed to serialize ImagePreloadedRecord: %w", err)
+	}
+
+	return writeFile(f.preloadedDir, cacheFilename(record.ImageRef), recordBytes.Bytes())
+}
+
+func (f *fsPullRecordsAccessor) DeleteImagePreloadedRecordObservedImage(logger klog.Logger, imageName, imageRef string) error {
+	sanitizedImage, err := trimImageTagDigest(imageName)
+	if err != nil {
+		return fmt.Errorf("invalid image name %q: %w", imageName, err)
+	}
+
+	record, err := f.GetImagePreloadedRecord(imageRef)
+	if err != nil {
+		return err
+	}
+	if record == nil {
+		return nil
+	}
+
+	if _, ok := record.ObservedImages[sanitizedImage]; !ok {
+		return nil
+	}
+	delete(record.ObservedImages, sanitizedImage)
+
+	// only the requested image name was observed for this imageRef, so the
+	// whole record can be removed
+	if len(record.ObservedImages) == 0 {
+		return f.DeleteImagePreloadedRecord(logger, imageRef)
+	}
+
+	return f.WriteImagePreloadedRecord(logger, record)
+}
+
+func (f *fsPullRecordsAccessor) DeleteImagePreloadedRecord(logger klog.Logger, imageRef string) error {
+	err := os.Remove(filepath.Join(f.preloadedDir, cacheFilename(imageRef)))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
+}
+
 func (f *fsPullRecordsAccessor) GetImagePulledRecord(imageRef string) (*kubeletconfiginternal.ImagePulledRecord, bool, error) {
 	recordBytes, err := os.ReadFile(filepath.Join(f.pulledDir, cacheFilename(imageRef)))
 	if os.IsNotExist(err) {
@@ -230,6 +330,14 @@ func (f *fsPullRecordsAccessor) intentsSize() (uint, error) {
 		return 0, err
 	}
 	return intentsCount, nil
+}
+
+func (f *fsPullRecordsAccessor) preloadedRecordsSize() (uint, error) {
+	preloadedRecordsCount, err := countCacheFiles(f.preloadedDir)
+	if err != nil {
+		return 0, err
+	}
+	return preloadedRecordsCount, nil
 }
 
 func (f *fsPullRecordsAccessor) pulledRecordsSize() (uint, error) {
@@ -401,6 +509,21 @@ func decodeIntent(d runtime.Decoder, objBytes []byte) (*kubeletconfiginternal.Im
 
 	isLatestVersion := gvk.Version == encodeVersion.Version
 	return intentObj, isLatestVersion, nil
+}
+
+func decodePreloadedRecord(d runtime.Decoder, objBytes []byte) (*kubeletconfiginternal.ImagePreloadedRecord, bool, error) {
+	obj, gvk, err := d.Decode(objBytes, nil, nil)
+	if err != nil {
+		return nil, false, err
+	}
+
+	preloadedRecord, ok := obj.(*kubeletconfiginternal.ImagePreloadedRecord)
+	if !ok {
+		return nil, false, fmt.Errorf("failed to convert object to *ImagePreloadedRecord: %T", obj)
+	}
+
+	isLatestVersion := gvk.Version == encodeVersion.Version
+	return preloadedRecord, isLatestVersion, nil
 }
 
 // decodePulledRecord decodes the pulled record and converts it to the internal API version.

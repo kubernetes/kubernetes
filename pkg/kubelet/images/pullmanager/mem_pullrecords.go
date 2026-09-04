@@ -94,12 +94,15 @@ type cachedPullRecordsAccessor struct {
 
 	intentsLocks       *StripedLockSet
 	intents            *lruCache[string, kubeletconfiginternal.ImagePullIntent]
+	preloadedLocks     *StripedLockSet
+	preloadedRecords   *lruCache[string, kubeletconfiginternal.ImagePreloadedRecord]
 	pulledRecordsLocks *StripedLockSet
 	pulledRecords      *lruCache[string, kubeletconfiginternal.ImagePulledRecord]
 }
 
-func NewCachedPullRecordsAccessor(logger klog.Logger, delegate PullRecordsAccessor, intentsCacheSize, pulledRecordsCacheSize, stripedLocksSize int32) PullRecordsAccessor {
+func NewCachedPullRecordsAccessor(logger klog.Logger, delegate PullRecordsAccessor, intentsCacheSize, preloadedRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSize int32) PullRecordsAccessor {
 	intentsCacheSize = min(intentsCacheSize, 1024)
+	preloadedRecordsCacheSize = min(preloadedRecordsCacheSize, 512)
 	pulledRecordsCacheSize = min(pulledRecordsCacheSize, 2000)
 
 	c := &cachedPullRecordsAccessor{
@@ -107,6 +110,8 @@ func NewCachedPullRecordsAccessor(logger klog.Logger, delegate PullRecordsAccess
 
 		intentsLocks:       NewStripedLockSet(stripedLocksSize),
 		intents:            newLRUCache[string, kubeletconfiginternal.ImagePullIntent](int(intentsCacheSize)),
+		preloadedLocks:     NewStripedLockSet(stripedLocksSize),
+		preloadedRecords:   newLRUCache[string, kubeletconfiginternal.ImagePreloadedRecord](int(preloadedRecordsCacheSize)),
 		pulledRecordsLocks: NewStripedLockSet(stripedLocksSize),
 		pulledRecords:      newLRUCache[string, kubeletconfiginternal.ImagePulledRecord](int(pulledRecordsCacheSize)),
 	}
@@ -115,11 +120,15 @@ func NewCachedPullRecordsAccessor(logger klog.Logger, delegate PullRecordsAccess
 	if err != nil {
 		logger.Info("there was an error initializing the image pull intents cache, the cache will work in a non-authoritative mode until the intents are listed successfully", "error", err)
 	}
+	_, err = c.ListImagePreloadedRecords()
+	if err != nil {
+		logger.Info("there was an error initializing the image preloaded records cache, the cache will work in a non-authoritative mode until the preloaded records are listed successfully", "error", err)
+	}
 	_, err = c.ListImagePulledRecords()
 	if err != nil {
 		logger.Info("there was an error initializing the image pulled records cache, the cache will work in a non-authoritative mode until the pulled records are listed successfully", "error", err)
 	}
-	return NewMeteringRecordsAccessor(c, inMemIntentsPercent, inMemPulledRecordsPercent)
+	return NewMeteringRecordsAccessor(c, inMemIntentsPercent, inMemPreloadedRecordsPercent, inMemPulledRecordsPercent)
 }
 
 func (c *cachedPullRecordsAccessor) ListImagePullIntents() ([]*kubeletconfiginternal.ImagePullIntent, error) {
@@ -182,6 +191,93 @@ func (c *cachedPullRecordsAccessor) DeleteImagePullIntent(logger klog.Logger, im
 		return err
 	}
 	c.intents.Delete(image)
+	return nil
+}
+
+func (c *cachedPullRecordsAccessor) ListImagePreloadedRecords() ([]*kubeletconfiginternal.ImagePreloadedRecord, error) {
+	return cacheRefreshingList(
+		c.preloadedRecords,
+		c.preloadedLocks,
+		c.delegate.ListImagePreloadedRecords,
+		preloadedRecordToCacheKey,
+	)
+}
+
+func (c *cachedPullRecordsAccessor) GetImagePreloadedRecord(imageRef string) (*kubeletconfiginternal.ImagePreloadedRecord, error) {
+	// do the cheap Get() lock-free
+	preloadedRecord, exists := c.preloadedRecords.Get(imageRef)
+	if exists {
+		return preloadedRecord, nil
+	}
+
+	// on a miss, lock on the imageRef
+	c.preloadedLocks.Lock(imageRef)
+	defer c.preloadedLocks.Unlock(imageRef)
+
+	// check again if the imageRef exists in the cache under imageRef lock
+	preloadedRecord, exists = c.preloadedRecords.Get(imageRef)
+	if exists {
+		return preloadedRecord, nil
+	}
+	// if the cache is authoritative, return false on a miss
+	if c.preloadedRecords.authoritative.Load() {
+		return nil, nil
+	}
+
+	// fall through to the expensive lookup
+	preloadedRecord, err := c.delegate.GetImagePreloadedRecord(imageRef)
+	if err == nil && preloadedRecord != nil {
+		c.preloadedRecords.Set(imageRef, preloadedRecord)
+	}
+	return preloadedRecord, err
+}
+
+func (c *cachedPullRecordsAccessor) WriteImagePreloadedRecord(logger klog.Logger, record *kubeletconfiginternal.ImagePreloadedRecord) error {
+	c.preloadedLocks.Lock(record.ImageRef)
+	defer c.preloadedLocks.Unlock(record.ImageRef)
+
+	if err := c.delegate.WriteImagePreloadedRecord(logger, record); err != nil {
+		return err
+	}
+	c.preloadedRecords.Set(record.ImageRef, record)
+	return nil
+}
+
+func (c *cachedPullRecordsAccessor) DeleteImagePreloadedRecordObservedImage(logger klog.Logger, imageName, imageRef string) error {
+	c.preloadedLocks.Lock(imageRef)
+	defer c.preloadedLocks.Unlock(imageRef)
+
+	sanitizedImage, err := trimImageTagDigest(imageName)
+	if err != nil {
+		return fmt.Errorf("invalid image name %q: %w", imageName, err)
+	}
+
+	if err := c.delegate.DeleteImagePreloadedRecordObservedImage(logger, sanitizedImage, imageRef); err != nil {
+		return err
+	}
+
+	// this should be fine even if non-authoritative - either we don't have the
+	// record loaded, or it should match the underlying storage
+	record, ok := c.preloadedRecords.Get(imageRef)
+	if !ok {
+		return nil
+	}
+	delete(record.ObservedImages, sanitizedImage)
+	if len(record.ObservedImages) == 0 {
+		c.preloadedRecords.Delete(imageRef)
+	}
+
+	return nil
+}
+
+func (c *cachedPullRecordsAccessor) DeleteImagePreloadedRecord(logger klog.Logger, imageRef string) error {
+	c.preloadedLocks.Lock(imageRef)
+	defer c.preloadedLocks.Unlock(imageRef)
+
+	if err := c.delegate.DeleteImagePreloadedRecord(logger, imageRef); err != nil {
+		return err
+	}
+	c.preloadedRecords.Delete(imageRef)
 	return nil
 }
 
@@ -250,6 +346,11 @@ func (c *cachedPullRecordsAccessor) intentsSize() (uint, error) {
 	return uint(intentsUsage), nil
 }
 
+func (c *cachedPullRecordsAccessor) preloadedRecordsSize() (uint, error) {
+	preloadedRecordsUsage := c.preloadedRecords.Len() * 100 / c.preloadedRecords.maxSize
+	return uint(preloadedRecordsUsage), nil
+}
+
 func (c *cachedPullRecordsAccessor) pulledRecordsSize() (uint, error) {
 	pulledRecordsUsage := c.pulledRecords.Len() * 100 / c.pulledRecords.maxSize
 	return uint(pulledRecordsUsage), nil
@@ -293,5 +394,9 @@ func pullIntentToCacheKey(intent *kubeletconfiginternal.ImagePullIntent) string 
 }
 
 func pulledRecordToCacheKey(record *kubeletconfiginternal.ImagePulledRecord) string {
+	return record.ImageRef
+}
+
+func preloadedRecordToCacheKey(record *kubeletconfiginternal.ImagePreloadedRecord) string {
 	return record.ImageRef
 }
