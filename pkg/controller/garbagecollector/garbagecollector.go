@@ -344,6 +344,14 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 		}
 	}
 
+	// Update apiVersion/kind if node from queue is outdated.
+	nodeFromGraph, existsInGraph := gc.dependencyGraphBuilder.uidToNode.Read(n.identity.UID)
+	if existsInGraph && (n.identity.APIVersion != nodeFromGraph.identity.APIVersion || n.identity.Kind != nodeFromGraph.identity.Kind) {
+		n = n.clone()
+		n.identity.APIVersion = nodeFromGraph.identity.APIVersion
+		n.identity.Kind = nodeFromGraph.identity.Kind
+	}
+
 	err := gc.attemptToDeleteItem(ctx, n)
 	if err == enqueuedVirtualDeleteEventErr {
 		// a virtual event was produced and will be handled by processGraphChanges, no need to requeue this node
@@ -360,7 +368,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 			//    have a way to distinguish this from a valid type we will recognize
 			//    after the next discovery sync.
 			// For now, log the error and retry.
-			logger.V(5).Info("error syncing item", "item", n.identity, "err", err)
+			logger.Error(err, "error syncing item", "item", n.identity)
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
 		}
