@@ -2,9 +2,9 @@
 
 module k8s.io/streaming
 
-go 1.26.0
+go 1.27.0
 
-godebug default=go1.26
+godebug default=go1.27
 
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
