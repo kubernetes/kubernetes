@@ -288,69 +288,60 @@ func (c *AvailableConditionController) sync(key string) error {
 
 		attempts := 5
 		results := make(chan error, attempts)
-		for range attempts {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		overallTimeout := time.NewTimer(6 * time.Second)
+		defer overallTimeout.Stop()
+
+		var lastError error
+		launched := 0
+		received := 0
+
+		launchAttempt := func() {
+			launched++
 			go func() {
-				discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, *apiService.Spec.Service.Port)
-				if err != nil {
-					results <- err
-					return
-				}
-				// render legacyAPIService health check path when it is delegated to a service
-				if apiService.Name == "v1." {
-					discoveryURL.Path = "/api/" + apiService.Spec.Version
-				} else {
-					discoveryURL.Path = "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
-				}
-
-				errCh := make(chan error, 1)
-				go func() {
-					// be sure to check a URL that the aggregated API server is required to serve
-					newReq, err := http.NewRequest("GET", discoveryURL.String(), nil)
-					if err != nil {
-						errCh <- err
-						return
-					}
-
-					// setting the system-masters identity ensures that we will always have access rights
-					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", "", []string{"system:masters"}, nil)
-					resp, err := discoveryClient.Do(newReq)
-					if resp != nil {
-						resp.Body.Close()
-						// we should always been in the 200s or 300s
-						if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-							errCh <- fmt.Errorf("bad status from %v: %d", discoveryURL, resp.StatusCode)
-							return
-						}
-					}
-
-					errCh <- err
-				}()
-
-				select {
-				case err = <-errCh:
-					if err != nil {
-						utilnet.CloseIdleConnectionsFor(restTransport)
-						results <- fmt.Errorf("failing or missing response from %v: %w", discoveryURL, err)
-						return
-					}
-
-					// we had trouble with slow dial and DNS responses causing us to wait too long.
-					// we added this as insurance
-				case <-time.After(6 * time.Second):
-					utilnet.CloseIdleConnectionsFor(restTransport)
-					results <- fmt.Errorf("timed out waiting for %v", discoveryURL)
-					return
-				}
-
-				results <- nil
+				results <- c.checkAPIServiceAvailability(ctx, apiService, discoveryClient, restTransport)
 			}()
 		}
 
-		var lastError error
-		for range attempts {
-			lastError = <-results
-			// if we had at least one success, we are successful overall and we can return now
-			if lastError == nil {
+		launchAttempt()
+
+		staggerTimer := time.NewTimer(1 * time.Second)
+		defer staggerTimer.Stop()
+
+		for received < attempts {
+			select {
+			case err := <-results:
+				received++
+				if err == nil {
+					cancel()
+					lastError = nil
+					received = attempts // satisfy the loop condition to exit
+					break
+				}
+				lastError = err
+				if launched < attempts {
+					if !staggerTimer.Stop() {
+						select {
+						case <-staggerTimer.C:
+						default:
+						}
+					}
+					launchAttempt()
+					staggerTimer.Reset(1 * time.Second)
+				}
+			case <-staggerTimer.C:
+				if launched < attempts {
+					launchAttempt()
+					staggerTimer.Reset(1 * time.Second)
+				}
+			case <-overallTimeout.C:
+				cancel()
+				if lastError == nil {
+					lastError = fmt.Errorf("timed out waiting for remote service availability")
+				}
+				received = attempts // satisfy the loop condition to exit
 				break
 			}
 		}
@@ -375,6 +366,53 @@ func (c *AvailableConditionController) sync(key string) error {
 	apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
 	_, err = c.updateAPIServiceStatus(originalAPIService, apiService)
 	return err
+}
+
+func (c *AvailableConditionController) checkAPIServiceAvailability(ctx context.Context, apiService *apiregistrationv1.APIService, discoveryClient *http.Client, restTransport http.RoundTripper) error {
+	discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, *apiService.Spec.Service.Port)
+	if err != nil {
+		return err
+	}
+	// render legacyAPIService health check path when it is delegated to a service
+	if apiService.Name == "v1." {
+		discoveryURL.Path = "/api/" + apiService.Spec.Version
+	} else {
+		discoveryURL.Path = "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
+	}
+
+	newReq, err := http.NewRequestWithContext(ctx, "GET", discoveryURL.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	// setting the system-masters identity ensures that we will always have access rights
+	transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", "", []string{"system:masters"}, nil)
+
+	errCh := make(chan error, 1)
+	go func() {
+		resp, err := discoveryClient.Do(newReq)
+		if resp != nil {
+			resp.Body.Close()
+			// we should always been in the 200s or 300s
+			if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+				errCh <- fmt.Errorf("bad status from %v: %d", discoveryURL, resp.StatusCode)
+				return
+			}
+		}
+		errCh <- err
+	}()
+
+	select {
+	case err = <-errCh:
+		if err != nil {
+			utilnet.CloseIdleConnectionsFor(restTransport)
+			return fmt.Errorf("failing or missing response from %v: %w", discoveryURL, err)
+		}
+		return nil
+	case <-ctx.Done():
+		utilnet.CloseIdleConnectionsFor(restTransport)
+		return ctx.Err()
+	}
 }
 
 func hasAvailableEndpoint(portName string, es ...*discoveryv1.EndpointSlice) bool {
