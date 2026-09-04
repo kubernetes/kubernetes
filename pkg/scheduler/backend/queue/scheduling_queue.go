@@ -121,10 +121,16 @@ type SchedulingQueue interface {
 	// cached by scheduling queue. Normally, incrementing this number whenever
 	// a pod is popped (e.g. called Pop()) is enough.
 	SchedulingCycle() int64
+	// InFlightPod returns the *v1.Pod for the given UID if it is currently in flight.
+	InFlightPod(types.UID) *v1.Pod
 	// Pop removes the head of the queue and returns it. It blocks if the
 	// queue is empty and waits until a new item is added to the queue.
 	Pop(logger klog.Logger) (framework.QueuedEntityInfo, error)
-	// Done must be called for pod returned by Pop. This allows the queue to
+	// DoneSchedulingCycle must be called for a pod when its scheduling cycle finishes (after Permit).
+	// It stops accumulating in-flight cluster events for the pod, but keeps the pod tracked as in-flight
+	// until Done is called at the end of the binding cycle or on failure.
+	DoneSchedulingCycle(types.UID)
+	// Done must be called for pod returned by Pop when processing finishes. This allows the queue to
 	// keep track of which pods are currently being processed.
 	Done(types.UID)
 	Update(ctx context.Context, oldPod, newPod *v1.Pod)
@@ -1088,6 +1094,17 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInf
 		}
 	}()
 
+	// Refresh the pod from inFlightPods if present, which contains the latest version delivered by Update events
+	// while the pod was in-flight (preventing stale informer reads from overwriting concurrent updates).
+	//
+	// TODO: Consider strictly requiring inFlightPod != nil here (and aborting if the pod is no longer in-flight,
+	// e.g. deleted or assigned). That would make queue state management fully strict, but requires auditing all callers
+	// and refactoring synthetic unit tests that invoke AddUnschedulablePodIfNotPresent directly without calling Pop().
+	if inFlightPod := p.activeQ.inFlightPod(pInfo.Pod.UID); inFlightPod != nil {
+		pInfo.PodInfo, _ = framework.NewPodInfo(inFlightPod)
+		pInfo.PodSignature = p.signPod(klog.NewContext(context.Background(), logger), inFlightPod)
+	}
+
 	pod := pInfo.Pod
 	if p.unschedulableEntities.get(pInfo) != nil {
 		return fmt.Errorf("Pod %v is already present in unschedulable queue", klog.KObj(pod))
@@ -1344,10 +1361,22 @@ func (p *PriorityQueue) Pop(logger klog.Logger) (framework.QueuedEntityInfo, err
 	return p.activeQ.pop(logger)
 }
 
-// Done must be called for pod returned by Pop. This allows the queue to
+// DoneSchedulingCycle must be called for a pod when its scheduling cycle finishes (after Permit).
+// It stops accumulating in-flight cluster events for the pod, but keeps the pod tracked as in-flight
+// until Done is called at the end of the binding cycle or on failure.
+func (p *PriorityQueue) DoneSchedulingCycle(pod types.UID) {
+	p.activeQ.doneSchedulingCycle(pod)
+}
+
+// Done must be called for pod returned by Pop when processing finishes. This allows the queue to
 // keep track of which pods are currently being processed.
 func (p *PriorityQueue) Done(pod types.UID) {
 	p.activeQ.done(pod)
+}
+
+// InFlightPod returns the *v1.Pod for the given UID if it is currently in flight.
+func (p *PriorityQueue) InFlightPod(uid types.UID) *v1.Pod {
+	return p.activeQ.inFlightPod(uid)
 }
 
 func (p *PriorityQueue) InFlightPods() []*v1.Pod {
@@ -1387,12 +1416,9 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 	// Locking only the part of Update method is sufficient, because in the other part the entity is in the unschedulableEntities,
 	// which is protected by p.lock anyway.
 	p.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-		// The inflight pod will be requeued using the latest version from the informer cache, which matches what the event delivers.
-		// Record this Pod update because
-		// this update may make the Pod schedulable in case it gets rejected and comes back to the queue.
-		// We can clean it up once we change updatePodInSchedulingQueue to call MoveAllToActiveOrBackoffQueue.
-		// See https://github.com/kubernetes/kubernetes/pull/125578#discussion_r1648338033 for more context.
-		if exists := unlockedActiveQ.addEventsIfPodInFlight(oldPod, newPod, events); exists {
+		if unlockedActiveQ.updateInFlightPod(newPod) {
+			unlockedActiveQ.addEventsIfPodInFlight(oldPod, newPod, events)
+			p.UpdateNominatedPod(logger, oldPod, &framework.PodInfo{Pod: newPod})
 			logger.V(6).Info("The pod doesn't need to be queued for now because it's being scheduled and will be queued back if necessary", "pod", klog.KObj(newPod))
 			updated = true
 			return
@@ -1508,6 +1534,7 @@ func (p *PriorityQueue) deletePodGroupMember(logger klog.Logger, pod *v1.Pod) {
 	if entity == nil {
 		pInfo := p.pendingPodGroupPods.delete(pod)
 		if pInfo == nil {
+			p.activeQ.deleteInFlight(pod.UID)
 			return
 		}
 
@@ -1562,7 +1589,11 @@ func (p *PriorityQueue) deletePod(pod *v1.Pod) {
 		p.unschedulableEntities.delete(pInfoLookup, entity.Gated())
 		// Drop metric for deleted pod.
 		decreaseUnschedulableReasonMetric(entity)
+		return
 	}
+
+	// Check inFlightPods
+	p.activeQ.deleteInFlight(pod.UID)
 }
 
 // AddGenericPodGroup adds a PodGroup or CompositePodGroup object to the queue,
@@ -1878,7 +1909,7 @@ func (p *PriorityQueue) IncompletePodGroupPodsPods() []*v1.Pod {
 	return p.incompletePodGroupPods.list()
 }
 
-// GetPod searches for a pod in the activeQ, backoffQ, and unschedulableEntities.
+// GetPod searches for a pod in the activeQ, backoffQ, unschedulableEntities, and in-flight pods.
 func (p *PriorityQueue) GetPod(name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -1932,6 +1963,9 @@ func (p *PriorityQueue) getPod(podLookup *v1.Pod, unlockedActiveQ unlockedActive
 
 	entity := p.getEntityFromAnyQueue(unlockedActiveQ, entityLookup)
 	if entity == nil {
+		if inFlightPod := unlockedActiveQ.inFlightPodByName(podLookup.Namespace, podLookup.Name); inFlightPod != nil {
+			return newQueuedPodInfoForLookup(inFlightPod)
+		}
 		if !p.isPodGroupMember(podLookup) {
 			return nil
 		}
@@ -1941,6 +1975,9 @@ func (p *PriorityQueue) getPod(podLookup *v1.Pod, unlockedActiveQ unlockedActive
 		if pInfo.Pod.Name == podLookup.Name && pInfo.Pod.Namespace == podLookup.Namespace {
 			return pInfo
 		}
+	}
+	if inFlightPod := unlockedActiveQ.inFlightPodByName(podLookup.Namespace, podLookup.Name); inFlightPod != nil {
+		return newQueuedPodInfoForLookup(inFlightPod)
 	}
 	return nil
 }
