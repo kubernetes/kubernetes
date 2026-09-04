@@ -18,8 +18,10 @@ package plugin
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -470,4 +472,151 @@ func (des *dummyExtrnalSigner) FetchKeys(ctx context.Context, r *externaljwtv1.F
 		DataTimestamp:      des.DataTimeStamp,
 		RefreshHintSeconds: int64(des.refreshHintSeconds),
 	}, nil
+}
+
+// signingBackend is a test signer whose signing behaviour is controlled by signFn.
+// This lets us plug in correct vs. buggy implementations in the same test harness.
+type signingBackend struct {
+	externaljwtv1.UnimplementedExternalJWTSignerServer
+	key    *rsa.PrivateKey
+	keyID  string
+	signFn func(key *rsa.PrivateKey, headerB64, claims string) (string, error)
+}
+
+func (s *signingBackend) Sign(_ context.Context, req *externaljwtv1.SignJWTRequest) (*externaljwtv1.SignJWTResponse, error) {
+	hdr := &headerT{Algorithm: "RS256", KeyID: s.keyID, Type: "JWT"}
+	headerJSON, err := json.Marshal(hdr)
+	if err != nil {
+		return nil, err
+	}
+	headerB64 := base64.RawURLEncoding.EncodeToString(headerJSON)
+	sig, err := s.signFn(s.key, headerB64, req.Claims)
+	if err != nil {
+		return nil, err
+	}
+	return &externaljwtv1.SignJWTResponse{Header: headerB64, Signature: sig}, nil
+}
+
+func (s *signingBackend) FetchKeys(_ context.Context, _ *externaljwtv1.FetchKeysRequest) (*externaljwtv1.FetchKeysResponse, error) {
+	keyBytes, err := x509.MarshalPKIXPublicKey(&s.key.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	return &externaljwtv1.FetchKeysResponse{
+		Keys:               []*externaljwtv1.Key{{KeyId: s.keyID, Key: keyBytes}},
+		RefreshHintSeconds: 10,
+		DataTimestamp:      timestamppb.Now(),
+	}, nil
+}
+
+// correctSign uses req.Claims as-is — it is already base64url-encoded.
+func correctSign(key *rsa.PrivateKey, headerB64, claims string) (string, error) {
+	h := sha256.Sum256([]byte(headerB64 + "." + claims))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, h[:])
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(sig), nil
+}
+
+// doubleEncodedSign re-encodes req.Claims before signing — this is the bug described in
+// https://github.com/kubernetes/kubernetes/issues/141670.
+// The assembled JWT uses the original claims, so the signature covers the wrong bytes.
+func doubleEncodedSign(key *rsa.PrivateKey, headerB64, claims string) (string, error) {
+	reEncoded := base64.RawURLEncoding.EncodeToString([]byte(claims))
+	h := sha256.Sum256([]byte(headerB64 + "." + reEncoded))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, h[:])
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(sig), nil
+}
+
+// TestClaimsEncodingContract verifies that SignJWTRequest.claims must be used as-is.
+// A signer that re-encodes the already-base64url-encoded claims produces a token that
+// passes GenerateToken (no error surfaced) but fails signature verification — the silent
+// failure mode reported in https://github.com/kubernetes/kubernetes/issues/141670.
+func TestClaimsEncodingContract(t *testing.T) {
+	tests := []struct {
+		name      string
+		signFn    func(*rsa.PrivateKey, string, string) (string, error)
+		wantSigOK bool
+	}{
+		{
+			name:      "correct signer: claims used as-is, token verifies",
+			signFn:    correctSign,
+			wantSigOK: true,
+		},
+		{
+			name:      "buggy signer: double-encoded claims, GenerateToken succeeds but signature is invalid",
+			signFn:    doubleEncodedSign,
+			wantSigOK: false,
+		},
+	}
+
+	for i, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			sockname := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("test-claims-encoding-%d-%d.sock", time.Now().Nanosecond(), i))
+
+			backend := &signingBackend{key: rsaKey1, keyID: "key-id-1", signFn: tc.signFn}
+			grpcServer := grpc.NewServer()
+			externaljwtv1.RegisterExternalJWTSignerServer(grpcServer, backend)
+
+			addr := &net.UnixAddr{Name: sockname, Net: "unix"}
+			listener, err := net.ListenUnix(addr.Network(), addr)
+			if err != nil {
+				t.Fatalf("listen: %v", err)
+			}
+			go func() {
+				if err := grpcServer.Serve(listener); err != nil {
+					panic(err)
+				}
+			}()
+			defer grpcServer.Stop()
+
+			conn, err := grpc.DialContext(ctx, sockname,
+				grpc.WithContextDialer(func(ctx context.Context, path string) (net.Conn, error) {
+					return (&net.Dialer{}).DialContext(ctx, "unix", path)
+				}),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+			)
+			if err != nil {
+				t.Fatalf("dial: %v", err)
+			}
+			defer conn.Close()
+
+			plugin := newPlugin("test-issuer", conn, false)
+			if err := plugin.keyCache.initialFill(ctx); err != nil {
+				t.Fatalf("initialFill: %v", err)
+			}
+
+			// GenerateToken never verifies the signature — it succeeds for both correct
+			// and buggy signers. The bug is invisible at this layer.
+			token, err := plugin.GenerateToken(ctx, &jwt.Claims{Subject: "test-sa"}, &privateClaimsT{})
+			if err != nil {
+				t.Fatalf("GenerateToken: %v", err)
+			}
+
+			// Verify the assembled token's signature the same way a JWT verifier would.
+			parts := strings.Split(token, ".")
+			if len(parts) != 3 {
+				t.Fatalf("malformed token: %d parts", len(parts))
+			}
+			signingInput := parts[0] + "." + parts[1]
+			sigBytes, err := base64.RawURLEncoding.DecodeString(parts[2])
+			if err != nil {
+				t.Fatalf("decode sig: %v", err)
+			}
+			h := sha256.Sum256([]byte(signingInput))
+			verifyErr := rsa.VerifyPKCS1v15(&rsaKey1.PublicKey, crypto.SHA256, h[:], sigBytes)
+
+			if tc.wantSigOK && verifyErr != nil {
+				t.Errorf("expected valid signature, got: %v", verifyErr)
+			}
+			if !tc.wantSigOK && verifyErr == nil {
+				t.Error("expected invalid signature (double-encoding bug) but verification passed")
+			}
+		})
+	}
 }
