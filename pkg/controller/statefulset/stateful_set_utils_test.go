@@ -195,6 +195,10 @@ func TestIsMemberOf(t *testing.T) {
 	if isMemberOf(set2, pod) {
 		t.Error("isMemberOf returned false positive")
 	}
+	pod.Name = set.Name + "-01"
+	if isMemberOf(set, pod) {
+		t.Error("isMemberOf returned true for a non-canonical Pod name")
+	}
 }
 
 func TestIdentityMatches(t *testing.T) {
