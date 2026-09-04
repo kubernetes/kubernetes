@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -365,8 +364,7 @@ func TestPodAffinityScoring(t *testing.T) {
 		existingPods []*testutils.PausePodConfig
 		nodes        []*v1.Node
 		// expectedNodeName is the list of node names. The pod should be scheduled on either of them.
-		expectedNodeName               []string
-		enableMatchLabelKeysInAffinity bool
+		expectedNodeName []string
 	}{
 		{
 			name: "pod affinity",
@@ -472,7 +470,7 @@ func TestPodAffinityScoring(t *testing.T) {
 			expectedNodeName: []string{"node1", "node6"},
 		},
 		{
-			name: "anti affinity: matchLabelKeys is merged into LabelSelector with In operator (feature flag: enabled)",
+			name: "anti affinity: matchLabelKeys is merged into LabelSelector with In operator",
 			pod: &testutils.PausePodConfig{
 				Name:      "incoming",
 				Namespace: "ns1",
@@ -520,11 +518,10 @@ func TestPodAffinityScoring(t *testing.T) {
 				st.MakeNode().Name("node1").Label(topologyKey, topologyValues[0]).Obj(),
 				st.MakeNode().Name("node2").Label(topologyKey, topologyValues[1]).Obj(),
 			},
-			expectedNodeName:               []string{"node1"},
-			enableMatchLabelKeysInAffinity: true,
+			expectedNodeName: []string{"node1"},
 		},
 		{
-			name: "anti affinity: mismatchLabelKeys is merged into LabelSelector with NotIn operator  (feature flag: enabled)",
+			name: "anti affinity: mismatchLabelKeys is merged into LabelSelector with NotIn operator",
 			pod: &testutils.PausePodConfig{
 				Name:      "incoming",
 				Namespace: "ns1",
@@ -572,11 +569,10 @@ func TestPodAffinityScoring(t *testing.T) {
 				st.MakeNode().Name("node1").Label(topologyKey, topologyValues[0]).Obj(),
 				st.MakeNode().Name("node2").Label(topologyKey, topologyValues[1]).Obj(),
 			},
-			expectedNodeName:               []string{"node2"},
-			enableMatchLabelKeysInAffinity: true,
+			expectedNodeName: []string{"node2"},
 		},
 		{
-			name: "affinity: matchLabelKeys is merged into LabelSelector with In operator (feature flag: enabled)",
+			name: "affinity: matchLabelKeys is merged into LabelSelector with In operator",
 			pod: &testutils.PausePodConfig{
 				Affinity: &v1.Affinity{
 					PodAffinity: &v1.PodAffinity{
@@ -642,7 +638,6 @@ func TestPodAffinityScoring(t *testing.T) {
 					Labels:    map[string]string{"foo": "", "bar": "a"},
 				},
 			},
-			enableMatchLabelKeysInAffinity: true,
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Label(topologyKey, topologyValues[0]).Obj(),
 				st.MakeNode().Name("node2").Label(topologyKey, topologyValues[1]).Obj(),
@@ -654,7 +649,7 @@ func TestPodAffinityScoring(t *testing.T) {
 			expectedNodeName: []string{"node3", "node6"},
 		},
 		{
-			name: "affinity: mismatchLabelKeys is merged into LabelSelector with NotIn operator (feature flag: enabled)",
+			name: "affinity: mismatchLabelKeys is merged into LabelSelector with NotIn operator",
 			pod: &testutils.PausePodConfig{
 				Affinity: &v1.Affinity{
 					PodAffinity: &v1.PodAffinity{
@@ -720,7 +715,6 @@ func TestPodAffinityScoring(t *testing.T) {
 					Labels:    map[string]string{"foo": "", "bar": "hoge"},
 				},
 			},
-			enableMatchLabelKeysInAffinity: true,
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Label(topologyKey, topologyValues[0]).Obj(),
 				st.MakeNode().Name("node2").Label(topologyKey, topologyValues[1]).Obj(),
@@ -735,18 +729,8 @@ func TestPodAffinityScoring(t *testing.T) {
 
 	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
 		for _, tt := range tests {
-			if !tt.enableMatchLabelKeysInAffinity && interPodAffinityHostnameFastPathEnabled {
-				// Avoid running the v1.32 emulation twice (once for interPodAffinityHostnameFastPathEnabled=true and once for false).
-				// Since fastPath is not available in v1.32, it will run with fastPath disabled when interPodAffinityHostnameFastPathEnabled=false.
-				continue
-			}
 			t.Run(fmt.Sprintf("%s/fastPathEnabled=%v", tt.name, interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
-				if !tt.enableMatchLabelKeysInAffinity {
-					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
-				} else {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
-				}
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
 
 				testCtx := initTestSchedulerForScoringTests(t, interpodaffinity.Name, interpodaffinity.Name)
 				if err := createNamespacesWithLabels(testCtx.ClientSet, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
@@ -971,14 +955,13 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                      string
-		incomingPod               *v1.Pod
-		existingPods              []*v1.Pod
-		fits                      bool
-		nodes                     []*v1.Node
-		want                      []string // nodes expected to schedule onto
-		enableNodeInclusionPolicy bool
-		enableMatchLabelKeys      bool
+		name                 string
+		incomingPod          *v1.Pod
+		existingPods         []*v1.Pod
+		fits                 bool
+		nodes                []*v1.Node
+		want                 []string // nodes expected to schedule onto
+		enableMatchLabelKeys bool
 	}{
 		// note: naming starts at index 0
 		// the symbol ~X~ means that node is infeasible
@@ -1041,8 +1024,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Obj(),
 			},
-			want:                      []string{"node-3"},
-			enableNodeInclusionPolicy: true,
+			want: []string{"node-3"},
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as ~3~/~1~
@@ -1067,8 +1049,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Obj(),
 			},
-			want:                      []string{"node-3"},
-			enableNodeInclusionPolicy: true,
+			want: []string{"node-3"},
 		},
 		{
 			name: "matchLabelKeys ignored when feature gate disabled, node-1 is the preferred fit",
@@ -1127,11 +1108,6 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !tt.enableNodeInclusionPolicy {
-				// TODO: this will be removed in 1.36
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)
-			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)
 
 			testCtx := initTestSchedulerForScoringTests(t, podtopologyspread.Name, podtopologyspread.Name)

@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1825,14 +1823,13 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                      string
-		incomingPod               *v1.Pod
-		existingPods              []*v1.Pod
-		fits                      bool
-		nodes                     []*v1.Node
-		candidateNodes            []string // nodes expected to schedule onto
-		enableNodeInclusionPolicy bool
-		enableMatchLabelKeys      bool
+		name                 string
+		incomingPod          *v1.Pod
+		existingPods         []*v1.Pod
+		fits                 bool
+		nodes                []*v1.Node
+		candidateNodes       []string // nodes expected to schedule onto
+		enableMatchLabelKeys bool
 	}{
 		// note: naming starts at index 0
 		{
@@ -2043,8 +2040,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-4"}, // node-3 is filtered out by NodeAffinity plugin
-			enableNodeInclusionPolicy: true,
+			candidateNodes: []string{"node-4"}, // node-3 is filtered out by NodeAffinity plugin
 		},
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity, pods spread across zone as 1/~2~",
@@ -2064,8 +2060,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-1", "node-2"},
-			enableNodeInclusionPolicy: true,
+			candidateNodes: []string{"node-1", "node-2"},
 		},
 		{
 			name: "NodeTaintsPolicy honored, pods spread across zone as 2/1",
@@ -2085,8 +2080,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Taints(taints).Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-4"}, // node-3 is filtered out by TaintToleration plugin
-			enableNodeInclusionPolicy: true,
+			candidateNodes: []string{"node-4"}, // node-3 is filtered out by TaintToleration plugin
 		},
 		{
 			name: "NodeTaintsPolicy ignored, pods spread across zone as 2/2",
@@ -2106,8 +2100,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Taints(taints).Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-1", "node-2", "node-4"}, // node-3 is filtered out by TaintToleration plugin
-			enableNodeInclusionPolicy: true,
+			candidateNodes: []string{"node-1", "node-2", "node-4"}, // node-3 is filtered out by TaintToleration plugin
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as 2/1
@@ -2132,34 +2125,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-4"},
-			enableNodeInclusionPolicy: true,
-		},
-		{
-			// 1. to fulfil "zone" constraint, pods spread across zones as 2/1
-			// 2. to fulfil "node" constraint, pods spread across zones as 1/1/~0~/1
-			// intersection of (1) and (2) returns node-4 as node-3 is filtered out by NodeAffinity plugin
-			name: "feature gate disabled, two node inclusion Constraints, zone: honor/ignore, node: honor/ignore",
-			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
-				NodeSelector(map[string]string{"foo": ""}).
-				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, nil).
-				SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, nil).
-				Obj(),
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Name("p3a").Node("node-3").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Name("p4a").Node("node-4").Label("foo", "").Container(pause).Obj(),
-			},
-			fits: true,
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node-1").Label("node", "node-1").Label("zone", "zone-1").Label("foo", "").Obj(),
-				st.MakeNode().Name("node-2").Label("node", "node-2").Label("zone", "zone-1").Label("foo", "").Taints(taints).Obj(),
-				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
-				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
-			},
-			candidateNodes:            []string{"node-4"},
-			enableNodeInclusionPolicy: false,
+			candidateNodes: []string{"node-4"},
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as 2/2
@@ -2184,8 +2150,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-1", "node-4"},
-			enableNodeInclusionPolicy: true,
+			candidateNodes: []string{"node-1", "node-4"},
 		},
 		{
 			name: "matchLabelKeys ignored when feature gate disabled, pods spread across zone as 2/1",
@@ -2235,11 +2200,6 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !tt.enableNodeInclusionPolicy {
-				// TODO: this will be removed in 1.36
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)
-			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)
 
 			testCtx := initTest(t, "pts-predicate")
@@ -2767,145 +2727,6 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestPodAffinityMatchLabelKeyEnablement tests the Pod is correctly mutated by MatchLabelKeysInPodAffinity feature,
-// even if turing the feature gate enabled or disabled.
-func TestPodAffinityMatchLabelKeyEnablement(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-
-	testCtx := initTest(t, "matchlabelkey")
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "test",
-			Namespace:    testCtx.NS.Name,
-			Labels:       map[string]string{"foo": "", "bar": "a"},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "container",
-					Image: imageutils.GetPauseImageName(),
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceMemory: resource.MustParse("1G"),
-						},
-					},
-				},
-			},
-			Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							TopologyKey: "node",
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
-									},
-								},
-							},
-							MatchLabelKeys: []string{"bar"},
-						},
-					},
-				},
-			},
-		},
-	}
-	expectedLabelSelector := &metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{
-				Key:      "foo",
-				Operator: metav1.LabelSelectorOpExists,
-			},
-			{
-				Key:      "bar",
-				Operator: metav1.LabelSelectorOpIn,
-				Values:   []string{"a"},
-			},
-		},
-	}
-
-	p1, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error while creating pod during test: %v", err)
-	}
-
-	// check the pod has the expected label selector.
-	gotpod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p1.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error while getting pod during test: %v", err)
-	}
-
-	// the label selector should be changed from the original one because the feature gate is enabled.
-	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
-		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
-	}
-
-	// disable the feature gate.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
-
-	p2, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error while creating pod during test: %v", err)
-	}
-
-	// check the pod has the expected label selector.
-	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p2.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error while getting pod during test: %v", err)
-	}
-
-	// the label selector should be the same as the original one because the feature gate is disabled.
-	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector); d != "" {
-		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p2.Name, d)
-	}
-
-	// check the pod, which was created when the feature gate is enabled, still has the expected label selector.
-	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p1.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error while getting pod during test: %v", err)
-	}
-
-	// the label selector should be changed from the original one because the feature gate is enabled.
-	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
-		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
-	}
-
-	// Again, enable the feature gate.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, true)
-
-	p3, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error while creating pod during test: %v", err)
-	}
-
-	// check the pod has the expected label selector.
-	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p3.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error while getting pod during test: %v", err)
-	}
-
-	// the label selector should be changed from the original one because the feature gate is enabled.
-	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
-		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
-	}
-
-	// check the pod has the expected label selector.
-	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p2.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error while getting pod during test: %v", err)
-	}
-
-	// the label selector shouldn't get changed because the feature gate was disabled at its creation.
-	// Even if the feature gate is enabled now, matchLabelKeys don't get applied to the pod.
-	// (it's only handled when the pod is created)
-	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector); d != "" {
-		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p2.Name, d)
-	}
-
 }
 
 func TestNodeResourcesFilter(t *testing.T) {

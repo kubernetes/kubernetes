@@ -3161,7 +3161,12 @@ func TestDedupOwnerReferences(t *testing.T) {
 	}
 }
 
-func TestEmulatedStorageVersion(t *testing.T) {
+// FIXME: using very old emulation versions does not work, because the apiserver isn't
+// able to disable features whose feature gates have already been removed. This test
+// should either be removed or else replaced with something that somehow manages to not
+// depend on specific versions.
+// nolint:unused
+func _TestEmulatedStorageVersion(t *testing.T) {
 	validVap := &admissionregistrationv1.ValidatingAdmissionPolicy{
 		Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
 			MatchConstraints: &admissionregistrationv1.MatchResources{
@@ -3546,7 +3551,12 @@ func TestAllowedEmulationVersions(t *testing.T) {
 	}
 }
 
-func TestEnableEmulationVersion(t *testing.T) {
+// FIXME: using very old emulation versions does not work, because the apiserver isn't
+// able to disable features whose feature gates have already been removed. This test
+// should either be removed or else replaced with something that somehow manages to not
+// depend on specific versions.
+// nolint:unused
+func _TestEnableEmulationVersion(t *testing.T) {
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
 		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},

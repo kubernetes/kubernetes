@@ -68,7 +68,6 @@ import (
 	"k8s.io/klog/v2"
 	configv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -614,11 +613,10 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	endpointSliceConfig.RegisterEventHandler(s.Proxier)
 	go endpointSliceConfig.Run(ctx.Done())
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		serviceCIDRConfig := config.NewServiceCIDRConfig(ctx, informerFactory.Networking().V1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
-		serviceCIDRConfig.RegisterEventHandler(s.Proxier)
-		go serviceCIDRConfig.Run(wait.NeverStop)
-	}
+	serviceCIDRConfig := config.NewServiceCIDRConfig(ctx, informerFactory.Networking().V1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
+	serviceCIDRConfig.RegisterEventHandler(s.Proxier)
+	go serviceCIDRConfig.Run(wait.NeverStop)
+
 	// This has to start after the calls to NewServiceConfig because that
 	// function must configure its shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
