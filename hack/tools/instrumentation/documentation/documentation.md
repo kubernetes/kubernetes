@@ -383,6 +383,13 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">execute</span><span class="metric_label">flow_schema</span><span class="metric_label">priority_level</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">apiserver_resource_size_estimate_bytes</div>
+	<div class="metric_help">Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">apiserver_storage_events_received_total</div>
 	<div class="metric_help">Number of etcd events received split by kind.</div>
 	<ul>
@@ -1568,13 +1575,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_resource_objects</div>
 	<div class="metric_help">Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_resource_size_estimate_bytes</div>
-	<div class="metric_help">Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
