@@ -806,7 +806,6 @@ func TestApplyOverride(t *testing.T) {
 				},
 			},
 		},
-
 		{
 			name: "alias command override",
 			nestedCmds: []fakeCmds[string]{
@@ -3200,5 +3199,66 @@ credentialPluginPolicy: ""
 				require.NoError(t, err)
 			}
 		})
+	}
+}
+
+func TestApplyOverrideDoesNotMatchSameLeafCommand(t *testing.T) {
+	rootCmd := &cobra.Command{Use: "root"}
+
+	configCmd := &cobra.Command{Use: "config"}
+	configViewCmd := &cobra.Command{Use: "view"}
+	configViewCmd.Flags().String("output", "default", "")
+	configCmd.AddCommand(configViewCmd)
+
+	kubercCmd := &cobra.Command{Use: "kuberc"}
+	kubercViewCmd := &cobra.Command{Use: "view"}
+	kubercViewCmd.Flags().String("output", "default", "")
+	kubercCmd.AddCommand(kubercViewCmd)
+
+	rootCmd.AddCommand(configCmd, kubercCmd)
+
+	opts := genericclioptions.NewConfigFlags(false)
+	prefHandler := NewPreferences()
+	prefHandler.AddFlags(rootCmd.PersistentFlags())
+
+	pref := prefHandler.(*Preferences)
+	pref.getPreferencesFunc = func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+		return &config.Preference{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Preference",
+				APIVersion: "kubectl.config.k8s.io/v1alpha1",
+			},
+			Defaults: []config.CommandDefaults{
+				{
+					Command: "config view",
+					Options: []config.CommandOptionDefault{
+						{
+							Name:    "output",
+							Default: "json",
+						},
+					},
+				},
+			},
+		}, nil
+	}
+
+	errWriter := &bytes.Buffer{}
+	args := []string{"root", "kuberc", "view"}
+
+	_, err := pref.Apply(rootCmd, opts, args, errWriter)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if errWriter.String() != "" {
+		t.Fatalf("unexpected error message %s", errWriter.String())
+	}
+
+	actualCmd, _, err := rootCmd.Find(args[1:])
+	if err != nil {
+		t.Fatalf("unable to find command: %v", err)
+	}
+
+	if got := actualCmd.Flag("output").Value.String(); got != "default" {
+		t.Fatalf("unexpected output flag value: got %q, want %q", got, "default")
 	}
 }
