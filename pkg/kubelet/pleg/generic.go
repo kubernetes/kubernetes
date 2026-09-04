@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/util/workqueue"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -84,6 +85,9 @@ type GenericPLEG struct {
 
 // Empty placeholder value for podsToReinspect (shared pointer reduces allocations).
 var empty = &struct{}{}
+
+// plegMaxParallelism is the maximum number of concurrent workers for PLEG update cache.
+const plegMaxParallelism = 16
 
 // plegContainerState has a one-to-one mapping to the
 // kubecontainer.State except for the non-existent state. This state
@@ -316,8 +320,120 @@ func (g *GenericPLEG) Relist(ctx context.Context) {
 	updateRunningPodAndContainerMetrics(pods)
 	g.podRecords.setCurrent(pods)
 
+	type podWork struct {
+		podUID types.UID
+		pod    *kubecontainer.Pod
+		events []*PodLifecycleEvent
+	}
+
+	var workList []podWork
 	for pid := range g.podRecords {
-		g.reconcilePodRecord(ctx, pid)
+		oldPod := g.podRecords.getOld(pid)
+		pod := g.podRecords.getCurrent(pid)
+		// Get all containers in the old and the new pod.
+		allContainers := getContainersFromPods(oldPod, pod)
+		var events []*PodLifecycleEvent
+		for _, container := range allContainers {
+			containerEvents := computeEvents(logger, oldPod, pod, &container.ID)
+			events = append(events, containerEvents...)
+		}
+
+		_, reinspect := g.podsToReinspect.LoadAndDelete(pid)
+
+		if len(events) == 0 && !reinspect {
+			// Nothing else needed for this pod.
+			continue
+		}
+
+		workList = append(workList, podWork{
+			podUID: pid,
+			pod:    pod,
+			events: events,
+		})
+	}
+
+	type podWorkResult struct {
+		status  *kubecontainer.PodStatus
+		updated bool
+		err     error
+	}
+
+	results := make([]podWorkResult, len(workList))
+	for i := range results {
+		results[i] = podWorkResult{
+			err: fmt.Errorf("context cancelled before processing"),
+		}
+	}
+	workqueue.ParallelizeUntil(ctx, plegMaxParallelism, len(workList), func(index int) {
+		w := workList[index]
+		status, updated, err := g.updateCache(ctx, w.pod, w.podUID)
+		results[index] = podWorkResult{
+			status:  status,
+			updated: updated,
+			err:     err,
+		}
+	})
+
+	for index, w := range workList {
+		pid := w.podUID
+		pod := w.pod
+		events := w.events
+		res := results[index]
+
+		if res.err != nil {
+			// Rely on updateCache calling GetPodStatus to log the actual error.
+			if pod != nil {
+				logger.V(4).Info("PLEG: Ignoring events for pod", "pod", klog.KRef(pod.Namespace, pod.Name), "err", res.err)
+			} else {
+				logger.V(4).Info("PLEG: Ignoring events for pod", "podUID", pid, "err", res.err)
+			}
+
+			// make sure we try to reinspect the pod during the next relisting
+			g.podsToReinspect.Store(pid, empty)
+			continue
+		} else if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+			if !res.updated {
+				continue
+			}
+		}
+
+		if len(events) == 0 {
+			// Make sure we always trigger a PodSync after a full reinspection.
+			events = append(events, &PodLifecycleEvent{ID: pid, Type: PodSync})
+		}
+
+		// Update the internal storage and send out the events.
+		g.podRecords.update(pid)
+
+		// Map from containerId to exit code; used as a temporary cache for lookup
+		containerExitCode := make(map[string]int)
+
+		for i := range events {
+			// Filter out events that are not reliable and no other components use yet.
+			if events[i].Type == ContainerChanged {
+				continue
+			}
+			select {
+			case g.eventChannel <- events[i]:
+			default:
+				metrics.PLEGDiscardEvents.Inc()
+				logger.Error(nil, "Event channel is full, discard this relist() cycle event")
+			}
+			// Log exit code of containers when they finished in a particular event
+			if events[i].Type == ContainerDied {
+				// Fill up containerExitCode map for ContainerDied event when first time appeared
+				if len(containerExitCode) == 0 && pod != nil && res.status != nil {
+					for _, containerStatus := range res.status.ContainerStatuses {
+						containerExitCode[containerStatus.ID.ID] = containerStatus.ExitCode
+					}
+				}
+				if containerID, ok := events[i].Data.(string); ok {
+					if exitCode, ok := containerExitCode[containerID]; ok && pod != nil {
+						logger.V(2).Info("Generic (PLEG): container finished", "podID", pod.ID, "containerID", containerID, "exitCode", exitCode)
+					}
+				}
+			}
+		}
 	}
 
 	// Update the cache timestamp.  This needs to happen *after*
@@ -361,7 +477,11 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 	status, err := g.updateCache(ctx, pod, pid)
 	if err != nil {
 		// Rely on updateCache calling GetPodStatus to log the actual error.
-		logger.V(4).Info("PLEG: Ignoring events for pod", "pod", klog.KRef(pod.Namespace, pod.Name), "err", err)
+		if pod != nil {
+			logger.V(4).Info("PLEG: Ignoring events for pod", "pod", klog.KRef(pod.Namespace, pod.Name), "err", err)
+		} else {
+			logger.V(4).Info("PLEG: Ignoring events for pod", "podUID", pid, "err", err)
+		}
 
 		// make sure we try to reinspect the pod during the next relisting
 		g.podsToReinspect.Store(pid, empty)
