@@ -566,7 +566,12 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 			lastMapping = mapping
 		}
 
-		printer.PrintObj(info.Object, w)
+		if err := printer.PrintObj(info.Object, w); err != nil {
+			if !errs.Has(err.Error()) {
+				errs.Insert(err.Error())
+				allErrs = append(allErrs, err)
+			}
+		}
 	}
 	w.Flush()
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
