@@ -215,6 +215,21 @@ test-integration:
 	KUBE_TEST_ARGS='$(value KUBE_TEST_ARGS)' hack/make-rules/test-integration.sh $(WHAT)
 endif
 
+define TEST_USERNS_HELP_INFO
+# Run Linux user-namespace tests (requires unprivileged user namespace support).
+#
+# Example:
+#   make test-userns
+endef
+.PHONY: test-userns
+ifeq ($(PRINT_HELP),y)
+test-userns:
+	echo "$$TEST_USERNS_HELP_INFO"
+else
+test-userns:
+	GOFLAGS="-tags=usernstest" WHAT="./pkg/proxy/nftables/..." unshare --user --map-root-user --net $(MAKE) test
+endif
+
 define TEST_E2E_NODE_HELP_INFO
 # Build and run node end-to-end tests.
 #
