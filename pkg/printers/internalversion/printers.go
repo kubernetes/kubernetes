@@ -239,6 +239,7 @@ func AddHandlers(h printers.PrintHandler) {
 	statefulSetColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Ready", Type: "string", Description: "Number of the pod with ready state"},
+		{Name: "Status", Type: "string", Description: "Status of the stateful set."},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
@@ -1607,7 +1608,11 @@ func printStatefulSet(obj *apps.StatefulSet, options printers.GenerateOptions) (
 	desiredReplicas := obj.Spec.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 	createTime := translateTimestampSince(obj.CreationTimestamp)
-	row.Cells = append(row.Cells, obj.Name, fmt.Sprintf("%d/%d", int64(readyReplicas), int64(desiredReplicas)), createTime)
+	status := "Active"
+	if obj.ObjectMeta.DeletionTimestamp != nil {
+		status = "Terminating"
+	}
+	row.Cells = append(row.Cells, obj.Name, fmt.Sprintf("%d/%d", int64(readyReplicas), int64(desiredReplicas)), status, createTime)
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images)

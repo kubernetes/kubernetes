@@ -5154,8 +5154,8 @@ func TestPrintStatefulSet(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Ready, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s"}}},
+			// Columns: Name, Ready, Status, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "Active", "0s"}}},
 		},
 		// Generate options "Wide"; includes containers and images.
 		{
@@ -5187,8 +5187,38 @@ func TestPrintStatefulSet(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, Ready, Age, Containers, Images
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2"}}},
+			// Columns: Name, Ready, Status, Age, Containers, Images
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "Active", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2"}}},
+		},
+		// A stateful set being deleted reports Terminating.
+		{
+			statefulSet: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.StatefulSetStatus{
+					Replicas:      5,
+					ReadyReplicas: 2,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Ready, Status, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "Terminating", "0s"}}},
 		},
 	}
 
