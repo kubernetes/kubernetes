@@ -273,6 +273,8 @@ type DriverInfo struct {
 	VolumeSnapshotStressTestOptions *VolumeSnapshotStressTestOptions
 	// [Optional] Scale parameters for volume modify stress tests.
 	VolumeModifyStressTestOptions *VolumeModifyStressTestOptions
+	// [Optional] Scale parameters for snapshot metadata stress tests.
+	SnapshotMetadataStressTestOptions *SnapshotMetadataStressTestOptions
 	// [Optional] Parameters for performance tests
 	PerformanceTestOptions *PerformanceTestOptions
 	// [Optional] Scale parameters for volume group snapshot stress tests.
@@ -302,6 +304,14 @@ type VolumeModifyStressTestOptions struct {
 	// Number of pods to create in the test. This may also create
 	// up to 1 volume with volumeAttributesClass per pod.
 	NumPods int
+}
+
+// SnapshotMetadataStressTestOptions contains parameters for snapshot metadata stress tests.
+type SnapshotMetadataStressTestOptions struct {
+	// Number of pods to create in the test. Each pod gets its own PVC and snapshots.
+	NumPods int
+	// Number of snapshot pairs per pod for delta verification.
+	NumSnapshotPairs int
 }
 
 // Metrics to evaluate performance of an operation
