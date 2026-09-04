@@ -19,6 +19,7 @@ package yaml
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"math/rand"
@@ -26,6 +27,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode/utf16"
 )
 
 func TestYAMLDecoderReadBytesLength(t *testing.T) {
@@ -555,5 +557,79 @@ func TestUnmarshal(t *testing.T) {
 	}
 	if _, ok := otherType[123].(float64); !ok {
 		t.Fatalf(`Expected number to be float64 but got "%T"`, otherType[123])
+	}
+}
+
+// encodeUTF16LEWithBOM encodes s as UTF-16 LE with a BOM, matching the
+// encoding Windows PowerShell 5.1 produces for `>` redirects.
+func encodeUTF16LEWithBOM(s string) []byte {
+	encoded := utf16.Encode([]rune(s))
+	out := make([]byte, 2+len(encoded)*2)
+	out[0], out[1] = 0xff, 0xfe
+	for i, u := range encoded {
+		binary.LittleEndian.PutUint16(out[2+i*2:], u)
+	}
+	return out
+}
+
+func TestYAMLOrJSONDecoderUTF16LEWithBOM(t *testing.T) {
+	const src = "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: utf16-test\n"
+	data := encodeUTF16LEWithBOM(src)
+
+	var out map[string]interface{}
+	err := NewYAMLOrJSONDecoder(bytes.NewReader(data), 4096).Decode(&out)
+	if err != nil {
+		t.Fatalf("Decode UTF-16 LE YAML: %v", err)
+	}
+	if out["kind"] != "ConfigMap" {
+		t.Fatalf("expected kind=ConfigMap, got %#v", out["kind"])
+	}
+	meta, ok := out["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected metadata map, got %#v", out["metadata"])
+	}
+	if meta["name"] != "utf16-test" {
+		t.Fatalf("expected name=utf16-test, got %#v", meta["name"])
+	}
+}
+
+func TestYAMLReaderUTF16LEWithBOM(t *testing.T) {
+	const src = "apiVersion: v1\nkind: Service\nmetadata:\n  name: svc\n"
+	data := encodeUTF16LEWithBOM(src)
+
+	chunk, err := NewYAMLReader(bufio.NewReader(bytes.NewReader(data))).Read()
+	if err != nil && err != io.EOF { //nolint:errorlint
+		t.Fatalf("YAMLReader.Read: %v", err)
+	}
+	// Before the fix, LineReader appended an extra 0x0a and grew the stream by
+	// one byte (odd length), which broke UTF-16 decoding downstream.
+	if len(chunk)%2 == 1 && bytes.HasPrefix(chunk, []byte{0xff, 0xfe}) {
+		t.Fatalf("reader corrupted UTF-16 stream: in=%d out=%d (odd length with BOM retained)", len(data), len(chunk))
+	}
+
+	var out map[string]interface{}
+	if err := Unmarshal(chunk, &out); err != nil {
+		t.Fatalf("Unmarshal YAMLReader chunk: %v", err)
+	}
+	if out["kind"] != "Service" {
+		t.Fatalf("expected kind=Service, got %#v", out["kind"])
+	}
+}
+
+func TestYAMLOrJSONDecoderUTF16BEWithBOM(t *testing.T) {
+	const src = "kind: Pod\nmetadata:\n  name: be\n"
+	runes := utf16.Encode([]rune(src))
+	data := make([]byte, 2+len(runes)*2)
+	data[0], data[1] = 0xfe, 0xff
+	for i, u := range runes {
+		binary.BigEndian.PutUint16(data[2+i*2:], u)
+	}
+
+	var out map[string]interface{}
+	if err := NewYAMLOrJSONDecoder(bytes.NewReader(data), 4096).Decode(&out); err != nil {
+		t.Fatalf("Decode UTF-16 BE YAML: %v", err)
+	}
+	if out["kind"] != "Pod" {
+		t.Fatalf("expected kind=Pod, got %#v", out["kind"])
 	}
 }
