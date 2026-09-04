@@ -99,7 +99,17 @@ type ContextTB interface {
 // Init can be called in a unit or integration test to create
 // a test context which:
 // - has a per-test logger with verbosity derived from the -v command line flag
-// - gets canceled when the test finishes (via [TB.Cleanup])
+// - gets canceled automatically when the test ends
+//
+// Note that "test ends" is defined as "main test function returned".
+// In other words, the test execution order is:
+//   - test function
+//   - all defer callbacks in that function
+//   - automatic TContext cancellation is triggered (i.e. not guaranteed to
+//     be instantaneous, but cleanup callbacks can rely on it to happen)
+//   - all [Cleanup] and [CleanupCtx] callbacks in LIFO order;
+//     they can still log to tb and record additional failures
+//   - underlying tb gets finalized, making it unusable
 //
 // Note that the test context supports the interfaces of [TB] and
 // [context.Context] and thus can be used like one of those where needed.
@@ -112,9 +122,13 @@ type ContextTB interface {
 // the context passed into that callback. This can be used to let
 // Ginkgo create a fresh context for cleanup code.
 //
-// Can be called more than once per test to get different contexts with
-// independent cancellation. The default behavior described above can be
+// The default behavior described above can be
 // modified via optional functional options defined in [initoption].
+// Can be called more than once per test to get different contexts with
+// independent cancellation: Cancel only affects the instance it is
+// called on. The automatic cancellation is triggered for all instances
+// when the test ends (as defined above), regardless of when Init was called.
+// Each instance can have a different configuration.
 //
 // Can be called inside a synctest bubble. Signal handling (cleaning up on
 // SIGINT, progress reporting on SIGUSR1) then does not get initialized because
@@ -181,7 +195,7 @@ func Init(tb TB, opts ...InitOption) TContext {
 		gracePeriod = DefaultCleanupGracePeriod
 	}
 
-	var cancelTimeout func(cause string)
+	var cancelTimeout func(cause error)
 	if deadline != nil {
 		timeLeft := time.Until(*deadline)
 		timeLeft -= gracePeriod
@@ -196,7 +210,7 @@ func Init(tb TB, opts ...InitOption) TContext {
 		tCtx.cancel = cancelTimeout
 	} else {
 		tCtx = tCtx.WithCancel()
-		tCtx.Cleanup(func() {
+		runWhenDone(tb, func() {
 			tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
 		})
 	}
@@ -413,7 +427,7 @@ type TContext struct {
 	perTestHeader func() string
 
 	// for Cancel
-	cancel func(cause string)
+	cancel func(cause error)
 
 	// steps is a concatenation ("step1: step2: step3: ") of steps passed to WithStep.
 	// It's empty if there are no steps.
@@ -477,6 +491,20 @@ func (tCtx TContext) Parallel() {
 // to context.Canceled. context.Cause will return that error for the
 // context.
 func (tCtx TContext) Cancel(cause string) {
+	if tCtx.cancel != nil {
+		var cancelCause error
+		if cause != "" {
+			cancelCause = canceledError(cause)
+		}
+		// nil is okay here, context.Canceled will be used instead.
+		tCtx.cancel(cancelCause)
+	}
+}
+
+// CancelBecause is like Cancel except that it directly uses
+// the provided error. It is up to the caller whether that
+// error is a context.Canceled error.
+func (tCtx TContext) CancelBecause(cause error) {
 	if tCtx.cancel != nil {
 		tCtx.cancel(cause)
 	}

@@ -35,6 +35,8 @@ func TestCleanupErr(t *testing.T) {
 
 func TestCause(t *testing.T) {
 	timeoutCause := canceledError("I timed out")
+	cancelText := "I got canceled"
+	var cancelCause error = canceledError(cancelText)
 	parentCause := errors.New("parent canceled")
 
 	contextBackground := func(t *testing.T) context.Context {
@@ -45,7 +47,8 @@ func TestCause(t *testing.T) {
 		parentCtx              func(t *testing.T) context.Context
 		timeout                time.Duration
 		sleep                  time.Duration
-		cancelCause            string
+		cancelCause            *error
+		cancelText             *string
 		expectErr, expectCause error
 		expectDeadline         time.Duration
 	}{
@@ -106,16 +109,48 @@ func TestCause(t *testing.T) {
 			timeout:        time.Minute,
 			expectDeadline: time.Minute,
 		},
+		"cancelCause": {
+			parentCtx:   contextBackground,
+			cancelCause: &cancelCause,
+			expectErr:   context.Canceled,
+			expectCause: cancelCause,
+		},
+		"cancelText": {
+			parentCtx:   contextBackground,
+			cancelText:  &cancelText,
+			expectErr:   context.Canceled,
+			expectCause: cancelCause,
+		},
+		"cancelEmptyText": {
+			// Canceling with an empty string must preserve the standard
+			// context.Canceled cause, just like context.CancelFunc does.
+			parentCtx:   contextBackground,
+			cancelText:  new(string),
+			expectErr:   context.Canceled,
+			expectCause: context.Canceled,
+		},
+		"cancelBecauseNil": {
+			// CancelBecause is a transparent pass-through to
+			// context.CancelCauseFunc, so nil must also result in the
+			// standard context.Canceled cause.
+			parentCtx:   contextBackground,
+			cancelCause: new(error),
+			expectErr:   context.Canceled,
+			expectCause: context.Canceled,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				tCtx := Init(t)
-				ctx, cancel := withTimeout(tt.parentCtx(t), t, tt.timeout, timeoutCause.Error())
-				if tt.cancelCause != "" {
-					cancel(tt.cancelCause)
+				tCtx = tCtx.WithContext(tt.parentCtx(t)).WithTimeout(tt.timeout, timeoutCause.Error())
+				if tt.cancelCause != nil {
+					tCtx.CancelBecause(*tt.cancelCause)
+				}
+				if tt.cancelText != nil {
+					tCtx.Cancel(*tt.cancelText)
 				}
 				if tt.expectDeadline != 0 {
-					actualDeadline, ok := ctx.Deadline()
+					actualDeadline, ok := tCtx.Deadline()
 					if !ok {
 						tCtx.Error("should have a deadline and hasn't")
 					} else {
@@ -127,8 +162,8 @@ func TestCause(t *testing.T) {
 				// Wait for them to do their work.
 				synctest.Wait()
 				// Now check.
-				actualErr := ctx.Err()
-				actualCause := context.Cause(ctx)
+				actualErr := tCtx.Err()
+				actualCause := context.Cause(tCtx)
 				if tt.expectErr == nil {
 					tCtx.Assert(actualErr).To(gomega.Succeed(), "ctx.Err()")
 				} else {
