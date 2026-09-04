@@ -6051,6 +6051,79 @@ func TestGetExec(t *testing.T) {
 	}
 }
 
+// TestGetExecAndRunEnforcePodUID verifies that the UID-qualified exec and run
+// routes reject a request whose pod UID does not match the current pod. A stale
+// or mismatched UID must not resolve to a recreated pod that merely shares the
+// namespace/name, keeping exec/run consistent with the UID enforcement already
+// performed by GetAttach. See https://github.com/kubernetes/kubernetes/issues/139987.
+func TestGetExecAndRunEnforcePodUID(t *testing.T) {
+	const (
+		podName      = "podFoo"
+		podNamespace = "nsFoo"
+		containerID  = "containerFoo"
+	)
+	currentUID := types.UID("current-uid")
+	podFullName := kubecontainer.GetPodFullName(podWithUIDNameNs(currentUID, podName, podNamespace))
+
+	testcases := []struct {
+		description string
+		requestUID  types.UID
+		expectError bool
+	}{
+		{
+			description: "matching uid is accepted",
+			requestUID:  currentUID,
+			expectError: false,
+		},
+		{
+			description: "empty uid falls back to name-based lookup",
+			requestUID:  "",
+			expectError: false,
+		},
+		{
+			description: "stale uid is rejected",
+			requestUID:  types.UID("stale-uid"),
+			expectError: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+
+			// The currently running pod is registered under currentUID.
+			kubelet.podManager.SetPods([]*v1.Pod{podWithUIDNameNs(currentUID, podName, podNamespace)})
+			testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
+				{Pod: &kubecontainer.Pod{
+					ID:        currentUID,
+					Name:      podName,
+					Namespace: podNamespace,
+					Containers: []*kubecontainer.Container{
+						{Name: containerID, ID: kubecontainer.ContainerID{Type: "test", ID: containerID}},
+					},
+				}},
+			}
+			streamingRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
+			kubelet.containerRuntime = streamingRuntime
+			kubelet.streamingRuntime = streamingRuntime
+			kubelet.runner = &containertest.FakeContainerCommandRunner{Stdout: "ok"}
+
+			_, execErr := kubelet.GetExec(tCtx, podFullName, tc.requestUID, containerID, []string{"ls"}, remotecommand.Options{})
+			_, runErr := kubelet.RunInContainer(tCtx, podFullName, tc.requestUID, containerID, []string{"ls"})
+			if tc.expectError {
+				require.Error(t, execErr, "GetExec should reject a mismatched pod UID")
+				require.Error(t, runErr, "RunInContainer should reject a mismatched pod UID")
+			} else {
+				require.NoError(t, execErr, "GetExec should accept a matching/empty pod UID")
+				require.NoError(t, runErr, "RunInContainer should accept a matching/empty pod UID")
+			}
+		})
+	}
+}
+
 func TestGetPortForward(t *testing.T) {
 	const (
 		podName                = "podFoo"
