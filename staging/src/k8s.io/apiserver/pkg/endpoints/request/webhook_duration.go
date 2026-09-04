@@ -104,6 +104,63 @@ func newMaxLatencyTracker(c clock.Clock) DurationTracker {
 	}
 }
 
+type RoundCommitter interface {
+	DurationTracker
+	CommitRound()
+}
+
+// sumOfMaxPerRoundTracker accumulates latency as -
+// sum over all rounds of max(concurrent Track calls within that round)
+type sumOfMaxPerRoundTracker struct {
+	clock        clock.Clock
+	mu           sync.Mutex
+	roundMax     time.Duration
+	committedSum time.Duration
+}
+
+func newSumOfMaxPerRoundTracker(c clock.Clock) RoundCommitter {
+	return &sumOfMaxPerRoundTracker{clock: c}
+}
+
+// Track records keeps the maximum within the current round.
+func (t *sumOfMaxPerRoundTracker) Track(f func()) {
+	startedAt := t.clock.Now()
+	defer func() {
+		duration := t.clock.Since(startedAt)
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		if duration > t.roundMax {
+			t.roundMax = duration
+		}
+	}()
+	f()
+}
+
+// TrackDuration records d and keeps the maximum within the current round.
+func (t *sumOfMaxPerRoundTracker) TrackDuration(d time.Duration) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if d > t.roundMax {
+		t.roundMax = d
+	}
+}
+
+// CommitRound adds its maximum to the committed sum
+// and resets the per-round accumulator.
+func (t *sumOfMaxPerRoundTracker) CommitRound() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.committedSum += t.roundMax
+	t.roundMax = 0
+}
+
+// GetLatency returns the sum of all committed rounds' maxima.
+func (t *sumOfMaxPerRoundTracker) GetLatency() time.Duration {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.committedSum
+}
+
 // LatencyTrackers stores trackers used to measure latecny incurred in
 // components within the apiserver.
 type LatencyTrackers struct {
@@ -113,7 +170,8 @@ type LatencyTrackers struct {
 	MutatingWebhookTracker DurationTracker
 
 	// ValidatingWebhookTracker tracks the latency incurred in validating webhook(s).
-	// Validate webhooks are done in parallel, so max function is used.
+	// Within a single dispatch round the webhooks run in parallel, so only the
+	// slowest one contributes to wall-clock latency (max within a round).
 	ValidatingWebhookTracker DurationTracker
 
 	// AuthenticationTracker tracks the latency incurred by Authentication of request
@@ -188,7 +246,7 @@ func WithLatencyTrackers(parent context.Context) context.Context {
 func WithLatencyTrackersAndCustomClock(parent context.Context, c clock.Clock) context.Context {
 	return WithValue(parent, latencyTrackersKey, &LatencyTrackers{
 		MutatingWebhookTracker:   newSumLatencyTracker(c),
-		ValidatingWebhookTracker: newMaxLatencyTracker(c),
+		ValidatingWebhookTracker: newSumOfMaxPerRoundTracker(c),
 		AuthenticationTracker:    newSumLatencyTracker(c),
 		AuthorizationTracker:     newMaxLatencyTracker(c),
 		APFQueueWaitTracker:      newMaxLatencyTracker(c),
