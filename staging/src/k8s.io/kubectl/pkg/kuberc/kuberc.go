@@ -499,6 +499,21 @@ func searchInArgs(flagName string, shorthand string, allShorthands map[string]st
 	return false
 }
 
+// GetAliasesForDisplay returns all aliases defined in kuberc file for display purposes (e.g., in help output).
+// This function does not execute aliases, it only returns their definitions.
+func GetAliasesForDisplay(errOut io.Writer) ([]config.AliasOverride, error) {
+	kuberc, err := DefaultGetPreferences("", errOut)
+	if err != nil {
+		return nil, err
+	}
+
+	if kuberc == nil {
+		return nil, nil
+	}
+
+	return kuberc.Aliases, nil
+}
+
 func (p *Preferences) validate(plugin *config.Preference) error {
 	validateFlag := func(flags []config.CommandOptionDefault) error {
 		for _, flag := range flags {
