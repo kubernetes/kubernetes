@@ -17,11 +17,9 @@ limitations under the License.
 package apimachinery
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -29,8 +27,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/prometheus/common/expfmt"
-	"github.com/prometheus/common/model"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,6 +41,7 @@ import (
 	"k8s.io/client-go/rest"
 	clientsideflowcontrol "k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-base/metrics/testutil"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -761,27 +758,15 @@ func getPriorityLevelNominalConcurrency(ctx context.Context, c clientset.Interfa
 	if err != nil {
 		return 0, fmt.Errorf("error requesting metrics; request=%#+v, request.URL()=%s: %w", req, req.URL(), err)
 	}
-	sampleDecoder := expfmt.SampleDecoder{
-		Dec:  expfmt.NewDecoder(bytes.NewBuffer(resp), expfmt.NewFormat(expfmt.TypeTextPlain)),
-		Opts: &expfmt.DecodeOptions{},
+
+	m := testutil.NewMetrics()
+	if err := testutil.ParseMetrics(string(resp), &m); err != nil {
+		return 0, err
 	}
-	for {
-		var v model.Vector
-		err := sampleDecoder.Decode(&v)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return 0, err
-		}
-		for _, metric := range v {
-			if string(metric.Metric[model.MetricNameLabel]) != nominalConcurrencyLimitMetricName {
-				continue
-			}
-			if string(metric.Metric[priorityLevelLabelName]) != priorityLevelName {
-				continue
-			}
-			return int32(metric.Value), nil
+
+	for _, sample := range m[nominalConcurrencyLimitMetricName] {
+		if string(sample.Metric[testutil.LabelName(priorityLevelLabelName)]) == priorityLevelName {
+			return int32(sample.Value), nil
 		}
 	}
 	return 0, errPriorityLevelNotFound
