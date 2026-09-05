@@ -360,10 +360,10 @@ func TestCallQueuePop(t *testing.T) {
 	t.Run("Pop blocks when queue is empty and unblocks after add", func(t *testing.T) {
 		cq := newCallQueue(mockRelevances)
 		poppedCallCh := make(chan *queuedAPICall)
-		popStarted := make(chan struct{})
+		popBlocked := make(chan struct{})
+		cq.testBeforeWait = func() { close(popBlocked) }
 
 		go func() {
-			close(popStarted)
 			poppedCall, popErr := cq.pop()
 			if popErr != nil {
 				t.Errorf("Unexpected error while popping call: %v", popErr)
@@ -371,16 +371,16 @@ func TestCallQueuePop(t *testing.T) {
 			poppedCallCh <- poppedCall
 		}()
 
-		// Wait for the goroutine to be scheduled before adding a call, so this
-		// test is actually exercising cq.pop()'s blocking path rather than
-		// racing it. This is a best-effort ordering hint, not a guarantee that
-		// pop() has reached cq.cond.Wait() yet -- but that's fine: whichever
-		// order add() and pop() actually run in, the call is still correctly
-		// delivered through poppedCallCh below.
+		// Wait until pop() has actually entered cq.cond.Wait() before adding a
+		// call. The hook fires while cq.lock is still held by pop(), so by the
+		// time add() below manages to acquire that same lock, pop() is
+		// guaranteed to already be blocked in Wait() -- this deterministically
+		// exercises the blocking path instead of merely hoping a fixed sleep
+		// was long enough.
 		select {
-		case <-popStarted:
+		case <-popBlocked:
 		case <-time.After(wait.ForeverTestTimeout):
-			t.Fatal("Timed out waiting for the pop() goroutine to start")
+			t.Fatal("Timed out waiting for pop() to start blocking")
 		}
 
 		call := &queuedAPICall{
@@ -587,10 +587,10 @@ func TestCallQueueClose(t *testing.T) {
 	t.Run("Pop unblocks and returns nil when controller is closed", func(t *testing.T) {
 		cq := newCallQueue(mockRelevances)
 		poppedCallCh := make(chan *queuedAPICall)
-		popStarted := make(chan struct{})
+		popBlocked := make(chan struct{})
+		cq.testBeforeWait = func() { close(popBlocked) }
 
 		go func() {
-			close(popStarted)
 			poppedCall, popErr := cq.pop()
 			if popErr != nil {
 				t.Errorf("Unexpected error while popping call: %v", popErr)
@@ -599,9 +599,9 @@ func TestCallQueueClose(t *testing.T) {
 		}()
 
 		select {
-		case <-popStarted:
+		case <-popBlocked:
 		case <-time.After(wait.ForeverTestTimeout):
-			t.Fatal("Timed out waiting for the pop() goroutine to start")
+			t.Fatal("Timed out waiting for pop() to start blocking")
 		}
 
 		cq.close()
