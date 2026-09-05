@@ -55,12 +55,12 @@ var registerMetrics sync.Once
 
 // PVLister used to list persistent volumes.
 type PVLister interface {
-	List() []interface{}
+	List() []*v1.PersistentVolume
 }
 
 // PVCLister used to list persistent volume claims.
 type PVCLister interface {
-	List() []interface{}
+	List() []*v1.PersistentVolumeClaim
 }
 
 // Register all metrics for pv controller.
@@ -204,11 +204,7 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- metrics.Metric) {
 	boundNumberByStorageClass := make(map[string]int)
 	unboundNumberByStorageClass := make(map[string]int)
 	totalCount := make(volumeCount)
-	for _, pvObj := range collector.pvLister.List() {
-		pv, ok := pvObj.(*v1.PersistentVolume)
-		if !ok {
-			continue
-		}
+	for _, pv := range collector.pvLister.List() {
 		pluginName := collector.getPVPluginName(pv)
 		totalCount.add(pluginName, string(*pv.Spec.VolumeMode))
 		if pv.Status.Phase == v1.VolumeBound {
@@ -246,11 +242,7 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- metrics.Metric) {
 func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- metrics.Metric) {
 	boundNumber := make(map[pvcBindingMetricDimensions]int)
 	unboundNumber := make(map[pvcBindingMetricDimensions]int)
-	for _, pvcObj := range collector.pvcLister.List() {
-		pvc, ok := pvcObj.(*v1.PersistentVolumeClaim)
-		if !ok {
-			continue
-		}
+	for _, pvc := range collector.pvcLister.List() {
 		if pvc.Status.Phase == v1.ClaimBound {
 			boundNumber[getPVCMetricDimensions(pvc)]++
 		} else {
