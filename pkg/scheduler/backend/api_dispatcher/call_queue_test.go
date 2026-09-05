@@ -361,6 +361,8 @@ func TestCallQueuePop(t *testing.T) {
 	t.Run("Pop blocks when queue is empty and unblocks after add", func(t *testing.T) {
 		cq := newCallQueue(mockRelevances)
 		poppedCallCh := make(chan *queuedAPICall)
+		popBlocked := make(chan struct{})
+		cq.testBeforeWait = func() { close(popBlocked) }
 
 		go func() {
 			poppedCall, popErr := cq.pop()
@@ -370,7 +372,17 @@ func TestCallQueuePop(t *testing.T) {
 			poppedCallCh <- poppedCall
 		}()
 
-		time.Sleep(100 * time.Millisecond)
+		// Wait until pop() has actually entered cq.cond.Wait() before adding a
+		// call. The hook fires while cq.lock is still held by pop(), so by the
+		// time add() below manages to acquire that same lock, pop() is
+		// guaranteed to already be blocked in Wait() -- this deterministically
+		// exercises the blocking path instead of merely hoping a fixed sleep
+		// was long enough.
+		select {
+		case <-popBlocked:
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("Timed out waiting for pop() to start blocking")
+		}
 
 			call := &queuedAPICall{
 				APICall: &mockAPICall{
@@ -575,6 +587,8 @@ func TestCallQueueClose(t *testing.T) {
 	t.Run("Pop unblocks and returns nil when controller is closed", func(t *testing.T) {
 		cq := newCallQueue(mockRelevances)
 		poppedCallCh := make(chan *queuedAPICall)
+		popBlocked := make(chan struct{})
+		cq.testBeforeWait = func() { close(popBlocked) }
 
 		go func() {
 			poppedCall, popErr := cq.pop()
@@ -584,7 +598,11 @@ func TestCallQueueClose(t *testing.T) {
 			poppedCallCh <- poppedCall
 		}()
 
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-popBlocked:
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("Timed out waiting for pop() to start blocking")
+		}
 
 			cq.close()
 
