@@ -18,6 +18,7 @@ package resourcepoolstatusrequest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -63,6 +64,8 @@ const (
 	// is retained before being automatically deleted. This handles stuck requests.
 	pendingRequestTTL = 24 * time.Hour
 )
+
+var errIncompletePool = errors.New("incomplete pools detected")
 
 // Controller manages ResourcePoolStatusRequest processing.
 type Controller struct {
@@ -210,7 +213,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	if c.workqueue.NumRequeues(key) < maxRetries {
+	if c.workqueue.NumRequeues(key) < maxRetries || errors.Is(err, errIncompletePool) {
 		logger.Error(err, "Error syncing request, requeuing", "request", key)
 		c.workqueue.AddRateLimited(key)
 		return true
@@ -267,7 +270,7 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 		}
 	}
 	if hasIncomplete {
-		return fmt.Errorf("incomplete pools detected, requeueing")
+		return fmt.Errorf("%w, requeueing", errIncompletePool)
 	}
 
 	// Update the request status
