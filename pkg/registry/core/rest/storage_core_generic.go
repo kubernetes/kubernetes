@@ -64,6 +64,16 @@ type GenericConfig struct {
 
 	LoopbackClientConfig *restclient.Config
 	Informers            informers.SharedInformerFactory
+
+	// ServiceAccountStorageOverride, when set, builds the ServiceAccount REST
+	// storage instead of the default one below. It is given the secret
+	// storage's Getter, already constructed by this method. Callers that
+	// need a richer storage (e.g. the full kube-apiserver's legacy REST
+	// storage provider, which adds pod and webhook support) set this so
+	// NewRESTStorage doesn't first build a throwaway generic ServiceAccount
+	// storage that would be discarded immediately - each one starts its own
+	// etcd watch cache, so building two for the same resource is wasteful.
+	ServiceAccountStorageOverride func(secretGetter rest.Getter) (*serviceaccountstore.REST, error)
 }
 
 func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -110,10 +120,13 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 	}
 
 	var serviceAccountStorage *serviceaccountstore.REST
-	if c.ServiceAccountIssuer != nil {
+	switch {
+	case c.ServiceAccountStorageOverride != nil:
+		serviceAccountStorage, err = c.ServiceAccountStorageOverride(secretStorage.Store)
+	case c.ServiceAccountIssuer != nil:
 		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, authorizerfactory.NewAlwaysDenyAuthorizer(), c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretStorage.Store, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
 			notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, c.ExtendExpiration, c.MaxExtendedExpiration)
-	} else {
+	default:
 		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, authorizerfactory.NewAlwaysDenyAuthorizer(), 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
 			notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, false, c.MaxExtendedExpiration)
 	}
