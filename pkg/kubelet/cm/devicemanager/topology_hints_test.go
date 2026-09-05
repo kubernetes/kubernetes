@@ -1584,6 +1584,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            50, // 2 out of 4 devices allocated = 50%
 					},
 				},
 			},
@@ -1710,6 +1711,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            100, // 2 out of 2 devices allocated = 100%
 					},
 				},
 			},
@@ -2039,12 +2041,14 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            50, // 2 out of 4 devices allocated = 50%
 					},
 				},
 				"testdevice2": {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            50, // 2 out of 4 devices allocated = 50%
 					},
 				},
 			},

@@ -151,6 +151,13 @@ type TopologyHint struct {
 	// Preferred is set to true when the NUMANodeAffinity encodes a preferred
 	// allocation for the Container. It is set to false otherwise.
 	Preferred bool
+	// Score is an optional utilization signal in the range [0,100].
+	// 0 means no packing signal is provided. A non-zero value (1–100)
+	// represents the fraction of allocated resources on the NUMA node(s)
+	// covered by NUMANodeAffinity; higher values indicate more allocated.
+	// Score is populated by HintProviders and aggregated during merge,
+	// but does not influence hint selection in the current policy.
+	Score int64
 }
 
 // IsEqual checks if TopologyHint are equal
