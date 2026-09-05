@@ -1534,21 +1534,21 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(ctx context.Context, plug
 func (ctrl *PersistentVolumeController) removeDeletionProtectionFinalizer(ctx context.Context, volume *v1.PersistentVolume) error {
 	// Retrieve latest version
 	logger := klog.FromContext(ctx)
-	newVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(ctx, volume.Name, metav1.GetOptions{})
+	latestVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(ctx, volume.Name, metav1.GetOptions{})
 	if err != nil {
 		logger.Error(err, "Error reading persistent volume", "volumeName", volume.Name)
 		return err
 	}
-	volume = newVolume
+	volume = latestVolume
 	volumeClone := volume.DeepCopy()
 	pvFinalizers := volumeClone.Finalizers
 	if pvFinalizers != nil && slices.Contains(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer) {
 		volumeClone.SetFinalizers(slice.RemoveString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil))
-		_, err = ctrl.kubeClient.CoreV1().PersistentVolumes().Update(ctx, volumeClone, metav1.UpdateOptions{})
+		newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(ctx, volumeClone, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("persistent volume controller can't update finalizer: %v", err)
 		}
-		_, err = ctrl.storeVolumeUpdate(logger, volumeClone)
+		_, err = ctrl.storeVolumeUpdate(logger, newVol)
 		if err != nil {
 			return fmt.Errorf("persistent Volume Controller can't anneal migration finalizer: %v", err)
 		}
@@ -1856,12 +1856,13 @@ func (ctrl *PersistentVolumeController) rescheduleProvisioning(ctx context.Conte
 
 	// The claim from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	newClaim := claim.DeepCopy()
-	delete(newClaim.Annotations, storagehelpers.AnnSelectedNode)
+	claimClone := claim.DeepCopy()
+	delete(claimClone.Annotations, storagehelpers.AnnSelectedNode)
 	// Try to update the PVC object
 	logger := klog.FromContext(ctx)
-	if _, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(newClaim.Namespace).Update(ctx, newClaim, metav1.UpdateOptions{}); err != nil {
-		logger.V(4).Info("Failed to delete annotation 'storagehelpers.AnnSelectedNode' for PersistentVolumeClaim", "PVC", klog.KObj(newClaim), "err", err)
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(ctx, claimClone, metav1.UpdateOptions{})
+	if err != nil {
+		logger.V(4).Info("Failed to delete annotation 'storagehelpers.AnnSelectedNode' for PersistentVolumeClaim", "PVC", klog.KObj(claimClone), "err", err)
 		return
 	}
 	if _, err := ctrl.storeClaimUpdate(logger, newClaim); err != nil {
