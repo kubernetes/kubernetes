@@ -475,6 +475,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		scheduler.WithPodMaxInUnschedulablePodsDuration(cc.PodMaxInUnschedulablePodsDuration),
 		scheduler.WithExtenders(cc.ComponentConfig.Extenders...),
 		scheduler.WithParallelism(cc.ComponentConfig.Parallelism),
+		scheduler.WithAsyncClient(cc.AsyncClient),
 		scheduler.WithBuildFrameworkCapturer(func(profile kubeschedulerconfig.KubeSchedulerProfile) {
 			// Profiles are processed during Framework instantiation to set default plugins and configurations. Capturing them for logging
 			completedProfiles = append(completedProfiles, profile)
