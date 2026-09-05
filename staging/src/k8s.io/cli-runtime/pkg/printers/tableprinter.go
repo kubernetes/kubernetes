@@ -208,9 +208,9 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 				}
 				var l int
 				if s, ok := cell.(string); ok {
-					l = len(s)
+					l = cellPrintWidth(s)
 				} else {
-					l = len(fmt.Sprint(cell))
+					l = cellPrintWidth(fmt.Sprint(cell))
 				}
 				if l > maxCellWidths[i] {
 					maxCellWidths[i] = l
@@ -306,7 +306,7 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 				default:
 					cellStr = fmt.Sprint(val)
 				}
-				cellLen = len(cellStr)
+				cellLen = cellPrintWidth(cellStr)
 				rowBuf = appendCellValue(output, rowBuf, cellStr)
 			}
 			if padFirstRow && ri == 0 && i != lastVisibleCol && i < len(maxCellWidths) {
@@ -323,6 +323,34 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 		}
 	}
 	return nil
+}
+
+// cellHead returns the part of val that is printed and reports whether the
+// rest was cut off. A cell ends at its first break character because a
+// tabwriter treats one as the end of a row, so printing the remainder would
+// emit it as extra rows carrying no columns. Both the column width pre-scan
+// and the writer take the printed prefix from here, so the two cannot
+// disagree on where a value is cut.
+func cellHead(val string) (string, bool) {
+	if breakChar := strings.IndexAny(val, cellBreakChars); breakChar >= 0 {
+		return val[:breakChar], true
+	}
+	return val, false
+}
+
+// cellPrintWidth returns the number of bytes appendCellValue writes for val,
+// which is not len(val): a value is truncated at its first break character and
+// terminal-unsafe characters are escaped into longer replacements.
+func cellPrintWidth(val string) int {
+	if !strings.ContainsAny(val, cellSpecialChars) {
+		return len(val)
+	}
+	head, truncated := cellHead(val)
+	width := len(EscapeTerminal(head))
+	if truncated {
+		width += len("...")
+	}
+	return width
 }
 
 // appendCellValue appends a cell's display text to rowBuf. For the common
@@ -346,13 +374,10 @@ func appendCellValue(w io.Writer, buf []byte, val string) []byte {
 
 	// Truncate at the first break character (newline, carriage return,
 	// or formfeed — which tabwriter treats as a newline).
-	breakchar := strings.IndexAny(val, cellBreakChars)
-	if breakchar >= 0 {
-		WriteEscaped(w, val[:breakchar]) //nolint:errcheck
-		io.WriteString(w, "...")         //nolint:errcheck
-	} else {
-		// No break chars, but contains terminal-unsafe chars that need escaping.
-		WriteEscaped(w, val) //nolint:errcheck
+	head, truncated := cellHead(val)
+	WriteEscaped(w, head) //nolint:errcheck
+	if truncated {
+		io.WriteString(w, "...") //nolint:errcheck
 	}
 	return buf
 }
