@@ -295,8 +295,11 @@ func resourcesQualifiedName[T ~string](ctx context.Context, op operation.Operati
 		}
 	}
 	default:
-		// Reject names with more than one slash.
-		allErrs = append(allErrs, field.Invalid(fldPath, s, "must not contain more than one slash"))
+		// Reject names with more than one slash, but only for create operations
+		// to avoid retroactively breaking existing persisted objects.
+		if op.Type == operation.Create {
+			allErrs = append(allErrs, field.Invalid(fldPath, s, "must not contain more than one slash"))
+		}
 	}
 	return allErrs
 }

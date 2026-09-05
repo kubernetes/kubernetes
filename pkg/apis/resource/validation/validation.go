@@ -1635,11 +1635,10 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 		// 2. In the corresponding declarative validation utility `resourcesQualifiedName`
 		//    in `staging/src/k8s.io/apimachinery/pkg/api/validate/strfmt.go`.
 		//
-		// The fix should be introduced carefully, possibly using ratcheting to avoid
-		// breaking existing, non-compliant objects.
-	default:
-		// Reject names with more than one slash.
-		allErrs = append(allErrs, field.Invalid(fldPath, string(name), "must not contain more than one slash"))
+		// The fix should be introduced carefully. Ratcheting (enforcing only on
+		// creation) should be considered to avoid breaking existing, non-compliant
+		// objects. The declarative validator `resourcesQualifiedName` handles
+		// ratcheting via `operation.Operation` when possible.
 	}
 
 	return allErrs
