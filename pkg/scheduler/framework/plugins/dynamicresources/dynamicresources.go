@@ -1859,7 +1859,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, pod
 					// the Pods sharing that pending allocation and they can be
 					// Reserved again in another cycle.
 					if podGroupState != nil {
-						delete(podGroupState.pendingAllocations, claim.UID)
+						delete(podGroupState.pendingAllocations, claimUIDs[0])
 					}
 					logger.V(5).Info("Removed claim from in-flight claims", "claim", klog.KObj(claim), "uid", claimUID, "resourceVersion", resourceVersion, "allocation", klog.Format(allocation))
 				}

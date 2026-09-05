@@ -1279,6 +1279,47 @@ func TestPlugin(t *testing.T) {
 	testPlugin(ktesting.Init(t))
 }
 
+func TestPreBindExtendedResourceClaimCleansUpPodGroupPendingAllocation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+
+	testCtx := setup(tCtx, nil, []*v1.Node{workerNode}, nil, []*resourceapi.DeviceClass{deviceClassWithExtendResourceName}, []*schedulingapi.PodGroup{podGroupWithClaimName}, []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName}, feature.Features{
+		EnableDRAAdminAccess:               true,
+		EnableDRADeviceBindingConditions:   true,
+		EnableDRAResourceClaimDeviceStatus: true,
+		EnableDRASchedulerFilterTimeout:    true,
+		EnableDynamicResourceAllocation:    true,
+		EnableDRAExtendedResource:          true,
+	}, false, nil)
+
+	status := testCtx.p.PreEnqueue(tCtx, podWithExtendedResourceName)
+	require.True(tCtx, status.IsSuccess(), status)
+	_, status = testCtx.p.PreFilter(tCtx, testCtx.state, podWithExtendedResourceName, []fwk.NodeInfo{framework.NewNodeInfo()})
+	require.True(tCtx, status.IsSuccess(), status)
+
+	pluginState, err := getStateData(testCtx.state)
+	require.NoError(tCtx, err)
+	originalClaimUID := pluginState.claims.extendedResourceClaim().UID
+
+	status = testCtx.p.Filter(tCtx, testCtx.state, podWithExtendedResourceName, testCtx.nodeInfos[0])
+	require.True(tCtx, status.IsSuccess(), status)
+	status = testCtx.p.Reserve(tCtx, testCtx.state, podWithExtendedResourceName, nodeName)
+	require.Nil(tCtx, status)
+
+	podGroupState, err := getPodGroupStateData(testCtx.state)
+	require.NoError(tCtx, err)
+	_, exists := podGroupState.pendingAllocations[originalClaimUID]
+	require.True(tCtx, exists, "Reserve did not store the pending allocation under the original claim UID")
+
+	status = testCtx.p.PreBind(tCtx, testCtx.state, podWithExtendedResourceName, nodeName)
+	require.Nil(tCtx, status)
+
+	if _, exists := podGroupState.pendingAllocations[originalClaimUID]; exists {
+		t.Fatalf("pending allocation for original claim UID was not cleaned up")
+	}
+	assert.Empty(tCtx, podGroupState.pendingAllocations)
+}
+
 func TestPreFilterReusesPendingAllocationWithNilNodeSelector(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
