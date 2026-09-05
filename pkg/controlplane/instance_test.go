@@ -27,9 +27,11 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
@@ -42,6 +44,7 @@ import (
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -49,6 +52,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -195,6 +199,76 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 	strategyErrors := registrytest.ValidateStorageStrategies(apiGroupInfo.VersionedResourcesStorageMap["v1"])
 	for _, err := range strategyErrors {
 		t.Error(err)
+	}
+}
+
+// countingRESTOptionsGetter wraps a real generic.RESTOptionsGetter and counts
+// how many times GetRESTOptions is called per GroupResource. Each call
+// stands up a new etcd watch cache for that resource, so the count is a
+// direct measure of how many REST storage backends get constructed for it.
+type countingRESTOptionsGetter struct {
+	generic.RESTOptionsGetter
+	mu     sync.Mutex
+	counts map[schema.GroupResource]int
+}
+
+func (c *countingRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource, example runtime.Object) (generic.RESTOptions, error) {
+	c.mu.Lock()
+	if c.counts == nil {
+		c.counts = map[schema.GroupResource]int{}
+	}
+	c.counts[resource]++
+	c.mu.Unlock()
+	return c.RESTOptionsGetter.GetRESTOptions(resource, example)
+}
+
+// fakeServiceAccountTokenGenerator is a no-op serviceaccount.TokenGenerator,
+// used only to exercise the ServiceAccountIssuer-configured code path of the
+// legacy core REST storage provider.
+type fakeServiceAccountTokenGenerator struct{}
+
+func (fakeServiceAccountTokenGenerator) GenerateToken(ctx context.Context, claims *jwt.Claims, privateClaims interface{}) (string, error) {
+	return "fake-token", nil
+}
+
+// TestServiceAccountStorageBuiltOnce ensures the legacy core REST storage
+// provider constructs exactly one ServiceAccount REST storage backend, even
+// though ServiceAccountIssuer is configured (the common case for a real
+// cluster). Building two - one generic, immediately discarded, plus one
+// pod-aware - means two separate etcd watch caches doing a full LIST at
+// startup for the same resource. See
+// https://github.com/kubernetes/kubernetes/issues/133877.
+func TestServiceAccountStorageBuiltOnce(t *testing.T) {
+	_, etcdserver, apiserverCfg, _ := newInstance(t)
+	defer etcdserver.Terminate(t)
+
+	genericConfig := *apiserverCfg.ControlPlane.NewCoreGenericConfig()
+	genericConfig.ServiceAccountIssuer = fakeServiceAccountTokenGenerator{}
+
+	storageProvider, err := corerest.New(corerest.Config{
+		GenericConfig: genericConfig,
+		Proxy: corerest.ProxyConfig{
+			Transport:           apiserverCfg.ControlPlane.Extra.ProxyTransport,
+			KubeletClientConfig: apiserverCfg.Extra.KubeletClientConfig,
+		},
+		Services: corerest.ServicesConfig{
+			ClusterIPRange: apiserverCfg.Extra.ServiceIPRange,
+			NodePortRange:  apiserverCfg.Extra.ServiceNodePortRange,
+		},
+		Authorizer: apiserverCfg.ControlPlane.Generic.Authorization.Authorizer,
+	}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+
+	countingGetter := &countingRESTOptionsGetter{RESTOptionsGetter: apiserverCfg.ControlPlane.Generic.RESTOptionsGetter}
+	if _, err := storageProvider.NewRESTStorage(serverstorage.NewResourceConfig(), countingGetter); err != nil {
+		t.Fatalf("failed to create legacy REST storage: %v", err)
+	}
+
+	serviceAccountsResource := schema.GroupResource{Resource: "serviceaccounts"}
+	if got := countingGetter.counts[serviceAccountsResource]; got != 1 {
+		t.Errorf("expected exactly 1 ServiceAccount REST storage to be built, got %d", got)
 	}
 }
 
