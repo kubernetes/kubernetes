@@ -458,7 +458,7 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 		// format must be BinarySI
 		number, exponent := rounded.AsCanonicalBase1024Bytes(out)
 		suffix, ok := quantitySuffixer.constructBytes(2, exponent*10, format)
-		if !ok {
+		if !ok && exponent != 0 {
 			// BinarySI only defines suffixes up to "Ei" (2^60). For a larger
 			// exponent there is no suffix, so fall back to decimal exponent
 			// notation ("e") instead of dropping the suffix, which would
