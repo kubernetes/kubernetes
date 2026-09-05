@@ -68,8 +68,7 @@ type Indexer interface {
 	Get(obj interface{}) (item interface{}, exists bool, err error)
 	GetByKey(key string) (item interface{}, exists bool, err error)
 	Replace([]interface{}, string) error
-	ByIndex(indexName, indexedValue string) ([]interface{}, error)
-	Count(prefix, continueKey string) (count int)
+	ByIndex(indexName, indexedValue string) ([]*Element, error)
 	Clone() Snapshot
 	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
@@ -78,12 +77,14 @@ type Indexer interface {
 type Snapshot interface {
 	GetByKey(key string) (item interface{}, exists bool, err error)
 	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
-	// RangePrefix iterates the elements with the given key prefix, in key
-	// order, starting from continueKey.
-	RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error]
-	// Count returns the number of items RangePrefix(prefix, continueKey)
-	// would visit.
-	Count(prefix, continueKey string) (count int)
+	RangePrefix(prefix, continueKey string) Range
+}
+
+// Range is the part of a Snapshot under one key prefix from a lower bound,
+// in key order.
+type Range interface {
+	All() iter.Seq[*Element]
+	Count() int
 }
 
 func NewIndexer(indexers *cache.Indexers) Indexer {
