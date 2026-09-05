@@ -35,7 +35,7 @@ var map_Event = map[string]string{
 	"reportingController":      "reportingController is the name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`. This field cannot be empty for new Events.",
 	"reportingInstance":        "reportingInstance is the ID of the controller instance, e.g. `kubelet-xyzf`. This field cannot be empty for new Events and it can have at most 128 characters.",
 	"action":                   "action is what action was taken/failed regarding to the regarding object. It is machine-readable. This field cannot be empty for new Events and it can have at most 128 characters.",
-	"reason":                   "reason is why the action was taken. It is human-readable. This field cannot be empty for new Events and it can have at most 128 characters.",
+	"reason":                   "reason is why the action was taken. It is a short, machine-readable CamelCase string, e.g. `FailedScheduling`. This field cannot be empty for new Events and it can have at most 128 characters.",
 	"regarding":                "regarding contains the object this Event is about. In most cases it's an Object reporting controller implements, e.g. ReplicaSetController implements ReplicaSets and this event is emitted because it acts on some changes in a ReplicaSet object.",
 	"related":                  "related is the optional secondary object for more complex actions. E.g. when regarding object triggers a creation or deletion of related object.",
 	"note":                     "note is a human-readable description of the status of this operation. Maximal length of the note is 1kB, but libraries should be prepared to handle values up to 64kB.",
