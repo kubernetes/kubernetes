@@ -784,6 +784,61 @@ func TestPrintTable_ConsistentAlignmentAcrossFlushes(t *testing.T) {
 	})
 }
 
+// TestPrintTable_ColumnWidthUsesPrintedCellWidth verifies that a cell holding a
+// break character does not widen its column to the untruncated length of the
+// value. printTable pre-scans cell widths to prime the tabwriter, and that scan
+// has to measure what appendCellValue actually writes: everything from the
+// first break character onwards is replaced by "...".
+func TestPrintTable_ColumnWidthUsesPrintedCellWidth(t *testing.T) {
+	build := func(msg string) *metav1.Table {
+		return &metav1.Table{
+			ColumnDefinitions: []metav1.TableColumnDefinition{
+				{Name: "NAME", Type: "string"},
+				{Name: "MESSAGE", Type: "string"},
+				{Name: "AGE", Type: "string"},
+			},
+			Rows: []metav1.TableRow{
+				{Cells: []interface{}{"a", "short", "1d"}},
+				{Cells: []interface{}{"b", msg, "2d"}},
+				{Cells: []interface{}{"c", "tail", "3d"}},
+			},
+		}
+	}
+
+	render := func(t *testing.T, table *metav1.Table, options PrintOptions) string {
+		t.Helper()
+		out := &bytes.Buffer{}
+		if err := NewTablePrinter(options).PrintObj(table, out); err != nil {
+			t.Fatalf("PrintObj error: %v", err)
+		}
+		return out.String()
+	}
+
+	// The multi-line value is printed as "line-one...", so it has to lay out
+	// exactly like a cell that literally holds "line-one...".
+	const truncated = "line-one..."
+	multiline := "line-one\nline-two-is-much-longer-than-it-looks"
+
+	for _, options := range []PrintOptions{{}, {NoHeaders: true}} {
+		name := "WithHeaders"
+		if options.NoHeaders {
+			name = "NoHeaders"
+		}
+		t.Run(name, func(t *testing.T) {
+			got := render(t, build(multiline), options)
+			want := render(t, build(truncated), options)
+			if got != want {
+				t.Errorf("column layout differs from an equivalent already-truncated cell:\ngot:\n%s\nwant:\n%s", got, want)
+			}
+			for _, line := range strings.Split(strings.TrimRight(got, "\n"), "\n") {
+				if strings.Contains(line, strings.Repeat(" ", 12)) {
+					t.Errorf("column padded well past the widest printed cell: %q", line)
+				}
+			}
+		})
+	}
+}
+
 // columnStartOffsets returns the byte offsets of the start of each non-first
 // column on a tabwriter-formatted line. A column starts at the first non-space
 // byte following a run of >=2 spaces. This matches tabwriter's inter-column
