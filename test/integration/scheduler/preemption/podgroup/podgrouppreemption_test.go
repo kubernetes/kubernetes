@@ -39,6 +39,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	k8suuid "k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -1125,8 +1126,18 @@ func TestPodGroupPreemption(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		for _, cpgEnabled := range []bool{true, false} {
+	for _, cpgEnabled := range []bool{true, false} {
+		// The API server configuration depends on these feature gates, so start
+		// one server per CPG setting and share it across the subtests.
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.PodLevelResources:               true,
+			features.GenericWorkload:                 true,
+			features.TopologyAwareWorkloadScheduling: true,
+			features.CompositePodGroup:               cpgEnabled,
+		})
+		sharedAPICtx := testutils.InitTestAPIServer(t, "podgroup-preemption", nil)
+
+		for _, tt := range tests {
 			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 					features.PodLevelResources:               true,
@@ -1170,9 +1181,10 @@ func TestPodGroupPreemption(t *testing.T) {
 					t.Fatalf("Error registering a pg post filter plugin: %v", err)
 				}
 
+				testSchedulerName := "podgroup-scheduler-" + string(k8suuid.NewUUID())
 				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 					Profiles: []configv1.KubeSchedulerProfile{{
-						SchedulerName: new(v1.DefaultSchedulerName),
+						SchedulerName: &testSchedulerName,
 						Plugins: &configv1.Plugins{
 							MultiPoint: configv1.PluginSet{
 								Enabled: []configv1.Plugin{
@@ -1202,12 +1214,20 @@ func TestPodGroupPreemption(t *testing.T) {
 
 				// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
 				// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
-				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption",
+				testCtx := testutils.InitTestSchedulerWithOptions(t,
+					testutils.WithNewNamespace(t, sharedAPICtx, "podgroup-preemption"),
+					0,
 					scheduler.WithProfiles(cfg.Profiles...),
 					scheduler.WithFrameworkOutOfTreeRegistry(registry),
 					scheduler.WithPodMaxBackoffSeconds(1),
 					scheduler.WithPodInitialBackoffSeconds(0))
+				testutils.SyncSchedulerInformerFactory(testCtx)
+				go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+				defer testCtx.SchedulerCloseFn()
 				cs, ns := testCtx.ClientSet, testCtx.NS.Name
+				t.Cleanup(func() {
+					cleanupSharedPodGroupPreemptionResources(t, testCtx.Ctx, cs, ns, tt.initialPods, tt.preemptorPods, tt.podGroups, nil, tt.pdb, tt.nodes)
+				})
 
 				// Create nodes
 				for _, n := range tt.nodes {
@@ -1235,6 +1255,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				// 2. Create initial pods
 				for _, p := range tt.initialPods {
 					p.Namespace = ns
+					p.Spec.SchedulerName = testSchedulerName
 					if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 					}
@@ -1266,6 +1287,7 @@ func TestPodGroupPreemption(t *testing.T) {
 
 				for _, p := range tt.preemptorPods {
 					p.Namespace = ns
+					p.Spec.SchedulerName = testSchedulerName
 					if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 					}
@@ -1436,6 +1458,57 @@ func TestPodGroupPreemption(t *testing.T) {
 					}
 				}
 			})
+		}
+	}
+}
+
+// cleanupSharedPodGroupPreemptionResources removes every resource that can
+// affect scheduling in a later subtest. Namespace deletion alone is
+// asynchronous and cannot provide that isolation when the API server is
+// shared.
+func cleanupSharedPodGroupPreemptionResources(t *testing.T, ctx context.Context, cs clientset.Interface, ns string, initialPods, preemptorPods []*v1.Pod, podGroups []*schedulingv1beta1.PodGroup, compositePodGroups []*schedulingv1alpha3.CompositePodGroup, pdb *policyv1.PodDisruptionBudget, nodes []*v1.Node) {
+	t.Helper()
+
+	pods := append(append([]*v1.Pod{}, initialPods...), preemptorPods...)
+	testutils.CleanupPods(ctx, cs, t, pods)
+
+	pgNames := make([]string, 0, len(podGroups))
+	for _, pg := range podGroups {
+		pgNames = append(pgNames, pg.Name)
+	}
+	if err := deletePodGroups(ctx, cs, ns, pgNames); err != nil {
+		t.Errorf("Failed to delete PodGroups in namespace %s: %v", ns, err)
+	}
+
+	cpgNames := make([]string, 0, len(compositePodGroups))
+	for _, cpg := range compositePodGroups {
+		cpgNames = append(cpgNames, cpg.Name)
+	}
+	if err := deleteCompositePodGroups(ctx, cs, ns, cpgNames); err != nil {
+		t.Errorf("Failed to delete CompositePodGroups in namespace %s: %v", ns, err)
+	}
+
+	if pdb != nil {
+		if err := cs.PolicyV1().PodDisruptionBudgets(ns).Delete(ctx, pdb.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			t.Errorf("Failed to delete PDB %s/%s: %v", ns, pdb.Name, err)
+		} else if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			_, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, pdb.Name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err), nil
+		}); err != nil {
+			t.Errorf("Failed to wait for PDB %s/%s to be deleted: %v", ns, pdb.Name, err)
+		}
+	}
+
+	for _, node := range nodes {
+		if err := cs.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			t.Errorf("Failed to delete node %s: %v", node.Name, err)
+			continue
+		}
+		if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			_, err := cs.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err), nil
+		}); err != nil {
+			t.Errorf("Failed to wait for node %s to be deleted: %v", node.Name, err)
 		}
 	}
 }
@@ -2324,6 +2397,13 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 		},
 	}
 
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.CompositePodGroup:               true,
+		features.TopologyAwareWorkloadScheduling: true,
+	})
+	sharedAPICtx := testutils.InitTestAPIServer(t, "cpg-preemption", nil)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -2371,9 +2451,10 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				}
 			}
 
+			testSchedulerName := "cpg-scheduler-" + string(k8suuid.NewUUID())
 			cfgV1 := configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{{
-					SchedulerName: new(v1.DefaultSchedulerName),
+					SchedulerName: &testSchedulerName,
 					Plugins: &configv1.Plugins{
 						MultiPoint: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
@@ -2396,12 +2477,20 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 
 			// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
 			// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
-			testCtx := testutils.InitTestSchedulerWithNS(t, "cpg-preemption",
+			testCtx := testutils.InitTestSchedulerWithOptions(t,
+				testutils.WithNewNamespace(t, sharedAPICtx, "cpg-preemption"),
+				0,
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithPodMaxBackoffSeconds(1),
 				scheduler.WithPodInitialBackoffSeconds(0))
+			testutils.SyncSchedulerInformerFactory(testCtx)
+			go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+			defer testCtx.SchedulerCloseFn()
 			cs, ns := testCtx.ClientSet, testCtx.NS.Name
+			t.Cleanup(func() {
+				cleanupSharedPodGroupPreemptionResources(t, testCtx.Ctx, cs, ns, tt.initialPods, tt.preemptorPods, tt.podGroups, tt.compositePodGroups, tt.pdb, tt.nodes)
+			})
 
 			// Create nodes
 			for _, n := range tt.nodes {
@@ -2437,6 +2526,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			// 4. Create initial pods
 			for _, p := range tt.initialPods {
 				p.Namespace = ns
+				p.Spec.SchedulerName = testSchedulerName
 				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
@@ -2477,6 +2567,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 
 			for _, p := range tt.preemptorPods {
 				p.Namespace = ns
+				p.Spec.SchedulerName = testSchedulerName
 				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
