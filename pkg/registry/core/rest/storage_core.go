@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -157,12 +158,47 @@ func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvid
 }
 
 func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
-	apiGroupInfo, err := p.GenericConfig.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
+	podDisruptionClient, err := policyclient.NewForConfig(p.LoopbackClientConfig)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	podDisruptionClient, err := policyclient.NewForConfig(p.LoopbackClientConfig)
+	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, p.Proxy.KubeletClientConfig, p.Proxy.Transport)
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	}
+
+	podStorage, err := podstore.NewStorage(
+		restOptionsGetter,
+		nodeStorage.KubeletConnectionInfo,
+		p.Proxy.Transport,
+		podDisruptionClient,
+		p.authorizer,
+	)
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	}
+
+	// client for getting service account token bound objects
+	whClient, err := admissionregistrationv1client.NewForConfig(p.LoopbackClientConfig)
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	}
+
+	// Build the richer, pod-aware ServiceAccount storage directly instead of
+	// letting GenericConfig.NewRESTStorage build its own generic one first:
+	// both variants would otherwise each stand up their own etcd watch
+	// cache for the same resource, and this one always replaces that one
+	// whenever an issuer is configured.
+	p.GenericConfig.ServiceAccountStorageOverride = func(secretGetter rest.Getter) (*serviceaccountstore.REST, error) {
+		if p.ServiceAccountIssuer != nil {
+			return serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.Authorizer, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, secretGetter, nodeStorage.Node.Store,
+				whClient.ValidatingWebhookConfigurations(), whClient.MutatingWebhookConfigurations(), p.ExtendExpiration, p.MaxExtendedExpiration)
+		}
+		return serviceaccountstore.NewREST(restOptionsGetter, nil, nil, authorizerfactory.NewAlwaysDenyAuthorizer(), 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
+			notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, false, p.MaxExtendedExpiration)
+	}
+	apiGroupInfo, err := p.GenericConfig.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -191,22 +227,6 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, p.Proxy.KubeletClientConfig, p.Proxy.Transport)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	podStorage, err := podstore.NewStorage(
-		restOptionsGetter,
-		nodeStorage.KubeletConnectionInfo,
-		p.Proxy.Transport,
-		podDisruptionClient,
-		p.authorizer,
-	)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
 	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
 		restOptionsGetter,
 		p.primaryServiceClusterIPAllocator.IPFamily(),
@@ -222,22 +242,6 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	storage := apiGroupInfo.VersionedResourcesStorageMap["v1"]
 	if storage == nil {
 		storage = map[string]rest.Storage{}
-	}
-
-	// client for getting service account token bound objects
-	whClient, err := admissionregistrationv1client.NewForConfig(p.LoopbackClientConfig)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	// potentially override the generic serviceaccount storage with one that supports pods
-	var serviceAccountStorage *serviceaccountstore.REST
-	if p.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.Authorizer, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeStorage.Node.Store,
-			whClient.ValidatingWebhookConfigurations(), whClient.MutatingWebhookConfigurations(), p.ExtendExpiration, p.MaxExtendedExpiration)
-		if err != nil {
-			return genericapiserver.APIGroupInfo{}, err
-		}
 	}
 
 	if resource := "pods"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
@@ -275,20 +279,6 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		storage[resource+"/status"] = controllerStorage.Status
 		if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 			storage[resource+"/scale"] = controllerStorage.Scale
-		}
-	}
-
-	// potentially override generic storage for service account (with pod support)
-	if resource := "serviceaccounts"; serviceAccountStorage != nil && apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		// don't leak go routines
-		storage[resource].Destroy()
-		if storage[resource+"/token"] != nil {
-			storage[resource+"/token"].Destroy()
-		}
-
-		storage[resource] = serviceAccountStorage
-		if serviceAccountStorage.Token != nil {
-			storage[resource+"/token"] = serviceAccountStorage.Token
 		}
 	}
 
