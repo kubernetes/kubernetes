@@ -781,6 +781,24 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			expectedErrs:      nil,
 		},
 		{
+			name:              "missing resourceVersion on update",
+			obj:               mkMeta(tweakResourceVersion("")),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("resourceVersion"), "", "must be specified for an update").WithOrigin("update").MarkAlpha(),
+			},
+		},
+		{
+			name:              "missing resourceVersion on update with empty old resourceVersion",
+			obj:               mkMeta(tweakResourceVersion("")),
+			oldObj:            mkMeta(tweakResourceVersion("")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("resourceVersion"), "", "must be specified for an update").WithOrigin("update").MarkAlpha(),
+			},
+		},
+		{
 			name:              "valid generation zero on update",
 			obj:               mkMeta(tweakResourceVersion("2"), tweakGeneration(0)),
 			oldObj:            mkMeta(tweakResourceVersion("1"), tweakGeneration(0)),

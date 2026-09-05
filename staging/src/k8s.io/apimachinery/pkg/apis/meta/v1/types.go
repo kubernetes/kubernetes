@@ -128,6 +128,7 @@ const (
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
 // users must create.
+// +k8s:alpha(since: "1.38")=+k8s:customValidation
 type ObjectMeta struct {
 	// Name must be unique within a namespace. Is required when creating resources, although
 	// some resources may allow a client to request the generation of an appropriate name
