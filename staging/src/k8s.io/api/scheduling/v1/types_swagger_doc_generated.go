@@ -34,6 +34,7 @@ var map_PriorityClass = map[string]string{
 	"globalDefault":    "globalDefault specifies whether this PriorityClass should be considered as the default priority for pods that do not have any priority class. Only one PriorityClass can be marked as `globalDefault`. However, if more than one PriorityClasses exists with their `globalDefault` field set to true, the smallest value of such global default PriorityClasses will be used as the default priority.",
 	"description":      "description is an arbitrary string that usually provides guidelines on when this priority class should be used.",
 	"preemptionPolicy": "preemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.",
+	"allowDisruptionByPriorityGreaterThanOrEqual": "allowDisruptionByPriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for pods associated with this priority class can only be violated by pods with a priority value greater than or equal to allowDisruptionByPriorityGreaterThanOrEqual during a preemption process. The value of allowDisruptionByPriorityGreaterThanOrEqual cannot be greater than the priority value of system-cluster-critical or system-node-critical. A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pod with a higher priority. This field is alpha-level and is only honored when the DisruptionPolicyInPriorityClass feature gate is enabled.",
 }
 
 func (PriorityClass) SwaggerDoc() map[string]string {

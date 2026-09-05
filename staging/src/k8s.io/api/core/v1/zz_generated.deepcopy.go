@@ -4802,6 +4802,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.AllowDisruptionByPriorityGreaterThanOrEqual != nil {
+		in, out := &in.AllowDisruptionByPriorityGreaterThanOrEqual, &out.AllowDisruptionByPriorityGreaterThanOrEqual
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

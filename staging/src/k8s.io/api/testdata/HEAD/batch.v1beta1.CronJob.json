@@ -1986,7 +1986,8 @@
                 "name": "nameValue",
                 "priority": 2
               }
-            ]
+            ],
+            "allowDisruptionByPriorityGreaterThanOrEqual": 45
           }
         },
         "ttlSecondsAfterFinished": 8,

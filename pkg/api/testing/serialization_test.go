@@ -216,7 +216,15 @@ func TestCommonKindsRegistered(t *testing.T) {
 func TestRoundTripTypes(t *testing.T) {
 	seed := rand.Int63()
 	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)
-	nonRoundTrippableTypes := map[schema.GroupVersionKind]bool{}
+	nonRoundTrippableTypes := map[schema.GroupVersionKind]bool{
+		// scheduling.k8s.io/v1beta1 PriorityClass was removed from serving in 1.22 (see
+		// +k8s:prerelease-lifecycle-gen:removed=1.22) and is frozen; it has no equivalent
+		// of the alpha-level allowDisruptionByPriorityGreaterThanOrEqual field added to the
+		// internal type and scheduling.k8s.io/v1, so round-tripping through it is lossy by
+		// design (see pkg/apis/scheduling/v1beta1/conversion.go).
+		{Group: "scheduling.k8s.io", Version: "v1beta1", Kind: "PriorityClass"}:     true,
+		{Group: "scheduling.k8s.io", Version: "v1beta1", Kind: "PriorityClassList"}: true,
+	}
 
 	roundtrip.RoundTripTypes(t, legacyscheme.Scheme, legacyscheme.Codecs, fuzzer, nonRoundTrippableTypes)
 }

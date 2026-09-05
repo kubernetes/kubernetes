@@ -3120,6 +3120,44 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			expectedNumViolatingVictim: 1,
 		},
 		{
+			name:      "DisruptionPolicyInPriorityClass: preemptor with insufficient priority cannot violate a guaranteed PDB",
+			nodeNames: []string{"node1"},
+			mainNode:  "node1",
+			features:  feature.Features{EnableDisruptionPolicyInPriorityClass: true},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Label("app", "foo").Priority(lowPriority).AllowDisruptionByPriorityGreaterThanOrEqual(veryHighPriority).Req(mediumRes).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Label("app", "foo").Priority(midPriority).AllowDisruptionByPriorityGreaterThanOrEqual(veryHighPriority).Req(mediumRes).Obj(),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					Spec:   policy.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}},
+					Status: policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				},
+			},
+			preemptor:      st.MakePod().Name("p").UID("p").Priority(highPriority).Req(largeRes).Obj(),
+			expectedPods:   nil,
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "preemption would violate a PodDisruptionBudget guaranteed for pods at this priority"),
+		},
+		{
+			name:      "DisruptionPolicyInPriorityClass: preemptor with sufficient priority may still violate the PDB",
+			nodeNames: []string{"node1"},
+			mainNode:  "node1",
+			features:  feature.Features{EnableDisruptionPolicyInPriorityClass: true},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Label("app", "foo").Priority(lowPriority).AllowDisruptionByPriorityGreaterThanOrEqual(midPriority).Req(mediumRes).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Label("app", "foo").Priority(midPriority).AllowDisruptionByPriorityGreaterThanOrEqual(midPriority).Req(mediumRes).Obj(),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					Spec:   policy.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}},
+					Status: policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				},
+			},
+			preemptor:                  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(largeRes).Obj(),
+			expectedPods:               sets.New("v1"),
+			expectedNumViolatingVictim: 1,
+		},
+		{
 			name:      "Workload Aware: Atomic preemption of PodGroup",
 			nodeNames: []string{"node1"},
 			mainNode:  "node1",

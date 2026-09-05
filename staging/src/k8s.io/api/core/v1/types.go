@@ -4742,6 +4742,20 @@ type PodSpec struct {
 	// +k8s:maxItems=10
 	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+
+	// allowDisruptionByPriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for this pod
+	// can only be violated during scheduler preemption by pods with a priority value greater than or
+	// equal to allowDisruptionByPriorityGreaterThanOrEqual. The value of
+	// allowDisruptionByPriorityGreaterThanOrEqual cannot be greater than the priority value of
+	// system-cluster-critical or system-node-critical.
+	// When the Priority Admission Controller is enabled, it prevents users from setting this field
+	// directly; the admission controller populates it from the pod's PriorityClassName.
+	// A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pod
+	// with a higher priority.
+	// This field is alpha-level and is only honored when the DisruptionPolicyInPriorityClass
+	// feature gate is enabled.
+	// +optional
+	AllowDisruptionByPriorityGreaterThanOrEqual *int32 `json:"allowDisruptionByPriorityGreaterThanOrEqual,omitempty" protobuf:"varint,45,opt,name=allowDisruptionByPriorityGreaterThanOrEqual"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly

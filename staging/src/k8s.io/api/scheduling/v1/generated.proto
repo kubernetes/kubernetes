@@ -60,6 +60,18 @@ message PriorityClass {
   // Defaults to PreemptLowerPriority if unset.
   // +optional
   optional string preemptionPolicy = 5;
+
+  // allowDisruptionByPriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for pods
+  // associated with this priority class can only be violated by pods with a priority value greater
+  // than or equal to allowDisruptionByPriorityGreaterThanOrEqual during a preemption process. The
+  // value of allowDisruptionByPriorityGreaterThanOrEqual cannot be greater than the priority value
+  // of system-cluster-critical or system-node-critical.
+  // A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pod
+  // with a higher priority.
+  // This field is alpha-level and is only honored when the DisruptionPolicyInPriorityClass
+  // feature gate is enabled.
+  // +optional
+  optional int32 allowDisruptionByPriorityGreaterThanOrEqual = 6;
 }
 
 // PriorityClassList is a collection of priority classes.

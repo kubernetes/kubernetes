@@ -400,6 +400,13 @@ func (p *PodWrapper) Priority(val int32) *PodWrapper {
 	return p
 }
 
+// AllowDisruptionByPriorityGreaterThanOrEqual sets the allowDisruptionByPriorityGreaterThanOrEqual
+// value into PodSpec of the inner pod.
+func (p *PodWrapper) AllowDisruptionByPriorityGreaterThanOrEqual(val int32) *PodWrapper {
+	p.Spec.AllowDisruptionByPriorityGreaterThanOrEqual = &val
+	return p
+}
+
 // CreationTimestamp sets the inner pod's CreationTimestamp.
 func (p *PodWrapper) CreationTimestamp(t metav1.Time) *PodWrapper {
 	p.ObjectMeta.CreationTimestamp = t

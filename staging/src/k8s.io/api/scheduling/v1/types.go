@@ -58,6 +58,18 @@ type PriorityClass struct {
 	// Defaults to PreemptLowerPriority if unset.
 	// +optional
 	PreemptionPolicy *apiv1.PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,5,opt,name=preemptionPolicy"`
+
+	// allowDisruptionByPriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for pods
+	// associated with this priority class can only be violated by pods with a priority value greater
+	// than or equal to allowDisruptionByPriorityGreaterThanOrEqual during a preemption process. The
+	// value of allowDisruptionByPriorityGreaterThanOrEqual cannot be greater than the priority value
+	// of system-cluster-critical or system-node-critical.
+	// A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pod
+	// with a higher priority.
+	// This field is alpha-level and is only honored when the DisruptionPolicyInPriorityClass
+	// feature gate is enabled.
+	// +optional
+	AllowDisruptionByPriorityGreaterThanOrEqual *int32 `json:"allowDisruptionByPriorityGreaterThanOrEqual,omitempty" protobuf:"varint,6,opt,name=allowDisruptionByPriorityGreaterThanOrEqual"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
