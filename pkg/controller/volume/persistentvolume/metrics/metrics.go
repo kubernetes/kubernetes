@@ -147,7 +147,7 @@ var (
 		&metrics.CounterOpts{
 			Name:           "volume_operation_errors_total",
 			Help:           "Total volume operation errors",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"plugin_name", "operation_name"})
 
@@ -286,7 +286,7 @@ func RecordRetroactiveStorageClassMetric(success bool) {
 }
 
 // RecordVolumeOperationErrorMetric records error count into metric
-// volume_operation_total_errors for provisioning/deletion operations
+// volume_operation_errors_total for provisioning/deletion operations
 func RecordVolumeOperationErrorMetric(pluginName, opName string) {
 	if pluginName == "" {
 		pluginName = "N/A"

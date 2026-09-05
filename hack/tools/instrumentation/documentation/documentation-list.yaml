@@ -7297,16 +7297,6 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: volume_operation_errors_total
-  help: Total volume operation errors
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - operation_name
-  - plugin_name
-  componentEndpoints:
-  - component: kube-controller-manager
-    endpoint: /metrics
 - name: volume_operation_total_errors
   help: Total volume operation errors
   type: Counter
@@ -8277,6 +8267,16 @@
   - 600
   componentEndpoints:
   - component: kubelet
+    endpoint: /metrics
+- name: volume_operation_errors_total
+  help: Total volume operation errors
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - operation_name
+  - plugin_name
+  componentEndpoints:
+  - component: kube-controller-manager
     endpoint: /metrics
 - name: volume_operation_total_seconds
   help: Storage operation end to end duration in seconds
