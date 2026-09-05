@@ -224,7 +224,17 @@ func Revision(obj runtime.Object) (int64, error) {
 	if !ok {
 		return 0, nil
 	}
-	return strconv.ParseInt(v, 10, 64)
+	revision, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	if revision < 0 {
+		return 0, fmt.Errorf("invalid negative revision %d", revision)
+	}
+	if revision >= math.MaxInt64 {
+		return 0, fmt.Errorf("invalid revision %d: would overflow", revision)
+	}
+	return revision, nil
 }
 
 // SetNewReplicaSetAnnotations sets new replica set's annotations appropriately by updating its revision and
