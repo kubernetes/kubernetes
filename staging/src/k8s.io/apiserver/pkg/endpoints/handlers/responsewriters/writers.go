@@ -17,6 +17,7 @@ limitations under the License.
 package responsewriters
 
 import (
+	"bufio"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -24,6 +25,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -148,7 +150,23 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 
 var gzipPool = NewGzipWriterPoolOrDie()
 
+// batchBufferPool holds the buffers that batch a response's writes on their
+// way to the http.ResponseWriter. Streamed list responses are written one
+// item at a time, and each write that reaches net/http costs a chunk frame
+// (HTTP/1.1) or a cross-goroutine frame handoff (HTTP/2); batching them into
+// batchBufferBytes writes removes most of that cost.
+// TODO: engage lazily so small responses don't hold a pooled buffer.
+var batchBufferPool = &sync.Pool{
+	New: func() interface{} {
+		return bufio.NewWriterSize(nil, batchBufferBytes)
+	},
+}
+
 const (
+	// batchBufferBytes is the size of the writes a batched response makes to
+	// the http.ResponseWriter (128KiB is the smallest size past which larger
+	// batches stop helping).
+	batchBufferBytes = 128 * 1024
 	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
 	// if the client requests it.
@@ -167,7 +185,10 @@ type deferredResponseWriter struct {
 	buffer      []byte
 	hasWritten  bool
 	hw          http.ResponseWriter
-	w           io.Writer
+	// batch sits directly above hw once the response is committed (below the
+	// gzip writer, if any) and batches the writes that reach hw.
+	batch *bufio.Writer
+	w     io.Writer
 	// totalBytes is the number of bytes written to `w` and does not include buffered bytes
 	totalBytes int
 	// lastWriteErr holds the error result (if any) of the last write attempt to `w`
@@ -234,17 +255,19 @@ func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 
 	hw := w.hw
 	header := hw.Header()
+	w.batch = batchBufferPool.Get().(*bufio.Writer)
+	w.batch.Reset(hw)
 	switch {
 	case w.contentEncoding == "gzip" && len(p) > defaultGzipThresholdBytes:
 		header.Set("Content-Encoding", "gzip")
 		header.Add("Vary", "Accept-Encoding")
 
 		gw := gzipPool.Get().(*gzip.Writer)
-		gw.Reset(hw)
+		gw.Reset(w.batch)
 
 		w.w = gw
 	default:
-		w.w = hw
+		w.w = w.batch
 	}
 
 	span := tracing.SpanFromContext(w.ctx)
@@ -280,17 +303,30 @@ func (w *deferredResponseWriter) Close() (err error) {
 		if !w.hasBuffered {
 			return nil
 		}
-		// never reached defaultGzipThresholdBytes, no need to do the gzip writer cleanup
-		_, err := w.unbufferedWrite(w.buffer)
+		// never reached defaultGzipThresholdBytes
+		_, err = w.unbufferedWrite(w.buffer)
 		w.buffer = nil
-		return err
 	}
 
 	switch t := w.w.(type) {
 	case *gzip.Writer:
-		err = t.Close()
+		if cerr := t.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
 		t.Reset(nil)
 		gzipPool.Put(t)
+	}
+	if w.batch != nil {
+		if ferr := w.batch.Flush(); ferr != nil && err == nil {
+			err = ferr
+		}
+		w.batch.Reset(nil)
+		batchBufferPool.Put(w.batch)
+		w.batch = nil
+	}
+	w.w = nil
+	if err != nil && w.lastWriteErr == nil {
+		w.lastWriteErr = err
 	}
 	return err
 }
