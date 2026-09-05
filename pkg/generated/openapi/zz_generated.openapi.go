@@ -29433,6 +29433,13 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							},
 						},
 					},
+					"allowDisruptionByPriorityGreaterThanOrEqual": {
+						SchemaProps: spec.SchemaProps{
+							Description: "allowDisruptionByPriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for this pod can only be violated during scheduler preemption by pods with a priority value greater than or equal to allowDisruptionByPriorityGreaterThanOrEqual. The value of allowDisruptionByPriorityGreaterThanOrEqual cannot be greater than the priority value of system-cluster-critical or system-node-critical. When the Priority Admission Controller is enabled, it prevents users from setting this field directly; the admission controller populates it from the pod's PriorityClassName. A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pod with a higher priority. This field is alpha-level and is only honored when the DisruptionPolicyInPriorityClass feature gate is enabled.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
@@ -56572,6 +56579,13 @@ func schema_k8sio_api_scheduling_v1_PriorityClass(ref common.ReferenceCallback) 
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
+						},
+					},
+					"allowDisruptionByPriorityGreaterThanOrEqual": {
+						SchemaProps: spec.SchemaProps{
+							Description: "allowDisruptionByPriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for pods associated with this priority class can only be violated by pods with a priority value greater than or equal to allowDisruptionByPriorityGreaterThanOrEqual during a preemption process. The value of allowDisruptionByPriorityGreaterThanOrEqual cannot be greater than the priority value of system-cluster-critical or system-node-critical. A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pod with a higher priority. This field is alpha-level and is only honored when the DisruptionPolicyInPriorityClass feature gate is enabled.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},

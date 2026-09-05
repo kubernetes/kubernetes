@@ -196,6 +196,7 @@ template:
           namespaces:
           - namespacesValue
           topologyKey: topologyKeyValue
+    allowDisruptionByPriorityGreaterThanOrEqual: 45
     automountServiceAccountToken: true
     containers:
     - args:

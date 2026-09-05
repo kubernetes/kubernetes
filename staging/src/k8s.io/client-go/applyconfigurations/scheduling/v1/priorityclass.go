@@ -54,6 +54,16 @@ type PriorityClassApplyConfiguration struct {
 	// One of Never, PreemptLowerPriority.
 	// Defaults to PreemptLowerPriority if unset.
 	PreemptionPolicy *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
+	// allowDisruptionByPriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for pods
+	// associated with this priority class can only be violated by pods with a priority value greater
+	// than or equal to allowDisruptionByPriorityGreaterThanOrEqual during a preemption process. The
+	// value of allowDisruptionByPriorityGreaterThanOrEqual cannot be greater than the priority value
+	// of system-cluster-critical or system-node-critical.
+	// A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pod
+	// with a higher priority.
+	// This field is alpha-level and is only honored when the DisruptionPolicyInPriorityClass
+	// feature gate is enabled.
+	AllowDisruptionByPriorityGreaterThanOrEqual *int32 `json:"allowDisruptionByPriorityGreaterThanOrEqual,omitempty"`
 }
 
 // PriorityClass constructs a declarative configuration of the PriorityClass type for use with
@@ -289,6 +299,14 @@ func (b *PriorityClassApplyConfiguration) WithDescription(value string) *Priorit
 // If called multiple times, the PreemptionPolicy field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithPreemptionPolicy(value corev1.PreemptionPolicy) *PriorityClassApplyConfiguration {
 	b.PreemptionPolicy = &value
+	return b
+}
+
+// WithAllowDisruptionByPriorityGreaterThanOrEqual sets the AllowDisruptionByPriorityGreaterThanOrEqual field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowDisruptionByPriorityGreaterThanOrEqual field is set to the value of the last call.
+func (b *PriorityClassApplyConfiguration) WithAllowDisruptionByPriorityGreaterThanOrEqual(value int32) *PriorityClassApplyConfiguration {
+	b.AllowDisruptionByPriorityGreaterThanOrEqual = &value
 	return b
 }
 

@@ -59,6 +59,7 @@ type Features struct {
 	EnableInterPodAffinityHostnameFastPath             bool
 	EnablePodGroupPreemptionPolicy                     bool
 	EnableCompositePodGroup                            bool
+	EnableDisruptionPolicyInPriorityClass              bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
@@ -98,5 +99,6 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableDRANodeAllocatableResources:                  featureGate.Enabled(features.DRANodeAllocatableResources),
 		EnableCompositePodGroup:                            featureGate.Enabled(features.CompositePodGroup),
 		EnableInterPodAffinityHostnameFastPath:             featureGate.Enabled(features.InterPodAffinityHostnameFastPath),
+		EnableDisruptionPolicyInPriorityClass:              featureGate.Enabled(features.DisruptionPolicyInPriorityClass),
 	}
 }

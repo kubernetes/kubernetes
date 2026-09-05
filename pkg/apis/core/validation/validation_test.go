@@ -24520,6 +24520,7 @@ func TestValidateOSFields(t *testing.T) {
 	osNeutralFields := sets.NewString(
 		"ActiveDeadlineSeconds",
 		"Affinity",
+		"AllowDisruptionByPriorityGreaterThanOrEqual",
 		"AutomountServiceAccountToken",
 		"Containers[*].Args",
 		"Containers[*].Command",

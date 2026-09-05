@@ -55,6 +55,11 @@ func (m *PriorityClass) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.AllowDisruptionByPriorityGreaterThanOrEqual != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.AllowDisruptionByPriorityGreaterThanOrEqual))
+		i--
+		dAtA[i] = 0x30
+	}
 	if m.PreemptionPolicy != nil {
 		i -= len(*m.PreemptionPolicy)
 		copy(dAtA[i:], *m.PreemptionPolicy)
@@ -165,6 +170,9 @@ func (m *PriorityClass) Size() (n int) {
 		l = len(*m.PreemptionPolicy)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.AllowDisruptionByPriorityGreaterThanOrEqual != nil {
+		n += 1 + sovGenerated(uint64(*m.AllowDisruptionByPriorityGreaterThanOrEqual))
+	}
 	return n
 }
 
@@ -201,6 +209,7 @@ func (this *PriorityClass) String() string {
 		`GlobalDefault:` + fmt.Sprintf("%v", this.GlobalDefault) + `,`,
 		`Description:` + fmt.Sprintf("%v", this.Description) + `,`,
 		`PreemptionPolicy:` + valueToStringGenerated(this.PreemptionPolicy) + `,`,
+		`AllowDisruptionByPriorityGreaterThanOrEqual:` + valueToStringGenerated(this.AllowDisruptionByPriorityGreaterThanOrEqual) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -395,6 +404,26 @@ func (m *PriorityClass) Unmarshal(dAtA []byte) error {
 			s := k8s_io_api_core_v1.PreemptionPolicy(dAtA[iNdEx:postIndex])
 			m.PreemptionPolicy = &s
 			iNdEx = postIndex
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllowDisruptionByPriorityGreaterThanOrEqual", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.AllowDisruptionByPriorityGreaterThanOrEqual = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

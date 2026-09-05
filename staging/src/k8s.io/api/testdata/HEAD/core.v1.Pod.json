@@ -1844,7 +1844,8 @@
         "name": "nameValue",
         "priority": 2
       }
-    ]
+    ],
+    "allowDisruptionByPriorityGreaterThanOrEqual": 45
   },
   "status": {
     "observedGeneration": 17,

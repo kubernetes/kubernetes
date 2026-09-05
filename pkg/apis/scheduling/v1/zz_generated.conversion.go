@@ -68,6 +68,7 @@ func autoConvert_v1_PriorityClass_To_scheduling_PriorityClass(in *schedulingv1.P
 	out.GlobalDefault = in.GlobalDefault
 	out.Description = in.Description
 	out.PreemptionPolicy = (*core.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
+	out.AllowDisruptionByPriorityGreaterThanOrEqual = (*int32)(unsafe.Pointer(in.AllowDisruptionByPriorityGreaterThanOrEqual))
 	return nil
 }
 
@@ -82,6 +83,7 @@ func autoConvert_scheduling_PriorityClass_To_v1_PriorityClass(in *scheduling.Pri
 	out.GlobalDefault = in.GlobalDefault
 	out.Description = in.Description
 	out.PreemptionPolicy = (*corev1.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
+	out.AllowDisruptionByPriorityGreaterThanOrEqual = (*int32)(unsafe.Pointer(in.AllowDisruptionByPriorityGreaterThanOrEqual))
 	return nil
 }
 

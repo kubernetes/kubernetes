@@ -386,6 +386,14 @@ const (
 	// DisableNodeKubeProxyVersion disable the status.nodeInfo.kubeProxyVersion field of v1.Node
 	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
 
+	// owner: @denkensk
+	// kep: http://kep.k8s.io/3280
+	//
+	// Enables the allowDisruptionByPriorityGreaterThanOrEqual field on PriorityClass and PodSpec,
+	// letting cluster administrators guarantee that a PodDisruptionBudget cannot be violated by
+	// scheduler preemption from pods below a configured priority threshold.
+	DisruptionPolicyInPriorityClass featuregate.Feature = "DisruptionPolicyInPriorityClass"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//
@@ -1539,6 +1547,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true}, // lock to default in 1.36 and remove in v1.39
 	},
 
+	DisruptionPolicyInPriorityClass: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DynamicResourceAllocation: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
@@ -2557,6 +2569,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DisableCPUQuotaWithExclusiveCPUs: {},
 
 	DisableNodeKubeProxyVersion: {},
+
+	DisruptionPolicyInPriorityClass: {},
 
 	DynamicResourceAllocation: {},
 
