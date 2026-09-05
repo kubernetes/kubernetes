@@ -1238,7 +1238,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(ctx context.Conte
 		logger.V(3).Info("Error reading persistent volume", "volumeName", volume.Name, "err", err)
 		return
 	}
-	needsReclaim, err := ctrl.isVolumeReleased(logger, newVolume)
+	needsReclaim, err := ctrl.isVolumeReleased(ctx, logger, newVolume)
 	if err != nil {
 		logger.V(3).Info("Error reading claim for volume", "volumeName", volume.Name, "err", err)
 		return
@@ -1351,7 +1351,7 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(ctx context.Contex
 		return "", nil
 	}
 
-	needsReclaim, err := ctrl.isVolumeReleased(logger, newVolume)
+	needsReclaim, err := ctrl.isVolumeReleased(ctx, logger, newVolume)
 	if err != nil {
 		logger.V(3).Info("Error reading claim for volume", "volumeName", volume.Name, "err", err)
 		return "", nil
@@ -1400,7 +1400,7 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(ctx context.Contex
 // isVolumeReleased returns true if given volume is released and can be recycled
 // or deleted, based on its retain policy. I.e. the volume is bound to a claim
 // and the claim does not exist or exists and is bound to different volume.
-func (ctrl *PersistentVolumeController) isVolumeReleased(logger klog.Logger, volume *v1.PersistentVolume) (bool, error) {
+func (ctrl *PersistentVolumeController) isVolumeReleased(ctx context.Context, logger klog.Logger, volume *v1.PersistentVolume) (bool, error) {
 	// A volume needs reclaim if it has ClaimRef and appropriate claim does not
 	// exist.
 	if volume.Spec.ClaimRef == nil {
@@ -1421,7 +1421,23 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(logger klog.Logger, vol
 		return false, err
 	}
 	if !found {
-		// Fall through with claim = nil
+		// ctrl.claims is populated from this controller's claim informer, so
+		// "not found" here normally means the claim was deleted. But it can
+		// also just mean the informer's cache is temporarily behind the API
+		// server (e.g. right after a relist). Since returning true here can
+		// lead to the underlying storage being permanently deleted, confirm
+		// against the API server that the claim is actually gone before
+		// trusting the cache.
+		liveClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(ctx, volume.Spec.ClaimRef.Name, metav1.GetOptions{})
+		switch {
+		case apierrors.IsNotFound(err):
+			// Confirmed live: claim stays nil.
+		case err != nil:
+			return false, err
+		default:
+			logger.V(4).Info("isVolumeReleased: claim missing from cache but present live, not releasing", "volumeName", volume.Name, "PVC", klog.KObj(liveClaim))
+			claim = liveClaim
+		}
 	} else {
 		var ok bool
 		claim, ok = obj.(*v1.PersistentVolumeClaim)
