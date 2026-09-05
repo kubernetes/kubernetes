@@ -17,6 +17,7 @@ limitations under the License.
 package experimental
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -97,13 +98,9 @@ type Allocator struct {
 	slicesShared   []*resourceapi.ResourceSlice
 	allSlices      []*resourceapi.ResourceSlice
 	celCache       *cel.Cache
-	// availableCounters contains the available counters for each
-	// resource pool. It acts as a cache that is updated the first time
-	// the available counters are needed for each pool. The information
-	// about each pool is never updated once set the first time.
-	// This is computed bsed on information on the Allocator, so it will
-	// be correct even for multiple usages of the Allocator.
-	// The keys in the map are resource pool IDs (driver name and pool name).
+	// availableCounters caches the counter baseline of each resource pool, keyed by driver
+	// and pool name. Sharing it across Allocate calls is only correct while they resolve
+	// equivalent counter sets, totals and allocated-device consumption for that pool.
 	// The allocator might be accessed by different goroutines, so
 	// access to this map must be synchronized.
 	availableCounters map[PoolID]counterSets
@@ -115,6 +112,8 @@ type Allocator struct {
 	// and pool name), and the inner map keys are counter set names.
 	compatibilityGroupsBaseline map[PoolID]map[string]compatibilityGroupIntersection
 	mutex                       sync.RWMutex
+	// allocatedDeviceIndex reports the allocated devices and how many of them each pool holds.
+	allocatedDeviceIndex func() (sets.Set[DeviceID], map[PoolID]int)
 	// numAllocateOneInvocations counts the number of times the allocateOne
 	// function is called for the allocator. This is a measurement of the
 	// amount of work the allocator had to do to allocate devices
@@ -157,7 +156,32 @@ func NewAllocator(ctx context.Context,
 
 		compatibilityGroupsBaseline: make(map[PoolID]map[string]compatibilityGroupIntersection),
 	}
+	a.allocatedDeviceIndex = sync.OnceValues(a.buildAllocatedDeviceIndex)
 	return a, nil
+}
+
+// buildAllocatedDeviceIndex walks the three sources IsDeviceAllocated recognizes. A device
+// named by more than one of them counts once.
+func (a *Allocator) buildAllocatedDeviceIndex() (sets.Set[DeviceID], map[PoolID]int) {
+	ids := sets.New[DeviceID]()
+	perPool := make(map[PoolID]int)
+	add := func(id DeviceID) {
+		if ids.Has(id) {
+			return
+		}
+		ids.Insert(id)
+		perPool[PoolID{Driver: id.Driver, Pool: id.Pool}]++
+	}
+	for id := range a.allocatedState.AllocatedDevices {
+		add(id)
+	}
+	for sharedID := range a.allocatedState.AllocatedSharedDeviceIDs {
+		add(sharedID.GetDeviceID())
+	}
+	for id := range a.allocatedState.AggregatedCapacity {
+		add(id)
+	}
+	return ids, perPool
 }
 
 func (a *Allocator) Channel() internal.AllocatorChannel {
@@ -691,6 +715,8 @@ type allocator struct {
 	// that are in the process of being allocated.
 	// The keys in the map are resource pool IDs (driver name and pool name).
 	consumedCounters map[PoolID]counterSets
+	// counterPoolAccountable is per node, since nodes can resolve different devices for a pool.
+	counterPoolAccountable map[PoolID]bool
 	// consumedCompatibilityGroups tracks the rolling compatibility-group
 	// intersection per counter set for each pool across the devices being
 	// allocated in the current attempt. It is seeded from the already-allocated
@@ -1644,7 +1670,16 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// a rejection returns before any counters have been reserved. While the
 	// feature is disabled there is nothing to check: GatherPools already ignored
 	// all slices with compatibility groups.
-	if alloc.features.CompatibilityGroups && !skipCounterCheck && len(device.ConsumesCounters) > 0 {
+	checkCounters := !skipCounterCheck && len(device.ConsumesCounters) > 0
+
+	// Both baselines are cached per pool and seeded by whichever snapshot reaches them first,
+	// so a pool this node cannot account for has to be rejected before either is built.
+	if checkCounters && !alloc.counterPoolIsAccountable(device.pool) {
+		alloc.logger.V(7).Info("Counter pool cannot be accounted for", "device", device.id)
+		return false, nil, nil
+	}
+
+	if alloc.features.CompatibilityGroups && checkCounters {
 		ok, restore := alloc.checkAndConsumeCompatibilityGroups(device)
 		if !ok {
 			alloc.logger.V(7).Info("Incompatible compatibility groups", "device", device.id)
@@ -1658,7 +1693,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// reserved this device's counters. It is not the same as
 	// len(device.ConsumesCounters) > 0, because skipCounterCheck can bypass the
 	// reservation.
-	if !skipCounterCheck && len(device.ConsumesCounters) > 0 {
+	if checkCounters {
 		// If a device consumes counters from a counter set, verify that
 		// there is sufficient counters available.
 		ok, err := alloc.checkAvailableCounters(device)
@@ -1853,6 +1888,73 @@ func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool
 	return false
 }
 
+// maxLoggedMissingDevices caps the list in the fail-closed log line.
+const maxLoggedMissingDevices = 10
+
+// rememberAccountable memoizes the answer for this node's view of the pool.
+func (alloc *allocator) rememberAccountable(poolID PoolID, accountable bool) {
+	if alloc.counterPoolAccountable == nil {
+		alloc.counterPoolAccountable = make(map[PoolID]bool)
+	}
+	alloc.counterPoolAccountable[poolID] = accountable
+}
+
+// counterPoolIsAccountable reports whether the pool, as resolved for this node, still publishes
+// every device allocated from it; a dropped device leaves its counter use unreconstructable.
+// The answer is per node, unlike availableCounters, so it must be settled before that cache.
+func (alloc *allocator) counterPoolIsAccountable(pool *Pool) bool {
+	poolID := pool.PoolID
+	if accountable, found := alloc.counterPoolAccountable[poolID]; found {
+		return accountable
+	}
+
+	// Nothing allocated from the pool means nothing to account for, which is the common case.
+	allocated, perPool := alloc.allocatedDeviceIndex()
+	want := perPool[poolID]
+	if want == 0 {
+		alloc.rememberAccountable(poolID, true)
+		return true
+	}
+
+	// Track only the allocated devices, since a pool usually publishes far more, and stop
+	// once all of them have turned up.
+	seen := make(sets.Set[DeviceID], want)
+scan:
+	for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
+		for _, slice := range resourceSlices {
+			for _, device := range slice.Spec.Devices {
+				id := DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: device.Name}
+				if !allocated.Has(id) {
+					continue
+				}
+				seen.Insert(id)
+				if seen.Len() == want {
+					break scan
+				}
+			}
+		}
+	}
+
+	accountable := seen.Len() == want
+	if !accountable {
+		if logger := alloc.logger.V(5); logger.Enabled() {
+			// Naming them walks the whole set, which only this log line needs.
+			missing := make([]DeviceID, 0, want-seen.Len())
+			for id := range allocated {
+				if id.Driver == poolID.Driver && id.Pool == poolID.Pool && !seen.Has(id) {
+					missing = append(missing, id)
+				}
+			}
+			slices.SortFunc(missing, func(a, b DeviceID) int { return cmp.Compare(a.String(), b.String()) })
+			logger.Info("Marking counter pool unavailable: allocated devices are absent from the pool resolved for this node",
+				"pool", poolID, "numMissingDevices", len(missing),
+				"missingDevices", missing[:min(len(missing), maxLoggedMissingDevices)])
+		}
+	}
+	alloc.rememberAccountable(poolID, accountable)
+	return accountable
+}
+
 // checkAvailableCounters checks if there are enough counters available to allocate
 // the specified device.
 //
@@ -1862,6 +1964,10 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	pool := device.pool
 	poolID := pool.PoolID
 
+	if !alloc.counterPoolIsAccountable(pool) {
+		return false, nil
+	}
+
 	// Check first if the available counters for this pool have already been
 	// calculated.
 	alloc.mutex.RLock()
@@ -1870,8 +1976,8 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	// If not, we need to do it now. But we store the result so it doesn't need
 	// to be calculated again.
 	// Since this is computed without holding the lock on the mutex, other goroutines
-	// might also do this work. But the input will be the same to all of them, so
-	// the result will also always be the same.
+	// might also do this work. The results agree only when the resolved pools have the
+	// same counter sets and totals and the same consumption for their allocated devices.
 	if !found {
 		availableCountersForPool = make(counterSets, len(pool.CounterSets))
 		for _, counterSet := range pool.CounterSets {
@@ -1885,7 +1991,9 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 
 		// Update the data structure to reflect counters already consumed by allocated devices. This
 		// only includes devices where the allocation process has completed, so this will never
-		// change during the allocation process.
+		// change during the allocation process. Whether the pool can still account for all of
+		// them was settled before this point.
+		allocated, _ := alloc.allocatedDeviceIndex()
 		for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
 			for _, slice := range resourceSlices {
 				for _, device := range slice.Spec.Devices {
@@ -1894,9 +2002,8 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 						Pool:   slice.Spec.Pool.Name,
 						Device: device.Name,
 					}
-					// Devices that aren't allocated doesn't consume any counters, so we don't
-					// need to consider them.
-					if !internal.IsDeviceAllocated(deviceID, &alloc.allocatedState) {
+					// Devices that aren't allocated consume no counters.
+					if !allocated.Has(deviceID) {
 						continue
 					}
 					for _, deviceCounterConsumption := range device.ConsumesCounters {
@@ -2039,6 +2146,7 @@ func (alloc *allocator) compatibilityGroupsBaselineForPool(pool *Pool) map[strin
 	}
 
 	baseline = make(map[string]compatibilityGroupIntersection)
+	allocated, _ := alloc.allocatedDeviceIndex()
 	for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
 		for _, slice := range resourceSlices {
 			for _, device := range slice.Spec.Devices {
@@ -2047,7 +2155,8 @@ func (alloc *allocator) compatibilityGroupsBaselineForPool(pool *Pool) map[strin
 					Pool:   slice.Spec.Pool.Name,
 					Device: device.Name,
 				}
-				if !internal.IsDeviceAllocated(deviceID, &alloc.allocatedState) {
+				// Only allocated devices contributed to the baseline.
+				if !allocated.Has(deviceID) {
 					continue
 				}
 				for _, deviceCounterConsumption := range device.ConsumesCounters {
