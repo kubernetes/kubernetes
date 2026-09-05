@@ -73,6 +73,13 @@ type callQueue struct {
 	cond   *sync.Cond
 	closed bool
 
+	// testBeforeWait, if non-nil, is invoked synchronously (while cq.lock is
+	// held) immediately before pop() calls cq.cond.Wait(). It exists solely
+	// so tests can deterministically detect the moment pop() begins blocking,
+	// instead of inferring it from timing. It must never be set outside of
+	// tests.
+	testBeforeWait func()
+
 	// apiCallRelevances maps all possible APICallTypes to a relevance value.
 	// A more relevant API call should overwrite a less relevant one for the same object.
 	// Types of the same relevance should only be defined for different object types.
@@ -247,6 +254,9 @@ func (cq *callQueue) pop() (*queuedAPICall, error) {
 	for cq.callsQueue.Len() == 0 {
 		if cq.closed {
 			return nil, nil
+		}
+		if cq.testBeforeWait != nil {
+			cq.testBeforeWait()
 		}
 		// Wait for an API call to become available.
 		cq.cond.Wait()
