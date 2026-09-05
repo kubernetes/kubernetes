@@ -924,7 +924,9 @@ func TestResourceFullyQualifiedName(t *testing.T) {
 	}, {
 		name:     "invalid: more than one slash",
 		input:    "prefix.com/name/extra",
-		wantErrs: nil, // This is not validated, yet.
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "prefix.com/name/extra", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
 	}, {
 		name:  "invalid: empty name",
 		input: "prefix.com/",
