@@ -634,6 +634,84 @@ func TestGCTerminating(t *testing.T) {
 	}
 }
 
+// TestGCTerminatingRevalidatesLiveNodeBeforeForceDeleting covers the case where
+// gcc.nodeLister (the informer cache consulted to decide *which* pods qualify
+// for force deletion) has fallen behind the live Node object. The out-of-service
+// taint is what authorizes force-deleting a terminating pod without waiting for
+// kubelet to confirm it's gone, so acting on a stale copy of that taint can
+// force-delete a pod whose node has, in reality, already recovered - producing
+// two running copies of the same pod.
+func TestGCTerminatingRevalidatesLiveNodeBeforeForceDeleting(t *testing.T) {
+	type node struct {
+		name           string
+		readyCondition v1.ConditionStatus
+		taints         []v1.Taint
+	}
+
+	outOfServiceTaint := []v1.Taint{{Key: v1.TaintNodeOutOfService, Effect: v1.TaintEffectNoExecute}}
+
+	testCases := []struct {
+		name            string
+		cachedNode      node
+		liveNode        node
+		deletedPodNames sets.Set[string]
+	}{
+		{
+			name:            "cache and live node agree the node is out-of-service and not ready: pod is force deleted",
+			cachedNode:      node{name: "worker", readyCondition: v1.ConditionFalse, taints: outOfServiceTaint},
+			liveNode:        node{name: "worker", readyCondition: v1.ConditionFalse, taints: outOfServiceTaint},
+			deletedPodNames: sets.New("a"),
+		},
+		{
+			name:       "an operator already removed the out-of-service taint on the live node, but the informer cache hasn't caught up: pod must not be force deleted",
+			cachedNode: node{name: "worker", readyCondition: v1.ConditionFalse, taints: outOfServiceTaint},
+			liveNode:   node{name: "worker", readyCondition: v1.ConditionFalse},
+		},
+		{
+			name:       "the live node has already recovered (Ready again), but the informer cache still shows it NotReady: pod must not be force deleted",
+			cachedNode: node{name: "worker", readyCondition: v1.ConditionFalse, taints: outOfServiceTaint},
+			liveNode:   node{name: "worker", readyCondition: v1.ConditionTrue, taints: outOfServiceTaint},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			resetMetrics()
+			_, ctx := ktesting.NewTestContext(t)
+
+			newNode := func(n node) *v1.Node {
+				return &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{Name: n.name},
+					Spec:       v1.NodeSpec{Taints: n.taints},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: n.readyCondition}},
+					},
+				}
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: metav1.NamespaceDefault, DeletionTimestamp: &metav1.Time{}},
+				Status:     v1.PodStatus{Phase: v1.PodRunning},
+				Spec:       v1.PodSpec{NodeName: test.cachedNode.name},
+			}
+
+			// The fake clientset stands in for the API server: it only ever knows
+			// about the live node.
+			client := setupNewSimpleClient([]*v1.Node{newNode(test.liveNode)}, []*v1.Pod{pod})
+			gcc, podInformer, nodeInformer := NewFromClient(ctx, client, -1)
+
+			// The informer cache is seeded independently of the fake clientset, so
+			// it can lag behind the live node above exactly as it would during a
+			// real watch delay.
+			podInformer.Informer().GetStore().Add(pod)
+			nodeInformer.Informer().GetStore().Add(newNode(test.cachedNode))
+
+			gcc.gc(ctx)
+			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.deletedPodNames)
+		})
+	}
+}
+
 func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
 	testCases := []struct {
 		name                 string
