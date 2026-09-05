@@ -77,6 +77,7 @@ import (
 	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
+	"k8s.io/kubernetes/pkg/controlplane/apirequirements"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
@@ -318,7 +319,7 @@ func (c *Config) Complete() CompletedConfig {
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 // KubeletClientConfig
-func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Instance, error) {
+func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget) (instance *Instance, retErr error) {
 	if reflect.DeepEqual(c.Extra.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
@@ -331,6 +332,13 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	s := &Instance{
 		ControlPlane: cp,
 	}
+	// Once storage is installed, Destroy is the only way to release it. Run would do that on
+	// shutdown, but a server that fails to construct is never run.
+	defer func() {
+		if retErr != nil {
+			s.ControlPlane.GenericAPIServer.Destroy()
+		}
+	}()
 
 	client, err := kubernetes.NewForConfig(c.ControlPlane.Generic.LoopbackClientConfig)
 	if err != nil {
@@ -343,6 +351,10 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	if err := s.ControlPlane.InstallAPIs(restStorageProviders...); err != nil {
+		return nil, err
+	}
+
+	if err := s.ControlPlane.ValidateFeatureGateAPIRequirements(apirequirements.DefaultForKubeAPIServer()); err != nil {
 		return nil, err
 	}
 
