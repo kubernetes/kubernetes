@@ -26,8 +26,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -75,7 +77,8 @@ func NewReconciler(
 	attacherDetacher operationexecutor.OperationExecutor,
 	nodeStatusUpdater statusupdater.NodeStatusUpdater,
 	nodeLister corelisters.NodeLister,
-	recorder record.EventRecorder) Reconciler {
+	recorder record.EventRecorder,
+	kubeClient clientset.Interface) Reconciler {
 	return &reconciler{
 		loopPeriod:                  loopPeriod,
 		maxWaitForUnmountDuration:   maxWaitForUnmountDuration,
@@ -89,6 +92,7 @@ func NewReconciler(
 		nodeLister:                  nodeLister,
 		timeOfLastSync:              time.Now(),
 		recorder:                    recorder,
+		kubeClient:                  kubeClient,
 	}
 }
 
@@ -105,6 +109,7 @@ type reconciler struct {
 	disableReconciliationSync   bool
 	disableForceDetachOnTimeout bool
 	recorder                    record.EventRecorder
+	kubeClient                  clientset.Interface
 }
 
 func (rc *reconciler) Run(ctx context.Context) {
@@ -233,6 +238,29 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 				logger.V(5).Info("Failed to get taint specs for node",
 					"node", klog.KRef("", string(attachedVolume.NodeName)),
 					"err", err)
+			}
+
+			// hasOutOfServiceTaint above only reflects rc.nodeLister's informer
+			// cache. That taint is what authorizes skipping verifySafeToDetach
+			// below, so before relying on it, revalidate against a live read of
+			// the Node: if an operator already removed the taint (the node
+			// recovered) and this controller's cache hasn't caught up yet,
+			// detaching without the normal safety check can pull the volume out
+			// from under a pod that is actually still running there, and a new
+			// pod attaching it elsewhere risks concurrent writers to the same
+			// volume.
+			if hasOutOfServiceTaint {
+				liveNode, err := rc.kubeClient.CoreV1().Nodes().Get(ctx, string(attachedVolume.NodeName), metav1.GetOptions{})
+				if err != nil {
+					logger.V(5).Info("Failed to get live node to verify out-of-service taint, not skipping the safe-to-detach check",
+						"node", klog.KRef("", string(attachedVolume.NodeName)),
+						"err", err)
+					hasOutOfServiceTaint = false
+				} else if !taints.TaintKeyExists(liveNode.Spec.Taints, v1.TaintNodeOutOfService) {
+					logger.V(4).Info("Node's out-of-service taint was already removed live, not skipping the safe-to-detach check for this volume",
+						"node", klog.KRef("", string(attachedVolume.NodeName)))
+					hasOutOfServiceTaint = false
+				}
 			}
 
 			// Check whether volume is still mounted. Skip detach if it is still mounted unless we have

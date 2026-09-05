@@ -176,7 +176,8 @@ func NewAttachDetachController(
 		adc.attacherDetacher,
 		adc.nodeStatusUpdater,
 		adc.nodeLister,
-		recorder)
+		recorder,
+		kubeClient)
 
 	csiTranslator := csitrans.New()
 	adc.intreeToCSITranslator = csiTranslator
