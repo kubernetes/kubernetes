@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -680,6 +681,7 @@ func TestPreEnqueue(t *testing.T) {
 		initialCompositePodGroups  []*schedulingv1alpha3.CompositePodGroup
 		isCompositePodGroupEnabled []bool
 		wantPreEnqueueStatus       *fwk.Status
+		wantEvent                  string
 	}
 	baseTests := []testCase{
 		{
@@ -718,7 +720,8 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p1,
 			initialPods:                []*v1.Pod{p2, p4, p5},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
-			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
+			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for gang quorum: 2/3 pods are available"),
+			wantEvent:                  "Normal GangSchedulingPending waiting for gang quorum: 2/3 pods are available",
 		},
 		{
 			name:                       "gang pod passes PreEnqueue",
@@ -798,7 +801,8 @@ func TestPreEnqueue(t *testing.T) {
 			initialPods:                []*v1.Pod{p1_1BasicCPG, p1_2BasicCPG},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1CPG, pgBasic2CPG},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
-			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
+			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for gang quorum: 1/2 pods are available"),
+			wantEvent:                  "Normal GangSchedulingPending waiting for gang quorum: 1/2 pods are available",
 		},
 	}
 
@@ -820,8 +824,10 @@ func TestPreEnqueue(t *testing.T) {
 				}
 				fakeActivator := &podActivatorMock{}
 				snapshot := internalcache.NewEmptySnapshot()
+				eventRecorder := events.NewFakeRecorder(1)
 				fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
 					frameworkruntime.WithInformerFactory(informerFactory),
+					frameworkruntime.WithEventRecorder(eventRecorder),
 					frameworkruntime.WithPodGroupManager(cache),
 					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 					frameworkruntime.WithPodActivator(fakeActivator),
@@ -863,6 +869,16 @@ func TestPreEnqueue(t *testing.T) {
 				gotPreEnqueueStatus := pl.PreEnqueue(ctx, tt.pod)
 				if diff := cmp.Diff(tt.wantPreEnqueueStatus, gotPreEnqueueStatus); diff != "" {
 					t.Fatalf("Unexpected PreEnqueue status (-want,+got):\n%s", diff)
+				}
+				if tt.wantEvent != "" {
+					select {
+					case gotEvent := <-eventRecorder.Events:
+						if gotEvent != tt.wantEvent {
+							t.Fatalf("Unexpected event: got %q, want %q", gotEvent, tt.wantEvent)
+						}
+					default:
+						t.Fatalf("Expected event %q, but no event was recorded", tt.wantEvent)
+					}
 				}
 			})
 		}

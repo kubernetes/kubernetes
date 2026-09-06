@@ -36,6 +36,8 @@ import (
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = names.GangScheduling
+
+	gangSchedulingPendingReason = "GangSchedulingPending"
 )
 
 // GangScheduling is a plugin that enforces "all-or-nothing" scheduling for pods
@@ -233,7 +235,16 @@ func (pl *GangScheduling) preEnqueueWithHierarchies(pod *v1.Pod) *fwk.Status {
 		if pl.isPGReady(snapshot, namespace, podGroup.Name, func(s fwk.PodGroupState) int { return s.AllPodsCount() }) {
 			return nil
 		}
-		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue")
+		podGroupState, err := snapshot.PodGroupStates().Get(namespace, podGroup.Name)
+		if err != nil {
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue")
+		}
+		allPodsCount := podGroupState.AllPodsCount()
+		minCount := int(podGroup.Spec.SchedulingPolicy.Gang.MinCount)
+		if allPodsCount >= minCount {
+			return nil
+		}
+		return pl.gangPendingStatus(pod, allPodsCount, minCount)
 	}
 
 	return pl.checkCPGHierarchyReadiness(snapshot, namespace, *podGroup.Spec.ParentCompositePodGroupName, func(s fwk.PodGroupState) int { return s.AllPodsCount() })
@@ -268,11 +279,19 @@ func (pl *GangScheduling) preEnqueueHierarchiesDisabled(pod *v1.Pod) *fwk.Status
 	}
 	allPodsCount := podGroupState.AllPodsCount()
 	if allPodsCount < int(policy.Gang.MinCount) {
-		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue")
+		return pl.gangPendingStatus(pod, allPodsCount, int(policy.Gang.MinCount))
 	}
 
 	// The quorum is met, allow the pod to enter the scheduling queue.
 	return nil
+}
+
+func (pl *GangScheduling) gangPendingStatus(pod *v1.Pod, available, required int) *fwk.Status {
+	message := fmt.Sprintf("waiting for gang quorum: %d/%d pods are available", available, required)
+	if recorder := pl.handle.EventRecorder(); recorder != nil {
+		recorder.Eventf(pod, nil, v1.EventTypeNormal, gangSchedulingPendingReason, "Scheduling", message)
+	}
+	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, message)
 }
 
 // checkCPGHierarchyReadiness checks if the Composite Pod Group hierarchy is ready for scheduling.
