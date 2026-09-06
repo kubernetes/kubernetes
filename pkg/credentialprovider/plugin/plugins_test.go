@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -40,7 +41,7 @@ type fakedockerConfigProviderWithCoordinates struct {
 	mu                   sync.Mutex
 }
 
-func (f *fakedockerConfigProviderWithCoordinates) provideWithCoordinates(image string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates) {
+func (f *fakedockerConfigProviderWithCoordinates) provideWithCoordinates(ctx context.Context, image string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.callCount++
@@ -257,7 +258,7 @@ func TestNewExternalCredentialProviderDockerKeyring(t *testing.T) {
 
 			tc.setupProviders()
 
-			keyring := NewExternalCredentialProviderDockerKeyring("test-namespace", "test-pod", "test-uid", "test-sa")
+			keyring := NewExternalCredentialProviderDockerKeyring(t.Context(), "test-namespace", "test-pod", "test-uid", "test-sa")
 
 			externalKeyring, ok := keyring.(*externalCredentialProviderKeyring)
 			if !ok {
@@ -296,7 +297,7 @@ func TestExternalCredentialProviderKeyringLookupNoProviders(t *testing.T) {
 		providers: []dockerConfigProviderWithCoordinates{},
 	}
 
-	configs, found := keyring.Lookup("test.registry.io/image:tag")
+	configs, found := keyring.Lookup(t.Context(), "test.registry.io/image:tag")
 
 	if found {
 		t.Errorf("Expected not found, got found=true")
@@ -413,7 +414,7 @@ func TestExternalCredentialProviderKeyringLookupWithProviders(t *testing.T) {
 				providers: tc.providers,
 			}
 
-			configs, found := keyring.Lookup(tc.image)
+			configs, found := keyring.Lookup(t.Context(), tc.image)
 
 			if found != tc.expectedFound {
 				t.Errorf("Expected found=%v, got found=%v", tc.expectedFound, found)
@@ -485,7 +486,7 @@ func TestExternalCredentialProviderKeyringLookupConcurrency(t *testing.T) {
 			defer wg.Done()
 			for j := range numCallsPerGoroutine {
 				image := "test.registry.io/image:tag"
-				configs, found := keyring.Lookup(image)
+				configs, found := keyring.Lookup(t.Context(), image)
 
 				if !found {
 					mu.Lock()

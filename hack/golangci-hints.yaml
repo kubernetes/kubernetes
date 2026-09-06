@@ -347,7 +347,6 @@ linters:
             structured k8s.io/kms/.*
             structured k8s.io/apiserver/pkg/storage/value/.*
             structured k8s.io/apiserver/pkg/server/options/encryptionconfig/.*
-            structured k8s.io/kubernetes/pkg/credentialprovider/plugin/.*
             
             # The following packages have been migrated to contextual logging.
             # Packages matched here do not have to be listed above because
@@ -378,6 +377,7 @@ linters:
             contextual k8s.io/kubernetes/pkg/client/.*
             contextual k8s.io/kubernetes/pkg/cluster/.*
             contextual k8s.io/kubernetes/pkg/controller/.*
+            contextual k8s.io/kubernetes/pkg/credentialprovider/plugin/.*
             contextual k8s.io/kubernetes/pkg/features/.*
             contextual k8s.io/kubernetes/pkg/fieldpath/.*
             contextual k8s.io/kubernetes/pkg/generated/.*

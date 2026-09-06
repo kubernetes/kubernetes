@@ -405,17 +405,18 @@ type perPodPluginProvider struct {
 // used for credential resolution. If ServiceAccountCoordinates is nil, it means no service account
 // context was used (e.g., the plugin is not operating in service account token mode or no service
 // account was provided for the request).
-func (p *perPodPluginProvider) provideWithCoordinates(image string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates) {
-	credentials, coordinates, err := p.provider.provide(image, p.podNamespace, p.podName, p.podUID, p.serviceAccountName)
+func (p *perPodPluginProvider) provideWithCoordinates(ctx context.Context, image string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates) {
+	credentials, coordinates, err := p.provider.provide(ctx, image, p.podNamespace, p.podName, p.podUID, p.serviceAccountName)
 	if err == nil {
 		return credentials, coordinates
 	}
 
 	// If there was an error providing credentials, we log the error but do not return it.
+	logger := klog.FromContext(ctx)
 	if p.provider.serviceAccountProvider != nil {
-		klog.ErrorS(err, "Failed to provide credentials for image", "provider", p.provider.name, "image", image, "pod", klog.KRef(p.podNamespace, p.podName), "podUID", p.podUID, "serviceAccount", klog.KRef(p.podNamespace, p.serviceAccountName))
+		logger.Error(err, "Failed to provide credentials for image", "provider", p.provider.name, "image", image, "pod", klog.KRef(p.podNamespace, p.podName), "podUID", p.podUID, "serviceAccount", klog.KRef(p.podNamespace, p.serviceAccountName))
 	} else {
-		klog.ErrorS(err, "Failed to provide credentials for image", "provider", p.provider.name, "image", image)
+		logger.Error(err, "Failed to provide credentials for image", "provider", p.provider.name, "image", image)
 	}
 
 	return credentialprovider.DockerConfig{}, nil
@@ -426,7 +427,7 @@ func (p *perPodPluginProvider) provideWithCoordinates(image string) (credentialp
 // If ServiceAccountCoordinates is nil, it means no service account context was used
 // (e.g., the plugin is not operating in service account token mode or no service account
 // was provided for the request).
-func (p *pluginProvider) provide(image, podNamespace, podName string, podUID types.UID, serviceAccountName string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates, error) {
+func (p *pluginProvider) provide(ctx context.Context, image, podNamespace, podName string, podUID types.UID, serviceAccountName string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates, error) {
 	if !p.isImageAllowed(image) {
 		return credentialprovider.DockerConfig{}, nil, nil
 	}
@@ -441,7 +442,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 
 	if p.serviceAccountProvider != nil {
 		if len(serviceAccountName) == 0 && p.serviceAccountProvider.requireServiceAccount {
-			klog.V(5).InfoS("Service account name is empty", "provider", p.name, "image", image, "pod", klog.KRef(podNamespace, podName), "podUID", podUID)
+			klog.FromContext(ctx).V(5).Info("Service account name is empty", "provider", p.name, "image", image, "pod", klog.KRef(podNamespace, podName), "podUID", podUID)
 			return credentialprovider.DockerConfig{}, nil, nil
 		}
 
@@ -455,7 +456,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 					// The required annotation could be a mechanism for individual workloads to opt in to using service account tokens
 					// for image pull. If any of the required annotation is missing, we will not invoke the plugin. We will log the error
 					// at higher verbosity level as it could be noisy.
-					klog.V(5).ErrorS(err, "Failed to get service account data", "provider", p.name, "image", image, "pod", klog.KRef(podNamespace, podName), "podUID", podUID, "serviceAccount", klog.KRef(podNamespace, serviceAccountName))
+					klog.FromContext(ctx).V(5).Info("Failed to get service account data", "err", err, "provider", p.name, "image", image, "pod", klog.KRef(podNamespace, podName), "podUID", podUID, "serviceAccount", klog.KRef(podNamespace, serviceAccountName))
 					return credentialprovider.DockerConfig{}, nil, nil
 				}
 
@@ -520,7 +521,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 		}
 	}
 	res, err, _ := p.group.Do(singleFlightKey, func() (interface{}, error) {
-		return p.plugin.ExecPlugin(context.Background(), image, serviceAccountToken, saAnnotations)
+		return p.plugin.ExecPlugin(ctx, image, serviceAccountToken, saAnnotations)
 	})
 
 	if err != nil {
@@ -684,7 +685,7 @@ type execPlugin struct {
 // The plugin is expected to receive the CredentialProviderRequest API via stdin from the kubelet and
 // return CredentialProviderResponse via stdout.
 func (e *execPlugin) ExecPlugin(ctx context.Context, image, serviceAccountToken string, serviceAccountAnnotations map[string]string) (*credentialproviderapi.CredentialProviderResponse, error) {
-	klog.V(5).InfoS("Getting image credentials from external exec plugin", "pluginName", e.name, "image", image)
+	klog.FromContext(ctx).V(5).Info("Getting image credentials from external exec plugin", "pluginName", e.name, "image", image)
 
 	authRequest := &credentialproviderapi.CredentialProviderRequest{Image: image, ServiceAccountToken: serviceAccountToken, ServiceAccountAnnotations: serviceAccountAnnotations}
 	data, err := e.encodeRequest(authRequest)
