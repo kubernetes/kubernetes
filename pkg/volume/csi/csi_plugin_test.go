@@ -1611,3 +1611,46 @@ func TestPluginConstructVolumeSpecFallsBackToGlobalMount(t *testing.T) {
 		t.Errorf("VolumeHandle: got %q, want %q", csi.VolumeHandle, volHandle)
 	}
 }
+
+// TestPluginConstructVolumeSpecGateOffKeepsOldBehavior is the other half of
+// issue #101791: with VolumeReconstructionFallback disabled, the very same
+// on-disk layout must still fail reconstruction exactly as it did before this
+// change. The gate is alpha and off by default, so this is what every cluster
+// gets until an operator opts in.
+func TestPluginConstructVolumeSpecGateOffKeepsOldBehavior(t *testing.T) {
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	const (
+		specVolID = "orphaned-pv"
+		volHandle = "orphaned-handle"
+	)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeReconstructionFallback, false)
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+
+	// Same arrangement as the gate-on test: pod-local dir without
+	// vol_data.json, global dir with a complete one.
+	podLocalDir := filepath.Join(tmpDir, "pods", "pod-uid", "volumes", "kubernetes.io~csi", specVolID)
+	if err := os.MkdirAll(filepath.Join(podLocalDir, "mount"), 0o755); err != nil {
+		t.Fatalf("setup pod-local dir: %v", err)
+	}
+	pluginDir := plug.host.GetPluginDir(plug.GetPluginName())
+	globalDataDir := filepath.Join(pluginDir, testDriver, "anyhashhere")
+	if err := os.MkdirAll(globalDataDir, 0o755); err != nil {
+		t.Fatalf("setup global dir: %v", err)
+	}
+	globalData := map[string]string{
+		volDataKey.specVolID:           specVolID,
+		volDataKey.volHandle:           volHandle,
+		volDataKey.driverName:          testDriver,
+		volDataKey.volumeLifecycleMode: string(storage.VolumeLifecyclePersistent),
+	}
+	if err := saveVolumeData(globalDataDir, volDataFileName, globalData); err != nil {
+		t.Fatalf("save global vol_data.json: %v", err)
+	}
+
+	// Act + assert: the global file is ignored and reconstruction still fails.
+	if _, err := plug.ConstructVolumeSpec(specVolID, podLocalDir); err == nil {
+		t.Fatal("ConstructVolumeSpec succeeded with the gate off; the fallback must not run unless the feature is enabled")
+	}
+}
