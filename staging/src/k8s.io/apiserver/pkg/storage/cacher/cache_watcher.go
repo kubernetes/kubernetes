@@ -50,6 +50,14 @@ const (
 	cacheWatcherBookmarkSent
 )
 
+// initEventsTimeout is how long we wait for a client to accept a single
+// initial event before terminating its watch.
+//
+// The timer is reset after every event we manage to send, so this bounds how
+// long a watch may make no progress at all, not how long it may take to
+// deliver all of its initial events.
+const initEventsTimeout = 30 * time.Second
+
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
@@ -412,7 +420,11 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 }
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
-func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sentAt time.Time) {
+//
+// A nil timer means that the send is not bounded by a timeout and will block
+// until the event is delivered or the watcher is stopped. It returns
+// terminated=true if the watcher was closed because the send timed out.
+func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent, timer clock.Timer) (builtAt, sentAt time.Time, terminated bool) {
 	// We need to ensure that if we put event X to the c.result, all
 	// previous events were already put into it before, no matter whether
 	// c.done is close or not.
@@ -427,24 +439,38 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	// events.
 	select {
 	case <-c.done:
-		return time.Time{}, time.Time{}
+		return time.Time{}, time.Time{}, false
 	default:
 	}
 
 	watchEvent := c.convertToWatchEvent(event)
 	if watchEvent == nil {
 		// Watcher is not interested in that object.
-		return time.Time{}, time.Time{}
+		return time.Time{}, time.Time{}, false
 	}
 	builtAt = c.clock.Now()
+
+	// Note that receiving from a nil channel blocks forever, which is exactly
+	// the behaviour we want when no timer was given.
+	var timeoutCh <-chan time.Time
+	if timer != nil {
+		timeoutCh = timer.C()
+	}
 
 	select {
 	case c.result <- *watchEvent:
 		c.markBookmarkAfterRvSent(event)
 		sentAt = c.clock.Now()
 	case <-c.done:
+	case <-timeoutCh:
+		// The client is not reading the events we have already sent it, so we
+		// terminate the watcher instead of blocking this goroutine (and
+		// pinning the events it still has to send) indefinitely. The client
+		// can re-establish the watch.
+		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness while sending initial events: %v. len(c.input) = %v, len(c.result) = %v", c.groupResource.String(), c.identifier, len(c.input), len(c.result))
+		return time.Time{}, time.Time{}, true
 	}
-	return builtAt, sentAt
+	return builtAt, sentAt, false
 }
 
 func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
@@ -452,8 +478,8 @@ func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInt
 	defer close(c.result)
 	defer c.Stop()
 
-	resourceVersion, err := c.processInitialEvents(cacheInterval, resourceVersion)
-	if err != nil {
+	resourceVersion, terminated, err := c.processInitialEvents(cacheInterval, resourceVersion)
+	if err != nil || terminated {
 		return
 	}
 	// At this point we already start processing incoming watch events.
@@ -466,9 +492,11 @@ func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInt
 	c.processIncomingEvents(ctx, resourceVersion)
 }
 
-func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, resourceVersion uint64) (uint64, error) {
+// processInitialEvents returns terminated=true if the watcher was closed
+// because a send timed out (see sendWatchCacheEvent).
+func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, resourceVersion uint64) (uint64, bool, error) {
 	if cacheInterval == nil {
-		return resourceVersion, nil
+		return resourceVersion, false, nil
 	}
 	// Check how long we are processing initEvents.
 	// As long as these are not processed, we are not processing
@@ -493,6 +521,13 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, r
 		resourceVersion = cacheInterval.resourceVersion
 	}
 
+	// A client that stops reading would otherwise block this goroutine (and
+	// pin the events it still has to send) indefinitely. Once we are serving
+	// incoming events, add() detects unresponsive watchers instead, so the
+	// timeout only covers the initial ones.
+	timer := c.clock.NewTimer(initEventsTimeout)
+	defer timer.Stop()
+
 	initEventCount := 0
 	for event, err := range cacheInterval.All() {
 		if err != nil {
@@ -511,9 +546,12 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, r
 			// custom clients, the cost of it is something that we
 			// are fully accepting.
 			klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
-			return resourceVersion, err
+			return resourceVersion, false, err
 		}
-		c.sendWatchCacheEvent(event)
+		if _, _, terminated := c.sendWatchCacheEvent(event, timer); terminated {
+			return resourceVersion, true, nil
+		}
+		resetTimer(timer, initEventsTimeout)
 
 		// With some events already sent, update resourceVersion so that
 		// events that were buffered and not yet processed won't be delivered
@@ -540,9 +578,11 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, r
 
 	// send bookmark after sending all events in cacheInterval for watchlist request
 	if cacheInterval.initialEventsEndBookmark != nil {
-		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+		if _, _, terminated := c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark, timer); terminated {
+			return resourceVersion, true, nil
+		}
 	}
-	return resourceVersion, nil
+	return resourceVersion, false, nil
 }
 
 func (c *cacheWatcher) processIncomingEvents(ctx context.Context, resourceVersion uint64) {
@@ -557,7 +597,7 @@ func (c *cacheWatcher) processIncomingEvents(ctx context.Context, resourceVersio
 			// or a bookmark event with an RV equal to resourceVersion
 			// if we haven't sent one to the client
 			if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
-				builtAt, sentAt := c.sendWatchCacheEvent(event)
+				builtAt, sentAt, _ := c.sendWatchCacheEvent(event, nil)
 				c.observeDispatchMetrics(event, dequeuedAt, builtAt, sentAt)
 			}
 		case <-ctx.Done():
@@ -577,4 +617,14 @@ func (c *cacheWatcher) observeDispatchMetrics(event *watchCacheEvent, dequeuedAt
 	tl.MarkAt(metrics.PointEventBuilt, builtAt)
 	tl.MarkAt(metrics.PointSentToClient, sentAt)
 	c.watcherMetrics.ObserveTimeline(&tl)
+}
+
+func resetTimer(t clock.Timer, d time.Duration) {
+	if !t.Stop() {
+		select {
+		case <-t.C():
+		default:
+		}
+	}
+	t.Reset(d)
 }
