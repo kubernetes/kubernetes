@@ -2215,8 +2215,15 @@
 - name: dispatch_duration_seconds
   subsystem: watch_events
   namespace: apiserver
-  help: Histogram of watch event dispatch latency broken by resource type and pipeline
-    stage. The 'total' stage is the end-to-end latency of a delivered event.
+  help: 'Histogram of watch event dispatch latency broken down by resource type and
+    pipeline stage. Stages: storage_input_queue_latency (received from etcd until
+    decoding begins), storage_transform_decode_latency (transform and decode), storage_output_queue_latency
+    (decoded until the watch cache''s reflector takes the event), cacher_queue_latency
+    (watch cache processing until dispatch begins), watcher_queue_latency (enqueued
+    to the watcher''s input channel until dequeued), watcher_to_client_latency (blocked
+    handing the event to the HTTP handler), total (received from etcd until handed
+    to the HTTP handler). The stages do not cover the whole pipeline and need not
+    sum to total.'
   type: Histogram
   stabilityLevel: ALPHA
   labels:

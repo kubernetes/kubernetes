@@ -45,7 +45,9 @@ type event struct {
 	isInitialEventsEndBookmark bool
 	// isInitialEvent indicates the event was generated from an initial state sync.
 	isInitialEvent bool
-	recordTime     time.Time
+	// receivedAt is when the backend response carrying this event was received.
+	// It is shared by every event of that response.
+	receivedAt time.Time
 }
 
 // parseKV converts a KeyValue retrieved from an initial sync() listing to a synthetic isCreated event.
@@ -61,7 +63,9 @@ func parseKV(kv *mvccpb.KeyValue) *event {
 	}
 }
 
-func parseEvent(e *clientv3.Event) (*event, error) {
+// parseEvent converts a raw etcd event into an event. receivedAt is the time
+// at which the WatchResponse carrying e was received.
+func parseEvent(e *clientv3.Event, receivedAt time.Time) (*event, error) {
 	if !e.IsCreate() && e.PrevKv == nil {
 		// If the previous value is nil, error. One example of how this is possible is if the previous value has been compacted already.
 		return nil, fmt.Errorf("etcd event received with PrevKv=nil (key=%q, modRevision=%d, type=%s)", string(e.Kv.Key), e.Kv.ModRevision, e.Type.String())
@@ -73,7 +77,7 @@ func parseEvent(e *clientv3.Event) (*event, error) {
 		rev:        e.Kv.ModRevision,
 		isDeleted:  e.Type == clientv3.EventTypeDelete,
 		isCreated:  e.IsCreate(),
-		recordTime: time.Now(),
+		receivedAt: receivedAt,
 	}
 	if e.PrevKv != nil {
 		ret.prevValue = e.PrevKv.Value
@@ -81,10 +85,10 @@ func parseEvent(e *clientv3.Event) (*event, error) {
 	return ret, nil
 }
 
-func progressNotifyEvent(rev int64) *event {
+func progressNotifyEvent(rev int64, receivedAt time.Time) *event {
 	return &event{
 		rev:              rev,
 		isProgressNotify: true,
-		recordTime:       time.Now(),
+		receivedAt:       receivedAt,
 	}
 }
