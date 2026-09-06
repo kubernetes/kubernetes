@@ -871,6 +871,79 @@ func RecreatesPVCForPendingPod(t *testing.T, set *apps.StatefulSet, invariants i
 	}
 }
 
+// TestDeletesAdoptedPodWithStaleVCTVolumes verifies that a pod carrying a
+// PVC-backed volume for a volumeClaimTemplate that no longer exists in the
+// StatefulSet is deleted (not endlessly retried with FailedUpdate) so it can
+// be cleanly recreated against the current template set.
+func TestDeletesAdoptedPodWithStaleVCTVolumes(t *testing.T) {
+	// Build a 1-replica set whose only VCT is "datadir".
+	set := newStatefulSet(1)
+	client := fake.NewSimpleClientset(set)
+	om, _, ssc := setupController(client)
+
+	// Bring pod foo-0 up to Running+Ready.
+	if err := scaleUpStatefulSetControl(set, ssc, om, assertMonotonicInvariants, nil); err != nil {
+		t.Fatalf("scaleUpStatefulSetControl: %v", err)
+	}
+	var err error
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("getting updated set: %v", err)
+	}
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatalf("building selector: %v", err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("listing pods: %v", err)
+	}
+	if len(pods) != 1 {
+		t.Fatalf("expected 1 pod, got %d", len(pods))
+	}
+
+	// Inject a stale PVC-backed volume "oldvol" — as if this pod was adopted
+	// from a set that previously had an "oldvol" volumeClaimTemplate.
+	pod := pods[0].DeepCopy()
+	staleClaimName := getPersistentVolumeClaimName(set, &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "oldvol"},
+	}, getOrdinal(pod))
+	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+		Name: "oldvol",
+		VolumeSource: v1.VolumeSource{
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+				ClaimName: staleClaimName,
+			},
+		},
+	})
+	fakeResourceVersion(pod)
+	if err := om.podsIndexer.Update(pod); err != nil {
+		t.Fatalf("updating pod in indexer: %v", err)
+	}
+
+	// Fetch the updated pod list and run one sync. The controller must delete
+	// the pod — not attempt an update that would loop forever.
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("listing pods after mutation: %v", err)
+	}
+	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+		t.Fatalf("UpdateStatefulSet returned unexpected error: %v", err)
+	}
+
+	// After the sync the pod must have been removed from the store (fakeObjectManager.DeletePod
+	// removes from the indexer directly), not left alive for endless update retries.
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("listing pods after sync: %v", err)
+	}
+	for _, p := range pods {
+		if p.Name == pod.Name {
+			t.Errorf("pod %s was not deleted; controller should delete pods with stale VCT volumes instead of retrying updates", p.Name)
+		}
+	}
+}
+
 func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 	runTestOverPVCRetentionPolicies(
 		t, "", func(t *testing.T, policy *apps.StatefulSetPersistentVolumeClaimRetentionPolicy) {
