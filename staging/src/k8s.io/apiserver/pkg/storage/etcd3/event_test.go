@@ -99,13 +99,14 @@ func TestParseEvent(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			actualEvent, err := parseEvent(tc.etcdEvent)
+			receivedAt := time.Now()
+			actualEvent, err := parseEvent(tc.etcdEvent, receivedAt)
 			if tc.expectedErr != "" {
 				require.Error(t, err)
 				assert.ErrorContains(t, err, tc.expectedErr)
 			} else {
 				require.NoError(t, err)
-				actualEvent.recordTime = time.Time{}
+				tc.expectedEvent.receivedAt = receivedAt
 				assert.Equal(t, tc.expectedEvent, actualEvent)
 			}
 		})
