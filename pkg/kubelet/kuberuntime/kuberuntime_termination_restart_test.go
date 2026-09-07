@@ -92,12 +92,16 @@ type terminationStopCall struct {
 type terminationRuntime struct {
 	internalapi.RuntimeService
 	calls chan terminationStopCall
+	stop  func(context.Context, string, int64) error
 }
 
 func (r *terminationRuntime) StopContainer(ctx context.Context, id string, grace int64) error {
 	call := terminationStopCall{id: id, grace: grace, done: make(chan struct{})}
 	r.calls <- call
 	defer close(call.done)
+	if r.stop != nil {
+		return r.stop(ctx, id, grace)
+	}
 	<-ctx.Done()
 	return ctx.Err()
 }
@@ -113,12 +117,15 @@ func nextTerminationStop(t *testing.T, r *terminationRuntime) terminationStopCal
 	return terminationStopCall{}
 }
 
-func setupTerminationTest(t *testing.T) (ktesting.TContext, *kubeGenericRuntimeManager, *apitest.FakeRuntimeService, *v1.Pod, *kubecontainer.PodStatus, *terminationRuntime) {
+func setupTerminationTest(t *testing.T, mutations ...func(*v1.Pod)) (ktesting.TContext, *kubeGenericRuntimeManager, *apitest.FakeRuntimeService, *v1.Pod, *kubecontainer.PodStatus, *terminationRuntime) {
 	t.Helper()
 	ctx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(ctx)
 	require.NoError(t, err)
 	pod := newSidecarRestartTestPod()
+	for _, mutate := range mutations {
+		mutate(pod)
+	}
 	makeAndSetFakePod(ctx, m, fakeRuntime, pod)
 	rp, err := m.GetPod(ctx, pod.UID)
 	require.NoError(t, err)
@@ -414,4 +421,285 @@ func TestSyncTerminatingPodDeadlineStopsUnknownContainer(t *testing.T) {
 	call := nextTerminationStop(t, r)
 	require.Equal(t, "removed", call.id)
 	require.Zero(t, call.grace)
+}
+
+func terminationStatus(t *testing.T, ctx context.Context, m *kubeGenericRuntimeManager, pod *v1.Pod) *kubecontainer.PodStatus {
+	t.Helper()
+	rp, err := m.GetPod(ctx, pod.UID)
+	require.NoError(t, err)
+	status, err := m.GetPodStatus(ctx, rp)
+	require.NoError(t, err)
+	return status
+}
+
+func TestSyncTerminatingPodRemovesPartialStartAtDeadline(t *testing.T) {
+	ctx, m, fakeRuntime, pod, status, _ := setupTerminationTest(t)
+	setSidecarStateExited(fakeRuntime, "sidecar")
+	status = terminationStatus(t, ctx, m, pod)
+	fakeRuntime.InjectError("StartContainer", errors.New("start interrupted"))
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	_, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, time.Now().Add(time.Minute))
+	require.ErrorContains(t, err, "start interrupted")
+	status = terminationStatus(t, ctx, m, pod)
+	partialID := status.FindContainerStatusByName("sidecar").ID.ID
+	require.Equal(t, kubecontainer.ContainerStateCreated, status.FindContainerStatusByName("sidecar").State)
+	_, err = m.SyncTerminatingPod(ctx, pod, status, nil, backOff, time.Now().Add(-time.Second))
+	require.NoError(t, err)
+	fakeRuntime.Lock()
+	_, exists := fakeRuntime.Containers[partialID]
+	fakeRuntime.Unlock()
+	require.False(t, exists, "an unstarted replacement must not survive the termination deadline")
+	require.Equal(t, 1, countCallsOf(fakeRuntime.GetCalls(), "CreateContainer"))
+}
+
+// A lost CRI response leaves kubelet unable to distinguish failure from a
+// committed operation. Recovery must use the runtime's state in either case.
+type interruptedTerminationRuntime struct {
+	internalapi.RuntimeService
+	operation string
+	after     bool
+}
+
+func (r *interruptedTerminationRuntime) CreateContainer(ctx context.Context, sandbox string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+	if r.operation != "create" {
+		return r.RuntimeService.CreateContainer(ctx, sandbox, config, sandboxConfig)
+	}
+	if r.after {
+		if _, err := r.RuntimeService.CreateContainer(ctx, sandbox, config, sandboxConfig); err != nil {
+			return "", err
+		}
+	}
+	return "", errors.New("create response lost")
+}
+
+func (r *interruptedTerminationRuntime) StartContainer(ctx context.Context, id string) error {
+	if r.operation != "start" {
+		return r.RuntimeService.StartContainer(ctx, id)
+	}
+	if r.after {
+		if err := r.RuntimeService.StartContainer(ctx, id); err != nil {
+			return err
+		}
+	}
+	return errors.New("start response lost")
+}
+
+func TestSyncTerminatingPodRecoversInterruptedStart(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		operation string
+		after     bool
+		creates   int
+	}{
+		{"before create", "create", false, 1},
+		{"after create", "create", true, 2},
+		{"before start", "start", false, 2},
+		{"after start", "start", true, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, m, fakeRuntime, pod, _, r := setupTerminationTest(t)
+			setSidecarStateExited(fakeRuntime, "sidecar")
+			status := terminationStatus(t, ctx, m, pod)
+			m.runtimeService = &interruptedTerminationRuntime{RuntimeService: r, operation: tc.operation, after: tc.after}
+			deadline := time.Now().Add(time.Minute)
+			_, err := m.SyncTerminatingPod(ctx, pod, status, nil, flowcontrol.NewBackOff(time.Second, time.Minute), deadline)
+			require.ErrorContains(t, err, "response lost")
+			originalStop := nextTerminationStop(t, r)
+			m.terminations[pod.UID].containers[status.FindContainerStatusByName("main").ID].stop.cancel()
+			select {
+			case <-originalStop.done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("old kubelet's stop call did not return after cancellation")
+			}
+			_, _, restarted, err := createTestRuntimeManager(ctx)
+			require.NoError(t, err)
+			restarted.runtimeService = r
+			status = terminationStatus(t, ctx, restarted, pod)
+			done, err := restarted.SyncTerminatingPod(ctx, pod, status, nil, flowcontrol.NewBackOff(time.Second, time.Minute), deadline)
+			require.NoError(t, err)
+			require.False(t, done)
+			replayedStop := nextTerminationStop(t, r)
+			require.Equal(t, originalStop.id, replayedStop.id)
+			require.LessOrEqual(t, replayedStop.grace, originalStop.grace)
+			require.Equal(t, tc.creates, countCallsOf(fakeRuntime.GetCalls(), "CreateContainer"))
+			status = terminationStatus(t, ctx, restarted, pod)
+			running := 0
+			for _, cs := range status.ContainerStatuses {
+				if cs.Name == "sidecar" && cs.State == kubecontainer.ContainerStateRunning {
+					running++
+				}
+			}
+			require.Equal(t, 1, running, "recovery must leave exactly one live sidecar instance")
+			// Finish through observations so all replacement-manager operations are released.
+			for _, cs := range status.ContainerStatuses {
+				cs.State = kubecontainer.ContainerStateExited
+			}
+			done, err = restarted.SyncTerminatingPod(ctx, pod, status, nil, flowcontrol.NewBackOff(time.Second, time.Minute), deadline)
+			require.NoError(t, err)
+			require.True(t, done)
+		})
+	}
+}
+
+func TestSyncTerminatingPodOrdersMultipleSidecars(t *testing.T) {
+	ctx, m, fakeRuntime, pod, status, r := setupTerminationTest(t, func(pod *v1.Pod) {
+		later := pod.Spec.InitContainers[0].DeepCopy()
+		later.Name = "later"
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, *later)
+	})
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	deadline := time.Now().Add(time.Minute)
+	_, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+	require.NoError(t, err)
+	require.Equal(t, status.FindContainerStatusByName("main").ID.ID, nextTerminationStop(t, r).id)
+	require.Empty(t, r.calls)
+	setSidecarStateExited(fakeRuntime, "main")
+	setSidecarStateExited(fakeRuntime, "sidecar")
+	status = terminationStatus(t, ctx, m, pod)
+	_, err = m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+	require.NoError(t, err)
+	require.Equal(t, status.FindContainerStatusByName("later").ID.ID, nextTerminationStop(t, r).id)
+	require.Equal(t, 1, countCallsOf(fakeRuntime.GetCalls(), "CreateContainer"), "the earlier sidecar is needed while the later one drains")
+	status = terminationStatus(t, ctx, m, pod)
+	replacementID := status.FindContainerStatusByName("sidecar").ID.ID
+	setSidecarStateExited(fakeRuntime, "later")
+	status = terminationStatus(t, ctx, m, pod)
+	_, err = m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+	require.NoError(t, err)
+	require.Equal(t, replacementID, nextTerminationStop(t, r).id)
+	require.Equal(t, 1, countCallsOf(fakeRuntime.GetCalls(), "CreateContainer"), "the later sidecar must not restart after its turn")
+	setSidecarStateExited(fakeRuntime, "sidecar")
+	done, err := m.SyncTerminatingPod(ctx, pod, terminationStatus(t, ctx, m, pod), nil, backOff, deadline)
+	require.NoError(t, err)
+	require.True(t, done)
+}
+
+func TestSyncTerminatingPodWaitsForObservedStop(t *testing.T) {
+	for _, loseResponse := range []bool{false, true} {
+		t.Run(map[bool]string{false: "success", true: "lost response"}[loseResponse], func(t *testing.T) {
+			ctx, m, fakeRuntime, pod, status, r := setupTerminationTest(t)
+			r.stop = func(ctx context.Context, id string, grace int64) error {
+				if err := fakeRuntime.StopContainer(ctx, id, grace); err != nil {
+					return err
+				}
+				if loseResponse {
+					return errors.New("stop response lost")
+				}
+				return nil
+			}
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			deadline := time.Now().Add(time.Minute)
+			_, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+			require.NoError(t, err)
+			call := nextTerminationStop(t, r)
+			select {
+			case <-call.done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("stop call did not complete")
+			}
+			done, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+			if loseResponse {
+				require.ErrorContains(t, err, "stop response lost")
+			} else {
+				require.NoError(t, err)
+			}
+			require.False(t, done, "a completed stop RPC cannot authorize cleanup on its own")
+			require.Empty(t, r.calls, "sidecar must stay up until the main container is observed exited")
+			status = terminationStatus(t, ctx, m, pod)
+			done, err = m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+			require.NoError(t, err)
+			require.False(t, done)
+			call = nextTerminationStop(t, r)
+			select {
+			case <-call.done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("sidecar stop call did not complete")
+			}
+			done, err = m.SyncTerminatingPod(ctx, pod, terminationStatus(t, ctx, m, pod), nil, backOff, deadline)
+			require.NoError(t, err)
+			require.True(t, done)
+		})
+	}
+}
+
+func TestSyncTerminatingPodShortensOutstandingStop(t *testing.T) {
+	ctx, m, _, pod, status, r := setupTerminationTest(t)
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	_, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, time.Now().Add(time.Minute))
+	require.NoError(t, err)
+	original := nextTerminationStop(t, r)
+	deadline := time.Now().Add(5 * time.Second)
+	done, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+	require.NoError(t, err)
+	require.False(t, done)
+	shortened := nextTerminationStop(t, r)
+	require.Equal(t, original.id, shortened.id)
+	require.Positive(t, shortened.grace)
+	require.LessOrEqual(t, shortened.grace, int64(5))
+	select {
+	case <-original.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("superseded stop call was not cancelled")
+	}
+	_, err = m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+	require.NoError(t, err)
+	require.Empty(t, r.calls, "the shortened stop must remain deduplicated across reconciles")
+}
+
+func TestSyncTerminatingPodDeadlineCancelsHooks(t *testing.T) {
+	ctx, m, _, pod, status, r := setupTerminationTest(t)
+	pod.Spec.Containers[0].Lifecycle = &v1.Lifecycle{PreStop: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"drain"}}}}
+	runner := &terminationHookRunner{calls: make(chan kubecontainer.ContainerID, 1), release: make(chan struct{})}
+	m.runner = runner
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	_, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, time.Now().Add(time.Minute))
+	require.NoError(t, err)
+	select {
+	case <-runner.calls:
+	case <-time.After(5 * time.Second):
+		t.Fatal("preStop hook did not start")
+	}
+	hook := m.terminations[pod.UID].containers[status.FindContainerStatusByName("main").ID].hook
+	done, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, time.Now().Add(-time.Second))
+	require.NoError(t, err)
+	require.False(t, done)
+	for range 2 {
+		require.Zero(t, nextTerminationStop(t, r).grace, "hooks must not renew the pod deadline")
+	}
+	select {
+	case err := <-hook.done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("preStop hook remained active after deadline expiry")
+	}
+}
+
+func TestSyncTerminatingPodRetriesFailedStop(t *testing.T) {
+	ctx, m, fakeRuntime, pod, status, r := setupTerminationTest(t)
+	fakeRuntime.InjectError("StopContainer", errors.New("stop rejected"))
+	r.stop = fakeRuntime.StopContainer
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	deadline := time.Now().Add(time.Minute)
+	_, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+	require.NoError(t, err)
+	original := nextTerminationStop(t, r)
+	select {
+	case <-original.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("failed stop call did not complete")
+	}
+	done, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+	require.False(t, done)
+	require.ErrorContains(t, err, "stop rejected")
+	_, err = m.SyncTerminatingPod(ctx, pod, status, nil, backOff, deadline)
+	require.NoError(t, err)
+	retried := nextTerminationStop(t, r)
+	require.Equal(t, original.id, retried.id)
+	require.LessOrEqual(t, retried.grace, original.grace)
+	select {
+	case <-retried.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("retried stop call did not complete")
+	}
+	require.Equal(t, kubecontainer.ContainerStateExited, terminationStatus(t, ctx, m, pod).FindContainerStatusByName("main").State)
 }
