@@ -377,9 +377,10 @@ func (cnc *CloudNodeController) reconcileAdditionalLabels(
 	for key, value := range instanceMetadata.AdditionalLabels {
 		// Cloud providers should not use label namespaces reserved by Kubernetes.
 		if k8sNamespaceRegex.MatchString(key) {
-			klog.Warningf(
-				"Discarding node label %s with kubernetes namespace",
-				key,
+			klog.V(4).InfoS(
+				"Discarding node label because it uses a Kubernetes-reserved namespace",
+				"node", klog.KObj(node),
+				"label", key,
 			)
 			continue
 		}
