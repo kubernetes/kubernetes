@@ -42,17 +42,11 @@ const invariantGoroutineLeaksLeafText = "should enable checking for goroutine le
 // nodes should have their kubelet checked.
 const defaultGoroutineLeakNodesRE = `.*`
 
-// goroutineLeakCheck determines what gets checked and whether findings fail
-// the suite.
+// goroutineLeakCheck determines what gets checked.
 type goroutineLeakCheck struct {
 	// nodes contains a regular expression which determines which nodes have
 	// their kubelet checked.
 	nodes goroutineLeakRegexp
-
-	// enforce turns findings into a suite failure. It defaults to false so
-	// that the check can be rolled out in reporting-only mode and cannot
-	// introduce flakes into jobs which are not watching it.
-	enforce bool
 }
 
 // goroutineLeakRegexp implements flag.Value for a regular expression.
@@ -90,8 +84,6 @@ var enabledGoroutineLeakCheck = goroutineLeakCheck{
 func RegisterGoroutineLeakFlags(fs *flag.FlagSet) {
 	fs.Var(&enabledGoroutineLeakCheck.nodes, "goroutineleak-nodes-regexp",
 		"all kubelets on nodes matching this regular expression get checked")
-	fs.BoolVar(&enabledGoroutineLeakCheck.enforce, "goroutineleak-enforce", false,
-		"turns leaked goroutines into a suite failure instead of only reporting them")
 }
 
 // podDialer adapts the e2e pod dialer to the interface used by the
@@ -153,14 +145,11 @@ func checkInvariantGoroutineLeaks(ctx context.Context) {
 	results = append(results, goroutineleak.CheckKubelets(ctx, c, enabledGoroutineLeakCheck.nodes.re)...)
 	results = append(results, checkControlPlanePods(ctx, c, config)...)
 
-	// Always report what was found, including components which reported no
-	// leaks, so that a check which examined nothing is distinguishable from
-	// one which passed.
+	// Report what was checked, including components which reported no leaks,
+	// so that a check which examined nothing is distinguishable from one
+	// which passed.
 	ginkgo.GinkgoWriter.Print(goroutineleak.Report(results))
 
-	if !enabledGoroutineLeakCheck.enforce {
-		return
-	}
 	if failure := goroutineleak.Failure(results); failure != "" {
 		framework.Failf("%s", failure)
 	}
