@@ -242,6 +242,30 @@ func TestFindGlobalMountDataBySpecVolIDScanErrors(t *testing.T) {
 		}
 	})
 
+	t.Run("block volume tree is not an incomplete scan", func(t *testing.T) {
+		// plugins/kubernetes.io/csi also holds volumeDevices/<specVolID>/data,
+		// one level deeper than a global mount. Walking into it must not make
+		// the scan claim it could not look everywhere.
+		pluginDir := t.TempDir()
+		blockDataDir := filepath.Join(pluginDir, "volumeDevices", "some-block-pv", "data")
+		if err := os.MkdirAll(blockDataDir, 0o755); err != nil {
+			t.Fatalf("setup block dir: %v", err)
+		}
+		if err := saveVolumeData(blockDataDir, volDataFileName, map[string]string{
+			volDataKey.specVolID: "some-block-pv",
+		}); err != nil {
+			t.Fatalf("save block vol_data.json: %v", err)
+		}
+
+		_, _, err := findGlobalMountDataBySpecVolID(pluginDir, specVolID)
+		if err == nil {
+			t.Fatal("expected a not-found error, got none")
+		}
+		if strings.Contains(err.Error(), "could not be read") {
+			t.Errorf("the block volume tree must not count as an unreadable dir, got: %v", err)
+		}
+	})
+
 	t.Run("complete scan with no match", func(t *testing.T) {
 		pluginDir := t.TempDir()
 		dataDir := filepath.Join(pluginDir, testDriver, "somehash")

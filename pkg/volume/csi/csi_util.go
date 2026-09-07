@@ -124,6 +124,15 @@ func findGlobalMountDataBySpecVolID(pluginDir, specVolID string) (string, map[st
 			dir := filepath.Join(driverDir, vol.Name())
 			data, err := loadVolumeData(dir, volDataFileName)
 			if err != nil {
+				// A directory with no vol_data.json at all is not a global
+				// mount and not a read failure. The block volume tree
+				// (volumeDevices/<specVolID>/data) lives under the same plugin
+				// dir and keeps its file one level deeper, and MountDevice
+				// creates the directory before it writes the file, so both
+				// show up here on a healthy node.
+				if errors.Is(err, os.ErrNotExist) {
+					continue
+				}
 				klog.V(4).Info(log("skipping unreadable volume data at %s: %v", dir, err))
 				skipped = append(skipped, dir)
 				continue
