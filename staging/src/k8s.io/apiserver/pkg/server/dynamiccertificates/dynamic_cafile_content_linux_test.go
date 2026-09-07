@@ -66,7 +66,11 @@ func TestDynamicFileCAContentPollReloadsAfterBindMountHidesInode(t *testing.T) {
 	if err := syscall.Mount(shadow, filename, "", syscall.MS_BIND, ""); err != nil {
 		t.Skipf("bind mount not permitted in this environment: %v", err)
 	}
-	t.Cleanup(func() { _ = syscall.Unmount(filename, syscall.MNT_DETACH) })
+	t.Cleanup(func() {
+		if err := syscall.Unmount(filename, syscall.MNT_DETACH); err != nil {
+			t.Errorf("unmount %s: %v", filename, err)
+		}
+	})
 
 	// Append on the new inode. The watch still holds the hidden original inode,
 	// so fsnotify should not fire; FileRefreshDuration must reload from the path.

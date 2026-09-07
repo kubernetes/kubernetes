@@ -92,7 +92,10 @@ func TestFileRefreshPollReloadsWithoutFsnotify(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Cleanup(func() {
+		cancel()
+		c.queue.ShutDown()
+	})
 	go wait.Until(c.runWorker, time.Second, ctx.Done())
 	go wait.Until(func() { c.queue.Add(workItemKey) }, FileRefreshDuration, ctx.Done())
 
