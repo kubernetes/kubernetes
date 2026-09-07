@@ -2110,11 +2110,9 @@ func TestReconcileAdditionalLabelsReturnsEarly(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			node := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node0",
-					Labels: map[string]string{
-						"example.com/existing": "preserved",
-					},
+				Name: "node0",
+				Labels: map[string]string{
+					"example.com/existing": "preserved",
 				},
 			}
 
@@ -2204,10 +2202,8 @@ func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 
 			node := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "node0",
-					Labels: test.existingLabels,
-				},
+				Name:   "node0",
+				Labels: test.existingLabels,
 				Spec: v1.NodeSpec{
 					ProviderID: "fake://node0",
 				},
