@@ -78,14 +78,27 @@ const (
 	defaultPodExecTimeout = 60 * time.Second
 )
 
-func NewCmdExec(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	options := &ExecOptions{
-		StreamOptions: StreamOptions{
-			IOStreams: streams,
-		},
+// ExecFlags directly reflect the information that CLI is gathering via flags.
+type ExecFlags struct {
+	resource.FilenameOptions
 
-		Executor: &DefaultRemoteExecutor{},
+	ContainerName string
+	Stdin         bool
+	TTY           bool
+	Quiet         bool
+
+	genericiooptions.IOStreams
+}
+
+// NewExecFlags returns a default ExecFlags
+func NewExecFlags(streams genericiooptions.IOStreams) *ExecFlags {
+	return &ExecFlags{
+		IOStreams: streams,
 	}
+}
+
+func NewCmdExec(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+	flags := NewExecFlags(streams)
 	cmd := &cobra.Command{
 		Use:                   "exec (POD | TYPE/NAME) [-c CONTAINER] [flags] -- COMMAND [args...]",
 		DisableFlagsInUseLine: true,
@@ -95,21 +108,27 @@ func NewCmdExec(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 		ValidArgsFunction:     completion.PodResourceNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
-			cmdutil.CheckErr(options.Complete(f, cmd, args, argsLenAtDash))
-			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.Run())
+			o, err := flags.ToOptions(f, cmd, args, argsLenAtDash)
+			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodExecTimeout)
-	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &options.FilenameOptions.Filenames, "to use to exec into the resource")
-	// TODO support UID
-	cmdutil.AddContainerVarFlags(cmd, &options.ContainerName, options.ContainerName)
+	flags.AddFlags(cmd)
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc("container", completion.ContainerCompletionFunc(f)))
-
-	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
-	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
-	cmd.Flags().BoolVarP(&options.Quiet, "quiet", "q", options.Quiet, "Only print output from the remote session")
 	return cmd
+}
+
+// AddFlags registers flags for a cli
+func (flags *ExecFlags) AddFlags(cmd *cobra.Command) {
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodExecTimeout)
+	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &flags.FilenameOptions.Filenames, "to use to exec into the resource")
+	// TODO support UID
+	cmdutil.AddContainerVarFlags(cmd, &flags.ContainerName, flags.ContainerName)
+
+	cmd.Flags().BoolVarP(&flags.Stdin, "stdin", "i", flags.Stdin, "Pass stdin to the container")
+	cmd.Flags().BoolVarP(&flags.TTY, "tty", "t", flags.TTY, "Stdin is a TTY")
+	cmd.Flags().BoolVarP(&flags.Quiet, "quiet", "q", flags.Quiet, "Only print output from the remote session")
 }
 
 // RemoteExecutor defines the interface accepted by the Exec command - provided for test stubbing
@@ -203,47 +222,60 @@ type ExecOptions struct {
 	Config        *restclient.Config
 }
 
-// Complete verifies command line arguments and loads data from the command environment
-func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
+// ToOptions converts from CLI inputs to runtime inputs
+func (flags *ExecFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) (*ExecOptions, error) {
+	o := &ExecOptions{
+		StreamOptions: StreamOptions{
+			ContainerName: flags.ContainerName,
+			Stdin:         flags.Stdin,
+			TTY:           flags.TTY,
+			Quiet:         flags.Quiet,
+			IOStreams:     flags.IOStreams,
+		},
+		FilenameOptions: flags.FilenameOptions,
+
+		Executor: &DefaultRemoteExecutor{},
+	}
+
 	if len(argsIn) > 0 && argsLenAtDash != 0 {
-		p.ResourceName = argsIn[0]
+		o.ResourceName = argsIn[0]
 	}
 	// we expect exactly one arg (the pod/resource name) before the dash separator.
 	// pflag guarantees `argsLenAtDash <= len(args)`.
 	if argsLenAtDash == 0 || argsLenAtDash == 1 {
-		p.Command = argsIn[argsLenAtDash:]
-	} else if len(argsIn) > 1 || (len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0) {
-		return cmdutil.UsageErrorf(cmd, "exec [POD] [COMMAND] is not supported anymore. Use exec [POD] -- [COMMAND] instead")
+		o.Command = argsIn[argsLenAtDash:]
+	} else if len(argsIn) > 1 || (len(argsIn) > 0 && len(flags.FilenameOptions.Filenames) != 0) {
+		return nil, fmt.Errorf("exec [POD] [COMMAND] is not supported anymore. Use exec [POD] -- [COMMAND] instead")
 	}
 
 	var err error
-	p.Namespace, p.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	p.ExecutablePodFn = polymorphichelpers.AttachablePodForObjectFn
+	o.ExecutablePodFn = polymorphichelpers.AttachablePodForObjectFn
 
-	p.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
+	o.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
-		return cmdutil.UsageErrorf(cmd, "%s", err.Error())
+		return nil, err
 	}
 
-	p.Builder = f.NewBuilder
-	p.restClientGetter = f
+	o.Builder = f.NewBuilder
+	o.restClientGetter = f
 
-	p.Config, err = f.ToRESTConfig()
+	o.Config, err = f.ToRESTConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	clientset, err := f.KubernetesClientSet()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	p.PodClient = clientset.CoreV1()
+	o.PodClient = clientset.CoreV1()
 
-	return nil
+	return o, nil
 }
 
 // Validate checks that the provided exec options are specified.
