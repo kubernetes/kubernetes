@@ -53,7 +53,7 @@ func (s *ProcessEnvSource) ResolveReferences(ctx context.Context, filename strin
 	found := make(map[string][]pkgDistance)
 	callback := &scanCallback{
 		rootFound: func(gopathwalk.Root) bool {
-			return true // We want everything.
+			return true
 		},
 		dirFound: func(pkg *pkg) bool {
 			return pkgIsCandidate(filename, refs, pkg)

@@ -27,7 +27,7 @@ require (
 	go.uber.org/zap v1.27.1
 	go.yaml.in/yaml/v2 v2.4.4
 	golang.org/x/sys v0.47.0
-	golang.org/x/text v0.40.0
+	golang.org/x/text v0.41.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/klog/v2 v2.140.0

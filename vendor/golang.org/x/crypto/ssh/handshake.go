@@ -162,7 +162,7 @@ func newClientTransport(conn keyingTransport, clientVersion, serverVersion []byt
 	t.remoteAddr = addr
 	t.hostKeyCallback = config.HostKeyCallback
 	t.bannerCallback = config.BannerCallback
-	if config.HostKeyAlgorithms != nil {
+	if len(config.HostKeyAlgorithms) > 0 {
 		t.hostKeyAlgorithms = config.HostKeyAlgorithms
 	} else {
 		t.hostKeyAlgorithms = defaultHostKeyAlgos

@@ -26,10 +26,16 @@ type Permissions struct {
 	// defines "force-command" (only allow the given command to
 	// execute) and "source-address" (only allow connections from
 	// the given address). The SSH package currently only enforces
-	// the "source-address" critical option. It is up to server
-	// implementations to enforce other critical options, such as
-	// "force-command", by checking them after the SSH handshake
-	// is successful. In general, SSH servers should reject
+	// the "source-address" critical option: it is validated against
+	// the client's remote address whenever it is present in the
+	// Permissions returned by any authentication callback. Its value
+	// is a comma-separated list of IP addresses and CIDR blocks;
+	// consistently with OpenSSH, a connection whose remote address is
+	// not an IP address, such as a Unix domain socket, never matches
+	// the list and is rejected when the option is present. It is up
+	// to server implementations to enforce other critical options,
+	// such as "force-command", by checking them after the SSH
+	// handshake is successful. In general, SSH servers should reject
 	// connections that specify critical options that are unknown
 	// or not supported.
 	CriticalOptions map[string]string
@@ -223,7 +229,9 @@ type ServerConfig struct {
 	// Permissions object can be the same object, optionally modified, or a
 	// completely new object. If VerifiedPublicKeyCallback is non-nil,
 	// PublicKeyCallback is not allowed to return a PartialSuccessError, which
-	// can instead be returned by VerifiedPublicKeyCallback.
+	// can instead be returned by VerifiedPublicKeyCallback. The
+	// signatureAlgorithm argument is the format of the signature that was
+	// successfully verified.
 	//
 	// VerifiedPublicKeyCallback does not affect which authentication methods
 	// are included in the list of methods that can be attempted by the client.
@@ -442,6 +450,10 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 	return perms, err
 }
 
+// checkSourceAddress matches addr against sourceAddrs, a comma-separated list
+// of IP addresses and CIDR blocks. Consistently with OpenSSH, a remote address
+// that is not IP-based, such as a Unix domain socket, never matches the list
+// and is rejected.
 func checkSourceAddress(addr net.Addr, sourceAddrs string) error {
 	if addr == nil {
 		return errors.New("ssh: no address known for client, but source-address match required")
@@ -449,7 +461,7 @@ func checkSourceAddress(addr net.Addr, sourceAddrs string) error {
 
 	tcpAddr, ok := addr.(*net.TCPAddr)
 	if !ok {
-		return fmt.Errorf("ssh: remote address %v is not an TCP address when checking source-address match", addr)
+		return fmt.Errorf("ssh: remote address %v is not a TCP address when checking source-address match", addr)
 	}
 
 	for _, sourceAddr := range strings.Split(sourceAddrs, ",") {
@@ -470,6 +482,21 @@ func checkSourceAddress(addr net.Addr, sourceAddrs string) error {
 	}
 
 	return fmt.Errorf("ssh: remote address %v is not allowed because of source-address restriction", addr)
+}
+
+// checkSourceAddressCriticalOption enforces the source-address critical
+// option, if present in perms, as documented in Permissions.CriticalOptions.
+// A present but empty value matches no address, so it denies authentication,
+// consistently with OpenSSH, rather than being treated as absent.
+func checkSourceAddressCriticalOption(addr net.Addr, perms *Permissions) error {
+	if perms == nil {
+		return nil
+	}
+	saco, ok := perms.CriticalOptions[sourceAddressCriticalOption]
+	if !ok {
+		return nil
+	}
+	return checkSourceAddress(addr, saco)
 }
 
 func gssExchangeToken(gssapiConfig *GSSAPIWithMICConfig, token []byte, s *connection,
@@ -685,7 +712,7 @@ userAuthLoop:
 		}
 
 		if userAuthReq.Service != serviceSSH {
-			return nil, errors.New("ssh: client attempted to negotiate for unknown service: " + userAuthReq.Service)
+			return nil, fmt.Errorf("ssh: client attempted to negotiate for unknown service: %q", userAuthReq.Service)
 		}
 
 		if s.user != userAuthReq.User && partialSuccessReturned {
@@ -771,7 +798,8 @@ userAuthLoop:
 
 			pubKey, err := ParsePublicKey(pubKeyData)
 			if err != nil {
-				return nil, err
+				authErr = err
+				break
 			}
 
 			candidate, ok := cache.get(s.user, pubKeyData)
@@ -784,13 +812,14 @@ userAuthLoop:
 					return nil, errors.New("ssh: invalid library usage: PublicKeyCallback must not return partial success when VerifiedPublicKeyCallback is defined")
 				}
 
-				if (candidate.result == nil || isPartialSuccessError) &&
-					candidate.perms != nil &&
-					candidate.perms.CriticalOptions != nil &&
-					candidate.perms.CriticalOptions[sourceAddressCriticalOption] != "" {
-					if err := checkSourceAddress(
-						s.RemoteAddr(),
-						candidate.perms.CriticalOptions[sourceAddressCriticalOption]); err != nil {
+				// This check is authoritative for the Permissions returned by
+				// PublicKeyCallback: the check at the end of the auth loop sees
+				// the final Permissions, which VerifiedPublicKeyCallback may
+				// have replaced, and is skipped on partial success. It also
+				// makes public key queries fail before the client signs when
+				// PublicKeyCallback supplies the restriction.
+				if candidate.result == nil || isPartialSuccessError {
+					if err := checkSourceAddressCriticalOption(s.RemoteAddr(), candidate.perms); err != nil {
 						candidate.result = err
 					}
 				}
@@ -864,14 +893,7 @@ userAuthLoop:
 					// Only call VerifiedPublicKeyCallback after the key has been accepted
 					// and successfully verified. If authErr is non-nil, the key is not
 					// considered verified and the callback must not run.
-					perms, authErr = config.VerifiedPublicKeyCallback(s, pubKey, perms, algo)
-				}
-				if authErr == nil && perms != nil && perms.CriticalOptions != nil {
-					if saco := perms.CriticalOptions[sourceAddressCriticalOption]; saco != "" {
-						if err := checkSourceAddress(s.RemoteAddr(), saco); err != nil {
-							authErr = err
-						}
-					}
+					perms, authErr = config.VerifiedPublicKeyCallback(s, pubKey, perms, sig.Format)
 				}
 			}
 		case "gssapi-with-mic":
@@ -923,6 +945,17 @@ userAuthLoop:
 			}
 		default:
 			authErr = fmt.Errorf("ssh: unknown method %q", userAuthReq.Method)
+		}
+
+		// The source-address critical option is enforced on the Permissions
+		// returned by any authentication callback. Permissions returned
+		// together with a PartialSuccessError skip this check: that is safe
+		// because they are required to be nil, as enforced in the partial
+		// success handling below.
+		if authErr == nil {
+			if err := checkSourceAddressCriticalOption(s.RemoteAddr(), perms); err != nil {
+				authErr = err
+			}
 		}
 
 		authErrs = append(authErrs, authErr)

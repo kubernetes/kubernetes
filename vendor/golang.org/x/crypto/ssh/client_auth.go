@@ -798,7 +798,7 @@ func (g *gssAPIWithMICCallback) auth(session []byte, user string, c packetConn, 
 			return authFailure, nil, fmt.Errorf("GSS-API Error:\n"+
 				"Major Status: %d\n"+
 				"Minor Status: %d\n"+
-				"Error Message: %s\n", userAuthGSSAPIErrorResp.MajorStatus, userAuthGSSAPIErrorResp.MinorStatus,
+				"Error Message: %q\n", userAuthGSSAPIErrorResp.MajorStatus, userAuthGSSAPIErrorResp.MinorStatus,
 				userAuthGSSAPIErrorResp.Message)
 		case msgUserAuthGSSAPIToken:
 			userAuthGSSAPITokenReq := &userAuthGSSAPIToken{}
