@@ -2091,6 +2091,60 @@ func Test_reconcileNodeLabels(t *testing.T) {
 
 }
 
+func TestReconcileAdditionalLabelsReturnsEarly(t *testing.T) {
+	tests := []struct {
+		name             string
+		instanceMetadata *cloudprovider.InstanceMetadata
+	}{
+		{
+			name: "nil instance metadata",
+		},
+		{
+			name: "empty additional labels",
+			instanceMetadata: &cloudprovider.InstanceMetadata{
+				AdditionalLabels: map[string]string{},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+					Labels: map[string]string{
+						"example.com/existing": "preserved",
+					},
+				},
+			}
+
+			clientset := fake.NewSimpleClientset(node)
+			cnc := &CloudNodeController{
+				kubeClient: clientset,
+			}
+
+			if err := cnc.reconcileAdditionalLabels(
+				node,
+				test.instanceMetadata,
+			); err != nil {
+				t.Fatalf(
+					"reconcileAdditionalLabels() returned an error: %v",
+					err,
+				)
+			}
+
+			assert.Equal(
+				t,
+				map[string]string{
+					"example.com/existing": "preserved",
+				},
+				node.Labels,
+			)
+			assert.Empty(t, clientset.Actions())
+		})
+	}
+}
+
 func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
 	tests := []struct {
 		name             string
