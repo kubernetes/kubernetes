@@ -299,6 +299,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	// Get secrets and publish context required for mountDevice
 	nodeName := string(c.plugin.host.GetNodeName())
 	publishContext, err := c.plugin.getPublishContext(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
+
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(err.Error())
 	}
@@ -334,7 +335,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
-	if err = filesystem.MkdirAllWithPathCheck(deviceMountPath, 0o750); err != nil {
+	if err = filesystem.MkdirAllWithPathCheck(deviceMountPath, 0750); err != nil {
 		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
 	}
 
@@ -576,6 +577,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	err = csi.NodeUnstageVolume(ctx,
 		volID,
 		deviceMountPath)
+
 	if err != nil {
 		return errors.New(log("attacher.UnmountDevice failed: %v", err))
 	}
