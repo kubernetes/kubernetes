@@ -1339,6 +1339,11 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 			case update.Options.RunningPod != nil:
 				// when we receive a running pod, we don't need status at all because we are
 				// guaranteed to be terminating and we skip updates to the pod
+			case update.WorkType == TerminatingPod && !update.TerminationDeadline.IsZero():
+				// Termination reconciles directly against the runtime. Waiting for
+				// PLEG here would prevent the worker timer from enforcing the deadline
+				// when the cache stops advancing.
+				status = &kubecontainer.PodStatus{ID: podUID}
 			default:
 				// wait until we see the next refresh from the PLEG via the cache (max 2s)
 				// TODO: this adds ~1s of latency on all transitions from sync to terminating

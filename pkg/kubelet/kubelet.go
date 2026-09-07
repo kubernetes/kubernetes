@@ -2362,6 +2362,25 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		logger.V(4).Info("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 	}()
 
+	if reconcile {
+		// A fresh runtime observation avoids both a stalled PLEG cache and
+		// duplicate replacements after a partially successful start. Bound the
+		// read so a runtime outage returns control to the worker for retries.
+		observationCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		runtimePod, observationErr := kl.containerRuntime.GetPod(observationCtx, pod.UID)
+		if errors.Is(observationErr, kubecontainer.ErrPodNotFound) {
+			runtimePod = &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}
+			observationErr = nil
+		}
+		if observationErr == nil {
+			podStatus, observationErr = kl.containerRuntime.GetPodStatus(observationCtx, runtimePod)
+		}
+		cancel()
+		if observationErr != nil {
+			return false, fmt.Errorf("observe containers before reconciling termination of pod %s/%s: %w", pod.Namespace, pod.Name, observationErr)
+		}
+	}
+
 	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, false)
 	if podStatusFn != nil {
 		podStatusFn(&apiPodStatus)

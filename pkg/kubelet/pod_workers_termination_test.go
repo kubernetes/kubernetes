@@ -113,3 +113,117 @@ func TestTerminationRetryCannotPassDeadline(t *testing.T) {
 		require.Equal(t, 500*time.Millisecond, queued[0].Delay)
 	}
 }
+
+func TestTerminatingPodProgressesWithStalledPLEG(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarsRestartableDuringPodTermination, true)
+	for _, source := range []string{"api", "eviction", "file"} {
+		t.Run(source, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			workers, _, _ := createPodWorkers(logger)
+			cache := kubecontainer.NewCache()
+			workers.podCache = cache
+			fakeClock := workers.clock.(*clocktesting.FakeClock)
+			policy := v1.ContainerRestartPolicyAlways
+			grace := int64(60)
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "0", Name: "terminating", Namespace: "default"}, Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: &grace,
+				InitContainers:                []v1.Container{{Name: "sidecar", RestartPolicy: &policy}},
+			}}
+			if source == "file" {
+				pod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource}
+			}
+			cache.Set(pod.UID, &kubecontainer.PodStatus{ID: pod.UID}, nil, fakeClock.Now())
+			t.Cleanup(func() {
+				// Release a blocked reader even when this regression fails.
+				cache.UpdateTime(fakeClock.Now().Add(time.Hour))
+				workers.podLock.Lock()
+				defer workers.podLock.Unlock()
+				for _, updates := range workers.podUpdates {
+					close(updates)
+				}
+			})
+			deadlines := make(chan time.Time, 10)
+			syncer := newPodSyncerFuncs(workers.podSyncer)
+			syncer.syncTerminatingPod = func(_ context.Context, _ *v1.Pod, _ *kubecontainer.PodStatus, _ *int64, deadline time.Time, _ func(*v1.PodStatus)) (bool, error) {
+				deadlines <- deadline
+				return false, nil
+			}
+			workers.podSyncer = syncer
+			workers.UpdatePod(ctx, UpdatePodOptions{Pod: pod, UpdateType: kubetypes.SyncPodCreate})
+			drainWorkers(workers, 1)
+			pod = pod.DeepCopy()
+			if source == "api" {
+				pod.DeletionTimestamp = &metav1.Time{Time: fakeClock.Now().Add(time.Minute)}
+			}
+			completed := make(chan struct{})
+			workers.UpdatePod(ctx, UpdatePodOptions{Pod: pod, UpdateType: kubetypes.SyncPodKill, KillPodOptions: &KillPodOptions{Evict: source == "eviction", CompletedCh: completed}})
+			nextDeadline := func() time.Time {
+				t.Helper()
+				select {
+				case deadline := <-deadlines:
+					return deadline
+				case <-time.After(5 * time.Second):
+					t.Fatal("termination did not reconcile without a PLEG cache refresh")
+					return time.Time{}
+				}
+			}
+			require.Equal(t, fakeClock.Now().Add(time.Minute), nextDeadline())
+			require.Eventually(t, fakeClock.HasWaiters, time.Second, time.Millisecond)
+			fakeClock.Step(time.Second)
+			require.Equal(t, fakeClock.Now().Add(59*time.Second), nextDeadline())
+			shortGrace := int64(5)
+			workers.UpdatePod(ctx, UpdatePodOptions{Pod: pod, UpdateType: kubetypes.SyncPodKill, KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: &shortGrace}})
+			shortDeadline := fakeClock.Now().Add(5 * time.Second)
+			require.Equal(t, shortDeadline, nextDeadline())
+			require.Eventually(t, fakeClock.HasWaiters, time.Second, time.Millisecond)
+			fakeClock.Step(5 * time.Second)
+			require.Equal(t, shortDeadline, nextDeadline())
+			require.False(t, workers.ShouldPodRuntimeBeRemoved(pod.UID))
+			require.False(t, workers.IsPodKnownTerminated(pod.UID))
+			select {
+			case <-completed:
+				t.Fatal("deadline expiry alone must not release the kill waiter")
+			default:
+			}
+		})
+	}
+}
+
+func TestTerminatingPodRecoversExpiredAPIDeadline(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarsRestartableDuringPodTermination, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	workers, _, _ := createPodWorkers(logger)
+	deadline := workers.clock.Now().Add(-time.Minute)
+	policy := v1.ContainerRestartPolicyAlways
+	grace := int64(60)
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "0", Name: "recovered", Namespace: "default", DeletionTimestamp: &metav1.Time{Time: deadline}, DeletionGracePeriodSeconds: &grace}, Spec: v1.PodSpec{
+		TerminationGracePeriodSeconds: &grace,
+		InitContainers:                []v1.Container{{Name: "sidecar", RestartPolicy: &policy}},
+	}}
+	observed := make(chan time.Time, 1)
+	syncer := newPodSyncerFuncs(workers.podSyncer)
+	syncer.syncTerminatingPod = func(_ context.Context, _ *v1.Pod, _ *kubecontainer.PodStatus, _ *int64, deadline time.Time, _ func(*v1.PodStatus)) (bool, error) {
+		observed <- deadline
+		return true, nil
+	}
+	workers.podSyncer = syncer
+	workers.UpdatePod(ctx, UpdatePodOptions{Pod: pod, UpdateType: kubetypes.SyncPodCreate})
+	select {
+	case got := <-observed:
+		require.Equal(t, deadline, got, "a new worker must not renew an expired API deletion deadline")
+	case <-time.After(5 * time.Second):
+		t.Fatal("recovered terminating pod was not reconciled")
+	}
+	drainWorkers(workers, 1)
+}
+
+func TestTerminatingRuntimePodDoesNotRestartSidecars(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarsRestartableDuringPodTermination, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	workers, _, processed := createPodWorkers(logger)
+	pod := &kubecontainer.Pod{ID: "0", Name: "force-deleted", Namespace: "default", Containers: []*kubecontainer.Container{{Name: "sidecar"}}}
+	workers.UpdatePod(ctx, UpdatePodOptions{RunningPod: pod, UpdateType: kubetypes.SyncPodKill})
+	drainWorkers(workers, 1)
+	require.Len(t, processed[pod.ID], 1)
+	require.Equal(t, pod, processed[pod.ID][0].runningPod, "a pod without its spec must use the runtime-only kill path")
+}

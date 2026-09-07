@@ -145,7 +145,7 @@ func (m *kubeGenericRuntimeManager) SyncTerminatingPod(ctx context.Context, pod 
 		if cs.State == kubecontainer.ContainerStateCreated {
 			// A failed StartContainer can leave a created replacement behind.
 			// Keep it for the restart action only if this sidecar has run before.
-			if !keep[c.Name] || cs.RestartCount == 0 {
+			if !time.Now().Before(deadline) || !keep[c.Name] || cs.RestartCount == 0 {
 				if err := m.removeContainer(ctx, cs.ID.ID, true); err != nil && !crierror.IsNotFound(err) {
 					errs = append(errs, fmt.Errorf("remove unstarted container %q during pod termination: %w", c.Name, err))
 				}
