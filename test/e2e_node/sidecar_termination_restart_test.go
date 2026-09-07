@@ -114,7 +114,7 @@ var _ = SIGDescribe("Restarting sidecar containers during pod termination",
 				current, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				original, found := podutil.GetContainerStatus(current.Status.InitContainerStatuses, sidecar1)
-				gomega.Expect(found).To(gomega.BeTrue())
+				gomega.Expect(found).To(gomega.BeTrueBecause("expected status for sidecar %q in pod %s/%s", sidecar1, current.Namespace, current.Name))
 
 				ginkgo.By("deleting the pod")
 				framework.ExpectNoError(client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}))
@@ -246,7 +246,7 @@ var _ = SIGDescribe("Restarting sidecar containers during pod termination",
 					current, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err)
 					original, found := podutil.GetContainerStatus(current.Status.InitContainerStatuses, sidecar2)
-					gomega.Expect(found).To(gomega.BeTrue())
+					gomega.Expect(found).To(gomega.BeTrueBecause("expected status for sidecar %q in pod %s/%s", sidecar2, current.Namespace, current.Name))
 					gomega.Expect(original.State.Running).NotTo(gomega.BeNil())
 					gomega.Expect(current.DeletionTimestamp).NotTo(gomega.BeNil())
 					deadline := current.DeletionTimestamp.Time
