@@ -307,6 +307,7 @@ func TestPluginCanSupport(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+
 			actual := plug.CanSupport(tc.spec)
 			if tc.canSupport != actual {
 				t.Errorf("expecting canSupport %t, got %t", tc.canSupport, actual)
@@ -573,6 +574,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			default:
 				t.Fatal("invalid volume.Spec constructed")
 			}
+
 		})
 	}
 }
@@ -779,7 +781,7 @@ func TestPluginNewUnmounter(t *testing.T) {
 
 	// save the data file to re-create client
 	dir := filepath.Join(getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host), "/mount")
-	if err := os.MkdirAll(dir, 0o755); err != nil && !os.IsNotExist(err) {
+	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
 		t.Errorf("failed to create dir [%s]: %v", dir, err)
 	}
 
@@ -1157,7 +1159,7 @@ func TestPluginNewUnmapper(t *testing.T) {
 
 	// save the data file to re-create client
 	dir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
-	if err := os.MkdirAll(dir, 0o755); err != nil && !os.IsNotExist(err) {
+	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
 		t.Errorf("failed to create dir [%s]: %v", dir, err)
 	}
 
@@ -1230,7 +1232,7 @@ func TestPluginConstructBlockVolumeSpec(t *testing.T) {
 
 		// create data file in csi plugin dir
 		if tc.data != nil {
-			if err := os.MkdirAll(deviceDataDir, 0o755); err != nil && !os.IsNotExist(err) {
+			if err := os.MkdirAll(deviceDataDir, 0755); err != nil && !os.IsNotExist(err) {
 				t.Errorf("failed to create dir [%s]: %v", deviceDataDir, err)
 			}
 			if err := saveVolumeData(deviceDataDir, volDataFileName, tc.data); err != nil {
