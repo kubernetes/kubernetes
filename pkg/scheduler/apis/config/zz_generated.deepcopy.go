@@ -198,6 +198,11 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 		*out = new(int32)
 		**out = **in
 	}
+	if in.PercentageOfPlacementsToScore != nil {
+		in, out := &in.PercentageOfPlacementsToScore, &out.PercentageOfPlacementsToScore
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Profiles != nil {
 		in, out := &in.Profiles, &out.Profiles
 		*out = make([]KubeSchedulerProfile, len(*in))
@@ -238,6 +243,11 @@ func (in *KubeSchedulerProfile) DeepCopyInto(out *KubeSchedulerProfile) {
 	*out = *in
 	if in.PercentageOfNodesToScore != nil {
 		in, out := &in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore
+		*out = new(int32)
+		**out = **in
+	}
+	if in.PercentageOfPlacementsToScore != nil {
+		in, out := &in.PercentageOfPlacementsToScore, &out.PercentageOfPlacementsToScore
 		*out = new(int32)
 		**out = **in
 	}

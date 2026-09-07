@@ -1,0 +1,6 @@
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+# Disable the placement limit by scoring every generated placement. Used as the baseline to measure
+# the performance impact of the adaptive placement limit (which the default TopologyAwareScheduling
+# test case exercises).
+percentageOfPlacementsToScore: 100
