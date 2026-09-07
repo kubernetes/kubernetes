@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -201,4 +202,91 @@ func TestCreateCSIOperationContext(t *testing.T) {
 			t.Errorf("Expect migrated value: %v, got: %v", tc.migrated, migrated)
 		}
 	}
+}
+
+// TestFindGlobalMountDataBySpecVolIDScanErrors covers the failure modes of the
+// reconstruction fallback scan (issue #101791). A scan that could not look
+// everywhere must not report a clean "no match": that would let kubelet
+// conclude no global mount exists and leak it, which is the exact leak this
+// feature is meant to close.
+func TestFindGlobalMountDataBySpecVolIDScanErrors(t *testing.T) {
+	const specVolID = "some-pv"
+
+	t.Run("missing plugin dir is reported", func(t *testing.T) {
+		_, _, err := findGlobalMountDataBySpecVolID(filepath.Join(t.TempDir(), "does-not-exist"), specVolID)
+		if err == nil {
+			t.Fatal("expected an error for an unreadable plugin dir, got none")
+		}
+		if !strings.Contains(err.Error(), "failed to read CSI plugin dir") {
+			t.Errorf("error should name the unreadable dir, got: %v", err)
+		}
+	})
+
+	t.Run("unreadable driver dir is not reported as no match", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("running as root, permission bits do not deny access")
+		}
+		pluginDir := t.TempDir()
+		driverDir := filepath.Join(pluginDir, testDriver)
+		if err := os.Mkdir(driverDir, 0o000); err != nil {
+			t.Fatalf("setup driver dir: %v", err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(driverDir, 0o755) })
+
+		_, _, err := findGlobalMountDataBySpecVolID(pluginDir, specVolID)
+		if err == nil {
+			t.Fatal("expected an error when a driver dir could not be read, got none")
+		}
+		if !strings.Contains(err.Error(), "could not be read") {
+			t.Errorf("error should say the scan was incomplete, got: %v", err)
+		}
+	})
+
+	t.Run("complete scan with no match", func(t *testing.T) {
+		pluginDir := t.TempDir()
+		dataDir := filepath.Join(pluginDir, testDriver, "somehash")
+		if err := os.MkdirAll(dataDir, 0o755); err != nil {
+			t.Fatalf("setup data dir: %v", err)
+		}
+		if err := saveVolumeData(dataDir, volDataFileName, map[string]string{
+			volDataKey.specVolID: "a-different-pv",
+		}); err != nil {
+			t.Fatalf("save vol_data.json: %v", err)
+		}
+
+		_, _, err := findGlobalMountDataBySpecVolID(pluginDir, specVolID)
+		if err == nil {
+			t.Fatal("expected a not-found error, got none")
+		}
+		if strings.Contains(err.Error(), "could not be read") {
+			t.Errorf("a fully readable scan must report a plain not-found, got: %v", err)
+		}
+	})
+
+	t.Run("match is returned", func(t *testing.T) {
+		pluginDir := t.TempDir()
+		dataDir := filepath.Join(pluginDir, testDriver, "somehash")
+		if err := os.MkdirAll(dataDir, 0o755); err != nil {
+			t.Fatalf("setup data dir: %v", err)
+		}
+		want := map[string]string{
+			volDataKey.specVolID:  specVolID,
+			volDataKey.volHandle:  "some-handle",
+			volDataKey.driverName: testDriver,
+		}
+		if err := saveVolumeData(dataDir, volDataFileName, want); err != nil {
+			t.Fatalf("save vol_data.json: %v", err)
+		}
+
+		gotDir, gotData, err := findGlobalMountDataBySpecVolID(pluginDir, specVolID)
+		if err != nil {
+			t.Fatalf("findGlobalMountDataBySpecVolID: %v", err)
+		}
+		if gotDir != dataDir {
+			t.Errorf("dir: got %q, want %q", gotDir, dataDir)
+		}
+		if gotData[volDataKey.volHandle] != want[volDataKey.volHandle] {
+			t.Errorf("volHandle: got %q, want %q", gotData[volDataKey.volHandle], want[volDataKey.volHandle])
+		}
+	})
 }

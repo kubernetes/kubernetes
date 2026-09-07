@@ -99,20 +99,42 @@ func loadVolumeData(dir string, fileName string) (map[string]string, error) {
 // /var/lib/kubelet/plugins/kubernetes.io/csi). Returns the data dir where the
 // matching vol_data.json lives and its parsed contents.
 func findGlobalMountDataBySpecVolID(pluginDir, specVolID string) (string, map[string]string, error) {
-	matches, err := filepath.Glob(filepath.Join(pluginDir, "*", "*", volDataFileName))
+	drivers, err := os.ReadDir(pluginDir)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to scan CSI plugin dir %q: %w", pluginDir, err)
+		return "", nil, fmt.Errorf("failed to read CSI plugin dir %q: %w", pluginDir, err)
 	}
-	for _, match := range matches {
-		dir := filepath.Dir(match)
-		data, err := loadVolumeData(dir, volDataFileName)
-		if err != nil {
-			klog.V(4).Info(log("skipping unreadable vol_data.json at %s: %v", match, err))
+	// Track directories that could not be read, so a scan that was unable to
+	// look everywhere does not report a clean "not found".
+	var skipped []string
+	for _, driver := range drivers {
+		if !driver.IsDir() {
 			continue
 		}
-		if data[volDataKey.specVolID] == specVolID {
-			return dir, data, nil
+		driverDir := filepath.Join(pluginDir, driver.Name())
+		volumes, err := os.ReadDir(driverDir)
+		if err != nil {
+			klog.V(4).Info(log("skipping unreadable CSI driver dir %s: %v", driverDir, err))
+			skipped = append(skipped, driverDir)
+			continue
 		}
+		for _, vol := range volumes {
+			if !vol.IsDir() {
+				continue
+			}
+			dir := filepath.Join(driverDir, vol.Name())
+			data, err := loadVolumeData(dir, volDataFileName)
+			if err != nil {
+				klog.V(4).Info(log("skipping unreadable volume data at %s: %v", dir, err))
+				skipped = append(skipped, dir)
+				continue
+			}
+			if data[volDataKey.specVolID] == specVolID {
+				return dir, data, nil
+			}
+		}
+	}
+	if len(skipped) > 0 {
+		return "", nil, fmt.Errorf("no CSI global mount data found matching specVolID %q, and %d director(ies) could not be read: %v", specVolID, len(skipped), skipped)
 	}
 	return "", nil, fmt.Errorf("no CSI global mount data found matching specVolID %q", specVolID)
 }
