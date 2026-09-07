@@ -30,7 +30,11 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/mount-utils"
 )
@@ -271,7 +275,7 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 	t.Run("follows the bind mount to the global mount", func(t *testing.T) {
 		plug, podLocalDir, globalDataDir := setup(t, "staged-pv", bound)
 
-		dir, data, err := findGlobalMountDataFromPodMount(plug.host, plug.GetPluginName(), podLocalDir)
+		dir, data, err := findGlobalMountDataFromPodMount(plug.host, podLocalDir)
 		if err != nil {
 			t.Fatalf("findGlobalMountDataFromPodMount: %v", err)
 		}
@@ -295,7 +299,7 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 			}
 		})
 
-		_, data, err := findGlobalMountDataFromPodMount(plug.host, plug.GetPluginName(), podLocalDir)
+		_, data, err := findGlobalMountDataFromPodMount(plug.host, podLocalDir)
 		if err == nil {
 			t.Fatalf("inline volume was paired with an unrelated PV, recovering volumeHandle %q", data[volDataKey.volHandle])
 		}
@@ -306,7 +310,7 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 			return nil
 		})
 
-		if _, _, err := findGlobalMountDataFromPodMount(plug.host, plug.GetPluginName(), podLocalDir); err == nil {
+		if _, _, err := findGlobalMountDataFromPodMount(plug.host, podLocalDir); err == nil {
 			t.Fatal("expected an error when the pod mount has no references, got none")
 		}
 	})
@@ -320,12 +324,95 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 			}
 		})
 
-		dir, _, err := findGlobalMountDataFromPodMount(plug.host, plug.GetPluginName(), podLocalDir)
+		dir, _, err := findGlobalMountDataFromPodMount(plug.host, podLocalDir)
 		if err != nil {
 			t.Fatalf("findGlobalMountDataFromPodMount: %v", err)
 		}
 		if dir != globalDataDir {
 			t.Errorf("dir: got %q, want the real global mount %q", dir, globalDataDir)
+		}
+	})
+}
+
+// TestNewUnmounterFallsBackToGlobalMount is the other half of issue #101791.
+// Reconstruction can rescue the volume, but the unmount that follows builds an
+// unmounter from the very same pod-local vol_data.json, so without the same
+// fallback the unmount operation is never generated, the pod is never dropped
+// from the actual state of the world, and the global mount stays orphaned.
+func TestNewUnmounterFallsBackToGlobalMount(t *testing.T) {
+	const (
+		driver    = "test-driver"
+		podUID    = types.UID("pod-uid")
+		specVolID = "staged-pv"
+		volHandle = "handle-of-the-staged-pv"
+		device    = "/dev/sdb"
+	)
+
+	setup := func(t *testing.T, gateOn bool) (*csiPlugin, string) {
+		t.Helper()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeReconstructionFallback, gateOn)
+		registerFakePlugin(driver, "endpoint", []string{"1.0.0"}, t)
+
+		plug, tmpDir := newTestPlugin(t, nil)
+		t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+		if resolved, err := filepath.EvalSymlinks(tmpDir); err == nil {
+			tmpDir = resolved
+		}
+
+		// Pod dir exists with its mount, but no vol_data.json.
+		podMount := filepath.Join(tmpDir, "pods", string(podUID), "volumes", "kubernetes.io~csi", specVolID, "mount")
+		if err := os.MkdirAll(podMount, 0o755); err != nil {
+			t.Fatalf("setup pod-local dir: %v", err)
+		}
+
+		globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, driver, "somehash")
+		if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
+			t.Fatalf("setup global dir: %v", err)
+		}
+		if err := saveVolumeData(globalDataDir, volDataFileName, map[string]string{
+			volDataKey.specVolID:           specVolID,
+			volDataKey.volHandle:           volHandle,
+			volDataKey.driverName:          driver,
+			volDataKey.volumeLifecycleMode: string(storagev1.VolumeLifecyclePersistent),
+		}); err != nil {
+			t.Fatalf("save global vol_data.json: %v", err)
+		}
+
+		fake, ok := plug.host.GetMounter().(*mount.FakeMounter)
+		if !ok {
+			t.Fatalf("expected a fake mounter, got %T", plug.host.GetMounter())
+		}
+		fake.MountPoints = []mount.MountPoint{
+			{Device: device, Path: filepath.Join(globalDataDir, globalMountInGlobalPath)},
+			{Device: device, Path: podMount},
+		}
+		return plug, globalDataDir
+	}
+
+	t.Run("gate on, unmounter is built from the global mount", func(t *testing.T) {
+		plug, _ := setup(t, true)
+
+		unmounter, err := plug.NewUnmounter(specVolID, podUID)
+		if err != nil {
+			t.Fatalf("NewUnmounter: %v", err)
+		}
+		mgr, ok := unmounter.(*csiMountMgr)
+		if !ok {
+			t.Fatalf("expected a csiMountMgr, got %T", unmounter)
+		}
+		if string(mgr.driverName) != driver {
+			t.Errorf("driverName: got %q, want %q", mgr.driverName, driver)
+		}
+		if mgr.volumeID != volHandle {
+			t.Errorf("volumeID: got %q, want %q", mgr.volumeID, volHandle)
+		}
+	})
+
+	t.Run("gate off, behaviour is unchanged", func(t *testing.T) {
+		plug, _ := setup(t, false)
+
+		if _, err := plug.NewUnmounter(specVolID, podUID); err == nil {
+			t.Fatal("NewUnmounter succeeded with the gate off; the fallback must not run unless the feature is enabled")
 		}
 	})
 }

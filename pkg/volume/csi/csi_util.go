@@ -104,7 +104,7 @@ func loadVolumeData(dir string, fileName string) (map[string]string, error) {
 // ambiguous: an inline ephemeral volume is named after its entry in the pod
 // spec, which is not unique on the node, and it never stages a global mount of
 // its own, so every name match it produced would be someone else's volume.
-func findGlobalMountDataFromPodMount(host volume.VolumeHost, pluginName, mountPath string) (string, map[string]string, error) {
+func findGlobalMountDataFromPodMount(host volume.VolumeHost, mountPath string) (string, map[string]string, error) {
 	podMountPath := filepath.Join(mountPath, "mount")
 	refs, err := volumeutil.GetReliableMountRefs(host.GetMounter(), podMountPath)
 	if err != nil {
