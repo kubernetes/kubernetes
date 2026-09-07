@@ -118,14 +118,14 @@ func baseKubeConfiguration(ctx context.Context, cfgPath string) (*kubeletconfig.
 		kc.FileCheckFrequency = metav1.Duration{Duration: 10 * time.Second}
 		kc.PodCIDR = "10.100.0.0/24"
 		kc.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 30 * time.Second}
+		// Inode-based eviction signals are not supported on Windows (NTFS has no
+		// POSIX inodes) and are rejected by kubelet config validation, so omit them.
 		kc.EvictionHard = map[string]string{
-			"memory.available":  "250Mi",
-			"nodefs.available":  "10%",
-			"nodefs.inodesFree": "5%",
+			"memory.available": "250Mi",
+			"nodefs.available": "10%",
 		}
 		kc.EvictionMinimumReclaim = map[string]string{
-			"nodefs.available":  "5%",
-			"nodefs.inodesFree": "5%",
+			"nodefs.available": "5%",
 		}
 
 		kc.ResolverConfig = ""
