@@ -48,7 +48,7 @@ func TestLeaseCandidateCreation(t *testing.T) {
 	defer cancel()
 
 	client := fake.NewSimpleClientset()
-	candidate, _, err := NewCandidate(
+	candidate, err := NewCandidate(
 		client,
 		tc.candidateNamespace,
 		tc.candidateName,
@@ -84,7 +84,7 @@ func TestLeaseCandidateAck(t *testing.T) {
 
 	client := fake.NewSimpleClientset()
 
-	candidate, _, err := NewCandidate(
+	candidate, err := NewCandidate(
 		client,
 		tc.candidateNamespace,
 		tc.candidateName,
