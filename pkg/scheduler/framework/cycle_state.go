@@ -30,6 +30,8 @@ type CycleState struct {
 	storage sync.Map
 	// if recordPluginMetrics is true, metrics.PluginExecutionDuration will be recorded for this cycle.
 	recordPluginMetrics bool
+	// if recordFrameworkExtensionPointMetrics is true, framework extension metrics will be recorded for this cycle.
+	recordFrameworkExtensionPointMetrics bool
 	// skipFilterPlugins are plugins that will be skipped in the Filter extension point.
 	skipFilterPlugins sets.Set[string]
 	// skipScorePlugins are plugins that will be skipped in the Score extension point.
@@ -71,6 +73,22 @@ func (c *CycleState) SetRecordPluginMetrics(flag bool) {
 		return
 	}
 	c.recordPluginMetrics = flag
+}
+
+// ShouldRecordFrameworkExtensionPointMetrics returns whether metrics.FrameworkExtensionPointDuration metrics should be recorded.
+func (c *CycleState) ShouldRecordFrameworkExtensionPointMetrics() bool {
+	if c == nil {
+		return false
+	}
+	return c.recordFrameworkExtensionPointMetrics
+}
+
+// SetRecordFrameworkExtensionPointMetrics sets recordFrameworkExtensionPointMetrics to the given value.
+func (c *CycleState) SetRecordFrameworkExtensionPointMetrics(flag bool) {
+	if c == nil {
+		return
+	}
+	c.recordFrameworkExtensionPointMetrics = flag
 }
 
 func (c *CycleState) SetSkipFilterPlugins(plugins sets.Set[string]) {
@@ -154,6 +172,7 @@ func (c *CycleState) Clone() fwk.CycleState {
 	})
 	// The below are not mutated, so we don't have to safe copy.
 	copy.recordPluginMetrics = c.recordPluginMetrics
+	copy.recordFrameworkExtensionPointMetrics = c.recordFrameworkExtensionPointMetrics
 	copy.skipFilterPlugins = c.skipFilterPlugins
 	copy.skipScorePlugins = c.skipScorePlugins
 	copy.skipPreBindPlugins = c.skipPreBindPlugins
