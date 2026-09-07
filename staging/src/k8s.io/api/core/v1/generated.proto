@@ -4748,6 +4748,10 @@ message PodSpec {
   // +optional
   optional string nodeName = 10;
 
+  // NodeUID indicates the UID of the Node object where this pod is scheduled.
+  // +optional
+  optional string nodeUID = 45;
+
   // Host networking requested for this pod. Use the host's network namespace.
   // When using HostNetwork you should specify ports so the scheduler is aware.
   // When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,

@@ -20,6 +20,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	types "k8s.io/apimachinery/pkg/types"
 )
 
 // PodSpecApplyConfiguration represents a declarative configuration of the PodSpec type for use
@@ -97,6 +98,8 @@ type PodSpecApplyConfiguration struct {
 	// This field should not be used to express a desire for the pod to be scheduled on a specific node.
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
 	NodeName *string `json:"nodeName,omitempty"`
+	// NodeUID indicates the UID of the Node object where this pod is scheduled.
+	NodeUID *types.UID `json:"nodeUID,omitempty"`
 	// Host networking requested for this pod. Use the host's network namespace.
 	// When using HostNetwork you should specify ports so the scheduler is aware.
 	// When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
@@ -437,6 +440,14 @@ func (b *PodSpecApplyConfiguration) WithAutomountServiceAccountToken(value bool)
 // If called multiple times, the NodeName field is set to the value of the last call.
 func (b *PodSpecApplyConfiguration) WithNodeName(value string) *PodSpecApplyConfiguration {
 	b.NodeName = &value
+	return b
+}
+
+// WithNodeUID sets the NodeUID field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NodeUID field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithNodeUID(value types.UID) *PodSpecApplyConfiguration {
+	b.NodeUID = &value
 	return b
 }
 

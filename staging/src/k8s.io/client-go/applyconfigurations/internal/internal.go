@@ -7275,6 +7275,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: nodeUID
+      type:
+        scalar: string
     - name: os
       type:
         namedType: io.k8s.api.core.v1.PodOS

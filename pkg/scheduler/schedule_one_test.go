@@ -2270,7 +2270,11 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 			case b := <-bindingChan:
 				expectBinding := &v1.Binding{
 					ObjectMeta: metav1.ObjectMeta{Name: "bar", UID: types.UID("bar")},
-					Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
+					Target: v1.ObjectReference{
+						Kind: "Node",
+						Name: node.Name,
+						UID:  node.UID,
+					},
 				}
 				if diff := cmp.Diff(expectBinding, b); diff != "" {
 					t.Errorf("unexpected binding (-want,+got):\n%s", diff)
@@ -2403,8 +2407,19 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				AllBound: true,
 			},
 			expectAssumeCalled: true,
-			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "node1"}},
-			eventReason:        "Scheduled",
+			expectPodBind: &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foo-ns",
+					UID:       types.UID("foo"),
+				},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: "node1",
+					UID:  "node1",
+				},
+			},
+			eventReason: "Scheduled",
 		},
 		{
 			name: "bound/invalid pv affinity",
@@ -2436,8 +2451,19 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 			volumeBinderConfig: &volumebinding.FakeVolumeBinderConfig{},
 			expectAssumeCalled: true,
 			expectBindCalled:   true,
-			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "node1"}},
-			eventReason:        "Scheduled",
+			expectPodBind: &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foo-ns",
+					UID:       types.UID("foo"),
+				},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: "node1",
+					UID:  "node1",
+				},
+			},
+			eventReason: "Scheduled",
 		},
 		{
 			name: "predicate error",
@@ -4981,7 +5007,11 @@ func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, clien
 	case b := <-bindingChan:
 		expectBinding := &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Name: pod.Name, UID: types.UID(pod.Name)},
-			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
+			Target: v1.ObjectReference{
+				Kind: "Node",
+				Name: node.Name,
+				UID:  node.UID,
+			},
 		}
 		if diff := cmp.Diff(expectBinding, b); diff != "" {
 			t.Errorf("Unexpected binding (-want,+got):\n%s", diff)

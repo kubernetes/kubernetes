@@ -10020,6 +10020,13 @@ func (m *PodSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	i -= len(m.NodeUID)
+	copy(dAtA[i:], m.NodeUID)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.NodeUID)))
+	i--
+	dAtA[i] = 0x2
+	i--
+	dAtA[i] = 0xea
 	if len(m.EvictionResponders) > 0 {
 		for iNdEx := len(m.EvictionResponders) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -19264,6 +19271,8 @@ func (m *PodSpec) Size() (n int) {
 			n += 2 + l + sovGenerated(uint64(l))
 		}
 	}
+	l = len(m.NodeUID)
+	n += 2 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -23860,6 +23869,7 @@ func (this *PodSpec) String() string {
 		`HostnameOverride:` + valueToStringGenerated(this.HostnameOverride) + `,`,
 		`SchedulingGroup:` + strings.Replace(this.SchedulingGroup.String(), "PodSchedulingGroup", "PodSchedulingGroup", 1) + `,`,
 		`EvictionResponders:` + repeatedStringForEvictionResponders + `,`,
+		`NodeUID:` + fmt.Sprintf("%v", this.NodeUID) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -56923,6 +56933,38 @@ func (m *PodSpec) Unmarshal(dAtA []byte) error {
 			if err := m.EvictionResponders[len(m.EvictionResponders)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 45:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeUID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NodeUID = k8s_io_apimachinery_pkg_types.UID(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

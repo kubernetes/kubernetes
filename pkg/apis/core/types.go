@@ -3961,6 +3961,9 @@ type PodSpec struct {
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
 	// +optional
 	NodeName string
+	// NodeUID indicates the UID of the Node object where this pod is scheduled.
+	// +optional
+	NodeUID types.UID
 	// Use the host's network namespace.  If this option is set, the ports that will be
 	// used must be specified.
 	// Optional: Default to false
