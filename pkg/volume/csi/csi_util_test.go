@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/mount-utils"
 )
 
 // TestMain starting point for all tests.
@@ -204,113 +204,128 @@ func TestCreateCSIOperationContext(t *testing.T) {
 	}
 }
 
-// TestFindGlobalMountDataBySpecVolIDScanErrors covers the failure modes of the
-// reconstruction fallback scan (issue #101791). A scan that could not look
-// everywhere must not report a clean "no match": that would let kubelet
-// conclude no global mount exists and leak it, which is the exact leak this
-// feature is meant to close.
-func TestFindGlobalMountDataBySpecVolIDScanErrors(t *testing.T) {
-	const specVolID = "some-pv"
+// TestFindGlobalMountDataFromPodMount covers the reconstruction fallback of
+// issue #101791. The fallback follows the mount reference the pod-local bind
+// mount holds, so it can only ever land on the global mount that this very
+// volume was staged at. An earlier revision matched on the directory name
+// instead, which silently paired an inline ephemeral volume with an unrelated
+// PersistentVolume that happened to share its short name.
+func TestFindGlobalMountDataFromPodMount(t *testing.T) {
+	const (
+		driver    = "test-driver"
+		podUID    = "pod-uid"
+		device    = "/dev/sdb"
+		volHandle = "handle-of-the-staged-pv"
+	)
 
-	t.Run("missing plugin dir is reported", func(t *testing.T) {
-		_, _, err := findGlobalMountDataBySpecVolID(filepath.Join(t.TempDir(), "does-not-exist"), specVolID)
-		if err == nil {
-			t.Fatal("expected an error for an unreadable plugin dir, got none")
-		}
-		if !strings.Contains(err.Error(), "failed to read CSI plugin dir") {
-			t.Errorf("error should name the unreadable dir, got: %v", err)
-		}
-	})
+	// setup builds a plugin whose fake mount table is the one given, and
+	// returns the pod-local dir for volName plus the global mount dir.
+	setup := func(t *testing.T, volName string, mountPoints func(podMount, globalMount string) []mount.MountPoint) (*csiPlugin, string, string) {
+		t.Helper()
+		plug, tmpDir := newTestPlugin(t, nil)
+		t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
-	t.Run("unreadable driver dir is not reported as no match", func(t *testing.T) {
-		if os.Getuid() == 0 {
-			t.Skip("running as root, permission bits do not deny access")
+		// GetMountRefs resolves symlinks before looking a path up in the mount
+		// table, and on some platforms the temp dir sits behind one, so build
+		// every path in this test from the resolved root.
+		if resolved, err := filepath.EvalSymlinks(tmpDir); err == nil {
+			tmpDir = resolved
 		}
-		pluginDir := t.TempDir()
-		driverDir := filepath.Join(pluginDir, testDriver)
-		if err := os.Mkdir(driverDir, 0o000); err != nil {
-			t.Fatalf("setup driver dir: %v", err)
-		}
-		t.Cleanup(func() { _ = os.Chmod(driverDir, 0o755) })
 
-		_, _, err := findGlobalMountDataBySpecVolID(pluginDir, specVolID)
-		if err == nil {
-			t.Fatal("expected an error when a driver dir could not be read, got none")
+		podLocalDir := filepath.Join(tmpDir, "pods", podUID, "volumes", "kubernetes.io~csi", volName)
+		if err := os.MkdirAll(filepath.Join(podLocalDir, "mount"), 0o755); err != nil {
+			t.Fatalf("setup pod-local dir: %v", err)
 		}
-		if !strings.Contains(err.Error(), "could not be read") {
-			t.Errorf("error should say the scan was incomplete, got: %v", err)
-		}
-	})
 
-	t.Run("block volume tree is not an incomplete scan", func(t *testing.T) {
-		// plugins/kubernetes.io/csi also holds volumeDevices/<specVolID>/data,
-		// one level deeper than a global mount. Walking into it must not make
-		// the scan claim it could not look everywhere.
-		pluginDir := t.TempDir()
-		blockDataDir := filepath.Join(pluginDir, "volumeDevices", "some-block-pv", "data")
-		if err := os.MkdirAll(blockDataDir, 0o755); err != nil {
-			t.Fatalf("setup block dir: %v", err)
+		globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, driver, "somehash")
+		if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
+			t.Fatalf("setup global dir: %v", err)
 		}
-		if err := saveVolumeData(blockDataDir, volDataFileName, map[string]string{
-			volDataKey.specVolID: "some-block-pv",
+		if err := saveVolumeData(globalDataDir, volDataFileName, map[string]string{
+			volDataKey.specVolID:           volName,
+			volDataKey.volHandle:           volHandle,
+			volDataKey.driverName:          driver,
+			volDataKey.volumeLifecycleMode: string(storagev1.VolumeLifecyclePersistent),
 		}); err != nil {
-			t.Fatalf("save block vol_data.json: %v", err)
+			t.Fatalf("save global vol_data.json: %v", err)
 		}
 
-		_, _, err := findGlobalMountDataBySpecVolID(pluginDir, specVolID)
-		if err == nil {
-			t.Fatal("expected a not-found error, got none")
+		fake, ok := plug.host.GetMounter().(*mount.FakeMounter)
+		if !ok {
+			t.Fatalf("expected a fake mounter, got %T", plug.host.GetMounter())
 		}
-		if strings.Contains(err.Error(), "could not be read") {
-			t.Errorf("the block volume tree must not count as an unreadable dir, got: %v", err)
-		}
-	})
+		fake.MountPoints = mountPoints(filepath.Join(podLocalDir, "mount"), filepath.Join(globalDataDir, globalMountInGlobalPath))
 
-	t.Run("complete scan with no match", func(t *testing.T) {
-		pluginDir := t.TempDir()
-		dataDir := filepath.Join(pluginDir, testDriver, "somehash")
-		if err := os.MkdirAll(dataDir, 0o755); err != nil {
-			t.Fatalf("setup data dir: %v", err)
-		}
-		if err := saveVolumeData(dataDir, volDataFileName, map[string]string{
-			volDataKey.specVolID: "a-different-pv",
-		}); err != nil {
-			t.Fatalf("save vol_data.json: %v", err)
-		}
+		return plug, podLocalDir, globalDataDir
+	}
 
-		_, _, err := findGlobalMountDataBySpecVolID(pluginDir, specVolID)
-		if err == nil {
-			t.Fatal("expected a not-found error, got none")
+	// bound is the healthy layout: SetUpAt bind mounted the global mount into
+	// the pod directory, so both share a device.
+	bound := func(podMount, globalMount string) []mount.MountPoint {
+		return []mount.MountPoint{
+			{Device: device, Path: globalMount},
+			{Device: device, Path: podMount},
 		}
-		if strings.Contains(err.Error(), "could not be read") {
-			t.Errorf("a fully readable scan must report a plain not-found, got: %v", err)
-		}
-	})
+	}
 
-	t.Run("match is returned", func(t *testing.T) {
-		pluginDir := t.TempDir()
-		dataDir := filepath.Join(pluginDir, testDriver, "somehash")
-		if err := os.MkdirAll(dataDir, 0o755); err != nil {
-			t.Fatalf("setup data dir: %v", err)
-		}
-		want := map[string]string{
-			volDataKey.specVolID:  specVolID,
-			volDataKey.volHandle:  "some-handle",
-			volDataKey.driverName: testDriver,
-		}
-		if err := saveVolumeData(dataDir, volDataFileName, want); err != nil {
-			t.Fatalf("save vol_data.json: %v", err)
-		}
+	t.Run("follows the bind mount to the global mount", func(t *testing.T) {
+		plug, podLocalDir, globalDataDir := setup(t, "staged-pv", bound)
 
-		gotDir, gotData, err := findGlobalMountDataBySpecVolID(pluginDir, specVolID)
+		dir, data, err := findGlobalMountDataFromPodMount(plug.host, plug.GetPluginName(), podLocalDir)
 		if err != nil {
-			t.Fatalf("findGlobalMountDataBySpecVolID: %v", err)
+			t.Fatalf("findGlobalMountDataFromPodMount: %v", err)
 		}
-		if gotDir != dataDir {
-			t.Errorf("dir: got %q, want %q", gotDir, dataDir)
+		if dir != globalDataDir {
+			t.Errorf("dir: got %q, want %q", dir, globalDataDir)
 		}
-		if gotData[volDataKey.volHandle] != want[volDataKey.volHandle] {
-			t.Errorf("volHandle: got %q, want %q", gotData[volDataKey.volHandle], want[volDataKey.volHandle])
+		if data[volDataKey.volHandle] != volHandle {
+			t.Errorf("volHandle: got %q, want %q", data[volDataKey.volHandle], volHandle)
+		}
+	})
+
+	t.Run("an inline volume does not pair with a PV of the same name", func(t *testing.T) {
+		// The staged PV is named "data". So is an inline ephemeral volume in
+		// some pod, which is legal: one name is a PV name, the other an entry
+		// in a pod spec. An inline volume never stages a global mount, so its
+		// pod-local mount shares a device with nothing under the plugin dir.
+		plug, podLocalDir, _ := setup(t, "data", func(podMount, globalMount string) []mount.MountPoint {
+			return []mount.MountPoint{
+				{Device: device, Path: globalMount},
+				{Device: "/dev/sdc", Path: podMount},
+			}
+		})
+
+		_, data, err := findGlobalMountDataFromPodMount(plug.host, plug.GetPluginName(), podLocalDir)
+		if err == nil {
+			t.Fatalf("inline volume was paired with an unrelated PV, recovering volumeHandle %q", data[volDataKey.volHandle])
+		}
+	})
+
+	t.Run("no mount reference is reported, not guessed", func(t *testing.T) {
+		plug, podLocalDir, _ := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
+			return nil
+		})
+
+		if _, _, err := findGlobalMountDataFromPodMount(plug.host, plug.GetPluginName(), podLocalDir); err == nil {
+			t.Fatal("expected an error when the pod mount has no references, got none")
+		}
+	})
+
+	t.Run("a mount reference with no volume data is skipped", func(t *testing.T) {
+		plug, podLocalDir, globalDataDir := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
+			return []mount.MountPoint{
+				{Device: device, Path: filepath.Join(t.TempDir(), globalMountInGlobalPath)},
+				{Device: device, Path: globalMount},
+				{Device: device, Path: podMount},
+			}
+		})
+
+		dir, _, err := findGlobalMountDataFromPodMount(plug.host, plug.GetPluginName(), podLocalDir)
+		if err != nil {
+			t.Fatalf("findGlobalMountDataFromPodMount: %v", err)
+		}
+		if dir != globalDataDir {
+			t.Errorf("dir: got %q, want the real global mount %q", dir, globalDataDir)
 		}
 	})
 }

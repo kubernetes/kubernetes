@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -1580,9 +1581,12 @@ func TestPluginConstructVolumeSpecFallsBackToGlobalMount(t *testing.T) {
 
 	// Arrange: global mount dir has a complete vol_data.json with
 	// specVolID (as MountDevice now writes).
-	pluginDir := plug.host.GetPluginDir(plug.GetPluginName())
-	globalDataDir := filepath.Join(pluginDir, testDriver, "anyhashhere")
-	if err := os.MkdirAll(globalDataDir, 0o755); err != nil {
+	if resolved, err := filepath.EvalSymlinks(tmpDir); err == nil {
+		tmpDir = resolved
+		podLocalDir = filepath.Join(tmpDir, "pods", "pod-uid", "volumes", "kubernetes.io~csi", specVolID)
+	}
+	globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, testDriver, "anyhashhere")
+	if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
 		t.Fatalf("setup global dir: %v", err)
 	}
 	globalData := map[string]string{
@@ -1593,6 +1597,17 @@ func TestPluginConstructVolumeSpecFallsBackToGlobalMount(t *testing.T) {
 	}
 	if err := saveVolumeData(globalDataDir, volDataFileName, globalData); err != nil {
 		t.Fatalf("save global vol_data.json: %v", err)
+	}
+
+	// Arrange: the pod-local mount is still a bind mount of the global one,
+	// which is what the fallback follows.
+	fake, ok := plug.host.GetMounter().(*mount.FakeMounter)
+	if !ok {
+		t.Fatalf("expected a fake mounter, got %T", plug.host.GetMounter())
+	}
+	fake.MountPoints = []mount.MountPoint{
+		{Device: "/dev/sdb", Path: filepath.Join(globalDataDir, globalMountInGlobalPath)},
+		{Device: "/dev/sdb", Path: filepath.Join(podLocalDir, "mount")},
 	}
 
 	// Act

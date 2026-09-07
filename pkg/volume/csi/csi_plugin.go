@@ -575,16 +575,14 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.Re
 			return volume.ReconstructedVolume{}, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v", mountPath, err))
 		}
 		// Pod-local vol_data.json is missing or corrupt. Fall back to the
-		// global mount data that MountDevice wrote, scanning for a matching
-		// specVolID. Prevents orphaned global mounts on failed reconstruction
-		// (issue #101791).
-		specVolID := filepath.Base(mountPath)
-		pluginDir := p.host.GetPluginDir(p.GetPluginName())
-		_, fallbackData, fallbackErr := findGlobalMountDataBySpecVolID(pluginDir, specVolID)
+		// global mount data that MountDevice wrote, found through the mount
+		// reference the pod-local bind mount still holds. Prevents orphaned
+		// global mounts on failed reconstruction (issue #101791).
+		globalDir, fallbackData, fallbackErr := findGlobalMountDataFromPodMount(p.host, p.GetPluginName(), mountPath)
 		if fallbackErr != nil {
 			return volume.ReconstructedVolume{}, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v (global mount fallback also failed: %v)", mountPath, err, fallbackErr))
 		}
-		klog.V(2).Info(log("plugin.ConstructVolumeSpec recovered vol_data from global mount for specVolID %q", specVolID))
+		klog.V(2).Info(log("plugin.ConstructVolumeSpec recovered vol_data from global mount %s", globalDir))
 		volData = fallbackData
 	}
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
