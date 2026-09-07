@@ -9803,7 +9803,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentSpec(ref common.ReferenceCallback) 
 						},
 					},
 				},
-				Required: []string{"template"},
+				Required: []string{"selector", "template"},
 			},
 		},
 		Dependencies: []string{
@@ -35728,6 +35728,7 @@ func schema_k8sio_api_extensions_v1beta1_Deployment(ref common.ReferenceCallback
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -35977,7 +35978,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentSpec(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"template"},
+				Required: []string{"selector", "template"},
 			},
 		},
 		Dependencies: []string{

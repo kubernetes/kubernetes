@@ -238,6 +238,7 @@ message Deployment {
 
   // Specification of the desired behavior of the Deployment.
   // +required
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional DeploymentSpec spec = 2;
 
   // Most recently observed status of the Deployment.
@@ -293,6 +294,8 @@ message DeploymentSpec {
   // selected by this will be the ones affected by this deployment.
   // It must match the pod template's labels.
   // +required
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.

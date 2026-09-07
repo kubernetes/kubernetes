@@ -405,6 +405,7 @@ type Deployment struct {
 
 	// Specification of the desired behavior of the Deployment.
 	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:required
 	Spec DeploymentSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Most recently observed status of the Deployment.
@@ -423,6 +424,8 @@ type DeploymentSpec struct {
 	// selected by this will be the ones affected by this deployment.
 	// It must match the pod template's labels.
 	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:alpha(since: "1.37")=+k8s:required
 	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template describes the pods that will be created.
