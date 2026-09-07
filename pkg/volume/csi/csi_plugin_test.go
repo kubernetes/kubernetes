@@ -1569,7 +1569,7 @@ func TestPluginConstructVolumeSpecFallsBackToGlobalMount(t *testing.T) {
 		specVolID = "orphaned-pv"
 		volHandle = "orphaned-handle"
 	)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeReconstructionFallback, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIGlobalMountReconstruction, true)
 	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 
 	// Arrange: pod-local mount dir exists but has NO vol_data.json
@@ -1630,7 +1630,7 @@ func TestPluginConstructVolumeSpecFallsBackToGlobalMount(t *testing.T) {
 }
 
 // TestPluginConstructVolumeSpecGateOffKeepsOldBehavior is the other half of
-// issue #101791: with VolumeReconstructionFallback disabled, the very same
+// issue #101791: with CSIGlobalMountReconstruction disabled, the very same
 // on-disk layout must still fail reconstruction exactly as it did before this
 // change. The gate is alpha and off by default, so this is what every cluster
 // gets until an operator opts in.
@@ -1642,7 +1642,7 @@ func TestPluginConstructVolumeSpecGateOffKeepsOldBehavior(t *testing.T) {
 		specVolID = "orphaned-pv"
 		volHandle = "orphaned-handle"
 	)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeReconstructionFallback, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIGlobalMountReconstruction, false)
 	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 
 	// Same arrangement as the gate-on test, bind mount included, so that the

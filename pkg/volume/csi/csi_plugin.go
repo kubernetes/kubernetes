@@ -557,7 +557,7 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 	dataDir := filepath.Dir(dir) // dropoff /mount at end
 	data, err := loadVolumeData(dataDir, volDataFileName)
 	if err != nil {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeReconstructionFallback) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIGlobalMountReconstruction) {
 			return nil, errors.New(log("unmounter failed to load volume data file [%s]: %v", dir, err))
 		}
 		// The same recovery ConstructVolumeSpec performs. Without it a volume
@@ -587,7 +587,7 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.Re
 
 	volData, err := loadVolumeData(mountPath, volDataFileName)
 	if err != nil {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeReconstructionFallback) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIGlobalMountReconstruction) {
 			return volume.ReconstructedVolume{}, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v", mountPath, err))
 		}
 		// Pod-local vol_data.json is missing or corrupt. Fall back to the

@@ -372,7 +372,7 @@ func TestNewUnmounterFallsBackToGlobalMount(t *testing.T) {
 
 	setup := func(t *testing.T, gateOn bool) (*csiPlugin, string) {
 		t.Helper()
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeReconstructionFallback, gateOn)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIGlobalMountReconstruction, gateOn)
 		registerFakePlugin(driver, "endpoint", []string{"1.0.0"}, t)
 
 		plug, tmpDir := newTestPlugin(t, nil)
@@ -453,7 +453,7 @@ func TestPluginConstructVolumeSpecFallbackSpecVolID(t *testing.T) {
 
 	setup := func(t *testing.T, globalData map[string]string) (*csiPlugin, string) {
 		t.Helper()
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeReconstructionFallback, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIGlobalMountReconstruction, true)
 		registerFakePlugin(driver, "endpoint", []string{"1.0.0"}, t)
 
 		plug, tmpDir := newTestPlugin(t, nil)

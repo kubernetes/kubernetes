@@ -347,6 +347,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.26"
+- name: CSIGlobalMountReconstruction
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: CSIServiceAccountTokenSecrets
   versionedSpecs:
   - default: true
@@ -2202,12 +2208,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
-- name: VolumeReconstructionFallback
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.38"
 - name: WatchCacheInitializationPostStartHook
   versionedSpecs:
   - default: false

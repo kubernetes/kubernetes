@@ -1266,7 +1266,7 @@ const (
 	// fall back to reading vol_data.json from the global mount directory
 	// if the pod-local file is missing or corrupt. Prevents orphaned
 	// global mounts that can lead to data corruption (issue #101791).
-	VolumeReconstructionFallback featuregate.Feature = "VolumeReconstructionFallback"
+	CSIGlobalMountReconstruction featuregate.Feature = "CSIGlobalMountReconstruction"
 
 	// owner: @ksubrmnn
 	//
@@ -2216,7 +2216,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	VolumeReconstructionFallback: {
+	CSIGlobalMountReconstruction: {
 		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
@@ -2838,7 +2838,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	VolumeLimitScaling: {},
 
-	VolumeReconstructionFallback: {},
+	CSIGlobalMountReconstruction: {},
 
 	WinDSR: {},
 
