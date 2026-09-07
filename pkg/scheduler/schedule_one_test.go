@@ -4793,8 +4793,22 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		if len(nodesThatFit) != nodesToFind {
 			t.Errorf("got %d nodes filtered, want %d", len(nodesThatFit), nodesToFind)
 		}
-		if sched.algorithm.nextStartNodeIndex != (i+1)*nodesToFind%numAllNodes {
-			t.Errorf("got %d lastProcessedNodeIndex, want %d", sched.algorithm.nextStartNodeIndex, (i+1)*nodesToFind%numAllNodes)
+		expectedNextStartNodeIndex := (i + 1) * nodesToFind % numAllNodes
+		if sched.algorithm.nextStartNodeIndex != expectedNextStartNodeIndex {
+			t.Errorf("got %d lastProcessedNodeIndex, want %d", sched.algorithm.nextStartNodeIndex, expectedNextStartNodeIndex)
+		}
+
+		// Interleave a FindAllNodesThatFitPod call between normal cycles and assert nextStartNodeIndex
+		// advances exactly as if the findAll call never happened.
+		allNodesThatFit, _, err := sched.algorithm.FindAllNodesThatFitPod(ctx, framework.NewCycleState(), fwk, podInfo)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(allNodesThatFit) != numAllNodes {
+			t.Errorf("got %d nodes filtered, want %d", len(allNodesThatFit), numAllNodes)
+		}
+		if sched.algorithm.nextStartNodeIndex != expectedNextStartNodeIndex {
+			t.Errorf("got %d lastProcessedNodeIndex, want %d", sched.algorithm.nextStartNodeIndex, expectedNextStartNodeIndex)
 		}
 	}
 }
