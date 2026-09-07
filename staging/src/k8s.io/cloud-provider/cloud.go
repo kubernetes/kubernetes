@@ -328,12 +328,12 @@ type InstanceMetadata struct {
 	//   * failure-domain.beta.kubernetes.io/region=<region> (DEPRECATED)
 	Region string
 
-        // AdditionalLabels is a map of additional labels provided by the cloud provider.
-        // When provided, they are applied to the node and enable cloud providers to
-        // label nodes with information that may be valuable to that provider. Missing
-        // labels and changed values are reconciled when the cloud node controller starts
-        // and every node status update interval afterwards (five minutes by default,
-        // configurable via --node-status-update-frequency). Labels that are no longer
-        // returned by the cloud provider are not removed.
-        AdditionalLabels map[string]string
+	// AdditionalLabels is a map of additional labels provided by the cloud provider.
+	// When provided, they are applied to the node and enable cloud providers to
+	// label nodes with information that may be valuable to that provider. Missing
+	// labels and changed values are reconciled when the cloud node controller starts
+	// and every node status update interval afterwards (five minutes by default,
+	// configurable via --node-status-update-frequency). Labels that are no longer
+	// returned by the cloud provider are not removed.
+	AdditionalLabels map[string]string
 }
