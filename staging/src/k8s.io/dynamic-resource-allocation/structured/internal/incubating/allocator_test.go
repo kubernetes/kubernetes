@@ -46,3 +46,18 @@ func TestAllocator(t *testing.T) {
 		newAllocator,
 	)
 }
+
+func TestCounterPoolAccountabilityAcrossNodesWithUnderreportedSliceCount(t *testing.T) {
+	allocatortesting.TestCounterPoolAccountabilityAcrossNodesWithUnderreportedSliceCount(t,
+		func(
+			ctx context.Context,
+			features Features,
+			allocatedState internal.AllocatedState,
+			classLister DeviceClassLister,
+			slices []*resourceapi.ResourceSlice,
+			celCache *cel.Cache,
+		) (internal.Allocator, error) {
+			return NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+		},
+	)
+}
