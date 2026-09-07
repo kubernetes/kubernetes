@@ -3500,7 +3500,7 @@ func HaveContainerStatusCPURequests(ctnName, expected string) types.GomegaMatche
 		if actual != nil {
 			for _, ctnStatus := range actual.Status.ContainerStatuses {
 				if ctnStatus.Name == ctnName {
-					if ctnStatus.Resources != nil && ctnStatus.Resources.Limits != nil {
+					if ctnStatus.Resources != nil && ctnStatus.Resources.Requests != nil {
 						md.CurrentCPUs = ctnStatus.Resources.Requests.Cpu().String()
 					}
 				}
