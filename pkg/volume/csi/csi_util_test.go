@@ -315,6 +315,28 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 		}
 	})
 
+	t.Run("volume data naming no driver is skipped", func(t *testing.T) {
+		pluginDir := t.TempDir()
+		dataDir := filepath.Join(pluginDir, testDriver, "somehash")
+		if err := os.MkdirAll(dataDir, 0o755); err != nil {
+			t.Fatalf("setup data dir: %v", err)
+		}
+		if err := saveVolumeData(dataDir, volDataFileName, map[string]string{
+			volDataKey.specVolID: "some-pv",
+		}); err != nil {
+			t.Fatalf("save vol_data.json: %v", err)
+		}
+		plug, _ := newTestPlugin(t, nil)
+		fake := plug.host.GetMounter().(*mount.FakeMounter)
+		fake.MountPoints = []mount.MountPoint{
+			{Device: "/dev/sdb", Path: filepath.Join(dataDir, globalMountInGlobalPath)},
+			{Device: "/dev/sdb", Path: filepath.Join(pluginDir, "podmount", "mount")},
+		}
+		if _, _, err := findGlobalMountDataFromPodMount(plug.host, filepath.Join(pluginDir, "podmount")); err == nil {
+			t.Fatal("volume data naming no driver was trusted; it must be skipped")
+		}
+	})
+
 	t.Run("a mount reference with no volume data is skipped", func(t *testing.T) {
 		plug, podLocalDir, globalDataDir := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
 			return []mount.MountPoint{
@@ -413,6 +435,86 @@ func TestNewUnmounterFallsBackToGlobalMount(t *testing.T) {
 
 		if _, err := plug.NewUnmounter(specVolID, podUID); err == nil {
 			t.Fatal("NewUnmounter succeeded with the gate off; the fallback must not run unless the feature is enabled")
+		}
+	})
+}
+
+// TestPluginConstructVolumeSpecFallbackSpecVolID covers the two ways the
+// specVolID of a recovered global vol_data.json can disagree with the volume
+// being reconstructed: absent, because an older kubelet never wrote it, and
+// belonging to somebody else, because mount references are matched by
+// superblock and root and a driver can stage several volumes from one export.
+func TestPluginConstructVolumeSpecFallbackSpecVolID(t *testing.T) {
+	const (
+		driver    = "test-driver"
+		volName   = "the-pv-being-reconstructed"
+		volHandle = "handle-of-the-staged-pv"
+	)
+
+	setup := func(t *testing.T, globalData map[string]string) (*csiPlugin, string) {
+		t.Helper()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeReconstructionFallback, true)
+		registerFakePlugin(driver, "endpoint", []string{"1.0.0"}, t)
+
+		plug, tmpDir := newTestPlugin(t, nil)
+		t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+		if resolved, err := filepath.EvalSymlinks(tmpDir); err == nil {
+			tmpDir = resolved
+		}
+
+		podLocalDir := filepath.Join(tmpDir, "pods", "pod-uid", "volumes", "kubernetes.io~csi", volName)
+		if err := os.MkdirAll(filepath.Join(podLocalDir, "mount"), 0o755); err != nil {
+			t.Fatalf("setup pod-local dir: %v", err)
+		}
+		globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, driver, "somehash")
+		if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
+			t.Fatalf("setup global dir: %v", err)
+		}
+		if err := saveVolumeData(globalDataDir, volDataFileName, globalData); err != nil {
+			t.Fatalf("save global vol_data.json: %v", err)
+		}
+		fake := plug.host.GetMounter().(*mount.FakeMounter)
+		fake.MountPoints = []mount.MountPoint{
+			{Device: "/dev/sdb", Path: filepath.Join(globalDataDir, globalMountInGlobalPath)},
+			{Device: "/dev/sdb", Path: filepath.Join(podLocalDir, "mount")},
+		}
+		return plug, podLocalDir
+	}
+
+	t.Run("a pre-feature global file is named from the pod directory", func(t *testing.T) {
+		// Everything staged before this feature shipped looks like this: the
+		// two fields MountDevice has always written, and nothing else.
+		plug, podLocalDir := setup(t, map[string]string{
+			volDataKey.volHandle:  volHandle,
+			volDataKey.driverName: driver,
+		})
+
+		rec, err := plug.ConstructVolumeSpec(volName, podLocalDir)
+		if err != nil {
+			t.Fatalf("ConstructVolumeSpec: %v", err)
+		}
+		if rec.Spec == nil || rec.Spec.PersistentVolume == nil {
+			t.Fatalf("incomplete spec: %+v", rec)
+		}
+		if got := rec.Spec.PersistentVolume.Name; got != volName {
+			t.Errorf("reconstructed volume name: got %q, want %q", got, volName)
+		}
+		if got := rec.Spec.PersistentVolume.Spec.CSI.VolumeHandle; got != volHandle {
+			t.Errorf("volumeHandle: got %q, want %q", got, volHandle)
+		}
+	})
+
+	t.Run("a global file belonging to another volume is refused", func(t *testing.T) {
+		plug, podLocalDir := setup(t, map[string]string{
+			volDataKey.specVolID:  "a-different-pv",
+			volDataKey.volHandle:  "handle-of-a-different-pv",
+			volDataKey.driverName: driver,
+		})
+
+		rec, err := plug.ConstructVolumeSpec(volName, podLocalDir)
+		if err == nil {
+			t.Fatalf("reconstructed %q from another volume's global mount, handle %q",
+				volName, rec.Spec.PersistentVolume.Spec.CSI.VolumeHandle)
 		}
 	})
 }

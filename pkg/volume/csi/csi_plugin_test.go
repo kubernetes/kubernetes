@@ -1558,9 +1558,9 @@ func TestIsResourceExhaustError(t *testing.T) {
 // errored out, marking the volume as failed-reconstruction and letting the
 // global mount leak (corruption risk on RWO volumes).
 //
-// With the fix, ConstructVolumeSpec scans the CSI plugin dir for a
-// vol_data.json whose specVolID matches and reuses it, so reconstruction
-// succeeds and the volume follows the normal unmount path.
+// With the fix, ConstructVolumeSpec follows the mount reference the pod-local
+// bind mount still holds to the global mount it was staged at, and rebuilds
+// the spec from the vol_data.json stored beside it.
 func TestPluginConstructVolumeSpecFallsBackToGlobalMount(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer func() { _ = os.RemoveAll(tmpDir) }()
@@ -1645,15 +1645,17 @@ func TestPluginConstructVolumeSpecGateOffKeepsOldBehavior(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeReconstructionFallback, false)
 	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 
-	// Same arrangement as the gate-on test: pod-local dir without
-	// vol_data.json, global dir with a complete one.
+	// Same arrangement as the gate-on test, bind mount included, so that the
+	// only difference between the two is the gate.
+	if resolved, err := filepath.EvalSymlinks(tmpDir); err == nil {
+		tmpDir = resolved
+	}
 	podLocalDir := filepath.Join(tmpDir, "pods", "pod-uid", "volumes", "kubernetes.io~csi", specVolID)
 	if err := os.MkdirAll(filepath.Join(podLocalDir, "mount"), 0o755); err != nil {
 		t.Fatalf("setup pod-local dir: %v", err)
 	}
-	pluginDir := plug.host.GetPluginDir(plug.GetPluginName())
-	globalDataDir := filepath.Join(pluginDir, testDriver, "anyhashhere")
-	if err := os.MkdirAll(globalDataDir, 0o755); err != nil {
+	globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, testDriver, "anyhashhere")
+	if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
 		t.Fatalf("setup global dir: %v", err)
 	}
 	globalData := map[string]string{
@@ -1664,6 +1666,15 @@ func TestPluginConstructVolumeSpecGateOffKeepsOldBehavior(t *testing.T) {
 	}
 	if err := saveVolumeData(globalDataDir, volDataFileName, globalData); err != nil {
 		t.Fatalf("save global vol_data.json: %v", err)
+	}
+
+	fake, ok := plug.host.GetMounter().(*mount.FakeMounter)
+	if !ok {
+		t.Fatalf("expected a fake mounter, got %T", plug.host.GetMounter())
+	}
+	fake.MountPoints = []mount.MountPoint{
+		{Device: "/dev/sdb", Path: filepath.Join(globalDataDir, globalMountInGlobalPath)},
+		{Device: "/dev/sdb", Path: filepath.Join(podLocalDir, "mount")},
 	}
 
 	// Act + assert: the global file is ignored and reconstruction still fails.
