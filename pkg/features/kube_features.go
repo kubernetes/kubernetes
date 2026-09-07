@@ -1262,10 +1262,14 @@ const (
 	// owner: @cniackz
 	// kep: https://kep.k8s.io/6058
 	//
-	// On kubelet restart, when reconstructing a CSI volume from disk,
-	// fall back to reading vol_data.json from the global mount directory
-	// if the pod-local file is missing or corrupt. Prevents orphaned
-	// global mounts that can lead to data corruption (issue #101791).
+	// Lets kubelet reconstruct a CSI global mount that its pod directory no
+	// longer describes, instead of leaving it staged with no in-memory record.
+	// Covers a global mount whose pod directory is gone, left behind when a
+	// node reboots during NodeUnstageVolume (issue #121937), and one whose
+	// pod-local vol_data.json is missing or corrupt (issue #101791). Either
+	// way the volume stays out of node.status.volumesInUse, so the
+	// attach/detach controller may attach it elsewhere and corrupt an RWO
+	// filesystem.
 	CSIGlobalMountReconstruction featuregate.Feature = "CSIGlobalMountReconstruction"
 
 	// owner: @ksubrmnn
