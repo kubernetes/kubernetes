@@ -2092,15 +2092,16 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 // TestCSIDriverValidationUpdate only assert whether an error was returned, so
 // nothing caught it.
 func TestCSIDriverAttachRequiredFieldPath(t *testing.T) {
+	objectMeta := metav1.ObjectMeta{Name: "test-driver", ResourceVersion: "1"}
 	driver := func(attachRequired *bool) *storage.CSIDriver {
 		return &storage.CSIDriver{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-driver", ResourceVersion: "1"},
+			ObjectMeta: objectMeta,
 			Spec: storage.CSIDriverSpec{
 				AttachRequired:                attachRequired,
-				PodInfoOnMount:                ptr.To(false),
-				StorageCapacity:               ptr.To(true),
-				SELinuxMount:                  ptr.To(false),
-				PreventPodSchedulingIfMissing: ptr.To(false),
+				PodInfoOnMount:                new(false),
+				StorageCapacity:               new(true),
+				SELinuxMount:                  new(false),
+				PreventPodSchedulingIfMissing: new(false),
 			},
 		}
 	}
@@ -2110,7 +2111,7 @@ func TestCSIDriverAttachRequiredFieldPath(t *testing.T) {
 		errs field.ErrorList
 	}{{
 		name: "immutable on update",
-		errs: ValidateCSIDriverUpdate(driver(ptr.To(true)), driver(ptr.To(false))),
+		errs: ValidateCSIDriverUpdate(driver(new(true)), driver(new(false))),
 	}, {
 		name: "required on create",
 		errs: ValidateCSIDriver(driver(nil)),
