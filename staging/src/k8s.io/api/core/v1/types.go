@@ -2589,6 +2589,7 @@ type ContainerPort struct {
 	HostPort int32 `json:"hostPort,omitempty" protobuf:"varint,2,opt,name=hostPort"`
 	// containerPort is the number of port to expose on the pod's IP address.
 	// This must be a valid port number, 0 < x < 65536.
+	// +required
 	ContainerPort int32 `json:"containerPort" protobuf:"varint,3,opt,name=containerPort"`
 	// protocol is the protocol for port. Must be UDP, TCP, or SCTP.
 	// Defaults to "TCP".
@@ -2724,6 +2725,7 @@ type VolumeDevice struct {
 type EnvVar struct {
 	// name is the name of the environment variable.
 	// May consist of any printable ASCII characters except '='.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// Optional: no more than one of the following may be specified.
@@ -2802,6 +2804,7 @@ type ObjectFieldSelector struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
 	// fieldPath is the path of the field to select in the specified API version.
+	// +required
 	FieldPath string `json:"fieldPath" protobuf:"bytes,2,opt,name=fieldPath"`
 }
 
@@ -2812,6 +2815,7 @@ type ResourceFieldSelector struct {
 	// +optional
 	ContainerName string `json:"containerName,omitempty" protobuf:"bytes,1,opt,name=containerName"`
 	// resource is the resource to select
+	// +required
 	Resource string `json:"resource" protobuf:"bytes,2,opt,name=resource"`
 	// divisor optionally indicates how the resource from the container should be scaled.
 	// If unset or 0, the resource is not scaled (divisor is treated as 1).
@@ -2826,6 +2830,7 @@ type ConfigMapKeySelector struct {
 	LocalObjectReference `json:"" protobuf:"bytes,1,opt,name=localObjectReference"`
 	// key is the key to select from the ConfigMap's Data field.
 	// Keys in the BinaryData field are not currently propagated to container env vars.
+	// +required
 	Key string `json:"key" protobuf:"bytes,2,opt,name=key"`
 	// optional specifies whether the ConfigMap or its key must be defined
 	// +optional
@@ -2838,6 +2843,7 @@ type SecretKeySelector struct {
 	// The name of the secret in the pod's namespace to select from.
 	LocalObjectReference `json:"" protobuf:"bytes,1,opt,name=localObjectReference"`
 	// key is the key of the secret to select from.  Must be a valid secret key.
+	// +required
 	Key string `json:"key" protobuf:"bytes,2,opt,name=key"`
 	// optional specifies whether the Secret or its key must be defined
 	// +optional
@@ -2889,8 +2895,10 @@ type SecretEnvSource struct {
 type HTTPHeader struct {
 	// name is the header field name.
 	// This will be canonicalized upon output, so case-variant names will be understood as the same header.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// value is the header field value
+	// +optional
 	Value string `json:"value" protobuf:"bytes,2,opt,name=value"`
 }
 
@@ -2915,6 +2923,7 @@ type HTTPGetAction struct {
 	// port is the name or number of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
+	// +required
 	Port intstr.IntOrString `json:"port" protobuf:"bytes,2,opt,name=port"`
 	// host is the host name to connect to, defaults to the pod IP. You probably want to set
 	// "Host" in httpHeaders instead.
@@ -2951,6 +2960,7 @@ type TCPSocketAction struct {
 	// port is the number or name of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
+	// +required
 	Port intstr.IntOrString `json:"port" protobuf:"bytes,1,opt,name=port"`
 	// host is the optional host name to connect to, defaults to the pod IP.
 	// +optional
@@ -2960,6 +2970,7 @@ type TCPSocketAction struct {
 // GRPCAction specifies an action involving a GRPC service.
 type GRPCAction struct {
 	// port is the number of the gRPC service. Number must be in the range 1 to 65535.
+	// +required
 	Port int32 `json:"port" protobuf:"bytes,1,opt,name=port"`
 
 	// service is the name of the service to place in the gRPC HealthCheckRequest
@@ -3007,6 +3018,7 @@ type ExecAction struct {
 // SleepAction describes a "sleep" action.
 type SleepAction struct {
 	// seconds is the number of seconds to sleep.
+	// +optional
 	Seconds int64 `json:"seconds" protobuf:"bytes,1,opt,name=seconds"`
 }
 
@@ -3084,9 +3096,11 @@ const (
 type ContainerResizePolicy struct {
 	// resourceName is the name of the resource to which this resource resize policy applies.
 	// Supported values: cpu, memory.
+	// +required
 	ResourceName ResourceName `json:"resourceName" protobuf:"bytes,1,opt,name=resourceName,casttype=ResourceName"`
 	// restartPolicy is the restart policy to apply when specified resource is resized.
 	// If not specified, it defaults to NotRequired.
+	// +required
 	RestartPolicy ResourceResizeRestartPolicy `json:"restartPolicy" protobuf:"bytes,2,opt,name=restartPolicy,casttype=ResourceResizeRestartPolicy"`
 }
 
@@ -3179,6 +3193,7 @@ type ResourceClaim struct {
 	// name must match the name of one entry in pod.spec.resourceClaims of
 	// the Pod where this field is used. It makes that resource available
 	// inside a container.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// request is the name chosen for a request in the referenced claim.
@@ -3199,6 +3214,7 @@ type Container struct {
 	// name of the container specified as a DNS_LABEL.
 	// Each container in a pod must have a unique name (DNS_LABEL).
 	// Cannot be updated.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// image is the container image name.
 	// More info: https://kubernetes.io/docs/concepts/containers/images
@@ -3570,6 +3586,7 @@ type ContainerStateRunning struct {
 // ContainerStateTerminated is a terminated state of a container.
 type ContainerStateTerminated struct {
 	// exitCode is the exit status from the last termination of the container
+	// +optional
 	ExitCode int32 `json:"exitCode" protobuf:"varint,1,opt,name=exitCode"`
 	// signal from the last termination of the container
 	// +optional
@@ -3611,6 +3628,7 @@ type ContainerStatus struct {
 	// name is a DNS_LABEL representing the unique name of the container.
 	// Each container in a pod must have a unique name across all container types.
 	// Cannot be updated.
+	// +optional
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// state holds details about the container's current condition.
 	// +optional
@@ -3627,20 +3645,24 @@ type ContainerStatus struct {
 	//
 	// The value is typically used to determine whether a container is ready to
 	// accept traffic.
+	// +optional
 	Ready bool `json:"ready" protobuf:"varint,4,opt,name=ready"`
 	// restartCount holds the number of times the container has been restarted.
 	// Kubelet makes an effort to always increment the value, but there
 	// are cases when the state may be lost due to node restarts and then the value
 	// may be reset to 0. The value is never negative.
+	// +optional
 	RestartCount int32 `json:"restartCount" protobuf:"varint,5,opt,name=restartCount"`
 	// image is the name of container image that the container is running.
 	// The container image may not match the image used in the PodSpec,
 	// as it may have been resolved by the runtime.
 	// More info: https://kubernetes.io/docs/concepts/containers/images.
+	// +optional
 	Image string `json:"image" protobuf:"bytes,6,opt,name=image"`
 	// imageID is the image ID of the container's image. The image ID may not
 	// match the image ID of the image used in the PodSpec, as it may have been
 	// resolved by the runtime.
+	// +optional
 	ImageID string `json:"imageID" protobuf:"bytes,7,opt,name=imageID"`
 	// containerID is the ID of the container in the format '<type>://<container_id>'.
 	// Where type is a container runtime identifier, returned from Version call of CRI API
@@ -3711,6 +3733,7 @@ type ResourceStatus struct {
 	// See ResourceID type definition for a specific format it has in various use cases.
 	// +listType=map
 	// +listMapKey=resourceID
+	// +optional
 	Resources []ResourceHealth `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
 }
 
@@ -3741,6 +3764,7 @@ type ResourceID string
 // This is a part of KEP https://kep.k8s.io/4680.
 type ResourceHealth struct {
 	// resourceID is the unique identifier of the resource. See the ResourceID type for more information.
+	// +optional
 	ResourceID ResourceID `json:"resourceID" protobuf:"bytes,1,opt,name=resourceID"`
 	// health of the resource.
 	// can be one of:
@@ -3752,6 +3776,7 @@ type ResourceHealth struct {
 	//             For example, Device Plugin got unregistered and hasn't been re-registered since.
 	//
 	// In future we may want to introduce the PermanentlyUnhealthy Status.
+	// +required
 	Health ResourceHealthStatus `json:"health,omitempty" protobuf:"bytes,2,name=health"`
 	// message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
 	// This field is populated by the kubelet when ResourceHealthStatusMessage is enabled if the DRA plugin returns a message, and is null otherwise.
@@ -3775,8 +3800,10 @@ type ContainerUser struct {
 // LinuxContainerUser represents user identity information in Linux containers
 type LinuxContainerUser struct {
 	// uid is the primary uid initially attached to the first process in the container
+	// +optional
 	UID int64 `json:"uid" protobuf:"varint,1,name=uid"`
 	// gid is the primary gid initially attached to the first process in the container
+	// +optional
 	GID int64 `json:"gid" protobuf:"varint,2,name=gid"`
 	// supplementalGroups are the supplemental groups initially attached to the first process in the container
 	// +optional
@@ -3883,6 +3910,7 @@ const (
 type PodCondition struct {
 	// type is the type of the condition.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+	// +required
 	Type PodConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PodConditionType"`
 	// observedGeneration if set, this represents the .metadata.generation that the pod condition was set based upon.
 	// +optional
@@ -3890,6 +3918,7 @@ type PodCondition struct {
 	// status is the status of the condition.
 	// Can be True, False, Unknown.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+	// +optional
 	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// lastProbeTime is the last time we probed the condition.
 	// +optional
@@ -4070,6 +4099,7 @@ type NodeSelector struct {
 	// nodeSelectorTerms is a list of node selector terms. The terms are ORed.
 	// Required. A list of node selector terms. The terms are ORed.
 	// +listType=atomic
+	// +required
 	NodeSelectorTerms []NodeSelectorTerm `json:"nodeSelectorTerms" protobuf:"bytes,1,rep,name=nodeSelectorTerms"`
 }
 
@@ -4092,9 +4122,11 @@ type NodeSelectorTerm struct {
 // that relates the key and values.
 type NodeSelectorRequirement struct {
 	// key is the label key that the selector applies to.
+	// +required
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// operator represents a key's relationship to a set of values.
 	// Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+	// +required
 	Operator NodeSelectorOperator `json:"operator" protobuf:"bytes,2,opt,name=operator,casttype=NodeSelectorOperator"`
 	// values is an array of string values. If the operator is In or NotIn,
 	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
@@ -4139,10 +4171,12 @@ type TopologySelectorTerm struct {
 // This is an alpha feature and may change in the future.
 type TopologySelectorLabelRequirement struct {
 	// key is the label key that the selector applies to.
+	// +required
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// values is an array of string values. One value must match the label to be selected.
 	// Each entry in values is ORed.
 	// +listType=atomic
+	// +required
 	Values []string `json:"values" protobuf:"bytes,2,rep,name=values"`
 }
 
@@ -4237,8 +4271,10 @@ type PodAntiAffinity struct {
 type WeightedPodAffinityTerm struct {
 	// weight associated with matching the corresponding podAffinityTerm,
 	// in the range 1-100.
+	// +required
 	Weight int32 `json:"weight" protobuf:"varint,1,opt,name=weight"`
 	// podAffinityTerm is a pod affinity term, associated with the corresponding weight. required.
+	// +required
 	PodAffinityTerm PodAffinityTerm `json:"podAffinityTerm" protobuf:"bytes,2,opt,name=podAffinityTerm"`
 }
 
@@ -4266,6 +4302,7 @@ type PodAffinityTerm struct {
 	// whose value of the label with key topologyKey matches that of any node on which any of the
 	// selected pods is running.
 	// Empty topologyKey is not allowed.
+	// +required
 	TopologyKey string `json:"topologyKey" protobuf:"bytes,3,opt,name=topologyKey"`
 	// namespaceSelector is a label query over the set of namespaces that the term applies to.
 	// The term is applied to the union of the namespaces selected by this field
@@ -4336,8 +4373,10 @@ type NodeAffinity struct {
 // (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
 type PreferredSchedulingTerm struct {
 	// weight is the weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
+	// +required
 	Weight int32 `json:"weight" protobuf:"varint,1,opt,name=weight"`
 	// preference is a node selector term, associated with the corresponding weight.
+	// +optional
 	Preference NodeSelectorTerm `json:"preference" protobuf:"bytes,2,opt,name=preference"`
 }
 
@@ -4346,6 +4385,7 @@ type PreferredSchedulingTerm struct {
 type Taint struct {
 	// key is the taint key to be applied to a node. Required.
 	// The taint key to be applied to a node.
+	// +required
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// value is the taint value corresponding to the taint key.
 	// +optional
@@ -4353,6 +4393,7 @@ type Taint struct {
 	// effect is the effect of the taint on pods
 	// that do not tolerate the taint. Required.
 	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
+	// +required
 	Effect TaintEffect `json:"effect" protobuf:"bytes,3,opt,name=effect,casttype=TaintEffect"`
 	// timeAdded represents the time at which the taint was added.
 	// +optional
@@ -4429,6 +4470,7 @@ const (
 // PodReadinessGate contains the reference to a pod condition
 type PodReadinessGate struct {
 	// conditionType refers to a condition in the pod's condition list with matching type.
+	// +required
 	ConditionType PodConditionType `json:"conditionType" protobuf:"bytes,1,opt,name=conditionType,casttype=PodConditionType"`
 }
 
@@ -4459,6 +4501,7 @@ type PodSpec struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
 	// containers is the list of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
@@ -4468,6 +4511,7 @@ type PodSpec struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +required
 	Containers []Container `json:"containers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=containers"`
 	// ephemeralContainers is the list of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
 	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
@@ -4835,6 +4879,7 @@ type PodSpec struct {
 type PodResourceClaim struct {
 	// name uniquely identifies this resource claim inside the pod.
 	// This must be a DNS_LABEL.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
 	// Source is tombstoned since Kubernetes 1.31 where it got replaced with
@@ -4847,6 +4892,7 @@ type PodResourceClaim struct {
 	//
 	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
 	// be set.
+	// +optional
 	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,3,opt,name=resourceClaimName"`
 
 	// resourceClaimTemplateName is the name of a ResourceClaimTemplate
@@ -4874,6 +4920,7 @@ type PodResourceClaim struct {
 	//
 	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
 	// be set.
+	// +optional
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,4,opt,name=resourceClaimTemplateName"`
 }
 
@@ -4884,6 +4931,7 @@ type PodResourceClaimStatus struct {
 	// name uniquely identifies this resource claim inside the pod.
 	// This must match the name of an entry in pod.spec.resourceClaims,
 	// which implies that the string must be a DNS_LABEL.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
 	// resourceClaimName is the name of the ResourceClaim that was
@@ -4909,10 +4957,12 @@ type PodExtendedResourceClaimStatus struct {
 	// requestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request
 	// in the generated ResourceClaim.
 	// +listType=atomic
+	// +required
 	RequestMappings []ContainerExtendedResourceRequest `json:"requestMappings" protobuf:"bytes,1,rep,name=requestMappings"`
 
 	// resourceClaimName is the name of the ResourceClaim that was
 	// generated for the Pod in the namespace of the Pod.
+	// +required
 	ResourceClaimName string `json:"resourceClaimName" protobuf:"bytes,2,name=resourceClaimName"`
 }
 
@@ -4920,10 +4970,13 @@ type PodExtendedResourceClaimStatus struct {
 // extended resource name to the device request name.
 type ContainerExtendedResourceRequest struct {
 	// containerName is the name of the container requesting resources.
+	// +required
 	ContainerName string `json:"containerName" protobuf:"bytes,1,name=containerName"`
 	// resourceName is the name of the extended resource in that container which gets backed by DRA.
+	// +required
 	ResourceName string `json:"resourceName" protobuf:"bytes,2,name=resourceName"`
 	// requestName is the name of the request in the special ResourceClaim which corresponds to the extended resource.
+	// +required
 	RequestName string `json:"requestName" protobuf:"bytes,3,name=requestName"`
 }
 
@@ -4942,6 +4995,7 @@ type PodOS struct {
 	// Additional value may be defined in future and can be one of:
 	// https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
 	// Clients should expect to handle additional values and treat unrecognized values in this field as os: null
+	// +required
 	Name OSName `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
@@ -4949,6 +5003,7 @@ type PodOS struct {
 type PodSchedulingGate struct {
 	// name of the scheduling gate.
 	// Each scheduling gate must have a unique name field.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
@@ -5011,6 +5066,7 @@ type TopologySpreadConstraint struct {
 	// When `whenUnsatisfiable=ScheduleAnyway`, it is used to give higher precedence
 	// to topologies that satisfy it.
 	// It's a required field. Default value is 1 and 0 is not allowed.
+	// +required
 	MaxSkew int32 `json:"maxSkew" protobuf:"varint,1,opt,name=maxSkew"`
 	// topologyKey is the key of node labels. Nodes that have a label with this key
 	// and identical values are considered to be in the same topology.
@@ -5022,6 +5078,7 @@ type TopologySpreadConstraint struct {
 	// e.g. If TopologyKey is "kubernetes.io/hostname", each Node is a domain of that topology.
 	// And, if TopologyKey is "topology.kubernetes.io/zone", each zone is a domain of that topology.
 	// It's a required field.
+	// +required
 	TopologyKey string `json:"topologyKey" protobuf:"bytes,2,opt,name=topologyKey"`
 	// whenUnsatisfiable indicates how to deal with a pod if it doesn't satisfy
 	// the spread constraint.
@@ -5044,6 +5101,7 @@ type TopologySpreadConstraint struct {
 	// MaxSkew(1). In other words, the cluster can still be imbalanced, but scheduler
 	// won't make it *more* imbalanced.
 	// It's a required field.
+	// +required
 	WhenUnsatisfiable UnsatisfiableConstraintAction `json:"whenUnsatisfiable" protobuf:"bytes,3,opt,name=whenUnsatisfiable,casttype=UnsatisfiableConstraintAction"`
 	// labelSelector is used to find matching pods.
 	// Pods that match this label selector are counted to determine the number of pods
@@ -5119,6 +5177,7 @@ type HostAlias struct {
 	IP string `json:"ip" protobuf:"bytes,1,opt,name=ip"`
 	// hostnames for the above IP address.
 	// +listType=atomic
+	// +optional
 	Hostnames []string `json:"hostnames,omitempty" protobuf:"bytes,2,rep,name=hostnames"`
 }
 
@@ -5306,6 +5365,7 @@ type SeccompProfile struct {
 	// RuntimeDefault - the container runtime default profile should be used.
 	// Unconfined - no profile should be applied.
 	// +unionDiscriminator
+	// +required
 	Type SeccompProfileType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=SeccompProfileType"`
 	// localhostProfile indicates a profile defined in a file on the node should be used.
 	// The profile must be preconfigured on the node to work.
@@ -5338,6 +5398,7 @@ type AppArmorProfile struct {
 	//   RuntimeDefault - the container runtime's default profile.
 	//   Unconfined - no AppArmor enforcement.
 	// +unionDiscriminator
+	// +required
 	Type AppArmorProfileType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=AppArmorProfileType"`
 
 	// localhostProfile indicates a profile loaded on the node that should be used.
@@ -5402,6 +5463,7 @@ type PodDNSConfig struct {
 type PodDNSConfigOption struct {
 	// name is this DNS resolver option's name.
 	// Required.
+	// +required
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	// value is this DNS resolver option's value.
 	// +optional
@@ -5429,9 +5491,11 @@ type HostIP struct {
 type EphemeralContainerCommon struct {
 	// name of the ephemeral container specified as a DNS_LABEL.
 	// This name must be unique among all containers, init containers and ephemeral containers.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// image is the container image name.
 	// More info: https://kubernetes.io/docs/concepts/containers/images
+	// +required
 	Image string `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
 	// command is the entrypoint array. Not executed within a shell.
 	// The image's ENTRYPOINT is used if this is not provided.
@@ -5753,6 +5817,7 @@ type PodStatus struct {
 	// ignored.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
 	// +listType=atomic
+	// +optional
 	InitContainerStatuses []ContainerStatus `json:"initContainerStatuses,omitempty" protobuf:"bytes,10,rep,name=initContainerStatuses"`
 
 	// Statuses of containers in this pod.
@@ -5870,7 +5935,7 @@ type Pod struct {
 
 	// spec is the specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec PodSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is the most recently observed status of the pod.
@@ -5908,7 +5973,7 @@ type PodTemplateSpec struct {
 
 	// spec is the specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec PodSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -5926,7 +5991,7 @@ type PodTemplate struct {
 
 	// template defines the pods that will be created from this pod template.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Template PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,2,opt,name=template"`
 }
 
@@ -8862,8 +8927,10 @@ const (
 // Sysctl defines a kernel parameter to be set
 type Sysctl struct {
 	// name of a property to set
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// value of a property to set
+	// +optional
 	Value string `json:"value" protobuf:"bytes,2,opt,name=value"`
 }
 
