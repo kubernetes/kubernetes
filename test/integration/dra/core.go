@@ -56,28 +56,15 @@ import (
 )
 
 // testPod creates a pod with a resource claim reference and then checks
-// whether that field is or isn't getting dropped.
-func testPod(tCtx ktesting.TContext, draEnabled bool) {
+// whether that field is stored in pod spec.
+func testPod(tCtx ktesting.TContext) {
 	tCtx.Parallel()
 	namespace := createTestNamespace(tCtx, nil)
 	podWithClaimName := podWithClaimName.DeepCopy()
 	podWithClaimName.Namespace = namespace
 	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, podWithClaimName, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create pod")
-	if draEnabled {
-		assert.NotEmpty(tCtx, pod.Spec.ResourceClaims, "should store resource claims in pod spec")
-	} else {
-		assert.Empty(tCtx, pod.Spec.ResourceClaims, "should drop resource claims from pod spec")
-	}
-}
-
-// testAPIDisabled checks that the resource.k8s.io API is disabled.
-func testAPIDisabled(tCtx ktesting.TContext) {
-	tCtx.Parallel()
-	_, err := tCtx.Client().ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{FieldValidation: "Strict"})
-	if !apierrors.IsNotFound(err) {
-		tCtx.Fatalf("expected 'resource not found' error, got %v", err)
-	}
+	assert.NotEmpty(tCtx, pod.Spec.ResourceClaims, "should store resource claims in pod spec")
 }
 
 // testConvert creates a claim using a one API version and reads it with another.
