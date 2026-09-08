@@ -22148,7 +22148,6 @@ func schema_k8sio_api_core_v1_ContainerStateTerminated(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"exitCode"},
 			},
 		},
 		Dependencies: []string{
@@ -22339,7 +22338,6 @@ func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback) comm
 						},
 					},
 				},
-				Required: []string{"name", "ready", "restartCount", "image", "imageID"},
 			},
 		},
 		Dependencies: []string{
@@ -23252,7 +23250,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 						},
 					},
 				},
-				Required: []string{"name"},
+				Required: []string{"name", "image"},
 			},
 		},
 		Dependencies: []string{
@@ -23563,7 +23561,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"name"},
+				Required: []string{"name", "image"},
 			},
 		},
 		Dependencies: []string{
@@ -24513,7 +24511,7 @@ func schema_k8sio_api_core_v1_HTTPHeader(ref common.ReferenceCallback) common.Op
 						},
 					},
 				},
-				Required: []string{"name", "value"},
+				Required: []string{"name"},
 			},
 		},
 	}
@@ -25259,7 +25257,6 @@ func schema_k8sio_api_core_v1_LinuxContainerUser(ref common.ReferenceCallback) c
 						},
 					},
 				},
-				Required: []string{"uid", "gid"},
 			},
 		},
 	}
@@ -27937,6 +27934,7 @@ func schema_k8sio_api_core_v1_Pod(ref common.ReferenceCallback) common.OpenAPIDe
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -28336,7 +28334,7 @@ func schema_k8sio_api_core_v1_PodCondition(ref common.ReferenceCallback) common.
 						},
 					},
 				},
-				Required: []string{"type", "status"},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -28437,6 +28435,7 @@ func schema_k8sio_api_core_v1_PodDNSConfigOption(ref common.ReferenceCallback) c
 						},
 					},
 				},
+				Required: []string{"name"},
 			},
 		},
 	}
@@ -29986,6 +29985,7 @@ func schema_k8sio_api_core_v1_PodTemplate(ref common.ReferenceCallback) common.O
 						},
 					},
 				},
+				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{
@@ -30065,6 +30065,7 @@ func schema_k8sio_api_core_v1_PodTemplateSpec(ref common.ReferenceCallback) comm
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -30242,7 +30243,7 @@ func schema_k8sio_api_core_v1_PreferredSchedulingTerm(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"weight", "preference"},
+				Required: []string{"weight"},
 			},
 		},
 		Dependencies: []string{
@@ -31086,7 +31087,7 @@ func schema_k8sio_api_core_v1_ResourceHealth(ref common.ReferenceCallback) commo
 						},
 					},
 				},
-				Required: []string{"resourceID"},
+				Required: []string{"health"},
 			},
 		},
 	}
@@ -32999,7 +33000,6 @@ func schema_k8sio_api_core_v1_SleepAction(ref common.ReferenceCallback) common.O
 						},
 					},
 				},
-				Required: []string{"seconds"},
 			},
 		},
 	}
@@ -33129,7 +33129,7 @@ func schema_k8sio_api_core_v1_Sysctl(ref common.ReferenceCallback) common.OpenAP
 						},
 					},
 				},
-				Required: []string{"name", "value"},
+				Required: []string{"name"},
 			},
 		},
 	}
@@ -33958,7 +33958,6 @@ func schema_k8sio_api_core_v1_VolumeMountStatus(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"name", "mountPath"},
 			},
 		},
 		Dependencies: []string{
