@@ -168,7 +168,7 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 
 	if options.DiscoveryFunc != nil {
 		qm := NewMonitor(
-			logger,
+			ctx,
 			options.InformersStarted,
 			options.InformerFactory,
 			options.IgnoredResourcesFunc(),

@@ -93,7 +93,8 @@ type Signer struct {
 }
 
 // NewSigner returns a new *Signer.
-func NewSigner(logger klog.Logger, cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
+func NewSigner(ctx context.Context, cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
+	logger := klog.FromContext(ctx)
 	e := &Signer{
 		client:             cl,
 		configMapKey:       options.ConfigMapNamespace + "/" + options.ConfigMapName,

@@ -106,7 +106,7 @@ func TestTypeChecking(t *testing.T) {
 				RestMapper:     testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
 			}
 			controller, err := NewController(
-				tCtx.Logger(),
+				tCtx,
 				informerFactory.Admissionregistration().V1().ValidatingAdmissionPolicies(),
 				client.AdmissionregistrationV1().ValidatingAdmissionPolicies(),
 				typeChecker,

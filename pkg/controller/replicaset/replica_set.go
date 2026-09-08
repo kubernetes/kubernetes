@@ -184,7 +184,7 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 		consistencyStore = consistencyutil.NewNoopConsistencyStore()
 	}
 
-	return NewBaseController(logger, rsInformer, podInformer, kubeClient, burstReplicas,
+	return NewBaseController(ctx, rsInformer, podInformer, kubeClient, burstReplicas,
 		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
 		"replicaset",
@@ -201,8 +201,9 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
-func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
+func NewBaseController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
 	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster, controllerFeatures ReplicaSetControllerFeatures, consistencyStore consistencyutil.ConsistencyStore) *ReplicaSetController {
+	logger := klog.FromContext(ctx)
 
 	rsc := &ReplicaSetController{
 		GroupVersionKind: gvk,

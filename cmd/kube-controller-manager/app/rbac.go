@@ -19,7 +19,6 @@ package app
 import (
 	"context"
 
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
@@ -39,7 +38,7 @@ func newClusterRoleAggregationController(ctx context.Context, controllerContext 
 	}
 
 	crac := clusterroleaggregation.NewClusterRoleAggregation(
-		klog.FromContext(ctx),
+		ctx,
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
 		client.RbacV1(),
 	)

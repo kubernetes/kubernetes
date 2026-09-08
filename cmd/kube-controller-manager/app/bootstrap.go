@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/bootstrap"
 )
@@ -41,7 +40,7 @@ func newBootstrapSignerController(ctx context.Context, controllerContext Control
 	}
 
 	bsc, err := bootstrap.NewSigner(
-		klog.FromContext(ctx),
+		ctx,
 		client,
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
@@ -70,7 +69,7 @@ func newTokenCleanerController(ctx context.Context, controllerContext Controller
 	}
 
 	tcc, err := bootstrap.NewTokenCleaner(
-		klog.FromContext(ctx),
+		ctx,
 		client,
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		bootstrap.DefaultTokenCleanerOptions(),

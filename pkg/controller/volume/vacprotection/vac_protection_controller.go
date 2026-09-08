@@ -94,11 +94,12 @@ type Controller struct {
 }
 
 // NewVACProtectionController returns a new *Controller.
-func NewVACProtectionController(logger klog.Logger,
+func NewVACProtectionController(ctx context.Context,
 	client clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	vacInformer storageinformers.VolumeAttributesClassInformer) (*Controller, error) {
+	logger := klog.FromContext(ctx)
 	c := &Controller{
 		client:    client,
 		pvcSynced: pvcInformer.Informer().HasSynced,

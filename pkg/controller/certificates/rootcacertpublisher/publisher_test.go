@@ -128,7 +128,7 @@ func TestConfigMapCreation(t *testing.T) {
 			informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 			cmInformer := informers.Core().V1().ConfigMaps()
 			nsInformer := informers.Core().V1().Namespaces()
-			controller, err := NewPublisher(tCtx.Logger(), cmInformer, nsInformer, client, fakeRootCA)
+			controller, err := NewPublisher(tCtx, cmInformer, nsInformer, client, fakeRootCA)
 			if err != nil {
 				t.Fatalf("error creating ServiceAccounts controller: %v", err)
 			}

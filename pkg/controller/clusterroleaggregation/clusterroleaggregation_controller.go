@@ -53,7 +53,8 @@ type ClusterRoleAggregationController struct {
 }
 
 // NewClusterRoleAggregation creates a new controller
-func NewClusterRoleAggregation(logger klog.Logger, clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
+func NewClusterRoleAggregation(ctx context.Context, clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
+	logger := klog.FromContext(ctx)
 	c := &ClusterRoleAggregationController{
 		clusterRoleClient:  clusterRoleClient,
 		clusterRoleLister:  clusterRoleInformer.Lister(),

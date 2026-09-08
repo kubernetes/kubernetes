@@ -73,7 +73,8 @@ type TokenCleaner struct {
 }
 
 // NewTokenCleaner returns a new *NewTokenCleaner.
-func NewTokenCleaner(logger klog.Logger, cl clientset.Interface, secrets coreinformers.SecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
+func NewTokenCleaner(ctx context.Context, cl clientset.Interface, secrets coreinformers.SecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
+	logger := klog.FromContext(ctx)
 	e := &TokenCleaner{
 		client:               cl,
 		secretLister:         secrets.Lister(),

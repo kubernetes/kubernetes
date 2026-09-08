@@ -50,7 +50,8 @@ type Controller struct {
 }
 
 // NewPVProtectionController returns a new *Controller.
-func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) (*Controller, error) {
+func NewPVProtectionController(ctx context.Context, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) (*Controller, error) {
+	logger := klog.FromContext(ctx)
 	e := &Controller{
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(

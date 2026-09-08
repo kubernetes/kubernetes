@@ -273,7 +273,7 @@ func newRootCACertificatePublisherController(ctx context.Context, controllerCont
 	}
 
 	sac, err := rootcacertpublisher.NewPublisher(
-		klog.FromContext(ctx),
+		ctx,
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
 		client,

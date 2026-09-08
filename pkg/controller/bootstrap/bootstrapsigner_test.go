@@ -42,7 +42,7 @@ func newSigner(t *testing.T) (*Signer, *fake.Clientset, coreinformers.SecretInfo
 	informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 	secrets := informers.Core().V1().Secrets()
 	configMaps := informers.Core().V1().ConfigMaps()
-	bsc, err := NewSigner(tCtx.Logger(), cl, secrets, configMaps, options)
+	bsc, err := NewSigner(tCtx, cl, secrets, configMaps, options)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

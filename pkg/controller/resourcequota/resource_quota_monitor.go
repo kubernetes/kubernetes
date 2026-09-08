@@ -106,7 +106,8 @@ type QuotaMonitor struct {
 }
 
 // NewMonitor creates a new instance of a QuotaMonitor
-func NewMonitor(logger klog.Logger, informersStarted <-chan struct{}, informerFactory informerfactory.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry, updateFilter UpdateFilter) *QuotaMonitor {
+func NewMonitor(ctx context.Context, informersStarted <-chan struct{}, informerFactory informerfactory.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry, updateFilter UpdateFilter) *QuotaMonitor {
+	logger := klog.FromContext(ctx)
 	return &QuotaMonitor{
 		informersStarted: informersStarted,
 		informerFactory:  informerFactory,
