@@ -7278,9 +7278,6 @@
           "description": "Time at which previous execution of the container started"
         }
       },
-      "required": [
-        "exitCode"
-      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.ContainerStateWaiting": {
@@ -7383,13 +7380,6 @@
           "x-kubernetes-patch-strategy": "merge"
         }
       },
-      "required": [
-        "name",
-        "ready",
-        "restartCount",
-        "image",
-        "imageID"
-      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.ContainerUser": {
@@ -7886,7 +7876,8 @@
         }
       },
       "required": [
-        "name"
+        "name",
+        "image"
       ],
       "type": "object"
     },
@@ -8392,8 +8383,7 @@
         }
       },
       "required": [
-        "name",
-        "value"
+        "name"
       ],
       "type": "object"
     },
@@ -8815,10 +8805,6 @@
           "type": "integer"
         }
       },
-      "required": [
-        "uid",
-        "gid"
-      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.LoadBalancerIngress": {
@@ -10251,6 +10237,9 @@
           "description": "Most recently observed status of the pod. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -10430,8 +10419,7 @@
         }
       },
       "required": [
-        "type",
-        "status"
+        "type"
       ],
       "type": "object"
     },
@@ -10477,6 +10465,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "name"
+      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.PodExtendedResourceClaimStatus": {
@@ -11182,6 +11173,9 @@
           "description": "Template defines the pods that will be created from this pod template. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "template"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -11238,6 +11232,9 @@
           "description": "Specification of the desired behavior of the pod. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.PodVolumeHealth": {
@@ -11329,8 +11326,7 @@
         }
       },
       "required": [
-        "weight",
-        "preference"
+        "weight"
       ],
       "type": "object"
     },
@@ -11765,7 +11761,7 @@
         }
       },
       "required": [
-        "resourceID"
+        "health"
       ],
       "type": "object"
     },
@@ -12745,9 +12741,6 @@
           "type": "integer"
         }
       },
-      "required": [
-        "seconds"
-      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.StorageOSPersistentVolumeSource": {
@@ -12815,8 +12808,7 @@
         }
       },
       "required": [
-        "name",
-        "value"
+        "name"
       ],
       "type": "object"
     },
