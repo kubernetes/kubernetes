@@ -84,18 +84,11 @@ func init() {
 func TestPostFilterNoOpStatusHasNoUserVisibleReason(t *testing.T) {
 	pod := st.MakePod().Name("pod").Namespace("default").Obj()
 
-	t.Run("plugin disabled", func(t *testing.T) {
-		_, status := (&DynamicResources{}).PostFilter(context.Background(), framework.NewCycleState(), pod, nil)
-
-		require.Equal(t, fwk.Unschedulable, status.Code())
-		assert.Empty(t, status.Reasons())
-	})
-
 	t.Run("no claims", func(t *testing.T) {
 		state := framework.NewCycleState()
 		state.Write(stateKey, &stateData{})
 
-		_, status := (&DynamicResources{enabled: true}).PostFilter(context.Background(), state, pod, nil)
+		_, status := (&DynamicResources{}).PostFilter(context.Background(), state, pod, nil)
 
 		require.Equal(t, fwk.Unschedulable, status.Code())
 		assert.Empty(t, status.Reasons())
@@ -1260,9 +1253,6 @@ type testPluginCase struct {
 	enableDRANodeAllocatableResources bool
 	// enableDRAConsumableCapacity is set to true if the DRAConsumableCapacity feature gate is enabled.
 	enableDRAConsumableCapacity bool
-	// Feature gates. False is chosen so that the uncommon case
-	// doesn't need to be set.
-	disableDRA bool
 
 	enableDRAExtendedResource        bool
 	enableDRAPrioritizedList         bool
@@ -1291,7 +1281,6 @@ func TestPreFilterReusesPendingAllocationWithNilNodeSelector(t *testing.T) {
 		EnableDRADeviceBindingConditions:   true,
 		EnableDRAResourceClaimDeviceStatus: true,
 		EnableDRASchedulerFilterTimeout:    true,
-		EnableDynamicResourceAllocation:    true,
 		EnableDRAWorkloadResourceClaims:    true,
 	}
 	testCtx := setup(tCtx, nil, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{pendingPodGroupClaim}, []*resourceapi.DeviceClass{deviceClass}, []*schedulingapi.PodGroup{podGroupWithClaimName}, []apiruntime.Object{workerNodeSlice}, feats, false, nil)
@@ -1351,7 +1340,6 @@ func TestFilterReusesPendingAllocationRequiresDRAOptionalNodeOperations(t *testi
 	})
 
 	feats := feature.Features{
-		EnableDynamicResourceAllocation: true,
 		EnableDRAWorkloadResourceClaims: true,
 	}
 	testCtx := setup(tCtx, &config.DynamicResourcesArgs{}, []*v1.Node{workerNode, workerNodeWithOptionalNodeOperations}, []*resourceapi.ResourceClaim{pendingPodGroupClaim}, []*resourceapi.DeviceClass{deviceClass}, []*schedulingapi.PodGroup{podGroupWithClaimName}, []apiruntime.Object{workerNodeSlice}, feats, false, nil)
@@ -2350,20 +2338,6 @@ func testPlugin(tCtx ktesting.TContext) {
 			pod:                             groupedPodWithClaimName,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
 			claims:                          []*resourceapi.ResourceClaim{inUseClaimByPodGroup},
-		},
-		"DRA-disabled": {
-			pod:    podWithClaimName,
-			claims: []*resourceapi.ResourceClaim{inUseClaim},
-			want: want{
-				prefilter: result{
-					status: fwk.NewStatus(fwk.Skip),
-				},
-				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable),
-				},
-				preBindPreFlightStatus: fwk.NewStatus(fwk.Skip),
-			},
-			disableDRA: true,
 		},
 		"claim-with-request-with-unknown-device-class": {
 			pod:    podWithClaimName,
@@ -4106,7 +4080,6 @@ func testPlugin(tCtx ktesting.TContext) {
 				EnableDRAResourceClaimDeviceStatus: !tc.disableDRAResourceClaimDeviceStatus,
 				EnableDRADeviceTaints:              tc.enableDRADeviceTaints,
 				EnableDRASchedulerFilterTimeout:    !tc.disableDRASchedulerFilterTimeout,
-				EnableDynamicResourceAllocation:    !tc.disableDRA,
 				EnableDRAPrioritizedList:           tc.enableDRAPrioritizedList,
 				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
 				EnableDRANodeAllocatableResources:  tc.enableDRANodeAllocatableResources,
@@ -4924,7 +4897,6 @@ func testIsSchedulableAfterClaimChange(tCtx ktesting.TContext) {
 		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			features := feature.Features{
 				EnableDRASchedulerFilterTimeout:    true,
-				EnableDynamicResourceAllocation:    true,
 				EnableDRADeviceBindingConditions:   true,
 				EnableDRAResourceClaimDeviceStatus: true,
 			}
@@ -5040,7 +5012,6 @@ func testIsSchedulableAfterTargetPodUpdate(tCtx ktesting.TContext) {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			features := feature.Features{
 				EnableDRASchedulerFilterTimeout:    true,
-				EnableDynamicResourceAllocation:    true,
 				EnableDRADeviceBindingConditions:   true,
 				EnableDRAResourceClaimDeviceStatus: true,
 			}
@@ -5722,9 +5693,7 @@ func TestNormalizeScore(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			pl := &DynamicResources{
-				enabled: true,
-			}
+			pl := &DynamicResources{}
 			scores := tc.scores
 			_ = pl.NormalizeScore(context.Background(), nil, nil, scores)
 			assert.Equal(t, tc.expectedScores, scores)
@@ -5914,7 +5883,7 @@ func TestDynamicResources_DeferredResizeSkipped(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	nodeInfo.SetNode(st.MakeNode().Name("node1").Obj())
 
-	pl := &DynamicResources{enabled: true, fts: feature.Features{EnableInPlacePodVerticalScalingSchedulerPreemption: true}}
+	pl := &DynamicResources{fts: feature.Features{EnableInPlacePodVerticalScalingSchedulerPreemption: true}}
 
 	if preRes, preStatus := pl.PreFilter(ctx, nil, pod, nil); preStatus.Code() != fwk.Skip || preRes != nil {
 		t.Errorf("PreFilter: got (res: %v, status: %v), want (nil, Skip)", preRes, preStatus.Code())
@@ -5933,7 +5902,6 @@ func TestPodGroupPostFilter(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
 	type testCase struct {
-		pluginEnabled                         bool
 		enableDRAWorkloadResourceClaims       bool
 		enableDRAExtendedResource             bool
 		enableTopologyAwareWorkloadScheduling bool
@@ -5952,21 +5920,13 @@ func TestPodGroupPostFilter(t *testing.T) {
 	}
 
 	testcases := map[string]testCase{
-		"disabled": {
-			pluginEnabled:   false,
-			podGroups:       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			unscheduledPods: []*v1.Pod{groupedPodWithClaimName},
-			wantStatus:      fwk.NewStatus(fwk.Unschedulable),
-		},
 		"empty": {
-			pluginEnabled:   true,
 			podGroups:       []*schedulingapi.PodGroup{podGroupWithClaimName},
 			unscheduledPods: []*v1.Pod{groupedPodWithClaimName},
 			claims:          []*resourceapi.ResourceClaim{pendingClaim},
 			wantStatus:      fwk.NewStatus(fwk.Unschedulable),
 		},
 		"deallocate-pod-level-claim": {
-			pluginEnabled:                   true,
 			enableDRAWorkloadResourceClaims: true,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
 			unscheduledPods:                 []*v1.Pod{groupedPodWithClaimName},
@@ -5982,7 +5942,6 @@ func TestPodGroupPostFilter(t *testing.T) {
 			},
 		},
 		"deallocate-podgroup-level-claim": {
-			pluginEnabled:                   true,
 			enableDRAWorkloadResourceClaims: true,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
 			unscheduledPods:                 []*v1.Pod{groupedPodWithClaimName},
@@ -5998,7 +5957,6 @@ func TestPodGroupPostFilter(t *testing.T) {
 			},
 		},
 		"delete-pod-level-extended-claim": {
-			pluginEnabled:             true,
 			enableDRAExtendedResource: true,
 			podGroups:                 []*schedulingapi.PodGroup{podGroupWithClaimName},
 			unscheduledPods:           []*v1.Pod{groupedPodWithClaimName},
@@ -6030,7 +5988,6 @@ func TestPodGroupPostFilter(t *testing.T) {
 			},
 		},
 		"unreserve-podgroup-claim": {
-			pluginEnabled:                   true,
 			enableDRAWorkloadResourceClaims: true,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
 			unscheduledPods:                 []*v1.Pod{groupedPodWithClaimName},
@@ -6044,7 +6001,6 @@ func TestPodGroupPostFilter(t *testing.T) {
 			},
 		},
 		"unreserve-podgroup-multiple-unscheduled-pods": {
-			pluginEnabled:                   true,
 			enableDRAWorkloadResourceClaims: true,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
 			unscheduledPods:                 []*v1.Pod{groupedPodWithClaimName, groupedPodWithClaimName2},
@@ -6058,7 +6014,6 @@ func TestPodGroupPostFilter(t *testing.T) {
 			},
 		},
 		"mixed-pod-level-and-podgroup-claims": {
-			pluginEnabled:                   true,
 			enableDRAWorkloadResourceClaims: true,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
 			unscheduledPods:                 []*v1.Pod{groupedPodWithClaimName, groupedPodWithPodLevelClaim},
@@ -6079,7 +6034,6 @@ func TestPodGroupPostFilter(t *testing.T) {
 			},
 		},
 		"skip-deallocate-feature-disabled": {
-			pluginEnabled:                   true,
 			enableDRAWorkloadResourceClaims: false,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
 			unscheduledPods:                 []*v1.Pod{groupedPodWithClaimName},
@@ -6093,7 +6047,6 @@ func TestPodGroupPostFilter(t *testing.T) {
 			},
 		},
 		"skip-deallocate-topology-aware-podgroup": {
-			pluginEnabled:                         true,
 			enableDRAWorkloadResourceClaims:       true,
 			enableTopologyAwareWorkloadScheduling: true,
 			podGroups:                             []*schedulingapi.PodGroup{podGroupWithClaimNameAndConstraints},
@@ -6122,14 +6075,12 @@ func TestPodGroupPostFilter(t *testing.T) {
 				EnableDRADeviceBindingConditions:      true,
 				EnableDRAResourceClaimDeviceStatus:    true,
 				EnableDRASchedulerFilterTimeout:       true,
-				EnableDynamicResourceAllocation:       tc.pluginEnabled,
 				EnableDRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
 				EnableDRAExtendedResource:             tc.enableDRAExtendedResource,
 				EnableTopologyAwareWorkloadScheduling: tc.enableTopologyAwareWorkloadScheduling,
 			}
 
 			testCtx := setup(tCtx, nil, []*v1.Node{workerNode}, tc.claims, tc.classes, tc.podGroups, tc.objs, feats, false, nil)
-			testCtx.p.enabled = tc.pluginEnabled
 
 			podGroupCycleState := framework.NewCycleState()
 			podGroupState := &podGroupStateData{
@@ -6138,34 +6089,32 @@ func TestPodGroupPostFilter(t *testing.T) {
 			}
 			podGroupCycleState.Write(stateKey, podGroupState)
 
-			if tc.pluginEnabled {
-				claimsList, err := testCtx.client.ResourceV1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
+			claimsList, err := testCtx.client.ResourceV1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
+			require.NoError(tCtx, err)
+			var testClaims []*resourceapi.ResourceClaim
+			for i := range claimsList.Items {
+				testClaims = append(testClaims, &claimsList.Items[i])
+			}
+
+			for _, pod := range tc.unscheduledPods {
+				// Initialize the stateData of the pod with unavailable claims
+				s := &stateData{}
+				userClaims, err := testCtx.p.podResourceClaims(pod)
 				require.NoError(tCtx, err)
-				var testClaims []*resourceapi.ResourceClaim
-				for i := range claimsList.Items {
-					testClaims = append(testClaims, &claimsList.Items[i])
-				}
+				extendedResourceClaim := findExtendedResourceClaim(pod, testClaims)
+				s.claims = newClaimStore(userClaims, extendedResourceClaim, nil)
 
-				for _, pod := range tc.unscheduledPods {
-					// Initialize the stateData of the pod with unavailable claims
-					s := &stateData{}
-					userClaims, err := testCtx.p.podResourceClaims(pod)
-					require.NoError(tCtx, err)
-					extendedResourceClaim := findExtendedResourceClaim(pod, testClaims)
-					s.claims = newClaimStore(userClaims, extendedResourceClaim, nil)
-
-					if len(tc.unavailableClaimNames) > 0 {
-						s.unavailableClaims = sets.New[int]()
-						for _, name := range tc.unavailableClaimNames {
-							for index, claim := range s.claims.all() {
-								if claim.Name == name {
-									s.unavailableClaims.Insert(index)
-								}
+				if len(tc.unavailableClaimNames) > 0 {
+					s.unavailableClaims = sets.New[int]()
+					for _, name := range tc.unavailableClaimNames {
+						for index, claim := range s.claims.all() {
+							if claim.Name == name {
+								s.unavailableClaims.Insert(index)
 							}
 						}
 					}
-					podGroupState.podsStateData[types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}] = s
 				}
+				podGroupState.podsStateData[types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}] = s
 			}
 
 			pgInfo := &framework.PodGroupInfo{

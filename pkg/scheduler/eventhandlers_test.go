@@ -303,24 +303,6 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name:            "DRA events disabled",
-			emulatedVersion: "1.34",
-			overrides: featuregatetesting.FeatureOverrides{
-				features.DynamicResourceAllocation: false,
-			},
-			gvkMap: map[fwk.EventResource]fwk.ActionType{
-				fwk.ResourceClaim: fwk.Add,
-				fwk.ResourceSlice: fwk.Add,
-				fwk.DeviceClass:   fwk.Add,
-			},
-			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeFor[*v1.Pod]():       true,
-				reflect.TypeFor[*v1.Node]():      true,
-				reflect.TypeFor[*v1.Namespace](): true,
-			},
-			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
-		},
-		{
 			name:            "core DRA events enabled",
 			emulatedVersion: "1.35",
 			overrides: featuregatetesting.FeatureOverrides{
@@ -507,28 +489,23 @@ func TestAddAllEventHandlers(t *testing.T) {
 
 			dynclient := dyfake.NewSimpleDynamicClient(scheme)
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
-			var resourceClaimCache *assumecache.AssumeCache
-			var resourceSliceTracker *resourceslicetracker.Tracker
 			var draManager fwk.SharedDRAManager
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
-				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
-				var err error
-				opts := resourceslicetracker.Options{
-					EnableDeviceTaintRules: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
-					SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
-				}
-				if opts.EnableDeviceTaintRules {
-					opts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
-				}
-				resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, opts)
-				if err != nil {
-					t.Fatalf("couldn't start resource slice tracker: %v", err)
-				}
+			resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
+			resourceClaimCache := assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+			opts := resourceslicetracker.Options{
+				EnableDeviceTaintRules: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
+				SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+			}
+			if opts.EnableDeviceTaintRules {
+				opts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
+			}
+			resourceSliceTracker, err := resourceslicetracker.StartTracker(ctx, opts)
+			if err != nil {
+				t.Fatalf("couldn't start resource slice tracker: %v", err)
+			}
 
-				if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-					draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
-				}
+			if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+				draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
 			}
 
 			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, draManager, tt.gvkMap); err != nil {
