@@ -1712,18 +1712,16 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		// When runc supports slash as sysctl separator, this function can no longer be used.
 		sysctl.ConvertPodSysctlsVariableToDotsSeparator(pod.Spec.SecurityContext)
 
-		// Prepare resources allocated by the Dynammic Resource Allocation feature for the pod
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-			if err := m.runtimeHelper.PrepareDynamicResources(ctx, pod); err != nil {
-				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
-				if referr != nil {
-					logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
-					return
-				}
-				m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "Failed to prepare dynamic resources: %v", err)
-				logger.Error(err, "Failed to prepare dynamic resources", "pod", klog.KObj(pod))
+		// Prepare resources allocated by the Dynamic Resource Allocation feature for the pod
+		if err := m.runtimeHelper.PrepareDynamicResources(ctx, pod); err != nil {
+			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+			if referr != nil {
+				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 				return
 			}
+			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "Failed to prepare dynamic resources: %v", err)
+			logger.Error(err, "Failed to prepare dynamic resources", "pod", klog.KObj(pod))
+			return
 		}
 
 		podSandboxID, msg, err = m.createPodSandbox(ctx, pod, podContainerChanges.Attempt)
