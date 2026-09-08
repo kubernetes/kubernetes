@@ -81,7 +81,7 @@ func quantityAccessorCases() []accessorCase {
 			wantValue: math.MaxInt64,
 			wantMilli: -1000, milliTODO: saturatePos,
 			wantScaledKilo: 9223372036854776,
-			wantAsInt64:    math.MaxInt64, wantAsInt64OK: false, asInt64TODO: "want (math.MaxInt64, true) once #138076 parses 19-digit values via the int64 fast path",
+			wantAsInt64:    math.MaxInt64, wantAsInt64OK: true,
 			wantFloat:       9.223372036854776e+18,
 			wantString:      "9223372036854775807",
 			atInt64Boundary: true,
@@ -245,16 +245,15 @@ func quantityAccessorCases() []accessorCase {
 			wantString: "92233720368547758070", // lossless: the full unscaled value
 		},
 
-		// --- Negative 19-digit values routed through the Dec backend: MilliValue still overflows. ---
+		// --- Negative 19-digit values on the int64 backend: MilliValue still overflows. ---
 		{
-			// MinInt64 from a string is Dec-backed, unlike NewQuantity(MinInt64), so the
-			// int64 accessors go through scaledValue.
+			// MinInt64 from a string takes the int64 fast path, like NewQuantity(MinInt64).
 			name: "int64-min-parsed", load: func() Quantity { return MustParse("-9223372036854775808") },
 			wantSign:  -1,
 			wantValue: math.MinInt64,
 			wantMilli: 0, milliTODO: saturateNeg,
 			wantScaledKilo: -9223372036854776,
-			wantAsInt64:    math.MinInt64, wantAsInt64OK: false, asInt64TODO: "want (math.MinInt64, true) once #138076 parses -2^63 via the int64 fast path",
+			wantAsInt64:    math.MinInt64, wantAsInt64OK: true,
 			wantFloat:       -9.223372036854776e+18,
 			wantString:      "-9223372036854775808",
 			atInt64Boundary: true,
@@ -265,7 +264,7 @@ func quantityAccessorCases() []accessorCase {
 			wantValue: math.MinInt64 + 1,
 			wantMilli: 1000, milliTODO: saturateNeg,
 			wantScaledKilo: -9223372036854776,
-			wantAsInt64:    math.MinInt64 + 1, wantAsInt64OK: false, asInt64TODO: "want (math.MinInt64 + 1, true) once #138076 parses this via the int64 fast path",
+			wantAsInt64:    math.MinInt64 + 1, wantAsInt64OK: true,
 			wantFloat:  -9.223372036854776e+18,
 			wantString: "-9223372036854775807",
 		},
