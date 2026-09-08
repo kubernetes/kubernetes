@@ -22,7 +22,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
+	volumepkg "k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
@@ -94,7 +98,70 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 		// Remember to update devicePath from node.status.volumesAttached
 		rc.volumesNeedUpdateFromNodeStatus = reconstructedVolumeNames
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIGlobalMountReconstruction) {
+		rc.reconstructGlobalVolumes(logger)
+	}
 	logger.V(2).Info("Volume reconstruction finished")
+}
+
+// reconstructGlobalVolumes finds volumes that are still staged on this node but
+// have no pod directory left to be found through, and records them in the
+// actual state of world as uncertain.
+//
+// The walk of /var/lib/kubelet/pods above cannot see them: kubelet lets a pod be
+// deleted once NodeUnpublishVolume succeeds and does not wait for
+// NodeUnstageVolume, so a restart in between leaves a staged volume behind with
+// its pod directory already gone. Nothing then unstages it and nothing keeps it
+// in node.status.volumesInUse, which is what lets the attach/detach controller
+// attach it somewhere else while it is still mounted here.
+//
+// Each plugin reports its own global mounts, so this stays free of any one
+// plugin's on-disk layout.
+func (rc *reconciler) reconstructGlobalVolumes(logger klog.Logger) {
+	for _, plugin := range rc.volumePluginMgr.FindGlobalVolumeListerPlugins() {
+		globalVolumes, err := plugin.ListGlobalVolumes()
+		if err != nil {
+			logger.Error(err, "Could not list global volumes", "pluginName", plugin.GetPluginName())
+			continue
+		}
+		for _, globalVolume := range globalVolumes {
+			rc.reconstructGlobalVolume(logger, plugin, globalVolume)
+		}
+	}
+}
+
+func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumepkg.GlobalVolumeListerPlugin, globalVolume volumepkg.GlobalVolume) {
+	// The name is derived here rather than reported by the plugin, so that it
+	// is the same name the desired state of world produces. A name only this
+	// side knows about would never be matched against a pod's volume, and the
+	// volume would be unstaged while a pod still needed it.
+	volumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, globalVolume.Spec)
+	if err != nil {
+		logger.Error(err, "Could not determine volume name for global mount", "deviceMountPath", globalVolume.DeviceMountPath)
+		return
+	}
+	if rc.actualStateOfWorld.VolumeExists(volumeName) {
+		// A pod directory already accounted for this volume.
+		logger.V(4).Info("Global mount is already in actual state, skipping", "volumeName", volumeName)
+		return
+	}
+
+	// devicePath is left empty on purpose: it is filled in later from
+	// node.status.volumesAttached, the same way reconstructed pod volumes are.
+	if err := rc.actualStateOfWorld.AddAttachUncertainReconstructedVolume(
+		logger, volumeName, globalVolume.Spec, rc.nodeName, ""); err != nil {
+		logger.Error(err, "Could not add global mount to actual state of world", "volumeName", volumeName)
+		return
+	}
+	if err := rc.actualStateOfWorld.MarkDeviceAsUncertain(
+		volumeName, "", globalVolume.DeviceMountPath, globalVolume.SELinuxMountContext); err != nil {
+		logger.Error(err, "Could not mark global mount device as uncertain", "volumeName", volumeName, "deviceMountPath", globalVolume.DeviceMountPath)
+		return
+	}
+
+	rc.volumesNeedUpdateFromNodeStatus = append(rc.volumesNeedUpdateFromNodeStatus, volumeName)
+	logger.V(2).Info("Global mount with no pod directory is marked uncertain and added into the actual state", "volumeName", volumeName, "deviceMountPath", globalVolume.DeviceMountPath)
 }
 
 func (rc *reconciler) updateStates(logger klog.Logger, reconstructedVolumes map[v1.UniqueVolumeName]*globalVolumeInfo) {

@@ -245,6 +245,20 @@ type DeviceMountableVolumePlugin interface {
 	CanDeviceMount(spec *Spec) (bool, error)
 }
 
+// GlobalVolumeListerPlugin is an extended interface of VolumePlugin, implemented
+// by plugins that keep a per-node global mount outside of any pod directory.
+// Reconstruction uses it to find global mounts whose pod directory no longer
+// exists, so that the volume manager does not need to know how a plugin lays
+// its directories out on disk.
+type GlobalVolumeListerPlugin interface {
+	DeviceMountableVolumePlugin
+	// ListGlobalVolumes returns one entry per global mount the plugin holds on
+	// this node. It is called once per reconstruction pass, at kubelet startup.
+	// A mount the plugin cannot describe is skipped rather than reported as an
+	// error, so that one unreadable directory does not hide the others.
+	ListGlobalVolumes() ([]GlobalVolume, error)
+}
+
 // ExpandableVolumePlugin is an extended interface of VolumePlugin and is used for volumes that can be
 // expanded via control-plane ExpandVolumeDevice call.
 type ExpandableVolumePlugin interface {
@@ -548,6 +562,15 @@ type ReconstructedVolume struct {
 	// SELinuxMountContext is value of -o context=XYZ mount option.
 	// If empty, no such mount option is used.
 	SELinuxMountContext string
+}
+
+// GlobalVolume describes one global mount found by ListGlobalVolumes.
+type GlobalVolume struct {
+	ReconstructedVolume
+	// DeviceMountPath is where the plugin has the volume staged. It is
+	// advisory: the unmount path recomputes it from Spec, so Spec must carry
+	// whatever identity the plugin derives that path from.
+	DeviceMountPath string
 }
 
 // NewSpecFromVolume creates an Spec from an v1.Volume
@@ -863,6 +886,31 @@ func (pm *VolumePluginMgr) FindDeviceMountablePluginByName(name string) (DeviceM
 		return deviceMountableVolumePlugin, nil
 	}
 	return nil, nil
+}
+
+// FindGlobalVolumeListerPlugins returns every registered plugin that keeps
+// global mounts of its own. Unlike the other Find helpers this one takes no
+// spec and no name: reconstruction calls it when it has neither, and asks each
+// plugin what it holds on disk.
+func (pm *VolumePluginMgr) FindGlobalVolumeListerPlugins() []GlobalVolumeListerPlugin {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
+
+	var matches []GlobalVolumeListerPlugin
+	for _, v := range pm.plugins {
+		if lister, ok := v.(GlobalVolumeListerPlugin); ok {
+			matches = append(matches, lister)
+		}
+	}
+	pm.refreshProbedPlugins()
+
+	for _, plugin := range pm.probedPlugins {
+		if lister, ok := plugin.(GlobalVolumeListerPlugin); ok {
+			matches = append(matches, lister)
+		}
+	}
+
+	return matches
 }
 
 // FindExpandablePluginBySpec fetches an expandable persistent volume plugin by spec.
