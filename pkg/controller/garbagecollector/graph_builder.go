@@ -231,8 +231,7 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 		return nil, nil, err
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)
-	// need to clone because it's from a shared cache
-	resyncPeriod := ResourceResyncTime
+	resyncPeriod := time.Duration(0)
 	if _, err := shared.Informer().AddEventHandlerWithOptions(handlers, cache.HandlerOptions{
 		Logger:       &logger,
 		ResyncPeriod: &resyncPeriod,
