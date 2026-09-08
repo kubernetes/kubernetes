@@ -3084,6 +3084,91 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			expectedNumViolatingVictim: 0,
 		},
 		{
+			// Repro for kubernetes/kubernetes#141227: two same-priority victims on one node,
+			// either one sufficient for the preemptor. movable-early can reschedule on node2;
+			// pinned-late (nodeSelector hostname=node1) cannot. Age decides today, so the later
+			// pinned pod is preempted and its replacement can never start on its only node.
+			name:      "#141227 repro: later pinned victim is preempted although an earlier movable victim exists",
+			nodeNames: []string{"node1", "node2"},
+			mainNode:  "node1",
+			initPods: []*v1.Pod{
+				st.MakePod().Name("movable-early").UID("m1").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime1).Obj(),
+				st.MakePod().Name("pinned-late").UID("p1").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime2).NodeSelector(map[string]string{"hostname": "node1"}).Obj(),
+			},
+			preemptor:    st.MakePod().Name("p").UID("p").Priority(highPriority).Req(largeRes).Obj(),
+			expectedPods: sets.New("movable-early"),
+		},
+		{
+			// #141227 control: when both victims can reschedule elsewhere, recoverability
+			// cannot tell them apart and the age tie-break is preserved.
+			name:      "#141227 control: both movable - age tie-break preserved",
+			nodeNames: []string{"node1", "node2"},
+			mainNode:  "node1",
+			initPods: []*v1.Pod{
+				st.MakePod().Name("movable-early").UID("m1").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime1).Obj(),
+				st.MakePod().Name("movable-late").UID("m2").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime2).Obj(),
+			},
+			preemptor:    st.MakePod().Name("p").UID("p").Priority(highPriority).Req(largeRes).Obj(),
+			expectedPods: sets.New("movable-late"),
+		},
+		{
+			// #141227 control: when neither victim can reschedule elsewhere, evicting
+			// either one leaves a stuck replacement, so the age tie-break is preserved.
+			name:      "#141227 control: both pinned - age tie-break preserved",
+			nodeNames: []string{"node1", "node2"},
+			mainNode:  "node1",
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pinned-early").UID("p1").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime1).NodeSelector(map[string]string{"hostname": "node1"}).Obj(),
+				st.MakePod().Name("pinned-late").UID("p2").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime2).NodeSelector(map[string]string{"hostname": "node1"}).Obj(),
+			},
+			preemptor:    st.MakePod().Name("p").UID("p").Priority(highPriority).Req(largeRes).Obj(),
+			expectedPods: sets.New("pinned-late"),
+		},
+		{
+			// #141227 control: priority stays the explicit importance signal; a pinned
+			// mid-priority victim is still preempted when a reschedulable high-priority
+			// victim of the preemptor's space is available.
+			name:      "#141227 control: priority beats recoverability",
+			nodeNames: []string{"node1", "node2"},
+			mainNode:  "node1",
+			initPods: []*v1.Pod{
+				st.MakePod().Name("movable-high").UID("m1").Node("node1").Priority(highPriority).Req(mediumRes).StartTime(epochTime2).Obj(),
+				st.MakePod().Name("pinned-mid").UID("p1").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime1).NodeSelector(map[string]string{"hostname": "node1"}).Obj(),
+			},
+			preemptor:    st.MakePod().Name("p").UID("p").Priority(veryHighPriority).Req(largeRes).Obj(),
+			expectedPods: sets.New("pinned-mid"),
+		},
+		{
+			// #141227 control: a victim pinned through required nodeAffinity (the shape
+			// DaemonSet controllers generate) is treated like a nodeSelector pin; the
+			// signal reads the pod's own constraints, not its owner.
+			name:      "#141227 control: nodeAffinity pin - movable victim preempted",
+			nodeNames: []string{"node1", "node2"},
+			mainNode:  "node1",
+			initPods: []*v1.Pod{
+				st.MakePod().Name("movable-early").UID("m1").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime1).Obj(),
+				st.MakePod().Name("affinity-pinned-late").UID("p1").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime2).NodeAffinityIn("hostname", []string{"node1"}, st.NodeSelectorTypeMatchExpressions).Obj(),
+			},
+			preemptor:    st.MakePod().Name("p").UID("p").Priority(highPriority).Req(largeRes).Obj(),
+			expectedPods: sets.New("movable-early"),
+		},
+		{
+			// #141227: with three same-priority victims where two must go, the pinned
+			// victim is still spared and both reschedulable victims are preempted;
+			// their replacements can start on node2, while evicting the pinned pod
+			// would leave a permanently unschedulable replacement.
+			name:      "#141227: two of three victims needed - pinned victim spared",
+			nodeNames: []string{"node1", "node2"},
+			mainNode:  "node1",
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pinned").UID("p1").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime1).NodeSelector(map[string]string{"hostname": "node1"}).Obj(),
+				st.MakePod().Name("movable-old").UID("m1").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime2).Obj(),
+				st.MakePod().Name("movable-new").UID("m2").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime3).Obj(),
+			},
+			preemptor:    st.MakePod().Name("p").UID("p").Priority(highPriority).Req(largeRes).Obj(),
+			expectedPods: sets.New("movable-old", "movable-new"),
+		},
+		{
 			name:      "PDB: Prefer non-violating victim with higher priority over violating victim with lower priority",
 			nodeNames: []string{"node1"},
 			mainNode:  "node1",

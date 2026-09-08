@@ -419,7 +419,11 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		}
 	}
 
-	// Now we try to reprieve non-violating victims.
+	// Now we try to reprieve non-violating victims. Between two same-priority
+	// standalone victims, the one whose replacement cannot reschedule elsewhere
+	// is reprieved first (kubernetes/kubernetes#141227), so a hard-pinned victim
+	// is only evicted when a reschedulable victim alone cannot make room.
+	pl.sortVictimsForReprieve(logger, nonViolatingVictims)
 	for _, v := range nonViolatingVictims {
 		if _, err := reprieveVictim(v); err != nil {
 			return nil, 0, fwk.AsStatus(err)
@@ -438,6 +442,72 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	}
 
 	return victimPods, numViolatingVictim, nil
+}
+
+// sortVictimsForReprieve orders victims for the reprieve pass, most important
+// first. It follows MoreImportantVictim, except that between two same-priority
+// standalone pods it prefers the one whose replacement cannot reschedule
+// elsewhere: when either victim alone is enough for the preemptor, sparing the
+// hard-pinned victim lets its replacement stay put, while the reschedulable
+// victim's replacement can start on another node. Evicting the pinned victim
+// instead leaves its replacement permanently unschedulable, because
+// same-priority pods cannot preempt each other and its only legal node stays
+// occupied. Victims of different priority, group victims and victims whose
+// recoverability cannot be told apart keep the age-based ordering unchanged.
+func (pl *DefaultPreemption) sortVictimsForReprieve(logger klog.Logger, victims []*preemption.DomainVictim) {
+	// The ordering can only change when at least two same-priority standalone
+	// pods compete for the reprieve pass. Skip the snapshot listing otherwise,
+	// so the common case stays on the plain importance ordering.
+	standaloneByPriority := make(map[int32]int, len(victims))
+	needsRecoverability := false
+	for _, dv := range victims {
+		if dv.Type() != fwk.PodKeyType || len(dv.Pods()) != 1 {
+			continue
+		}
+		standaloneByPriority[dv.Priority()]++
+		if standaloneByPriority[dv.Priority()] > 1 {
+			needsRecoverability = true
+			break
+		}
+	}
+	if !needsRecoverability {
+		return
+	}
+
+	pinned := pl.pinnedVictims(logger, victims)
+	sort.Slice(victims, func(i, j int) bool {
+		vi, vj := victims[i].Victim, victims[j].Victim
+		if vi.Priority() == vj.Priority() && vi.Type() == fwk.PodKeyType && vj.Type() == fwk.PodKeyType {
+			pi, pj := pinned[victims[i]], pinned[victims[j]]
+			if pi != pj {
+				return pi
+			}
+		}
+		return pl.MoreImportantVictim(vi, vj)
+	})
+}
+
+// pinnedVictims reports, for each standalone-pod victim, whether its replacement
+// can only run on the pod's current node. Group victims are not classified.
+func (pl *DefaultPreemption) pinnedVictims(logger klog.Logger, victims []*preemption.DomainVictim) map[*preemption.DomainVictim]bool {
+	pinned := make(map[*preemption.DomainVictim]bool, len(victims))
+	nodeInfos, err := pl.fh.SnapshotSharedLister().NodeInfos().List()
+	if err != nil {
+		logger.Error(err, "Failed to list nodes for recoverability-aware victim ordering; falling back to the default ordering")
+		return pinned
+	}
+	nodes := make([]*v1.Node, 0, len(nodeInfos))
+	for _, nodeInfo := range nodeInfos {
+		nodes = append(nodes, nodeInfo.Node())
+	}
+	for _, dv := range victims {
+		if dv.Type() != fwk.PodKeyType || len(dv.Pods()) != 1 {
+			continue
+		}
+		pod := dv.Pods()[0].GetPod()
+		pinned[dv] = !preemption.CanRescheduleElsewhere(logger, pod, pod.Spec.NodeName, nodes, pl.fts.EnableTaintTolerationComparisonOperators)
+	}
+	return pinned
 }
 
 // PodEligibleToPreemptOthers returns one bool and one string. The bool
