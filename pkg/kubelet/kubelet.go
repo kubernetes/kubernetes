@@ -3249,11 +3249,6 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		}
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
-		// Defer to the pod worker (via cleanUpContainersInPod/ShouldPodContentBeRemoved) to
-		// decide whether it is actually safe to remove all containers: the pod's API status
-		// can observably transition to evicted before the pod worker has finished capturing
-		// final container status, and force-removing containers ahead of that would race
-		// with the runtime and surface as ContainerStatusUnknown.
 		if eviction.PodIsEvicted(pod.Status) {
 			kl.cleanUpContainersInPod(ctx, pod.UID, "")
 		}
@@ -3454,6 +3449,19 @@ func (kl *Kubelet) cleanUpContainersInPod(ctx context.Context, podID types.UID, 
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
 		// When an evicted or deleted pod has already synced, all containers can be removed.
 		removeAll := kl.podWorkers.ShouldPodContentBeRemoved(podID)
+		if removeAll {
+			// Record the pod's current container statuses with the status manager before
+			// force-removing every container below. ShouldPodContentBeRemoved can return true
+			// as soon as eviction is requested, which can race with the runtime returning a
+			// container's final terminated status; once a container is removed here, the
+			// runtime can no longer report it and the kubelet falls back to
+			// ContainerStatusUnknown instead of the container's true terminated reason.
+			// Persisting the status we already have, while the containers are still present,
+			// avoids that fallback. See https://issue.k8s.io/122160.
+			if pod, ok := kl.podManager.GetPodByUID(podID); ok {
+				kl.statusManager.SetPodStatus(klog.FromContext(ctx), pod, kl.generateAPIPodStatus(ctx, pod, podStatus, false))
+			}
+		}
 		kl.containerDeletor.deleteContainersInPod(klog.FromContext(ctx), exitedContainerID, podStatus, removeAll)
 	}
 }

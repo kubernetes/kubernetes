@@ -5261,6 +5261,81 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 	}
 }
 
+// TestCleanUpContainersInPodRecordsStatusBeforeRemovingAll verifies that when
+// cleanUpContainersInPod is about to aggressively remove all of a pod's dead
+// containers (e.g. because the pod has been evicted), it first records the
+// pod's current container statuses with the status manager. Without this,
+// a container's true terminated reason can be lost: once the container is
+// removed from the runtime, the runtime can no longer report its status, and
+// the kubelet falls back to ContainerStatusUnknown instead. See
+// https://issue.k8s.io/122160.
+func TestCleanUpContainersInPodRecordsStatusBeforeRemovingAll(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "bar"},
+			},
+		},
+	}
+	kubelet.podManager.AddPod(pod)
+	logger, _ := ktesting.NewTestContext(t)
+	kubelet.containerDeletor = newPodContainerDeletor(logger, kubelet.containerRuntime, 0)
+
+	startedAt := time.Now().Add(-time.Minute)
+	finishedAt := time.Now()
+	testKubelet.fakeRuntime.PodStatus = kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:         kubecontainer.ContainerID{Type: "test", ID: "done"},
+				Name:       "bar",
+				State:      kubecontainer.ContainerStateExited,
+				ExitCode:   1,
+				Reason:     "Error",
+				Message:    "some message",
+				StartedAt:  startedAt,
+				FinishedAt: finishedAt,
+			},
+		},
+	}
+
+	// Simulate the pod worker deciding this evicted pod's content is safe to
+	// aggressively remove.
+	kubelet.podWorkers.(*fakePodWorkers).removeContent = map[types.UID]bool{pod.UID: true}
+
+	kubelet.cleanUpContainersInPod(tCtx, pod.UID, "done")
+
+	status, ok := kubelet.statusManager.GetPodStatus(pod.UID)
+	if !ok {
+		t.Fatalf("expected a pod status to have been recorded before removing all containers")
+	}
+	if len(status.ContainerStatuses) != 1 {
+		t.Fatalf("expected one container status, got %#v", status.ContainerStatuses)
+	}
+	terminated := status.ContainerStatuses[0].State.Terminated
+	if terminated == nil {
+		t.Fatalf("expected container status to be terminated, got %#v", status.ContainerStatuses[0].State)
+	}
+	if terminated.Reason == kubecontainer.ContainerReasonStatusUnknown {
+		t.Errorf("container's terminated reason should have been captured before removal, got ContainerStatusUnknown")
+	}
+	if terminated.Reason != "Error" || terminated.ExitCode != 1 {
+		t.Errorf("expected the container's real terminated reason/exit code to be recorded, got reason=%q exitCode=%d", terminated.Reason, terminated.ExitCode)
+	}
+}
+
 func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
