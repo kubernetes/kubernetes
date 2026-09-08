@@ -1006,7 +1006,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 
 	testcases := []struct {
 		description                      string
-		enabled                          bool
 		extendedEnabled                  bool
 		enableDRANodeAllocatableResouces bool
 		oldPod                           *api.Pod
@@ -1014,105 +1013,44 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		wantPod                          *api.Pod
 	}{
 		{
-			description: "old with claims / new with claims / disabled",
+			description: "old with claims / new with claims",
 			oldPod:      podWithClaims,
 			newPod:      podWithClaims,
 			wantPod:     podWithClaims,
 		},
 		{
-			description: "old without claims / new with claims / disabled",
-			oldPod:      podWithoutClaims,
-			newPod:      podWithClaims,
-			wantPod:     podWithoutClaims,
-		},
-		{
-			description: "no old pod/ new with claims / disabled",
-			oldPod:      noPod,
-			newPod:      podWithClaims,
-			wantPod:     podWithoutClaims,
-		},
-
-		{
-			description: "old with claims / new without claims / disabled",
-			oldPod:      podWithClaims,
-			newPod:      podWithoutClaims,
-			wantPod:     podWithoutClaims,
-		},
-		{
-			description: "old without claims / new without claims / disabled",
-			oldPod:      podWithoutClaims,
-			newPod:      podWithoutClaims,
-			wantPod:     podWithoutClaims,
-		},
-		{
-			description: "no old pod/ new without claims / disabled",
-			oldPod:      noPod,
-			newPod:      podWithoutClaims,
-			wantPod:     podWithoutClaims,
-		},
-
-		{
-			description: "old with claims / new with claims / enabled",
-			enabled:     true,
-			oldPod:      podWithClaims,
-			newPod:      podWithClaims,
-			wantPod:     podWithClaims,
-		},
-		{
-			description: "old without claims / new with claims / enabled",
-			enabled:     true,
+			description: "old without claims / new with claims",
 			oldPod:      podWithoutClaims,
 			newPod:      podWithClaims,
 			wantPod:     podWithClaims,
 		},
 		{
-			description: "no old pod/ new with claims / enabled",
-			enabled:     true,
+			description: "no old pod / new with claims",
 			oldPod:      noPod,
 			newPod:      podWithClaims,
 			wantPod:     podWithClaims,
 		},
 
 		{
-			description: "old with claims / new without claims / enabled",
-			enabled:     true,
+			description: "old with claims / new without claims",
 			oldPod:      podWithClaims,
 			newPod:      podWithoutClaims,
 			wantPod:     podWithoutClaims,
 		},
 		{
-			description: "old without claims / new without claims / enabled",
-			enabled:     true,
+			description: "old without claims / new without claims",
 			oldPod:      podWithoutClaims,
 			newPod:      podWithoutClaims,
 			wantPod:     podWithoutClaims,
 		},
 		{
-			description: "no old pod/ new without claims / enabled",
-			enabled:     true,
+			description: "no old pod / new without claims",
 			oldPod:      noPod,
 			newPod:      podWithoutClaims,
 			wantPod:     podWithoutClaims,
-		},
-		{
-			description:     "extended resource / no old pod/ new with extended resource / disabled",
-			enabled:         false,
-			extendedEnabled: false,
-			oldPod:          noPod,
-			newPod:          podWithExtendedResource,
-			wantPod:         podWithoutClaims,
-		},
-		{
-			description:     "extended resource / old without claim / new with extended resource / disabled",
-			enabled:         false,
-			extendedEnabled: false,
-			oldPod:          podWithoutClaims,
-			newPod:          podWithExtendedResource,
-			wantPod:         podWithoutClaims,
 		},
 		{
 			description:     "extended resource / no old pod/ new with extended resource / extended disabled only",
-			enabled:         true,
 			extendedEnabled: false,
 			oldPod:          noPod,
 			newPod:          podWithExtendedResource,
@@ -1120,7 +1058,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:     "extended resource / old without claim / new with extended resource / extended disabled only",
-			enabled:         true,
 			extendedEnabled: false,
 			oldPod:          podWithoutClaims,
 			newPod:          podWithExtendedResource,
@@ -1128,7 +1065,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:     "extended resource / no old pod/ new with extended resource / enabled",
-			enabled:         true,
 			extendedEnabled: true,
 			oldPod:          noPod,
 			newPod:          podWithExtendedResource,
@@ -1136,7 +1072,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:     "extended resource / old without claim / new with extended resource / enabled",
-			enabled:         true,
 			extendedEnabled: true,
 			oldPod:          podWithoutClaims,
 			newPod:          podWithExtendedResource,
@@ -1144,7 +1079,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:                      "DRA node allocatable resources / no old pod / new with DRA node allocatable resource / disabled",
-			enabled:                          true,
 			enableDRANodeAllocatableResouces: false,
 			oldPod:                           noPod,
 			newPod:                           podWithDRANodeAllocatableResourceStatus,
@@ -1152,7 +1086,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:                      "DRA node allocatable resources / no old pod / new with DRA node allocatable resource / enabled",
-			enabled:                          true,
 			enableDRANodeAllocatableResouces: true,
 			oldPod:                           noPod,
 			newPod:                           podWithDRANodeAllocatableResourceStatus,
@@ -1160,7 +1093,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:                      "DRA node allocatable resources / old without node allocatable resource status / new with node allocatable resource status / disabled",
-			enabled:                          true,
 			enableDRANodeAllocatableResouces: false,
 			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
 			newPod:                           podWithDRANodeAllocatableResourceStatus,
@@ -1168,7 +1100,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:                      "DRA node allocatable resources / old without node allocatable resource status / new with node allocatable resource status / enabled",
-			enabled:                          true,
 			enableDRANodeAllocatableResouces: true,
 			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
 			newPod:                           podWithDRANodeAllocatableResourceStatus,
@@ -1176,7 +1107,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:                      "DRA node allocatable resources (overhead) / no old pod / new with DRA node allocatable resource (overhead) / disabled",
-			enabled:                          true,
 			enableDRANodeAllocatableResouces: false,
 			oldPod:                           noPod,
 			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
@@ -1184,7 +1114,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:                      "DRA node allocatable resources (overhead) / no old pod / new with DRA node allocatable resource (overhead) / enabled",
-			enabled:                          true,
 			enableDRANodeAllocatableResouces: true,
 			oldPod:                           noPod,
 			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
@@ -1192,7 +1121,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:                      "DRA node allocatable resources (overhead) / old without node allocatable resource status / new with node allocatable resource (overhead) status / disabled",
-			enabled:                          true,
 			enableDRANodeAllocatableResouces: false,
 			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
 			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
@@ -1200,7 +1128,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		{
 			description:                      "DRA node allocatable resources (overhead) / old without node allocatable resource status / new with node allocatable resource (overhead) status / enabled",
-			enabled:                          true,
 			enableDRANodeAllocatableResouces: true,
 			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
 			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
@@ -1210,14 +1137,11 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
-			if !tc.enabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			} else if !tc.extendedEnabled {
+			if !tc.extendedEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
 			overrides := featuregatetesting.FeatureOverrides{
-				features.DynamicResourceAllocation: tc.enabled,
-				features.DRAExtendedResource:       tc.extendedEnabled,
+				features.DRAExtendedResource: tc.extendedEnabled,
 			}
 			if tc.enableDRANodeAllocatableResouces {
 				overrides[features.DRANodeAllocatableResources] = true

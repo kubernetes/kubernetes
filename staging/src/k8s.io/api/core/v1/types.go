@@ -3142,14 +3142,10 @@ type ResourceRequirements struct {
 	// Claims lists the names of resources, defined in spec.resourceClaims,
 	// that are used by this container.
 	//
-	// This field depends on the
-	// DynamicResourceAllocation feature gate.
-	//
 	// This field is immutable. It can only be set for containers.
 	//
 	// +listType=map
 	// +listMapKey=name
-	// +featureGate=DynamicResourceAllocation
 	// +optional
 	Claims []ResourceClaim `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
 }
@@ -4729,17 +4725,12 @@ type PodSpec struct {
 	// and reserved before the Pod is allowed to start. The resources
 	// will be made available to those containers which consume them
 	// by name.
-	//
-	// This is a stable field but requires that the
-	// DynamicResourceAllocation feature gate is enabled.
-	//
 	// This field is immutable.
 	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaims []PodResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,39,rep,name=resourceClaims"`
 	// Resources is the total amount of CPU and Memory resources required by all
@@ -5802,7 +5793,6 @@ type PodStatus struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaimStatuses []PodResourceClaimStatus `json:"resourceClaimStatuses,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,15,rep,name=resourceClaimStatuses"`
 	// Status of extended resource claim backed by DRA.

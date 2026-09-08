@@ -2760,12 +2760,8 @@ type ResourceRequirements struct {
 	// Claims lists the names of resources, defined in spec.resourceClaims,
 	// that are used by this container.
 	//
-	// This field depends on the
-	// DynamicResourceAllocation feature gate.
-	//
 	// This field is immutable. It can only be set for containers.
 	//
-	// +featureGate=DynamicResourceAllocation
 	// +optional
 	Claims []ResourceClaim
 }
@@ -4138,13 +4134,8 @@ type PodSpec struct {
 	// and reserved before the Pod is allowed to start. The resources
 	// will be made available to those containers which consume them
 	// by name.
-	//
-	// This is a stable field but requires that the
-	// DynamicResourceAllocation feature gate is enabled.
-	//
 	// This field is immutable.
 	//
-	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaims []PodResourceClaim
 	// Resources is the total amount of CPU and Memory resources required by all
@@ -4910,7 +4901,6 @@ type PodStatus struct {
 	Resize PodResizeStatus
 
 	// Status of resource claims.
-	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaimStatuses []PodResourceClaimStatus
 

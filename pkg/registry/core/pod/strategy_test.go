@@ -4979,7 +4979,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			description: "drop disabled status fields/InPlacePodVerticalScaling=false",
 			features: map[featuregate.Feature]bool{
 				features.InPlacePodVerticalScaling: false,
-				features.DynamicResourceAllocation: false,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -4988,9 +4987,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			newPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					ResourceClaimStatuses: []api.PodResourceClaimStatus{
-						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
-					},
 					ContainerStatuses: []api.ContainerStatus{
 						{Resources: &api.ResourceRequirements{}},
 					},
@@ -5007,7 +5003,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			description: "drop disabled status fields/InPlacePodVerticalScaling=true",
 			features: map[featuregate.Feature]bool{
 				features.InPlacePodVerticalScaling: true,
-				features.DynamicResourceAllocation: false,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -5016,9 +5011,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			newPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					ResourceClaimStatuses: []api.PodResourceClaimStatus{
-						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
-					},
 					ContainerStatuses: []api.ContainerStatus{
 						{Resources: &api.ResourceRequirements{}},
 					},
@@ -5351,9 +5343,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		},
 		{
 			description: "preserve old ResourceClaimStatuses when misbehaving client clears them on terminating pod",
-			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
 				Status: api.PodStatus{
@@ -5377,9 +5366,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		},
 		{
 			description: "preserve old ResourceClaimStatuses when omitted on non-terminating pod",
-			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
@@ -5403,9 +5389,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		},
 		{
 			description: "allow explicit empty-slice removal of ResourceClaimStatuses on non-terminating pod",
-			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
@@ -5561,7 +5544,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			if draEnabled, draExists := tc.features[features.DynamicResourceAllocation]; draExists && !draEnabled {
+			if v, ok := tc.features[features.InPlacePodVerticalScaling]; ok && !v {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.features)
