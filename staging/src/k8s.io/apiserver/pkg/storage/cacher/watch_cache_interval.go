@@ -241,28 +241,26 @@ type lazySnapshotCacheIntervalSource struct {
 	resourceVersion uint64
 	// loaded indicates whether items has been materialized from the snapshot.
 	loaded bool
-	// items holds the result of OrderedListPrefix, populated on the first Next() call
-	items []interface{}
+	// items holds the snapshot's elements in key order, populated on the first Next() call
+	items []*store.Element
 	// currentIndex tracks the current position within items.
 	currentIndex int
 }
 
 func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	if !s.loaded {
-		items, err := s.snapshot.OrderedListPrefix("", "")
-		if err != nil {
-			return nil, err
+		for elem, err := range s.snapshot.RangePrefix("", "").All() {
+			if err != nil {
+				return nil, err
+			}
+			s.items = append(s.items, elem)
 		}
-		s.items = items
 		s.loaded = true
 	}
 	if s.currentIndex >= len(s.items) {
 		return nil, nil
 	}
-	elem, ok := s.items[s.currentIndex].(*store.Element)
-	if !ok {
-		return nil, fmt.Errorf("not a storeElement: %v", s.items[s.currentIndex])
-	}
+	elem := s.items[s.currentIndex]
 	s.currentIndex++
 	return storeElementToWatchCacheEvent(elem, s.resourceVersion), nil
 }

@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSnapshotListPrefix(t *testing.T) {
+func TestSnapshotRangePrefix(t *testing.T) {
 	// Elements are deliberately unordered; snapshots must return keys in order.
 	elements := []*Element{
 		testStorageElement("/pods/ns1/b", "b", 2),
@@ -92,14 +92,6 @@ func TestSnapshotListPrefix(t *testing.T) {
 			snapshot := s.newSnapshot(t)
 			for _, tc := range testCases {
 				t.Run(tc.name, func(t *testing.T) {
-					items, err := snapshot.OrderedListPrefix(tc.prefix, tc.continueKey)
-					require.NoError(t, err)
-					var listed []string
-					for _, item := range items {
-						listed = append(listed, item.(*Element).Key)
-					}
-					assert.Equal(t, tc.expectKeys, listed, "OrderedListPrefix")
-
 					r := snapshot.RangePrefix(tc.prefix, tc.continueKey)
 					var ranged []string
 					for elem, err := range r.All() {

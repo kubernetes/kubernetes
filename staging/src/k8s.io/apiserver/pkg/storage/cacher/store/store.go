@@ -70,13 +70,11 @@ type Indexer interface {
 	Replace([]interface{}, string) error
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 	Clone() Snapshot
-	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
 
 // Snapshot is an immutable point-in-time view of the store.
 type Snapshot interface {
 	GetByKey(key string) (item interface{}, exists bool, err error)
-	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 	RangePrefix(prefix, continueKey string) Range
 }
 

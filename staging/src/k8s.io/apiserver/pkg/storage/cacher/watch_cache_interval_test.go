@@ -527,21 +527,16 @@ func TestGetIntervalFromStoreLocked(t *testing.T) {
 }
 
 type countingSnapshot struct {
-	items                  []interface{}
-	orderedListPrefixCalls int
+	rangePrefixCalls int
 }
 
 func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
-func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error) {
-	s.orderedListPrefixCalls++
-	return s.items, nil
-}
-
 func (s *countingSnapshot) RangePrefix(_, _ string) store.Range {
-	return nil
+	s.rangePrefixCalls++
+	return store.EmptyRange()
 }
 
 // TestLazySnapshotCacheIntervalSourceEmpty checks that on an empty snapshot Next() returns
@@ -559,7 +554,7 @@ func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
 			t.Errorf("expected nil event from empty snapshot, got %v", *event)
 		}
 	}
-	if snap.orderedListPrefixCalls != 1 {
-		t.Errorf("expected OrderedListPrefix to be called once, got %d", snap.orderedListPrefixCalls)
+	if snap.rangePrefixCalls != 1 {
+		t.Errorf("expected RangePrefix to be called once, got %d", snap.rangePrefixCalls)
 	}
 }

@@ -19,7 +19,8 @@ package store
 import (
 	"fmt"
 	"iter"
-	"sort"
+	"slices"
+	"strings"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -126,36 +127,19 @@ func (l listSnapshot) GetByKey(key string) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
-func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]interface{}, error) {
-	var result []interface{}
+func (l listSnapshot) RangePrefix(prefix, continueKey string) Range {
+	var matching elements
 	for _, item := range l.Items {
 		elem, ok := item.(*Element)
 		if !ok {
-			return nil, fmt.Errorf("non *Element returned from storage: %v", item)
+			return failedRange{fmt.Errorf("non *Element returned from storage: %v", item)}
 		}
-		if len(continueKey) > 0 && continueKey > elem.Key {
-			continue
+		if continueKey <= elem.Key && key.HasPathPrefix(elem.Key, prefix) {
+			matching = append(matching, elem)
 		}
-		if !key.HasPathPrefix(elem.Key, prefix) {
-			continue
-		}
-		result = append(result, item)
 	}
-	sort.Sort(sortableStoreElements(result))
-	return result, nil
-}
-
-func (l listSnapshot) RangePrefix(prefix, continueKey string) Range {
-	items, err := l.OrderedListPrefix(prefix, continueKey)
-	if err != nil {
-		return failedRange{err}
-	}
-	elems := make(elements, 0, len(items))
-	for _, item := range items {
-		// OrderedListPrefix has already checked every item is an *Element.
-		elems = append(elems, item.(*Element))
-	}
-	return elems
+	slices.SortFunc(matching, func(a, b *Element) int { return strings.Compare(a.Key, b.Key) })
+	return matching
 }
 
 type failedRange struct{ err error }
@@ -166,20 +150,6 @@ func (r failedRange) All() iter.Seq2[*Element, error] {
 
 func (r failedRange) Count() int {
 	return 0
-}
-
-type sortableStoreElements []interface{}
-
-func (s sortableStoreElements) Len() int {
-	return len(s)
-}
-
-func (s sortableStoreElements) Less(i, j int) bool {
-	return s[i].(*Element).Key < s[j].(*Element).Key
-}
-
-func (s sortableStoreElements) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
 }
 
 // Get takes runtime.Object as a parameter. However, it returns
