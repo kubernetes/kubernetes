@@ -179,9 +179,9 @@ func (e *Executor) actuatePodPreemption(ctx context.Context, candidate Candidate
 func (e *Executor) actuatePodGroupPreemption(ctx context.Context, candidate Candidate, pgInfo fwk.PodGroupInfo, pluginName string) *fwk.Status {
 	var podGroupPreemptor ExecutorPreemptor
 	if pgInfo.GetCompositePodGroup() != nil {
-		podGroupPreemptor = &compositePodGroupExecutorPreemptor{cpg: pgInfo.GetCompositePodGroup(), pods: pgInfo.GetUnscheduledPods()}
+		podGroupPreemptor = &compositePodGroupExecutorPreemptor{cpg: pgInfo.GetCompositePodGroup(), pods: pgInfo.GetAllUnscheduledPods()}
 	} else {
-		podGroupPreemptor = &podGroupExecutorPreemptor{pg: pgInfo.GetPodGroup(), pods: pgInfo.GetUnscheduledPods()}
+		podGroupPreemptor = &podGroupExecutorPreemptor{pg: pgInfo.GetPodGroup(), pods: pgInfo.GetAllUnscheduledPods()}
 	}
 	if e.fts.EnableAsyncPreemption {
 		e.prepareCandidateAsync(candidate, podGroupPreemptor, pluginName)

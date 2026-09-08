@@ -172,57 +172,64 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 
 // validatePodGroup ensures that:
 // - all Pods in a group hierarchy have matching scheduler name,
-// - all Pods in a group hierarchy have the same preemption policy,
-// - the root group has the same priority as all the Pods.
-// - the root group has the same preemption policy as all the Pods.
+// - all entities in a group hierarchy have the same priority as the root group,
+// - all entities in a group hierarchy have the same preemption policy.
 func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupInfo) error {
 	schedulerName := ""
-	podGroupPriority := podGroupInfo.GetPriority()
+	rootPriority := podGroupInfo.GetPriority()
 
-	var pgPreemptionPolicy v1.PreemptionPolicy
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
-		pgPreemptionPolicy = podGroupPreemptionPolicy(podGroupInfo)
+	var rootPreemptionPolicy v1.PreemptionPolicy
+	if sched.podGroupPreemptionPolicyEnabled {
+		rootPreemptionPolicy = podGroupInfo.GetPreemptionPolicy()
+	}
+	for pInfo := range podGroupInfo.ForEachPodInfo() {
+		schedulerName = pInfo.Pod.Spec.SchedulerName
+		if !sched.podGroupPreemptionPolicyEnabled {
+			rootPreemptionPolicy = util.PodPreemptionPolicy(pInfo.Pod)
+		}
+		break
 	}
 
-	validatePod := func(pod *v1.Pod) error {
-		if pod.Spec.SchedulerName != schedulerName {
-			return fmt.Errorf("all pods in a single pod group should have the same .spec.schedulerName set, got: %q and %q", pod.Spec.SchedulerName, schedulerName)
-		}
-		podPriority := corev1helpers.PodPriority(pod)
-		if podPriority != podGroupPriority {
-			return fmt.Errorf("all pods in a single pod group should have the same priority as the pod group's priority, got %d and %d", podPriority, podGroupPriority)
+	validatePodGroup := func(pgi *framework.PodGroupInfo) error {
+		pgPriority := pgi.GetPriority()
+		if pgPriority != rootPriority {
+			return fmt.Errorf("all pod groups in a hierarchy should have the same priority as the root pod group's priority, got %d and %d", pgPriority, rootPriority)
 		}
 
-		pPreemptionPolicy := podPreemptionPolicy(pod)
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
-			// If the PodGroupPreemptionPolicy feature is enabled, validate that the pod's preemption policy
-			// matches the root group's preemption policy.
-			if pPreemptionPolicy != pgPreemptionPolicy {
-				return fmt.Errorf("all pods in a single pod group should have the same preemption policy as the pod group's preemption policy, got %v and %v", pPreemptionPolicy, pgPreemptionPolicy)
-			}
-		} else {
-			// If the PodGroupPreemptionPolicy feature is disabled, the preemption policy is determined by the first pod in the group.
-			// Validate that preemption policy is the same across all pods in the pod group.
-			if pgPreemptionPolicy == "" {
-				pgPreemptionPolicy = pPreemptionPolicy
-			} else if pPreemptionPolicy != pgPreemptionPolicy {
-				return fmt.Errorf("all pods in a single pod group should have the same preemption policy, got %v and %v", pPreemptionPolicy, pgPreemptionPolicy)
+		if sched.podGroupPreemptionPolicyEnabled {
+			pgPreemptionPolicy := pgi.GetPreemptionPolicy()
+			if pgPreemptionPolicy != rootPreemptionPolicy {
+				return fmt.Errorf("all pod groups in a hierarchy should have the same preemption policy as the root pod group's preemption policy, got %v and %v", pgPreemptionPolicy, rootPreemptionPolicy)
 			}
 		}
 		return nil
 	}
-	for pInfo := range podGroupInfo.ForEachPodInfo() {
-		if schedulerName == "" {
-			schedulerName = pInfo.Pod.Spec.SchedulerName
+
+	validatePod := func(pod *v1.Pod) error {
+		if pod.Spec.SchedulerName != schedulerName {
+			return fmt.Errorf("all pods in a pod group hierarchy should have the same .spec.schedulerName set, got: %q and %q", pod.Spec.SchedulerName, schedulerName)
 		}
-		err := validatePod(pInfo.Pod)
-		if err != nil {
-			return err
+		podPriority := corev1helpers.PodPriority(pod)
+		if podPriority != rootPriority {
+			return fmt.Errorf("all pods in a pod group hierarchy should have the same priority as the root pod group's priority, got %d and %d", podPriority, rootPriority)
 		}
+
+		podPreemptionPolicy := util.PodPreemptionPolicy(pod)
+		if podPreemptionPolicy != rootPreemptionPolicy {
+			if sched.podGroupPreemptionPolicyEnabled {
+				// If the PodGroupPreemptionPolicy feature is enabled, validate that the pod's preemption policy
+				// matches the root group's preemption policy.
+				return fmt.Errorf("all pods in a pod group hierarchy should have the same preemption policy as the root pod group's preemption policy, got %v and %v", podPreemptionPolicy, rootPreemptionPolicy)
+			} else {
+				// If the PodGroupPreemptionPolicy feature is disabled, the preemption policy is determined by the first pod in the group.
+				// Validate that preemption policy is the same across all pods in the pod group.
+				return fmt.Errorf("all pods in a pod group hierarchy should have the same preemption policy, got %v and %v", podPreemptionPolicy, rootPreemptionPolicy)
+			}
+		}
+		return nil
 	}
 
-	err := sched.validateScheduledPods(podGroupInfo.PodGroupInfo, validatePod)
-	if err != nil {
+	if err := sched.validatePodGroupHierarchy(podGroupInfo.PodGroupInfo, validatePodGroup, validatePod); err != nil {
 		return err
 	}
 
@@ -233,41 +240,28 @@ func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupI
 	return nil
 }
 
-// podGroupPreemptionPolicy returns the PreemptionPolicy set in the pod group, or the default policy
-// (PreemptLowerPriority) if not set.
-func podGroupPreemptionPolicy(podGroupInfo *framework.QueuedPodGroupInfo) v1.PreemptionPolicy {
-	if pg := podGroupInfo.PodGroup; pg != nil && pg.Spec.PreemptionPolicy != nil {
-		return v1.PreemptionPolicy(*pg.Spec.PreemptionPolicy)
+// validatePodGroupHierarchy recursively validates that all entities in the hierarchy
+// (composite pod groups, pod groups, and both unscheduled and scheduled pods)
+// conform to the group-wide constraints.
+func (sched *Scheduler) validatePodGroupHierarchy(podGroupInfo *framework.PodGroupInfo, validatePodGroup func(pgi *framework.PodGroupInfo) error, validatePod func(pod *v1.Pod) error) error {
+	if err := validatePodGroup(podGroupInfo); err != nil {
+		return err
 	}
-	if cpg := podGroupInfo.CompositePodGroup; cpg != nil && cpg.Spec.PreemptionPolicy != nil {
-		return v1.PreemptionPolicy(*cpg.Spec.PreemptionPolicy)
-	}
-	return v1.PreemptLowerPriority
-}
 
-// podPreemptionPolicy returns the PreemptionPolicy set in the pod, or the default policy
-// (PreemptLowerPriority) if not set.
-func podPreemptionPolicy(pod *v1.Pod) v1.PreemptionPolicy {
-	if pod != nil && pod.Spec.PreemptionPolicy != nil {
-		return *pod.Spec.PreemptionPolicy
-	}
-	return v1.PreemptLowerPriority
-}
-
-// validateScheduledPods validates that already-scheduled pods in the pod group hierarchy
-// conform to the same group-wide constraints (like scheduler name and priority) as
-// unscheduled pods. It recursively traverses the hierarchy to fetch and check the cached
-// state for each leaf group.
-func (sched *Scheduler) validateScheduledPods(podGroupInfo *framework.PodGroupInfo, validatePod func(pod *v1.Pod) error) error {
-	if podGroupInfo.CompositePodGroup != nil {
+	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
 		for _, child := range podGroupInfo.GetChildGroups() {
-			if err := sched.validateScheduledPods(child, validatePod); err != nil {
+			if err := sched.validatePodGroupHierarchy(child, validatePodGroup, validatePod); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
 
+	for _, pod := range podGroupInfo.UnscheduledPods {
+		if err := validatePod(pod); err != nil {
+			return err
+		}
+	}
 	podGroupState, err := sched.nodeInfoSnapshot.PodGroupStates().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
 	if err != nil {
 		return fmt.Errorf("failed to get pod group state: %w", err)
@@ -472,7 +466,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 	// Run PlacementFeasible plugins to check if the pod group can meet its constraints
 	// before even attempting to schedule any pods.
 	placementProgress := framework.PlacementProgress{
-		Remaining: len(podGroupInfo.GetUnscheduledPods()),
+		Remaining: len(podGroupInfo.GetAllUnscheduledPods()),
 		Scheduled: podGroupState.ScheduledPodsCount(),
 	}
 	proceed, placementFeasibleStatus := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
