@@ -291,10 +291,13 @@ func ParseQuantity(str string) (Quantity, error) {
 	precision := int32(0)
 	scale := int32(0)
 	mantissa := int64(1)
+	forceRecanonicalize := false
 	switch format {
 	case DecimalExponent, DecimalSI:
 		scale = exponent
 		precision = maxInt64Factors - int32(len(num)+len(denom))
+		// preserves compatibility with recanonicalizing integers >18 digits long, even if they are in int64 range
+		forceRecanonicalize = precision <= 0
 	case BinarySI:
 		scale = 0
 		switch {
@@ -338,11 +341,11 @@ func ParseQuantity(str string) (Quantity, error) {
 						// if the number is in canonical form, reuse the string
 						switch format {
 						case BinarySI:
-							if exponent%10 == 0 && (value&0x07 != 0) {
+							if !forceRecanonicalize && exponent%10 == 0 && (value&0x07 != 0) {
 								return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
 							}
 						default:
-							if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
+							if !forceRecanonicalize && scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
 								return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
 							}
 						}
