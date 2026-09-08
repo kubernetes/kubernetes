@@ -230,3 +230,43 @@ func (prober *fakeProber) Probe() (events []ProbeEvent, err error) {
 	}
 	return []ProbeEvent{}, nil
 }
+
+// namedTestPlugin is a testPlugins that can be registered alongside another one.
+type namedTestPlugin struct {
+	*testPlugins
+	name string
+}
+
+func (p *namedTestPlugin) GetPluginName() string { return p.name }
+
+// globalListerTestPlugin keeps global mounts of its own.
+type globalListerTestPlugin struct {
+	*namedTestPlugin
+}
+
+func (p *globalListerTestPlugin) NewDeviceMounter() (DeviceMounter, error)     { return nil, nil }
+func (p *globalListerTestPlugin) NewDeviceUnmounter() (DeviceUnmounter, error) { return nil, nil }
+func (p *globalListerTestPlugin) GetDeviceMountRefs(string) ([]string, error)  { return nil, nil }
+func (p *globalListerTestPlugin) CanDeviceMount(*Spec) (bool, error)           { return true, nil }
+func (p *globalListerTestPlugin) ListGlobalVolumes() ([]GlobalVolume, error)   { return nil, nil }
+
+func TestFindGlobalVolumeListerPlugins(t *testing.T) {
+	lister := &globalListerTestPlugin{&namedTestPlugin{&testPlugins{}, "lister"}}
+	plain := &namedTestPlugin{&testPlugins{}, "plain"}
+
+	vpm := VolumePluginMgr{}
+	if err := vpm.InitPlugins([]VolumePlugin{lister, plain}, nil, nil); err != nil {
+		t.Fatalf("InitPlugins: %v", err)
+	}
+
+	// Only the plugin that keeps global mounts is asked for them. Reporting one
+	// that does not implement the interface would have reconstruction believe
+	// it had asked a plugin that was never asked.
+	found := vpm.FindGlobalVolumeListerPlugins()
+	if len(found) != 1 {
+		t.Fatalf("got %d plugins, want 1", len(found))
+	}
+	if got, want := found[0].GetPluginName(), "lister"; got != want {
+		t.Errorf("plugin name: got %q, want %q", got, want)
+	}
+}

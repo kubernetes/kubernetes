@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,9 +31,14 @@ import (
 func TestListGlobalVolumes(t *testing.T) {
 	const driver = "test-driver"
 
-	// stage writes what MountDevice leaves on disk for one volume.
+	// stage writes what MountDevice leaves on disk for one volume. MountDevice
+	// always names the directory sha256(volumeHandle), and reconstruction
+	// checks that, so the fixture has to use the real name.
 	stage := func(t *testing.T, pluginDir, driverName, dirName string, data map[string]string) string {
 		t.Helper()
+		if handle := data[volDataKey.volHandle]; handle != "" && dirName == "" {
+			dirName = generateSha(handle)
+		}
 		volDir := filepath.Join(pluginDir, driverName, dirName)
 		if err := os.MkdirAll(filepath.Join(volDir, globalMountInGlobalPath), 0o755); err != nil {
 			t.Fatalf("stage %s: %v", dirName, err)
@@ -59,7 +64,7 @@ func TestListGlobalVolumes(t *testing.T) {
 		plug, tmpDir := newTestPlugin(t, nil)
 		t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 		pluginDir := plug.host.GetPluginDir(plug.GetPluginName())
-		volDir := stage(t, pluginDir, driver, "somehash", volumeData("staged-pv", "handle-of-the-staged-pv"))
+		volDir := stage(t, pluginDir, driver, "", volumeData("staged-pv", "handle-of-the-staged-pv"))
 
 		found, err := plug.ListGlobalVolumes()
 		if err != nil {
@@ -99,8 +104,8 @@ func TestListGlobalVolumes(t *testing.T) {
 		// under it is reported whatever it holds, so this stages a directory
 		// there that would otherwise be described in full.
 		blockDir := filepath.Base(plug.host.GetVolumeDevicePluginDir(CSIPluginName))
-		stage(t, pluginDir, blockDir, "block-volume", volumeData("block-pv", "handle-of-a-block-volume"))
-		stage(t, pluginDir, driver, "somehash", volumeData("staged-pv", "handle-of-the-staged-pv"))
+		stage(t, pluginDir, blockDir, "", volumeData("block-pv", "handle-of-a-block-volume"))
+		stage(t, pluginDir, driver, "", volumeData("staged-pv", "handle-of-the-staged-pv"))
 
 		found, err := plug.ListGlobalVolumes()
 		if err != nil {
@@ -135,7 +140,7 @@ func TestListGlobalVolumes(t *testing.T) {
 			t.Fatalf("save volume data: %v", err)
 		}
 		// The one good volume, last so that a walk aborting early fails here.
-		stage(t, pluginDir, driver, "somehash", volumeData("staged-pv", "handle-of-the-staged-pv"))
+		stage(t, pluginDir, driver, "", volumeData("staged-pv", "handle-of-the-staged-pv"))
 
 		found, err := plug.ListGlobalVolumes()
 		if err != nil {
@@ -158,7 +163,7 @@ func TestListGlobalVolumes(t *testing.T) {
 		// volumes already staged when the gate is turned on, and the unique
 		// volume name comes from the driver and handle, not from this name, so
 		// they are recoverable.
-		stage(t, pluginDir, driver, "somehash", map[string]string{
+		stage(t, pluginDir, driver, "", map[string]string{
 			volDataKey.volHandle:  "handle-of-an-older-volume",
 			volDataKey.driverName: driver,
 		})
@@ -176,6 +181,31 @@ func TestListGlobalVolumes(t *testing.T) {
 		}
 		if want := driver + volNameSep + "handle-of-an-older-volume"; name != want {
 			t.Errorf("volume name: got %q, want %q", name, want)
+		}
+		// With no specVolID the spec is named from the handle, so the volume is
+		// still identifiable in a log rather than nameless.
+		if got, want := found[0].Spec.Name(), "handle-of-an-older-volume"; got != want {
+			t.Errorf("spec name: got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("skips a directory whose volume data names another volume", func(t *testing.T) {
+		plug, tmpDir := newTestPlugin(t, nil)
+		t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+		pluginDir := plug.host.GetPluginDir(plug.GetPluginName())
+
+		// MountDevice stages under sha256(volumeHandle). A directory holding
+		// volume data for a different handle would be unstaged at a path that
+		// is not this one, reporting success and leaving this mount in place.
+		stage(t, pluginDir, driver, generateSha("some-other-handle"),
+			volumeData("staged-pv", "handle-of-the-staged-pv"))
+
+		found, err := plug.ListGlobalVolumes()
+		if err != nil {
+			t.Fatalf("ListGlobalVolumes: %v", err)
+		}
+		if len(found) != 0 {
+			t.Fatalf("got %d volumes, want none", len(found))
 		}
 	})
 

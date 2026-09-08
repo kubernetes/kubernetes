@@ -571,6 +571,10 @@ type GlobalVolume struct {
 	// advisory: the unmount path recomputes it from Spec, so Spec must carry
 	// whatever identity the plugin derives that path from.
 	DeviceMountPath string
+	// VolumeMode says whether the volume is staged as a filesystem or as a raw
+	// block device. The two reach the actual state of world by different paths,
+	// so a caller has to know which it is holding.
+	VolumeMode v1.PersistentVolumeMode
 }
 
 // NewSpecFromVolume creates an Spec from an v1.Volume

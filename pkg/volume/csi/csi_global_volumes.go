@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +17,11 @@ limitations under the License.
 package csi
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
+	api "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -40,13 +42,20 @@ var _ volume.GlobalVolumeListerPlugin = &csiPlugin{}
 // A directory that cannot be described is skipped rather than reported as an
 // error, so that one volume staged by an older kubelet, or one caught
 // mid-MountDevice, does not hide the rest.
+//
+// The walk is os.ReadDir at a fixed depth rather than filepath.WalkDir, which
+// would descend into globalmount, that is, into the volume's own contents.
+//
+// TODO(#121937): raw block volumes stage under volumeDevices with a layout of
+// their own and are skipped here. They leak the same way and are tracked for
+// beta.
 func (p *csiPlugin) ListGlobalVolumes() ([]volume.GlobalVolume, error) {
-	pluginDir := p.host.GetPluginDir(p.GetPluginName())
+	pluginDir := p.host.GetPluginDir(CSIPluginName)
 
 	// volumeDevices is a sibling of the per-driver directories rather than a
-	// driver, and holds raw block volumes under a layout of its own. Take the
-	// name from the host so that this stays correct if the layout moves.
-	blockDir := filepath.Base(p.host.GetVolumeDevicePluginDir(CSIPluginName))
+	// driver, and holds raw block volumes. Compare the whole path, since a bare
+	// basename would silently stop excluding anything if the host returned "".
+	blockDir := p.host.GetVolumeDevicePluginDir(CSIPluginName)
 
 	drivers, err := os.ReadDir(pluginDir)
 	if err != nil {
@@ -54,15 +63,15 @@ func (p *csiPlugin) ListGlobalVolumes() ([]volume.GlobalVolume, error) {
 			// No CSI volume has ever been staged on this node.
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to read the CSI plugin directory %q: %w", pluginDir, err)
 	}
 
 	var found []volume.GlobalVolume
 	for _, driver := range drivers {
-		if !driver.IsDir() || driver.Name() == blockDir {
+		driverDir := filepath.Join(pluginDir, driver.Name())
+		if !driver.IsDir() || driverDir == blockDir {
 			continue
 		}
-		driverDir := filepath.Join(pluginDir, driver.Name())
 		volumes, err := os.ReadDir(driverDir)
 		if err != nil {
 			klog.V(4).Info(log("skipping driver directory %s: %v", driverDir, err))
@@ -113,11 +122,25 @@ func (p *csiPlugin) describeGlobalVolume(volDir string) (volume.GlobalVolume, bo
 		specVolID = data[volDataKey.volHandle]
 	}
 
+	spec := p.constructPVSourceSpec(specVolID, data[volDataKey.driverName], data[volDataKey.volHandle])
+
+	// MountDevice stages every volume under sha256(volumeHandle), and
+	// GenerateUnmountDeviceFunc recomputes that path from the spec rather than
+	// using the one reported here. A directory whose volume data names another
+	// volume would therefore be unstaged at a path that is not this one, which
+	// reports success while leaving this mount in place.
+	expected, err := makeDeviceMountPath(p, spec)
+	if err != nil || expected != deviceMountPath {
+		klog.V(4).Info(log("skipping %s, volume data belongs to another volume: %v", volDir, err))
+		return volume.GlobalVolume{}, false
+	}
+
 	return volume.GlobalVolume{
 		ReconstructedVolume: volume.ReconstructedVolume{
-			Spec:                p.constructPVSourceSpec(specVolID, data[volDataKey.driverName], data[volDataKey.volHandle]),
+			Spec:                spec,
 			SELinuxMountContext: data[volDataKey.seLinuxMountContext],
 		},
 		DeviceMountPath: deviceMountPath,
+		VolumeMode:      api.PersistentVolumeFilesystem,
 	}, true
 }

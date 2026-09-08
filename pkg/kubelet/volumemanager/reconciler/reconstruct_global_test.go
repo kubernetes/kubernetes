@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,56 +22,48 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
-var errNotListable = errors.New("cannot list global volumes")
-
-// globalListerPlugin is a plugin that reports global mounts, the shape
-// reconstruction relies on to find a volume no pod directory names any more.
-type globalListerPlugin struct {
-	*volumetesting.FakeVolumePlugin
-	globalVolumes []volume.GlobalVolume
-	err           error
+// stagedVolume is what a plugin reports for a volume that is still staged on the
+// node with no pod directory left to be found through.
+func stagedVolume(name, pdName string) volume.GlobalVolume {
+	return volume.GlobalVolume{
+		ReconstructedVolume: volume.ReconstructedVolume{
+			Spec: volume.NewSpecFromPersistentVolume(&v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{UID: "001", Name: name},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: pdName},
+					},
+				},
+			}, false),
+		},
+		DeviceMountPath: "/var/lib/kubelet/plugins/kubernetes.io/csi/driver/somehash/globalmount",
+		VolumeMode:      v1.PersistentVolumeFilesystem,
+	}
 }
 
-func (p *globalListerPlugin) ListGlobalVolumes() ([]volume.GlobalVolume, error) {
-	return p.globalVolumes, p.err
-}
-
-var _ volume.GlobalVolumeListerPlugin = &globalListerPlugin{}
-
-// TestReconstructGlobalVolume covers what reconstruction does with a volume that
-// is still staged on the node but has no pod directory left to be found through,
-// the state a node drain and reboot leaves behind (issue #121937). Registering
-// it is what keeps it in node.status.volumesInUse until the unstage completes.
-func TestReconstructGlobalVolume(t *testing.T) {
-	setup := func(t *testing.T) (*reconciler, *globalListerPlugin, volume.GlobalVolume) {
+// TestReconstructGlobalVolumes covers reconstruction of a volume that is still
+// staged on the node but has no pod directory naming it, the state a node drain
+// and reboot leaves behind (issue #121937). Kubelet finds it by asking each
+// plugin rather than by walking /var/lib/kubelet/pods.
+func TestReconstructGlobalVolumes(t *testing.T) {
+	setup := func(t *testing.T, staged ...volume.GlobalVolume) (*reconciler, *volumetesting.FakeVolumePlugin) {
 		t.Helper()
 		rc, fakePlugin := getReconciler(t.TempDir(), t, nil, nil)
-		rcInstance := rc.(*reconciler)
-		plugin := &globalListerPlugin{FakeVolumePlugin: fakePlugin}
-		globalVolume := volume.GlobalVolume{
-			ReconstructedVolume: volume.ReconstructedVolume{
-				Spec: volume.NewSpecFromPersistentVolume(&v1.PersistentVolume{
-					ObjectMeta: metav1.ObjectMeta{UID: "001", Name: "staged-pv"},
-					Spec: v1.PersistentVolumeSpec{
-						PersistentVolumeSource: v1.PersistentVolumeSource{
-							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: "fake-device1"},
-						},
-					},
-				}, false),
-			},
-			DeviceMountPath: "/var/lib/kubelet/plugins/kubernetes.io/csi/driver/somehash/globalmount",
-		}
-		return rcInstance, plugin, globalVolume
+		fakePlugin.GlobalVolumes = staged
+		return rc.(*reconciler), fakePlugin
 	}
 
-	uniqueName := func(t *testing.T, plugin *globalListerPlugin, gv volume.GlobalVolume) v1.UniqueVolumeName {
+	uniqueName := func(t *testing.T, plugin *volumetesting.FakeVolumePlugin, gv volume.GlobalVolume) v1.UniqueVolumeName {
 		t.Helper()
 		name, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, gv.Spec)
 		if err != nil {
@@ -80,61 +72,129 @@ func TestReconstructGlobalVolume(t *testing.T) {
 		return name
 	}
 
-	t.Run("registers a pod-less global mount as an uncertain device", func(t *testing.T) {
+	t.Run("registers a pod-less staged volume as an uncertain device", func(t *testing.T) {
 		logger, _ := ktesting.NewTestContext(t)
-		rc, plugin, globalVolume := setup(t)
+		staged := stagedVolume("staged-pv", "fake-device1")
+		staged.SELinuxMountContext = "system_u:object_r:container_file_t:s0:c1,c2"
+		rc, plugin := setup(t, staged)
 
-		rc.reconstructGlobalVolume(logger, plugin, globalVolume)
+		rc.reconstructGlobalVolumes(logger)
 
-		volumeName := uniqueName(t, plugin, globalVolume)
+		volumeName := uniqueName(t, plugin, staged)
 		if !rc.actualStateOfWorld.VolumeExists(volumeName) {
 			t.Fatalf("volume %q is not in the actual state of world", volumeName)
 		}
-		// It has to be uncertain rather than mounted: kubelet has not verified
-		// this mount, it only found it staged on disk. Uncertain is also what
-		// makes DeviceMayBeMounted true, which is what gets it to UnmountDevice.
+		// Uncertain rather than mounted: kubelet has not verified this mount,
+		// it only found it staged. Uncertain is what makes DeviceMayBeMounted
+		// true, which is what gets the volume to UnmountDevice.
 		if got, want := rc.actualStateOfWorld.GetDeviceMountState(volumeName), operationexecutor.DeviceMountUncertain; got != want {
 			t.Errorf("device mount state: got %q, want %q", got, want)
 		}
-		// The device path is filled in later from node.status.volumesAttached,
-		// exactly as it is for volumes reconstructed from a pod directory.
+		// The path the plugin reported has to reach the actual state of world:
+		// it is what UnmountDevice falls back to when it cannot recompute one.
 		found := false
-		for _, name := range rc.volumesNeedUpdateFromNodeStatus {
-			if name == volumeName {
-				found = true
+		for _, vol := range rc.actualStateOfWorld.GetAttachedVolumes() {
+			if vol.VolumeName != volumeName {
+				continue
+			}
+			found = true
+			if got, want := vol.DeviceMountPath, staged.DeviceMountPath; got != want {
+				t.Errorf("device mount path: got %q, want %q", got, want)
+			}
+			if got, want := vol.SELinuxMountContext, staged.SELinuxMountContext; got != want {
+				t.Errorf("selinux mount context: got %q, want %q", got, want)
 			}
 		}
 		if !found {
+			t.Fatalf("volume %q is not among the attached volumes", volumeName)
+		}
+		// Attachability stays uncertain until node.status.volumesAttached is
+		// read, which is why the volume has to be queued for that update: it is
+		// what decides whether it is reported in node.status.volumesInUse.
+		if !containsVolume(rc.volumesNeedUpdateFromNodeStatus, volumeName) {
 			t.Errorf("volume %q was not queued for a device path update, got %v", volumeName, rc.volumesNeedUpdateFromNodeStatus)
 		}
 	})
 
 	t.Run("leaves a volume a pod directory already accounted for", func(t *testing.T) {
 		logger, _ := ktesting.NewTestContext(t)
-		rc, plugin, globalVolume := setup(t)
+		staged := stagedVolume("staged-pv", "fake-device1")
+		rc, plugin := setup(t, staged)
 
-		// First pass stands in for the pod directory walk having found it.
-		rc.reconstructGlobalVolume(logger, plugin, globalVolume)
+		// The first pass stands in for the pod directory walk having found it.
+		rc.reconstructGlobalVolumes(logger)
+		volumeName := uniqueName(t, plugin, staged)
 		before := len(rc.volumesNeedUpdateFromNodeStatus)
 
-		rc.reconstructGlobalVolume(logger, plugin, globalVolume)
+		rc.reconstructGlobalVolumes(logger)
 
 		if got := len(rc.volumesNeedUpdateFromNodeStatus); got != before {
-			t.Errorf("volume was registered twice: %d entries, want %d", got, before)
+			t.Errorf("volume %q was registered twice: %d entries, want %d", volumeName, got, before)
 		}
 	})
 
-	t.Run("a plugin that cannot list its volumes does not stop the others", func(t *testing.T) {
+	t.Run("a plugin that cannot list its volumes is not fatal", func(t *testing.T) {
 		logger, _ := ktesting.NewTestContext(t)
-		rc, plugin, _ := setup(t)
-		plugin.err = errNotListable
+		rc, plugin := setup(t, stagedVolume("staged-pv", "fake-device1"))
+		plugin.ListGlobalVolumesErr = errors.New("cannot read the plugin directory")
 
-		// Nothing to assert beyond it returning: a plugin failing to list is
-		// logged and skipped, never fatal to reconstruction.
 		rc.reconstructGlobalVolumes(logger)
 
 		if len(rc.volumesNeedUpdateFromNodeStatus) != 0 {
-			t.Errorf("expected no volumes registered, got %v", rc.volumesNeedUpdateFromNodeStatus)
+			t.Errorf("expected nothing registered, got %v", rc.volumesNeedUpdateFromNodeStatus)
 		}
 	})
+
+	t.Run("leaves a raw block volume to the block path", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		staged := stagedVolume("block-pv", "fake-device1")
+		staged.VolumeMode = v1.PersistentVolumeBlock
+		rc, plugin := setup(t, staged)
+
+		rc.reconstructGlobalVolumes(logger)
+
+		// A block volume reaches the actual state of world through the block
+		// mapper, not through a device mount, so registering it here would
+		// describe it with the wrong path.
+		if rc.actualStateOfWorld.VolumeExists(uniqueName(t, plugin, staged)) {
+			t.Errorf("a block volume was registered as a device mount")
+		}
+	})
+
+	t.Run("nothing is listed with the feature gate off", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIGlobalMountReconstruction, false)
+		staged := stagedVolume("staged-pv", "fake-device1")
+		rc, plugin := setup(t, staged)
+
+		rc.reconstructVolumes(logger)
+
+		volumeName := uniqueName(t, plugin, staged)
+		if rc.actualStateOfWorld.VolumeExists(volumeName) {
+			t.Errorf("volume %q reached the actual state of world with the gate off", volumeName)
+		}
+	})
+
+	t.Run("a staged volume is listed with the feature gate on", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIGlobalMountReconstruction, true)
+		staged := stagedVolume("staged-pv", "fake-device1")
+		rc, plugin := setup(t, staged)
+
+		rc.reconstructVolumes(logger)
+
+		volumeName := uniqueName(t, plugin, staged)
+		if !rc.actualStateOfWorld.VolumeExists(volumeName) {
+			t.Errorf("volume %q did not reach the actual state of world with the gate on", volumeName)
+		}
+	})
+}
+
+func containsVolume(names []v1.UniqueVolumeName, name v1.UniqueVolumeName) bool {
+	for _, n := range names {
+		if n == name {
+			return true
+		}
+	}
+	return false
 }

@@ -52,6 +52,13 @@ func (rc *reconciler) readyToUnmount() bool {
 // put the volumes to volumesFailedReconstruction to be cleaned up later when DesiredStateOfWorld
 // is populated.
 func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
+	// Volumes that are still staged but have no pod directory naming them are
+	// found by asking the plugins, which is independent of the walk below and
+	// runs even when that walk cannot.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIGlobalMountReconstruction) {
+		rc.reconstructGlobalVolumes(logger)
+	}
+
 	// Get volumes information by reading the pod's directory
 	podVolumes, err := getVolumesFromPodDir(logger, rc.kubeletPodsDir)
 	if err != nil {
@@ -95,12 +102,9 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 		// Add the volumes to ASW
 		rc.updateStates(logger, reconstructedVolumes)
 
-		// Remember to update devicePath from node.status.volumesAttached
-		rc.volumesNeedUpdateFromNodeStatus = reconstructedVolumeNames
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIGlobalMountReconstruction) {
-		rc.reconstructGlobalVolumes(logger)
+		// Remember to update devicePath from node.status.volumesAttached.
+		// Anything the plugins reported above is already queued there.
+		rc.volumesNeedUpdateFromNodeStatus = append(rc.volumesNeedUpdateFromNodeStatus, reconstructedVolumeNames...)
 	}
 	logger.V(2).Info("Volume reconstruction finished")
 }
@@ -132,17 +136,30 @@ func (rc *reconciler) reconstructGlobalVolumes(logger klog.Logger) {
 }
 
 func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumepkg.GlobalVolumeListerPlugin, globalVolume volumepkg.GlobalVolume) {
-	// The name is derived here rather than reported by the plugin, so that it
-	// is the same name the desired state of world produces. A name only this
-	// side knows about would never be matched against a pod's volume, and the
-	// volume would be unstaged while a pod still needed it.
+	// Raw block volumes reach the actual state of world through the block
+	// mapper rather than through a device mount, so they are not handled here.
+	if globalVolume.VolumeMode == v1.PersistentVolumeBlock {
+		logger.V(4).Info("Skipping block volume reported as a global mount", "deviceMountPath", globalVolume.DeviceMountPath)
+		return
+	}
+
+	// The desired state of world names a volume by device when the plugin can
+	// device mount it, and by pod otherwise. Only the first kind can be matched
+	// against what is found on disk, since there is no pod here to name it
+	// with, and unstaging a volume under a name the desired state never
+	// produces would unstage one a pod still needs.
+	if canMount, err := plugin.CanDeviceMount(globalVolume.Spec); err != nil || !canMount {
+		logger.V(4).Info("Skipping global mount of a volume that is not device mountable", "deviceMountPath", globalVolume.DeviceMountPath, "err", err)
+		return
+	}
+
 	volumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, globalVolume.Spec)
 	if err != nil {
 		logger.Error(err, "Could not determine volume name for global mount", "deviceMountPath", globalVolume.DeviceMountPath)
 		return
 	}
 	if rc.actualStateOfWorld.VolumeExists(volumeName) {
-		// A pod directory already accounted for this volume.
+		// Another plugin, or another entry from this one, already reported it.
 		logger.V(4).Info("Global mount is already in actual state, skipping", "volumeName", volumeName)
 		return
 	}
@@ -157,6 +174,11 @@ func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumep
 	if err := rc.actualStateOfWorld.MarkDeviceAsUncertain(
 		volumeName, "", globalVolume.DeviceMountPath, globalVolume.SELinuxMountContext); err != nil {
 		logger.Error(err, "Could not mark global mount device as uncertain", "volumeName", volumeName, "deviceMountPath", globalVolume.DeviceMountPath)
+		// Leaving the volume behind would be worse than not having found it:
+		// with no pod and no mounted device, the reconciler would take it for a
+		// volume to detach, report it detached and drop it, and nothing would
+		// unstage the mount until the next kubelet start.
+		rc.actualStateOfWorld.DeleteVolume(volumeName)
 		return
 	}
 
