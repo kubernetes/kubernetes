@@ -1142,10 +1142,8 @@ func (kl *Kubelet) PodCouldHaveRunningContainers(pod *v1.Pod) bool {
 	// status manager and its tests.
 	// TODO: extend PodDeletionSafetyProvider interface and implement it
 	// in a separate Kubelet method.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		if kl.containerManager.PodMightNeedToUnprepareResources(pod.UID) {
-			return true
-		}
+	if kl.containerManager.PodMightNeedToUnprepareResources(pod.UID) {
+		return true
 	}
 	return false
 }
