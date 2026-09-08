@@ -55,6 +55,7 @@ import (
 	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/watchexperiment"
 	restclient "k8s.io/client-go/rest"
 	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
@@ -442,6 +443,10 @@ type preparedGenericAPIServer struct {
 
 // PrepareRun does post API installation setup steps. It calls recursively the same function of the delegates.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
+	// TEMPORARY, for the watch-chain scale experiment. Runs before any
+	// connection is served, which the HTTP/2 buffer size override requires.
+	watchexperiment.Apply()
+
 	s.delegationTarget.PrepareRun()
 
 	if s.openAPIConfig != nil && !s.skipOpenAPIInstallation {

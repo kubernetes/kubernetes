@@ -50,6 +50,24 @@ const (
 	cacheWatcherBookmarkSent
 )
 
+// watchBacklogSampleRate is how often the backlog and conversion signals are
+// observed, as one in every N handoffs.
+const watchBacklogSampleRate = 64
+
+// Watch scope, recorded as a label on terminations.
+const (
+	watchScopeCluster   = "cluster"
+	watchScopeNamespace = "namespace"
+	watchScopeResource  = "resource"
+)
+
+func (c *cacheWatcher) scopeLabel() string {
+	if c.scope == "" {
+		return watchScopeCluster
+	}
+	return c.scope
+}
+
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
@@ -67,6 +85,14 @@ type cacheWatcher struct {
 	groupResource       schema.GroupResource
 	watcherMetrics      *metrics.WatcherMetricsObservers
 	clock               clock.Clock
+
+	// scope is the cluster/namespace/resource breadth of this watch, recorded
+	// only so a termination can be attributed to a kind of client.
+	scope string
+
+	// handoffs counts calls to sendWatchCacheEvent and gates the sampled
+	// backlog observations. Only the watcher's own goroutine touches it.
+	handoffs uint64
 
 	// human readable identifier that helps assigning cacheWatcher
 	// instance with request
@@ -188,6 +214,13 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
 		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
+		metrics.TerminatedWatchersDetailed.WithLabelValues(
+			c.groupResource.Group,
+			c.groupResource.Resource,
+			metrics.TerminationReason(len(c.input), len(c.result), cap(c.result)),
+			c.scopeLabel(),
+			metrics.ChanSizeBucket(cap(c.input)),
+		).Inc()
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely, we simply terminate it.
 
@@ -413,7 +446,26 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
 func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sentAt time.Time) {
+	// Sampled rather than observed every time: at hundreds of millions of
+	// deliveries per run these three observations would cost more than the
+	// distribution they answer is worth. c.handoffs is only touched by this
+	// watcher's own goroutine.
+	c.handoffs++
+	sampled := c.handoffs%watchBacklogSampleRate == 0
+
+	var conversionStart time.Time
+	if sampled {
+		conversionStart = c.clock.Now()
+	}
 	watchEvent := c.convertToWatchEvent(event)
+	if sampled {
+		metrics.WatchEventConversionDuration.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).
+			Observe(c.clock.Since(conversionStart).Seconds())
+		// Observed before the handoff, so it reflects the backlog this event
+		// arrived into rather than the one it leaves behind.
+		metrics.WatchInputBacklog.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Observe(float64(len(c.input)))
+		metrics.WatchResultBacklog.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Observe(float64(len(c.result)))
+	}
 	if watchEvent == nil {
 		// Watcher is not interested in that object.
 		return time.Time{}, time.Time{}
@@ -437,6 +489,25 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 		return time.Time{}, time.Time{}
 	default:
 	}
+
+	// Fast path: the serve loop is keeping up, so this watcher is not blocked
+	// and must not be counted below.
+	select {
+	case c.result <- *watchEvent:
+		c.markBookmarkAfterRvSent(event)
+		return builtAt, c.clock.Now()
+	case <-c.done:
+		return builtAt, time.Time{}
+	default:
+	}
+
+	// The result buffer is full, so the serve loop (encode plus write to the
+	// client) is not draining it. StageCacheToWatcher times this same wait but
+	// can only report it once the wait ends, so a watcher that is wedged
+	// indefinitely is visible only in this gauge.
+	blocked := metrics.WatchersBlockedOnResult.WithLabelValues(c.groupResource.Group, c.groupResource.Resource)
+	blocked.Inc()
+	defer blocked.Dec()
 
 	select {
 	case c.result <- *watchEvent:

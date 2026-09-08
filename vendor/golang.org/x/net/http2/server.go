@@ -55,11 +55,21 @@ import (
 	"golang.org/x/net/internal/httpcommon"
 )
 
+// handlerChunkWriteSize is upstream a const of 4<<10. It is a var here only so
+// that the kubernetes watch-chain scale experiment can raise it on one master
+// and compare. LOCAL PATCH, revert before this branch is anything but a test.
+var handlerChunkWriteSize = 4 << 10
+
+// SetHandlerChunkWriteSize overrides the buffer size between a handler and the
+// connection write loop. It must be called before any connection is served,
+// because the value is captured when the responseWriterState pool first
+// allocates. LOCAL PATCH, see above.
+func SetHandlerChunkWriteSize(n int) { handlerChunkWriteSize = n }
+
 const (
-	prefaceTimeout        = 10 * time.Second
-	firstSettingsTimeout  = 2 * time.Second // should be in-flight with preface anyway
-	handlerChunkWriteSize = 4 << 10
-	defaultMaxStreams     = 250 // TODO: make this 100 as the GFE seems to?
+	prefaceTimeout       = 10 * time.Second
+	firstSettingsTimeout = 2 * time.Second // should be in-flight with preface anyway
+	defaultMaxStreams    = 250             // TODO: make this 100 as the GFE seems to?
 
 	// maxQueuedControlFrames is the maximum number of control frames like
 	// SETTINGS, PING and RST_STREAM that will be queued for writing before

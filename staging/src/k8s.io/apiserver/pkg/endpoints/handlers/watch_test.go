@@ -43,6 +43,7 @@ import (
 	endpointstesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
+	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 )
@@ -420,6 +421,10 @@ func TestWatchEventSizes(t *testing.T) {
 
 			metrics.WatchEventsSizes.Reset()
 			metrics.WatchEvents.Reset()
+			metrics.WatchEventEncodeDuration.Reset()
+			metrics.WatchEventWriteDuration.Reset()
+			metrics.WatchEventFlushDuration.Reset()
+			metrics.WatchServeIdleDuration.Reset()
 
 			watcher := watch.NewFake()
 			timeoutCh := make(chan time.Time)
@@ -484,6 +489,33 @@ apiserver_watch_events_total{group="group",resource="resource",version="version"
 
 			err = metricstestutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_watch_events_sizes", "apiserver_watch_events_total")
 			require.NoError(t, err)
+
+			// The durations themselves are not reproducible, so only assert that
+			// every event is accounted for in each stage of the serve loop.
+			for name, metric := range map[string]*compbasemetrics.HistogramVec{
+				"apiserver_watch_event_encode_duration_seconds": metrics.WatchEventEncodeDuration,
+				"apiserver_watch_event_flush_duration_seconds":  metrics.WatchEventFlushDuration,
+			} {
+				count, err := metricstestutil.GetHistogramMetricCount(metric.WithLabelValues(gvr.Group, gvr.Version, gvr.Resource))
+				require.NoError(t, err)
+				require.Equal(t, uint64(2), count, "unexpected sample count for %s", name)
+			}
+
+			// Write duration is split by size, and these test events are small,
+			// so both land in the smallest bucket and the others stay empty.
+			writeCounts := map[string]uint64{"<4Ki": 2, "4-16Ki": 0, ">16Ki": 0}
+			for bucket, want := range writeCounts {
+				count, err := metricstestutil.GetHistogramMetricCount(
+					metrics.WatchEventWriteDuration.WithLabelValues(gvr.Group, gvr.Version, gvr.Resource, bucket))
+				require.NoError(t, err)
+				require.Equal(t, want, count, "unexpected write duration sample count for size_bucket %q", bucket)
+			}
+
+			// The serve loop waits for each event, so idle time is recorded.
+			idle, err := metricstestutil.GetCounterMetricValue(
+				metrics.WatchServeIdleDuration.WithLabelValues(gvr.Group, gvr.Version, gvr.Resource))
+			require.NoError(t, err)
+			require.Positive(t, idle, "expected the serve loop to record idle time waiting for events")
 		})
 	}
 }
