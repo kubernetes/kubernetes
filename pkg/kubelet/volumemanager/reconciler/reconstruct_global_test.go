@@ -18,6 +18,8 @@ package reconciler
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -158,6 +160,37 @@ func TestReconstructGlobalVolumes(t *testing.T) {
 		// describe it with the wrong path.
 		if rc.actualStateOfWorld.VolumeExists(uniqueName(t, plugin, staged)) {
 			t.Errorf("a block volume was registered as a device mount")
+		}
+	})
+
+	t.Run("a volume found both ways is queued once", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIGlobalMountReconstruction, true)
+
+		// A volume that is staged and whose pod directory also survived is
+		// reported by both sources: the listing runs first, then the pod
+		// directory walk reconstructs the same volume for its pod.
+		kubeletDir := t.TempDir()
+		podVolumeDir := filepath.Join(kubeletDir, "pods", "pod1", "volumes", "fake-plugin", "fake-device1")
+		if err := os.MkdirAll(podVolumeDir, 0o755); err != nil {
+			t.Fatalf("setup pod volume dir: %v", err)
+		}
+		rc, fakePlugin := getReconciler(kubeletDir, t, []string{podVolumeDir}, nil)
+		rcInstance := rc.(*reconciler)
+		staged := stagedVolume("staged-pv", "fake-device1")
+		fakePlugin.GlobalVolumes = []volume.GlobalVolume{staged}
+
+		rcInstance.reconstructVolumes(logger)
+
+		volumeName := uniqueName(t, fakePlugin, staged)
+		count := 0
+		for _, name := range rcInstance.volumesNeedUpdateFromNodeStatus {
+			if name == volumeName {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Errorf("volume %q queued %d times, want 1, got %v", volumeName, count, rcInstance.volumesNeedUpdateFromNodeStatus)
 		}
 	})
 

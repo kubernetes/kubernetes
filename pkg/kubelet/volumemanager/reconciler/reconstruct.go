@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -102,9 +103,15 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 		// Add the volumes to ASW
 		rc.updateStates(logger, reconstructedVolumes)
 
-		// Remember to update devicePath from node.status.volumesAttached.
-		// Anything the plugins reported above is already queued there.
-		rc.volumesNeedUpdateFromNodeStatus = append(rc.volumesNeedUpdateFromNodeStatus, reconstructedVolumeNames...)
+		// Remember to update devicePath from node.status.volumesAttached. A
+		// volume the plugins reported above is already queued, and a pod
+		// directory for it does not queue it twice.
+		queued := sets.New(rc.volumesNeedUpdateFromNodeStatus...)
+		for _, volumeName := range reconstructedVolumeNames {
+			if !queued.Has(volumeName) {
+				rc.volumesNeedUpdateFromNodeStatus = append(rc.volumesNeedUpdateFromNodeStatus, volumeName)
+			}
+		}
 	}
 	logger.V(2).Info("Volume reconstruction finished")
 }
