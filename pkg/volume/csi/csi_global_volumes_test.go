@@ -102,9 +102,16 @@ func TestListGlobalVolumes(t *testing.T) {
 		// The raw block subtree is a sibling of the per-driver directories, not a
 		// driver, and a block volume is not a filesystem device mount. Nothing
 		// under it is reported whatever it holds, so this stages a directory
-		// there that would otherwise be described in full.
+		// there that passes every other check: naming the driver after the
+		// subtree is what makes MountDevice's own path land inside it, so only
+		// the exclusion can keep it out of the listing.
 		blockDir := filepath.Base(plug.host.GetVolumeDevicePluginDir(CSIPluginName))
-		stage(t, pluginDir, blockDir, "", volumeData("block-pv", "handle-of-a-block-volume"))
+		stage(t, pluginDir, blockDir, "", map[string]string{
+			volDataKey.specVolID:           "block-pv",
+			volDataKey.volHandle:           "handle-of-a-block-volume",
+			volDataKey.driverName:          blockDir,
+			volDataKey.volumeLifecycleMode: string(storagev1.VolumeLifecyclePersistent),
+		})
 		stage(t, pluginDir, driver, "", volumeData("staged-pv", "handle-of-the-staged-pv"))
 
 		found, err := plug.ListGlobalVolumes()
