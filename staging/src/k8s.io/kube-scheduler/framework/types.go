@@ -25,6 +25,7 @@ import (
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
@@ -700,6 +701,10 @@ type PodGroupInfo interface {
 	GetType() EntityKeyType
 	// GetKey returns the EntityKey that uniquely identifies the pod group.
 	GetKey() EntityKey
+	// GetUID returns UID of the pod group.
+	GetUID() types.UID
+	// GetObject returns a raw runtime.Object representing the pod group.
+	GetObject() runtime.Object
 	// GetPodGroup returns the PodGroup API object or nil if the group is a composite pod group.
 	GetPodGroup() *schedulingv1beta1.PodGroup
 	// GetCompositePodGroup returns the associated composite pod group or nil if the group is not a composite pod group.
@@ -827,6 +832,22 @@ func (gpg *GenericPodGroup) GetCompositePodGroup() *schedulingv1alpha3.Composite
 	return gpg.CompositePodGroup
 }
 
+// GetObject returns a raw runtime.Object representing the wrapped object.
+func (gpg *GenericPodGroup) GetObject() runtime.Object {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup
+	}
+	return gpg.CompositePodGroup
+}
+
+// GetUID returns UID of the wrapped object.
+func (gpg *GenericPodGroup) GetUID() types.UID {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.UID
+	}
+	return gpg.CompositePodGroup.UID
+}
+
 // GetName returns a name of the wrapped object.
 func (gpg *GenericPodGroup) GetName() string {
 	if gpg.PodGroup != nil {
@@ -911,4 +932,15 @@ func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
 		return v1.PreemptionPolicy(*cpg.Spec.PreemptionPolicy)
 	}
 	return v1.PreemptLowerPriority
+}
+
+// HasDisruptionModeAll returns true if the wrapped object has disruption mode All.
+func (gpg *GenericPodGroup) HasDisruptionModeAll() bool {
+	if pg := gpg.PodGroup; pg != nil && pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil {
+		return true
+	}
+	if cpg := gpg.CompositePodGroup; cpg != nil && cpg.Spec.DisruptionMode != nil && cpg.Spec.DisruptionMode.All != nil {
+		return true
+	}
+	return false
 }
