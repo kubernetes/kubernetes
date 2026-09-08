@@ -105,7 +105,7 @@ func (si *threadedStoreIndexer) Get(obj interface{}) (item interface{}, exists b
 	return si.store.Get(obj)
 }
 
-func (si *threadedStoreIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
+func (si *threadedStoreIndexer) GetByKey(key string) (*Element, bool) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.GetByKey(key)
@@ -121,7 +121,7 @@ func (si *threadedStoreIndexer) Replace(objs []interface{}, resourceVersion stri
 	return si.indexer.Replace(objs, resourceVersion)
 }
 
-func (si *threadedStoreIndexer) ByIndex(indexName, indexValue string) ([]interface{}, error) {
+func (si *threadedStoreIndexer) ByIndex(indexName, indexValue string) ([]*Element, error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.indexer.ByIndex(indexName, indexValue)
@@ -214,8 +214,8 @@ func (s *btreeStore) Get(obj interface{}) (item interface{}, exists bool, err er
 	return item, exists, nil
 }
 
-func (s *btreeStore) GetByKey(key string) (item interface{}, exists bool, err error) {
-	return s.getByKey(key)
+func (s *btreeStore) GetByKey(key string) (*Element, bool) {
+	return s.tree.Get(&Element{Key: key})
 }
 
 func (s *btreeStore) Replace(objs []interface{}, _ string) error {
@@ -237,41 +237,27 @@ func (s *btreeStore) addOrUpdateElem(storeElem *Element) *Element {
 	return oldObj
 }
 
-func (s *btreeStore) getByKey(key string) (item interface{}, exists bool, err error) {
-	keyElement := &Element{Key: key}
-	item, exists = s.tree.Get(keyElement)
-	return item, exists, nil
-}
-
 func (s *btreeStore) RangePrefix(prefix, continueKey string) Range {
-	return prefixRange{s, prefix, continueKey}
+	return btreeRange{tree: s.tree, prefix: prefix, startKey: max(prefix, continueKey)}
 }
 
-func (s *btreeStore) rangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
-	if continueKey == "" {
-		continueKey = prefix
-	}
-	return func(yield func(*Element, error) bool) {
-		s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
-			if !strings.HasPrefix(item.Key, prefix) {
-				return false
-			}
-			return yield(item, nil)
+type btreeRange struct {
+	tree             *btree.BTree[*Element]
+	prefix, startKey string
+}
+
+func (r btreeRange) All() iter.Seq[*Element] {
+	return func(yield func(*Element) bool) {
+		r.tree.AscendGreaterOrEqual(&Element{Key: r.startKey}, func(item *Element) bool {
+			return strings.HasPrefix(item.Key, r.prefix) && yield(item)
 		})
 	}
 }
 
-func (s *btreeStore) countPrefix(prefix, continueKey string) (count int) {
-	if continueKey == "" {
-		continueKey = prefix
-	}
-	s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
-		if !strings.HasPrefix(item.Key, prefix) {
-			return false
-		}
+func (r btreeRange) Count() (count int) {
+	for range r.All() {
 		count++
-		return true
-	})
+	}
 	return count
 }
 
@@ -295,14 +281,14 @@ type indexer struct {
 	indexers cache.Indexers
 }
 
-func (i *indexer) ByIndex(indexName, indexValue string) ([]interface{}, error) {
+func (i *indexer) ByIndex(indexName, indexValue string) ([]*Element, error) {
 	indexFunc := i.indexers[indexName]
 	if indexFunc == nil {
 		return nil, fmt.Errorf("index with name %s does not exist", indexName)
 	}
 	index := i.indices[indexName]
 	set := index[indexValue]
-	list := make([]interface{}, 0, len(set))
+	list := make([]*Element, 0, len(set))
 	for _, obj := range set {
 		list = append(list, obj)
 	}

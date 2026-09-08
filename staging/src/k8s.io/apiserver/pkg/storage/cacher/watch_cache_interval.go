@@ -230,31 +230,25 @@ func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	if s.exhausted {
 		return nil, nil
 	}
-	if err := s.fillBuffer(); err != nil {
-		return nil, err
-	}
+	s.fillBuffer()
 	event, _ := s.buffer.next()
 	return event, nil
 }
 
-func (s *snapshotCacheIntervalSource) fillBuffer() error {
+func (s *snapshotCacheIntervalSource) fillBuffer() {
 	if s.buffer.buffer == nil {
 		s.buffer.buffer = make([]*watchCacheEvent, bufferSize)
 	}
 	s.buffer.startIndex, s.buffer.endIndex = 0, 0
-	for elem, err := range s.snapshot.RangePrefix("", s.nextKey).All() {
-		if err != nil {
-			return err
-		}
+	for elem := range s.snapshot.RangePrefix("", s.nextKey).All() {
 		s.buffer.buffer[s.buffer.endIndex] = storeElementToWatchCacheEvent(elem, s.resourceVersion)
 		s.buffer.endIndex++
 		if s.buffer.isFull() {
 			s.nextKey = elem.Key + "\x00"
-			return nil
+			return
 		}
 	}
 	s.exhausted = true
-	return nil
 }
 
 const bufferSize = 100

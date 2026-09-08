@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"iter"
 	"reflect"
+	"slices"
 	"sort"
 	"sync"
 	"testing"
@@ -532,8 +533,8 @@ type countingSnapshot struct {
 	rangePrefixCalls int
 }
 
-func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
-	return nil, false, nil
+func (s *countingSnapshot) GetByKey(string) (*store.Element, bool) {
+	return nil, false
 }
 
 func (s *countingSnapshot) RangePrefix(_, continueKey string) store.Range {
@@ -549,14 +550,8 @@ func (s *countingSnapshot) RangePrefix(_, continueKey string) store.Range {
 
 type elementsRange []*store.Element
 
-func (r elementsRange) All() iter.Seq2[*store.Element, error] {
-	return func(yield func(*store.Element, error) bool) {
-		for _, elem := range r {
-			if !yield(elem, nil) {
-				return
-			}
-		}
-	}
+func (r elementsRange) All() iter.Seq[*store.Element] {
+	return slices.Values(r)
 }
 
 func (r elementsRange) Count() int {

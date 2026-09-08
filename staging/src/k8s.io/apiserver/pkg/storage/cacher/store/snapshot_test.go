@@ -61,11 +61,7 @@ func TestSnapshotRangePrefix(t *testing.T) {
 		{
 			name: "listSnapshot",
 			newSnapshot: func(t *testing.T) Snapshot {
-				items := make([]interface{}, 0, len(elements))
-				for _, elem := range elements {
-					items = append(items, elem)
-				}
-				return listSnapshot{Items: items}
+				return listSnapshot(elements)
 			},
 		},
 	}
@@ -94,8 +90,7 @@ func TestSnapshotRangePrefix(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					r := snapshot.RangePrefix(tc.prefix, tc.continueKey)
 					var ranged []string
-					for elem, err := range r.All() {
-						require.NoError(t, err)
+					for elem := range r.All() {
 						ranged = append(ranged, elem.Key)
 					}
 					assert.Equal(t, tc.expectKeys, ranged, "RangePrefix")
@@ -118,8 +113,7 @@ func TestSingleElementRange(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var keys []string
-			for e, err := range tc.r.All() {
-				require.NoError(t, err)
+			for e := range tc.r.All() {
 				keys = append(keys, e.Key)
 			}
 			assert.Equal(t, tc.expectKeys, keys)
