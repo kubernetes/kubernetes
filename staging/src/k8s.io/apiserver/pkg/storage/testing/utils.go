@@ -166,8 +166,8 @@ func testCheckResultFunc(t *testing.T, w watch.Interface, check func(actualEvent
 		if co, ok := obj.(runtime.CacheableObject); ok {
 			res.Object = co.GetObject()
 		}
-		if withRecordTime, ok := res.Object.(storage.WatchEventWithRecordTime); ok {
-			res.Object = withRecordTime.Unwrap()
+		if withTimestamps, ok := res.Object.(storage.WatchEventWithTimestamps); ok {
+			res.Object = withTimestamps.Unwrap()
 		}
 		check(res)
 	case <-time.After(wait.ForeverTestTimeout):
@@ -184,8 +184,8 @@ func testCheckResultWithIgnoreFunc(t *testing.T, w watch.Interface, expectedEven
 			if co, ok := obj.(runtime.CacheableObject); ok {
 				event.Object = co.GetObject()
 			}
-			if withRecordTime, ok := event.Object.(storage.WatchEventWithRecordTime); ok {
-				event.Object = withRecordTime.Unwrap()
+			if withTimestamps, ok := event.Object.(storage.WatchEventWithTimestamps); ok {
+				event.Object = withTimestamps.Unwrap()
 			}
 			if ignore != nil && ignore(event) {
 				continue

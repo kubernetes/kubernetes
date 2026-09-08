@@ -39,8 +39,15 @@ const (
 type DispatchPoint int
 
 const (
-	// PointStorageDecoded: the event was decoded from the storage backend (etcd).
-	PointStorageDecoded DispatchPoint = iota
+	// PointStorageReceived: the backend (etcd) response carrying the event was
+	// received by the storage layer. This is the start of the timeline.
+	PointStorageReceived DispatchPoint = iota
+	// PointStorageDecodeStarted: the storage layer dequeued the event from its
+	// incoming channel and began transforming and decoding it.
+	PointStorageDecodeStarted
+	// PointStorageDecoded: the event was fully transformed and decoded, and is
+	// about to be sent on the storage layer's result channel.
+	PointStorageDecoded
 	// PointCacheReceived: the event was first processed by the cacher's reflector loop.
 	PointCacheReceived
 	// PointEventBuilt: the outgoing watch.Event was built (filter + convert).
@@ -69,13 +76,32 @@ func (tl *DispatchTimeline) MarkAt(p DispatchPoint, t time.Time) { tl[p] = t }
 // dispatchStages declares the labeled intervals emitted from a DispatchTimeline.
 // Adding a stage is a single entry here; "total" spans the whole delivery. The
 // additive stages need not partition "total" (only a subset of points may be set).
+//
+// Stages are named after the queue or work where the time is spent, not after
+// their endpoints, so that a label alone says what a growing value means.
+//
+// The three storage_* stages partition the storage layer's share of the
+// delivery: an event waits in the storage layer's incoming channel, is
+// transformed and decoded, then waits in its result channel until the cacher's
+// reflector picks it up. Which of the three grows tells which goroutine is
+// behind: the decoder (storage_incoming_queue), the decode cost itself
+// (storage_decode), or the reflector (storage_result_queue), which stalls
+// whenever the watch cache or the dispatch loop behind it is slow.
+//
+// watcher_result_send only measures time blocked sending on the watcher's
+// result channel; while that buffer has room it is near zero regardless of how
+// far behind the HTTP handler is. The span from PointCacheReceived to
+// PointEventBuilt (watch cache update, dispatch loop, per-watcher input queue)
+// has no stage yet.
 var dispatchStages = []struct {
 	label    string
 	from, to DispatchPoint
 }{
-	{"storage_to_cache", PointStorageDecoded, PointCacheReceived},
-	{"watcher_to_client_handler", PointEventBuilt, PointSentToClient},
-	{"total", PointStorageDecoded, PointSentToClient},
+	{"storage_incoming_queue", PointStorageReceived, PointStorageDecodeStarted},
+	{"storage_decode", PointStorageDecodeStarted, PointStorageDecoded},
+	{"storage_result_queue", PointStorageDecoded, PointCacheReceived},
+	{"watcher_result_send", PointEventBuilt, PointSentToClient},
+	{"total", PointStorageReceived, PointSentToClient},
 }
 
 /*
@@ -286,7 +312,7 @@ var (
 			Namespace:      namespace,
 			Subsystem:      "watch_events",
 			Name:           "dispatch_duration_seconds",
-			Help:           "Histogram of watch event dispatch latency broken by resource type and pipeline stage. The 'total' stage is the end-to-end latency of a delivered event.",
+			Help:           "Histogram of watch event dispatch latency broken down by resource type and pipeline stage. Stages: storage_incoming_queue (received from etcd until decoding begins), storage_decode (transform and decode), storage_result_queue (decoded until the watch cache's reflector takes the event), watcher_result_send (blocked handing the event to the HTTP handler), total (received from etcd until handed to the HTTP handler). The stages do not cover the whole pipeline and need not sum to total.",
 			StabilityLevel: compbasemetrics.ALPHA,
 			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 		}, []string{"group", "resource", "stage"})
