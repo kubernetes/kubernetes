@@ -19,6 +19,7 @@ package cacher
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"reflect"
 	"sort"
 	"sync"
@@ -529,8 +530,8 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 }
 
 type countingSnapshot struct {
-	items                  []interface{}
-	orderedListPrefixCalls int
+	items            []interface{}
+	rangePrefixCalls int
 }
 
 func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
@@ -538,16 +539,36 @@ func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
 }
 
 func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error) {
-	s.orderedListPrefixCalls++
 	return s.items, nil
 }
 
-func (s *countingSnapshot) RangePrefix(_, _ string) store.Range {
-	return nil
+func (s *countingSnapshot) RangePrefix(_, continueKey string) store.Range {
+	s.rangePrefixCalls++
+	var elems []*store.Element
+	for _, item := range s.items {
+		if elem := item.(*store.Element); elem.Key >= continueKey {
+			elems = append(elems, elem)
+		}
+	}
+	return elementsRange(elems)
 }
 
-// TestLazySnapshotCacheIntervalSourceEmpty checks that on an empty snapshot Next() returns
-// no events, and that repeated calls still read the snapshot only once.
+type elementsRange []*store.Element
+
+func (r elementsRange) All() iter.Seq2[*store.Element, error] {
+	return func(yield func(*store.Element, error) bool) {
+		for _, elem := range r {
+			if !yield(elem, nil) {
+				return
+			}
+		}
+	}
+}
+
+func (r elementsRange) Count() int {
+	return len(r)
+}
+
 func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
 	snap := &countingSnapshot{}
 	wci := newCacheIntervalFromLazySnapshot(100, snap)
@@ -561,7 +582,7 @@ func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
 			t.Errorf("expected nil event from empty snapshot, got %v", *event)
 		}
 	}
-	if snap.orderedListPrefixCalls != 1 {
-		t.Errorf("expected OrderedListPrefix to be called once, got %d", snap.orderedListPrefixCalls)
+	if snap.rangePrefixCalls != 1 {
+		t.Errorf("expected the snapshot to be ranged once, got %d", snap.rangePrefixCalls)
 	}
 }
