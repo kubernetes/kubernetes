@@ -141,20 +141,11 @@ func run(tCtx ktesting.TContext, whatRE string) {
 		features map[featuregate.Feature]bool
 		f        func(tCtx ktesting.TContext)
 	}{
-		"disabled": {
-			version:  "1.34", // In 1.34 it was still possible to disable DRA.
-			apis:     map[schema.GroupVersion]bool{resourceapi.SchemeGroupVersion: false},
-			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: false},
-			f: func(tCtx ktesting.TContext) {
-				runSubTest(tCtx, "APIDisabled", testAPIDisabled)
-				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, false) })
-			},
-		},
 		"default": {
 			apis:     map[schema.GroupVersion]bool{},
 			features: map[featuregate.Feature]bool{},
 			f: func(tCtx ktesting.TContext) {
-				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				runSubTest(tCtx, "Pod", testPod)
 				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, false) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceCompatibilityGroups, features.DRAOptionalNodeOperations)
@@ -201,7 +192,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "NoScheduleWithSlices", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useNoRule) })
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, false) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
-				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				runSubTest(tCtx, "Pod", testPod)
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRAPartitionableDevices, features.DRADeviceBindingConditions, features.DRAOptionalNodeOperations)
 				})
@@ -228,7 +219,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
-				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				runSubTest(tCtx, "Pod", testPod)
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions, features.DRAOptionalNodeOperations)
 				})
@@ -243,7 +234,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
-				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				runSubTest(tCtx, "Pod", testPod)
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions, features.DRAOptionalNodeOperations)
 				})
@@ -267,7 +258,6 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				resourcev1beta2.SchemeGroupVersion: true,
 			},
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation:    true,
 				features.DRADeviceTaintRules:          true,
 				features.DRADeviceCompatibilityGroups: true,
 			},

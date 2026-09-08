@@ -248,8 +248,6 @@
 
 ## SchedulingWithExtendedResource uses pods with extended resources requests.
 - name: SchedulingWithExtendedResource
-  featureGates:
-    DynamicResourceAllocation: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutExtendedResource

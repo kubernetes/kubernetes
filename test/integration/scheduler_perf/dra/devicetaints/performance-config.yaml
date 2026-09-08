@@ -21,7 +21,6 @@
 # with a claim template that tolerates the taint defined in a DeviceTaintRule.
 - name: DeviceTaintToleration
   featureGates:
-    DynamicResourceAllocation: true
     DRADeviceTaints: true
   workloadTemplate:
   - opcode: createNodes
