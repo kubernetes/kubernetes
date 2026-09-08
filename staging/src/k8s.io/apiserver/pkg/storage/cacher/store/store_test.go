@@ -78,7 +78,7 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	require.NoError(t, store.Add(testStorageElement("foo", "bar", 1)))
 	items, err = store.ByIndex("by_val", "bar")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "bar", 1),
 	}, items)
 
@@ -88,7 +88,7 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	assert.Empty(t, items)
 	items, err = store.ByIndex("by_val", "baz")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "baz", 2),
 	}, items)
 
@@ -98,7 +98,7 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	assert.Empty(t, items)
 	items, err = store.ByIndex("by_val", "baz")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "baz", 3),
 	}, items)
 
@@ -107,7 +107,7 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	}, ""))
 	items, err = store.ByIndex("by_val", "bar")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "bar", 4),
 	}, items)
 	items, err = store.ByIndex("by_val", "baz")
@@ -128,10 +128,9 @@ func assertStoreEmpty(t *testing.T, store Indexer, nonExistingKey string) {
 	assert.False(t, ok)
 	assert.Nil(t, item)
 
-	item, ok, err = store.GetByKey(nonExistingKey)
-	require.NoError(t, err)
+	elem, ok := store.GetByKey(nonExistingKey)
 	assert.False(t, ok)
-	assert.Nil(t, item)
+	assert.Nil(t, elem)
 
 	items := store.List()
 	assert.Empty(t, items)
@@ -143,10 +142,9 @@ func assertStoreSingleKey(t *testing.T, store Indexer, expectKey, expectValue st
 	assert.True(t, ok)
 	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
 
-	item, ok, err = store.GetByKey(expectKey)
-	require.NoError(t, err)
+	elem, ok := store.GetByKey(expectKey)
 	assert.True(t, ok)
-	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
+	assert.Equal(t, expectValue, elem.Object.(fakeObj).value)
 
 	items := store.List()
 	assert.Equal(t, []interface{}{testStorageElement(expectKey, expectValue, expectRV)}, items)

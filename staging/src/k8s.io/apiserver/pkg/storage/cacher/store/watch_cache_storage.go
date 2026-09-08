@@ -18,7 +18,6 @@ package store
 
 import (
 	"fmt"
-	"iter"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -111,45 +110,26 @@ func (w *WatchCacheStorage) LatestSnapshotOrCloneLocked() Snapshot {
 }
 
 // listSnapshot serves an unordered index bucket.
-type listSnapshot struct {
-	Items []interface{}
-}
+type listSnapshot []*Element
 
-var _ Snapshot = (*listSnapshot)(nil)
-
-func (l listSnapshot) GetByKey(key string) (interface{}, bool, error) {
-	for _, item := range l.Items {
-		elem, ok := item.(*Element)
-		if ok && elem.Key == key {
-			return item, true, nil
+func (l listSnapshot) GetByKey(key string) (*Element, bool) {
+	for _, elem := range l {
+		if elem.Key == key {
+			return elem, true
 		}
 	}
-	return nil, false, nil
+	return nil, false
 }
 
 func (l listSnapshot) RangePrefix(prefix, continueKey string) Range {
-	var matching elements
-	for _, item := range l.Items {
-		elem, ok := item.(*Element)
-		if !ok {
-			return failedRange{fmt.Errorf("non *Element returned from storage: %v", item)}
-		}
+	var matching []*Element
+	for _, elem := range l {
 		if continueKey <= elem.Key && key.HasPathPrefix(elem.Key, prefix) {
 			matching = append(matching, elem)
 		}
 	}
 	slices.SortFunc(matching, func(a, b *Element) int { return strings.Compare(a.Key, b.Key) })
-	return matching
-}
-
-type failedRange struct{ err error }
-
-func (r failedRange) All() iter.Seq2[*Element, error] {
-	return func(yield func(*Element, error) bool) { yield(nil, r.err) }
-}
-
-func (r failedRange) Count() int {
-	return 0
+	return elements(matching)
 }
 
 // Get takes runtime.Object as a parameter. However, it returns
@@ -167,8 +147,7 @@ func (w *WatchCacheStorage) Get(obj interface{}) (interface{}, bool, error) {
 	return w.store.Get(&Element{Key: key, Object: object})
 }
 
-// GetByKey returns pointer to <storeElement>.
-func (w *WatchCacheStorage) GetByKey(key string) (interface{}, bool, error) {
+func (w *WatchCacheStorage) GetByKey(key string) (*Element, bool) {
 	return w.store.GetByKey(key)
 }
 
@@ -242,7 +221,7 @@ func (w *WatchCacheStorage) GetByIndexSnapshot(indexName, value string) (Snapsho
 	if err != nil {
 		return nil, err
 	}
-	return listSnapshot{Items: result}, nil
+	return listSnapshot(result), nil
 }
 
 // ListResourceVersion returns the list resource version.

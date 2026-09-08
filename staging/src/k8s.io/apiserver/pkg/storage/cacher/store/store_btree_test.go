@@ -98,7 +98,7 @@ func (f fakeIndexer) Add(obj interface{}) error    { return nil }
 func (f fakeIndexer) Update(obj interface{}) error { return nil }
 func (f fakeIndexer) Delete(obj interface{}) error { return nil }
 func (f fakeIndexer) Clone() Snapshot              { return f }
-func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]interface{}, error) {
+func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]*Element, error) {
 	return nil, nil
 }
 
@@ -106,8 +106,8 @@ func (f fakeIndexer) Get(obj interface{}) (item interface{}, exists bool, err er
 	return nil, false, nil
 }
 
-func (f fakeIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
-	return nil, false, nil
+func (f fakeIndexer) GetByKey(key string) (*Element, bool) {
+	return nil, false
 }
 
 func (f fakeIndexer) List() []interface{} {
@@ -121,7 +121,7 @@ func (f fakeIndexer) ListKeys() []string {
 func (f fakeIndexer) Replace([]interface{}, string) error {
 	return nil
 }
-func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) Range { return nil }
+func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) Range { return EmptyRange() }
 
 type fakeSnapshotter struct {
 	getLessOrEqual func(rv uint64) (Snapshot, bool)

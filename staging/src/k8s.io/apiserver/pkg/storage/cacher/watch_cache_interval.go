@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/watch"
@@ -249,12 +250,7 @@ type lazySnapshotCacheIntervalSource struct {
 
 func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	if !s.loaded {
-		for elem, err := range s.snapshot.RangePrefix("", "").All() {
-			if err != nil {
-				return nil, err
-			}
-			s.items = append(s.items, elem)
-		}
+		s.items = slices.Collect(s.snapshot.RangePrefix("", "").All())
 		s.loaded = true
 	}
 	if s.currentIndex >= len(s.items) {

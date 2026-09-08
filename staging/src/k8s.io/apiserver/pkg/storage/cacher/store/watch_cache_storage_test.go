@@ -117,11 +117,8 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	val, ok, err := snap.GetByKey("foo")
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if !ok || val.(*Element).Object.(*mockObject).val != "20" {
+	val, ok := snap.GetByKey("foo")
+	if !ok || val.Object.(*mockObject).val != "20" {
 		t.Fatalf("Unexpected element in snapshot")
 	}
 
@@ -146,11 +143,8 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	val, ok, err = snap30.GetByKey("foo")
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if !ok || val.(*Element).Object.(*mockObject).val != "30" {
+	val, ok = snap30.GetByKey("foo")
+	if !ok || val.Object.(*mockObject).val != "30" {
 		t.Fatalf("Unexpected element in snapshot at RV 30")
 	}
 }
@@ -278,8 +272,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 func allElements(t *testing.T, snapshot Snapshot) []*Element {
 	t.Helper()
 	var elems []*Element
-	for elem, err := range snapshot.RangePrefix("", "").All() {
-		require.NoError(t, err)
+	for elem := range snapshot.RangePrefix("", "").All() {
 		elems = append(elems, elem)
 	}
 	return elems

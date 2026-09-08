@@ -19,6 +19,7 @@ package store
 import (
 	"fmt"
 	"iter"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -66,22 +67,22 @@ type Indexer interface {
 	List() []interface{}
 	ListKeys() []string
 	Get(obj interface{}) (item interface{}, exists bool, err error)
-	GetByKey(key string) (item interface{}, exists bool, err error)
+	GetByKey(key string) (*Element, bool)
 	Replace([]interface{}, string) error
-	ByIndex(indexName, indexedValue string) ([]interface{}, error)
+	ByIndex(indexName, indexedValue string) ([]*Element, error)
 	Clone() Snapshot
 }
 
 // Snapshot is an immutable point-in-time view of the store.
 type Snapshot interface {
-	GetByKey(key string) (item interface{}, exists bool, err error)
+	GetByKey(key string) (*Element, bool)
 	RangePrefix(prefix, continueKey string) Range
 }
 
 // Range is the elements of a Snapshot with a given key prefix, in key
 // order, starting from continueKey.
 type Range interface {
-	All() iter.Seq2[*Element, error]
+	All() iter.Seq[*Element]
 	Count() int
 }
 
@@ -95,36 +96,12 @@ func EmptyRange() Range {
 
 type elements []*Element
 
-func (e elements) All() iter.Seq2[*Element, error] {
-	return func(yield func(*Element, error) bool) {
-		for _, elem := range e {
-			if !yield(elem, nil) {
-				return
-			}
-		}
-	}
+func (e elements) All() iter.Seq[*Element] {
+	return slices.Values(e)
 }
 
 func (e elements) Count() int {
 	return len(e)
-}
-
-type prefixRanger interface {
-	rangePrefix(prefix, continueKey string) iter.Seq2[*Element, error]
-	countPrefix(prefix, continueKey string) int
-}
-
-type prefixRange struct {
-	snapshot            prefixRanger
-	prefix, continueKey string
-}
-
-func (r prefixRange) All() iter.Seq2[*Element, error] {
-	return r.snapshot.rangePrefix(r.prefix, r.continueKey)
-}
-
-func (r prefixRange) Count() int {
-	return r.snapshot.countPrefix(r.prefix, r.continueKey)
 }
 
 func NewIndexer(indexers *cache.Indexers) Indexer {

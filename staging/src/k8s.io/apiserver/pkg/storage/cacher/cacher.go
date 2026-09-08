@@ -708,7 +708,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		return err
 	}
 
-	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, getRV, key)
+	elem, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, getRV, key)
 	if err != nil {
 		return err
 	}
@@ -716,10 +716,6 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	defer span.End(500 * time.Millisecond)
 
 	if exists {
-		elem, ok := obj.(*store.Element)
-		if !ok {
-			return fmt.Errorf("non *store.Element returned from storage: %v", obj)
-		}
 		objVal.Set(reflect.ValueOf(elem.Object).Elem())
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
@@ -805,10 +801,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			hasMoreListItems = true
 		}
 		listVal.Set(reflect.MakeSlice(listVal.Type(), count, count))
-		for elem, err := range resp.All() {
-			if err != nil {
-				return err
-			}
+		for elem := range resp.All() {
 			listVal.Index(numFetched).Set(reflect.ValueOf(elem.Object).Elem())
 			lastSelectedObjectKey = elem.Key
 			numFetched++
@@ -822,10 +815,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
 		//   so we try to delay this action as much as possible
 		var selectedObjects []runtime.Object
-		for elem, err := range resp.All() {
-			if err != nil {
-				return err
-			}
+		for elem := range resp.All() {
 			numFetched++
 			if limit > 0 && int64(len(selectedObjects)) >= limit {
 				// Reaching an item past a full page is how we learn a continuation is needed.
@@ -834,6 +824,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			}
 			shardMatch := true
 			if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+				var err error
 				shardMatch, err = opts.Predicate.MatchesSharding(elem.Object)
 				if err != nil {
 					return fmt.Errorf("shard matching failed: %w", err)

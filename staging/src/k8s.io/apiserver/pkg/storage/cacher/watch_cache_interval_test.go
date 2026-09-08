@@ -530,8 +530,8 @@ type countingSnapshot struct {
 	rangePrefixCalls int
 }
 
-func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
-	return nil, false, nil
+func (s *countingSnapshot) GetByKey(string) (*store.Element, bool) {
+	return nil, false
 }
 
 func (s *countingSnapshot) RangePrefix(_, _ string) store.Range {
