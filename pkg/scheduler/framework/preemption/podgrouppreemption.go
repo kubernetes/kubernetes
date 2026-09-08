@@ -69,7 +69,7 @@ func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor, fts feature.Feature
 func (ev *PodGroupEvaluator) evaluate(ctx context.Context, preemptor *podGroupPreemptor, domain *domain, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.PreemptionEvaluationDuration.WithLabelValues("podgroup", status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionEvaluationDuration.WithLabelValues(preemptor.getType(), status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	pdbs, err := getPodDisruptionBudgets(ev.pdbLister)
