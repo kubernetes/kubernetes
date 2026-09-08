@@ -4291,7 +4291,7 @@ func TestQueuedPodGroupInfo_ForEachPodInfo(t *testing.T) {
 	}
 }
 
-func TestPodGroupInfo_GetUnscheduledPods(t *testing.T) {
+func TestPodGroupInfo_GetAllUnscheduledPods(t *testing.T) {
 	pod1 := st.MakePod().Name("pod1").Namespace("ns1").Obj()
 	pod2 := st.MakePod().Name("pod2").Namespace("ns1").Obj()
 	pod3 := st.MakePod().Name("pod3").Namespace("ns1").Obj()
@@ -4365,7 +4365,7 @@ func TestPodGroupInfo_GetUnscheduledPods(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.pgi.GetUnscheduledPods()
+			got := tt.pgi.GetAllUnscheduledPods()
 			if diff := cmp.Diff(tt.expected, got); diff != "" {
 				t.Errorf("GetUnscheduledPods() mismatch (-want +got):\n%s", diff)
 			}

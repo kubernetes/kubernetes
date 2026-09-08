@@ -23,8 +23,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,7 +34,6 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kube-scheduler/util"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -65,7 +62,7 @@ type ExecutorPreemptor interface {
 	// Priority returns the priority of the preemptor.
 	Priority() int32
 	// Type returns the type of the preemptor.
-	Type() string
+	Type() fwk.EntityKeyType
 }
 
 // Executor is responsible for actuating the preemption process based on the provided candidate.
@@ -177,12 +174,7 @@ func (e *Executor) actuatePodPreemption(ctx context.Context, candidate Candidate
 
 // actuatePodGroupPreemption actuates the preemption given preemptor pods, pod group and a list of victims to be evicted.
 func (e *Executor) actuatePodGroupPreemption(ctx context.Context, candidate Candidate, pgInfo fwk.PodGroupInfo, pluginName string) *fwk.Status {
-	var podGroupPreemptor ExecutorPreemptor
-	if pgInfo.GetCompositePodGroup() != nil {
-		podGroupPreemptor = &compositePodGroupExecutorPreemptor{cpg: pgInfo.GetCompositePodGroup(), pods: pgInfo.GetUnscheduledPods()}
-	} else {
-		podGroupPreemptor = &podGroupExecutorPreemptor{pg: pgInfo.GetPodGroup(), pods: pgInfo.GetUnscheduledPods()}
-	}
+	podGroupPreemptor := &podGroupExecutorPreemptor{GenericPodGroup: pgInfo.GetGenericPodGroup(), pods: pgInfo.GetAllUnscheduledPods()}
 	if e.fts.EnableAsyncPreemption {
 		e.prepareCandidateAsync(candidate, podGroupPreemptor, pluginName)
 		return nil
@@ -237,7 +229,7 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 		startTime := time.Now()
 		result := metrics.GoroutineResultSuccess
 		defer func() {
-			metrics.PreemptionExecutionDuration.WithLabelValues(preemptor.Type(), result).Observe(metrics.SinceInSeconds(startTime))
+			metrics.PreemptionExecutionDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), result).Observe(metrics.SinceInSeconds(startTime))
 		}()
 		defer func() {
 			metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
@@ -321,7 +313,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 	startTime := time.Now()
 	metricsResult := metrics.GoroutineResultSuccess
 	defer func() {
-		metrics.PreemptionExecutionDuration.WithLabelValues(preemptor.Type(), metricsResult).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionExecutionDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), metricsResult).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	fh := e.fh
@@ -362,20 +354,20 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 
 func observeVictims(preemptor ExecutorPreemptor, candidate Candidate) {
 	numVictims := float64(len(candidate.Victims().Pods))
-	if preemptor.Type() == string(fwk.PodGroupKeyType) || preemptor.Type() == string(fwk.CompositePodGroupKeyType) {
-		metrics.WorkloadPreemptionVictims.Observe(numVictims)
-	} else {
+	if preemptor.Type() == fwk.PodKeyType {
 		metrics.PreemptionVictims.Observe(numVictims)
+	} else {
+		metrics.WorkloadPreemptionVictims.Observe(numVictims)
 	}
 
 	workloadDisruptions := float64(candidate.NumPodGroupDisruptions())
 	if workloadDisruptions > 0 {
-		metrics.PreemptionWorkloadDisruptions.WithLabelValues(preemptor.Type()).Observe(workloadDisruptions)
+		metrics.PreemptionWorkloadDisruptions.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type())).Observe(workloadDisruptions)
 	}
 
 	numPDBViolations := float64(candidate.Victims().NumPDBViolations)
 	if numPDBViolations > 0 {
-		metrics.PreemptionPDBViolations.WithLabelValues(preemptor.Type()).Add(numPDBViolations)
+		metrics.PreemptionPDBViolations.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type())).Add(numPDBViolations)
 	}
 }
 
@@ -477,14 +469,6 @@ func (p *podExecutorPreemptor) SchedulerName() string {
 	return p.Spec.SchedulerName
 }
 
-func (p *podExecutorPreemptor) GetName() string {
-	return p.Name
-}
-
-func (p *podExecutorPreemptor) GetNamespace() string {
-	return p.Namespace
-}
-
 func (p *podExecutorPreemptor) Obj() runtime.Object {
 	return p
 }
@@ -497,18 +481,18 @@ func (p *podExecutorPreemptor) Priority() int32 {
 	return corev1helpers.PodPriority(p.Pod)
 }
 
-func (p *podExecutorPreemptor) Type() string {
-	return string(fwk.PodKeyType)
+func (p *podExecutorPreemptor) Type() fwk.EntityKeyType {
+	return fwk.PodKeyType
 }
 
-// podGroupExecutorPreemptor is a wrapper around pod group used by preemption execution.
+// podGroupExecutorPreemptor is a wrapper around generic pod group used by preemption execution.
 type podGroupExecutorPreemptor struct {
-	pg   *schedulingv1beta1.PodGroup
+	*fwk.GenericPodGroup
 	pods []*v1.Pod
 }
 
 func (p *podGroupExecutorPreemptor) UID() types.UID {
-	return p.pg.UID
+	return p.GetUID()
 }
 
 func (p *podGroupExecutorPreemptor) SchedulerName() string {
@@ -516,20 +500,12 @@ func (p *podGroupExecutorPreemptor) SchedulerName() string {
 	return p.pods[0].Spec.SchedulerName
 }
 
-func (p *podGroupExecutorPreemptor) GetName() string {
-	return p.pg.Name
-}
-
-func (p *podGroupExecutorPreemptor) GetNamespace() string {
-	return p.pg.Namespace
-}
-
 func (p *podGroupExecutorPreemptor) Obj() runtime.Object {
-	return p.pg
+	return p.GetObject()
 }
 
 func (p *podGroupExecutorPreemptor) Priority() int32 {
-	return util.PodGroupPriority(p.pg)
+	return p.GetPriority()
 }
 
 func (p *podGroupExecutorPreemptor) Pods() map[string]*v1.Pod {
@@ -540,49 +516,6 @@ func (p *podGroupExecutorPreemptor) Pods() map[string]*v1.Pod {
 	return m
 }
 
-func (p *podGroupExecutorPreemptor) Type() string {
-	return string(fwk.PodGroupKeyType)
-}
-
-// compositePodGroupExecutorPreemptor is a wrapper around composite pod group used by preemption execution.
-type compositePodGroupExecutorPreemptor struct {
-	cpg  *schedulingv1alpha3.CompositePodGroup
-	pods []*v1.Pod
-}
-
-func (p *compositePodGroupExecutorPreemptor) UID() types.UID {
-	return p.cpg.UID
-}
-
-func (p *compositePodGroupExecutorPreemptor) SchedulerName() string {
-	// All pods in a composite pod group should use the same scheduler name.
-	return p.pods[0].Spec.SchedulerName
-}
-
-func (p *compositePodGroupExecutorPreemptor) GetName() string {
-	return p.cpg.Name
-}
-
-func (p *compositePodGroupExecutorPreemptor) GetNamespace() string {
-	return p.cpg.Namespace
-}
-
-func (p *compositePodGroupExecutorPreemptor) Obj() runtime.Object {
-	return p.cpg
-}
-
-func (p *compositePodGroupExecutorPreemptor) Priority() int32 {
-	return util.CompositePodGroupPriority(p.cpg)
-}
-
-func (p *compositePodGroupExecutorPreemptor) Pods() map[string]*v1.Pod {
-	m := make(map[string]*v1.Pod, len(p.pods))
-	for _, pod := range p.pods {
-		m[pod.Name] = pod
-	}
-	return m
-}
-
-func (p *compositePodGroupExecutorPreemptor) Type() string {
-	return string(fwk.CompositePodGroupKeyType)
+func (p *podGroupExecutorPreemptor) Type() fwk.EntityKeyType {
+	return p.GetType()
 }

@@ -21,98 +21,41 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kube-scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 type podGroupPreemptor struct {
-	priority          int32
-	pods              []*v1.Pod
-	podGroup          *schedulingv1beta1.PodGroup
-	compositePodGroup *schedulingv1alpha3.CompositePodGroup
-	preemptionPolicy  schedulingv1beta1.PreemptionPolicy
+	*fwk.GenericPodGroup
+	pods             []*v1.Pod
+	preemptionPolicy v1.PreemptionPolicy
 }
 
 func newPodGroupPreemptor(pgInfo fwk.PodGroupInfo, enablePodGroupPreemptionPolicy bool) *podGroupPreemptor {
 	p := &podGroupPreemptor{
-		pods: pgInfo.GetUnscheduledPods(),
+		GenericPodGroup: pgInfo.GetGenericPodGroup(),
+		pods:            pgInfo.GetAllUnscheduledPods(),
 	}
-	if pgInfo.GetCompositePodGroup() != nil {
-		cpg := pgInfo.GetCompositePodGroup()
-		p.compositePodGroup = cpg
-		p.priority = util.CompositePodGroupPriority(cpg)
-		p.preemptionPolicy = resolveCompositePreemptionPolicy(cpg, p.pods, enablePodGroupPreemptionPolicy)
-	} else {
-		pg := pgInfo.GetPodGroup()
-		p.podGroup = pg
-		p.priority = util.PodGroupPriority(pg)
-		p.preemptionPolicy = resolvePreemptionPolicy(pg, p.pods, enablePodGroupPreemptionPolicy)
-	}
+	p.preemptionPolicy = resolvePreemptionPolicy(pgInfo, p.pods, enablePodGroupPreemptionPolicy)
 	return p
 }
 
-func (p *podGroupPreemptor) getType() string {
-	if p.compositePodGroup != nil {
-		return string(fwk.CompositePodGroupKeyType)
-	}
-	return string(fwk.PodGroupKeyType)
-}
-
-func (p *podGroupPreemptor) getObj() klog.KMetadata {
-	if p.compositePodGroup != nil {
-		return p.compositePodGroup
-	}
-	return p.podGroup
-}
-
-func resolvePreemptionPolicy(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) schedulingv1beta1.PreemptionPolicy {
+func resolvePreemptionPolicy(pgInfo fwk.PodGroupInfo, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) v1.PreemptionPolicy {
 	if enablePodGroupPreemptionPolicy {
-		// If the PodGroup was created with PodGroupPreemptionPolicy feature disabled, the PreemptionPolicy field will be nil.
-		// In this case the default policy value should be returned.
-		if pg.Spec.PreemptionPolicy != nil {
-			return *pg.Spec.PreemptionPolicy
-		}
-	} else {
-		for _, pod := range pods {
-			if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
-				return schedulingv1beta1.PreemptNever
-			}
+		return pgInfo.GetPreemptionPolicy()
+	}
+	for _, pod := range pods {
+		if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
+			return *p
 		}
 	}
-	return schedulingv1beta1.PreemptLowerPriority
-}
-
-func resolveCompositePreemptionPolicy(cpg *schedulingv1alpha3.CompositePodGroup, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) schedulingv1beta1.PreemptionPolicy {
-	if enablePodGroupPreemptionPolicy {
-		if cpg.Spec.PreemptionPolicy != nil {
-			if *cpg.Spec.PreemptionPolicy == schedulingv1alpha3.PreemptLowerPriority {
-				return schedulingv1beta1.PreemptLowerPriority
-			}
-			return schedulingv1beta1.PreemptNever
-		}
-	} else {
-		for _, pod := range pods {
-			if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
-				return schedulingv1beta1.PreemptNever
-			}
-		}
-	}
-	return schedulingv1beta1.PreemptLowerPriority
-}
-
-// Priority returns the scheduling priority of the preemptor.
-// This value is used to identify potential victims (which must have lower priority).
-func (p *podGroupPreemptor) Priority() int32 {
-	return p.priority
+	return v1.PreemptLowerPriority
 }
 
 // Members returns the list of Pods that belong to this preemptor.
@@ -120,18 +63,8 @@ func (p *podGroupPreemptor) Members() []*v1.Pod {
 	return p.pods
 }
 
-// PodGroup returns a pod group connected with this preemptor.
-func (p *podGroupPreemptor) PodGroup() *schedulingv1beta1.PodGroup {
-	return p.podGroup
-}
-
-// CompositePodGroup returns a composite pod group connected with this preemptor.
-func (p *podGroupPreemptor) CompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
-	return p.compositePodGroup
-}
-
-// PreemptionPolicy returns a preemption policy of this preemptor.
-func (p *podGroupPreemptor) PreemptionPolicy() schedulingv1beta1.PreemptionPolicy {
+// GetPreemptionPolicy returns a preemption policy of this preemptor.
+func (p *podGroupPreemptor) GetPreemptionPolicy() v1.PreemptionPolicy {
 	return p.preemptionPolicy
 }
 
@@ -169,35 +102,16 @@ func getHighestAllAncestor(pod *v1.Pod, pgLister fwk.PodGroupLister, cpgLister f
 	if pod.Spec.SchedulingGroup == nil || pgLister == nil {
 		return fwk.EntityKey{}, false
 	}
-	if cpgLister == nil {
-		pg, err := pgLister.Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-		if err != nil || pg == nil {
-			return fwk.EntityKey{}, false
-		}
-		if pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil {
-			return fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName), true
-		}
-		return fwk.EntityKey{}, false
-	}
-
 	startKey := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	var highestAllKey fwk.EntityKey
 	var hasAll bool
 
-	TraverseHierarchyUp(pod.Namespace, startKey, pgLister, cpgLister, func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
-		if pg != nil {
-			if pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil {
-				highestAllKey = key
-				hasAll = true
-			}
-		} else if cpg != nil {
-			if cpg.Spec.DisruptionMode != nil && cpg.Spec.DisruptionMode.All != nil {
-				highestAllKey = key
-				hasAll = true
-			}
+	for gpg := range traverseHierarchyUp(pod.Namespace, startKey, pgLister, cpgLister) {
+		if gpg.HasDisruptionModeAll() {
+			highestAllKey = gpg.GetKey()
+			hasAll = true
 		}
-		return false
-	})
+	}
 
 	return highestAllKey, hasAll
 }
@@ -324,7 +238,7 @@ func searchCrossNodesVictimPods(
 		podInfos[i], _ = framework.NewPodInfo(p)
 	}
 
-	priority := GetPodPriority(podInfo.GetPod(), podGroupSnapshot, compositePodGroupSnapshot)
+	priority := getPodPriority(podInfo.GetPod(), podGroupSnapshot, compositePodGroupSnapshot)
 	// It can only return an error for empty podInfos, which is guaranteed not to be empty here.
 	victim, _ := NewVictim(podInfos, priority, pgKey.Type)
 	return victim
@@ -407,7 +321,7 @@ func (v *victim) Type() fwk.EntityKeyType {
 //
 // We should fix this on the occasion of adding support for CompositePodGroup WAP-related metrics.
 func NewPodVictim(podInfo fwk.PodInfo, pgLister fwk.PodGroupLister, cpgLister fwk.CompositePodGroupLister) Victim {
-	priority := GetPodPriority(podInfo.GetPod(), pgLister, cpgLister)
+	priority := getPodPriority(podInfo.GetPod(), pgLister, cpgLister)
 	keyType := fwk.PodKeyType
 	if podInfo.GetPod().Spec.SchedulingGroup != nil && pgLister != nil {
 		keyType = fwk.PodGroupKeyType

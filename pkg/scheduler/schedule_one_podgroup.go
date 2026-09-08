@@ -472,7 +472,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 	// Run PlacementFeasible plugins to check if the pod group can meet its constraints
 	// before even attempting to schedule any pods.
 	placementProgress := framework.PlacementProgress{
-		Remaining: len(podGroupInfo.GetUnscheduledPods()),
+		Remaining: len(podGroupInfo.GetAllUnscheduledPods()),
 		Scheduled: podGroupState.ScheduledPodsCount(),
 	}
 	proceed, placementFeasibleStatus := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
