@@ -300,6 +300,7 @@ func TestLabelFunc(t *testing.T) {
 func TestLabelErrors(t *testing.T) {
 	testCases := map[string]struct {
 		args  []string
+		list  bool
 		errFn func(error) bool
 	}{
 		"no args": {
@@ -338,6 +339,20 @@ func TestLabelErrors(t *testing.T) {
 				return strings.Contains(err.Error(), "resource(s) were provided, but no name was specified")
 			},
 		},
+		"cannot add labels when --list is specified": {
+			args: []string{"pods", "foo", "app=bar"},
+			list: true,
+			errFn: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "cannot modify labels when --list is specified")
+			},
+		},
+		"cannot remove labels when --list is specified": {
+			args: []string{"pods", "foo", "app-"},
+			list: true,
+			errFn: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "cannot modify labels when --list is specified")
+			},
+		},
 	}
 
 	for k, testCase := range testCases {
@@ -354,6 +369,7 @@ func TestLabelErrors(t *testing.T) {
 			cmd.SetErr(buf)
 
 			opts := NewLabelOptions(ioStreams)
+			opts.list = testCase.list
 			err := opts.Complete(tf, cmd, testCase.args)
 			if err == nil {
 				err = opts.Validate()
@@ -367,47 +383,6 @@ func TestLabelErrors(t *testing.T) {
 			}
 			if buf.Len() > 0 {
 				t.Errorf("buffer should be empty: %s", buf.String())
-			}
-		})
-	}
-}
-
-func TestLabelListWithChanges(t *testing.T) {
-	testCases := map[string]struct {
-		args  []string
-		errFn func(error) bool
-	}{
-		"addition": {
-			args: []string{"pods", "foo", "app=bar"},
-			errFn: func(err error) bool {
-				return err != nil && strings.Contains(err.Error(), "cannot modify labels when --list is specified")
-			},
-		},
-		"removal": {
-			args: []string{"pods", "foo", "app-"},
-			errFn: func(err error) bool {
-				return err != nil && strings.Contains(err.Error(), "cannot modify labels when --list is specified")
-			},
-		},
-	}
-
-	for name, testCase := range testCases {
-		t.Run(name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
-			defer tf.Cleanup()
-
-			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
-			cmd := NewCmdLabel(tf, ioStreams)
-			opts := NewLabelOptions(ioStreams)
-			opts.list = true
-
-			err := opts.Complete(tf, cmd, testCase.args)
-			if err == nil {
-				err = opts.Validate()
-			}
-			if !testCase.errFn(err) {
-				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}
