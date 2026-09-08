@@ -48,10 +48,10 @@ func NewPodGroupEvaluator(fh fwk.Handle) *PodGroupEvaluator {
 }
 
 // evaluate determines the victims for preemption, without actuation.
-func (ev *PodGroupEvaluator) evaluate(ctx context.Context, potentialVictims []fwk.PreemptionVictim, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
+func (ev *PodGroupEvaluator) evaluate(ctx context.Context, preemptorType fwk.EntityKeyType, potentialVictims []fwk.PreemptionVictim, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.PreemptionEvaluationDuration.WithLabelValues("podgroup", status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionEvaluationDuration.WithLabelValues(string(preemptorType), status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	return ev.selectVictimsOnDomain(ctx, potentialVictims, podGroupSchedulingFunc)
@@ -85,7 +85,7 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInf
 		return nil, fwk.NewStatus(fwk.Unschedulable, "No preemption victims found for incoming preemptor")
 	}
 
-	res, status := ev.evaluate(ctx, victims, podGroupSchedulingFunc)
+	res, status := ev.evaluate(ctx, pgInfo.GetType(), victims, podGroupSchedulingFunc)
 	if !status.IsSuccess() {
 		return nil, status
 	}

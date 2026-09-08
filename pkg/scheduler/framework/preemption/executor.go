@@ -359,7 +359,7 @@ func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandida
 	if preemptor.Type() == fwk.PodKeyType {
 		metrics.PreemptionVictims.Observe(numVictims)
 	} else {
-		metrics.WorkloadPreemptionVictims.Observe(numVictims)
+		metrics.WorkloadPreemptionVictims.WithLabelValues(string(preemptor.Type())).Observe(numVictims)
 	}
 
 	workloadDisruptions := float64(candidate.NumPodGroupDisruptions())
