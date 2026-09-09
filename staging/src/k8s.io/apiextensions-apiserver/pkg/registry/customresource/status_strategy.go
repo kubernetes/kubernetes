@@ -26,13 +26,11 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel/common"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 type statusStrategy struct {
@@ -103,14 +101,11 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 
 	var options []validation.ValidationOption
 	var celOptions []cel.Option
-	var correlatedObject *common.CorrelatedObject
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-		correlatedObject = common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
-		if a.structuralSchema != nil {
-			options = append(options, validation.WithRatcheting(correlatedObject.Key("status")))
-		}
-		celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
+	correlatedObject := common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
+	if a.structuralSchema != nil {
+		options = append(options, validation.WithRatcheting(correlatedObject.Key("status")))
 	}
+	celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
 
 	var errs field.ErrorList
 	errs = append(errs, a.customResourceStrategy.validator.ValidateStatusUpdate(ctx, uNew, uOld, a.scale, options...)...)
@@ -133,9 +128,7 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 	}
 
 	// No-op if not attached to context
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-		validation.Metrics.ObserveRatchetingTime(*correlatedObject.Duration)
-	}
+	validation.Metrics.ObserveRatchetingTime(*correlatedObject.Duration)
 	return errs
 }
 

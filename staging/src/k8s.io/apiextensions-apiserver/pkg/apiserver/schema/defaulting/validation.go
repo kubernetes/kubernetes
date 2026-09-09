@@ -26,12 +26,10 @@ import (
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // ValidateDefaults checks that default values validate and are properly pruned.
@@ -95,11 +93,10 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
 				allErrs = append(allErrs, celErrs...)
 
-				if len(celErrs) == 0 && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-					// If ratcheting is enabled some CEL rules may use optionalOldSelf
-					// For such rules the above validation is not sufficient for
-					// determining if the default value is a valid value to introduce
-					// via create or uncorrelated update.
+				if len(celErrs) == 0 {
+					// Some CEL rules may use optionalOldSelf. For such rules the above
+					// validation is not sufficient for determining if the default value
+					// is a valid value to introduce via create or uncorrelated update.
 					//
 					// Validate an update from nil to the default value to ensure
 					// that the default value pass
@@ -139,11 +136,10 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
 				allErrs = append(allErrs, celErrs...)
 
-				if len(celErrs) == 0 && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-					// If ratcheting is enabled some CEL rules may use optionalOldSelf
-					// For such rules the above validation is not sufficient for
-					// determining if the default value is a valid value to introduce
-					// via create or uncorrelated update.
+				if len(celErrs) == 0 {
+					// Some CEL rules may use optionalOldSelf. For such rules the above
+					// validation is not sufficient for determining if the default value
+					// is a valid value to introduce via create or uncorrelated update.
 					//
 					// Validate an update from nil to the default value to ensure
 					// that the default value pass
