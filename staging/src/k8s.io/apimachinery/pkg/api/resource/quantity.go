@@ -777,8 +777,7 @@ func (q Quantity) ToUnstructured() interface{} {
 func (q *Quantity) UnmarshalJSON(value []byte) error {
 	l := len(value)
 	if l == 4 && bytes.Equal(value, []byte("null")) {
-		q.d.Dec = nil
-		q.i = int64Amount{}
+		q.Set(0)
 		return nil
 	}
 	if l >= 2 && value[0] == '"' && value[l-1] == '"' {
@@ -802,8 +801,7 @@ func (q *Quantity) UnmarshalCBOR(value []byte) error {
 	}
 
 	if s == nil {
-		q.d.Dec = nil
-		q.i = int64Amount{}
+		q.Set(0)
 		return nil
 	}
 
