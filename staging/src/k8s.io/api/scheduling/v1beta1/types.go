@@ -43,8 +43,8 @@ type PriorityClass struct {
 	// receive when they have the name of this class in their pod spec.
 	// +optional
 	// +default=0
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	Value int32 `json:"value" protobuf:"bytes,2,opt,name=value"`
 
 	// globalDefault specifies whether this PriorityClass should be considered as

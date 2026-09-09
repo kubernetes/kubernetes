@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	registry "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 
 	// Ensure all API groups are registered with the scheme.
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -46,6 +47,7 @@ func setValue(v int32) func(obj *scheduling.PriorityClass) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
 		APIGroup:          "scheduling.k8s.io",
 		APIVersion:        apiVersion,
 		Resource:          "priorityclasses",
@@ -66,6 +68,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkValidPriorityClass()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -77,6 +81,15 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "scheduling.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "priorityclasses",
+		Name:              "valid-priority-class",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
 	testCases := map[string]struct {
 		oldObj       scheduling.PriorityClass
 		updateObj    scheduling.PriorityClass
@@ -112,18 +125,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		t.Run(k, func(t *testing.T) {
 			tc.oldObj.ResourceVersion = "1"
 			tc.updateObj.ResourceVersion = "2"
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "scheduling.k8s.io",
-				APIVersion:        apiVersion,
-				Resource:          "priorityclasses",
-				Name:              "valid-priority-class",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidPriorityClass()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func mkValidPriorityClass(tweaks ...func(*scheduling.PriorityClass)) scheduling.PriorityClass {
