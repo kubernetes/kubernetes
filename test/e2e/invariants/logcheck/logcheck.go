@@ -100,6 +100,15 @@ const (
 	dataRaceStart     = "WARNING: DATA RACE\n"
 	dataRaceEnd       = "==================\n"
 	maxBacktraceLines = 20
+
+	// nodeLogQueryInterval is how often the kubelet log of each node gets queried.
+	//
+	// How long to wait between queries is a compromise between "too long" (= too much data)
+	// and "too short" (= too much overhead because of frequent queries). It's not clear
+	// where the sweet spot is. With the current default, there were 12 calls for one worker node
+	// during a ~1h pull-kubernetes-e2e-kind-alpha-beta-features run, with an average result
+	// size of ~16MB.
+	nodeLogQueryInterval = 300 * time.Second
 )
 
 var (
@@ -192,6 +201,8 @@ func initialize() {
 		return
 	}
 
+	// All log checking activities share the same client instance. It's created specifically
+	// for that purpose, so client-side throttling does not affect other tests.
 	config, err := framework.LoadConfig()
 	framework.ExpectNoError(err, "loading client config")
 	client, err := kubernetes.NewForConfig(config)
@@ -211,8 +222,10 @@ func finalize() {
 		return
 	}
 
-	failure, stdout := lc.stop(lcLogger)
+	failure, stdout, queryStats := lc.stop(lcLogger)
 	_, _ = ginkgo.GinkgoWriter.Write([]byte(stdout))
+	// ReportEntry stays visible even for a successful suite, unlike GinkgoWriter output.
+	ginkgo.AddReportEntry("Log Check node log query statistics", queryStats)
 	if failure != "" {
 		// Reports as post-suite failure.
 		ginkgo.Fail(failure)
@@ -249,13 +262,14 @@ func newLogChecker(ctx context.Context, client kubernetes.Interface, check logCh
 
 	ctx, cancel := context.WithCancelCause(ctx)
 	return ctx, &logChecker{
-		wg:        newWaitGroup(),
-		client:    client,
-		cancel:    cancel,
-		check:     check,
-		logDir:    logDir,
-		logFile:   logFile,
-		dataRaces: make(map[string][][]string),
+		wg:         newWaitGroup(),
+		client:     client,
+		cancel:     cancel,
+		check:      check,
+		logDir:     logDir,
+		logFile:    logFile,
+		dataRaces:  make(map[string][][]string),
+		queryStats: make(map[string]*nodeQueryStat),
 	}, nil
 }
 
@@ -280,15 +294,91 @@ type logChecker struct {
 	// Only entities for which at least some output was received get added here,
 	// therefore also the "<entity>: okay" part of the report only appears for those.
 	dataRaces map[string][][]string
+
+	// queryStats tracks, per node, how much data periodic kubelet log queries
+	// pulled. Helps with tuning nodeLogQueryInterval and the number of
+	// nodes being watched.
+	queryStats map[string]*nodeQueryStat
 }
 
-// stop cancels pod monitoring, waits until that is shut down, and then produces text for a failure message (ideally empty) and stdout.
-func (l *logChecker) stop(logger klog.Logger) (failure, stdout string) {
+// nodeQueryStat accumulates the number of periodic kubelet log queries and how
+// many bytes of log data they returned for one node.
+type nodeQueryStat struct {
+	Queries int `json:"queries"`
+	Bytes   int `json:"bytes"`
+}
+
+// recordNodeQuery gets called after each periodic kubelet log query for a node
+// to record how much data (if any) was retrieved.
+func (l *logChecker) recordNodeQuery(nodeName string, numBytes int) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	stat := l.queryStats[nodeName]
+	if stat == nil {
+		stat = &nodeQueryStat{}
+		l.queryStats[nodeName] = stat
+	}
+	stat.Queries++
+	stat.Bytes += numBytes
+}
+
+// nodeQueryStatEntry is one row in a nodeQueryStatsReport, naming the node the
+// statistics were collected for.
+type nodeQueryStatEntry struct {
+	Node string `json:"node"`
+	nodeQueryStat
+}
+
+// nodeQueryStatsReport is the value passed to ginkgo.AddReportEntry for the
+// "Log Check node log query statistics" report. It knows how to render itself
+// as text (String, used for the console and Markdown reports) and, because it
+// is a plain struct, is also encoded as JSON automatically for report.json.
+type nodeQueryStatsReport struct {
+	Nodes []nodeQueryStatEntry `json:"nodes"`
+	Total nodeQueryStat        `json:"total"`
+}
+
+func (r nodeQueryStatsReport) String() string {
+	if len(r.Nodes) == 0 {
+		return "No periodic kubelet log queries were made."
+	}
+
+	var buffer strings.Builder
+	for _, entry := range r.Nodes {
+		fmt.Fprintf(&buffer, "%s: %d queries, %d bytes\n", entry.Node, entry.Queries, entry.Bytes)
+	}
+	fmt.Fprintf(&buffer, "total: %d queries, %d bytes\n", r.Total.Queries, r.Total.Bytes)
+	return buffer.String()
+}
+
+// queryStatsReport builds a report of the recorded query statistics, sorted by node name,
+// followed by a total across all nodes.
+func (l *logChecker) queryStatsReport() nodeQueryStatsReport {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	var report nodeQueryStatsReport
+	nodeNames := slices.Sorted(maps.Keys(l.queryStats))
+	for _, nodeName := range nodeNames {
+		stat := l.queryStats[nodeName]
+		report.Nodes = append(report.Nodes, nodeQueryStatEntry{Node: nodeName, nodeQueryStat: *stat})
+		report.Total.Queries += stat.Queries
+		report.Total.Bytes += stat.Bytes
+	}
+	return report
+}
+
+// stop cancels pod monitoring, waits until that is shut down, and then produces text for a failure message (ideally empty), stdout, and a report of the periodic kubelet log query statistics.
+func (l *logChecker) stop(logger klog.Logger) (failure, stdout string, queryStats nodeQueryStatsReport) {
 	logger.V(4).Info("Asking log monitors to stop")
 	l.cancel(errors.New("asked to stop"))
 
 	// Wait for completion.
 	l.wg.wait()
+
+	// Computed separately because it takes the mutex itself.
+	queryStats = l.queryStatsReport()
 
 	// Now we can proceed and produce the report.
 	l.mutex.Lock()
@@ -383,10 +473,10 @@ func (l *logChecker) stop(logger klog.Logger) (failure, stdout string) {
 		}
 	}
 
-	return failureBuffer.String(), stdoutBuffer.String()
+	return failureBuffer.String(), stdoutBuffer.String(), queryStats
 }
 
-func (l *logChecker) start(ctx context.Context, startCopyAllLogs func(ctx context.Context, cs kubernetes.Interface, ns string, to podlogs.LogOutput) error, startNodeLog func(ctx context.Context, cs kubernetes.Interface, wg *waitGroup, nodeName string) io.Reader) {
+func (l *logChecker) start(ctx context.Context, startCopyAllLogs func(ctx context.Context, cs kubernetes.Interface, ns string, to podlogs.LogOutput) error, startNodeLog func(ctx context.Context, cs kubernetes.Interface, wg *waitGroup, nodeName string, startDelay time.Duration, record func(nodeName string, numBytes int)) io.Reader) {
 	if !l.check.any() {
 		return
 	}
@@ -425,13 +515,24 @@ func (l *logChecker) start(ctx context.Context, startCopyAllLogs func(ctx contex
 		}
 	}
 
+	var nodesToWatch []v1.Node
 	for _, node := range nodes.Items {
 		if !l.check.nodes.re.MatchString(node.Name) {
 			continue
 		}
+		nodesToWatch = append(nodesToWatch, node)
+	}
 
-		logger.Info("Watching", "node", klog.KObj(&node))
-		kubeletLog := startNodeLog(ctx, l.client, l.wg, node.Name)
+	for i, node := range nodesToWatch {
+		// Stagger the initial query per node across one nodeLogQueryInterval
+		// instead of letting all nodes query at the same time.
+		// This avoids the "thundering herd" problem of all workers hitting
+		// the apiserver at the same time, which has been observed to cause
+		// resource contention problems.
+		startDelay := time.Duration(i) * nodeLogQueryInterval / time.Duration(len(nodesToWatch))
+
+		logger.Info("Watching", "node", klog.KObj(&node), "startDelay", startDelay)
+		kubeletLog := startNodeLog(ctx, l.client, l.wg, node.Name, startDelay, l.recordNodeQuery)
 		l.wg.goIfNotShuttingDown(nil, func() {
 			scanner := bufio.NewScanner(kubeletLog)
 			writer := logOutputChecker{
@@ -562,7 +663,13 @@ func (p *logOutputChecker) Close() error {
 //
 // The lines in the data written to the reader may contain journald headers or other,
 // platform specific headers (this is not specified for the log query feature).
-func kubeletLogQuery(ctx context.Context, cs kubernetes.Interface, wg *waitGroup, nodeName string) io.Reader {
+//
+// startDelay delays the first query by that much time, to spread out queries
+// for different nodes (see the caller in (*logChecker).start).
+//
+// record, if not nil, gets called after each query (successful or not) with the
+// node name and the number of bytes of log data that were retrieved.
+func kubeletLogQuery(ctx context.Context, cs kubernetes.Interface, wg *waitGroup, nodeName string, startDelay time.Duration, record func(nodeName string, numBytes int)) io.Reader {
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithName(logger, "KubeletLogQuery")
 	logger = klog.LoggerWithValues(logger, "node", klog.KRef("", nodeName))
@@ -571,29 +678,36 @@ func kubeletLogQuery(ctx context.Context, cs kubernetes.Interface, wg *waitGroup
 	wg.goIfNotShuttingDown(func() {
 		_ = writer.Close()
 	}, func() {
-		logger.V(4).Info("Started")
+		logger.V(4).Info("Started", "startDelay", startDelay)
 		defer func() {
 			logger.V(4).Info("Stopped", "reason", context.Cause(ctx))
 		}()
 
-		// How long to wait between queries is a compromise between "too long" (= too much data)
-		// and "too short" (= too much overhead because of frequent queries). It's not clear
-		// where the sweet spot is. With the current default, there were 12 calls for one worker node
-		// during a ~1h pull-kubernetes-e2e-kind-alpha-beta-features run, with an average result
-		// size of ~16MB.
-		//
-		// All log checking activities share the same client instance. It's created specifically
-		// for that purpose, so client-side throttling does not affect other tests.
-		ticker := time.NewTicker(300 * time.Second)
-		defer ticker.Stop()
+		// The first query is delayed by startDelay so not all nodes query at once.
+		// After that, tick switches to a regular ticker.
+		delay := time.NewTimer(startDelay)
+		defer delay.Stop()
+		tick := delay.C
+		var ticker *time.Ticker
+		defer func() {
+			if ticker != nil {
+				ticker.Stop()
+			}
+		}()
 
 		var since time.Time
 		for {
 			select {
 			case <-ctx.Done():
 				logger.V(4).Info("Asked to stop, will query log one last time", "reason", context.Cause(ctx))
-			case <-ticker.C:
+			case <-tick:
 				logger.V(6).Info("Starting periodic log query")
+			}
+
+			if ticker == nil {
+				// Delay elapsed (or we got canceled first); switch to the regular interval.
+				ticker = time.NewTicker(nodeLogQueryInterval)
+				tick = ticker.C
 			}
 
 			// Query once also when asked to stop via cancelation, to get the tail of the output.
@@ -627,6 +741,9 @@ func kubeletLogQuery(ctx context.Context, cs kubernetes.Interface, wg *waitGroup
 					req = req.Param("sinceTime", sinceTime)
 				}
 				data, err := req.DoRaw(ctx)
+				if record != nil {
+					record(nodeName, len(data))
+				}
 				if loggerV := logger.V(4); loggerV.Enabled() {
 					head := string(data)
 					if len(head) > 30 {
