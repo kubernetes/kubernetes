@@ -8573,6 +8573,7 @@ func TestGetentUserExists(t *testing.T) {
 	}
 	tests := []struct {
 		name       string
+		user       string // account to look up; "kubelet" when empty
 		getentExit string // shell script body for a fake "getent"; empty means no getent on PATH
 		wantFound  bool
 		wantErr    bool
@@ -8593,8 +8594,22 @@ func TestGetentUserExists(t *testing.T) {
 			wantErr:    true,
 		},
 		{
-			name:      "getent not installed",
+			// root is in /etc/passwd on any Linux host, so os/user sees it without getent
+			name:      "getent not installed, account is in passwd",
+			user:      "root",
+			wantFound: true,
+		},
+		{
+			name:      "getent not installed, no such account",
+			user:      "kubelet-test-no-such-account",
 			wantFound: false,
+		},
+		{
+			// once getent runs, its answer stands, even for an account os/user can see
+			name:       "getent reports not found for a local account",
+			user:       "root",
+			getentExit: "exit 2",
+			wantFound:  false,
 		},
 	}
 	for _, tc := range tests {
@@ -8608,7 +8623,12 @@ func TestGetentUserExists(t *testing.T) {
 			}
 			t.Setenv("PATH", binDir)
 
-			found, err := getentUserExists("kubelet")
+			logger, _ := ktesting.NewTestContext(t)
+			name := tc.user
+			if name == "" {
+				name = "kubelet"
+			}
+			found, err := getentUserExists(logger, name)
 			if tc.wantErr {
 				if err == nil {
 					t.Errorf("%s: expected error, got nil", tc.name)
