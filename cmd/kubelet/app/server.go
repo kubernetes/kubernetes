@@ -1422,7 +1422,16 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
 			}
 			if v1.ResourceName(k) == v1.ResourceCPU {
-				q.SetMilli((q.ScaledValue(resource.Micro) + 500) / 1000)
+				// Round to the nearest milli while micro-cores fit an int64, where
+				// micro+500 used to wrap into a negative reservation. Past that the
+				// value is kept as parsed, so the cutoff is a step, not a no-op.
+				if micro, ok := q.AsScaledInt64(resource.Micro); ok {
+					milli := micro / 1000
+					if micro%1000 >= 500 {
+						milli++
+					}
+					q.SetMilli(milli)
+				}
 			}
 			rl[v1.ResourceName(k)] = q
 		default:

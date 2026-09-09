@@ -33,15 +33,6 @@ import (
 //   - archSplitCases: ToDec rows whose int64 accessors are arch-dependent
 //     (golang/go#45588: MinInt64 amd64, MaxInt64 arm64), so they are guarded.
 
-const (
-	// Shared TODO text. #141166 settles the overflow value: cap at the
-	// MinInt64/MaxInt64 rail (matching strconv). The checked-accessor API shape
-	// that carries the overflow bool is still being finalized.
-	saturatePos = "want math.MaxInt64 once positive overflow saturates instead of wrapping (#141166)"
-	saturateNeg = "want math.MinInt64 once negative overflow saturates instead of wrapping or reading zero (#141166)"
-	// String drops the DecimalSI suffix above 10^18.
-)
-
 type accessorCase struct {
 	name string
 	load func() Quantity
@@ -77,9 +68,9 @@ func quantityAccessorCases() []accessorCase {
 		// --- In range or capped at parse time: only the smaller accessors overflow. ---
 		{
 			name: "int64-max-parsed", load: func() Quantity { return MustParse("9223372036854775807") },
-			wantSign:  1,
-			wantValue: math.MaxInt64,
-			wantMilli: -1000, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 9223372036854776,
 			wantAsInt64:    math.MaxInt64, wantAsInt64OK: true,
 			wantFloat:       9.223372036854776e+18,
@@ -88,9 +79,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "int64-max-constructed", load: func() Quantity { return *NewQuantity(math.MaxInt64, DecimalSI) },
-			wantSign:  1,
-			wantValue: math.MaxInt64,
-			wantMilli: -1000, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 9223372036854776,
 			wantAsInt64:    math.MaxInt64, wantAsInt64OK: true,
 			wantFloat:       9.223372036854776e+18,
@@ -99,9 +90,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "int64-min-constructed", load: func() Quantity { return *NewQuantity(math.MinInt64, DecimalSI) },
-			wantSign:  -1,
-			wantValue: math.MinInt64,
-			wantMilli: 0, milliTODO: saturateNeg,
+			wantSign:       -1,
+			wantValue:      math.MinInt64,
+			wantMilli:      math.MinInt64,
 			wantScaledKilo: -9223372036854776,
 			wantAsInt64:    math.MinInt64, wantAsInt64OK: true,
 			wantFloat:       -9.223372036854776e+18,
@@ -110,9 +101,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "ten-to-18-parsed", load: func() Quantity { return MustParse("1E") },
-			wantSign:  1,
-			wantValue: 1000000000000000000,
-			wantMilli: 0, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      1000000000000000000,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 1000000000000000,
 			wantAsInt64:    1000000000000000000, wantAsInt64OK: true,
 			wantFloat:  1e18,
@@ -120,9 +111,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "binary-8Ei-caps-at-max", load: func() Quantity { return MustParse("8Ei") },
-			wantSign:  1,
-			wantValue: math.MaxInt64,
-			wantMilli: -1000, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 9223372036854776,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:       9.223372036854776e+18,
@@ -131,9 +122,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "binary-negative-8Ei-caps-at-negative-max", load: func() Quantity { return MustParse("-8Ei") },
-			wantSign:  -1,
-			wantValue: -math.MaxInt64,
-			wantMilli: 1000, milliTODO: saturateNeg,
+			wantSign:       -1,
+			wantValue:      -math.MaxInt64,
+			wantMilli:      math.MinInt64,
 			wantScaledKilo: -9223372036854776,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -9.223372036854776e+18,
@@ -141,9 +132,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "binary-20Ei-caps-at-max", load: func() Quantity { return MustParse("20Ei") },
-			wantSign:  1,
-			wantValue: math.MaxInt64,
-			wantMilli: -1000, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 9223372036854776,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:       9.223372036854776e+18,
@@ -152,9 +143,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "binary-negative-20Ei-caps-at-negative-max", load: func() Quantity { return MustParse("-20Ei") },
-			wantSign:  -1,
-			wantValue: -math.MaxInt64,
-			wantMilli: 1000, milliTODO: saturateNeg,
+			wantSign:       -1,
+			wantValue:      -math.MaxInt64,
+			wantMilli:      math.MinInt64,
 			wantScaledKilo: -9223372036854776,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -9.223372036854776e+18,
@@ -164,9 +155,9 @@ func quantityAccessorCases() []accessorCase {
 		// --- Positive magnitude over int64: Value and MilliValue wrap or truncate. ---
 		{
 			name: "two-to-63-parsed", load: func() Quantity { return MustParse("9223372036854775808") },
-			wantSign:  1,
-			wantValue: math.MinInt64, valueTODO: saturatePos,
-			wantMilli: 0, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 9223372036854776, // 2^63/1000 rounds back under int64
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  9.223372036854776e+18,
@@ -174,9 +165,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "two-to-64-parsed", load: func() Quantity { return MustParse("18446744073709551616") },
-			wantSign:  1,
-			wantValue: 0, valueTODO: saturatePos,
-			wantMilli: 0, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 18446744073709552, // 2^64/1000 fits, so ScaledValue is correct here
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  1.8446744073709552e+19,
@@ -184,9 +175,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "ten-to-20-parsed", load: func() Quantity { return MustParse("100E") },
-			wantSign:  1,
-			wantValue: 0, valueTODO: saturatePos,
-			wantMilli: 0, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 100000000000000000,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  1e20,
@@ -194,9 +185,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "ten-to-21-parsed", load: func() Quantity { return MustParse("1000E") },
-			wantSign:  1,
-			wantValue: 0, valueTODO: saturatePos,
-			wantMilli: 0, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 1000000000000000000,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  1e21,
@@ -204,9 +195,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "five-times-ten-to-21-parsed", load: func() Quantity { return MustParse("5000E") },
-			wantSign:  1,
-			wantValue: 0, valueTODO: saturatePos,
-			wantMilli: 0, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 5000000000000000000,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  5e21,
@@ -214,19 +205,19 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "ten-to-100-parsed", load: func() Quantity { return MustParse("1e100") },
-			wantSign:  1,
-			wantValue: 0, valueTODO: saturatePos,
-			wantMilli: 0, milliTODO: saturatePos,
-			wantScaledKilo: 0, scaledTODO: saturatePos, // 1e97 also overflows
-			wantAsInt64: 0, wantAsInt64OK: false,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
+			wantScaledKilo: math.MaxInt64, // 1e97 also overflows
+			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  1e100,
 			wantString: "10e99", // lossless: 10e99 == 1e100
 		},
 		{
 			name: "scaled-one-times-ten-to-21", load: func() Quantity { return *NewScaledQuantity(1, 21) },
-			wantSign:  1,
-			wantValue: 0, valueTODO: saturatePos,
-			wantMilli: 0, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 1000000000000000000,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  1e21,
@@ -236,9 +227,9 @@ func quantityAccessorCases() []accessorCase {
 			// NewScaledQuantity(MaxInt64, 1) is MaxInt64*10; Value wraps to -10,
 			// the accidental negative that validateBasicResource rejects today.
 			name: "scaled-max-times-ten", load: func() Quantity { return *NewScaledQuantity(math.MaxInt64, 1) },
-			wantSign:  1,
-			wantValue: -10, valueTODO: saturatePos,
-			wantMilli: 0, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 92233720368547759, // MaxInt64*10/1000 fits
 			wantAsInt64:    -10, wantAsInt64OK: false,
 			wantFloat:  9.223372036854776e+19,
@@ -249,9 +240,9 @@ func quantityAccessorCases() []accessorCase {
 		{
 			// MinInt64 from a string takes the int64 fast path, like NewQuantity(MinInt64).
 			name: "int64-min-parsed", load: func() Quantity { return MustParse("-9223372036854775808") },
-			wantSign:  -1,
-			wantValue: math.MinInt64,
-			wantMilli: 0, milliTODO: saturateNeg,
+			wantSign:       -1,
+			wantValue:      math.MinInt64,
+			wantMilli:      math.MinInt64,
 			wantScaledKilo: -9223372036854776,
 			wantAsInt64:    math.MinInt64, wantAsInt64OK: true,
 			wantFloat:       -9.223372036854776e+18,
@@ -260,9 +251,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "int64-min-plus-one-parsed", load: func() Quantity { return MustParse("-9223372036854775807") },
-			wantSign:  -1,
-			wantValue: math.MinInt64 + 1,
-			wantMilli: 1000, milliTODO: saturateNeg,
+			wantSign:       -1,
+			wantValue:      math.MinInt64 + 1,
+			wantMilli:      math.MinInt64,
 			wantScaledKilo: -9223372036854776,
 			wantAsInt64:    math.MinInt64 + 1, wantAsInt64OK: true,
 			wantFloat:  -9.223372036854776e+18,
@@ -271,19 +262,19 @@ func quantityAccessorCases() []accessorCase {
 		// --- Negative values kept in the int64 backend at a large scale; Value and Milli overflow to zero. ---
 		{
 			name: "negative-ten-to-30-parsed", load: func() Quantity { return MustParse("-1e30") },
-			wantSign:  -1,
-			wantValue: 0, valueTODO: saturateNeg,
-			wantMilli: 0, milliTODO: saturateNeg,
-			wantScaledKilo: 0, scaledTODO: saturateNeg,
-			wantAsInt64: 0, wantAsInt64OK: false,
+			wantSign:       -1,
+			wantValue:      math.MinInt64,
+			wantMilli:      math.MinInt64,
+			wantScaledKilo: math.MinInt64,
+			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -1e30,
 			wantString: "-1e30",
 		},
 		{
 			name: "negative-ten-to-20-parsed", load: func() Quantity { return MustParse("-100E") },
-			wantSign:  -1,
-			wantValue: 0, valueTODO: saturateNeg,
-			wantMilli: 0, milliTODO: saturateNeg,
+			wantSign:       -1,
+			wantValue:      math.MinInt64,
+			wantMilli:      math.MinInt64,
 			wantScaledKilo: -100000000000000000,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -1e20,
@@ -291,9 +282,9 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			name: "negative-ten-to-21-parsed", load: func() Quantity { return MustParse("-1000E") },
-			wantSign:  -1,
-			wantValue: 0, valueTODO: saturateNeg,
-			wantMilli: 0, milliTODO: saturateNeg,
+			wantSign:       -1,
+			wantValue:      math.MinInt64,
+			wantMilli:      math.MinInt64,
 			wantScaledKilo: -1000000000000000000,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -1e21,
@@ -409,9 +400,9 @@ func quantityAccessorCases() []accessorCase {
 				q.Add(*NewQuantity(math.MaxInt64, DecimalSI))
 				return *q
 			},
-			wantSign:  1,
-			wantValue: -2, valueTODO: saturatePos,
-			wantMilli: -2000, milliTODO: saturatePos,
+			wantSign:       1,
+			wantValue:      math.MaxInt64,
+			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 18446744073709552,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  1.8446744073709552e+19,
@@ -549,12 +540,10 @@ func TestQuantityParseErrorBaseline(t *testing.T) {
 // amd64 and arm64 result, and the check accepts either. The two are equal for a
 // portable column, so a wrapper or scale that quietly changed would still fail.
 //
-// TODO: these rows resolve when #141166's checked accessors cap the result at
-// the MinInt64/MaxInt64 rail and report overflow. golang/go#76264 might later
-// make Go's float-to-int step saturate on every arch, but that alone is not
-// enough: it adds no overflow bool and does not fix the int64 multiply after it
-// (ten-to-20-parsed-via-dec's MilliValue is 100 * MaxInt64, which still wraps to
-// -100). Collapse each pair once #141166 lands; until then they track the split.
+// The pairs are equal now: capping at the MinInt64/MaxInt64 rail made every
+// overflowing column portable, so golang/go#45588 no longer reaches them. They
+// stay paired so a change that reintroduced an arch-dependent result would
+// still have to edit both columns to pass.
 type archSplitCase struct {
 	name       string
 	load       func() Quantity
@@ -574,26 +563,26 @@ func quantityArchSplitCases() []archSplitCase {
 		{
 			name: "ten-to-100-parsed-via-dec", load: func() Quantity { q := MustParse("1e100"); q.ToDec(); return q },
 			wantSign: 1, wantString: "10e99",
-			valueAmd64: math.MinInt64, valueArm64: math.MaxInt64,
-			milliAmd64: math.MinInt64, milliArm64: math.MaxInt64,
-			scaledAmd64: math.MinInt64, scaledArm64: math.MaxInt64,
+			valueAmd64: math.MaxInt64, valueArm64: math.MaxInt64,
+			milliAmd64: math.MaxInt64, milliArm64: math.MaxInt64,
+			scaledAmd64: math.MaxInt64, scaledArm64: math.MaxInt64,
 			wantAsInt64OK: false, wantFloat: 1e100,
 		},
 		{
 			name: "ten-to-19-parsed-via-dec", load: func() Quantity { q := MustParse("1e19"); q.ToDec(); return q },
 			wantSign: 1, wantString: "10e18",
-			valueAmd64: math.MinInt64, valueArm64: math.MaxInt64,
-			milliAmd64: math.MinInt64, milliArm64: math.MaxInt64,
+			valueAmd64: math.MaxInt64, valueArm64: math.MaxInt64,
+			milliAmd64: math.MaxInt64, milliArm64: math.MaxInt64,
 			scaledAmd64: 10000000000000000, scaledArm64: 10000000000000000, // Pow10(16) fits, portable
 			wantAsInt64OK: false, wantFloat: 1e19,
 		},
 		{
-			// Value uses Pow10(18) (fits), so its wrap is portable; MilliValue uses
-			// Pow10(21) and lands on 0 (amd64) or -100 (arm64).
+			// Saturation removed the split: every overflowing column now reads
+			// math.MaxInt64 on both arches. ScaledValue(Kilo) is 1e17, which fits.
 			name: "ten-to-20-parsed-via-dec", load: func() Quantity { q := MustParse("100E"); q.ToDec(); return q },
 			wantSign: 1, wantString: "100E",
-			valueAmd64: 7766279631452241920, valueArm64: 7766279631452241920,
-			milliAmd64: 0, milliArm64: -100,
+			valueAmd64: math.MaxInt64, valueArm64: math.MaxInt64,
+			milliAmd64: math.MaxInt64, milliArm64: math.MaxInt64,
 			scaledAmd64: 100000000000000000, scaledArm64: 100000000000000000, // 1e17
 			wantAsInt64OK: false, wantFloat: 1e20,
 		},
