@@ -28,8 +28,8 @@ import (
 	"fmt"
 	"strings"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"

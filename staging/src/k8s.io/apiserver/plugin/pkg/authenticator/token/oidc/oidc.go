@@ -48,7 +48,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-	jose "gopkg.in/go-jose/go-jose.v2"
+	jose "github.com/go-jose/go-jose/v4"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"

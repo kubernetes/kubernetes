@@ -37,7 +37,7 @@ import (
 	"text/template"
 	"time"
 
-	"gopkg.in/go-jose/go-jose.v2"
+	"github.com/go-jose/go-jose/v4"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
