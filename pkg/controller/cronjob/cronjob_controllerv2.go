@@ -114,13 +114,14 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 		now: time.Now,
 	}
 
-	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := jobInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    jm.addJob,
 		UpdateFunc: jm.updateJob,
 		DeleteFunc: jm.deleteJob,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
-	cronJobsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = cronJobsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			jm.enqueueController(obj)
 		},
@@ -130,9 +131,10 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 		DeleteFunc: func(obj interface{}) {
 			jm.enqueueController(obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
-	err := jobInformer.Informer().AddIndexers(cache.Indexers{
+	err = jobInformer.Informer().AddIndexers(cache.Indexers{
 		jobControllerUIDIndex: func(obj interface{}) ([]string, error) {
 			job, ok := obj.(*batchv1.Job)
 			if !ok {
