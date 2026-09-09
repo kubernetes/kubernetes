@@ -27,6 +27,7 @@ import (
 
 	yaml "go.yaml.in/yaml/v2"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -103,6 +104,28 @@ func TestParseResourceList(t *testing.T) {
 		q := rl[v1.ResourceCPU]
 		require.Equal(t, test.expected, q.String(), test.name)
 	}
+}
+
+func TestParseResourceListCPUOverflowsMicro(t *testing.T) {
+	// The old rounding read the quantity through a wrapping micro projection, so
+	// a reservation past that range was stored as a negative number of cores.
+	for _, v := range []string{"1e30", "10000000000000", "9223372036854775808u"} {
+		rl, err := parseResourceList(map[string]string{"cpu": v})
+		require.NoError(t, err, v)
+		q := rl[v1.ResourceCPU]
+		require.Equal(t, 1, q.Sign(), v)
+		require.Zero(t, q.Cmp(resource.MustParse(v)), "%s: kept unrounded, got %s", v, q.String())
+	}
+
+	// The largest micro value that fits, where adding 500 before dividing does not.
+	rl, err := parseResourceList(map[string]string{"cpu": "9223372036854775807u"})
+	require.NoError(t, err)
+	q := rl[v1.ResourceCPU]
+	require.Equal(t, int64(9223372036854776), q.MilliValue())
+
+	// Rounding stops at the cutoff rather than continuing past it, so the largest
+	// rounded value sits above the smallest kept one.
+	require.Equal(t, 1, q.Cmp(resource.MustParse("9223372036854775808u")))
 }
 
 func TestMergeKubeletConfigurations(t *testing.T) {
