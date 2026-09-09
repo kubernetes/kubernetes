@@ -337,12 +337,25 @@ type Validator[PrivateClaims any] interface {
 	Validate(ctx context.Context, tokenData string, public *jwt.Claims, private *PrivateClaims) (*apiserverserviceaccount.ServiceAccountInfo, error)
 }
 
+// IMPORTANT: The algorithms listed below must be kept in sync with:
+// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
+// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
+// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+// - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
+// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
+var AcceptableServiceAccountSignatureAlgorithms = []jose.SignatureAlgorithm{
+	jose.ES256,
+	jose.ES384,
+	jose.ES512,
+	jose.RS256,
+}
+
 func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil
 	}
 
-	tok, err := jwt.ParseSigned(tokenData)
+	tok, err := jwt.ParseSigned(tokenData, AcceptableServiceAccountSignatureAlgorithms)
 	if err != nil {
 		return nil, false, nil
 	}
@@ -454,5 +467,5 @@ func GenerateToken(signer jose.Signer, iss string, claims *jwt.Claims, privateCl
 		Claims(&jwt.Claims{
 			Issuer: iss,
 		}).
-		CompactSerialize()
+		Serialize()
 }

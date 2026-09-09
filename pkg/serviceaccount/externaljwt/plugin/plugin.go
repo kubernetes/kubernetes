@@ -178,6 +178,7 @@ func (p *Plugin) validateJWTHeader(ctx context.Context, response *externaljwtv1.
 	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
 	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
 	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 	case "RS256", "ES256", "ES384", "ES512":
 		// OK

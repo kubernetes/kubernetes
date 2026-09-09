@@ -472,7 +472,7 @@ func (k *keyIDPrefixer) GetPublicKeys(ctx context.Context, keyIDHint string) []s
 }
 
 func checkJSONWebSignatureHasKeyID(t *testing.T, jwsString string, expectedKeyID string) {
-	jws, err := jose.ParseSigned(jwsString)
+	jws, err := jose.ParseSigned(jwsString, serviceaccount.AcceptableServiceAccountSignatureAlgorithms)
 	if err != nil {
 		t.Fatalf("Error checking for key ID: couldn't parse token: %v", err)
 	}
@@ -531,7 +531,7 @@ func generateECDSATokenWithMalformedIss(t *testing.T, serviceAccount *v1.Service
 
 	ecdsaToken := generateECDSAToken(t, "panda", serviceAccount, ecdsaSecret)
 
-	ecdsaTokenJWS, err := jose.ParseSigned(ecdsaToken)
+	ecdsaTokenJWS, err := jose.ParseSigned(ecdsaToken, serviceaccount.AcceptableServiceAccountSignatureAlgorithms)
 	if err != nil {
 		t.Fatal(err)
 	}
