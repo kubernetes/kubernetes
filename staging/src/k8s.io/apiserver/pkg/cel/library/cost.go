@@ -503,7 +503,11 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
-		// url accessors
+		// url accessors — result is a component of the URL, can't exceed the URL's size
+		if target != nil {
+			sz := l.sizeEstimate(*target)
+			return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}, ResultSize: &sz}
+		}
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "_==_":
 		if len(args) == 2 {
