@@ -18,15 +18,19 @@ package metrics
 
 import (
 	"fmt"
+	"math"
+	"math/big"
 )
 
 // GetResourceUtilizationRatio takes in a set of metrics, a set of matching requests,
 // and a target utilization percentage, and calculates the ratio of
 // desired to actual utilization (returning that, the actual utilization, and the raw average value)
 func GetResourceUtilizationRatio(metrics PodMetricsInfo, requests map[string]int64, targetUtilization int32) (utilizationRatio float64, currentUtilization int32, rawAverageValue int64, err error) {
-	metricsTotal := int64(0)
-	requestsTotal := int64(0)
-	numEntries := 0
+	// Values near math.MaxInt64 wrap when summed as int64, and so does the *100
+	// taken for the percentage, so the totals are accumulated exactly.
+	metricsTotal := new(big.Int)
+	requestsTotal := new(big.Int)
+	numEntries := int64(0)
 
 	for podName, metric := range metrics {
 		request, hasRequest := requests[podName]
@@ -35,20 +39,34 @@ func GetResourceUtilizationRatio(metrics PodMetricsInfo, requests map[string]int
 			continue
 		}
 
-		metricsTotal += metric.Value
-		requestsTotal += request
+		metricsTotal.Add(metricsTotal, big.NewInt(metric.Value))
+		requestsTotal.Add(requestsTotal, big.NewInt(request))
 		numEntries++
 	}
 
 	// if the set of requests is completely disjoint from the set of metrics,
 	// then we could have an issue where the requests total is zero
-	if requestsTotal == 0 {
+	if requestsTotal.Sign() == 0 {
 		return 0, 0, 0, fmt.Errorf("no metrics returned matched known pods")
 	}
 
-	currentUtilization = int32((metricsTotal * 100) / requestsTotal)
+	// The percentage is reported as an int32, so an oversized utilization is
+	// clamped to the rail instead of being truncated into an arbitrary value.
+	percentage := new(big.Int).Mul(metricsTotal, big.NewInt(100))
+	percentage.Quo(percentage, requestsTotal)
+	switch {
+	case percentage.Cmp(big.NewInt(math.MaxInt32)) > 0:
+		currentUtilization = math.MaxInt32
+	case percentage.Cmp(big.NewInt(math.MinInt32)) < 0:
+		currentUtilization = math.MinInt32
+	default:
+		currentUtilization = int32(percentage.Int64())
+	}
 
-	return float64(currentUtilization) / float64(targetUtilization), currentUtilization, metricsTotal / int64(numEntries), nil
+	// the average of int64 values always fits in an int64
+	rawAverageValue = metricsTotal.Quo(metricsTotal, big.NewInt(numEntries)).Int64()
+
+	return float64(currentUtilization) / float64(targetUtilization), currentUtilization, rawAverageValue, nil
 }
 
 // GetMetricUsageRatio takes in a set of metrics and a target usage value,
