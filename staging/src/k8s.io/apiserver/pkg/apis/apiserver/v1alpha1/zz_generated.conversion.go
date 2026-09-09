@@ -267,11 +267,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiserver.WebhookConfiguration)(nil), (*WebhookConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiserver_WebhookConfiguration_To_v1alpha1_WebhookConfiguration(a.(*apiserver.WebhookConfiguration), b.(*WebhookConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*WebhookConnectionInfo)(nil), (*apiserver.WebhookConnectionInfo)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_WebhookConnectionInfo_To_apiserver_WebhookConnectionInfo(a.(*WebhookConnectionInfo), b.(*apiserver.WebhookConnectionInfo), scope)
 	}); err != nil {
@@ -289,6 +284,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*apiserver.WebhookMatchCondition)(nil), (*WebhookMatchCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apiserver_WebhookMatchCondition_To_v1alpha1_WebhookMatchCondition(a.(*apiserver.WebhookMatchCondition), b.(*WebhookMatchCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apiserver.WebhookConfiguration)(nil), (*WebhookConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserver_WebhookConfiguration_To_v1alpha1_WebhookConfiguration(a.(*apiserver.WebhookConfiguration), b.(*WebhookConfiguration), scope)
 	}); err != nil {
 		return err
 	}
