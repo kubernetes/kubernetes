@@ -1228,7 +1228,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			t.Fatalf("len(jwks.Keys) = %d, want 1", len(jwks.Keys))
 		}
 		key := jwks.Keys[0]
-		tok, err := jwt.ParseSigned(token)
+		tok, err := jwt.ParseSigned(token, serviceaccount.AcceptableServiceAccountSignatureAlgorithms)
 		if err != nil {
 			t.Fatalf("could not parse token %q: %v", token, err)
 		}
