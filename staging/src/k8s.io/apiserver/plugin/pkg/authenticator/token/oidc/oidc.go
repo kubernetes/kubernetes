@@ -44,11 +44,11 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	jose "github.com/go-jose/go-jose/v4"
 	celgo "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-	jose "github.com/go-jose/go-jose/v4"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -68,11 +68,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var (
-	// synchronizeTokenIDVerifierForTest should be set to true to force a
-	// wait until the token ID verifiers are ready.
-	synchronizeTokenIDVerifierForTest = false
-)
+// synchronizeTokenIDVerifierForTest should be set to true to force a
+// wait until the token ID verifiers are ready.
+var synchronizeTokenIDVerifierForTest = false
 
 const (
 	wellKnownEndpointPath = "/.well-known/openid-configuration"
@@ -214,6 +212,18 @@ type jwtAuthenticator struct {
 	requiredClaims map[string]string
 
 	healthCheck atomic.Pointer[errorHolder]
+
+	// lifecycleCtx is used to determine whether or not the authenticator
+	// should continue to be used.
+	// This is mainly used to replace the fact that cancelled contexts
+	// used to cause verification errors through coreos/go-oidc but that
+	// was dropped in coreos/go-oidc v3 so that cancelled contexts no longer
+	// cause outgoing requests to fail (i.e for fetching remote keys).
+	// When lifecycleCtx is cancelled, this authenticator will return
+	// an error on token authentication requests and will report as being
+	// unhealthy.
+	// TODO(everettraven): Make this being cancelled cause health checks to fail.
+	lifecycleCtx context.Context
 }
 
 // idTokenVerifier is a wrapper around oidc.IDTokenVerifier. It uses the oidc.IDTokenVerifier
@@ -298,6 +308,7 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 		return nil, fmt.Errorf("oidc: Client and EgressLookup are mutually exclusive")
 	}
 
+	// TODO(everettraven): Add a new round-tripper that enforces a rate limit for JWKS fetching.
 	client := opts.Client
 
 	if client == nil {
@@ -407,6 +418,7 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 		resolver:         resolver,
 		celMapper:        celMapper,
 		requiredClaims:   requiredClaims,
+		lifecycleCtx:     lifecycleCtx,
 	}
 	authn.healthCheck.Store(&errorHolder{
 		err: fmt.Errorf("oidc: authenticator for issuer %q is not initialized", authn.jwtAuthenticator.Issuer.URL),
@@ -858,6 +870,10 @@ func (v *idTokenVerifier) verifyAudience(t *oidc.IDToken) error {
 }
 
 func (a *jwtAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	if err := a.lifecycleCtx.Err(); err != nil {
+		return nil, false, err
+	}
+
 	if !hasCorrectIssuer(a.jwtAuthenticator.Issuer.URL, token) {
 		return nil, false, nil
 	}
