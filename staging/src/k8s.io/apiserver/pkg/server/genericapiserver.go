@@ -181,6 +181,11 @@ type GenericAPIServer struct {
 	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
 	OpenAPIVersionedService *handler.OpenAPIService
 
+	// OpenAPIV2BytesService serves the /openapi/v2 endpoint from marshaled
+	// spec bytes when the OpenAPIV2BytesCache feature gate is enabled, in
+	// which case OpenAPIVersionedService and StaticOpenAPISpec are left nil.
+	OpenAPIV2BytesService *routes.OpenAPIV2BytesService
+
 	// OpenAPIV3VersionedService controls the /openapi/v3 endpoint and can be used to update the served spec.
 	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
 	OpenAPIV3VersionedService *handler3.OpenAPIService
@@ -445,9 +450,18 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.delegationTarget.PrepareRun()
 
 	if s.openAPIConfig != nil && !s.skipOpenAPIInstallation {
-		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
-			Config: s.openAPIConfig,
-		}.InstallV2(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV2BytesCache) {
+			// Serve /openapi/v2 from marshaled bytes; the parsed spec is not
+			// retained, and OpenAPIVersionedService and StaticOpenAPISpec
+			// remain nil so it can be garbage collected.
+			s.OpenAPIV2BytesService = routes.OpenAPI{
+				Config: s.openAPIConfig,
+			}.InstallV2Bytes(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		} else {
+			s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
+				Config: s.openAPIConfig,
+			}.InstallV2(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		}
 	}
 
 	if s.openAPIV3Config != nil && !s.skipOpenAPIInstallation {

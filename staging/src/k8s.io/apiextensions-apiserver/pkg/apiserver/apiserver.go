@@ -50,6 +50,9 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/klog/v2"
+	builder2 "k8s.io/kube-openapi/pkg/builder"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
+	openapihandler "k8s.io/kube-openapi/pkg/handler"
 )
 
 var (
@@ -232,10 +235,28 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		// Together they serve the /openapi/v2 endpoint on a generic apiserver. A generic apiserver may
 		// choose to not enable OpenAPI by having null openAPIConfig, and thus OpenAPIVersionedService
 		// and StaticOpenAPISpec are both null. In that case we don't run the CRD OpenAPI controller.
-		if s.GenericAPIServer.StaticOpenAPISpec != nil {
+		staticOpenAPISpec := s.GenericAPIServer.StaticOpenAPISpec
+		if staticOpenAPISpec == nil && s.GenericAPIServer.OpenAPIV2BytesService != nil {
+			// With OpenAPIV2BytesCache, PrepareRun serves /openapi/v2 from marshaled bytes
+			// and does not retain the parsed spec. Build our own base spec for the CRD
+			// OpenAPI controller to merge CRD schemas into.
+			var err error
+			staticOpenAPISpec, err = builder2.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices()), c.GenericConfig.OpenAPIConfig)
+			if err != nil {
+				return fmt.Errorf("failed to build base OpenAPI v2 spec for the CRD OpenAPI controller: %w", err)
+			}
+			staticOpenAPISpec.Definitions = openapihandler.PruneDefaults(staticOpenAPISpec.Definitions)
+		}
+		if staticOpenAPISpec != nil {
+			var openAPIService openapicontroller.SpecUpdater
 			if s.GenericAPIServer.OpenAPIVersionedService != nil {
+				openAPIService = s.GenericAPIServer.OpenAPIVersionedService
+			} else if s.GenericAPIServer.OpenAPIV2BytesService != nil {
+				openAPIService = s.GenericAPIServer.OpenAPIV2BytesService
+			}
+			if openAPIService != nil {
 				openapiController := openapicontroller.NewController(s.Informers.Apiextensions().V1().CustomResourceDefinitions())
-				go openapiController.Run(s.GenericAPIServer.StaticOpenAPISpec, s.GenericAPIServer.OpenAPIVersionedService, hookContext.Done())
+				go openapiController.Run(staticOpenAPISpec, openAPIService, hookContext.Done())
 			}
 
 			if s.GenericAPIServer.OpenAPIV3VersionedService != nil {
