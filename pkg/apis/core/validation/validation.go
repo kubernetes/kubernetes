@@ -8543,12 +8543,24 @@ func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *f
 	return allErrs
 }
 
+// isIntegerResourceValue reports whether q may be used where whole units are
+// required. Wherever the milli projection fits in an int64 this is the check
+// that has always been applied, so values it accepted, such as 1.9999, still
+// pass. Past that range only an exact whole number passes.
+func isIntegerResourceValue(q resource.Quantity) bool {
+	if _, integer := q.AsScale(0); integer {
+		return true
+	}
+	milli, ok := q.AsMilliInt64()
+	return ok && milli%1000 == 0
+}
+
 // ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource
 func ValidateResourceQuantityValue(resource core.ResourceName, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
 	if helper.IsIntegerResourceName(resource) {
-		if value.MilliValue()%int64(1000) != int64(0) {
+		if !isIntegerResourceValue(value) {
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
 		}
 	}
