@@ -4285,7 +4285,7 @@ func TestDropHTTPProbeProtocol(t *testing.T) {
 	}
 }
 
-func TestDropSupplementalGroupsPolicy(t *testing.T) {
+func TestSupplementalGroupsPolicyNotDropped(t *testing.T) {
 	supplementalGroupsPolicyMerge := api.SupplementalGroupsPolicyMerge
 	podWithSupplementalGroupsPolicy := func() *api.Pod {
 		return &api.Pod{
@@ -4340,82 +4340,57 @@ func TestDropSupplementalGroupsPolicy(t *testing.T) {
 	}
 
 	podInfo := []struct {
-		description                 string
-		hasSupplementalGroupsPolicy bool
-		pod                         func() *api.Pod
+		description string
+		pod         func() *api.Pod
 	}{
 		{
-			description:                 "with SupplementalGroupsPolicy and User",
-			hasSupplementalGroupsPolicy: true,
-			pod:                         podWithSupplementalGroupsPolicy,
+			description: "with SupplementalGroupsPolicy and User",
+			pod:         podWithSupplementalGroupsPolicy,
 		},
 		{
-			description:                 "without SupplementalGroupsPolicy and User",
-			hasSupplementalGroupsPolicy: false,
-			pod:                         podWithoutSupplementalGroupsPolicy,
+			description: "without SupplementalGroupsPolicy and User",
+			pod:         podWithoutSupplementalGroupsPolicy,
 		},
 		{
-			description:                 "is nil",
-			hasSupplementalGroupsPolicy: false,
-			pod:                         func() *api.Pod { return nil },
+			description: "is nil",
+			pod:         func() *api.Pod { return nil },
 		},
 	}
 
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasSupplementalGroupsPolicy, oldPod := oldPodInfo.hasSupplementalGroupsPolicy, oldPodInfo.pod()
-				newPodHasSupplementalGroupsPolicy, newPod := newPodInfo.hasSupplementalGroupsPolicy, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(
-					fmt.Sprintf(
-						"feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description,
-					),
-					func(t *testing.T) {
-						// Set emulation version so that the feature gate can be disabled in the test
-						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, enabled)
-
-						var oldPodSpec *api.PodSpec
-						var oldPodStatus *api.PodStatus
-						if oldPod != nil {
-							oldPodSpec = &oldPod.Spec
-							oldPodStatus = &oldPod.Status
-						}
-						dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
-
-						// old pod should never be changed
-						if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-							t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
-						}
-						switch {
-						case enabled || oldPodHasSupplementalGroupsPolicy:
-							// new pod shouldn't change if feature enabled or if old pod has SupplementalGroupsPolicy and User set
-							if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-								t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-							}
-						case newPodHasSupplementalGroupsPolicy:
-							// new pod should be changed
-							if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-								t.Errorf("new pod was not changed")
-							}
-							// new pod should not have SupplementalGroupsPolicy and User fields
-							if !reflect.DeepEqual(newPod, podWithoutSupplementalGroupsPolicy()) {
-								t.Errorf("new pod has SupplementalGroups and User: %v", cmp.Diff(newPod, podWithoutSupplementalGroupsPolicy()))
-							}
-						default:
-							// new pod should not need to be changed
-							if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-								t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-							}
-						}
-					},
-				)
+	for _, oldPodInfo := range podInfo {
+		for _, newPodInfo := range podInfo {
+			oldPod := oldPodInfo.pod()
+			newPod := newPodInfo.pod()
+			if newPod == nil {
+				continue
 			}
+
+			t.Run(
+				fmt.Sprintf("old pod %v, new pod %v", oldPodInfo.description, newPodInfo.description),
+				func(t *testing.T) {
+					var oldPodSpec *api.PodSpec
+					var oldPodStatus *api.PodStatus
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+						oldPodStatus = &oldPod.Status
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+					dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
+
+					// SupplementalGroupsPolicy is GA and its feature gate has been
+					// removed, so neither PodSpec.SecurityContext.SupplementalGroupsPolicy
+					// nor ContainerStatus.User must ever be dropped.
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+					// new pod should never be changed
+					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+						t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+					}
+				},
+			)
 		}
 	}
 }

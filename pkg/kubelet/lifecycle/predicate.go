@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -305,25 +304,13 @@ func rejectPodAdmissionBasedOnOSField(pod *v1.Pod) bool {
 }
 
 // rejectPodAdmissionBasedOnSupplementalGroupsPolicy rejects pod only if
-// - the feature is beta or above, and SupplementalPolicy=Strict is set in the pod
+// - SupplementalGroupsPolicy=Strict is set in the pod
 // - but, the node does not support the feature
-//
-// Note: During the feature is alpha or before(not yet released) in emulated version,
-// it should admit for backward compatibility
 func rejectPodAdmissionBasedOnSupplementalGroupsPolicy(pod *v1.Pod, node *v1.Node) bool {
 	admit, reject := false, true // just for readability
 
 	inUse := (pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SupplementalGroupsPolicy != nil)
 	if !inUse {
-		return admit
-	}
-
-	isBetaOrAbove := false
-	if featureSpec, ok := utilfeature.DefaultMutableFeatureGate.GetAll()[features.SupplementalGroupsPolicy]; ok {
-		isBetaOrAbove = (featureSpec.PreRelease == featuregate.Beta) || (featureSpec.PreRelease == featuregate.GA)
-	}
-
-	if !isBetaOrAbove {
 		return admit
 	}
 
