@@ -185,6 +185,20 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 		return fwk.Queue, err
 	}
 
+	// The matching helpers below assume namespaceSelector was already unrolled into
+	// Namespaces, as done in the Filter and Scoring paths, so unroll the queued
+	// pod terms here before matching them against the event pod.
+	for i := range terms {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&terms[i]); err != nil {
+			return fwk.Queue, err
+		}
+	}
+	for i := range antiTerms {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&antiTerms[i]); err != nil {
+			return fwk.Queue, err
+		}
+	}
+
 	// Pod is updated. Return Queue when the updated pod matching the target pod's affinity or not matching anti-affinity.
 	// Note that, we don't need to check each affinity individually when the Pod has more than one affinity
 	// because the current PodAffinity looks for a **single** existing pod that can satisfy **all** the terms of inter-pod affinity of an incoming pod.
@@ -227,6 +241,12 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 	originalPodAntiTerms, err := fwk.GetAffinityTerms(originalPod, fwk.GetPodAntiAffinityTerms(originalPod.Spec.Affinity))
 	if err != nil {
 		return fwk.Queue, err
+	}
+	// The deleted pod's anti-affinity terms are matched against the queued pod, so unroll them here too.
+	for i := range originalPodAntiTerms {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&originalPodAntiTerms[i]); err != nil {
+			return fwk.Queue, err
+		}
 	}
 	if podMatchesAnyAffinityTerms(originalPodAntiTerms, pod) {
 		logger.V(5).Info("a scheduled pod was deleted and the target pod matches the deleted pod's anti-affinity. The pod may be schedulable now",
