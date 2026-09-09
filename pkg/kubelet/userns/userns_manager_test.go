@@ -259,16 +259,16 @@ func TestUserNsManagerParseUserNsFile(t *testing.T) {
 		{
 			name: "wrong offset",
 			file: `{
-	                        "uidMappings":[ {"hostId":131072, "containerId":0, "length":65536 } ],
-	                        "gidMappings":[ {"hostId":1, "containerId":0, "length":65536 } ]
+	                        "uidMappings":[ {"hostId":131073, "containerId":0, "length":65536 } ],
+	                        "gidMappings":[ {"hostId":131073, "containerId":0, "length":65536 } ]
                                }`,
 			success: false,
 		},
 		{
 			name: "two GID mappings",
 			file: `{
-	                        "uidMappings":[ { "hostId":131072, "containerId":0, "length":userNsLength } ],
-	                        "gidMappings":[ { "hostId":131072, "containerId":0, "length":userNsLength }, { "hostId":196608, "containerId":0, "length":65536 } ]
+	                        "uidMappings":[ { "hostId":131072, "containerId":0, "length":65536 } ],
+	                        "gidMappings":[ { "hostId":131072, "containerId":0, "length":65536 }, { "hostId":196608, "containerId":0, "length":65536 } ]
                                }`,
 			success: false,
 		},
@@ -284,7 +284,7 @@ func TestUserNsManagerParseUserNsFile(t *testing.T) {
 			name: "no root UID",
 			file: `{
 	                        "uidMappings":[ { "hostId":131072, "containerId":1, "length":65536 } ],
-	                        "gidMappings":[ { "hostId":131072, "containerId":0, "length":65536 } ]
+	                        "gidMappings":[ { "hostId":131072, "containerId":1, "length":65536 } ]
                                }`,
 			success: false,
 		},
