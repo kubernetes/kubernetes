@@ -5261,79 +5261,168 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 	}
 }
 
-// TestCleanUpContainersInPodRecordsStatusBeforeRemovingAll verifies that when
-// cleanUpContainersInPod is about to aggressively remove all of a pod's dead
-// containers (e.g. because the pod has been evicted), it first records the
-// pod's current container statuses with the status manager. Without this,
-// a container's true terminated reason can be lost: once the container is
-// removed from the runtime, the runtime can no longer report its status, and
-// the kubelet falls back to ContainerStatusUnknown instead. See
-// https://issue.k8s.io/122160.
-func TestCleanUpContainersInPodRecordsStatusBeforeRemovingAll(t *testing.T) {
+// TestWithoutContainersPendingStatusCapture covers withoutContainersPendingStatusCapture's
+// filtering: a container must not be handed to the aggressive removeAll cleanup while the
+// status manager's last-known status for it still says Running, since that means the pod
+// worker's own status write hasn't observed the exit yet.
+func TestWithoutContainersPendingStatusCapture(t *testing.T) {
+	podID := types.UID("pod-uid")
+	exited := &kubecontainer.Status{
+		ID:    kubecontainer.ContainerID{Type: "test", ID: "exited-current"},
+		Name:  "main",
+		State: kubecontainer.ContainerStateExited,
+	}
+	exitedOther := &kubecontainer.Status{
+		ID:    kubecontainer.ContainerID{Type: "test", ID: "exited-other"},
+		Name:  "sidecar",
+		State: kubecontainer.ContainerStateExited,
+	}
+	podStatus := &kubecontainer.PodStatus{
+		ID:                podID,
+		ContainerStatuses: []*kubecontainer.Status{exited, exitedOther},
+	}
+
+	testCases := []struct {
+		name         string
+		apiStatus    v1.PodStatus
+		statusCached bool
+		want         []*kubecontainer.Status
+	}{
+		{
+			name:         "no cached status leaves podStatus untouched",
+			statusCached: false,
+			want:         []*kubecontainer.Status{exited, exitedOther},
+		},
+		{
+			name:         "container the cached status still shows running is withheld",
+			statusCached: true,
+			apiStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{Name: "main", ContainerID: exited.ID.String(), State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+					{Name: "sidecar", ContainerID: exitedOther.ID.String(), State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}},
+				},
+			},
+			want: []*kubecontainer.Status{exitedOther},
+		},
+		{
+			name:         "container the cached status already shows terminated is not withheld",
+			statusCached: true,
+			apiStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{Name: "main", ContainerID: exited.ID.String(), State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}},
+					{Name: "sidecar", ContainerID: exitedOther.ID.String(), State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}},
+				},
+			},
+			want: []*kubecontainer.Status{exited, exitedOther},
+		},
+		{
+			name:         "a running init container is also withheld",
+			statusCached: true,
+			apiStatus: v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					{Name: "main", ContainerID: exited.ID.String(), State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					{Name: "sidecar", ContainerID: exitedOther.ID.String(), State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}},
+				},
+			},
+			want: []*kubecontainer.Status{exitedOther},
+		},
+		{
+			name:         "an empty ContainerID never matches",
+			statusCached: true,
+			apiStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{Name: "main", ContainerID: "", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
+					{Name: "sidecar", ContainerID: exitedOther.ID.String(), State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}},
+				},
+			},
+			want: []*kubecontainer.Status{exited, exitedOther},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			if tc.statusCached {
+				kubelet.statusManager.SetPodStatus(klog.Background(), &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podID}}, tc.apiStatus)
+			}
+
+			got := kubelet.withoutContainersPendingStatusCapture(podID, podStatus)
+
+			if !reflect.DeepEqual(got.ContainerStatuses, tc.want) {
+				t.Errorf("got %#v, want %#v", got.ContainerStatuses, tc.want)
+			}
+			// The input must never be mutated - callers (and the shared podCache) rely on that.
+			if !reflect.DeepEqual(podStatus.ContainerStatuses, []*kubecontainer.Status{exited, exitedOther}) {
+				t.Errorf("input podStatus was mutated: %#v", podStatus.ContainerStatuses)
+			}
+		})
+	}
+}
+
+// TestCleanUpContainersInPodDefersRemovalUntilStatusCaptured is an end-to-end check, through
+// the real container deletor, that cleanUpContainersInPod withholds a container from an
+// aggressive removeAll cleanup until the status manager has observed its exit, and removes it
+// once that catches up.
+func TestCleanUpContainersInPodDefersRemovalUntilStatusCaptured(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{Name: "bar"},
-			},
-		},
+		ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "foo", Namespace: "new"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "bar"}}},
 	}
 	kubelet.podManager.AddPod(pod)
 	logger, _ := ktesting.NewTestContext(t)
 	kubelet.containerDeletor = newPodContainerDeletor(logger, kubelet.containerRuntime, 0)
+	kubelet.podWorkers.(*fakePodWorkers).removeContent = map[types.UID]bool{pod.UID: true}
 
-	startedAt := time.Now().Add(-time.Minute)
-	finishedAt := time.Now()
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "done"}
 	testKubelet.fakeRuntime.PodStatus = kubecontainer.PodStatus{
-		ID:        pod.UID,
-		Name:      pod.Name,
-		Namespace: pod.Namespace,
+		ID:   pod.UID,
+		Name: pod.Name, Namespace: pod.Namespace,
 		ContainerStatuses: []*kubecontainer.Status{
-			{
-				ID:         kubecontainer.ContainerID{Type: "test", ID: "done"},
-				Name:       "bar",
-				State:      kubecontainer.ContainerStateExited,
-				ExitCode:   1,
-				Reason:     "Error",
-				Message:    "some message",
-				StartedAt:  startedAt,
-				FinishedAt: finishedAt,
-			},
+			{ID: containerID, Name: "bar", State: kubecontainer.ContainerStateExited, ExitCode: 1, Reason: "Error"},
 		},
 	}
 
-	// Simulate the pod worker deciding this evicted pod's content is safe to
-	// aggressively remove.
-	kubelet.podWorkers.(*fakePodWorkers).removeContent = map[types.UID]bool{pod.UID: true}
+	deleteContainerCalls := func() int {
+		testKubelet.fakeRuntime.Lock()
+		defer testKubelet.fakeRuntime.Unlock()
+		n := 0
+		for _, c := range testKubelet.fakeRuntime.CalledFunctions {
+			if c == "DeleteContainer" {
+				n++
+			}
+		}
+		return n
+	}
 
+	// The status manager still shows "bar" as Running (its last write, from before the
+	// eviction killed it) - the container must be withheld.
+	kubelet.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{Name: "bar", ContainerID: containerID.String(), State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+		},
+	})
 	kubelet.cleanUpContainersInPod(tCtx, pod.UID, "done")
+	require.Never(t, func() bool { return deleteContainerCalls() > 0 }, 200*time.Millisecond, 20*time.Millisecond,
+		"container should not be removed while the status manager still reports it Running")
 
-	status, ok := kubelet.statusManager.GetPodStatus(pod.UID)
-	if !ok {
-		t.Fatalf("expected a pod status to have been recorded before removing all containers")
-	}
-	if len(status.ContainerStatuses) != 1 {
-		t.Fatalf("expected one container status, got %#v", status.ContainerStatuses)
-	}
-	terminated := status.ContainerStatuses[0].State.Terminated
-	if terminated == nil {
-		t.Fatalf("expected container status to be terminated, got %#v", status.ContainerStatuses[0].State)
-	}
-	if terminated.Reason == kubecontainer.ContainerReasonStatusUnknown {
-		t.Errorf("container's terminated reason should have been captured before removal, got ContainerStatusUnknown")
-	}
-	if terminated.Reason != "Error" || terminated.ExitCode != 1 {
-		t.Errorf("expected the container's real terminated reason/exit code to be recorded, got reason=%q exitCode=%d", terminated.Reason, terminated.ExitCode)
-	}
+	// The pod worker's own sync catches up and records the real terminated status.
+	kubelet.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{Name: "bar", ContainerID: containerID.String(), State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "Error", ExitCode: 1}}},
+		},
+	})
+	kubelet.cleanUpContainersInPod(tCtx, pod.UID, "done")
+	require.Eventually(t, func() bool { return deleteContainerCalls() > 0 }, time.Second, 10*time.Millisecond,
+		"container should be removed once the status manager has captured its terminated status")
 }
 
 func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {

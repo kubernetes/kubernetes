@@ -3450,20 +3450,48 @@ func (kl *Kubelet) cleanUpContainersInPod(ctx context.Context, podID types.UID, 
 		// When an evicted or deleted pod has already synced, all containers can be removed.
 		removeAll := kl.podWorkers.ShouldPodContentBeRemoved(podID)
 		if removeAll {
-			// Record the pod's current container statuses with the status manager before
-			// force-removing every container below. ShouldPodContentBeRemoved can return true
-			// as soon as eviction is requested, which can race with the runtime returning a
-			// container's final terminated status; once a container is removed here, the
-			// runtime can no longer report it and the kubelet falls back to
-			// ContainerStatusUnknown instead of the container's true terminated reason.
-			// Persisting the status we already have, while the containers are still present,
-			// avoids that fallback. See https://issue.k8s.io/122160.
-			if pod, ok := kl.podManager.GetPodByUID(podID); ok {
-				kl.statusManager.SetPodStatus(klog.FromContext(ctx), pod, kl.generateAPIPodStatus(ctx, pod, podStatus, false))
-			}
+			podStatus = kl.withoutContainersPendingStatusCapture(podID, podStatus)
 		}
 		kl.containerDeletor.deleteContainersInPod(klog.FromContext(ctx), exitedContainerID, podStatus, removeAll)
 	}
+}
+
+// withoutContainersPendingStatusCapture returns a copy of podStatus with any
+// container removed whose exit the status manager's last-known status for
+// this pod hasn't observed yet (still reports Running). This runs on the sync
+// loop, not the pod worker's own goroutine, so it only reads the pod worker's
+// status write rather than racing it with one of its own: ShouldPodContentBeRemoved
+// can go true for an evicted pod before that write captures a container's exit,
+// and removing the container from the runtime first would leave its true
+// terminated reason unrecoverable, falling back to ContainerStatusUnknown.
+// Filtering it out here just defers its removal to the pod worker's next
+// sync, which will have caught up by then, or to the periodic container GC.
+// See https://issue.k8s.io/122160.
+func (kl *Kubelet) withoutContainersPendingStatusCapture(podID types.UID, podStatus *kubecontainer.PodStatus) *kubecontainer.PodStatus {
+	apiStatus, ok := kl.statusManager.GetPodStatus(podID)
+	if !ok {
+		return podStatus
+	}
+	running := sets.New[string]()
+	for _, statuses := range [][]v1.ContainerStatus{apiStatus.ContainerStatuses, apiStatus.InitContainerStatuses, apiStatus.EphemeralContainerStatuses} {
+		for _, cs := range statuses {
+			if cs.State.Running != nil && cs.ContainerID != "" {
+				running.Insert(cs.ContainerID)
+			}
+		}
+	}
+	if running.Len() == 0 {
+		return podStatus
+	}
+	filtered := *podStatus
+	filtered.ContainerStatuses = make([]*kubecontainer.Status, 0, len(podStatus.ContainerStatuses))
+	for _, cs := range podStatus.ContainerStatuses {
+		if running.Has(cs.ID.String()) {
+			continue
+		}
+		filtered.ContainerStatuses = append(filtered.ContainerStatuses, cs)
+	}
+	return &filtered
 }
 
 // fastStatusUpdateOnce starts a loop that checks if the current state of kubelet + container runtime
