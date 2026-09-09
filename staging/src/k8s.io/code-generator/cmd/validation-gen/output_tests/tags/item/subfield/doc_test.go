@@ -34,6 +34,17 @@ func Test(t *testing.T) {
 		`items[1].stringField`: {"item Items[key=target].stringField"},
 	})
 
+	// otherField's required check short-circuits, but must not suppress the
+	// validation on stringField.
+	st.Value(&Struct{
+		Items: []Item{
+			{Key: "target", StringField: "fails", OtherField: ""},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Required(field.NewPath("items").Index(0).Child("otherField"), ""),
+		field.Invalid(field.NewPath("items").Index(0).Child("stringField"), "fails", "").WithOrigin("validateFalse"),
+	})
+
 	st.Value(&Struct{
 		Items: []Item{
 			{Key: "other", StringField: "anything"},
