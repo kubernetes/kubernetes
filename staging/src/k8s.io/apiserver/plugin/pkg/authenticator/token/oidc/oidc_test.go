@@ -116,7 +116,12 @@ type staticKeySet struct {
 }
 
 func (s *staticKeySet) VerifySignature(ctx context.Context, jwt string) (payload []byte, err error) {
-	jws, err := jose.ParseSigned(jwt)
+	allowedSignatureAlgorithms := []jose.SignatureAlgorithm{}
+	for _, key := range s.keys {
+		allowedSignatureAlgorithms = append(allowedSignatureAlgorithms, jose.SignatureAlgorithm(key.Algorithm))
+	}
+
+	jws, err := jose.ParseSigned(jwt, allowedSignatureAlgorithms)
 	if err != nil {
 		return nil, err
 	}
