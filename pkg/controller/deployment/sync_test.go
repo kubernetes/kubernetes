@@ -596,89 +596,98 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 }
 
 func TestDeploymentController_generateReplicaSetName(t *testing.T) {
+	// controller.ComputeHash output length varies (typically 8-10 chars) depending on
+	// the PodTemplateSpec contents — see kubernetes/kubernetes#134975. Compute the
+	// expected deployment-name truncation point from the actual hash length rather
+	// than hard-coding 242, so this test stays correct as the hash function evolves.
 	tests := []struct {
-		name                  string
-		deploymentName        string
-		wantDeploymentPortion string
+		name           string
+		deploymentName string
 	}{
 		{
-			name:                  "short name",
-			deploymentName:        "my-deployment",
-			wantDeploymentPortion: "my-deployment",
+			name:           "short name",
+			deploymentName: "my-deployment",
 		},
 		{
-			name:                  "very long name truncated",
-			deploymentName:        strings.Repeat("a", 250),
-			wantDeploymentPortion: strings.Repeat("a", 242),
+			name:           "very long name truncated",
+			deploymentName: strings.Repeat("a", 250),
 		},
 		{
-			name:                  "very long name not truncated",
-			deploymentName:        strings.Repeat("a", 242),
-			wantDeploymentPortion: strings.Repeat("a", 242),
+			name:           "very long name not truncated",
+			deploymentName: strings.Repeat("a", 242),
 		},
 	}
 
 	for _, test := range tests {
-		_, ctx := ktesting.NewTestContext(t)
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 
-		fake := &fake.Clientset{}
-		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
-		if err != nil {
-			t.Fatalf("error creating Deployment controller: %v", err)
-		}
+			fake := &fake.Clientset{}
+			informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+			controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+			if err != nil {
+				t.Fatalf("error creating Deployment controller: %v", err)
+			}
 
-		controller.eventRecorder = &record.FakeRecorder{}
-		controller.dListerSynced = alwaysReady
-		controller.rsListerSynced = alwaysReady
-		controller.podListerSynced = alwaysReady
+			controller.eventRecorder = &record.FakeRecorder{}
+			controller.dListerSynced = alwaysReady
+			controller.rsListerSynced = alwaysReady
+			controller.podListerSynced = alwaysReady
 
-		stopCh := make(chan struct{})
-		defer close(stopCh)
-		informers.Start(stopCh)
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			informers.Start(stopCh)
 
-		d := newDeployment(test.deploymentName, 1, nil, nil, nil, map[string]string{"foo": "bar"})
+			d := newDeployment(test.deploymentName, 1, nil, nil, nil, map[string]string{"foo": "bar"})
 
-		if _, err := controller.getNewReplicaSet(ctx, d, []*apps.ReplicaSet{}, []*apps.ReplicaSet{}, true); err != nil {
-			t.Errorf("failed to create new ReplicaSet: %v", err)
-			return
-		}
+			if _, err := controller.getNewReplicaSet(ctx, d, []*apps.ReplicaSet{}, []*apps.ReplicaSet{}, true); err != nil {
+				t.Errorf("failed to create new ReplicaSet: %v", err)
+				return
+			}
 
-		rsName := ""
-		for _, action := range fake.Actions() {
-			if createAction, ok := action.(testclient.CreateAction); ok {
-				if createdRS, ok := createAction.GetObject().(*apps.ReplicaSet); ok {
-					if createdRS.Name != "" {
-						rsName = createdRS.Name
-						break
+			rsName := ""
+			for _, action := range fake.Actions() {
+				if createAction, ok := action.(testclient.CreateAction); ok {
+					if createdRS, ok := createAction.GetObject().(*apps.ReplicaSet); ok {
+						if createdRS.Name != "" {
+							rsName = createdRS.Name
+							break
+						}
 					}
 				}
 			}
-		}
 
-		if len(rsName) > validation.DNS1123SubdomainMaxLength {
-			t.Errorf("ReplicaSet name length %d, want <= %d", len(rsName), validation.DNS1123SubdomainMaxLength)
-		}
-
-		parts := strings.Split(rsName, "-")
-		if len(parts) < 2 {
-			t.Errorf("ReplicaSet name should contain at least one hyphen separator")
-		}
-
-		deploymentPortion := strings.Join(parts[:len(parts)-1], "-")
-		if len(test.deploymentName) <= 242 {
-			if len(deploymentPortion) != len(test.deploymentName) {
-				t.Errorf("Deployment name portion should be %d chars, got %d", len(test.deploymentName), len(deploymentPortion))
+			if len(rsName) > validation.DNS1123SubdomainMaxLength {
+				t.Errorf("ReplicaSet name length %d, want <= %d", len(rsName), validation.DNS1123SubdomainMaxLength)
 			}
-		} else {
-			if len(deploymentPortion) != 242 {
-				t.Errorf("Truncated deployment name should be 242 chars, got %d", len(deploymentPortion))
-			}
-		}
 
-		if deploymentPortion != test.wantDeploymentPortion {
-			t.Errorf("Deployment name portion mismatch: got %q, want %q", deploymentPortion, test.wantDeploymentPortion)
-		}
+			parts := strings.Split(rsName, "-")
+			if len(parts) < 2 {
+				t.Fatalf("ReplicaSet name %q should contain at least one hyphen separator", rsName)
+			}
+
+			deploymentPortion := strings.Join(parts[:len(parts)-1], "-")
+			hashPortion := parts[len(parts)-1]
+
+			// Production code in generateReplicaSetName truncates the deployment-name portion
+			// to (DNS1123SubdomainMaxLength - 1 - len(hash)). Mirror that here so the assertion
+			// remains correct for any hash length ComputeHash happens to emit.
+			maxDeploymentLen := validation.DNS1123SubdomainMaxLength - 1 - len(hashPortion)
+			wantDeploymentLen := len(test.deploymentName)
+			if wantDeploymentLen > maxDeploymentLen {
+				wantDeploymentLen = maxDeploymentLen
+			}
+			wantDeploymentPortion := test.deploymentName[:wantDeploymentLen]
+
+			if len(deploymentPortion) != wantDeploymentLen {
+				t.Errorf("Deployment name portion length: got %d, want %d (hash length %d)",
+					len(deploymentPortion), wantDeploymentLen, len(hashPortion))
+			}
+
+			if deploymentPortion != wantDeploymentPortion {
+				t.Errorf("Deployment name portion mismatch: got %q, want %q", deploymentPortion, wantDeploymentPortion)
+			}
+		})
 	}
 }
 
@@ -712,6 +721,16 @@ func TestGenerateReplicaSetName(t *testing.T) {
 			deploymentName: strings.Repeat("d", 252),
 			hash:           strings.Repeat("h", 252),
 			want:           strings.Repeat("d", 252) + "-" + strings.Repeat("h", 252),
+		},
+		{
+			// Regression test for kubernetes/kubernetes#134975: controller.ComputeHash
+			// can return shorter hashes (8-10 chars) depending on the PodTemplateSpec.
+			// generateReplicaSetName must truncate the deployment portion based on the
+			// actual hash length, not assume 10 chars.
+			name:           "9-char hash leaves 243 chars for deployment name",
+			deploymentName: strings.Repeat("e", 250),
+			hash:           "abcde1234",
+			want:           strings.Repeat("e", 243) + "-abcde1234",
 		},
 	}
 
