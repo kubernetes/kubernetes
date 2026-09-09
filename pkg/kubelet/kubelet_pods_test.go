@@ -8854,7 +8854,7 @@ func TestParseGetSubIdsOutput(t *testing.T) {
 	}
 }
 
-func TestGetentUserExists(t *testing.T) {
+func TestUserExists(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("getent is a Linux tool")
 	}
@@ -8880,7 +8880,7 @@ func TestGetentUserExists(t *testing.T) {
 			wantErr:    true,
 		},
 		{
-			name:      "getent not installed",
+			name:      "no getent, os/user reports not found",
 			wantFound: false,
 		},
 	}
@@ -8895,7 +8895,7 @@ func TestGetentUserExists(t *testing.T) {
 			}
 			t.Setenv("PATH", binDir)
 
-			found, err := getentUserExists("kubelet")
+			found, err := userExists("kubelet-nonexistent-test-user")
 			if tc.wantErr {
 				if err == nil {
 					t.Errorf("%s: expected error, got nil", tc.name)
