@@ -401,6 +401,7 @@ func TestUpdateAnnotations(t *testing.T) {
 func TestAnnotateErrors(t *testing.T) {
 	testCases := map[string]struct {
 		args  []string
+		list  bool
 		errFn func(error) bool
 	}{
 		"no args": {
@@ -433,23 +434,32 @@ func TestAnnotateErrors(t *testing.T) {
 			args:  []string{"pods=bar"},
 			errFn: func(err error) bool { return strings.Contains(err.Error(), "one or more resources must be specified") },
 		},
+		"cannot add annotations when --list is specified": {
+			args: []string{"pods", "foo", "app=bar"},
+			list: true,
+			errFn: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "cannot modify annotations when --list is specified")
+			},
+		},
+		"cannot remove annotations when --list is specified": {
+			args: []string{"pods", "foo", "app-"},
+			list: true,
+			errFn: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "cannot modify annotations when --list is specified")
+			},
+		},
 	}
 
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
-			// tf satisfies cmdutil.Factory, which embeds genericclioptions.RESTClientGetter, so the
-			// same value serves both tab-completion (via ValidArgsFunction) and resource building.
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
-			defer tf.Cleanup()
-
-			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			iostreams, _, bufOut, bufErr := genericiooptions.NewTestIOStreams()
-			cmd := NewCmdAnnotate("kubectl", tf, iostreams)
+			cmd := NewCmdAnnotate("kubectl", nil, iostreams)
 			cmd.SetOut(bufOut)
 			cmd.SetErr(bufOut)
 
-			flags := NewAnnotateFlags(tf, iostreams)
+			flags := NewAnnotateFlags(nil, iostreams)
+			flags.List = testCase.list
 			_, err := flags.ToOptions(cmd, testCase.args)
 			if !testCase.errFn(err) {
 				t.Errorf("%s: unexpected error: %v", k, err)
