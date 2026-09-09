@@ -30,10 +30,15 @@ func Test(t *testing.T) {
 	// prove that a nil intermediate produces no errors of its own: the only
 	// nil hop which reports is the one whose chain marks it required, and it
 	// reports once, without also running the deeper chain.
+	//
+	// validatedChildField reports both errors: the child type's own required
+	// check does not suppress the parent's subfield validation.
 	st.Value(&Struct{}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailExact().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("structField", "structField", "stringField"), "", "forced failure: Struct.StructField.StructField 1").WithOrigin("validateFalse"),
 		field.Invalid(field.NewPath("structField", "structField", "stringField"), "", "forced failure: Struct.StructField.StructField 2").WithOrigin("validateFalse"),
 		field.Required(field.NewPath("requiredHopField", "ptrField"), ""),
+		field.Invalid(field.NewPath("validatedChildField", "stringField"), "", "forced failure: Struct.ValidatedChildField.StringField").WithOrigin("validateFalse"),
+		field.Required(field.NewPath("validatedChildField", "stringField"), ""),
 	})
 
 	st.Value(&Struct{
@@ -66,6 +71,7 @@ func Test(t *testing.T) {
 		RequiredHopField: OtherStruct{
 			PtrField: &SmallStruct{StringField: "RHF"},
 		},
+		ValidatedChildField: ValidatedStruct{StringField: "VCF"},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"structField.structField.stringField":      {"Struct.StructField.StructField 1", "Struct.StructField.StructField 2"},
 		"structField.sliceField[0].stringField":    {"Struct.StructField.SliceField"},
@@ -80,5 +86,6 @@ func Test(t *testing.T) {
 		"structPtrField.mapField[b].stringField":   {"Struct.StructPtrField.MapField"},
 		"structPtrField.ptrField.stringField":      {"Struct.StructPtrField.PtrField"},
 		"requiredHopField.ptrField.stringField":    {"Struct.RequiredHopField.PtrField"},
+		"validatedChildField.stringField":          {"Struct.ValidatedChildField.StringField"},
 	})
 }

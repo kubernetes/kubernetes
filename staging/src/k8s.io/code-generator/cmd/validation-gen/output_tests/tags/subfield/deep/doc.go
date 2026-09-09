@@ -50,6 +50,17 @@ type Struct struct {
 	// +k8s:subfield(ptrField)=+k8s:required
 	// +k8s:subfield(ptrField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.RequiredHopField.PtrField"
 	RequiredHopField OtherStruct `json:"requiredHopField"`
+
+	// A subfield validation is the parent's own, so a short-circuit in the
+	// subfield type's own validations does not suppress it.
+	// +k8s:subfield(stringField)=+k8s:validateFalse="Struct.ValidatedChildField.StringField"
+	ValidatedChildField ValidatedStruct `json:"validatedChildField"`
+}
+
+// ValidatedStruct, unlike the other child types here, has validations of its own.
+type ValidatedStruct struct {
+	// +k8s:required
+	StringField string `json:"stringField"`
 }
 
 type OtherStruct struct {
