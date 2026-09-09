@@ -122,12 +122,16 @@ var unusedSinceNowFunc = metav1.Now
 type podUsageCheckFunc func(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
-func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) (*Controller, error) {
+func NewPVCProtectionController(ctx context.Context, pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) (*Controller, error) {
+	logger := klog.FromContext(ctx)
 	e := &Controller{
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvcprotection"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "pvcprotection",
+			},
 		),
 		pvcProcessingStore: NewPVCProcessingStore(),
 	}
@@ -172,7 +176,7 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 
 // Run runs the controller goroutines.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting PVC protection controller")

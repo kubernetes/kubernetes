@@ -357,7 +357,8 @@ func NewNodeLifecycleController(
 		podUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[podUpdateItem](),
 			workqueue.TypedRateLimitingQueueConfig[podUpdateItem]{
-				Name: "node_lifecycle_controller_pods",
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "node_lifecycle_controller_pods",
 			},
 		),
 	}
@@ -366,7 +367,7 @@ func NewNodeLifecycleController(
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*v1.Pod)
 			nc.podUpdated(nil, pod)
@@ -376,7 +377,7 @@ func NewNodeLifecycleController(
 			newPod := obj.(*v1.Pod)
 			nc.podUpdated(prevPod, newPod)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
 	controller.AddPodNodeNameIndexer(podInformer.Informer())
 	podIndexer := podInformer.Informer().GetIndexer()
@@ -408,7 +409,7 @@ func NewNodeLifecycleController(
 	}
 
 	logger.Info("Controller will reconcile labels")
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
 			nc.nodeUpdateQueue.Add(node.Name)
 			return nil
@@ -421,7 +422,7 @@ func NewNodeLifecycleController(
 			nc.nodesToRetry.Delete(node.Name)
 			return nil
 		}),
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
 	nc.leaseLister = leaseInformer.Lister()
 	nc.leaseInformerSynced = leaseInformer.Informer().HasSynced

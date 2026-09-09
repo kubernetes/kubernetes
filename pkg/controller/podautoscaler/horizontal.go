@@ -150,6 +150,7 @@ func NewHorizontalController(
 	cpuInitializationPeriod,
 	delayOfInitialReadinessStatus time.Duration,
 ) *HorizontalController {
+	logger := klog.FromContext(ctx)
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	broadcaster.StartStructuredLogging(3)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
@@ -174,7 +175,8 @@ func NewHorizontalController(
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			NewDefaultHPARateLimiter(resyncPeriod),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "horizontalpodautoscaler",
+				Logger: &logger,
+				Name:   "horizontalpodautoscaler",
 			},
 		),
 		mapper:              mapper,
@@ -193,13 +195,13 @@ func NewHorizontalController(
 		hpaController.selectorTracker = newBiMultimapSelectorTracker()
 	}
 
-	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
+	_, _ = hpaInformer.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    hpaController.enqueueHPA,
 			UpdateFunc: hpaController.updateHPA,
 			DeleteFunc: hpaController.deleteHPA,
 		},
-		resyncPeriod,
+		cache.HandlerOptions{Logger: &logger, ResyncPeriod: &resyncPeriod},
 	)
 	hpaController.hpaLister = hpaInformer.Lister()
 	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced
@@ -222,7 +224,7 @@ func NewHorizontalController(
 
 // Run begins watching and syncing.
 func (a *HorizontalController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting HPA controller")

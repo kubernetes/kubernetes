@@ -173,7 +173,7 @@ func TestServiceAccountCreation(t *testing.T) {
 			defer tCtx.Cancel("test case terminating")
 
 			controller, err := NewServiceAccountsController(
-				logger,
+				tCtx,
 				saInformer,
 				nsInformer,
 				client,

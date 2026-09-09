@@ -47,9 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 )
 
-// ResourceResyncTime defines the resync period of the garbage collector's informers.
-const ResourceResyncTime time.Duration = 0
-
 // GarbageCollector runs reflectors to watch for changes of managed API
 // objects, funnels the results to a single-threaded dependencyGraphBuilder,
 // which builds a graph caching the dependencies among objects. Triggered by the
@@ -130,7 +127,7 @@ func (gc *GarbageCollector) resyncMonitors(logger klog.Logger, deletableResource
 
 // Run starts garbage collector workers.
 func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTimeout time.Duration) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	gc.eventBroadcaster.StartStructuredLogging(3)

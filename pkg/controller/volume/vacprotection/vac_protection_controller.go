@@ -94,11 +94,12 @@ type Controller struct {
 }
 
 // NewVACProtectionController returns a new *Controller.
-func NewVACProtectionController(logger klog.Logger,
+func NewVACProtectionController(ctx context.Context,
 	client clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	vacInformer storageinformers.VolumeAttributesClassInformer) (*Controller, error) {
+	logger := klog.FromContext(ctx)
 	c := &Controller{
 		client:    client,
 		pvcSynced: pvcInformer.Informer().HasSynced,
@@ -108,7 +109,8 @@ func NewVACProtectionController(logger klog.Logger,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "vacprotection",
+				Logger: &logger,
+				Name:   "vacprotection",
 			},
 		),
 	}
@@ -209,7 +211,7 @@ func NewVACProtectionController(logger klog.Logger,
 
 // Run runs the controller goroutines.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting VAC protection controller")

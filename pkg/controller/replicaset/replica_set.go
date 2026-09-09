@@ -184,7 +184,7 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 		consistencyStore = consistencyutil.NewNoopConsistencyStore()
 	}
 
-	return NewBaseController(logger, rsInformer, podInformer, kubeClient, burstReplicas,
+	return NewBaseController(ctx, rsInformer, podInformer, kubeClient, burstReplicas,
 		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
 		"replicaset",
@@ -201,8 +201,9 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
-func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
+func NewBaseController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
 	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster, controllerFeatures ReplicaSetControllerFeatures, consistencyStore consistencyutil.ConsistencyStore) *ReplicaSetController {
+	logger := klog.FromContext(ctx)
 
 	rsc := &ReplicaSetController{
 		GroupVersionKind: gvk,
@@ -213,14 +214,17 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: queueName},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   queueName,
+			},
 		),
 		clock:              clock.RealClock{},
 		controllerFeatures: controllerFeatures,
 		consistencyStore:   consistencyStore,
 	}
 
-	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = rsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			rsc.addRS(logger, obj)
 		},
@@ -230,7 +234,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		DeleteFunc: func(obj interface{}) {
 			rsc.deleteRS(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	rsInformer.Informer().AddIndexers(cache.Indexers{
 		controllerUIDIndex: func(obj interface{}) ([]string, error) {
 			rs, ok := obj.(*apps.ReplicaSet)
@@ -248,7 +252,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 	rsc.rsLister = rsInformer.Lister()
 	rsc.rsListerSynced = rsInformer.Informer().HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			rsc.addPod(logger, obj)
 		},
@@ -261,7 +265,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		DeleteFunc: func(obj interface{}) {
 			rsc.deletePod(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	rsc.podLister = podInformer.Lister()
 	rsc.podListerSynced = podInformer.Informer().HasSynced
 	controller.AddPodControllerIndexer(podInformer.Informer()) //nolint:errcheck
@@ -273,7 +277,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 
 // Run begins watching and syncing.
 func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	rsc.eventBroadcaster.StartStructuredLogging(3)

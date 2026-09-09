@@ -76,24 +76,29 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	metrics.Register()
+	logger := klog.FromContext(ctx)
 
 	tc := &Controller{
 		client:   client,
 		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ttl_jobs_to_delete"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "ttl_jobs_to_delete",
+			},
 		),
 	}
 
-	logger := klog.FromContext(ctx)
-	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = jobInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			tc.addJob(logger, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			tc.updateJob(logger, oldObj, newObj)
 		},
+	}, cache.HandlerOptions{
+		Logger: &logger,
 	})
 
 	tc.jLister = jobInformer.Lister()
@@ -106,7 +111,7 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 
 // Run starts the workers to clean up Jobs.
 func (tc *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting TTL after finished controller")

@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -939,7 +940,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 			set2.Status.CurrentRevision = rev0.Name
 			set2.Status.CollisionCount = new(int32)
 			rev2 := newRevisionOrDie(set2, 3)
-			tests := []struct {
+			type testcase struct {
 				name            string
 				existing        []*apps.ControllerRevision
 				set             *apps.StatefulSet
@@ -947,7 +948,8 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 				expectedCurrent *apps.ControllerRevision
 				expectedUpdate  *apps.ControllerRevision
 				err             bool
-			}{
+			}
+			tests := []testcase{
 				{
 					name:            "creates initial revision",
 					existing:        nil,
@@ -985,18 +987,19 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 					err:             false,
 				},
 			}
-			for _, test := range tests {
+			run := func(tCtx ktesting.TContext, test testcase) {
 				client := fake.NewSimpleClientset()
 				informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 				spc := NewStatefulPodControlFromManager(newFakeObjectManager(informerFactory), &noopRecorder{})
 				ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
 				ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), lru.New(maxRevisionEqualityCacheEntries)}
 
-				stop := make(chan struct{})
-				defer close(stop)
-				informerFactory.Start(stop)
+				informerFactory.StartWithContext(tCtx)
+				tCtx.Cleanup(func() {
+					informerFactory.Shutdown()
+				})
 				cache.WaitForCacheSync(
-					stop,
+					tCtx.Done(),
 					informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
 					informerFactory.Core().V1().Pods().Informer().HasSynced,
 					informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
@@ -1007,34 +1010,37 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 				}
 				revisions, err := ssc.ListRevisions(test.set)
 				if err != nil {
-					t.Fatal(err)
+					tCtx.Fatal(err)
 				}
 				current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions)
 				if err != nil {
-					t.Fatalf("error getting statefulset revisions:%v", err)
+					tCtx.Fatalf("error getting statefulset revisions:%v", err)
 				}
 				revisions, err = ssc.ListRevisions(test.set)
 				if err != nil {
-					t.Fatal(err)
+					tCtx.Fatal(err)
 				}
 				if len(revisions) != test.expectedCount {
-					t.Errorf("%s: want %d revisions got %d", test.name, test.expectedCount, len(revisions))
+					tCtx.Errorf("want %d revisions got %d", test.expectedCount, len(revisions))
 				}
 				if test.err {
-					t.Errorf("%s: expected error", test.name)
+					tCtx.Errorf("expected error")
 				}
 				if !test.err && !history.EqualRevision(current, test.expectedCurrent) {
-					t.Errorf("%s: for current want %v got %v", test.name, test.expectedCurrent, current)
+					tCtx.Errorf("for current want %v got %v", test.expectedCurrent, current)
 				}
 				if !test.err && !history.EqualRevision(update, test.expectedUpdate) {
-					t.Errorf("%s: for update want %v got %v", test.name, test.expectedUpdate, update)
+					tCtx.Errorf("for update want %v got %v", test.expectedUpdate, update)
 				}
 				if !test.err && test.expectedCurrent != nil && current != nil && test.expectedCurrent.Revision != current.Revision {
-					t.Errorf("%s: for current revision want %d got %d", test.name, test.expectedCurrent.Revision, current.Revision)
+					tCtx.Errorf("for current revision want %d got %d", test.expectedCurrent.Revision, current.Revision)
 				}
 				if !test.err && test.expectedUpdate != nil && update != nil && test.expectedUpdate.Revision != update.Revision {
-					t.Errorf("%s: for update revision want %d got %d", test.name, test.expectedUpdate.Revision, update.Revision)
+					tCtx.Errorf("for update revision want %d got %d", test.expectedUpdate.Revision, update.Revision)
 				}
+			}
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) { run(ktesting.Init(t), test) })
 			}
 		})
 }

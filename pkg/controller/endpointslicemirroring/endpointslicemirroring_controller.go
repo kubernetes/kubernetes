@@ -96,13 +96,14 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 			&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 		),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "endpoint_slice_mirroring",
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "endpoint_slice_mirroring",
 			},
 		),
 		workerLoopPeriod: time.Second,
 	}
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = endpointsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c.onEndpointsAdd(logger, obj)
 		},
@@ -112,17 +113,17 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 		DeleteFunc: func(obj interface{}) {
 			c.onEndpointsDelete(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	c.endpointsLister = endpointsInformer.Lister()
 	c.endpointsSynced = endpointsInformer.Informer().HasSynced
 
-	endpointSliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = endpointSliceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.onEndpointSliceAdd,
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			c.onEndpointSliceUpdate(logger, oldObj, newObj)
 		},
 		DeleteFunc: c.onEndpointSliceDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
 	c.endpointSliceLister = endpointSliceInformer.Lister()
 	c.endpointSlicesSynced = endpointSliceInformer.Informer().HasSynced
@@ -130,11 +131,11 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = serviceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onServiceAdd,
 		UpdateFunc: c.onServiceUpdate,
 		DeleteFunc: c.onServiceDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
 	c.maxEndpointsPerSubset = maxEndpointsPerSubset
 
@@ -215,7 +216,7 @@ type Controller struct {
 
 // Run will not return until stopCh is closed.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	c.eventBroadcaster.StartLogging(klog.Infof)

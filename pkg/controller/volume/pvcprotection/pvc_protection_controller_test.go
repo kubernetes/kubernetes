@@ -736,8 +736,8 @@ func TestPVCProtectionController(t *testing.T) {
 		podInformer := informers.Core().V1().Pods()
 
 		// Create the controller
-		logger, _ := ktesting.NewTestContext(t)
-		ctrl, err := NewPVCProtectionController(logger, pvcInformer, podInformer, client)
+		logger, ctx := ktesting.NewTestContext(t)
+		ctrl, err := NewPVCProtectionController(ctx, pvcInformer, podInformer, client)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

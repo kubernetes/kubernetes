@@ -585,10 +585,9 @@ func newServiceAccountController(ctx context.Context, controllerContext Controll
 	if err != nil {
 		return nil, err
 	}
-	logger := klog.FromContext(ctx)
 
 	sac, err := serviceaccountcontroller.NewServiceAccountsController(
-		logger,
+		ctx,
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
 		client,
@@ -727,7 +726,7 @@ func newPersistentVolumeClaimProtectionController(ctx context.Context, controlle
 	}
 
 	pvcProtectionController, err := pvcprotection.NewPVCProtectionController(
-		klog.FromContext(ctx),
+		ctx,
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		client,
@@ -756,7 +755,7 @@ func newPersistentVolumeProtectionController(ctx context.Context, controllerCont
 	}
 
 	pvpc, err := pvprotection.NewPVProtectionController(
-		klog.FromContext(ctx),
+		ctx,
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		client,
 	)
@@ -785,7 +784,7 @@ func newVolumeAttributesClassProtectionController(ctx context.Context, controlle
 	}
 
 	vacProtectionController, err := vacprotection.NewVACProtectionController(
-		klog.FromContext(ctx),
+		ctx,
 		client,
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),

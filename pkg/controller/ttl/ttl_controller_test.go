@@ -231,7 +231,7 @@ func TestDesiredTTL(t *testing.T) {
 	for i, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
 		ttlController := &Controller{
-			queue:             workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+			queue:             workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
 			nodeCount:         testCase.nodeCount,
 			desiredTTLSeconds: testCase.desiredTTL,
 			boundaryStep:      testCase.boundaryStep,

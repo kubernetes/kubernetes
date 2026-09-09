@@ -116,7 +116,13 @@ func NewController(
 		requestSynced: requestInformer.Informer().HasSynced,
 		sliceSynced:   sliceInformer.Informer().HasSynced,
 		claimSynced:   claimInformer.Informer().HasSynced,
-		workqueue:     workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+		workqueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "resourcepoolstatusrequest",
+			},
+		),
 	}
 
 	// Only consume the DeviceTaintRule informer when the gate is enabled, so
@@ -148,7 +154,7 @@ func NewController(
 
 // Run starts the controller workers.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ResourcePoolStatusRequest controller")
