@@ -4,7 +4,7 @@ metadata:
   name: test-tas-scheduling-{{.Index}}
 spec:
   schedulingGroup:
-    podGroupName: gang-{{DivideInt .Index .podsPerGroup}}
+    podGroupName: group-{{DivideInt .Index .podsPerGroup}}
   containers:
   - image: registry.k8s.io/pause:3.10.1
     name: pause
