@@ -128,7 +128,7 @@ func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, old
 	if err != nil {
 		return field.ErrorList{field.InternalError(nil, err)}
 	}
-	versionedObj, err := scheme.ConvertToVersion(obj, versionedGroupVersion)
+	versionedObj, err := scheme.UnsafeConvertToVersion(obj, versionedGroupVersion)
 	if err != nil {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
 	}
@@ -138,7 +138,7 @@ func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, old
 	case operation.Create:
 		return scheme.Validate(ctx, o.Options, versionedObj, subresources...)
 	case operation.Update:
-		versionedOldObj, err = scheme.ConvertToVersion(oldObj, versionedGroupVersion)
+		versionedOldObj, err = scheme.UnsafeConvertToVersion(oldObj, versionedGroupVersion)
 		if err != nil {
 			return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
 		}
