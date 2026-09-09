@@ -376,7 +376,7 @@ func (m *manager) removeStaleState(logger klog.Logger) {
 	activeContainers := make(map[string]map[string]struct{})
 	for _, pod := range activePods {
 		activeContainers[string(pod.UID)] = make(map[string]struct{})
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 			activeContainers[string(pod.UID)][container.Name] = struct{}{}
 		}
 	}

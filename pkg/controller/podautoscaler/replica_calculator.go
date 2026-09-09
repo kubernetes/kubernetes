@@ -521,15 +521,11 @@ func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, er
 // resource by summing requests from all containers in the pod.
 // If a container name is specified, it uses only that container.
 func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource v1.ResourceName) (int64, error) {
-	containers := append([]v1.Container{}, pod.Spec.Containers...)
-	for _, c := range pod.Spec.InitContainers {
-		if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
-			containers = append(containers, c)
-		}
-	}
-
 	request := int64(0)
-	for _, c := range containers {
+	for c, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(c) {
+			continue
+		}
 		if container == "" || container == c.Name {
 			containerRequest, ok := c.Resources.Requests[resource]
 			if !ok {

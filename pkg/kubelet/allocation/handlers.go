@@ -136,11 +136,11 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 		}
 		return false
 	}
-	allocatedContainers := make(map[string]v1.Container)
-	for _, container := range append(allocatedPod.Spec.Containers, allocatedPod.Spec.InitContainers...) {
+	allocatedContainers := make(map[string]*v1.Container)
+	for container := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
 		allocatedContainers[container.Name] = container
 	}
-	for _, desiredContainer := range append(desiredPod.Spec.Containers, desiredPod.Spec.InitContainers...) {
+	for desiredContainer := range podutil.ContainerIter(&desiredPod.Spec, podutil.InitContainers|podutil.Containers) {
 		allocatedContainer, ok := allocatedContainers[desiredContainer.Name]
 		if !ok {
 			continue
@@ -148,8 +148,8 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 		origMemRequest := desiredContainer.Resources.Requests[v1.ResourceMemory]
 		newMemRequest := allocatedContainer.Resources.Requests[v1.ResourceMemory]
 		if !origMemRequest.Equal(newMemRequest) && !restartableMemoryResizePolicy(allocatedContainer.ResizePolicy) {
-			aSwapBehavior := runtime.GetContainerSwapBehavior(desiredPod, &desiredContainer)
-			bSwapBehavior := runtime.GetContainerSwapBehavior(allocatedPod, &allocatedContainer)
+			aSwapBehavior := runtime.GetContainerSwapBehavior(desiredPod, desiredContainer)
+			bSwapBehavior := runtime.GetContainerSwapBehavior(allocatedPod, allocatedContainer)
 			if aSwapBehavior != kubetypes.NoSwap || bSwapBehavior != kubetypes.NoSwap {
 				return true, "In-place resize of containers with swap is not supported."
 			}

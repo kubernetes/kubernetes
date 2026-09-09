@@ -23,6 +23,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -67,11 +68,11 @@ func (s *podScope) admitUsingContainerResources(ctx context.Context, pod *v1.Pod
 		return admission.GetPodAdmitResult(NewTopologyAffinityError())
 	}
 
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		logger.Info("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
-		err := s.allocateAlignedResources(ctx, pod, &container, operation)
+		err := s.allocateAlignedResources(ctx, pod, container, operation)
 		if err != nil {
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 			return admission.GetPodAdmitResult(err)
@@ -96,7 +97,7 @@ func (s *podScope) admitUsingPodResources(ctx context.Context, pod *v1.Pod, oper
 	logger.V(4).Info("Calling AllocatePod on hint providers", "pod", klog.KObj(pod))
 
 	// Store the best hint for all containers.
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		logger.Info("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 	}

@@ -33,6 +33,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -284,7 +285,6 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 	if len(nodeAllocatableClaimAllocations) == 0 {
 		return []v1.NodeAllocatableResourceClaimStatus{}, nil
 	}
-
 	claimToStatus := make(map[types.UID]v1.NodeAllocatableResourceClaimStatus)
 
 	for key, alloc := range nodeAllocatableClaimAllocations {
@@ -341,14 +341,12 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 		}
 	}
 
-	for _, containers := range [][]v1.Container{pod.Spec.InitContainers, pod.Spec.Containers} {
-		for _, container := range containers {
-			for _, podClaim := range container.Resources.Claims {
-				if claimUID, ok := claimNametoUID[podClaim.Name]; ok {
-					if nodeAllocatableClaimStatus, ok := claimToStatus[claimUID]; ok {
-						nodeAllocatableClaimStatus.Containers = append(nodeAllocatableClaimStatus.Containers, container.Name)
-						claimToStatus[claimUID] = nodeAllocatableClaimStatus
-					}
+	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		for _, podClaim := range container.Resources.Claims {
+			if claimUID, ok := claimNametoUID[podClaim.Name]; ok {
+				if nodeAllocatableClaimStatus, ok := claimToStatus[claimUID]; ok {
+					nodeAllocatableClaimStatus.Containers = append(nodeAllocatableClaimStatus.Containers, container.Name)
+					claimToStatus[claimUID] = nodeAllocatableClaimStatus
 				}
 			}
 		}
