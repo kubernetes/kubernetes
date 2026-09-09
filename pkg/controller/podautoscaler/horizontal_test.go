@@ -168,9 +168,8 @@ func AddUpdateAutoscalingReactor(fakeClient *fake.Clientset) {
 	})
 }
 
-// AddListHPAReactor registers a list reactor that returns a populated HPA list.
-func AddListHPAReactor(fakeClient *fake.Clientset, cfg *horizontalScenario, t *testing.T) {
-	hpa := buildHPA(t, cfg)
+// AddListHPAReactor registers a list reactor that returns the given HPA.
+func AddListHPAReactor(fakeClient *fake.Clientset, hpa *autoscalingv2.HorizontalPodAutoscaler) {
 	fakeClient.AddReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &autoscalingv2.HorizontalPodAutoscalerList{
 			Items: []autoscalingv2.HorizontalPodAutoscaler{*hpa},
@@ -841,7 +840,10 @@ func TestScaleCPU(t *testing.T) {
 
 			testClient := &fake.Clientset{}
 			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
-			AddListHPAReactor(testClient, &tt.fixture, t)
+
+			hpa := buildHPA(t, &tt.fixture)
+
+			AddListHPAReactor(testClient, hpa)
 			AddListPodsReactor(testClient, &tt.fixture)
 			AddUpdateAutoscalingReactor(testClient)
 
@@ -867,7 +869,6 @@ func TestScaleCPU(t *testing.T) {
 
 			setup := newHorizontalSetup(t, &tt.fixture, testClient, eventClient, fakeMetricsClient, nil, nil, fakeScaleClient)
 
-			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
 			// Register the HPA in the selector tracker. In production this is done by
@@ -4087,7 +4088,10 @@ func TestConditionSelectorValidation(t *testing.T) {
 			fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 			testClient := &fake.Clientset{}
 			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
-			AddListHPAReactor(testClient, &tt.fixture, t)
+
+			hpa := buildHPA(t, &tt.fixture)
+
+			AddListHPAReactor(testClient, hpa)
 			AddListPodsReactor(testClient, &tt.fixture)
 			AddUpdateAutoscalingReactor(testClient)
 
@@ -4112,8 +4116,6 @@ func TestConditionSelectorValidation(t *testing.T) {
 					setup.controller.selectorTracker.PutIfAbsent(key.Namespace, key, sel)
 				}
 			}
-
-			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
 			beforeReconciliationsTotal, err := metricstestutil.GetCounterMetricValue(
@@ -4284,7 +4286,10 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 			fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 			testClient := &fake.Clientset{}
 			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
-			AddListHPAReactor(testClient, &tt.fixture, t)
+
+			hpa := buildHPA(t, &tt.fixture)
+
+			AddListHPAReactor(testClient, hpa)
 			AddListPodsReactor(testClient, &tt.fixture)
 			AddUpdateAutoscalingReactor(testClient)
 
@@ -4313,8 +4318,6 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 			eventClient := &fake.Clientset{}
 
 			setup := newHorizontalSetup(t, &tt.fixture, testClient, eventClient, fakeMetricsClient, fakeCMClient, fakeEMClient, fakeScaleClient)
-
-			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
 			// Register the HPA in the selector tracker. In production this is done by
@@ -4425,7 +4428,10 @@ func TestInvalidMetricSourceType(t *testing.T) {
 			fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 			testClient := &fake.Clientset{}
 			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
-			AddListHPAReactor(testClient, &tt.fixture, t)
+
+			hpa := buildHPA(t, &tt.fixture)
+
+			AddListHPAReactor(testClient, hpa)
 			AddListPodsReactor(testClient, &tt.fixture)
 			AddUpdateAutoscalingReactor(testClient)
 
@@ -4440,7 +4446,6 @@ func TestInvalidMetricSourceType(t *testing.T) {
 
 			setup := newHorizontalSetup(t, &tt.fixture, testClient, eventClient, fakeMetricsClient, nil, nil, fakeScaleClient)
 
-			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
 			// Register the HPA in the selector tracker. In production this is done by
@@ -4535,7 +4540,10 @@ func TestConditionFailedScale(t *testing.T) {
 			fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 			testClient := &fake.Clientset{}
 			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
-			AddListHPAReactor(testClient, &tt.fixture, t)
+
+			hpa := buildHPA(t, &tt.fixture)
+
+			AddListHPAReactor(testClient, hpa)
 			AddListPodsReactor(testClient, &tt.fixture)
 			AddUpdateAutoscalingReactor(testClient)
 
@@ -4552,7 +4560,6 @@ func TestConditionFailedScale(t *testing.T) {
 
 			setup := newHorizontalSetup(t, &tt.fixture, testClient, eventClient, fakeMetricsClient, nil, nil, fakeScaleClient)
 
-			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
 			// Register the HPA in the selector tracker. In production this is done by
@@ -4790,7 +4797,10 @@ func TestScaleTimingBehavior(t *testing.T) {
 
 			testClient := &fake.Clientset{}
 			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
-			AddListHPAReactor(testClient, &tt.fixture, t)
+
+			hpa := buildHPA(t, &tt.fixture)
+
+			AddListHPAReactor(testClient, hpa)
 			AddListPodsReactor(testClient, &tt.fixture)
 			AddUpdateAutoscalingReactor(testClient)
 
@@ -4812,7 +4822,6 @@ func TestScaleTimingBehavior(t *testing.T) {
 
 			setup := newHorizontalSetup(t, &tt.fixture, testClient, eventClient, fakeMetricsClient, fakeCmClient, fakeEMClient, fakeScaleClient)
 
-			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
 			hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
@@ -4901,7 +4910,10 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	testClient := &fake.Clientset{}
 	testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
-	AddListHPAReactor(testClient, &fixture, t)
+
+	hpa := buildHPA(t, &fixture)
+
+	AddListHPAReactor(testClient, hpa)
 	AddListPodsReactor(testClient, &fixture)
 	AddUpdateAutoscalingReactor(testClient)
 
@@ -4917,7 +4929,6 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 
 	setup := newHorizontalSetup(t, &fixture, testClient, eventClient, fakeMetricsClient, nil, nil, fakeScaleClient)
 
-	hpa := buildHPA(t, &fixture)
 	hpa.Generation = 1
 	key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
@@ -6156,7 +6167,10 @@ func TestOneMetricEmptyExternalError(t *testing.T) {
 
 			testClient := &fake.Clientset{}
 			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
-			AddListHPAReactor(testClient, &tt.fixture, t)
+
+			hpa := buildHPA(t, &tt.fixture)
+
+			AddListHPAReactor(testClient, hpa)
 			AddListPodsReactor(testClient, &tt.fixture)
 			AddUpdateAutoscalingReactor(testClient)
 
@@ -6180,7 +6194,6 @@ func TestOneMetricEmptyExternalError(t *testing.T) {
 
 			setup := newHorizontalSetup(t, &tt.fixture, testClient, eventClient, fakeMetricsClient, fakeCmClient, fakeEMClient, fakeScaleClient)
 
-			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
 			hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
@@ -6546,7 +6559,10 @@ func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
 	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	testClient := &fake.Clientset{}
 	testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
-	AddListHPAReactor(testClient, &fixture, t)
+
+	hpa := buildHPA(t, &fixture)
+
+	AddListHPAReactor(testClient, hpa)
 	AddListPodsReactor(testClient, &fixture)
 	AddUpdateAutoscalingReactor(testClient)
 
@@ -6571,7 +6587,6 @@ func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
 
 	setup := newHorizontalSetup(t, &fixture, testClient, eventClient, fakeMetricsClient, nil, nil, fakeScaleClient)
 
-	hpa := buildHPA(t, &fixture)
 	key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
 	// Register the HPA in the selector tracker. In production this is done by
