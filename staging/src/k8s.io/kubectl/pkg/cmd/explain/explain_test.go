@@ -194,9 +194,10 @@ var explainV2Cases = []explainTestCase{
 		ExpectErrorPattern: `couldn't find resource for \"/v99, (Kind=Pod|Resource=pods)\"`,
 	},
 	{
-		Name:               "NonExistingResource",
-		Args:               []string{"foo"},
-		ExpectErrorPattern: `the server doesn't have a resource type "foo"`,
+		Name:               "EmptyAPIVersion",
+		Args:               []string{"pods"},
+		Flags:              map[string]string{"api-version": ""},
+		ExpectErrorPattern: `--api-version cannot be empty`,
 	},
 }
 
