@@ -254,7 +254,6 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	// Success cases are expected to pass validation.
 	for _, v := range successCases {
 		t.Run("", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			if errs := ValidateNetworkPolicy(v, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) != 0 {
 				t.Errorf("Expected success, got %v", errs)
 			}
@@ -268,6 +267,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 	for _, v := range legacyValidationCases {
 		t.Run("", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			if errs := ValidateNetworkPolicy(v, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) != 0 {
 				t.Errorf("Expected success, got %v", errs)
@@ -391,7 +391,6 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	// Error cases are not expected to pass validation.
 	for testName, networkPolicy := range errorCases {
 		t.Run(testName, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			if errs := ValidateNetworkPolicy(networkPolicy, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) == 0 {
 				t.Errorf("Expected failure")
 			}
@@ -528,7 +527,6 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 
 	for testName, successCase := range successCases {
 		t.Run(testName, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			successCase.old.ObjectMeta.ResourceVersion = "1"
 			successCase.update.ObjectMeta.ResourceVersion = "1"
 			if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{}); len(errs) != 0 {
@@ -599,7 +597,6 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 
 	for testName, errorCase := range errorCases {
 		t.Run(testName, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errorCase.old.ObjectMeta.ResourceVersion = "1"
 			errorCase.update.ObjectMeta.ResourceVersion = "1"
 			if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{}); len(errs) == 0 {
@@ -2326,6 +2323,7 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 	}
 	for k, tc := range successCases {
 		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 
 			errs := ValidateIngressStatusUpdate(&tc.newValue, &tc.oldValue)
@@ -2342,8 +2340,6 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 	}
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
-
 			errs := ValidateIngressStatusUpdate(&v, &oldValue)
 			if len(errs) == 0 {
 				t.Errorf("expected failure")
