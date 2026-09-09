@@ -37,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
@@ -4966,6 +4967,120 @@ func TestValidateInvalidLabelValueInNodeSelectorOption(t *testing.T) {
 				t.Errorf("Got AllowInvalidLabelValueInRequiredNodeAffinity=%t, want %t", gotOptions.AllowInvalidLabelValueInRequiredNodeAffinity, tc.wantOption)
 			}
 		})
+	}
+}
+
+func TestValidateAllowIndivisibleHugePagesValuesOption(t *testing.T) {
+	// 1e19 bytes is not a whole multiple of 2Mi; the option admits it for the
+	// objects the API already stores.
+	hugePages := api.ResourceName(api.ResourceHugePagesPrefix + "2Mi")
+	indivisible := api.ResourceList{hugePages: resource.MustParse("1e19")}
+
+	testCases := []struct {
+		name       string
+		oldPodSpec *api.PodSpec
+		wantOption bool
+	}{
+		{
+			name:       "NoOldPodSpec",
+			oldPodSpec: nil,
+			wantOption: false,
+		},
+		{
+			name: "DivisibleContainerLimit",
+			oldPodSpec: &api.PodSpec{Containers: []api.Container{{Resources: api.ResourceRequirements{
+				Limits: api.ResourceList{hugePages: resource.MustParse("4Mi")},
+			}}}},
+			wantOption: false,
+		},
+		{
+			name: "ContainerLimit",
+			oldPodSpec: &api.PodSpec{Containers: []api.Container{{Resources: api.ResourceRequirements{
+				Limits: indivisible,
+			}}}},
+			wantOption: true,
+		},
+		{
+			name:       "PodLevelLimit",
+			oldPodSpec: &api.PodSpec{Resources: &api.ResourceRequirements{Limits: indivisible}},
+			wantOption: true,
+		},
+		{
+			name:       "PodLevelRequest",
+			oldPodSpec: &api.PodSpec{Resources: &api.ResourceRequirements{Requests: indivisible}},
+			wantOption: true,
+		},
+		{
+			name:       "Overhead",
+			oldPodSpec: &api.PodSpec{Overhead: indivisible},
+			wantOption: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowIndivisibleHugePagesValues {
+				t.Errorf("Got AllowIndivisibleHugePagesValues=%t, want %t", gotOptions.AllowIndivisibleHugePagesValues, tc.wantOption)
+			}
+		})
+	}
+}
+
+// A stored pod-level hugepage value that is not a whole multiple survives an
+// update that leaves it unchanged, while a create still rejects it.
+func TestPodLevelIndivisibleHugePagesValueSurvivesUpdate(t *testing.T) {
+	hugePages := api.ResourceName(api.ResourceHugePagesPrefix + "2Mi")
+	pod := func(value string) *api.Pod {
+		list := api.ResourceList{
+			hugePages:          resource.MustParse(value),
+			api.ResourceMemory: resource.MustParse("64Mi"),
+		}
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns", ResourceVersion: "1"},
+			Spec: api.PodSpec{
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
+				Containers: []api.Container{{
+					Name:                     "ctr",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+				}},
+				Resources: &api.ResourceRequirements{Limits: list, Requests: list},
+			},
+		}
+	}
+	createErrors := func(created *api.Pod) field.ErrorList {
+		opts := GetValidationOptionsFromPodSpecAndMeta(&created.Spec, nil, &created.ObjectMeta, nil)
+		opts.PodLevelResourcesEnabled = true
+		return apivalidation.ValidatePodSpec(&created.Spec, &created.ObjectMeta, field.NewPath("spec"), opts)
+	}
+
+	// The fixture has to be valid apart from the hugepage value, or the empty
+	// error list below proves nothing.
+	if errs := createErrors(pod("4Mi")); len(errs) != 0 {
+		t.Fatalf("the fixture is not valid on its own: %v", errs)
+	}
+
+	errs := createErrors(pod("1e19"))
+	if len(errs) != 2 {
+		t.Errorf("create: got %v, want one error for requests and one for limits", errs)
+	}
+	for _, err := range errs {
+		if !strings.Contains(err.Error(), "not positive integer multiple") {
+			t.Errorf("create: unexpected error %v", err)
+		}
+	}
+
+	stored := pod("1e19")
+	updated := stored.DeepCopy()
+	updated.Labels = map[string]string{"touched": "yes"}
+	opts := GetValidationOptionsFromPodSpecAndMeta(&updated.Spec, &stored.Spec, &updated.ObjectMeta, &stored.ObjectMeta)
+	opts.PodLevelResourcesEnabled = true
+	if errs := apivalidation.ValidatePodUpdate(updated, stored, opts); len(errs) != 0 {
+		t.Errorf("update that only changes a label: %v", errs)
 	}
 }
 

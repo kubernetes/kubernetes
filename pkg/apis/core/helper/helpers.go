@@ -19,6 +19,7 @@ package helper
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -75,11 +76,78 @@ func IsHugePageResourceValueDivisible(name core.ResourceName, quantity resource.
 		return false
 	}
 
-	if pageSize.Sign() <= 0 || pageSize.MilliValue()%int64(1000) != int64(0) {
+	// The page size is parsed out of the resource name, so it is not bounded.
+	size, ok := wholePositiveBytes(pageSize)
+	if !ok {
 		return false
 	}
 
-	return quantity.Value()%pageSize.Value() == 0
+	// AsInt64 is exact when it succeeds, so an ordinary request allocates nothing.
+	if v, ok := quantity.AsInt64(); ok {
+		return v%size == 0
+	}
+
+	// Reduce modulo the page size rather than writing the value out: an exponent
+	// is caller supplied, so "1e100000000" names a 10^8-digit number.
+	d := quantity.AsDec()
+	if d.Sign() == 0 {
+		return true
+	}
+	// UnscaledBig aliases the quantity's own big.Int, so copy before reducing.
+	unscaled := new(big.Int).Set(d.UnscaledBig())
+	scale := int64(d.Scale())
+	ten := big.NewInt(10)
+	rem := new(big.Int)
+	// A leftover digit is a fraction of a byte, so the value is not a whole one.
+	for ; scale > 0; scale-- {
+		unscaled.QuoRem(unscaled, ten, rem)
+		if rem.Sign() != 0 {
+			return false
+		}
+	}
+	p := big.NewInt(size)
+	acc := new(big.Int).Mod(unscaled, p)
+	if scale < 0 {
+		acc.Mul(acc, new(big.Int).Exp(ten, big.NewInt(-scale), p))
+		acc.Mod(acc, p)
+	}
+	return acc.Sign() == 0
+}
+
+// wholePositiveBytes returns q as a positive whole number of bytes, and false
+// when q is zero, negative, fractional, or outside the int64 range. Unlike
+// Quantity.Value() it neither rounds nor silently overflows.
+func wholePositiveBytes(q resource.Quantity) (int64, bool) {
+	if v, ok := q.AsInt64(); ok {
+		return v, v > 0
+	}
+	d := q.AsDec()
+	if d.Sign() <= 0 {
+		return 0, false
+	}
+	// UnscaledBig aliases q's big.Int, which can outgrow an int64 even when the
+	// value does not, so copy and normalize before narrowing.
+	unscaled := new(big.Int).Set(d.UnscaledBig())
+	scale := int64(d.Scale())
+	ten := big.NewInt(10)
+	rem := new(big.Int)
+	// Trailing zeros are not precision: 2097152.000 is a whole number of bytes.
+	for ; scale > 0; scale-- {
+		unscaled.QuoRem(unscaled, ten, rem)
+		if rem.Sign() != 0 {
+			return 0, false
+		}
+	}
+	for ; scale < 0; scale++ {
+		unscaled.Mul(unscaled, ten)
+		if unscaled.BitLen() > 63 {
+			return 0, false
+		}
+	}
+	if !unscaled.IsInt64() {
+		return 0, false
+	}
+	return unscaled.Int64(), true
 }
 
 // IsQuotaHugePageResourceName returns true if the resource name has the quota

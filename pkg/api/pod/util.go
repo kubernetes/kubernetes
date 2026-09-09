@@ -314,28 +314,23 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 	return !isEqual
 }
 
-func checkContainerUseIndivisibleHugePagesValues(container api.Container) bool {
-	for resourceName, quantity := range container.Resources.Limits {
-		if helper.IsHugePageResourceName(resourceName) {
-			if !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
-				return true
-			}
-		}
-	}
-
-	for resourceName, quantity := range container.Resources.Requests {
-		if helper.IsHugePageResourceName(resourceName) {
-			if !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
-				return true
-			}
+func hasIndivisibleHugePagesValue(list api.ResourceList) bool {
+	for resourceName, quantity := range list {
+		if helper.IsHugePageResourceName(resourceName) && !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
+			return true
 		}
 	}
 
 	return false
 }
 
-// usesIndivisibleHugePagesValues returns true if the one of the containers uses non-integer multiple
-// of huge page unit size
+func checkContainerUseIndivisibleHugePagesValues(container api.Container) bool {
+	return hasIndivisibleHugePagesValue(container.Resources.Limits) ||
+		hasIndivisibleHugePagesValue(container.Resources.Requests)
+}
+
+// usesIndivisibleHugePagesValues returns true if the pod spec asks for a non-integer
+// multiple of huge page unit size anywhere validation checks for one.
 func usesIndivisibleHugePagesValues(podSpec *api.PodSpec) bool {
 	foundIndivisibleHugePagesValue := false
 	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
@@ -349,15 +344,16 @@ func usesIndivisibleHugePagesValues(podSpec *api.PodSpec) bool {
 		return true
 	}
 
-	for resourceName, quantity := range podSpec.Overhead {
-		if helper.IsHugePageResourceName(resourceName) {
-			if !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
-				return true
-			}
+	// Pod-level resources go through the same check, so an old pod carrying an
+	// indivisible one has to stay updatable.
+	if podSpec.Resources != nil {
+		if hasIndivisibleHugePagesValue(podSpec.Resources.Limits) ||
+			hasIndivisibleHugePagesValue(podSpec.Resources.Requests) {
+			return true
 		}
 	}
 
-	return false
+	return hasIndivisibleHugePagesValue(podSpec.Overhead)
 }
 
 // hasInvalidTopologySpreadConstraintLabelSelector return true if spec.TopologySpreadConstraints have any entry with invalid labelSelector
