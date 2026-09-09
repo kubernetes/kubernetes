@@ -144,7 +144,12 @@ func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Ta
 			}
 			f := Function(subfieldTagName, fn.Flags, validateSubfield, subname, getFn, equivArg,
 				WrapperFunction{Function: fn, ObjType: submemb.Type, PathFragment: "." + subname})
+			// The cohort is the short-circuit scope: name the whole path, or
+			// chains through a common hop suppress each other.
 			f.Cohort = subname
+			if fn.Cohort != "" {
+				f.Cohort = subname + "." + fn.Cohort
+			}
 			return f
 		})
 

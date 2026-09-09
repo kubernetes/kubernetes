@@ -75,7 +75,7 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "structField"
+			func() { // cohort = "structField.stringField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
 					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
@@ -131,7 +131,7 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
-			func() { // cohort = "ptrField"
+			func() { // cohort = "ptrField.stringField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ptrField",
 					func(o *OtherStruct) *SmallStruct { return o.PtrField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
@@ -172,7 +172,7 @@ func Validate_Struct(
 			if earlyReturn {
 				return // do not proceed
 			}
-			func() { // cohort = "structField"
+			func() { // cohort = "structField.stringField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
 					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
@@ -228,7 +228,7 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
-			func() { // cohort = "ptrField"
+			func() { // cohort = "ptrField.stringField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ptrField",
 					func(o *OtherStruct) *SmallStruct { return o.PtrField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
@@ -248,6 +248,51 @@ func Validate_Struct(
 				return oldObj.StructPtrField
 			})
 		errs = append(errs, fn(fldPath.Child("structPtrField"), obj.StructPtrField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.RequiredHopField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *OtherStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			func() { // cohort = "ptrField"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ptrField",
+					func(o *OtherStruct) *SmallStruct { return o.PtrField }, validate.DirectEqual, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			func() { // cohort = "ptrField.stringField"
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ptrField",
+					func(o *OtherStruct) *SmallStruct { return o.PtrField }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
+							func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.RequiredHopField.PtrField")
+							})
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *OtherStruct {
+				return &oldObj.RequiredHopField
+			})
+		errs = append(errs, fn(fldPath.Child("requiredHopField"), &obj.RequiredHopField, oldVal, oldObj != nil)...)
 	}
 
 	return errs

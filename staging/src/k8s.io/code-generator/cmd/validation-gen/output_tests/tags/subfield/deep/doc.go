@@ -43,6 +43,13 @@ type Struct struct {
 	// +k8s:subfield(mapField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.MapField"
 	// +k8s:subfield(ptrField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.PtrField"
 	StructPtrField *OtherStruct `json:"structPtrField"`
+
+	// Traversal does not assert that an intermediate field is set, so a chain
+	// which needs one declares it. The other fields here leave the same hop
+	// unmarked, so a nil hop is silently tolerated.
+	// +k8s:subfield(ptrField)=+k8s:required
+	// +k8s:subfield(ptrField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.RequiredHopField.PtrField"
+	RequiredHopField OtherStruct `json:"requiredHopField"`
 }
 
 type OtherStruct struct {

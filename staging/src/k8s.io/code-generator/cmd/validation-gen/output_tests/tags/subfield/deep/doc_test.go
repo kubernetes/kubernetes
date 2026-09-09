@@ -18,13 +18,22 @@ package deep
 
 import (
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
-	st.Value(&Struct{}).ExpectValidateFalseByPath(map[string][]string{
-		"structField.structField.stringField": {"Struct.StructField.StructField 1", "Struct.StructField.StructField 2"},
+	// Every nilable field is nil, so each chain which traverses one stops
+	// there. This asserts the full error set, not just the forced failures, to
+	// prove that a nil intermediate produces no errors of its own: the only
+	// nil hop which reports is the one whose chain marks it required, and it
+	// reports once, without also running the deeper chain.
+	st.Value(&Struct{}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailExact().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("structField", "structField", "stringField"), "", "forced failure: Struct.StructField.StructField 1").WithOrigin("validateFalse"),
+		field.Invalid(field.NewPath("structField", "structField", "stringField"), "", "forced failure: Struct.StructField.StructField 2").WithOrigin("validateFalse"),
+		field.Required(field.NewPath("requiredHopField", "ptrField"), ""),
 	})
 
 	st.Value(&Struct{
@@ -54,6 +63,9 @@ func Test(t *testing.T) {
 			},
 			PtrField: &SmallStruct{StringField: "PF"},
 		},
+		RequiredHopField: OtherStruct{
+			PtrField: &SmallStruct{StringField: "RHF"},
+		},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"structField.structField.stringField":      {"Struct.StructField.StructField 1", "Struct.StructField.StructField 2"},
 		"structField.sliceField[0].stringField":    {"Struct.StructField.SliceField"},
@@ -67,5 +79,6 @@ func Test(t *testing.T) {
 		"structPtrField.mapField[a].stringField":   {"Struct.StructPtrField.MapField"},
 		"structPtrField.mapField[b].stringField":   {"Struct.StructPtrField.MapField"},
 		"structPtrField.ptrField.stringField":      {"Struct.StructPtrField.PtrField"},
+		"requiredHopField.ptrField.stringField":    {"Struct.RequiredHopField.PtrField"},
 	})
 }
