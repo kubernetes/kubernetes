@@ -130,7 +130,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 		}
 	}
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
@@ -163,7 +163,10 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 				utilruntime.HandleErrorWithContext(ctx, err, "Error while processing CIDR Release")
 			}
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, err
+	}
 
 	return ra, nil
 }
