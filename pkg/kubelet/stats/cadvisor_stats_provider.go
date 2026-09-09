@@ -148,6 +148,25 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 		podStats.ProcessStats = mergeProcessStats(podStats.ProcessStats, cadvisorInfoToProcessStats(&cinfo))
 	}
 
+	// A Running pod can have no live container samples during restart backoff.
+	// Its volumes are still mounted, so retain the pod for storage collection
+	// without bringing back the filtered container stats.
+	seenPods := make(map[statsapi.PodReference]bool)
+	for key, cinfo := range infos {
+		if strings.HasSuffix(key, ".mount") || !isPodManagedContainer(logger, &cinfo) {
+			continue
+		}
+		ref := buildPodRef(cinfo.Spec.Labels)
+		if _, found := podToStats[ref]; found || seenPods[ref] {
+			continue
+		}
+		seenPods[ref] = true
+		podStatus, found := p.statusProvider.GetPodStatus(types.UID(ref.UID))
+		if found && podStatus.Phase == v1.PodRunning {
+			podToStats[ref] = &statsapi.PodStats{PodRef: ref}
+		}
+	}
+
 	// Add each PodStats to the result.
 	result := make([]statsapi.PodStats, 0, len(podToStats))
 	for _, podStats := range podToStats {
