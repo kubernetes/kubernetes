@@ -61,14 +61,13 @@ const (
 )
 
 type Indexer interface {
-	Add(obj interface{}) error
-	Update(obj interface{}) error
-	Delete(obj interface{}) error
-	List() []interface{}
+	Add(*Element) error
+	Update(*Element) error
+	Delete(*Element) error
+	Replace([]*Element) error
+	List() []*Element
 	ListKeys() []string
-	Get(obj interface{}) (item interface{}, exists bool, err error)
 	GetByKey(key string) (*Element, bool)
-	Replace([]interface{}, string) error
 	ByIndex(indexName, indexedValue string) ([]*Element, error)
 	Clone() Snapshot
 }

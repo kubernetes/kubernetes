@@ -31,13 +31,10 @@ import (
 )
 
 func TestWatchCacheStorageMarkConsistent(t *testing.T) {
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	assert.True(t, s.snapshottingEnabled.Load())
 
@@ -70,13 +67,10 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 }
 
 func TestLatestSnapshotLocked(t *testing.T) {
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	_, ok := s.LatestSnapshotLocked()
 	assert.False(t, ok, "expected no snapshot before any writes")
@@ -92,13 +86,10 @@ func TestLatestSnapshotLocked(t *testing.T) {
 }
 
 func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	t.Log("Initially no snapshots exist, should return ResourceExpired error")
 	_, err := s.GetExactSnapshotLocked(20)
@@ -162,12 +153,8 @@ func (m *mockObject) DeepCopyObject() runtime.Object {
 func TestWatchCacheStorageSnapshots(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
-
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	assert.True(t, s.snapshottingEnabled.Load(), "Expected snapshotting to be enabled when feature gate is active")
 
@@ -251,9 +238,9 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	_, err = s.GetExactSnapshotLocked(500)
 	require.NoError(t, err, "Confirm that cache stores history before replace")
 
-	err = s.ReplaceLocked([]interface{}{
-		&Element{Key: "foo", Object: &mockObject{key: "foo", val: "600"}},
-	}, "700", 700)
+	err = s.ReplaceLocked([]*Element{
+		{Key: "foo", Object: &mockObject{key: "foo", val: "600"}},
+	}, 700)
 	require.NoError(t, err)
 
 	_, err = s.GetExactSnapshotLocked(500)

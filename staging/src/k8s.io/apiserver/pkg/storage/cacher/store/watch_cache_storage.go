@@ -23,7 +23,6 @@ import (
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/cacher/key"
@@ -31,9 +30,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func NewWatchCacheStorage(keyFunc func(runtime.Object) (string, error), indexers *cache.Indexers) *WatchCacheStorage {
+func NewWatchCacheStorage(indexers *cache.Indexers) *WatchCacheStorage {
 	storage := &WatchCacheStorage{
-		keyFunc:             keyFunc,
 		store:               NewIndexer(indexers),
 		listResourceVersion: 0,
 	}
@@ -45,8 +43,6 @@ func NewWatchCacheStorage(keyFunc func(runtime.Object) (string, error), indexers
 }
 
 type WatchCacheStorage struct {
-	keyFunc func(runtime.Object) (string, error)
-
 	// store will effectively support LIST operation from the "end of cache
 	// history" i.e. from the moment just after the newest cached watched event.
 	// It is necessary to effectively allow clients to start watching at now.
@@ -132,21 +128,6 @@ func (l listSnapshot) RangePrefix(prefix, continueKey string) Range {
 	return elements(matching)
 }
 
-// Get takes runtime.Object as a parameter. However, it returns
-// pointer to <storeElement>.
-func (w *WatchCacheStorage) Get(obj interface{}) (interface{}, bool, error) {
-	object, ok := obj.(runtime.Object)
-	if !ok {
-		return nil, false, fmt.Errorf("obj does not implement runtime.Object interface: %v", obj)
-	}
-	key, err := w.keyFunc(object)
-	if err != nil {
-		return nil, false, fmt.Errorf("couldn't compute key: %w", err)
-	}
-
-	return w.store.Get(&Element{Key: key, Object: object})
-}
-
 func (w *WatchCacheStorage) GetByKey(key string) (*Element, bool) {
 	return w.store.GetByKey(key)
 }
@@ -155,8 +136,7 @@ func (w *WatchCacheStorage) ListKeys() []string {
 	return w.store.ListKeys()
 }
 
-// List returns list of pointers to <Element> objects.
-func (w *WatchCacheStorage) List() []interface{} {
+func (w *WatchCacheStorage) List() []*Element {
 	return w.store.List()
 }
 
@@ -189,8 +169,8 @@ func (w *WatchCacheStorage) CompactSnapshotsLocked(oldestRV uint64) {
 }
 
 // ReplaceLocked replaces the elements in the underlying store and resets snapshots.
-func (w *WatchCacheStorage) ReplaceLocked(toReplace []interface{}, resourceVersion string, version uint64) error {
-	if err := w.store.Replace(toReplace, resourceVersion); err != nil {
+func (w *WatchCacheStorage) ReplaceLocked(elems []*Element, version uint64) error {
+	if err := w.store.Replace(elems); err != nil {
 		return err
 	}
 	if w.snapshots != nil {
