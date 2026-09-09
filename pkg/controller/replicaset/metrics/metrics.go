@@ -44,6 +44,16 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+
+	ExpectationsWaiting = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      ReplicaSetControllerSubsystem,
+			Name:           "expectations_waiting_total",
+			Help:           "Total number of times ReplicaSet expectations were checked and found unsatisfied.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"type"},
+	)
 )
 
 // Register registers ReplicaSet controller metrics.
@@ -51,5 +61,9 @@ func Register(registrationFunc func(metrics.Registerable) error) error {
 	if err := registrationFunc(SortingDeletionAgeRatio); err != nil {
 		return err
 	}
-	return registrationFunc(ReplicaSetRequeueSkips)
+	if err := registrationFunc(ReplicaSetRequeueSkips); err != nil {
+		return err
+	}
+
+	return registrationFunc(ExpectationsWaiting)
 }

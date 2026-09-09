@@ -172,6 +172,16 @@ Possible values of the "status" label are:
 		// These are the labels (dimensions)
 		[]string{"group", "resource"},
 	)
+
+	ExpectationsWaiting = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      JobControllerSubsystem,
+			Name:           "expectations_waiting_total",
+			Help:           "Total number of times Job expectations were checked and found unsatisfied.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"type"},
+	)
 )
 
 const (
@@ -226,5 +236,6 @@ func Register() {
 		legacyregistry.MustRegister(JobPodsCreationTotal)
 		legacyregistry.MustRegister(JobByExternalControllerTotal)
 		legacyregistry.MustRegister(JobRequeueSkips)
+		legacyregistry.MustRegister(ExpectationsWaiting)
 	})
 }
