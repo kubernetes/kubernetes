@@ -27,9 +27,9 @@ import (
 //
 // CertificateSigningRequestSpec contains the certificate request.
 type CertificateSigningRequestSpecApplyConfiguration struct {
-	// Base64-encoded PKCS#10 CSR data
+	// request is Base64-encoded PKCS#10 CSR data
 	Request []byte `json:"request,omitempty"`
-	// Requested signer for the request. It is a qualified name in the form:
+	// signerName is the requested signer for the request. It is a qualified name in the form:
 	// `scope-hostname.io/name`.
 	// If empty, it will be defaulted:
 	// 1. If it's a kubelet client certificate, it is assigned
@@ -59,7 +59,7 @@ type CertificateSigningRequestSpecApplyConfiguration struct {
 	//
 	// The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
 	ExpirationSeconds *int32 `json:"expirationSeconds,omitempty"`
-	// allowedUsages specifies a set of usage contexts the key will be
+	// usages specifies a set of usage contexts the key will be
 	// valid for.
 	// See:
 	// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
@@ -90,16 +90,16 @@ type CertificateSigningRequestSpecApplyConfiguration struct {
 	// "microsoft sgc",
 	// "netscape sgc"
 	Usages []certificatesv1beta1.KeyUsage `json:"usages,omitempty"`
-	// Information about the requesting user.
+	// username is the information about the requesting user.
 	// See user.Info interface for details.
 	Username *string `json:"username,omitempty"`
-	// UID information about the requesting user.
+	// uid is the UID information about the requesting user.
 	// See user.Info interface for details.
 	UID *string `json:"uid,omitempty"`
-	// Group information about the requesting user.
+	// groups is the Group information about the requesting user.
 	// See user.Info interface for details.
 	Groups []string `json:"groups,omitempty"`
-	// Extra information about the requesting user.
+	// extra information about the requesting user.
 	// See user.Info interface for details.
 	Extra map[string]certificatesv1beta1.ExtraValue `json:"extra,omitempty"`
 }
