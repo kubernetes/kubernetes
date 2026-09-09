@@ -9286,7 +9286,7 @@ func RunTestAllocator(t *testing.T,
 			}
 			g.Expect(err).To(matchError)
 			if tc.expectErrorIs != nil {
-				g.Expect(errors.Is(err, tc.expectErrorIs)).To(gomega.BeTrue())
+				g.Expect(errors.Is(err, tc.expectErrorIs)).To(gomega.BeTrueBecause("expected error %v to wrap %v", err, tc.expectErrorIs))
 			}
 
 			t.Logf("name: %s", name)
