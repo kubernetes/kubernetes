@@ -125,7 +125,7 @@
     templatePath: templates/podgroup.yaml
     templateParams:
       podsPerGroup: $podsPerGroup
-      priority: 9999999
+      priority: 10000
   - opcode: createPods
     collectMetrics: true
     countParam: $highPriorityGroups
@@ -136,7 +136,7 @@
       podsPerGroup: $podsPerGroup
       cpuRequest: $highPriorityCpuRequest
       hostPortBase: 9000
-      priority: 9999999
+      priority: 10000
 
   workloads:
   - name: 2Nodes_1PreemptorGang_2Pods_Evicting_2LowPriorityGangs
@@ -339,7 +339,7 @@
     templatePath: templates/podgroup.yaml
     templateParams:
       podsPerGroup: $podsPerGroup
-      priority: 9999999
+      priority: 10000
   - opcode: createPods
     collectMetrics: true
     countParam: $preemptorPodGroups
@@ -349,7 +349,7 @@
     templateParams:
       podsPerGroup: $podsPerGroup
       cpuRequest: $gangCpuRequest
-      priority: 9999999
+      priority: 10000
   workloads:
   - name: 3Nodes_1PreemptorGang_3Pods_Evicting_12InitPods
     labels: [short, integration-test]

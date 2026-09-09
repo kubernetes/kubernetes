@@ -5,7 +5,7 @@ metadata:
   labels:
     gang-name: gang-{{DivideInt .Index .podsPerGroup}}
 spec:
-  priority: {{if .priority}}{{AddInt 0 .priority}}{{else}}8888888{{end}}
+  priority: {{if .priority}}{{AddInt 0 .priority}}{{else}}10000{{end}}
   schedulingGroup:
     podGroupName: gang-{{DivideInt .Index .podsPerGroup}}
   terminationGracePeriodSeconds: 0
