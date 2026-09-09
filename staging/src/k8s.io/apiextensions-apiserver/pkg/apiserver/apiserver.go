@@ -238,9 +238,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				go openapiController.Run(s.GenericAPIServer.StaticOpenAPISpec, s.GenericAPIServer.OpenAPIVersionedService, hookContext.Done())
 			}
 
-			if s.GenericAPIServer.OpenAPIV3VersionedService != nil {
+			if updater := s.GenericAPIServer.OpenAPIV3Updater(); updater != nil {
 				openapiv3Controller := openapiv3controller.NewController(s.Informers.Apiextensions().V1().CustomResourceDefinitions())
-				go openapiv3Controller.Run(s.GenericAPIServer.OpenAPIV3VersionedService, hookContext.Done())
+				go openapiv3Controller.Run(updater, hookContext.Done())
 			}
 		}
 

@@ -1444,6 +1444,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.24"
+- name: OpenAPIV3LazyBuild
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: OpportunisticBatching
   versionedSpecs:
   - default: true
