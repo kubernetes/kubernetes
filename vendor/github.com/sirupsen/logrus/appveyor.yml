@@ -1,0 +1,12 @@
+# Minimal stub to satisfy AppVeyor CI
+version: 1.0.{build}
+platform: x64
+shallow_clone: true
+
+branches:
+  only:
+    - master
+    - main
+
+build_script:
+  - echo "No-op build to satisfy AppVeyor CI"

@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-aggregator
+  namespace: kube-public
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-aggregator
+    image: kube-aggregator
+    imagePullPolicy: IfNotPresent
+    args:
+    - "/usr/local/bin/kube-aggregator"
+    - "--secure-port=9443"
+    - "--kubeconfig=/var/run/auth-client/kube-aggregator.kubeconfig"
+    - "--authentication-kubeconfig=/var/run/auth-client/kube-aggregator.kubeconfig"
+    - "--authorization-kubeconfig=/var/run/auth-client/kube-aggregator.kubeconfig"
+    - "--proxy-client-cert-file=/var/run/auth-proxy-client/client-auth-proxy.crt"
+    - "--proxy-client-key-file=/var/run/auth-proxy-client/client-auth-proxy.key"
+    - "--tls-cert-file=/var/run/serving-cert/serving-kube-aggregator.crt"
+    - "--tls-private-key-file=/var/run/serving-cert/serving-kube-aggregator.key"
+    - "--client-ca-file=/var/run/client-ca/client-ca.crt"
+    - "--requestheader-username-headers=X-Remote-User"
+    - "--requestheader-group-headers=X-Remote-Group"
+    - "--requestheader-extra-headers-prefix=X-Remote-Extra-"
+    - "--requestheader-client-ca-file=/var/run/request-header-ca/request-header-ca.crt"
+    - "--etcd-servers=http://127.0.0.1:2379"
+    ports:
+    - containerPort: 9443
+      hostPort: 9443
+    volumeMounts:
+    - mountPath: /var/run/request-header-ca
+      name: volume-request-header-ca
+      readOnly: true
+    - mountPath: /var/run/client-ca
+      name: volume-client-ca
+      readOnly: true
+    - mountPath: /var/run/auth-proxy-client
+      name: volume-auth-proxy-client
+      readOnly: true
+    - mountPath: /var/run/etcd-client-cert
+      name: volume-etcd-client-cert
+      readOnly: true
+    - mountPath: /var/run/serving-ca
+      name: volume-serving-ca
+      readOnly: true
+    - mountPath: /var/run/serving-cert
+      name: volume-serving-cert
+      readOnly: true
+    - mountPath: /var/run/etcd-ca
+      name: volume-etcd-ca
+      readOnly: true
+    - mountPath: /var/run/auth-client
+      name: volume-auth-client
+      readOnly: true
+  volumes:
+  - name: volume-request-header-ca
+    hostPath:
+      path: /var/run/kubernetes/
+  - name: volume-client-ca
+    hostPath:
+      path: /var/run/kubernetes/
+  - name: volume-auth-proxy-client
+    hostPath:
+      path: /var/run/kubernetes/
+  - name: volume-etcd-client-cert
+    hostPath:
+      path: /var/run/kubernetes/
+  - name: volume-serving-cert
+    hostPath:
+      path: /var/run/kubernetes/
+  - name: volume-serving-ca
+    hostPath:
+      path: /var/run/kubernetes/
+  - name: volume-etcd-ca
+    hostPath:
+      path: /var/run/kubernetes/
+  - name: volume-auth-client
+    hostPath:
+      path: /var/run/kubernetes/

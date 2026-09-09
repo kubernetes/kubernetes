@@ -1,0 +1,17 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - sig-cloud-provider-leads
+  - api-approvers
+  - deads2k
+  - luxas
+  - mtaufen
+  - sttts
+reviewers:
+  - api-reviewers
+  - deads2k
+  - luxas
+  - mtaufen
+  - sttts
+emeritus_approvers:
+  - stewart-yu

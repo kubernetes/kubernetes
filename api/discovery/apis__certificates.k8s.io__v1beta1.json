@@ -1,0 +1,52 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "certificates.k8s.io/v1beta1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "ClusterTrustBundle",
+      "name": "clustertrustbundles",
+      "namespaced": false,
+      "singularName": "clustertrustbundle",
+      "storageVersionHash": "v5yhuVertL4=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "PodCertificateRequest",
+      "name": "podcertificaterequests",
+      "namespaced": true,
+      "singularName": "podcertificaterequest",
+      "storageVersionHash": "wYA9yXQH8fg=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "PodCertificateRequest",
+      "name": "podcertificaterequests/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}

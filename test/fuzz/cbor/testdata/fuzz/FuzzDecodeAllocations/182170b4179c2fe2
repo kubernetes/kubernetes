@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("\xa2\x00dpiVersionA5555yTkin\xff\xff\x7f\xffAx")

@@ -1,0 +1,9 @@
+{{ template "base" .KubeHome }}
+ENCRYPTION_PROVIDER_CONFIG_PATH={{.EncryptionProviderConfigPath}}
+{{if .EncryptionProviderConfig}}
+  ENCRYPTION_PROVIDER_CONFIG={{.EncryptionProviderConfig}}
+{{end}}
+{{if .CloudKMSIntegration}}
+  readonly CLOUD_KMS_INTEGRATION=true
+{{end}}
+readonly KUBE_API_SERVER_RUNASUSER={{.KubeAPIServerRunAsUser}}

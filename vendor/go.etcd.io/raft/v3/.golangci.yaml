@@ -1,0 +1,60 @@
+version: "2"
+run:
+  timeout: 30m
+linters:
+  default: none
+  # please keep this alphabetized
+  enable:
+  # Don't use soon to deprecated[1] linters that lead to false
+  # https://github.com/golangci/golangci-lint/issues/1841
+  # - deadcode
+  # - structcheck
+  # - varcheck
+    - govet
+    - ineffassign
+    - revive
+    - staticcheck
+    - unused
+    - unconvert # Remove unnecessary type conversions
+    - usetesting
+  # please keep this alphabetized
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - -SA1019 # TODO(fix) Using a deprecated function, variable, constant or field
+        - -SA2002 # TODO(fix) Called testing.T.FailNow or SkipNow in a goroutine, which isn’t allowed
+        - -QF1008
+        - -QF1003
+        - -QF1001
+        - -S1019
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # exclude ineffassing linter for generated files for conversion
+      - linters:
+          - ineffassign
+        path: conversion\.go
+issues:
+  max-same-issues: 0
+formatters:
+  enable:
+    - gci
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(go.etcd.io)
+    goimports:
+      local-prefixes:
+        - go.etcd.io
+  exclusions:
+    generated: lax

@@ -1,0 +1,25 @@
+{
+	"kind": "Status",
+	"apiVersion": "v1",
+	"metadata": {},
+	"status": "Failure",
+	"message": "Service \"svc1\" is invalid: [spec.clusterIP: Invalid value: \"10.0.0.146.1\": field is immutable, spec.clusterIP: Invalid value: \"10.0.0.146.1\": must be empty, 'None', or a valid IP address]",
+	"reason": "Invalid",
+	"details": {
+		"name": "svc1",
+		"kind": "Service",
+		"causes": [
+			{
+				"reason": "FieldValueInvalid",
+				"message": "Invalid value: \"10.0.0.146.1\": field is immutable",
+				"field": "spec.clusterIP"
+			},
+			{
+				"reason": "FieldValueInvalid",
+				"message": "Invalid value: \"10.0.0.146.1\": must be empty, 'None', or a valid IP address",
+				"field": "spec.clusterIP"
+			}
+		]
+	},
+	"code": 422
+}

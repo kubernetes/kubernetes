@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Disable inheritance as stable metrics require SIG Instrumentation approval
+options:
+  no_parent_owners: true
+approvers:
+  - sig-instrumentation-approvers
+reviewers:
+  - sig-instrumentation-reviewers
+labels:
+  - sig/instrumentation
+  - area/stable-metrics

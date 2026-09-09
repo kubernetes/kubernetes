@@ -1,0 +1,3 @@
+kind: Foo
+apiVersion: foo.k8s.io/v1
+fooField: foo

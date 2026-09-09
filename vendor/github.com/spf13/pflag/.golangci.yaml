@@ -1,0 +1,4 @@
+linters:
+    disable-all: true
+    enable:
+        - nolintlint

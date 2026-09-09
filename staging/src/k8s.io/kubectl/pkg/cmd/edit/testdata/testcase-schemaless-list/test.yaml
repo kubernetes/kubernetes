@@ -1,0 +1,55 @@
+description: edit a mix of schema and schemaless data
+mode: edit
+args:
+- service/kubernetes
+- bars/test
+- bars/test2
+namespace: default
+expectedStdout:
+- "service/kubernetes edited"
+- "bar.company.com/test edited"
+- "bar.company.com/test2 edited"
+expectedExitCode: 0
+steps:
+- type: request
+  expectedMethod: GET
+  expectedPath: /api/v1/namespaces/default/services/kubernetes
+  expectedInput: 0.request
+  resultingStatusCode: 200
+  resultingOutput: 0.response
+- type: request
+  expectedMethod: GET
+  expectedPath: /apis/company.com/v1/namespaces/default/bars/test
+  expectedInput: 1.request
+  resultingStatusCode: 200
+  resultingOutput: 1.response
+- type: request
+  expectedMethod: GET
+  expectedPath: /apis/company.com/v1/namespaces/default/bars/test2
+  expectedInput: 2.request
+  resultingStatusCode: 200
+  resultingOutput: 2.response
+- type: edit
+  expectedInput: 3.original
+  resultingOutput: 3.edited
+- type: request
+  expectedMethod: PATCH
+  expectedPath: /api/v1/namespaces/default/services/kubernetes
+  expectedContentType: application/strategic-merge-patch+json
+  expectedInput: 4.request
+  resultingStatusCode: 200
+  resultingOutput: 4.response
+- type: request
+  expectedMethod: PATCH
+  expectedPath: /apis/company.com/v1/namespaces/default/bars/test
+  expectedContentType: application/merge-patch+json
+  expectedInput: 5.request
+  resultingStatusCode: 200
+  resultingOutput: 5.response
+- type: request
+  expectedMethod: PATCH
+  expectedPath: /apis/company.com/v1/namespaces/default/bars/test2
+  expectedContentType: application/merge-patch+json
+  expectedInput: 6.request
+  resultingStatusCode: 200
+  resultingOutput: 6.response

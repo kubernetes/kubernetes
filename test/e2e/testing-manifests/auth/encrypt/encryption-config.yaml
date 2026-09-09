@@ -1,0 +1,10 @@
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+    - '*.*'
+    providers:
+    - kms:
+        apiVersion: v2
+        name: kmsv2provider
+        endpoint: unix:///tmp/kms.socket

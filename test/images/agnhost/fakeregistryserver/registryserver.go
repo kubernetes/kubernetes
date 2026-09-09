@@ -1,0 +1,185 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package fakeregistryserver
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/spf13/cobra"
+)
+
+var (
+	port        int
+	private     bool
+	registryDir = "/var/registry"
+)
+
+const (
+	privateRegistryUser = "user"
+	privateRegistryPass = "password"
+)
+
+func init() {
+	CmdFakeRegistryServer.Flags().IntVar(&port, "port", 5000, "Port number.")
+	CmdFakeRegistryServer.Flags().BoolVar(&private, "private", false, "Enable authentication for the registry.")
+}
+
+// CmdFakeRegistryServer is the cobra command for the fake registry server
+var CmdFakeRegistryServer = &cobra.Command{
+	Use:   "fake-registry-server",
+	Short: "Starts a fake registry server for testing",
+	Long:  fmt.Sprintf("Starts a fake registry server that serves static OCI image files from %s folder", registryDir),
+	Run:   main,
+}
+
+func main(cmd *cobra.Command, args []string) {
+	log.Printf("Registry server starting with registry directory: %s", registryDir)
+
+	registryMux := NewRegistryServerMux(private)
+
+	addr := fmt.Sprintf(":%d", port)
+	log.Printf("HTTP server starting to listen on %s", addr)
+	if err := http.ListenAndServe(addr, registryMux); err != nil {
+		log.Fatalf("Error while starting the HTTP server: %v", err)
+	}
+}
+
+func NewRegistryServerMux(isPrivate bool) *http.ServeMux {
+	mux := http.NewServeMux()
+
+	var v2Handler http.Handler = http.HandlerFunc(handleV2)
+	if isPrivate {
+		v2Handler = auth(v2Handler)
+	}
+	mux.Handle("/v2/", v2Handler)
+
+	return mux
+}
+
+func auth(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != privateRegistryUser || pass != privateRegistryPass {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte("Unauthorized\n"))
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+// digestToPath converts a digest to a nested directory path following the Docker
+// registry storage layout. For example, "sha256:abc123..." becomes
+// "<baseDir>/sha256/ab/abc123.../data". This avoids filesystem issues with colons
+// in filenames on Windows and matches the standard Docker registry layout.
+func digestToPath(baseDir, digest string) string {
+	parts := strings.SplitN(digest, ":", 2)
+	if len(parts) != 2 || len(parts[1]) < 2 {
+		return filepath.Join(baseDir, digest)
+	}
+	algo := parts[0] // e.g., "sha256"
+	hash := parts[1] // e.g., "abc123..."
+	return filepath.Join(baseDir, algo, hash[:2], hash, "data")
+}
+
+// handleBlobs serves blob requests
+func handleBlobs(w http.ResponseWriter, r *http.Request, imageName, identifier string) {
+	filePath := digestToPath(filepath.Join(registryDir, imageName, "blobs"), identifier)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	log.Printf("Serving blob: %s", filePath)
+	http.ServeFile(w, r, filePath)
+}
+
+// handleManifests serves manifest requests. It dynamically sets the Content-Type
+// based on the manifest's mediaType field. If the identifier is a tag, it
+// reads the digest from the tag file and issues a redirect.
+func handleManifests(w http.ResponseWriter, r *http.Request, imageName, identifier string) {
+	manifestsDir := filepath.Join(registryDir, imageName, "manifests")
+
+	// if the identifier is not a digest, assume it's a tag and perform a redirect.
+	if !strings.HasPrefix(identifier, "sha256:") {
+		// Tags are stored as flat files (not nested)
+		tagFilePath := filepath.Join(manifestsDir, identifier)
+		log.Printf("Looking for tag file: %s", tagFilePath)
+		digest, err := os.ReadFile(tagFilePath)
+		if err != nil {
+			log.Printf("Tag file not found: %s, error: %v", tagFilePath, err)
+			http.NotFound(w, r)
+			return
+		}
+		redirectURL := strings.Replace(r.URL.String(), identifier, strings.TrimSpace(string(digest)), 1)
+		w.Header().Set("Location", redirectURL)
+		w.WriteHeader(http.StatusTemporaryRedirect)
+		return
+	}
+
+	filePath := digestToPath(manifestsDir, identifier)
+	log.Printf("Serving manifest: %s", filePath)
+	manifestContent, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Printf("Manifest file not found: %s, error: %v", filePath, err)
+		http.NotFound(w, r)
+		return
+	}
+
+	var manifestData struct {
+		MediaType string `json:"mediaType"`
+	}
+
+	if err := json.Unmarshal(manifestContent, &manifestData); err == nil && manifestData.MediaType != "" {
+		w.Header().Set("Content-Type", manifestData.MediaType)
+	}
+
+	log.Printf("Serving manifest: %s", filePath)
+	_, _ = w.Write(manifestContent)
+}
+
+func handleV2(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Docker-Distribution-Api-Version", "registry/2.0")
+
+	if r.URL.Path == "/v2/" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/v2/")
+	parts := strings.Split(path, "/")
+	if len(parts) < 3 {
+		http.NotFound(w, r)
+		return
+	}
+
+	imageName := parts[0]
+	objectType := parts[1]
+	identifier := parts[2]
+
+	switch objectType {
+	case "blobs":
+		handleBlobs(w, r, imageName, identifier)
+	case "manifests":
+		handleManifests(w, r, imageName, identifier)
+	default:
+		http.NotFound(w, r)
+	}
+}

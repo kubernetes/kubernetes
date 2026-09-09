@@ -1,0 +1,32 @@
+#$ Used in:
+#$ - geps/gep-1748.md
+kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: foo
+  namespace: foo
+spec:
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /bar
+    backendRefs:
+    - group: multicluster.x-k8s.io
+      kind: ServiceImport
+      name: bar
+      namespace: bar
+---
+kind: ReferenceGrant
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: bar
+  namespace: bar
+spec:
+  from:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    namespace: foo
+  to:
+  - group: multicluster.x-k8s.io
+    kind: ServiceImport

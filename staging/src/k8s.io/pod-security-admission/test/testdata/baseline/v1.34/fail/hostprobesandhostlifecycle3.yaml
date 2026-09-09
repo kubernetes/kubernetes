@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostprobesandhostlifecycle3
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    livenessProbe:
+      httpGet:
+        host: 127.0.0.1
+        port: 8080
+    name: container1
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1

@@ -1,0 +1,146 @@
+# HostPortConflict Scenario
+# Best-case scenario for opportunistic batching.
+# The `HostPort` constraint (port 80) strictly limits scheduling to 1 pod per node.
+# Since 20000 Pods need port 80 and we have 20000 Nodes, once Pod N is scheduled on Node X, Node X is immediately invalid for Pod N+1.
+# Opportunistic batching should detect this and skip Node X for Pod N+1 without running plugins, resulting in significant performance improvement (O(N) -> O(1) node scans).
+- name: HostPortConflict
+  schedulerConfigPath: scheduler-config-no-topology.yaml
+  defaultPodTemplatePath: ../templates/pod-hostport-80.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+  - opcode: createPods
+    signatureBatchSizeParam: $signatureBatchSize
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 10Nodes_10Pods_10BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [integration-test, short]
+    params:
+      signatureBatchSize: 10
+      initNodes: 10
+      measurePods: 10
+  - name: 20000Nodes_20000Pods_10BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [performance]
+    params:
+      signatureBatchSize: 10
+      initNodes: 20000
+      measurePods: 20000
+  - name: 20000Nodes_20000Pods_100BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [performance]
+    params:
+      signatureBatchSize: 100
+      initNodes: 20000
+      measurePods: 20000
+  - name: 20000Nodes_20000Pods_1000BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [performance]
+    params:
+      signatureBatchSize: 1000
+      initNodes: 20000
+      measurePods: 20000
+  - name: 20000Nodes_20000Pods_5000BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [performance]
+    params:
+      signatureBatchSize: 5000
+      initNodes: 20000
+      measurePods: 20000
+  - name: 20000Nodes_20000Pods_20000BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [performance]
+    params:
+      signatureBatchSize: 20000
+      initNodes: 20000
+      measurePods: 20000
+  - name: 20000Nodes_20000Pods_OpportunisticBatchingDisabled
+    featureGates:
+      OpportunisticBatching: false
+    labels: [performance]
+    params:
+      signatureBatchSize: 1
+      initNodes: 20000
+      measurePods: 20000
+
+# ResourceSaturation Scenario
+# Simulates a common "bin-packing" scenario where pods fill up nodes based on CPU/Memory.
+# We use pods requesting 3 CPU on 4 CPU nodes, which forces a 1-pod-per-node placement (since 3+3 > 4).
+# This validates that the batching logic correctly handles resource availability constraints, which are more complex than simple boolean predicates like HostPort.
+- name: ResourceSaturation
+  schedulerConfigPath: scheduler-config-no-topology.yaml
+  defaultPodTemplatePath: ../templates/pod-saturation.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+  - opcode: createPods
+    signatureBatchSizeParam: $signatureBatchSize
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 10Nodes_10Pods_10BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [integration-test, short]
+    params:
+      signatureBatchSize: 10
+      initNodes: 10
+      measurePods: 10
+  - name: 20000Nodes_20000Pods_10BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [performance]
+    params:
+      signatureBatchSize: 10
+      initNodes: 20000
+      measurePods: 20000
+  - name: 20000Nodes_20000Pods_100BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [performance]
+    params:
+      signatureBatchSize: 100
+      initNodes: 20000
+      measurePods: 20000
+  - name: 20000Nodes_20000Pods_1000BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [performance]
+    params:
+      signatureBatchSize: 1000
+      initNodes: 20000
+      measurePods: 20000
+  - name: 20000Nodes_20000Pods_5000BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [performance]
+    params:
+      signatureBatchSize: 5000
+      initNodes: 20000
+      measurePods: 20000
+  - name: 20000Nodes_20000Pods_20000BatchSize
+    featureGates:
+      OpportunisticBatching: true
+    labels: [performance]
+    params:
+      signatureBatchSize: 20000
+      initNodes: 20000
+      measurePods: 20000
+  - name: 20000Nodes_20000Pods_OpportunisticBatchingDisabled
+    featureGates:
+      OpportunisticBatching: false
+    labels: [performance]
+    params:
+      signatureBatchSize: 1
+      initNodes: 20000
+      measurePods: 20000

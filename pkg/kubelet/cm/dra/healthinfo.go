@@ -1,0 +1,283 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package dra
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+)
+
+const (
+	// DefaultHealthTimeout is the default timeout for device health checks when not specified by the plugin
+	DefaultHealthTimeout = 30 * time.Second
+
+	// maxDevicesPerDriver caps how many device health entries the cache keeps
+	// per driver. Health reports are not validated against ResourceSlices, so
+	// without a cap a misbehaving plugin could grow the cache (and the
+	// checkpoint file written on every change) without bound by inventing
+	// ever-new device names. The value is far above realistic per-node device
+	// counts, which stay in the low thousands even for large SR-IOV or
+	// partitioned GPU setups. New devices reported beyond the cap are ignored
+	// with an error in the log; entries for already known devices are always
+	// updated.
+	maxDevicesPerDriver = 16384
+)
+
+// healthInfoCache is a cache of known device health.
+type healthInfoCache struct {
+	sync.RWMutex
+	HealthInfo *state.DevicesHealthMap
+	stateFile  string
+}
+
+// newHealthInfoCache creates a new cache, loading from a checkpoint if present.
+func newHealthInfoCache(logger klog.Logger, stateFile string) (*healthInfoCache, error) {
+	logger = logger.WithName("dra-healthinfo")
+	cache := &healthInfoCache{
+		HealthInfo: &state.DevicesHealthMap{},
+		stateFile:  stateFile,
+	}
+	if err := cache.loadFromCheckpoint(); err != nil {
+		logger.Error(err, "Failed to load health checkpoint, proceeding with empty cache")
+	}
+	return cache, nil
+}
+
+// loadFromCheckpoint loads the cache from the state file. On return,
+// cache.HealthInfo always points to a non-nil map, and every driver entry
+// has a non-nil Devices map — even if the file was missing, unreadable, or
+// decoded a nil map at either level (e.g., `null` or
+// `{"driverA":{"Devices":null}}`), which json.Unmarshal would otherwise
+// silently turn into a nil map, causing a panic on the first update.
+func (cache *healthInfoCache) loadFromCheckpoint() (err error) {
+	defer func() {
+		if cache.HealthInfo == nil || *cache.HealthInfo == nil {
+			cache.HealthInfo = &state.DevicesHealthMap{}
+		}
+		for name, driver := range *cache.HealthInfo {
+			if driver.Devices == nil {
+				driver.Devices = make(map[string]state.DeviceHealth)
+				(*cache.HealthInfo)[name] = driver
+			}
+		}
+	}()
+	if cache.stateFile == "" {
+		return nil
+	}
+	data, err := os.ReadFile(cache.stateFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	return json.Unmarshal(data, cache.HealthInfo)
+}
+
+// withLock runs a function while holding the healthInfoCache lock.
+func (cache *healthInfoCache) withLock(f func() error) error {
+	cache.Lock()
+	defer cache.Unlock()
+	return f()
+}
+
+// withRLock runs a function while holding the healthInfoCache rlock.
+func (cache *healthInfoCache) withRLock(f func() error) error {
+	cache.RLock()
+	defer cache.RUnlock()
+	return f()
+}
+
+// saveToCheckpointInternal does the actual saving without locking.
+// Assumes the caller holds the necessary lock.
+func (cache *healthInfoCache) saveToCheckpointInternal(logger klog.Logger) error {
+	logger = logger.WithName("dra-healthinfo")
+	if cache.stateFile == "" {
+		return nil
+	}
+	data, err := json.Marshal(cache.HealthInfo)
+	if err != nil {
+		return fmt.Errorf("failed to marshal health info: %w", err)
+	}
+
+	tempFile, err := os.CreateTemp(filepath.Dir(cache.stateFile), filepath.Base(cache.stateFile)+".tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp checkpoint file: %w", err)
+	}
+
+	defer func() {
+		if err := os.Remove(tempFile.Name()); err != nil && !os.IsNotExist(err) {
+			logger.Error(err, "Failed to remove temporary checkpoint file", "path", tempFile.Name())
+		}
+	}()
+
+	if _, err := tempFile.Write(data); err != nil {
+		_ = tempFile.Close()
+		return fmt.Errorf("failed to write to temporary file: %w", err)
+	}
+
+	if err := tempFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temporary file: %w", err)
+	}
+
+	if err := os.Rename(tempFile.Name(), cache.stateFile); err != nil {
+		return fmt.Errorf("failed to rename temporary file to state file: %w", err)
+	}
+
+	return nil
+}
+
+// getHealthInfo returns the current health info, adjusting for timeouts.
+func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName string) state.DeviceHealth {
+	res := state.DeviceHealth{
+		PoolName:   poolName,
+		DeviceName: deviceName,
+		Health:     state.DeviceHealthStatusUnknown,
+		Message:    "",
+	}
+
+	_ = cache.withRLock(func() error {
+		now := time.Now()
+		if driver, ok := (*cache.HealthInfo)[driverName]; ok {
+			key := poolName + "/" + deviceName
+			if device, ok := driver.Devices[key]; ok {
+				// Use device-specific timeout if set, otherwise use default
+				timeout := device.HealthCheckTimeout
+				if timeout == 0 {
+					timeout = DefaultHealthTimeout
+				}
+
+				// Check if device health has timed out
+				if now.Sub(device.LastUpdated) > timeout {
+					// Keep default Unknown status, clear message for stale device
+					res.Health = state.DeviceHealthStatusUnknown
+					res.Message = ""
+				} else {
+					res = device
+				}
+			}
+		}
+		return nil
+	})
+	return res
+}
+
+// updateHealthInfo reconciles the cache with a fresh list of device health states
+// from a plugin. It identifies which devices have changed state and handles devices
+// that are no longer being reported by the plugin.
+func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName string, devices []state.DeviceHealth) ([]state.DeviceHealth, error) {
+	logger = logger.WithName("dra-healthinfo")
+	changedDevices := []state.DeviceHealth{}
+	err := cache.withLock(func() error {
+		now := time.Now()
+		currentDriver, exists := (*cache.HealthInfo)[driverName]
+		if !exists {
+			currentDriver = state.DriverHealthState{Devices: make(map[string]state.DeviceHealth)}
+			(*cache.HealthInfo)[driverName] = currentDriver
+		}
+
+		reportedKeys := make(map[string]struct{})
+
+		// Phase 1: Process the incoming report from the plugin.
+		// Update existing devices, add new ones, and record all devices
+		// present in this report.
+		ignoredDevices := 0
+		for _, reportedDevice := range devices {
+			reportedDevice.LastUpdated = now
+			key := reportedDevice.PoolName + "/" + reportedDevice.DeviceName
+			reportedKeys[key] = struct{}{}
+
+			existingDevice, ok := currentDriver.Devices[key]
+
+			// Ignore new devices beyond the per-driver cap. Updates for
+			// already known devices are always accepted.
+			if !ok && len(currentDriver.Devices) >= maxDevicesPerDriver {
+				ignoredDevices++
+				continue
+			}
+
+			// Consider health status, message, and timeout changes as updates
+			if !ok || existingDevice.Health != reportedDevice.Health || existingDevice.Message != reportedDevice.Message || existingDevice.HealthCheckTimeout != reportedDevice.HealthCheckTimeout {
+				changedDevices = append(changedDevices, reportedDevice)
+			}
+
+			currentDriver.Devices[key] = reportedDevice
+		}
+		if ignoredDevices > 0 {
+			logger.Error(nil, "Health report contains more devices than the cache keeps per driver, ignoring new devices beyond the limit", "driverName", driverName, "limit", maxDevicesPerDriver, "ignoredDevices", ignoredDevices)
+		}
+
+		// Phase 2: Handle devices that are in the cache but were not in the report.
+		// These devices may have been removed or the plugin may have stopped
+		// monitoring them. Once their status has timed out, notify about the
+		// transition to "Unknown" and remove them. A device which is absent
+		// from the cache reads as "Unknown" (see getHealthInfo), so removing
+		// the entry is equivalent to keeping it as "Unknown" forever and
+		// bounds the cache by what the driver keeps reporting.
+		deletedDevices := false
+		for key, existingDevice := range currentDriver.Devices {
+			if _, wasReported := reportedKeys[key]; !wasReported {
+				// Use device-specific timeout if set, otherwise use default
+				timeout := existingDevice.HealthCheckTimeout
+				if timeout == 0 {
+					timeout = DefaultHealthTimeout
+				}
+
+				if now.Sub(existingDevice.LastUpdated) > timeout {
+					// Entries which were already "Unknown" are removed
+					// without a notification, nothing changes for readers.
+					if existingDevice.Health != state.DeviceHealthStatusUnknown {
+						existingDevice.Health = state.DeviceHealthStatusUnknown
+						existingDevice.Message = ""
+						existingDevice.LastUpdated = now
+						changedDevices = append(changedDevices, existingDevice)
+					}
+					delete(currentDriver.Devices, key)
+					deletedDevices = true
+				}
+			}
+		}
+
+		// Phase 3: Persist changes to the checkpoint file if any state changed.
+		if len(changedDevices) > 0 || deletedDevices {
+			if err := cache.saveToCheckpointInternal(logger); err != nil {
+				logger.Error(err, "Failed to save health checkpoint after update. Kubelet restart may lose the device health information.")
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return changedDevices, nil
+}
+
+// clearDriver clears all health data for a specific driver.
+func (cache *healthInfoCache) clearDriver(logger klog.Logger, driverName string) error {
+	return cache.withLock(func() error {
+		delete(*cache.HealthInfo, driverName)
+		return cache.saveToCheckpointInternal(logger)
+	})
+}

@@ -1,0 +1,30 @@
+linters:
+  enable:
+    - exportloopref # Checks for pointers to enclosing loop variables
+    - gofmt
+    - goimports
+    - gosec
+    - ineffassign
+    - misspell
+    - nolintlint
+    - revive
+    - staticcheck
+    - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
+    - unconvert
+    - unused
+    - vet
+    - dupword # Checks for duplicate words in the source code
+  disable:
+    - errcheck
+
+run:
+  timeout: 5m
+  skip-dirs:
+    - api
+    - cluster
+    - design
+    - docs
+    - docs/man
+    - releases
+    - reports
+    - test # e2e scripts

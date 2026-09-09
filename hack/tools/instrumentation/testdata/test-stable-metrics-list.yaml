@@ -1,0 +1,338 @@
+- name: network_programming_duration_seconds
+  subsystem: kube_proxy
+  help: In Cluster Network Programming Latency in seconds
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 0.25
+  - 0.5
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 17
+  - 18
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 26
+  - 27
+  - 28
+  - 29
+  - 30
+  - 31
+  - 32
+  - 33
+  - 34
+  - 35
+  - 36
+  - 37
+  - 38
+  - 39
+  - 40
+  - 41
+  - 42
+  - 43
+  - 44
+  - 45
+  - 46
+  - 47
+  - 48
+  - 49
+  - 50
+  - 51
+  - 52
+  - 53
+  - 54
+  - 55
+  - 56
+  - 57
+  - 58
+  - 59
+  - 60
+  - 65
+  - 70
+  - 75
+  - 80
+  - 85
+  - 90
+  - 95
+  - 100
+  - 105
+  - 110
+  - 115
+  - 120
+  - 150
+  - 180
+  - 210
+  - 240
+  - 270
+  - 300
+- name: network_programming_duration_seconds2
+  subsystem: kube_proxy
+  help: In Cluster Network Programming Latency in seconds
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 0.25
+  - 0.5
+  - 1
+  - 5
+  - 10
+  - 59
+  - 60
+  - 65
+  - 70
+  - 75
+  - 80
+  - 85
+  - 90
+  - 95
+  - 100
+  - 105
+  - 110
+  - 115
+  - 120
+  - 150
+  - 180
+  - 210
+  - 240
+  - 270
+  - 300
+- name: certificate_manager_client_ttl_seconds
+  subsystem: kubelet
+  help: Gauge of the TTL (time-to-live) of the Kubelet's client certificate. The value
+    is in seconds until certificate expiry (negative if already expired). If client
+    certificate is invalid or unused, the value will be +INF.
+  type: Gauge
+  stabilityLevel: BETA
+- name: cgroup_manager_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds for cgroup manager operations. Broken down by method.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - operation_type
+  buckets:
+  - 0.01
+  - 0.02154434690031884
+  - 0.046415888336127795
+  - 0.10000000000000002
+  - 0.21544346900318842
+  - 0.46415888336127803
+  - 1.0000000000000002
+  - 2.1544346900318847
+  - 4.641588833612781
+  - 10.000000000000005
+- name: device_plugin_alloc_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds to serve a device plugin Allocation request. Broken down
+    by resource name.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - resource_name
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+- name: max_age
+  subsystem: kubelet
+  help: 'Duration in seconds to sync a single pod. Broken down by operation type:
+    create, update, or sync'
+  type: Summary
+  stabilityLevel: BETA
+  maxAge: 7200000000000
+- name: max_age_const
+  subsystem: kubelet
+  help: 'Duration in seconds to sync a single pod. Broken down by operation type:
+    create, update, or sync'
+  type: Summary
+  stabilityLevel: BETA
+  maxAge: 120000000000
+- name: running_containers
+  subsystem: kubelet
+  help: Number of containers currently running
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - container_state
+- name: runtime_operations_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds of runtime operations. Broken down by operation type.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - operation_type
+  buckets:
+  - 0.005
+  - 0.0125
+  - 0.03125
+  - 0.078125
+  - 0.1953125
+  - 0.48828125
+  - 1.220703125
+  - 3.0517578125
+  - 7.62939453125
+  - 19.073486328125
+  - 47.6837158203125
+  - 119.20928955078125
+  - 298.0232238769531
+  - 745.0580596923828
+- name: kubelet_volume_stats_capacity_bytes
+  help: Capacity in bytes of the volume
+  type: Custom
+  stabilityLevel: BETA
+  labels:
+  - namespace
+  - persistentvolumeclaim
+- name: healthcheck
+  namespace: kubernetes
+  help: This metric records the result of a single healthcheck.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+  - type
+- name: healthchecks_total
+  namespace: kubernetes
+  help: This metric records the results of all healthcheck.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+  - status
+  - type
+- name: priority_level_seat_utilization
+  subsystem: subsystem
+  namespace: namespace
+  help: Observations, at the end of every nanosecond, of utilization of seats for
+    any stage of execution (but only initial stage for WATCHes)
+  type: TimingRatioHistogram
+  stabilityLevel: BETA
+  labels:
+  - priorityLevel
+  buckets:
+  - 0
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 0.95
+  - 0.99
+  - 1
+  constLabels:
+    phase: executing
+- name: test_beta_desc
+  help: Number of volumes in Volume Manager
+  type: Custom
+  stabilityLevel: BETA
+  constLabels:
+    alalala: lalalal
+- name: label
+  subsystem: const
+  namespace: test
+  help: Observations, at the end of every nanosecond, of utilization of seats for
+    any stage of execution (but only initial stage for WATCHes)
+  type: TimingRatioHistogram
+  stabilityLevel: BETA
+  labels:
+  - priorityLevel
+  buckets:
+  - 0
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 0.95
+  - 0.99
+  - 1
+  constLabels:
+    phase: blah
+    somestring: executing
+- name: multiline
+  subsystem: kubelet
+  help: Cumulative number of pod preemptions by preemption resource asdf asdf asdf
+    asdfas dfasdf
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - preemption_signal
+- name: summary_metric_test
+  subsystem: kubelet
+  help: Cumulative number of device plugin registrations. Broken down by resource
+    name.
+  type: Summary
+  stabilityLevel: STABLE
+- name: summary_vec_metric_test
+  subsystem: kubelet
+  help: Duration in seconds to serve a device plugin Allocation request. Broken down
+    by resource name.
+  type: Summary
+  stabilityLevel: STABLE
+  labels:
+  - resource_name
+  objectives:
+    0.5: 0.5
+    0.75: 0.75
+  ageBuckets: 5
+  bufCap: 500
+  maxAge: 600000000000
+- name: test_histogram_metric
+  subsystem: kubelet
+  help: Interval in seconds between relisting in PLEG.
+  type: Histogram
+  stabilityLevel: STABLE
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+- name: volume_manager_total_volumes
+  help: Number of volumes in Volume Manager
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - plugin_name
+  - state

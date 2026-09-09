@@ -1,0 +1,12 @@
+{
+  "kind": "APIVersions",
+  "serverAddressByClientCIDRs": [
+    {
+      "clientCIDR": "0.0.0.0/0",
+      "serverAddress": "10.10.10.10:8050"
+    }
+  ],
+  "versions": [
+    "v1"
+  ]
+}

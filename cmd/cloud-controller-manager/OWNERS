@@ -1,0 +1,19 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - thockin
+  - luxas
+  - andrewsykim
+  - cheftako
+  - sttts
+reviewers:
+  - thockin
+  - luxas
+  - andrewsykim
+  - cheftako
+  - sttts
+emeritus_approvers:
+  - wlan0
+labels:
+  - sig/api-machinery
+  - sig/cloud-provider

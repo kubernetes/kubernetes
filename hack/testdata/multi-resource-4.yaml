@@ -1,0 +1,27 @@
+# Tests that initial failures to not block subsequent applies.
+# Initial apply for Widget fails, since CRD is not applied yet,
+# but the CRD apply should succeed. Subsequent custom resource
+# apply of Widget should succeed.
+apiVersion: example.com/v1
+kind: Widget
+metadata:
+  name: foo
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: widgets.example.com
+spec:
+  group: example.com
+  scope: Namespaced
+  names:
+    plural: widgets
+    kind: Widget
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          x-kubernetes-preserve-unknown-fields: true
+          type: object

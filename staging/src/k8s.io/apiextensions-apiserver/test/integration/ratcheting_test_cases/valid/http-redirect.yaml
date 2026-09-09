@@ -1,0 +1,73 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: GatewayClass
+metadata:
+  name: filter-lb
+spec:
+  controllerName: acme.io/gateway-controller
+  parametersRef:
+    name: acme-lb
+    group: acme.io
+    kind: Parameters
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway-api-example-ns1
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: my-filter-gateway
+  namespace: gateway-api-example-ns1
+spec:
+  gatewayClassName: filter-lb
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        certificateRefs:
+          - kind: Secret
+            group: ""
+            name: example-com-cert
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: http-filter-1
+  namespace: gateway-api-example-ns1
+spec:
+  parentRefs:
+    - name: my-filter-gateway
+      sectionName: http
+  hostnames:
+    - my-filter.example.com
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: http-filter-2
+  namespace: gateway-api-example-ns1
+spec:
+  parentRefs:
+    - name: my-filter-gateway
+      sectionName: https
+  hostnames:
+    - my-filter.example.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: my-filter-svc1
+          weight: 1
+          port: 80

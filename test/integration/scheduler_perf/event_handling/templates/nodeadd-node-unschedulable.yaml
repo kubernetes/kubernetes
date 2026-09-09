@@ -1,0 +1,23 @@
+# Node unschedulable is similar to node unblocker but has unschedulable: true.
+apiVersion: v1
+kind: Node
+metadata:
+  generateName: node-unschedulable-
+  labels:
+    topology.kubernetes.io/zone: zone1
+    affinity: allow
+    topology: allow
+spec:
+  unschedulable: true
+  taints:
+    - key: allow
+      effect: NoSchedule
+status:
+  capacity:
+    pods: "3000"
+    cpu: "4"
+    memory: 32Gi
+  conditions:
+    - status: "True"
+      type: Ready
+  phase: Running

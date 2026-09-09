@@ -1,0 +1,19 @@
+# this is a test-only certificate request that is used in integration
+# tests to test certificate based auth.
+# generated with 'openssl req -out testuser.csr -key testuser.key -new -sha256'
+# then skipping all the options except for setting CN to testuser
+-----BEGIN CERTIFICATE REQUEST-----
+MIICWDCCAUACAQAwEzERMA8GA1UEAwwIdGVzdHVzZXIwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQC0MWVzF3QC92dQSzA/tBla3okdNkSNyd+SbnzFNxIG
+mnm/5vSg1T2b8yx6s0IXLzUK2laY9cB12nS96m3YV+71YFVnXhGpgcxUlQgcr/yk
+mcMl545HYBRs5d2m/v7cfYjqtmuvFwEeQeVyI3DpWLEu3DFCas1TpABnDggOcLDe
+1YEjBgo5hNlojnKuOqKzJfIWjjbh/wevvxRMZ+5fdi4ilaSh3J13kmvmvrhD2nn6
+WqUdjhSsC8oOTmnzbm1RNbpgO6w7SCbTp/Exb3YIvq1T6mzio/N0N4VQgS2uQ+66
+ERiVB1iGH+J5jSphcm8sYAtwXQyd+A3d61wo08BaezBVAgMBAAGgADANBgkqhkiG
+9w0BAQsFAAOCAQEACQia6OUAsEw0zC6K7fxdI1jnPYqcx8QGqbFQ0yWWKwAlW7rY
+PitodCU+0d/88a9ig32Yj01bfOwgU1GPL5NXJmXNtNw1Lu5nQzgiZWzFLjZe3+Ni
+bUr8+HhaxHMMV2//SPILtr0aYZIkHPSK3+rcGmo6Mvlr8ANP0G9pwZzb8q2NO3mQ
+iXGpFyLq00BEZZyZ3mCGyYGNBpO/pSIxL5eK0gJgT5UJWHZxepi2gsyz+prLjwGo
+d5M2z9W6l3/ACHltjEz9t9b1gTZ/fUlNUWRk2frE/NwJDKzL9lhh5qaIKtSsROQ1
+OQHcijbY6cSTmgqyAqrGoXMyfJJJvJ4gvludcQ==
+-----END CERTIFICATE REQUEST-----

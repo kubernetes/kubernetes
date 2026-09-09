@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: test-rc
+  labels:
+    name: test-rc
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: test-rc
+    spec:
+      containers:
+        - name: test-rc
+          image: nginx
+          args:
+          - -random_flag=%s@domain.com
+          ports:
+          - containerPort: 80
