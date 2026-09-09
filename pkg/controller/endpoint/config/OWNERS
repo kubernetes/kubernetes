@@ -1,0 +1,14 @@
+approvers:
+  - api-approvers
+  - deads2k
+  - luxas
+  - mtaufen
+  - sttts
+reviewers:
+  - api-reviewers
+  - deads2k
+  - luxas
+  - mtaufen
+  - sttts
+emeritus_approvers:
+  - stewart-yu

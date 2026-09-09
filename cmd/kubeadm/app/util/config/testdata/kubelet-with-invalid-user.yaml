@@ -1,0 +1,17 @@
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://10.0.2.15:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: invalidUser
+  name: system:node:mynode@kubernetes
+current-context: system:node:mynode@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: system:node:mynode
+  user:
+      client-certificate: kubelet.pem

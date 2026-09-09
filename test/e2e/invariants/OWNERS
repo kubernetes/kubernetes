@@ -1,0 +1,11 @@
+# go.k8s.io/owners
+options:
+  no_parent_owners: true
+approvers:
+  - bentheelder
+  - aojea
+  - pohly
+reviewers:
+  - bentheelder
+  - aojea
+  - pohly

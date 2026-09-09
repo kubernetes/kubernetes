@@ -1,0 +1,153 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
+# It basically covers all test cases but with their smallest workload. 
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
+#
+# ConsumableCapacity is a variant of
+# SchedulingWithResourceClaimTemplate. For each node, it creates one ResourceSlice with four
+# shareable devices, each providing 10Gb of consumable bandwidth capacity.
+# It also creates a ResourceClaimTemplate with one request for two devices.
+# Each allocation requests 2500Mb of bandwidth, and the constraint requires the
+# selected devices to have distinct values for dra.example.com/index.
+#
+# This means eight pods fit onto one node.
+- name: ConsumableCapacity
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAConsumableCapacity: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    # one ResourceSlice with four shareable devices of 10Gb bandwidth
+    templatePath: ../templates/resourceslice-consumablecapacity.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/deviceclass-consumablecapacity.yaml
+  - opcode: createAny
+    # A request for two distinct devices of 2500Mb bandwidth
+    templatePath: ../templates/resourceclaimtemplate-consumablecapacity.yaml
+    namespace: test
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate-consumablecapacity.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-with-claim-template.yaml
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyStateParam: $steadyState
+    durationParam: $duration
+    podTemplatePath: ../templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 1
+      steadyState: false
+      duration: 0s # unused
+  - name: fast_with_DRAPartitionableDevices
+    featureGates:
+      DRAPartitionableDevices: true
+      DRAResourceClaimDeviceStatus: true
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 1
+      steadyState: false
+      duration: 0s # unused
+  - name: empty_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 400 # 50 nodes * 8 pods/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: empty_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2000  # 250 nodes * 8 pods/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: full_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 3990  # 500 nodes * 8 pods/node - 10 pods
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: empty_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initPods: 4000 # 500 nodes * 8 pods/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: full_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initPods: 7990 # 1000 nodes * 8 pods/node - 10 pods
+      measurePods: 10
+      steadyState: true
+      duration: 10s

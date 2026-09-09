@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - sig-instrumentation-approvers
+  - wojtek-t
+reviewers:
+  - sig-instrumentation-reviewers
+  - wojtek-t
+emeritus_approvers:
+  - yastij

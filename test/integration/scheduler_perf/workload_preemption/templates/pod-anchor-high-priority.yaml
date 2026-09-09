@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-anchor-{{.Index}}-
+  labels:
+    app: blue
+    label1: value1
+    label2: value2
+    label3: value3
+    label4: value4
+spec:
+  priority: 9999999
+  terminationGracePeriodSeconds: 0
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    ports:
+    - containerPort: 80
+      # hostPort is configured with a formula based on .Index and the number of pods per node
+      # to guarantee that anchor pods are evenly distributed/spread across all nodes in the cluster.
+      hostPort: {{AddInt 7000 (Mod .Index (DivideInt .podsCount .nodesCount))}}
+    resources:
+      limits:
+        cpu: 10m
+        memory: 100Mi
+      requests:
+        cpu: 10m
+        memory: 100Mi
+        

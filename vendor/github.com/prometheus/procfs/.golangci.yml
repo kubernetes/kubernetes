@@ -1,0 +1,59 @@
+version: "2"
+linters:
+  enable:
+    - errorlint
+    - forbidigo
+    - gocritic
+    - godot
+    - misspell
+    - revive
+    - testifylint
+  settings:
+    forbidigo:
+      forbid:
+        - pattern: ^fmt\.Print.*$
+          msg: Do not commit print statements.
+    gocritic:
+      enable-all: true
+      disabled-checks:
+        - commentFormatting
+        - commentedOutCode
+        - deferInLoop
+        - filepathJoin
+        - hugeParam
+        - importShadow
+        - paramTypeCombine
+        - rangeValCopy
+        - tooManyResultsChecker
+        - unnamedResult
+        - whyNoLint
+    godot:
+      exclude:
+        # Ignore "See: URL".
+        - 'See:'
+      capital: true
+    misspell:
+      locale: US
+    revive:
+      rules:
+        - name: var-naming
+          # TODO(SuperQ): See: https://github.com/prometheus/prometheus/issues/17766
+          arguments:
+            - []
+            - []
+            - - skip-package-name-checks: true
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    warn-unused: true
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/prometheus/procfs

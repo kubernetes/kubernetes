@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - sig-api-machinery-approvers
+reviewers:
+  - derekwaynecarr
+  - smarterclayton
+  - sig-api-machinery-reviewers
+labels:
+  - sig/api-machinery

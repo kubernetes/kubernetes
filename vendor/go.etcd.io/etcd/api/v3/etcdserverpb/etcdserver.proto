@@ -1,0 +1,9 @@
+syntax = "proto2";
+package etcdserverpb;
+
+option go_package = "go.etcd.io/etcd/api/v3/etcdserverpb";
+
+message Metadata {
+	optional uint64 NodeID    = 1;
+	optional uint64 ClusterID = 2;
+}

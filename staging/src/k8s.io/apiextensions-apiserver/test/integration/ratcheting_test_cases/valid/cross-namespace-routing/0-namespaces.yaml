@@ -1,0 +1,27 @@
+#$ Used in:
+#$ - site-src/guides/multiple-ns.md
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infra-ns
+  labels:
+    shared-gateway-access: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: site-ns
+  labels:
+    shared-gateway-access: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: store-ns
+  labels:
+    shared-gateway-access: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: no-external-access

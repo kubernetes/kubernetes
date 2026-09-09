@@ -1,0 +1,28 @@
+rules:
+  # Allow only specific k8s.io/kubernetes dependencies currently used
+  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/api/v1/pod$
+    allowedPrefixes: [ "" ]
+  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/apis/core/v1/helper$
+    allowedPrefixes: [ "" ]
+  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/apis/core/validation$
+    allowedPrefixes: [ "" ]
+  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/apis/scheduling$
+    allowedPrefixes: [ "" ]
+  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/controller$
+    allowedPrefixes: [ "" ]
+  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/controller/volume/persistentvolume/testing$
+    allowedPrefixes: [ "" ]
+  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/features$
+    allowedPrefixes: [ "" ]
+  - selectorRegexp: ^k8s[.]io/kubernetes/test/utils/image$
+    allowedPrefixes: [ "" ]
+  - selectorRegexp: ^k8s[.]io/kubernetes/test/utils/ktesting($|/)
+    allowedPrefixes: [ "" ]
+
+  # Allow internal pkg/scheduler packages and subpackages
+  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/scheduler($|/)
+    allowedPrefixes: [ "" ]
+
+  # Forbid any other k8s.io/kubernetes imports
+  - selectorRegexp: ^k8s[.]io/kubernetes
+    forbiddenPrefixes: [ "" ]

@@ -1,0 +1,13 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+options:
+  no_parent_owners: true
+approvers:
+  - api-approvers
+reviewers:
+  - sig-node-reviewers
+  - sig-scheduling
+labels:
+  - sig/node
+  - sig/scheduling
+  - kind/api-change

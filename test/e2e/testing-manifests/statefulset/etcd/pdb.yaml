@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: etcd-pdb
+  labels:
+    pdb: etcd
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: etcd

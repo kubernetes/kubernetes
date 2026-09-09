@@ -1,0 +1,1488 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package workload
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/api/operation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
+
+	// Side-effect import: registers Workload with legacyscheme.Scheme so
+	// the ConvertToVersion calls below resolve the type.
+	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
+	"k8s.io/kubernetes/pkg/features"
+)
+
+var (
+	workload = &scheduling.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: scheduling.WorkloadSpec{
+			PodGroupTemplates: []scheduling.PodGroupTemplate{
+				{
+					Name: "bar",
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 5,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fieldImmutableError     = "field is immutable"
+	minCountError           = "must be greater than or equal to 1"
+	tooManyItemsError       = "must have at most 1 item"
+	requiredError           = "Required value"
+	subdomainNameError      = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
+	itemCannotBeAddedError  = "item may not be added"
+	forbiddenError          = "Forbidden"
+	fieldCannotBeUnsetError = "field cannot be cleared once set"
+	supportedPoliciesError  = `supported values: "Never", "PreemptLowerPriority"`
+)
+
+func TestWorkloadStrategy(t *testing.T) {
+	if !Strategy.NamespaceScoped() {
+		t.Errorf("Workload must be namespace scoped")
+	}
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
+		t.Errorf("Workload should not allow create on update")
+	}
+}
+
+func ctxWithRequestInfo() context.Context {
+	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "scheduling.k8s.io",
+		APIVersion:        "v1beta1",
+		Resource:          "workloads",
+		IsResourceRequest: true,
+	})
+}
+
+func TestStrategyCreate(t *testing.T) {
+	ctx := ctxWithRequestInfo()
+
+	testCases := map[string]struct {
+		obj                            *scheduling.Workload
+		expectObj                      *scheduling.Workload
+		enableTopologyAwareScheduling  bool
+		enableCompositePodGroup        bool
+		enablePodGroupPreemptionPolicy bool
+		expectValidationError          string
+	}{
+		"simple": {
+			obj:       workload,
+			expectObj: workload,
+		},
+		"failed validation": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount = -1
+				return w
+			}(),
+			expectValidationError: minCountError,
+		},
+		"drops field with SchedulingConstraints set and TAS disabled": {
+			obj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			expectObj: workload,
+		},
+		"valid with SchedulingConstraints set and TAS enabled": {
+			obj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			expectObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			enableTopologyAwareScheduling: true,
+		},
+		"invalid with multiple topology constraints": {
+			obj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{
+						{Key: "foo"},
+						{Key: "bar"},
+					},
+				}
+				return workload
+			}(),
+			enableTopologyAwareScheduling: true,
+			expectValidationError:         tooManyItemsError,
+		},
+		"invalid with invalid topology key": {
+			obj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{
+						{Key: ""},
+					},
+				}
+				return workload
+			}(),
+			enableTopologyAwareScheduling: true,
+			expectValidationError:         requiredError,
+		},
+		"disruption mode single": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
+				return w
+			}(),
+		},
+		"disruption mode all": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{All: &scheduling.AllDisruptionMode{}}
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{All: &scheduling.AllDisruptionMode{}}
+				return w
+			}(),
+		},
+		"both disruption modes set": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{
+					Single: &scheduling.SingleDisruptionMode{},
+					All:    &scheduling.AllDisruptionMode{},
+				}
+				return w
+			}(),
+			expectValidationError: "must specify exactly one of",
+		},
+		"priorityClassName set": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PriorityClassName = "high-priority"
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PriorityClassName = "high-priority"
+				return w
+			}(),
+		},
+		"invalid priorityClassName": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PriorityClassName = "invalid/priority/class/name"
+				return w
+			}(),
+			expectValidationError: subdomainNameError,
+		},
+		"drop preemptionPolicy with PodGroupPreemptionPolicy disabled": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptNever
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			expectObj: workload,
+		},
+		"drop invalid preemptionPolicy with PodGroupPreemptionPolicy disabled": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptionPolicy("Invalid")
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			expectObj: workload,
+		},
+		"preemptionPolicy set (Never) with PodGroupPreemptionPolicy enabled": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptNever
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptNever
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"preemptionPolicy set (PreemptLowerPriority) with PodGroupPreemptionPolicy enabled": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptLowerPriority
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptLowerPriority
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"invalid preemptionPolicy with PodGroupPreemptionPolicy enabled": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptionPolicy("Invalid")
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			enablePodGroupPreemptionPolicy: true,
+			expectValidationError:          supportedPoliciesError,
+		},
+		"drop cpg preemptionPolicy with PodGroupPreemptionPolicy disabled": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptNever
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"drop invalid cpg preemptionPolicy with PodGroupPreemptionPolicy disabled": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptionPolicy("Invalid")
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"cpg preemptionPolicy set (Never) with PodGroupPreemptionPolicy enabled": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptNever
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptNever
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			enableCompositePodGroup:        true,
+			enableTopologyAwareScheduling:  true,
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"invalid cpg preemptionPolicy with PodGroupPreemptionPolicy enabled": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptionPolicy("Invalid")
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			enableCompositePodGroup:        true,
+			enableTopologyAwareScheduling:  true,
+			enablePodGroupPreemptionPolicy: true,
+			expectValidationError:          supportedPoliciesError,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			workload := tc.obj.DeepCopy()
+
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
+				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				features.CompositePodGroup:               tc.enableCompositePodGroup,
+			})
+
+			Strategy.PrepareForCreate(ctx, workload)
+			errs := Strategy.Validate(ctx, workload)
+			errs = Strategy.ValidateDeclaratively(ctx, workload, nil, errs, operation.Create, Strategy.DeclarativeValidationConfig(ctx, workload, nil))
+			if len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error(s): %v", errs)
+				}
+				if len(errs) != 1 {
+					t.Fatalf("exactly one error expected")
+				}
+				if errMsg := errs[0].Error(); !strings.Contains(errMsg, tc.expectValidationError) {
+					t.Fatalf("error %#v does not contain the expected message %q", errMsg, tc.expectValidationError)
+				}
+			}
+			if tc.expectObj != nil {
+				if diff := cmp.Diff(tc.expectObj, workload); diff != "" {
+					t.Errorf("got unexpected workload object (-want, +got): %s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestStrategyUpdate(t *testing.T) {
+	ctx := ctxWithRequestInfo()
+
+	testCases := map[string]struct {
+		oldObj                         *scheduling.Workload
+		newObj                         *scheduling.Workload
+		enableTopologyAwareScheduling  bool
+		enableCompositePodGroup        bool
+		enablePodGroupPreemptionPolicy bool
+		expectValidationErrors         []string
+		expectWorkload                 *scheduling.Workload
+	}{
+		"no changes": {
+			oldObj:         workload,
+			newObj:         workload,
+			expectWorkload: workload,
+		},
+		"name update": {
+			oldObj: workload,
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Name += "bar"
+				return w
+			}(),
+			expectValidationErrors: []string{fieldImmutableError},
+		},
+		"invalid spec update - controllerRef": {
+			oldObj: workload,
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					Kind: "foo",
+					Name: "baz",
+				}
+				return w
+			}(),
+			expectValidationErrors: []string{fieldImmutableError},
+		},
+		"invalid spec update - podGroupTemplates": {
+			oldObj: workload,
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
+					Basic: &scheduling.BasicSchedulingPolicy{},
+				}
+				return w
+			}(),
+			expectValidationErrors: []string{fieldImmutableError, fieldCannotBeUnsetError},
+		},
+		"valid update with scheduling constraints unchanged and TAS disabled": {
+			oldObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, *workload.Spec.PodGroupTemplates[0].DeepCopy())
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			newObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, *workload.Spec.PodGroupTemplates[0].DeepCopy())
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			expectWorkload: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, *workload.Spec.PodGroupTemplates[0].DeepCopy())
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+		},
+		"valid update with scheduling constraints unchanged and TAS enabled": {
+			oldObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, *workload.Spec.PodGroupTemplates[0].DeepCopy())
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			newObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, *workload.Spec.PodGroupTemplates[0].DeepCopy())
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			expectWorkload: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, *workload.Spec.PodGroupTemplates[0].DeepCopy())
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			enableTopologyAwareScheduling: true,
+		},
+		"changing topology key not allowed with TAS disabled": {
+			oldObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			newObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "bar"}},
+				}
+				return workload
+			}(),
+			expectValidationErrors: []string{forbiddenError, fieldImmutableError},
+		},
+		"changing topology key not allowed with TAS enabled": {
+			oldObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			newObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "bar"}},
+				}
+				return workload
+			}(),
+			enableTopologyAwareScheduling: true,
+			expectValidationErrors:        []string{fieldImmutableError},
+		},
+		"topology constraint addition is dropped with TAS disabled": {
+			oldObj: workload,
+			newObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			expectWorkload: workload,
+		},
+		"changing topology constraints not allowed with TAS enabled": {
+			oldObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, *workload.Spec.PodGroupTemplates[0].DeepCopy())
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			newObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, *workload.Spec.PodGroupTemplates[0].DeepCopy())
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				workload.Spec.PodGroupTemplates[1].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				workload.Spec.PodGroupTemplates[1].Name = "bar1"
+				return workload
+			}(),
+			enableTopologyAwareScheduling: true,
+			expectValidationErrors:        []string{itemCannotBeAddedError},
+		},
+		"adding scheduling constraints not allowed with TAS disabled": {
+			oldObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			newObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, *workload.Spec.PodGroupTemplates[0].DeepCopy())
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				workload.Spec.PodGroupTemplates[1].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				workload.Spec.PodGroupTemplates[1].Name = "bar1"
+				return workload
+			}(),
+			expectValidationErrors: []string{itemCannotBeAddedError},
+		},
+		"adding scheduling constraints not allowed with TAS enabled": {
+			oldObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				return workload
+			}(),
+			newObj: func() *scheduling.Workload {
+				workload := workload.DeepCopy()
+				workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, *workload.Spec.PodGroupTemplates[0].DeepCopy())
+				workload.Spec.PodGroupTemplates[0].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				workload.Spec.PodGroupTemplates[1].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
+				}
+				workload.Spec.PodGroupTemplates[1].Name = "bar1"
+				return workload
+			}(),
+			enableTopologyAwareScheduling: true,
+			expectValidationErrors:        []string{itemCannotBeAddedError},
+		},
+		"changing disruption mode": {
+			oldObj: workload,
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
+				return w
+			}(),
+			expectValidationErrors: []string{fieldImmutableError},
+		},
+		"changing priorityClassName": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PriorityClassName = "high-priority"
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PriorityClassName = "low-priority"
+				return w
+			}(),
+			expectValidationErrors: []string{fieldImmutableError},
+		},
+		"changing preemptionPolicy not allowed with PodGroupPreemptionPolicy disabled": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptNever
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptLowerPriority
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			expectValidationErrors: []string{forbiddenError, fieldImmutableError},
+		},
+		"changing preemptionPolicy not allowed with PodGroupPreemptionPolicy enabled": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptNever
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptLowerPriority
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			enablePodGroupPreemptionPolicy: true,
+			expectValidationErrors:         []string{fieldImmutableError},
+		},
+		"clearing preemptionPolicy not allowed with PodGroupPreemptionPolicy enabled": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptNever
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = nil
+				return w
+			}(),
+			enablePodGroupPreemptionPolicy: true,
+			expectValidationErrors:         []string{fieldImmutableError},
+		},
+		"clearing preemptionPolicy not allowed with PodGroupPreemptionPolicy disabled": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				policy := scheduling.PreemptNever
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = nil
+				return w
+			}(),
+			expectValidationErrors: []string{fieldImmutableError},
+		},
+		"changing cpg preemptionPolicy not allowed with PodGroupPreemptionPolicy disabled": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptNever
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptLowerPriority
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectValidationErrors:        []string{forbiddenError, fieldImmutableError},
+		},
+		"changing cpg preemptionPolicy not allowed with PodGroupPreemptionPolicy enabled": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptNever
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptLowerPriority
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			enableCompositePodGroup:        true,
+			enableTopologyAwareScheduling:  true,
+			enablePodGroupPreemptionPolicy: true,
+			expectValidationErrors:         []string{fieldImmutableError},
+		},
+		"clearing cpg preemptionPolicy not allowed with PodGroupPreemptionPolicy enabled": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptNever
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: nil,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			enableCompositePodGroup:        true,
+			enableTopologyAwareScheduling:  true,
+			enablePodGroupPreemptionPolicy: true,
+			expectValidationErrors:         []string{fieldImmutableError},
+		},
+		"clearing cpg preemptionPolicy not allowed with PodGroupPreemptionPolicy disabled": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptNever
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: nil,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectValidationErrors:        []string{fieldImmutableError},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
+				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				features.CompositePodGroup:               tc.enableCompositePodGroup,
+			})
+			oldWorkload := tc.oldObj.DeepCopy()
+			newWorkload := tc.newObj.DeepCopy()
+			newWorkload.ResourceVersion = "4"
+
+			Strategy.PrepareForUpdate(ctx, newWorkload, oldWorkload)
+			errs := Strategy.ValidateUpdate(ctx, newWorkload, oldWorkload)
+			errs = Strategy.ValidateDeclaratively(ctx, newWorkload, oldWorkload, errs, operation.Update, Strategy.DeclarativeValidationConfig(ctx, newWorkload, oldWorkload))
+			if len(errs) != 0 {
+				if len(tc.expectValidationErrors) == 0 {
+					t.Fatalf("unexpected error(s): %v", errs)
+				}
+				for _, e := range errs {
+					t.Logf("error: %v", e)
+				}
+				if len(errs) != len(tc.expectValidationErrors) {
+					t.Fatalf("%d errors expected", len(tc.expectValidationErrors))
+				}
+				for i, err := range errs {
+					if !strings.Contains(err.Error(), tc.expectValidationErrors[i]) {
+						t.Fatalf("error %#v does not contain the expected message %q", err.Error(), tc.expectValidationErrors[i])
+					}
+				}
+				return
+			}
+			if len(tc.expectValidationErrors) != 0 {
+				t.Fatal("expected validation error(s), got none")
+			}
+			if warnings := Strategy.WarningsOnUpdate(ctx, newWorkload, oldWorkload); len(warnings) != 0 {
+				t.Fatalf("unexpected warnings: %q", warnings)
+			}
+			Strategy.Canonicalize(newWorkload)
+
+			expectWorkload := tc.expectWorkload.DeepCopy()
+			expectWorkload.ResourceVersion = "4"
+			if diff := cmp.Diff(expectWorkload, newWorkload); diff != "" {
+				t.Errorf("Workload mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDropPodGroupTemplateResourceClaims(t *testing.T) {
+	var noWorkload *scheduling.Workload
+	workloadWithoutClaims := workload
+	workloadWithClaims := func() *scheduling.Workload {
+		w := workloadWithoutClaims.DeepCopy()
+		w.Spec.PodGroupTemplates[0].ResourceClaims = []scheduling.PodGroupResourceClaim{
+			{
+				Name:              "my-claim",
+				ResourceClaimName: new("resource-claim"),
+			},
+		}
+		return w
+	}()
+
+	tests := []struct {
+		description  string
+		enabled      bool
+		oldWorkload  *scheduling.Workload
+		newWorkload  *scheduling.Workload
+		wantWorkload *scheduling.Workload
+	}{
+		{
+			description:  "old with claims / new with claims / disabled",
+			oldWorkload:  workloadWithClaims,
+			newWorkload:  workloadWithClaims,
+			wantWorkload: workloadWithClaims,
+		},
+		{
+			description:  "old without claims / new with claims / disabled",
+			oldWorkload:  workloadWithoutClaims,
+			newWorkload:  workloadWithClaims,
+			wantWorkload: workloadWithoutClaims,
+		},
+		{
+			description:  "no old workload / new with claims / disabled",
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithClaims,
+			wantWorkload: workloadWithoutClaims,
+		},
+
+		{
+			description:  "old with claims / new without claims / disabled",
+			oldWorkload:  workloadWithClaims,
+			newWorkload:  workloadWithoutClaims,
+			wantWorkload: workloadWithoutClaims,
+		},
+		{
+			description:  "old without claims / new without claims / disabled",
+			oldWorkload:  workloadWithoutClaims,
+			newWorkload:  workloadWithoutClaims,
+			wantWorkload: workloadWithoutClaims,
+		},
+		{
+			description:  "no old workload / new without claims / disabled",
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithoutClaims,
+			wantWorkload: workloadWithoutClaims,
+		},
+
+		{
+			description:  "old with claims / new with claims / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithClaims,
+			newWorkload:  workloadWithClaims,
+			wantWorkload: workloadWithClaims,
+		},
+		{
+			description:  "old without claims / new with claims / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithoutClaims,
+			newWorkload:  workloadWithClaims,
+			wantWorkload: workloadWithClaims,
+		},
+		{
+			description:  "no old workload / new with claims / enabled",
+			enabled:      true,
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithClaims,
+			wantWorkload: workloadWithClaims,
+		},
+
+		{
+			description:  "old with claims / new without claims / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithClaims,
+			newWorkload:  workloadWithoutClaims,
+			wantWorkload: workloadWithoutClaims,
+		},
+		{
+			description:  "old without claims / new without claims / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithoutClaims,
+			newWorkload:  workloadWithoutClaims,
+			wantWorkload: workloadWithoutClaims,
+		},
+		{
+			description:  "no old workload / new without claims / enabled",
+			enabled:      true,
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithoutClaims,
+			wantWorkload: workloadWithoutClaims,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAWorkloadResourceClaims: tc.enabled,
+				features.GenericWorkload:           tc.enabled,
+			})
+
+			oldWorkload := tc.oldWorkload.DeepCopy()
+			newWorkload := tc.newWorkload.DeepCopy()
+			wantWorkload := tc.wantWorkload
+			dropDisabledWorkloadFields(newWorkload, oldWorkload)
+
+			// old Workload should never be changed
+			if diff := cmp.Diff(oldWorkload, tc.oldWorkload); diff != "" {
+				t.Errorf("old Workload changed: %s", diff)
+			}
+
+			if diff := cmp.Diff(wantWorkload, newWorkload); diff != "" {
+				t.Errorf("new Workload changed (- want, + got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestDropCompositePodGroupTemplates(t *testing.T) {
+	var noWorkload *scheduling.Workload
+	workloadWithoutCPG := workload.DeepCopy()
+
+	workloadWithCPG := func() *scheduling.Workload {
+		w := workloadWithoutCPG.DeepCopy()
+		w.Spec.PodGroupTemplates = nil
+		w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+			{
+				Name: "cpg-template",
+				CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "child-cpg-template",
+					},
+				},
+				PodGroupTemplates: []scheduling.PodGroupTemplate{
+					{
+						Name: "pg-template",
+					},
+				},
+			},
+		}
+		return w
+	}()
+
+	workloadWithCPGDropped := func() *scheduling.Workload {
+		w := workloadWithCPG.DeepCopy()
+		w.Spec.CompositePodGroupTemplates = nil
+		return w
+	}()
+
+	tests := []struct {
+		description  string
+		enabled      bool
+		oldWorkload  *scheduling.Workload
+		newWorkload  *scheduling.Workload
+		wantWorkload *scheduling.Workload
+	}{
+		{
+			description:  "old with cpg / new with cpg / disabled",
+			enabled:      false,
+			oldWorkload:  workloadWithCPG,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPG,
+		},
+		{
+			description:  "old with cpg / new with cpg / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithCPG,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPG,
+		},
+		{
+			description:  "old without cpg / new with cpg / disabled",
+			enabled:      false,
+			oldWorkload:  workloadWithoutCPG,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPGDropped,
+		},
+		{
+			description:  "old without cpg / new with cpg / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithoutCPG,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPG,
+		},
+		{
+			description:  "old without cpg / new without cpg / disabled",
+			enabled:      false,
+			oldWorkload:  workloadWithoutCPG,
+			newWorkload:  workloadWithoutCPG,
+			wantWorkload: workloadWithoutCPG,
+		},
+		{
+			description:  "old without cpg / new without cpg / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithoutCPG,
+			newWorkload:  workloadWithoutCPG,
+			wantWorkload: workloadWithoutCPG,
+		},
+		{
+			description:  "nil old / new with cpg / disabled",
+			enabled:      false,
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPGDropped,
+		},
+		{
+			description:  "nil old / new with cpg / enabled",
+			enabled:      true,
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPG,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.CompositePodGroup:               tc.enabled,
+				features.TopologyAwareWorkloadScheduling: tc.enabled,
+			})
+			var oldSpec *scheduling.WorkloadSpec
+			if tc.oldWorkload != nil {
+				oldSpec = &tc.oldWorkload.Spec
+			}
+			dropDisabledWorkloadSpecFields(&tc.newWorkload.Spec, oldSpec)
+			if diff := cmp.Diff(tc.wantWorkload, tc.newWorkload); diff != "" {
+				t.Errorf("new Workload changed (- want, + got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestDropCompositePodGroupTemplatePreemptionPolicy(t *testing.T) {
+	var noWorkload *scheduling.Workload
+	workloadWithoutPreemptionPolicy := &scheduling.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: scheduling.WorkloadSpec{
+			CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+				{
+					Name: "cpg-template",
+					SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+						Gang: &scheduling.CompositeGangSchedulingPolicy{
+							MinGroupCount: 5,
+						},
+					},
+					PodGroupTemplates: []scheduling.PodGroupTemplate{
+						{
+							Name: "pg-template",
+							SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+								Gang: &scheduling.GangSchedulingPolicy{
+									MinCount: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	workloadWithPreemptionPolicy := func() *scheduling.Workload {
+		w := workloadWithoutPreemptionPolicy.DeepCopy()
+		policy := scheduling.PreemptNever
+		w.Spec.CompositePodGroupTemplates[0].PreemptionPolicy = &policy
+		return w
+	}()
+
+	tests := []struct {
+		description  string
+		enabled      bool
+		oldWorkload  *scheduling.Workload
+		newWorkload  *scheduling.Workload
+		wantWorkload *scheduling.Workload
+	}{
+		{
+			description:  "old with preemption / new with preemption / disabled",
+			oldWorkload:  workloadWithPreemptionPolicy,
+			newWorkload:  workloadWithPreemptionPolicy,
+			wantWorkload: workloadWithPreemptionPolicy,
+		},
+		{
+			description:  "old without preemption / new with preemption / disabled",
+			oldWorkload:  workloadWithoutPreemptionPolicy,
+			newWorkload:  workloadWithPreemptionPolicy,
+			wantWorkload: workloadWithoutPreemptionPolicy,
+		},
+		{
+			description:  "no old workload / new with preemption / disabled",
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithPreemptionPolicy,
+			wantWorkload: workloadWithoutPreemptionPolicy,
+		},
+		{
+			description:  "old with preemption / new without preemption / disabled",
+			oldWorkload:  workloadWithPreemptionPolicy,
+			newWorkload:  workloadWithoutPreemptionPolicy,
+			wantWorkload: workloadWithoutPreemptionPolicy,
+		},
+		{
+			description:  "old without preemption / new without preemption / disabled",
+			oldWorkload:  workloadWithoutPreemptionPolicy,
+			newWorkload:  workloadWithoutPreemptionPolicy,
+			wantWorkload: workloadWithoutPreemptionPolicy,
+		},
+		{
+			description:  "no old workload / new without preemption / disabled",
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithoutPreemptionPolicy,
+			wantWorkload: workloadWithoutPreemptionPolicy,
+		},
+		{
+			description:  "old with preemption / new with preemption / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithPreemptionPolicy,
+			newWorkload:  workloadWithPreemptionPolicy,
+			wantWorkload: workloadWithPreemptionPolicy,
+		},
+		{
+			description:  "old without preemption / new with preemption / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithoutPreemptionPolicy,
+			newWorkload:  workloadWithPreemptionPolicy,
+			wantWorkload: workloadWithPreemptionPolicy,
+		},
+		{
+			description:  "no old workload / new with preemption / enabled",
+			enabled:      true,
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithPreemptionPolicy,
+			wantWorkload: workloadWithPreemptionPolicy,
+		},
+		{
+			description:  "old with preemption / new without preemption / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithPreemptionPolicy,
+			newWorkload:  workloadWithoutPreemptionPolicy,
+			wantWorkload: workloadWithoutPreemptionPolicy,
+		},
+		{
+			description:  "old without preemption / new without preemption / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithoutPreemptionPolicy,
+			newWorkload:  workloadWithoutPreemptionPolicy,
+			wantWorkload: workloadWithoutPreemptionPolicy,
+		},
+		{
+			description:  "no old workload / new without preemption / enabled",
+			enabled:      true,
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithoutPreemptionPolicy,
+			wantWorkload: workloadWithoutPreemptionPolicy,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PodGroupPreemptionPolicy:        tc.enabled,
+				features.GenericWorkload:                 true,
+				features.CompositePodGroup:               true,
+				features.TopologyAwareWorkloadScheduling: true,
+			})
+			var oldSpec *scheduling.WorkloadSpec
+			if tc.oldWorkload != nil {
+				oldSpec = &tc.oldWorkload.Spec
+			}
+			dropDisabledWorkloadSpecFields(&tc.newWorkload.Spec, oldSpec)
+			if diff := cmp.Diff(tc.wantWorkload, tc.newWorkload); diff != "" {
+				t.Errorf("new Workload changed (- want, + got): %s", diff)
+			}
+		})
+	}
+}

@@ -1,0 +1,28 @@
+# Copyright 2020 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# The e2e aggregator test is designed to test ability to run sample-apiserver as an aggregated server.
+# see e2e test named "Should be able to support the 1.17 Sample API Server using the current Aggregator"
+
+ARG BASEIMAGE
+ARG REGISTRY
+ARG OS_VERSION
+
+FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
+FROM $BASEIMAGE
+
+COPY --from=servercore-helper /Windows/System32/netapi32.dll /Windows/System32/netapi32.dll
+ADD sample-apiserver /sample-apiserver.exe
+
+ENTRYPOINT ["/sample-apiserver.exe"]

@@ -1,0 +1,15 @@
+# Defined below are the security contacts for this repo.
+#
+# They are the contact point for the Security Response Committee (SRC) to reach out
+# to for triaging and handling of incoming issues.
+#
+# The below names agree to abide by the
+# [Embargo Policy](https://git.k8s.io/security/private-distributors-list.md#embargo-policy)
+# and will be removed and replaced if they violate that agreement.
+#
+# To contact the SRC, please see https://github.com/kubernetes/committee-security-response#contacting-the-src
+#
+# DO NOT REPORT SECURITY VULNERABILITIES DIRECTLY TO THESE NAMES, FOLLOW THE
+# INSTRUCTIONS AT https://kubernetes.io/security/
+
+committee-security-response

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("\xa3JapiVersionA0@\xfb00000000DkindA0")

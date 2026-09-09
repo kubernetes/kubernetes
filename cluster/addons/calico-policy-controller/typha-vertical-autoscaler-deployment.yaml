@@ -1,0 +1,38 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: calico-typha-vertical-autoscaler
+  namespace: kube-system
+  labels:
+    k8s-app: calico-typha-autoscaler
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: calico-typha-autoscaler
+  template:
+    metadata:
+      labels:
+        k8s-app: calico-typha-autoscaler
+    spec:
+      priorityClassName: system-cluster-critical
+      containers:
+        - image: registry.k8s.io/cpvpa-amd64:v0.8.3
+          name: autoscaler
+          command:
+            - /cpvpa
+            - --target=deployment/calico-typha
+            - --namespace=kube-system
+            - --logtostderr=true
+            - --poll-period-seconds=30
+            - --v=2
+            - --config-file=/etc/config/typha-autoscaler
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+      volumes:
+        - name: config
+          configMap:
+            name: calico-typha-vertical-autoscaler
+      serviceAccountName: calico-cpva

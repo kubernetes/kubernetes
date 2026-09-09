@@ -1,0 +1,33 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
+# services "svc1" was not valid:
+# * spec.clusterIP: Invalid value: "10.0.0.146.1": field is immutable
+# * spec.clusterIP: Invalid value: "10.0.0.146.1": must be empty, 'None', or a valid IP address
+#
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: "2017-02-01T21:14:09Z"
+  labels:
+    app: svc1
+    new-label: new-value
+  name: svc1
+  namespace: edit-test
+  resourceVersion: "20820"
+  selfLink: /api/v1/namespaces/edit-test/services/svc1
+  uid: 5f7da8db-e8c3-11e6-b7e2-acbc32c1ca87
+spec:
+  clusterIP: 10.0.0.146
+  ports:
+  - name: "80"
+    port: 82
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: svc1
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

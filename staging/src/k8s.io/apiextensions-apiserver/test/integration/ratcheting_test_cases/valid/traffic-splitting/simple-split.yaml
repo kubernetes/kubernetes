@@ -1,0 +1,15 @@
+#$ Used in:
+#$ - site-src/guides/traffic-splitting.md
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: simple-split
+spec:
+  rules:
+  - backendRefs:
+    - name: foo-v1
+      port: 8080
+      weight: 90
+    - name: foo-v2
+      port: 8080
+      weight: 10

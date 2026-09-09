@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agnhost-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agnhost
+  template:
+    metadata:
+      labels:
+        app: agnhost
+      annotations:
+        annotations_app: annotations_agnhost
+    spec:
+      containers:
+      - name: agnhost
+        image: {{.AgnhostImage}}
+        args: ["netexec", "--http-port=80"]
+        ports:
+        - containerPort: 80

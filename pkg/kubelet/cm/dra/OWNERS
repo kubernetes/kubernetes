@@ -1,0 +1,7 @@
+labels:
+  - wg/device-management
+approvers:
+  - pohly
+  - bart0sh
+reviewers:
+  - troychiu

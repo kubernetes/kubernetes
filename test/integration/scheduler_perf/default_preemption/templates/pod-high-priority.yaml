@@ -1,0 +1,18 @@
+# High-priority preemptor pod manifest used in preemption benchmark suites.
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-high-priority-
+spec:
+  terminationGracePeriodSeconds: 0
+  priority: 9999999
+  containers:
+  - image: registry.k8s.io/pause:3.10.2
+    name: pause
+    resources:
+      limits:
+        cpu: 3970m
+        memory: 500Mi
+      requests:
+        cpu: 3970m
+        memory: 500Mi

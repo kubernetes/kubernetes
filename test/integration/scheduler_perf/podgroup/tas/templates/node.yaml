@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-{{.Index}}
+  labels:
+    kubernetes.io/hostname: node-{{.Index}}
+    topology.kubernetes.io/zone: zone-{{DivideInt .Index 100}}
+    topology.kubernetes.io/rack: rack-{{DivideInt .Index 100}}
+status:
+  capacity:
+    cpu: "4"
+    memory: 32Gi
+    pods: "110"
+  allocatable:
+    cpu: "4"
+    memory: 32Gi
+    pods: "110"
+  phase: Running
+  conditions:
+  - type: Ready
+    status: "True"

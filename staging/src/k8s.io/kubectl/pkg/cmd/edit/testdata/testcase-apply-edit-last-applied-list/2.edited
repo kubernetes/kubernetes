@@ -1,0 +1,39 @@
+# Please edit the 'last-applied-configuration' annotations below.
+# Lines beginning with a '#' will be ignored, and an empty file will abort the edit.
+#
+apiVersion: v1
+items:
+- apiVersion: v1
+  data:
+    baz: qux
+    foo: changed-value
+    new-data: new-value
+    new-data2: new-value
+    new-data3: newivalue
+  kind: ConfigMap
+  metadata:
+    annotations: {}
+    name: cm1
+    namespace: myproject
+- kind: Service
+  apiVersion: v1
+  metadata:
+    annotations: {}
+    labels:
+      app: svc1
+      new-label: foo
+      new-label2: foo2
+    name: svc1
+    namespace: myproject
+  spec:
+    ports:
+    - name: "80"
+      port: 82
+      protocol: TCP
+      targetPort: 81
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+kind: List
+metadata: {}

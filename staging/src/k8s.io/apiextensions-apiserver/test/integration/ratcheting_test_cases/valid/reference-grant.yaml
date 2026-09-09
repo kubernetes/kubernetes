@@ -1,0 +1,14 @@
+#$ Used in:
+#$ - site-src/concepts/security-model.md
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-prod-traffic
+spec:
+  from:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    namespace: prod
+  to:
+  - group: ""
+    kind: Service

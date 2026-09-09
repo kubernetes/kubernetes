@@ -1,0 +1,72 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "batch/v1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "categories": [
+        "all"
+      ],
+      "kind": "CronJob",
+      "name": "cronjobs",
+      "namespaced": true,
+      "shortNames": [
+        "cj"
+      ],
+      "singularName": "cronjob",
+      "storageVersionHash": "sd5LIXh4Fjs=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "CronJob",
+      "name": "cronjobs/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "categories": [
+        "all"
+      ],
+      "kind": "Job",
+      "name": "jobs",
+      "namespaced": true,
+      "singularName": "job",
+      "storageVersionHash": "mudhfqk/qZY=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "Job",
+      "name": "jobs/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}

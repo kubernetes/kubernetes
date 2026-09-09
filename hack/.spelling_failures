@@ -1,0 +1,6 @@
+CHANGELOG
+go.mod
+go.sum
+third_party/
+translations/
+vendor/

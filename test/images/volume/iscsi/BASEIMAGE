@@ -1,0 +1,4 @@
+linux/amd64=fedora:42
+linux/arm64=arm64v8/fedora:42
+linux/ppc64le=ppc64le/fedora:42
+linux/s390x=s390x/fedora:42

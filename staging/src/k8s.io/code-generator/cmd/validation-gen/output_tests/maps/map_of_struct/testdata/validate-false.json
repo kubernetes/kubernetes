@@ -1,0 +1,51 @@
+{
+  "*mapofstruct.Struct": {
+    "": [
+      "type Struct"
+    ],
+    "mapField": [
+      "field Struct.MapField"
+    ],
+    "mapField[岯Ȉ\u0026\u003c沲3]": [
+      "field Struct.MapField[*]",
+      "type OtherStruct"
+    ],
+    "mapField[铃]3g!fȺ苬ĥəƣ]": [
+      "field Struct.MapField[*]",
+      "type OtherStruct"
+    ],
+    "mapPtrField": [
+      "field Struct.MapPtrField"
+    ],
+    "mapPtrField[\u003eóǲ岋笨Gń條]": [
+      "field Struct.MapPtrField[*]",
+      "type OtherStruct"
+    ],
+    "mapPtrField[]": [
+      "field Struct.MapPtrField[*]",
+      "type OtherStruct"
+    ],
+    "mapPtrTypedefField": [
+      "field Struct.MapPtrTypedefField"
+    ],
+    "mapPtrTypedefField[v$蛷)讻IeYF墄[C_睿ȉǫ蹟t´]": [
+      "field Struct.MapPtrTypedefField[*]",
+      "type OtherTypedefStruct"
+    ],
+    "mapPtrTypedefField[ș$0đ\u003eƯ]ɹȽ東]": [
+      "field Struct.MapPtrTypedefField[*]",
+      "type OtherTypedefStruct"
+    ],
+    "mapTypedefField": [
+      "field Struct.MapTypedefField"
+    ],
+    "mapTypedefField[]": [
+      "field Struct.MapTypedefField[*]",
+      "type OtherTypedefStruct"
+    ],
+    "mapTypedefField[x飖Ǒp!ǪŰ]": [
+      "field Struct.MapTypedefField[*]",
+      "type OtherTypedefStruct"
+    ]
+  }
+}

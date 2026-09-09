@@ -1,0 +1,30 @@
+all: false
+dir: '{{.InterfaceDir}}'
+filename: mocks_test.go
+force-file-write: true
+formatter: goimports
+include-auto-generated: false
+log-level: info
+structname: '{{.Mock}}{{.InterfaceName}}'
+pkgname: '{{.SrcPackageName}}'
+recursive: false
+require-template-schema-exists: true
+template: matryer
+template-schema: '{{.Template}}.schema.json'
+packages:
+  github.com/go-openapi/swag/jsonutils/adapters/ifaces:
+    config:
+      dir: jsonutils/adapters/ifaces/mocks
+      filename: mocks.go
+      pkgname: 'mocks'
+      force-file-write: true
+      all: true
+  github.com/go-openapi/swag/jsonutils/adapters/testintegration:
+    config:
+      inpackage: true
+      dir: jsonutils/adapters/testintegration
+      force-file-write: true
+      all: true
+    interfaces:
+      EJMarshaler:
+      EJUnmarshaler:

@@ -1,0 +1,14 @@
+{
+    "auths":{
+        "http://foo.example.com":{
+            "username":"foo",
+            "password":"bar",
+            "email":"foo@example.com"
+        },
+        "http://bar.example.com":{
+            "username":"bar",
+            "password":"baz",
+            "email":"bar@example.com"
+        }
+    }
+}
