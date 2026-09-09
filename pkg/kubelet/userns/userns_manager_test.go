@@ -232,89 +232,113 @@ func TestMakeUserNsManager(t *testing.T) {
 }
 
 func TestUserNsManagerParseUserNsFile(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
+
+	// Built rather than hand written, so a fixture cannot quietly stop being JSON.
+	mapping := func(hostID, containerID, length uint32) string {
+		return fmt.Sprintf(`{"hostId":%d,"containerId":%d,"length":%d}`, hostID, containerID, length)
+	}
+	mappingsFile := func(uid, gid string) string {
+		return fmt.Sprintf(`{"uidMappings":[%s],"gidMappings":[%s]}`, uid, gid)
+	}
+
+	// The second block of the pool, so the one after it is still in range.
+	const firstID = minimumMappingUID + testUserNsLength
+	produced := mapping(firstID, 0, testUserNsLength)
+	nextRange := mapping(firstID+testUserNsLength, 0, testUserNsLength)
 
 	cases := []struct {
 		name    string
 		file    string
-		success bool
-	}{
-		{
-			name: "basic",
-			file: `{
-	                        "uidMappings":[ { "hostId":131072, "containerId":0, "length":65536 } ],
-	                        "gidMappings":[ { "hostId":131072, "containerId":0, "length":65536 } ]
-                               }`,
-			success: true,
+		wantErr string        // empty means the file is accepted
+		want    userNamespace // what an accepted file has to parse to
+	}{{
+		name: "one UID mapping and an identical GID mapping",
+		file: mappingsFile(produced, produced),
+		want: userNamespace{
+			UIDMappings: []idMapping{{HostId: firstID, ContainerId: 0, Length: testUserNsLength}},
+			GIDMappings: []idMapping{{HostId: firstID, ContainerId: 0, Length: testUserNsLength}},
 		},
-		{
-			name: "invalid length",
-			file: `{
-	                        "uidMappings":[ { "hostId":131072, "containerId":0, "length":0 } ],
-	                        "gidMappings":[ { "hostId":131072, "containerId":0, "length":0 } ]
-                               }`,
-			success: false,
-		},
-		{
-			name: "wrong offset",
-			file: `{
-	                        "uidMappings":[ {"hostId":131072, "containerId":0, "length":65536 } ],
-	                        "gidMappings":[ {"hostId":1, "containerId":0, "length":65536 } ]
-                               }`,
-			success: false,
-		},
-		{
-			name: "two GID mappings",
-			file: `{
-	                        "uidMappings":[ { "hostId":131072, "containerId":0, "length":userNsLength } ],
-	                        "gidMappings":[ { "hostId":131072, "containerId":0, "length":userNsLength }, { "hostId":196608, "containerId":0, "length":65536 } ]
-                               }`,
-			success: false,
-		},
-		{
-			name: "two UID mappings",
-			file: `{
-	                        "uidMappings":[ { "hostId":131072, "containerId":0, "length":65536 }, { "hostId":196608, "containerId":0, "length":65536 } ],
-	                        "gidMappings":[ { "hostId":131072, "containerId":0, "length":65536 } ]
-                               }`,
-			success: false,
-		},
-		{
-			name: "no root UID",
-			file: `{
-	                        "uidMappings":[ { "hostId":131072, "containerId":1, "length":65536 } ],
-	                        "gidMappings":[ { "hostId":131072, "containerId":0, "length":65536 } ]
-                               }`,
-			success: false,
-		},
-		{
-			name: "no root GID",
-			file: `{
-	                        "uidMappings":[ { "hostId":131072, "containerId":0, "length":65536 } ],
-	                        "gidMappings":[ { "hostId":131072, "containerId":1, "length":65536 } ]
-                               }`,
-			success: false,
-		},
-	}
-
-	testUserNsPodsManager := &testUserNsPodsManager{}
-	m, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
-	assert.NoError(t, err)
+	}, {
+		name:    "truncated file",
+		file:    `{"uidMappings":`,
+		wantErr: "invalid user namespace mappings file",
+	}, {
+		name:    "no UID mapping",
+		file:    mappingsFile("", produced),
+		wantErr: "no more than one mapping allowed",
+	}, {
+		name:    "two UID mappings",
+		file:    mappingsFile(produced+","+nextRange, produced),
+		wantErr: "no more than one mapping allowed",
+	}, {
+		name:    "no GID mapping",
+		file:    mappingsFile(produced, ""),
+		wantErr: "GID and UID mappings should be identical",
+	}, {
+		name:    "two GID mappings",
+		file:    mappingsFile(produced, produced+","+nextRange),
+		wantErr: "GID and UID mappings should be identical",
+	}, {
+		name:    "GID mapping at another host ID",
+		file:    mappingsFile(produced, nextRange),
+		wantErr: "GID and UID mapping should be identical",
+	}, {
+		name:    "GID mapping of another length",
+		file:    mappingsFile(produced, mapping(firstID, 0, testUserNsLength*2)),
+		wantErr: "GID and UID mapping should be identical",
+	}, {
+		name:    "container ID 0 not mapped",
+		file:    mappingsFile(mapping(firstID, 1, testUserNsLength), mapping(firstID, 1, testUserNsLength)),
+		wantErr: "UID 0 must be mapped",
+	}, {
+		name:    "zero mapping length",
+		file:    mappingsFile(mapping(firstID, 0, 0), mapping(firstID, 0, 0)),
+		wantErr: "wrong user namespace length",
+	}, {
+		// Same wrong length in both, so it reaches record() and not the identity check.
+		name:    "nonzero length other than the configured IDs per pod",
+		file:    mappingsFile(mapping(firstID, 0, testUserNsLength*2), mapping(firstID, 0, testUserNsLength*2)),
+		wantErr: "wrong user namespace length",
+	}, {
+		name:    "host ID is not a multiple of the unit",
+		file:    mappingsFile(mapping(firstID+1, 0, testUserNsLength), mapping(firstID+1, 0, testUserNsLength)),
+		wantErr: "wrong user namespace offset",
+	}}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// We don't validate the result. It was parsed with the json parser, we trust that.
-			_, err = m.parseUserNsFileAndRecord(logger, types.UID(tc.name), []byte(tc.file))
-			if (tc.success && err == nil) || (!tc.success && err != nil) {
+			logger, _ := ktesting.NewTestContext(t)
+			// One manager per case: a shared one lets an earlier case hold this range.
+			m, err := MakeUserNsManager(logger, &testUserNsPodsManager{}, nil)
+			require.NoError(t, err)
+
+			podUID := types.UID(tc.name)
+			freeBefore := m.used.Free()
+
+			got, err := m.parseUserNsFileAndRecord(logger, podUID, []byte(tc.file))
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				// A rejected file must leave the allocator as it was.
+				require.Empty(t, m.usedBy)
+				require.Equal(t, freeBefore, m.used.Free())
 				return
 			}
 
-			t.Errorf("expected success: %v but got error: %v", tc.success, err)
+			require.NoError(t, err)
+			// GetOrCreateUserNamespaceMappings passes this value on to the runtime.
+			require.Equal(t, tc.want, got)
+
+			// The other half of the function: the range is reserved, and to this pod.
+			require.Len(t, m.usedBy, 1)
+			recorded, found := m.usedBy[podUID]
+			require.True(t, found)
+			require.Equal(t, tc.want.UIDMappings[0].HostId, recorded)
+			require.True(t, m.isSet(recorded))
+			require.Equal(t, freeBefore-1, m.used.Free())
 		})
 	}
 }
-
 func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
