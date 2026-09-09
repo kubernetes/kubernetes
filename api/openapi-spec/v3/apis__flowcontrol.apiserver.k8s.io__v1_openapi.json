@@ -673,17 +673,7 @@
         "required": [
           "kind"
         ],
-        "type": "object",
-        "x-kubernetes-unions": [
-          {
-            "discriminator": "kind",
-            "fields-to-discriminateBy": {
-              "group": "Group",
-              "serviceAccount": "ServiceAccount",
-              "user": "User"
-            }
-          }
-        ]
+        "type": "object"
       },
       "io.k8s.api.flowcontrol.v1.UserSubject": {
         "description": "UserSubject holds detailed information for user-kind subject.",
