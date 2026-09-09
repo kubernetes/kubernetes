@@ -882,6 +882,30 @@ func TestConvert_core_Pod_To_v1_Pod(t *testing.T) {
 	}
 }
 
+func BenchmarkPodConvertToVersion(b *testing.B) {
+	in := &core.Pod{}
+	if err := legacyscheme.Scheme.Convert(loadExemplarPod(), in, nil); err != nil {
+		b.Fatalf("unexpected setup conversion error: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name    string
+		convert func(runtime.Object, runtime.GroupVersioner) (runtime.Object, error)
+	}{
+		{name: "safe", convert: legacyscheme.Scheme.ConvertToVersion},
+		{name: "unsafe", convert: legacyscheme.Scheme.UnsafeConvertToVersion},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				if _, err := tc.convert(in, v1.SchemeGroupVersion); err != nil {
+					b.Fatalf("unexpected conversion error: %v", err)
+				}
+			}
+		})
+	}
+}
+
 // TestPodMemoryIdenticalConversion ensures the internal and v1 Pod types
 // remain memory-identical. These types must be kept memory-identical
 // for performance reasons.
