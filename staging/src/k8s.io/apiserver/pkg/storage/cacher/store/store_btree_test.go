@@ -28,7 +28,7 @@ func TestStoreListOrdered(t *testing.T) {
 	require.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
 	require.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
 	require.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo1", "bar2", 2),
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
@@ -94,23 +94,19 @@ type fakeIndexer struct {
 	rv int
 }
 
-func (f fakeIndexer) Add(obj interface{}) error    { return nil }
-func (f fakeIndexer) Update(obj interface{}) error { return nil }
-func (f fakeIndexer) Delete(obj interface{}) error { return nil }
-func (f fakeIndexer) Clone() Snapshot              { return f }
+func (f fakeIndexer) Add(*Element) error    { return nil }
+func (f fakeIndexer) Update(*Element) error { return nil }
+func (f fakeIndexer) Delete(*Element) error { return nil }
+func (f fakeIndexer) Clone() Snapshot       { return f }
 func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]*Element, error) {
 	return nil, nil
-}
-
-func (f fakeIndexer) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	return nil, false, nil
 }
 
 func (f fakeIndexer) GetByKey(key string) (*Element, bool) {
 	return nil, false
 }
 
-func (f fakeIndexer) List() []interface{} {
+func (f fakeIndexer) List() []*Element {
 	return nil
 }
 
@@ -118,7 +114,7 @@ func (f fakeIndexer) ListKeys() []string {
 	return nil
 }
 
-func (f fakeIndexer) Replace([]interface{}, string) error {
+func (f fakeIndexer) Replace([]*Element) error {
 	return nil
 }
 func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) Range { return EmptyRange() }

@@ -155,7 +155,7 @@ func newWatchCache(
 		resourceVersion: 0,
 		config:          config,
 		history:         newWatchCacheHistory(config, eventFreshDuration),
-		storage:         store.NewWatchCacheStorage(config.keyFunc, indexers),
+		storage:         store.NewWatchCacheStorage(indexers),
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.config.indexValidator = wc.history.isIndexValidLocked
@@ -242,20 +242,15 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 	wcEvent.timeline.MarkAt(metrics.PointStorageDecoded, recordTime)
 	wcEvent.timeline.MarkAt(metrics.PointCacheReceived, cacheReceived)
 
-	// We can call w.storage.Get() outside of a critical section,
+	// We can call w.storage.GetByKey() outside of a critical section,
 	// because the w.storage itself is thread-safe and the only
 	// place where it is modified is below (via UpdateStoreLocked)
 	// and these calls are serialized because reflector is processing
 	// events one-by-one.
-	previous, exists, err := w.storage.Get(event.Object)
-	if err != nil {
-		return err
-	}
-	if exists {
-		previousElem := previous.(*store.Element)
-		wcEvent.PrevObject = previousElem.Object
-		wcEvent.PrevObjLabels = previousElem.Labels
-		wcEvent.PrevObjFields = previousElem.Fields
+	if previous, exists := w.storage.GetByKey(key); exists {
+		wcEvent.PrevObject = previous.Object
+		wcEvent.PrevObjLabels = previous.Labels
+		wcEvent.PrevObjFields = previous.Fields
 	}
 
 	if err := func() error {
@@ -555,7 +550,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		return err
 	}
 
-	toReplace := make([]interface{}, 0, len(objs))
+	toReplace := make([]*store.Element, 0, len(objs))
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
@@ -588,7 +583,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	// Empty the cyclic buffer, ensuring startIndex doesn't decrease.
 	w.history.ResetLocked()
 
-	if err := w.storage.ReplaceLocked(toReplace, resourceVersion, version); err != nil {
+	if err := w.storage.ReplaceLocked(toReplace, version); err != nil {
 		return err
 	}
 	w.resourceVersion = version
