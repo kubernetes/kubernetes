@@ -84,12 +84,16 @@ func TestGetConntrackMax(t *testing.T) {
 }
 
 type fakeConntracker struct {
+	max      int
 	hashsize int
 	err      error
 
 	called []string
 }
 
+func (fc *fakeConntracker) GetMax(ctx context.Context) (int, error) {
+	return fc.max, fc.err
+}
 func (fc *fakeConntracker) SetMax(ctx context.Context, max int) error {
 	fc.called = append(fc.called, fmt.Sprintf("SetMax(%d)", max))
 	return fc.err
@@ -130,6 +134,7 @@ func TestSetupConntrack(t *testing.T) {
 	tests := []struct {
 		name         string
 		config       kubeproxyconfig.KubeProxyConntrackConfiguration
+		max          int
 		hashsize     int
 		conntrackErr error
 		expect       []string
@@ -141,11 +146,38 @@ func TestSetupConntrack(t *testing.T) {
 			expect: nil,
 		},
 		{
-			name: "SetMax is called if conntrack.maxPerCore is specified",
+			name: "SetMax is called if conntrack.maxPerCore is specified and sysctl is unset",
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				MaxPerCore: ptr.To(int32(12)),
 			},
 			expect: []string{"SetMax(96)", "SetHashsize(24)"},
+		},
+		{
+			name: "SetMax is not called if sysctl value is already correct",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      96,
+			hashsize: 24,
+			expect:   nil,
+		},
+		{
+			name: "SetMax is not called if sysctl value is higher than wanted",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      192,
+			hashsize: 48,
+			expect:   nil,
+		},
+		{
+			name: "SetMax is called if sysctl value is too low",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      48,
+			hashsize: 12,
+			expect:   []string{"SetMax(96)", "SetHashsize(24)"},
 		},
 		{
 			name: "SetMax is not called if conntrack.maxPerCore is 0",
@@ -155,10 +187,20 @@ func TestSetupConntrack(t *testing.T) {
 			expect: nil,
 		},
 		{
+			name: "SetHashsize is called if max is correct but hashsize isn't",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      96,
+			hashsize: 0,
+			expect:   []string{"SetHashsize(24)"},
+		},
+		{
 			name: "SetHashsize is not called if max is wrong but hashsize is correct",
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				MaxPerCore: ptr.To(int32(12)),
 			},
+			max:      48,
 			hashsize: 24,
 			expect:   []string{"SetMax(96)"},
 		},
@@ -245,7 +287,7 @@ func TestSetupConntrack(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fc := &fakeConntracker{hashsize: test.hashsize, err: test.conntrackErr}
+			fc := &fakeConntracker{max: test.max, hashsize: test.hashsize, err: test.conntrackErr}
 			err := setSysctls(ctx, fc, &test.config)
 			if test.wantErr && err == nil {
 				t.Errorf("Test %q: Expected error, got nil", test.name)

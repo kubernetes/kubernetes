@@ -33,7 +33,7 @@ import (
 )
 
 func SetSysctls(ctx context.Context, config *kubeproxyconfig.KubeProxyConntrackConfiguration) error {
-	return setSysctls(ctx, realConntrackConfigurer{}, config)
+	return setSysctls(ctx, realConntrackConfigurer{sys: sysctl.New()}, config)
 }
 
 // conntrackConfigurer is a mockable interface for setting conntrack sysctls.
@@ -41,6 +41,8 @@ func SetSysctls(ctx context.Context, config *kubeproxyconfig.KubeProxyConntrackC
 // Descriptions of the various sysctl fields can be found here:
 // https://www.kernel.org/doc/Documentation/networking/nf_conntrack-sysctl.txt
 type conntrackConfigurer interface {
+	// GetMax gets the current value of nf_conntrack_max.
+	GetMax(ctx context.Context) (int, error)
 	// SetMax adjusts nf_conntrack_max.
 	SetMax(ctx context.Context, max int) error
 	// SetTCPEstablishedTimeout adjusts nf_conntrack_tcp_timeout_established.
@@ -69,9 +71,11 @@ func setSysctls(ctx context.Context, ct conntrackConfigurer, config *kubeproxyco
 		return err
 	}
 	if max > 0 {
-		err := ct.SetMax(ctx, max)
-		if err != nil {
-			return err
+		if curMax, err := ct.GetMax(ctx); err != nil || curMax < max {
+			err := ct.SetMax(ctx, max)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Check if hashsize is large enough for the nf_conntrack_max value.
@@ -149,6 +153,7 @@ func getConntrackMax(ctx context.Context, config *kubeproxyconfig.KubeProxyConnt
 }
 
 type realConntrackConfigurer struct {
+	sys sysctl.Interface
 }
 
 // DetectNumCPU returns the CPU count used to size nf_conntrack_max. That limit
@@ -163,13 +168,12 @@ func (rct realConntrackConfigurer) DetectNumCPU() int {
 	return runtime.NumCPU()
 }
 
+func (rct realConntrackConfigurer) GetMax(_ context.Context) (int, error) {
+	return rct.sys.GetSysctl("net/netfilter/nf_conntrack_max")
+}
+
 func (rct realConntrackConfigurer) SetMax(ctx context.Context, max int) error {
-	logger := klog.FromContext(ctx)
-	logger.Info("Setting nf_conntrack_max", "nfConntrackMax", max)
-	if err := rct.setIntSysCtl(ctx, "nf_conntrack_max", max); err != nil {
-		return err
-	}
-	return nil
+	return rct.setIntSysCtl(ctx, "nf_conntrack_max", max)
 }
 
 func (rct realConntrackConfigurer) SetTCPEstablishedTimeout(ctx context.Context, seconds int) error {
@@ -196,10 +200,9 @@ func (rct realConntrackConfigurer) setIntSysCtl(ctx context.Context, name string
 	logger := klog.FromContext(ctx)
 	entry := "net/netfilter/" + name
 
-	sys := sysctl.New()
-	if val, _ := sys.GetSysctl(entry); val != value {
+	if val, _ := rct.sys.GetSysctl(entry); val != value {
 		logger.Info("Set sysctl", "entry", entry, "value", value)
-		if err := sys.SetSysctl(entry, value); err != nil {
+		if err := rct.sys.SetSysctl(entry, value); err != nil {
 			return err
 		}
 	}
