@@ -3895,6 +3895,12 @@ const (
 	SchedulerEvaluationCompleted PodConditionType = "SchedulerEvaluationCompleted"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+	// InsecureImplicitUserID indicates that one or more containers of the pod are running as
+	// UID 0 without the pod or container spec explicitly requesting it via runAsUser.
+	InsecureImplicitUserID PodConditionType = "InsecureImplicitUserID"
+	// InsecureImplicitGroupID indicates that one or more containers of the pod are running as
+	// GID 0 without the pod or container spec explicitly requesting it via runAsGroup.
+	InsecureImplicitGroupID PodConditionType = "InsecureImplicitGroupID"
 )
 
 // These are reasons for a pod's transition to a condition.
