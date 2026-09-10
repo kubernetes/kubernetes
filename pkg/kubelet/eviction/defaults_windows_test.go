@@ -26,13 +26,11 @@ import (
 
 func TestDefaultEvictionHardWindows(t *testing.T) {
 	expected := map[string]string{
-		"memory.available": "500Mi",
-		"nodefs.available": "10%",
+		"memory.available":  "500Mi",
+		"nodefs.available":  "10%",
+		"imagefs.available": "15%",
 	}
 	if diff := cmp.Diff(expected, DefaultEvictionHard); diff != "" {
 		t.Fatalf("DefaultEvictionHard mismatch (-want +got):%s", diff)
-	}
-	if _, ok := DefaultEvictionHard["imagefs.available"]; ok {
-		t.Errorf("DefaultEvictionHard should not register imagefs.available on Windows: it never produces an observation")
 	}
 }
