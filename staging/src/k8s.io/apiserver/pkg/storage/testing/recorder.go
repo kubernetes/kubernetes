@@ -28,8 +28,8 @@ import (
 type KVRecorder struct {
 	clientv3.KV
 
-	reads       uint64
-	streamReads uint64
+	reads       atomic.Uint64
+	streamReads atomic.Uint64
 	lists       *KubernetesRecorder
 }
 
@@ -38,16 +38,16 @@ func NewKVRecorder(kv clientv3.KV, lists *KubernetesRecorder) *KVRecorder {
 }
 
 func (r *KVRecorder) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
-	atomic.AddUint64(&r.reads, 1)
+	r.reads.Add(1)
 	return r.KV.Get(ctx, key, opts...)
 }
 
 func (r *KVRecorder) GetReadsAndReset() uint64 {
-	return atomic.SwapUint64(&r.reads, 0)
+	return r.reads.Swap(0)
 }
 
 func (r *KVRecorder) GetStream(ctx context.Context, key string, opts ...clientv3.OpOption) (clientv3.GetStreamChan, error) {
-	atomic.AddUint64(&r.streamReads, 1)
+	r.streamReads.Add(1)
 	if r.lists != nil {
 		op := clientv3.OpGet(key, opts...)
 		r.lists.record(ctx, RecordedList{Key: key, Revision: op.Rev(), Limit: op.Limit()})
@@ -56,7 +56,7 @@ func (r *KVRecorder) GetStream(ctx context.Context, key string, opts ...clientv3
 }
 
 func (r *KVRecorder) GetStreamReadsAndReset() uint64 {
-	return atomic.SwapUint64(&r.streamReads, 0)
+	return r.streamReads.Swap(0)
 }
 
 type KubernetesRecorder struct {
