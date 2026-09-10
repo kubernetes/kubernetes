@@ -687,10 +687,10 @@ const (
 // PodGroupInfo is a wrapper around the PodGroup API object together with a list of unscheduled pods that belong to the pod group.
 // Typically used as an input to pod group scheduling cycle plugins.
 type PodGroupInfo interface {
-	// GetUnscheduledPods returns pods that are currently being considered for scheduling.
+	// GetAllUnscheduledPods returns pods that are currently being considered for scheduling.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	// This structure only contains the pods considered for scheduling in the pod group scheduling cycle.
-	GetUnscheduledPods() []*v1.Pod
+	GetAllUnscheduledPods() []*v1.Pod
 
 	// GetName returns the PodGroup name that is used to identify the pod group.
 	GetName() string
@@ -708,6 +708,12 @@ type PodGroupInfo interface {
 	// GetChildren returns the child pod groups of this pod group.
 	// Only composite pod groups have children.
 	GetChildren() []PodGroupInfo
+	// GetPriority returns the priority of the inner pod group or composite pod group.
+	GetPriority() int32
+	// GetPreemptionPolicy returns the PreemptionPolicy set in the inner pod group or composite pod group,
+	// or the default policy (PreemptLowerPriority) if not set.
+	// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
+	GetPreemptionPolicy() v1.PreemptionPolicy
 }
 
 // Placement determines the resources to be considered when scheduling a pod group.
@@ -892,4 +898,17 @@ func (gpg *GenericPodGroup) GetCreationTimestamp() time.Time {
 		return gpg.PodGroup.CreationTimestamp.Time
 	}
 	return gpg.CompositePodGroup.CreationTimestamp.Time
+}
+
+// GetPreemptionPolicy returns the PreemptionPolicy set in the inner pod group or composite pod group,
+// or the default policy (PreemptLowerPriority) if not set.
+// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
+func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
+	if pg := gpg.PodGroup; pg != nil && pg.Spec.PreemptionPolicy != nil {
+		return v1.PreemptionPolicy(*pg.Spec.PreemptionPolicy)
+	}
+	if cpg := gpg.CompositePodGroup; cpg != nil && cpg.Spec.PreemptionPolicy != nil {
+		return v1.PreemptionPolicy(*cpg.Spec.PreemptionPolicy)
+	}
+	return v1.PreemptLowerPriority
 }

@@ -1248,7 +1248,7 @@ func (pl *DynamicResources) PodGroupPostFilter(
 	// 1. Process pod-level claims deallocations/deletions.
 	// This mimics running PostFilter for each of the pods in pod group.
 	if podGroupState != nil && len(podGroupState.podsStateData) > 0 {
-		for _, pod := range pgInfo.GetUnscheduledPods() {
+		for _, pod := range pgInfo.GetAllUnscheduledPods() {
 			podState := podGroupState.podsStateData[types.NamespacedName{Namespace: pod.GetNamespace(), Name: pod.GetName()}]
 			if podState == nil {
 				continue
@@ -1265,14 +1265,14 @@ func (pl *DynamicResources) PodGroupPostFilter(
 	}
 
 	// 2. If at least one pod with claims did not deallocate/delete, try to unreserve PodGroup claims.
-	if unreservePodGroup && pl.fts.EnableDRAWorkloadResourceClaims && len(pgInfo.GetUnscheduledPods()) > 0 {
+	if unreservePodGroup && pl.fts.EnableDRAWorkloadResourceClaims && len(pgInfo.GetAllUnscheduledPods()) > 0 {
 		// To let the scheduler try to find new devices in case binding the current allocation
 		// failed in some previous cycle, deallocate any PodGroup-scoped claims
 		// unavailable on all nodes and remove the PodGroup from all its claims' status.reservedFor.
 		// Note that more Pods may exist than a PodGroup's minCount, but performing
 		// a cleanup after a previous cycle is safe as long as there are no assumed
 		// nor assigned pods yet.
-		status := pl.deallocatePodGroupClaims(ctx, podGroupState, pgInfo.GetUnscheduledPods()[0])
+		status := pl.deallocatePodGroupClaims(ctx, podGroupState, pgInfo.GetAllUnscheduledPods()[0])
 		if status != nil {
 			return nil, status
 		}
