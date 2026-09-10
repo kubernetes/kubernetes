@@ -975,6 +975,12 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	// Set AllContainersRestarting.LastTransitionTime
 	updateLastTransitionTime(&status, &oldStatus, v1.AllContainersRestarting)
 
+	// Set InsecureImplicitUserID.LastTransitionTime.
+	updateLastTransitionTime(&status, &oldStatus, v1.InsecureImplicitUserID)
+
+	// Set InsecureImplicitGroupID.LastTransitionTime.
+	updateLastTransitionTime(&status, &oldStatus, v1.InsecureImplicitGroupID)
+
 	// ensure that the start time does not change across updates.
 	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {
 		status.StartTime = oldStatus.StartTime.DeepCopy()
