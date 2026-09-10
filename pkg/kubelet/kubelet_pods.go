@@ -2040,6 +2040,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 		insecureUserIDCondition := status.GenerateInsecureUserIDCondition(pod, &oldPodStatus, allContainerStatuses)
 		insecureGroupIDCondition := status.GenerateInsecureGroupIDCondition(pod, &oldPodStatus, allContainerStatuses)
 		s.Conditions = append(s.Conditions, insecureUserIDCondition, insecureGroupIDCondition)
+		kl.emitInsecureIDEvent(pod, insecureUserIDCondition, insecureGroupIDCondition)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
 		if podutil.AllContainersCouldRestart(&pod.Spec) {

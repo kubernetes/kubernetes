@@ -9709,6 +9709,78 @@ func TestMakeMountsBindMountOptions(t *testing.T) {
 	assert.Empty(t, mounts[1].BindMountOptions)
 }
 
+func TestEmitInsecureIDEvent(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	fakeRecorder := record.NewFakeRecorder(10)
+	kl.insecureIDEventRecorder = fakeRecorder
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"}}
+
+	insecureUserID := v1.PodCondition{
+		Type:    v1.InsecureUserID,
+		Status:  v1.ConditionTrue,
+		Reason:  "ImplicitlyInsecureUserID",
+		Message: "container(s) c running as UID 0 without runAsUser set",
+	}
+	insecureGroupID := v1.PodCondition{
+		Type:    v1.InsecureGroupID,
+		Status:  v1.ConditionTrue,
+		Reason:  "ImplicitlyInsecureGroupID",
+		Message: "container(s) c running as GID 0 without runAsGroup set",
+	}
+	insecureSupplementalGroups := v1.PodCondition{
+		Type:    v1.InsecureGroupID,
+		Status:  v1.ConditionTrue,
+		Reason:  "ImplicitlyInsecureGroupID",
+		Message: "container(s) c running with GID 0 merged into supplementalGroups from the image (supplementalGroupsPolicy: Merge)",
+	}
+	notInsecureUserID := v1.PodCondition{Type: v1.InsecureUserID, Status: v1.ConditionFalse}
+	notInsecureGroupID := v1.PodCondition{Type: v1.InsecureGroupID, Status: v1.ConditionFalse}
+
+	for desc, test := range map[string]struct {
+		userIDCondition  v1.PodCondition
+		groupIDCondition v1.PodCondition
+		wantEvent        string
+	}{
+		"both UID and GID insecure: single combined event": {
+			userIDCondition:  insecureUserID,
+			groupIDCondition: insecureGroupID,
+			wantEvent:        "Warning ImplicitlyInsecureUserAndGroupID container(s) c running as UID 0 without runAsUser set; container(s) c running as GID 0 without runAsGroup set",
+		},
+		"only UID insecure: UID-specific event": {
+			userIDCondition:  insecureUserID,
+			groupIDCondition: notInsecureGroupID,
+			wantEvent:        "Warning ImplicitlyInsecureUserID container(s) c running as UID 0 without runAsUser set",
+		},
+		"only GID insecure: GID-specific event": {
+			userIDCondition:  notInsecureUserID,
+			groupIDCondition: insecureGroupID,
+			wantEvent:        "Warning ImplicitlyInsecureGroupID container(s) c running as GID 0 without runAsGroup set",
+		},
+		"only GID insecure via supplementalGroups: GID-specific event": {
+			userIDCondition:  notInsecureUserID,
+			groupIDCondition: insecureSupplementalGroups,
+			wantEvent:        "Warning ImplicitlyInsecureGroupID container(s) c running with GID 0 merged into supplementalGroups from the image (supplementalGroupsPolicy: Merge)",
+		},
+		"neither insecure: no event": {
+			userIDCondition:  notInsecureUserID,
+			groupIDCondition: notInsecureGroupID,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			kl.emitInsecureIDEvent(pod, test.userIDCondition, test.groupIDCondition)
+
+			select {
+			case got := <-fakeRecorder.Events:
+				assert.Equal(t, test.wantEvent, got)
+			default:
+				assert.Empty(t, test.wantEvent, "expected an event, got none")
+			}
+		})
+	}
+}
+
 func TestUpdateInsecurePodCountMetric(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
