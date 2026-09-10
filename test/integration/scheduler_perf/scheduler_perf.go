@@ -178,6 +178,7 @@ var (
 		names.DefaultBinder,
 		names.DefaultPreemption,
 		names.DynamicResources,
+		names.GangScheduling,
 		names.ImageLocality,
 		names.InterPodAffinity,
 		names.NodeAffinity,

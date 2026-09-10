@@ -48,6 +48,7 @@ const (
 
 // ExtensionPoints is a list of possible values for the extension_point label.
 var ExtensionPoints = []string{
+	PreEnqueue,
 	PreFilter,
 	Filter,
 	PreFilterExtensionAddPod,
@@ -70,6 +71,7 @@ var ExtensionPoints = []string{
 }
 
 const (
+	PreEnqueue                       = "PreEnqueue"
 	PreFilter                        = "PreFilter"
 	Filter                           = "Filter"
 	PreFilterExtensionAddPod         = "PreFilterExtensionAddPod"
