@@ -3191,14 +3191,14 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
             },
-            "description": "Default resource requirement limit value by resource name if resource limit is omitted.",
+            "description": "Default specifies resource limit values by resource name. These are applied to containers which do not specify their own limits for those resources.",
             "type": "object"
           },
           "defaultRequest": {
             "additionalProperties": {
               "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
             },
-            "description": "DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.",
+            "description": "DefaultRequest specifies resource request values by resource name. These are applied to containers which do not specify their own requests for those resources.",
             "type": "object"
           },
           "max": {

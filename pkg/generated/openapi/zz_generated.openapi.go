@@ -24736,7 +24736,7 @@ func schema_k8sio_api_core_v1_LimitRangeItem(ref common.ReferenceCallback) commo
 					},
 					"default": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Default resource requirement limit value by resource name if resource limit is omitted.",
+							Description: "Default specifies resource limit values by resource name. These are applied to containers which do not specify their own limits for those resources.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -24750,7 +24750,7 @@ func schema_k8sio_api_core_v1_LimitRangeItem(ref common.ReferenceCallback) commo
 					},
 					"defaultRequest": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.",
+							Description: "DefaultRequest specifies resource request values by resource name. These are applied to containers which do not specify their own requests for those resources.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,

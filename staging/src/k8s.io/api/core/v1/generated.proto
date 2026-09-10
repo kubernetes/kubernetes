@@ -2523,11 +2523,11 @@ message LimitRangeItem {
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> min = 3;
 
-  // Default resource requirement limit value by resource name if resource limit is omitted.
+  // Default specifies resource limit values by resource name. These are applied to containers which do not specify their own limits for those resources.
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> default = 4;
 
-  // DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.
+  // DefaultRequest specifies resource request values by resource name. These are applied to containers which do not specify their own requests for those resources.
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> defaultRequest = 5;
 
