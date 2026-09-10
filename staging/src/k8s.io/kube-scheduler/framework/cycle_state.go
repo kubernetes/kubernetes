@@ -98,9 +98,9 @@ type CycleState interface {
 	// or doesn't belong to any pod group.
 	// This field can only be true when GenericWorkload feature flag is enabled.
 	IsPodGroupSchedulingCycle() bool
-	// GetPodGroupSchedulingCycle gets the cycle state of the PodGroup for a Pod.
+	// GetPodGroupCycleState gets the cycle state of the PodGroup for a Pod.
 	// This should be only used when GenericWorkload feature flag is enabled.
-	GetPodGroupSchedulingCycle() PodGroupCycleState
+	GetPodGroupCycleState() PodGroupCycleState
 	// GetPlacementCycleState gets the cycle state of the current Placement for a Pod.
 	// Returns nil if this pod is not being scheduled within a placement context.
 	// This should be only used when GenericWorkload feature flag is enabled.
@@ -131,9 +131,9 @@ type PlacementCycleState interface {
 	//
 	// See PlacementCycleState for notes on concurrency.
 	Delete(key StateKey)
-	// GetPodGroupSchedulingCycle gets the cycle state of the PodGroup for this Placement.
+	// GetPodGroupCycleState gets the cycle state of the PodGroup for this Placement.
 	// This should be only used when GenericWorkload feature flag is enabled.
-	GetPodGroupSchedulingCycle() PodGroupCycleState
+	GetPodGroupCycleState() PodGroupCycleState
 }
 
 // PodGroupCycleState provides a mechanism for plugins that operate on pod groups to store and retrieve arbitrary data.

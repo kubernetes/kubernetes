@@ -496,7 +496,7 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 
 			state := framework.NewCycleState()
 			if tt.podGroupCycle {
-				state.SetPodGroupSchedulingCycle(framework.NewCycleState())
+				state.SetPodGroupCycleState(framework.NewCycleState())
 			}
 
 			scheduleResult, status := sched.schedulingAlgorithm(ctx, state, schedFwk, queuedPodInfo, time.Now())
@@ -736,6 +736,6 @@ func isPodInSnapshot(snapshot *internalcache.Snapshot, nodeName, podName string)
 
 func newPodGroupCycleState() *framework.CycleState {
 	state := framework.NewCycleState()
-	state.SetPodGroupSchedulingCycle(framework.NewCycleState())
+	state.SetPodGroupCycleState(framework.NewCycleState())
 	return state
 }

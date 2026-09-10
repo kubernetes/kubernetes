@@ -1949,7 +1949,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 					continue
 				}
 				placementCycleState := framework.NewCycleState()
-				placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+				placementCycleState.SetPodGroupCycleState(podGroupCycleState)
 				result.podCtx = initPodSchedulingContext(ctx, pod, placementCycleState)
 				algorithmResult.podResults = append(algorithmResult.podResults, result)
 			}
@@ -3685,7 +3685,7 @@ func collectHierarchyFromPlacementCycleState(cycleState fwk.PlacementCycleState,
 		return nil
 	}
 
-	err := collectHierarchyFromPodGroupCycleState(cycleState.GetPodGroupSchedulingCycle(), results)
+	err := collectHierarchyFromPodGroupCycleState(cycleState.GetPodGroupCycleState(), results)
 	if err != nil {
 		return err
 	}
@@ -3729,7 +3729,7 @@ func (p *multiLevelPlacementStateTracker) PlacementFeasible(ctx context.Context,
 	if args.Scheduled == 0 {
 		if podGroup.GetPodGroup() != nil {
 			trajectory := []string{}
-			if err := collectHierarchyFromPodGroupCycleState(state.GetPodGroupSchedulingCycle(), &trajectory); err != nil {
+			if err := collectHierarchyFromPodGroupCycleState(state.GetPodGroupCycleState(), &trajectory); err != nil {
 				return fwk.AsStatus(err)
 			}
 			p.placementFeasibleTrajectories = append(p.placementFeasibleTrajectories, trajectory)
@@ -5008,6 +5008,7 @@ type podGroupStateTrackerPlugin struct {
 	asyncPermitCount    int
 	syncUnreserveCount  int
 	asyncUnreserveCount int
+	unreserveError      error
 }
 
 var _ fwk.ReservePlugin = &podGroupStateTrackerPlugin{}
@@ -5020,9 +5021,15 @@ func (u *podGroupStateTrackerPlugin) Reserve(ctx context.Context, state fwk.Cycl
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	if p.Name == u.podToTrack {
-		if state.GetPodGroupSchedulingCycle() != nil {
+		if state.GetPodGroupCycleState() != nil {
+			if state.GetPlacementCycleState() == nil {
+				return fwk.AsStatus(fmt.Errorf("PlacementCycleState should be set in synchronous Reserve"))
+			}
 			u.syncReserveCount++
 		} else {
+			if state.GetPlacementCycleState() != nil {
+				return fwk.AsStatus(fmt.Errorf("PlacementCycleState should not be set in asynchronous Reserve"))
+			}
 			u.asyncReserveCount++
 		}
 	}
@@ -5036,7 +5043,10 @@ func (u *podGroupStateTrackerPlugin) Permit(ctx context.Context, state fwk.Cycle
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	if p.Name == u.podToTrack {
-		if state.GetPodGroupSchedulingCycle() == nil {
+		if state.GetPodGroupCycleState() == nil {
+			if state.GetPlacementCycleState() != nil {
+				return fwk.AsStatus(fmt.Errorf("PlacementCycleState should not be set in Permit")), 0
+			}
 			u.asyncPermitCount++
 		}
 	}
@@ -5047,9 +5057,15 @@ func (u *podGroupStateTrackerPlugin) Unreserve(ctx context.Context, state fwk.Cy
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	if p.Name == u.podToTrack {
-		if state.GetPodGroupSchedulingCycle() != nil {
+		if state.GetPodGroupCycleState() != nil {
+			if state.GetPlacementCycleState() == nil {
+				u.unreserveError = fmt.Errorf("PlacementCycleState should be set in synchronous Reserve")
+			}
 			u.syncUnreserveCount++
 		} else {
+			if state.GetPlacementCycleState() != nil {
+				u.unreserveError = fmt.Errorf("PlacementCycleState should not be set in asynchronous Reserve")
+			}
 			u.asyncUnreserveCount++
 		}
 	}
@@ -5221,6 +5237,7 @@ func TestScheduleOnePodGroup_PodGroupStateAvailability(t *testing.T) {
 			permitCount := trackerPlugin.asyncPermitCount
 			syncUnreserveCount := trackerPlugin.syncUnreserveCount
 			asyncUnreserveCount := trackerPlugin.asyncUnreserveCount
+			unreserveError := trackerPlugin.unreserveError
 			trackerPlugin.mu.Unlock()
 
 			if syncReserveCount != tt.expectSyncReserve {
@@ -5237,6 +5254,9 @@ func TestScheduleOnePodGroup_PodGroupStateAvailability(t *testing.T) {
 			}
 			if asyncUnreserveCount != tt.expectAsyncUnreserve {
 				t.Errorf("Expected async Unreserve count to be %d, got %d", tt.expectAsyncUnreserve, asyncUnreserveCount)
+			}
+			if unreserveError != nil {
+				t.Errorf("Unexpected error from Unreserve: %v", unreserveError)
 			}
 		})
 	}
@@ -5657,7 +5677,7 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 	}
 	t.Logf("Node info list size: %d", func() int { l, _ := snapshot.NodeInfos().List(); return len(l) }())
 	podGroupCycleState := framework.NewCycleState()
-	podGroupCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+	podGroupCycleState.SetPodGroupCycleState(podGroupCycleState)
 	sched.podGroupCycle(ctx, schedFwk, podGroupCycleState, podGroupInfo, time.Now())
 
 	lock.Lock()
