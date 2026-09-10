@@ -673,6 +673,8 @@ func stopCollectingMetrics(tCtx ktesting.TContext, collectorCancel func(string),
 	}
 	collectorCancel("collecting metrics, collector must stop first")
 	collectorWG.Wait()
+	// MetricAsyncRecorder flushes every second; give it time to flush before gathering metrics.
+	time.Sleep(1100 * time.Millisecond)
 	var dataItems []DataItem
 	for _, collector := range collectors {
 		items := collector.collect()
