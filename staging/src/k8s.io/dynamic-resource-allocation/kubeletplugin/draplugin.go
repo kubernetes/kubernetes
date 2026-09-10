@@ -123,6 +123,9 @@ type DRAPlugin interface {
 	//
 	// This call must be idempotent because the kubelet might have to ask
 	// for preparation multiple times, for example if it gets restarted.
+	// DRA drivers can rely on it being called after a node reboot
+	// and before the kubelet restarts application pods, so this call is
+	// a good place to verify that everything is really ready.
 	//
 	// A DRA driver should verify that all devices listed in a
 	// [resourceapi.DeviceRequestAllocationResult] are not already in use
