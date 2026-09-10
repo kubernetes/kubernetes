@@ -656,7 +656,12 @@ func (a *cpuAccumulator) takeRemainingCPUs() {
 // rangeNUMANodesNeededToSatisfy returns minimum and maximum (in this order) number of NUMA nodes
 // needed to satisfy the cpuAccumulator's goal of accumulating `a.numCPUsNeeded` CPUs, assuming that
 // CPU groups have size given by the `cpuGroupSize` argument.
-func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int) (minNumNUMAs, maxNumNUMAs int) {
+//
+// When minNumNUMAsFromHint is greater than 0, it raises the minimum NUMA node count
+// to honor the TopologyManager's topology hint. This ensures CPU allocation alignes with device
+// topology (e.g., GPUs, NICs that span multiple NUMA nodes). If the hint exceeds the maximum feasible NUMA count,
+// minNumNUMAsFromHint is ignored.
+func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int, minNumNUMAsFromHint int) (minNumNUMAs, maxNumNUMAs int) {
 	// Get the total number of NUMA nodes in the system.
 	numNUMANodes := a.topo.CPUDetails.NUMANodes().Size()
 
@@ -683,6 +688,17 @@ func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int) (minNum
 	// Calculate the maximum number of numa nodes required to satisfy the allocation.
 	maxNumNUMAs = min(numCPUGroupsNeeded, numNUMANodesAvailable)
 
+	// If the TopologyManager selected a specific NUMA affinity, honor it by
+	// ensuring we distribute across at least that many NUMA nodes. This
+	// prevents CPUManager from shrinking a multi-NUMA affinity back to fewer
+	// nodes than what TopologyManager intended (e.g., for GPU/NIC alignment).
+	if minNumNUMAsFromHint > 0 {
+		if minNumNUMAsFromHint > minNumNUMAs && minNumNUMAsFromHint <= maxNumNUMAs {
+			minNumNUMAs = minNumNUMAsFromHint
+		} else if minNumNUMAsFromHint > maxNumNUMAs {
+			a.logger.V(4).Info("NUMA affinity hint exceeds maximum feasible NUMA count, ignoring", "minNumNUMAsFromHint", minNumNUMAsFromHint, "maxNumNUMAs", maxNumNUMAs)
+		}
+	}
 	return
 }
 
@@ -896,7 +912,12 @@ func takeByTopologyNUMAPacked(logger klog.Logger, topo *topology.CPUTopology, av
 // of size 'cpuGroupSize' according to the algorithm described above. This is
 // important, for example, to ensure that all CPUs (i.e. all hyperthreads) from
 // a single core are allocated together.
-func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, alignBySocket bool) (cpuset.CPUSet, error) {
+//
+// minNUMAsFromHint is the NUMA node count from the TopologyManager's topology
+// hint. When non-zero, it raises the minimum NUMA node count for distribution,
+// ensuring CPU allocation stays aligned with device topology (e.g., GPUs, NICs).
+// Pass 0 to use the default behavior (minimum NUMAs needed to satisfy the request).
+func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, alignBySocket bool, minNUMAsFromHint int) (cpuset.CPUSet, error) {
 	// If the number of CPUs requested cannot be handed out in chunks of
 	// 'cpuGroupSize', then we just call out the packing algorithm since we
 	// can't distribute CPUs in this chunk size.
@@ -921,7 +942,7 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 	// Calculate the minimum and maximum possible number of NUMA nodes that
 	// could satisfy this request. This is used to optimize how many iterations
 	// of the loop we need to go through below.
-	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize)
+	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize, minNUMAsFromHint)
 
 	// Try combinations of 1,2,3,... NUMA nodes until we find a combination
 	// where we can evenly distribute CPUs across them. To optimize things, we
