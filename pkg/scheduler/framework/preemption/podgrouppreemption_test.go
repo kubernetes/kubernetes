@@ -39,7 +39,6 @@ import (
 	componentmetrics "k8s.io/component-base/metrics"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kube-scheduler/util"
 	"k8s.io/kubernetes/pkg/features"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
@@ -123,14 +122,13 @@ func (m *mockCompositePodGroupLister) Get(namespace, name string) (*schedulingv1
 }
 
 func makePodGroupPreemptor(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod) *podGroupPreemptor {
-	return makePodGroupPreemptorWithPreemptionPolicy(pg, pods, schedulingv1beta1.PreemptLowerPriority)
+	return makePodGroupPreemptorWithPreemptionPolicy(pg, pods, v1.PreemptLowerPriority)
 }
 
-func makePodGroupPreemptorWithPreemptionPolicy(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod, policy schedulingv1beta1.PreemptionPolicy) *podGroupPreemptor {
+func makePodGroupPreemptorWithPreemptionPolicy(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod, policy v1.PreemptionPolicy) *podGroupPreemptor {
 	return &podGroupPreemptor{
-		priority:         util.PodGroupPriority(pg),
 		pods:             pods,
-		podGroup:         pg,
+		GenericPodGroup:  fwk.NewGenericPodGroup(pg),
 		preemptionPolicy: policy,
 	}
 }
@@ -330,7 +328,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			preemptor: makePodGroupPreemptorWithPreemptionPolicy(
 				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
 				[]*v1.Pod{st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).Obj()},
-				schedulingv1beta1.PreemptLowerPriority,
+				v1.PreemptLowerPriority,
 			),
 			nodeCapacities: []nodeCapacity{
 				{nodeName: "node1", capacity: 1},
@@ -357,7 +355,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				[]*v1.Pod{
 					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
 				},
-				schedulingv1beta1.PreemptLowerPriority,
+				v1.PreemptLowerPriority,
 			),
 			nodeCapacities: []nodeCapacity{
 				{nodeName: "node1", capacity: 1},
@@ -608,7 +606,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				[]*v1.Pod{
 					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).Obj(),
 				},
-				schedulingv1beta1.PreemptLowerPriority,
+				v1.PreemptLowerPriority,
 			),
 			expectedVictims: []string{"p1"},
 			expectedStatus:  fwk.NewStatus(fwk.Success),
@@ -634,7 +632,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				[]*v1.Pod{
 					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
 				},
-				schedulingv1beta1.PreemptLowerPriority,
+				v1.PreemptLowerPriority,
 			),
 			nodeCapacities: []nodeCapacity{
 				{nodeName: "node1", capacity: 1},
@@ -1239,9 +1237,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			// Pod sizes are taken from the "size" label on a pod, defaulting to 1 if the label is not set.
 			var mockSchedulingFunc fwk.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 				minCount := 1
-				if tt.preemptor.podGroup != nil {
-					if tt.preemptor.podGroup.Spec.SchedulingPolicy.Gang != nil {
-						minCount = int(tt.preemptor.podGroup.Spec.SchedulingPolicy.Gang.MinCount)
+				if tt.preemptor.PodGroup != nil {
+					if tt.preemptor.PodGroup.Spec.SchedulingPolicy.Gang != nil {
+						minCount = int(tt.preemptor.PodGroup.Spec.SchedulingPolicy.Gang.MinCount)
 					}
 				}
 
@@ -1603,7 +1601,10 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				return nil, fwk.NewStatus(fwk.Error)
 			}
 
-			pgInfo := newTestPodGroupInfo(tt.preemptorPodGroup, nil, tt.preemptorPods)
+			pgInfo := &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericPodGroup(tt.preemptorPodGroup),
+				UnscheduledPods: tt.preemptorPods,
+			}
 
 			gotResult, gotStatus := pl.Preempt(ctx, pgInfo, mockSchedulingFunc)
 			if gotStatus.Code() != tt.expectedStatus.Code() || gotStatus.Message() != tt.expectedStatus.Message() {
@@ -1651,10 +1652,11 @@ func (pa *mockProposedAssignment) GetCycleState() fwk.CycleState {
 func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 	nodeName := "node1"
 	preemptorPod := st.MakePod().Name("p1").UID("p1").Obj()
-	preemptor := newPodGroupPreemptor(
-		newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod}),
-		false,
-	)
+	pgInfo := &framework.PodGroupInfo{
+		GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj()),
+		UnscheduledPods: []*v1.Pod{preemptorPod},
+	}
+	preemptor := newPodGroupPreemptor(pgInfo, false)
 
 	tests := []struct {
 		name             string

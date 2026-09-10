@@ -1135,18 +1135,22 @@ type PodGroupInfo struct {
 	Children []*PodGroupInfo
 }
 
-// GetUnscheduledPods returns the unscheduled pods for this pod group.
+// GetAllUnscheduledPods returns the unscheduled pods for this pod group.
 // For composite pod groups, this method recursively aggregates the unscheduled pods
 // from all leaf pod groups in the hierarchy.
-func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
+func (pgi *PodGroupInfo) GetAllUnscheduledPods() []*v1.Pod {
 	if pgi.PodGroup != nil {
 		return pgi.UnscheduledPods
 	}
 	var pods []*v1.Pod
 	for _, child := range pgi.Children {
-		pods = append(pods, child.GetUnscheduledPods()...)
+		pods = append(pods, child.GetAllUnscheduledPods()...)
 	}
 	return pods
+}
+
+func (pgi *PodGroupInfo) GetGenericPodGroup() *fwk.GenericPodGroup {
+	return pgi.GenericPodGroup
 }
 
 func (pgi *PodGroupInfo) GetChildren() []fwk.PodGroupInfo {

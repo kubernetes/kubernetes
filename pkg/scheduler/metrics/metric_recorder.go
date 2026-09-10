@@ -101,6 +101,19 @@ func EntityToLabel(entity Entity) (string, bool) {
 	return "", false
 }
 
+// EntityTypeToLabel converts an fwk.EntityKeyType to an entity metric label string.
+func EntityTypeToLabel(entityType fwk.EntityKeyType) string {
+	switch entityType {
+	case fwk.PodKeyType:
+		return Pod
+	case fwk.PodGroupKeyType:
+		return PodGroup
+	case fwk.CompositePodGroupKeyType:
+		return PodGroup
+	}
+	return ""
+}
+
 // Add records the addition of an entity.
 // It increments pending pods and queued entities metric counters.
 func (r *QueuedEntitiesRecorder) Add(entity Entity) {

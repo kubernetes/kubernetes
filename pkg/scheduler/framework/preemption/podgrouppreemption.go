@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	policylisters "k8s.io/client-go/listers/policy/v1"
@@ -106,7 +105,7 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInf
 
 	// Ensure the preemptor is eligible to preempt other pods.
 	if ok, msg := ev.preemptorEligibleToPreemptOthers(ctx, preemptor); !ok {
-		logger.V(5).Info("Preemptor is not eligible for preemption", "preemptor", preemptor.getObj(), "type", preemptor.getType(), "reason", msg)
+		logger.V(5).Info("Preemptor is not eligible for preemption", "preemptor", klog.KObj(preemptor), "type", preemptor.GetType(), "reason", msg)
 		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
 	}
 
@@ -375,14 +374,14 @@ func toPodNames(pods []fwk.PodInfo) string {
 
 // isPreemptionAllowed returns whether the victim residing on nodeInfo can be preempted by the preemptor
 func (ev *PodGroupEvaluator) isPreemptionAllowed(victim Victim, preemptor *podGroupPreemptor) bool {
-	return victim.Priority() < preemptor.priority
+	return victim.Priority() < preemptor.GetPriority()
 }
 
 // preemptorEligibleToPreemptOthers returns one bool and one string. The bool
 // indicates whether this preemptor should be considered for preempting other pods or
 // not. The string includes the reason if this preemptor isn't eligible.
 func (ev *PodGroupEvaluator) preemptorEligibleToPreemptOthers(_ context.Context, preemptor *podGroupPreemptor) (bool, string) {
-	if preemptor.PreemptionPolicy() == schedulingapi.PreemptNever {
+	if preemptor.GetPreemptionPolicy() == v1.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
 
@@ -402,7 +401,7 @@ func (ev *PodGroupEvaluator) isOngoingPreemption(_ context.Context, preemptor *p
 	for nomNodeName := range nominatedNodes {
 		if nodeInfo, exists := nameToNode[nomNodeName]; exists {
 			for _, p := range nodeInfo.GetPods() {
-				if GetPodPriority(p.GetPod(), ev.podGroupSnapshot, ev.compositePodGroupSnapshot) < preemptor.Priority() && PodTerminatingByPreemption(p.GetPod()) {
+				if getPodPriority(p.GetPod(), ev.podGroupSnapshot, ev.compositePodGroupSnapshot) < preemptor.GetPriority() && PodTerminatingByPreemption(p.GetPod()) {
 					return true
 				}
 			}

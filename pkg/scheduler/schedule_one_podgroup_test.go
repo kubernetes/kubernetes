@@ -114,7 +114,7 @@ func (mp *fakePodGroupPlugin) PodGroupPostFilter(ctx context.Context, state fwk.
 	if mp.podGroupPostFilterResult == nil {
 		return nil, mp.podGroupPostFilterStatus
 	}
-	pods := pgInfo.GetUnscheduledPods()
+	pods := pgInfo.GetAllUnscheduledPods()
 	n := make(map[types.NamespacedName]*fwk.NominatingInfo, len(pods))
 	for _, passedPod := range pods {
 		namespacedName := types.NamespacedName{Namespace: passedPod.Namespace, Name: passedPod.Name}
@@ -157,7 +157,7 @@ func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, pl
 		return nil
 	}
 
-	total := len(podGroupInfo.GetUnscheduledPods())
+	total := len(podGroupInfo.GetAllUnscheduledPods())
 	if pgInfo, ok := podGroupInfo.(*framework.PodGroupInfo); ok && pgInfo.GetType() == fwk.CompositePodGroupKeyType {
 		total = len(pgInfo.Children)
 	}
