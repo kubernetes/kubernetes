@@ -31,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -3792,7 +3793,7 @@ func TestValidateIncompletePodGroupPods(t *testing.T) {
 
 	tests := []struct {
 		name                string
-		pod                 *v1.Pod
+		pods                []*v1.Pod
 		initialPodGroups    []*schedulingv1beta1.PodGroup
 		initialCPGs         []*schedulingv1alpha3.CompositePodGroup
 		stepDuration        time.Duration
@@ -3805,7 +3806,9 @@ func TestValidateIncompletePodGroupPods(t *testing.T) {
 	}{
 		{
 			name: "young pod waiting less than timeout is skipped",
-			pod:  st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg2").ParentCompositePodGroup("cpg1").Obj(),
@@ -3820,7 +3823,9 @@ func TestValidateIncompletePodGroupPods(t *testing.T) {
 		},
 		{
 			name: "pod waiting longer than timeout with cycle is patched as unschedulable",
-			pod:  st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg2").ParentCompositePodGroup("cpg1").Obj(),
@@ -3832,13 +3837,15 @@ func TestValidateIncompletePodGroupPods(t *testing.T) {
 			wantCondition:       true,
 			wantConditionReason: v1.PodReasonUnschedulable,
 			wantConditionSubMsg: "cycle detected in hierarchy",
-			wantApiActionsCount: 1,
+			wantApiActionsCount: 4,
 			wantIncomplete:      true,
 			wantActiveQLen:      0,
 		},
 		{
 			name: "pod waiting longer than timeout with depth exceeding max is patched as unschedulable",
-			pod:  st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
 				st.MakeCompositePodGroup().Namespace("default").Name("cpg2").ParentCompositePodGroup("cpg3").Obj(),
@@ -3852,13 +3859,15 @@ func TestValidateIncompletePodGroupPods(t *testing.T) {
 			wantCondition:       true,
 			wantConditionReason: v1.PodReasonUnschedulable,
 			wantConditionSubMsg: "hierarchy depth 5 exceeds maximum allowed depth 4",
-			wantApiActionsCount: 1,
+			wantApiActionsCount: 6,
 			wantIncomplete:      true,
 			wantActiveQLen:      0,
 		},
 		{
 			name: "pod waiting longer than timeout with missing parent is patched as unschedulable",
-			pod:  st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg1").ParentCompositePodGroup("cpg-missing").Obj(),
 			},
@@ -3866,35 +3875,89 @@ func TestValidateIncompletePodGroupPods(t *testing.T) {
 			wantCondition:       true,
 			wantConditionReason: v1.PodReasonUnschedulable,
 			wantConditionSubMsg: "compositepodgroup/default/cpg-missing not found in workload forest",
-			wantApiActionsCount: 1,
+			wantApiActionsCount: 2,
 			wantIncomplete:      true,
 			wantActiveQLen:      0,
 		},
 		{
-			name: "pod already having identical condition is not re-patched",
-			pod: func() *v1.Pod {
-				pod := st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Conditions([]v1.PodCondition{
+			name: "pod and groups already having identical condition are not re-patched",
+			pods: []*v1.Pod{
+				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Conditions([]v1.PodCondition{
 					{
 						Type:    v1.PodScheduled,
 						Status:  v1.ConditionFalse,
 						Reason:  v1.PodReasonUnschedulable,
 						Message: "cycle detected in hierarchy at compositepodgroup/default/cpg1",
 					},
-				}).Obj()
-				return pod
-			}(),
+				}).Obj(),
+			},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Namespace("default").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
-				st.MakeCompositePodGroup().Namespace("default").Name("cpg2").ParentCompositePodGroup("cpg1").Obj(),
+				func() *schedulingv1alpha3.CompositePodGroup {
+					cpg := st.MakeCompositePodGroup().Namespace("default").Name("cpg1").ParentCompositePodGroup("cpg2").Obj()
+					cpg.Status.Conditions = []metav1.Condition{
+						{
+							Type:    schedulingv1alpha3.CompositePodGroupInitiallyScheduled,
+							Status:  metav1.ConditionFalse,
+							Reason:  schedulingv1alpha3.CompositePodGroupReasonUnschedulable,
+							Message: "cycle detected in hierarchy at compositepodgroup/default/cpg1",
+						},
+					}
+					return cpg
+				}(),
+				func() *schedulingv1alpha3.CompositePodGroup {
+					cpg := st.MakeCompositePodGroup().Namespace("default").Name("cpg2").ParentCompositePodGroup("cpg1").Obj()
+					cpg.Status.Conditions = []metav1.Condition{
+						{
+							Type:    schedulingv1alpha3.CompositePodGroupInitiallyScheduled,
+							Status:  metav1.ConditionFalse,
+							Reason:  schedulingv1alpha3.CompositePodGroupReasonUnschedulable,
+							Message: "cycle detected in hierarchy at compositepodgroup/default/cpg1",
+						},
+					}
+					return cpg
+				}(),
 			},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Namespace("default").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+				func() *schedulingv1beta1.PodGroup {
+					pg := st.MakePodGroup().Namespace("default").Name("pg1").ParentCompositePodGroup("cpg1").Obj()
+					pg.Status.Conditions = []metav1.Condition{
+						{
+							Type:    schedulingv1beta1.PodGroupInitiallyScheduled,
+							Status:  metav1.ConditionFalse,
+							Reason:  schedulingv1beta1.PodGroupReasonUnschedulable,
+							Message: "cycle detected in hierarchy at compositepodgroup/default/cpg1",
+						},
+					}
+					return pg
+				}(),
 			},
 			stepDuration:        6 * time.Minute,
 			wantCondition:       true,
 			wantConditionReason: v1.PodReasonUnschedulable,
 			wantConditionSubMsg: "cycle detected in hierarchy at compositepodgroup/default/cpg1",
 			wantApiActionsCount: 0,
+			wantIncomplete:      true,
+			wantActiveQLen:      0,
+		},
+		{
+			name: "multiple pods in same hierarchy: validates once and patches both pods and all groups",
+			pods: []*v1.Pod{
+				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+				st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg2").Obj(),
+			},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg2").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("default").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+				st.MakePodGroup().Namespace("default").Name("pg2").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			stepDuration:        6 * time.Minute,
+			wantCondition:       true,
+			wantConditionReason: v1.PodReasonUnschedulable,
+			wantConditionSubMsg: "cycle detected in hierarchy",
+			wantApiActionsCount: 6,
 			wantIncomplete:      true,
 			wantActiveQLen:      0,
 		},
@@ -3907,7 +3970,17 @@ func TestValidateIncompletePodGroupPods(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cs := fake.NewClientset(tt.pod)
+			var initObjs []runtime.Object
+			for _, pod := range tt.pods {
+				initObjs = append(initObjs, pod)
+			}
+			for _, pg := range tt.initialPodGroups {
+				initObjs = append(initObjs, pg)
+			}
+			for _, cpg := range tt.initialCPGs {
+				initObjs = append(initObjs, cpg)
+			}
+			cs := fake.NewClientset(initObjs...)
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithClient(cs),
 				WithPodMaxInIncompletePodsDuration(flushDuration),
 				WithIncompletePodGroupPodsPeriod(flushDuration))
@@ -3919,23 +3992,27 @@ func TestValidateIncompletePodGroupPods(t *testing.T) {
 				q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg))
 			}
 
-			pInfo := &framework.QueuedPodInfo{
-				PodInfo: &framework.PodInfo{Pod: tt.pod},
-				QueueingParams: framework.QueueingParams{
-					Timestamp: c.Now(),
-				},
+			for _, pod := range tt.pods {
+				pInfo := &framework.QueuedPodInfo{
+					PodInfo: &framework.PodInfo{Pod: pod},
+					QueueingParams: framework.QueueingParams{
+						Timestamp: c.Now(),
+					},
+				}
+				q.incompletePodGroupPods.add(pInfo)
 			}
-			q.incompletePodGroupPods.add(pInfo)
 
 			c.Step(tt.stepDuration)
 			cs.ClearActions()
 			q.validateIncompletePodGroupPods(logger)
 
-			if tt.wantIncomplete && q.incompletePodGroupPods.get(tt.pod) == nil {
-				t.Fatalf("Expected pod to remain in incompletePodGroupPods")
-			}
-			if !tt.wantIncomplete && q.incompletePodGroupPods.get(tt.pod) != nil {
-				t.Fatalf("Expected pod to be removed from incompletePodGroupPods")
+			for _, pod := range tt.pods {
+				if tt.wantIncomplete && q.incompletePodGroupPods.get(pod) == nil {
+					t.Fatalf("Expected pod %s to remain in incompletePodGroupPods", pod.Name)
+				}
+				if !tt.wantIncomplete && q.incompletePodGroupPods.get(pod) != nil {
+					t.Fatalf("Expected pod %s to be removed from incompletePodGroupPods", pod.Name)
+				}
 			}
 			if q.activeQ.len() != tt.wantActiveQLen {
 				t.Fatalf("Expected activeQ len %d, got %d", tt.wantActiveQLen, q.activeQ.len())
@@ -3945,27 +4022,70 @@ func TestValidateIncompletePodGroupPods(t *testing.T) {
 				t.Fatalf("Expected %d API actions, got %d: %v", tt.wantApiActionsCount, len(cs.Actions()), cs.Actions())
 			}
 
-			podObj, err := cs.CoreV1().Pods(tt.pod.Namespace).Get(ctx, tt.pod.Name, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("Failed to get pod from clientset: %v", err)
+			for _, pod := range tt.pods {
+				podObj, err := cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get pod %s from clientset: %v", pod.Name, err)
+				}
+				_, cond := podutil.GetPodCondition(&podObj.Status, v1.PodScheduled)
+				if tt.wantCondition {
+					if cond == nil {
+						t.Fatalf("Expected PodScheduled condition on pod %s", pod.Name)
+					}
+					if cond.Status != v1.ConditionFalse {
+						t.Fatalf("Expected ConditionFalse, got %v", cond.Status)
+					}
+					if cond.Reason != tt.wantConditionReason {
+						t.Fatalf("Expected Reason %s, got %s", tt.wantConditionReason, cond.Reason)
+					}
+					if tt.wantConditionSubMsg != "" && !strings.Contains(cond.Message, tt.wantConditionSubMsg) {
+						t.Fatalf("Expected condition message to contain %q, got %q", tt.wantConditionSubMsg, cond.Message)
+					}
+				} else {
+					if cond != nil {
+						t.Fatalf("Expected no PodScheduled condition on pod %s, got %v", pod.Name, cond)
+					}
+				}
 			}
-			_, cond := podutil.GetPodCondition(&podObj.Status, v1.PodScheduled)
+
 			if tt.wantCondition {
-				if cond == nil {
-					t.Fatalf("Expected PodScheduled condition on pod")
+				for _, pg := range tt.initialPodGroups {
+					pgObj, err := cs.SchedulingV1beta1().PodGroups(pg.Namespace).Get(ctx, pg.Name, metav1.GetOptions{})
+					if err != nil {
+						t.Fatalf("Failed to get podgroup %s from clientset: %v", pg.Name, err)
+					}
+					cond := apimeta.FindStatusCondition(pgObj.Status.Conditions, schedulingv1beta1.PodGroupInitiallyScheduled)
+					if cond == nil {
+						t.Fatalf("Expected PodGroupInitiallyScheduled condition on podgroup %s", pg.Name)
+					}
+					if cond.Status != metav1.ConditionFalse {
+						t.Fatalf("Expected ConditionFalse on podgroup %s, got %v", pg.Name, cond.Status)
+					}
+					if cond.Reason != schedulingv1beta1.PodGroupReasonUnschedulable {
+						t.Fatalf("Expected Reason %s on podgroup %s, got %s", schedulingv1beta1.PodGroupReasonUnschedulable, pg.Name, cond.Reason)
+					}
+					if tt.wantConditionSubMsg != "" && !strings.Contains(cond.Message, tt.wantConditionSubMsg) {
+						t.Fatalf("Expected condition message to contain %q on podgroup %s, got %q", tt.wantConditionSubMsg, pg.Name, cond.Message)
+					}
 				}
-				if cond.Status != v1.ConditionFalse {
-					t.Fatalf("Expected ConditionFalse, got %v", cond.Status)
-				}
-				if cond.Reason != tt.wantConditionReason {
-					t.Fatalf("Expected Reason %s, got %s", tt.wantConditionReason, cond.Reason)
-				}
-				if tt.wantConditionSubMsg != "" && !strings.Contains(cond.Message, tt.wantConditionSubMsg) {
-					t.Fatalf("Expected condition message to contain %q, got %q", tt.wantConditionSubMsg, cond.Message)
-				}
-			} else {
-				if cond != nil {
-					t.Fatalf("Expected no PodScheduled condition on pod, got %v", cond)
+				for _, cpg := range tt.initialCPGs {
+					cpgObj, err := cs.SchedulingV1alpha3().CompositePodGroups(cpg.Namespace).Get(ctx, cpg.Name, metav1.GetOptions{})
+					if err != nil {
+						t.Fatalf("Failed to get compositepodgroup %s from clientset: %v", cpg.Name, err)
+					}
+					cond := apimeta.FindStatusCondition(cpgObj.Status.Conditions, schedulingv1alpha3.CompositePodGroupInitiallyScheduled)
+					if cond == nil {
+						t.Fatalf("Expected CompositePodGroupInitiallyScheduled condition on cpg %s", cpg.Name)
+					}
+					if cond.Status != metav1.ConditionFalse {
+						t.Fatalf("Expected ConditionFalse on cpg %s, got %v", cpg.Name, cond.Status)
+					}
+					if cond.Reason != schedulingv1alpha3.CompositePodGroupReasonUnschedulable {
+						t.Fatalf("Expected Reason %s on cpg %s, got %s", schedulingv1alpha3.CompositePodGroupReasonUnschedulable, cpg.Name, cond.Reason)
+					}
+					if tt.wantConditionSubMsg != "" && !strings.Contains(cond.Message, tt.wantConditionSubMsg) {
+						t.Fatalf("Expected condition message to contain %q on cpg %s, got %q", tt.wantConditionSubMsg, cpg.Name, cond.Message)
+					}
 				}
 			}
 		})

@@ -1209,6 +1209,7 @@ func TestWorkloadForest_ValidateHierarchy(t *testing.T) {
 		key                        fwk.EntityKey
 		wantErrSub                 string
 		expectError                bool
+		wantHierarchy              sets.Set[fwk.EntityKey]
 	}{
 		{
 			name:                       "single pod group without parent",
@@ -1216,8 +1217,9 @@ func TestWorkloadForest_ValidateHierarchy(t *testing.T) {
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("ns").Name("pg1").Obj(),
 			},
-			key:         fwk.PodGroupKey("ns", "pg1"),
-			expectError: false,
+			key:           fwk.PodGroupKey("ns", "pg1"),
+			expectError:   false,
+			wantHierarchy: sets.New(fwk.PodGroupKey("ns", "pg1")),
 		},
 		{
 			name:                       "valid 2 levels (PG -> CPG1)",
@@ -1228,8 +1230,9 @@ func TestWorkloadForest_ValidateHierarchy(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Namespace("ns").Name("cpg1").Obj(),
 			},
-			key:         fwk.PodGroupKey("ns", "pg1"),
-			expectError: false,
+			key:           fwk.PodGroupKey("ns", "pg1"),
+			expectError:   false,
+			wantHierarchy: sets.New(fwk.PodGroupKey("ns", "pg1"), fwk.CompositePodGroupKey("ns", "cpg1")),
 		},
 		{
 			name:                       "valid 4 levels (PG -> CPG1 -> CPG2 -> CPG3)",
@@ -1242,8 +1245,24 @@ func TestWorkloadForest_ValidateHierarchy(t *testing.T) {
 				st.MakeCompositePodGroup().Namespace("ns").Name("cpg2").ParentCompositePodGroup("cpg3").Obj(),
 				st.MakeCompositePodGroup().Namespace("ns").Name("cpg3").Obj(),
 			},
-			key:         fwk.PodGroupKey("ns", "pg1"),
-			expectError: false,
+			key:           fwk.PodGroupKey("ns", "pg1"),
+			expectError:   false,
+			wantHierarchy: sets.New(fwk.PodGroupKey("ns", "pg1"), fwk.CompositePodGroupKey("ns", "cpg1"), fwk.CompositePodGroupKey("ns", "cpg2"), fwk.CompositePodGroupKey("ns", "cpg3")),
+		},
+		{
+			name:                       "valid tree with branches collects all descendants and ancestors",
+			isCompositePodGroupEnabled: true,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("ns").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+				st.MakePodGroup().Namespace("ns").Name("pg2").ParentCompositePodGroup("cpg2").Obj(),
+			},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg1").Obj(),
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg2").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			key:           fwk.PodGroupKey("ns", "pg1"),
+			expectError:   false,
+			wantHierarchy: sets.New(fwk.PodGroupKey("ns", "pg1"), fwk.PodGroupKey("ns", "pg2"), fwk.CompositePodGroupKey("ns", "cpg1"), fwk.CompositePodGroupKey("ns", "cpg2")),
 		},
 		{
 			name:                       "depth exceeds WorkloadMaxTreeDepth (5 levels: PG -> CPG1 -> CPG2 -> CPG3 -> CPG4)",
@@ -1257,9 +1276,10 @@ func TestWorkloadForest_ValidateHierarchy(t *testing.T) {
 				st.MakeCompositePodGroup().Namespace("ns").Name("cpg3").ParentCompositePodGroup("cpg4").Obj(),
 				st.MakeCompositePodGroup().Namespace("ns").Name("cpg4").Obj(),
 			},
-			key:         fwk.PodGroupKey("ns", "pg1"),
-			expectError: true,
-			wantErrSub:  "hierarchy depth 5 exceeds maximum allowed depth 4",
+			key:           fwk.PodGroupKey("ns", "pg1"),
+			expectError:   true,
+			wantErrSub:    "hierarchy depth 5 exceeds maximum allowed depth 4",
+			wantHierarchy: sets.New(fwk.PodGroupKey("ns", "pg1"), fwk.CompositePodGroupKey("ns", "cpg1"), fwk.CompositePodGroupKey("ns", "cpg2"), fwk.CompositePodGroupKey("ns", "cpg3"), fwk.CompositePodGroupKey("ns", "cpg4")),
 		},
 		{
 			name:                       "direct cycle in CPG (CPG1 -> CPG1)",
@@ -1311,8 +1331,9 @@ func TestWorkloadForest_ValidateHierarchy(t *testing.T) {
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("ns").Name("pg1").ParentCompositePodGroup("cpg-missing").Obj(),
 			},
-			key:         fwk.PodGroupKey("ns", "pg1"),
-			expectError: false,
+			key:           fwk.PodGroupKey("ns", "pg1"),
+			expectError:   false,
+			wantHierarchy: sets.New(fwk.PodGroupKey("ns", "pg1")),
 		},
 	}
 
@@ -1326,7 +1347,7 @@ func TestWorkloadForest_ValidateHierarchy(t *testing.T) {
 				wf.addGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
 			}
 
-			err := wf.validateHierarchy(tt.key)
+			hierarchy, err := wf.validateHierarchy(tt.key)
 			if tt.expectError {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tt.wantErrSub)
@@ -1337,6 +1358,11 @@ func TestWorkloadForest_ValidateHierarchy(t *testing.T) {
 			} else {
 				if err != nil {
 					t.Fatalf("expected no error, got: %v", err)
+				}
+			}
+			if tt.wantHierarchy != nil {
+				if diff := cmp.Diff(tt.wantHierarchy, hierarchy); diff != "" {
+					t.Errorf("Unexpected hierarchy (-want +got):\n%s", diff)
 				}
 			}
 		})

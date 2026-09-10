@@ -243,29 +243,61 @@ func (wf *workloadForest) buildQueuedPodGroupInfo(logger klog.Logger, rootLookup
 
 // validateHierarchy validates that the hierarchy starting from key (PodGroup) up to its root
 // has no cycles, does not exceed WorkloadMaxTreeDepth, and all ancestor groups exist in the forest.
-func (wf *workloadForest) validateHierarchy(key fwk.EntityKey) error {
+// It returns all entity keys belonging to the hierarchy (ancestor path and all their descendants)
+// and an error if validation fails.
+func (wf *workloadForest) validateHierarchy(key fwk.EntityKey) (sets.Set[fwk.EntityKey], error) {
 	depth := 1
-	visited := sets.New[fwk.EntityKey]()
+	visitedUp := sets.New[fwk.EntityKey]()
 	currentKey := key
+	var validationErr error
 
 	for {
-		if visited.Has(currentKey) {
-			return fmt.Errorf("cycle detected in hierarchy at %s", currentKey.String())
+		if visitedUp.Has(currentKey) {
+			validationErr = fmt.Errorf("cycle detected in hierarchy at %s", currentKey.String())
+			break
 		}
+		visitedUp.Insert(currentKey)
 		if depth > schedulingv1alpha3.WorkloadMaxTreeDepth {
-			return fmt.Errorf("hierarchy depth %d exceeds maximum allowed depth %d at %s", depth, schedulingv1alpha3.WorkloadMaxTreeDepth, currentKey.String())
+			validationErr = fmt.Errorf("hierarchy depth %d exceeds maximum allowed depth %d at %s", depth, schedulingv1alpha3.WorkloadMaxTreeDepth, currentKey.String())
+			break
 		}
-		visited.Insert(currentKey)
 
 		gpg, ok := wf.podGroups[currentKey]
 		if !ok {
-			return fmt.Errorf("%s not found in workload forest", currentKey.String())
+			validationErr = fmt.Errorf("%s not found in workload forest", currentKey.String())
+			break
 		}
 		if !wf.isCompositePodGroupEnabled || !gpg.HasParent() {
-			return nil
+			break
 		}
-		parentKey, _ := gpg.GetParentKey()
+		parentKey, ok := gpg.GetParentKey()
+		if !ok {
+			break
+		}
 		depth++
 		currentKey = parentKey
 	}
+
+	hierarchy := sets.New[fwk.EntityKey]()
+	var queue []fwk.EntityKey
+	visitedDown := sets.New[fwk.EntityKey]()
+	for k := range visitedUp {
+		hierarchy.Insert(k)
+		queue = append(queue, k)
+		visitedDown.Insert(k)
+	}
+
+	for len(queue) > 0 {
+		curr := queue[0]
+		queue = queue[1:]
+		for child := range wf.children[curr] {
+			if !visitedDown.Has(child) {
+				visitedDown.Insert(child)
+				hierarchy.Insert(child)
+				queue = append(queue, child)
+			}
+		}
+	}
+
+	return hierarchy, validationErr
 }
