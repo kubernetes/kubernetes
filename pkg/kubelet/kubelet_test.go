@@ -238,6 +238,7 @@ func newTestKubeletWithImageList(
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
 	kubelet.recorder = fakeRecorder
+	kubelet.insecureIDEventRecorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.heartbeatClient = fakeKubeClient
 	kubelet.os = &containertest.FakeOS{}
@@ -291,6 +292,7 @@ func newTestKubeletWithImageList(
 		},
 	}
 	kubelet.recorder = fakeRecorder
+	kubelet.insecureIDEventRecorder = fakeRecorder
 	if err := kubelet.setupDataDirs(logger); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
