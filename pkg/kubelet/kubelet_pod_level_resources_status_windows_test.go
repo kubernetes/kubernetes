@@ -134,7 +134,7 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 			mockCM := cmtesting.NewMockContainerManager(t)
 
 			kl := &Kubelet{containerManager: mockCM}
-			got := kl.convertToAPIPodLevelResourcesStatus(logger, tc.pod, oldPodStatus)
+			got := kl.convertToAPIPodLevelResourcesStatus(logger, tc.pod, oldPodStatus, tc.pod.Status.Phase)
 			require.NotNil(t, got)
 
 			// Result must be the allocated (spec) resources, not the stale/synthetic status.

@@ -486,9 +486,10 @@ func TestCgroupManagerGetCgroupConfig(t *testing.T) {
 		setupFilesV1 func(t *testing.T, podDir string)
 		setupFilesV2 func(t *testing.T, podDir string)
 
-		expectErr   bool
-		mountPoints map[string]string
-		expectedCfg *ResourceConfig
+		expectErr    bool
+		expectENOENT bool
+		mountPoints  map[string]string
+		expectedCfg  *ResourceConfig
 	}{
 		{
 			name:     "valid CPU quota, period, and shares",
@@ -538,6 +539,22 @@ func TestCgroupManagerGetCgroupConfig(t *testing.T) {
 			expectedCfg: &ResourceConfig{
 				Memory: new(int64(209715200)),
 			},
+		},
+		{
+			// The read error must wrap os.ErrNotExist (readCgroupMemoryConfig
+			// uses %w) so callers can detect a missing cgroup with errors.Is.
+			name:         "missing memory limit file returns wrapped ENOENT",
+			resource:     v1.ResourceMemory,
+			expectErr:    true,
+			expectENOENT: true,
+		},
+		{
+			// Both CPU readers (v1 quota, v2 cpu.max) must wrap os.ErrNotExist
+			// so the kubelet ENOENT handling covers the CPU path as well.
+			name:         "missing CPU files return wrapped ENOENT",
+			resource:     v1.ResourceCPU,
+			expectErr:    true,
+			expectENOENT: true,
 		},
 		{
 			name:     "memory limit max returns -1 limit",
@@ -635,6 +652,9 @@ func TestCgroupManagerGetCgroupConfig(t *testing.T) {
 					cfg, err := m.GetCgroupConfig(cgroupName, tc.resource)
 					if tc.expectErr {
 						require.Errorf(t, err, "expected error for %s in %s", tc.name, runner.version)
+						if tc.expectENOENT {
+							require.ErrorIs(t, err, os.ErrNotExist, "expected wrapped os.ErrNotExist for %s in %s", tc.name, runner.version)
+						}
 					} else {
 						require.NoErrorf(t, err, "unexpected error for %s in %s", tc.name, runner.version)
 						assert.Equalf(t, tc.expectedCfg, cfg, "mismatch for %s in %s", tc.name, runner.version)

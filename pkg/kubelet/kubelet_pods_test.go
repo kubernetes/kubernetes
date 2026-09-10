@@ -4989,7 +4989,7 @@ func TestConvertToAPIPodLevelResourcesStatusWithOverhead(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := kl.convertToAPIPodLevelResourcesStatus(klog.Background(), tc.pod, tc.oldStatus)
+			got := kl.convertToAPIPodLevelResourcesStatus(klog.Background(), tc.pod, tc.oldStatus, tc.pod.Status.Phase)
 			if !apiequality.Semantic.DeepEqual(tc.expectedRes, got) {
 				t.Errorf("Unexpected resources (-want,+got):\n%s", cmp.Diff(tc.expectedRes, got))
 			}
