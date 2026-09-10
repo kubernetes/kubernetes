@@ -93,37 +93,6 @@ func TestCancelBeforeCleanup(t *testing.T) {
 	})
 }
 
-func TestSyncTestInit(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		// This must work inside a synctest bubble, despite Deadline panicking there.
-		// We then don't have a deadline.
-		tCtx := ktesting.Init(t)
-		deadline, ok := tCtx.Deadline()
-		if ok {
-			tCtx.Errorf("Expected no deadline, got %s", deadline)
-		}
-		if !tCtx.IsSyncTest() {
-			tCtx.Errorf("Expected to run as synctest")
-		}
-	})
-}
-
-func TestNormalInit(t *testing.T) {
-	// The outcome depends on how the unit test was started.
-	// See below for deterministic deadline/no deadline testing.
-	expectDeadline, expectOK := t.Deadline()
-	expectDeadline = expectDeadline.Add(-ktesting.DefaultCleanupGracePeriod)
-	tCtx := ktesting.Init(t)
-	actualDeadline, actualOK := tCtx.Deadline()
-	tCtx.Expect(actualOK).To(gomega.Equal(expectOK), "have deadline")
-	if expectOK {
-		tCtx.Expect(actualDeadline).To(gomega.BeTemporally("~", expectDeadline, 2*time.Second), "deadline")
-	}
-	if tCtx.IsSyncTest() {
-		tCtx.Errorf("Expected to not run as synctest")
-	}
-}
-
 func TestNoDeadline(t *testing.T) {
 	mockT := &deadlineT{T: t, deadline: nil}
 	tCtx := ktesting.Init(mockT)

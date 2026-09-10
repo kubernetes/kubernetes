@@ -21,5 +21,5 @@ import "time"
 type InitConfig struct {
 	PerTestOutput      bool
 	BufferLogs         bool
-	CleanupGracePeriod time.Duration // Zero means use the package default (DefaultCleanupGracePeriod).
+	CleanupGracePeriod time.Duration // Zero means use the package default [DefaultCleanupGracePeriod].
 }

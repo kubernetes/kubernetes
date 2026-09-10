@@ -112,9 +112,11 @@ var _ = ginkgo.Describe("e2e", func() {
 			if tCtx.Logger() != discardLogger {
 				tCtx.Errorf("expected discard logger in context, got %+v", tCtx.Logger())
 			}
-			_, ok := tCtx.Value("GINKGO_SPEC_CONTEXT").(ginkgo.SpecContext)
+			_, ok := tCtx.Value("GINKGO_SPEC_CONTEXT").(interface {
+				AttachProgressReporter(reporter func() string) func()
+			})
 			if !ok {
-				tCtx.Errorf("expected Ginkgo context, got %+v", tCtx.Context)
+				tCtx.Errorf("expected support for AttachProgressReporter, got %+v", tCtx.Context)
 			}
 			if oldCtx.Err() == nil {
 				tCtx.Error("Ginkgo.It context should be canceled but isn't")

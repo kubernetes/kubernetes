@@ -37,6 +37,7 @@ type testcase struct {
 
 func (tc testcase) run(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
+		t.Helper()
 		buffer := &mockTB{}
 		tCtx := Init(buffer)
 		start := time.Now()

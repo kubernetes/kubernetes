@@ -155,13 +155,78 @@ func Init(tb TB, opts ...InitOption) TContext {
 		opt(&c)
 	}
 
+	// Resolve the effective cleanup grace period: use the caller-supplied value
+	// if positive, otherwise fall back to DefaultCleanupGracePeriod.
+	gracePeriod := c.CleanupGracePeriod
+	if gracePeriod <= 0 {
+		gracePeriod = DefaultCleanupGracePeriod
+	}
+
+	isSyncTest, deadline := analyzeTB(tb)
+
+	ctx := defaultProgressReporter.init(tb, isSyncTest)
+	var header func() string
+	if c.PerTestOutput {
+		logger := newLogger(tb, c.BufferLogs)
+		ctx = klog.NewContext(ctx, logger)
+		header = klogHeader
+	}
+
+	var cancelTimeout func(cause error)
+	if deadline != nil {
+		timeLeft := time.Until(*deadline)
+		timeLeft -= gracePeriod
+		ctx, cancelTimeout = withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), gracePeriod))
+	}
+
+	// Construct new TContext with context and settings as determined above.
+	tCtx := newTContext(ctx, tb, gracePeriod, isSyncTest)
+	tCtx.isSyncTest = isSyncTest
+	if cancelTimeout != nil {
+		tCtx.cancel = cancelTimeout
+	} else {
+		tCtx = tCtx.WithCancel()
+		runWhenDone(tb, func() {
+			tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
+		})
+	}
+	tCtx.perTestHeader = header
+
+	return tCtx
+}
+
+// InitCtx is a variant of [Init] which uses an already existing context and
+// whatever logger and timeouts are stored there.
+func InitCtx(ctx context.Context, tb TB, opts ...InitOption) TContext {
+	tb.Helper()
+	c := internal.InitConfig{}
+	for _, opt := range opts {
+		opt(&c)
+	}
+	gracePeriod := c.CleanupGracePeriod
+	if gracePeriod <= 0 {
+		gracePeriod = DefaultCleanupGracePeriod
+	}
+	isSyncTest, _ := analyzeTB(tb)
+	defaultProgressReporter.init(tb, isSyncTest)
+	return newTContext(ctx, tb, gracePeriod, isSyncTest)
+}
+
+func newTContext(ctx context.Context, tb TB, gracePeriod time.Duration, isSyncTest bool) TContext {
+	return TContext{
+		Context:            ctx,
+		testingTB:          testingTB{TB: tb},
+		cleanupGracePeriod: gracePeriod,
+		isSyncTest:         isSyncTest,
+	}
+}
+
+func analyzeTB(tb TB) (isSyncTest bool, deadline *time.Time) {
 	// We don't need a Deadline implementation, testing.B doesn't have it.
 	// But if we have one, we use it to determine the deadline and
 	// set a timeout shortly before it.
 	//
 	// This also allows us to detect a synctest bubble.
-	isSyncTest := false
-	var deadline *time.Time
 	if deadlineTB, deadlineOK := tb.(interface {
 		Deadline() (time.Time, bool)
 	}); deadlineOK {
@@ -180,43 +245,7 @@ func Init(tb TB, opts ...InitOption) TContext {
 		}()
 	}
 
-	ctx := defaultProgressReporter.init(tb, isSyncTest)
-	var header func() string
-	if c.PerTestOutput {
-		logger := newLogger(tb, c.BufferLogs)
-		ctx = klog.NewContext(ctx, logger)
-		header = klogHeader
-	}
-
-	// Resolve the effective cleanup grace period: use the caller-supplied value
-	// if positive, otherwise fall back to DefaultCleanupGracePeriod.
-	gracePeriod := c.CleanupGracePeriod
-	if gracePeriod <= 0 {
-		gracePeriod = DefaultCleanupGracePeriod
-	}
-
-	var cancelTimeout func(cause error)
-	if deadline != nil {
-		timeLeft := time.Until(*deadline)
-		timeLeft -= gracePeriod
-		ctx, cancelTimeout = withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), gracePeriod))
-	}
-
-	// Construct new TContext with context and settings as determined above.
-	tCtx := InitCtx(ctx, tb)
-	tCtx.cleanupGracePeriod = gracePeriod
-	tCtx.isSyncTest = isSyncTest
-	if cancelTimeout != nil {
-		tCtx.cancel = cancelTimeout
-	} else {
-		tCtx = tCtx.WithCancel()
-		runWhenDone(tb, func() {
-			tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
-		})
-	}
-	tCtx.perTestHeader = header
-
-	return tCtx
+	return
 }
 
 func newLogger(tb TB, bufferLogs bool) klog.Logger {
@@ -260,25 +289,11 @@ func newLogger(tb TB, bufferLogs bool) klog.Logger {
 	return logger
 }
 
+// InitOption is an alias for the options provided through the [initoption] package.
+//
+// They are in a separate package to separate the main API from the less
+// commonly used configuration and to simplify auto-completion.
 type InitOption = initoption.InitOption
-
-// InitCtx is a variant of [Init] which uses an already existing context and
-// whatever logger and timeouts are stored there.
-func InitCtx(ctx context.Context, tb TB, opts ...InitOption) TContext {
-	c := internal.InitConfig{}
-	for _, opt := range opts {
-		opt(&c)
-	}
-	gracePeriod := c.CleanupGracePeriod
-	if gracePeriod <= 0 {
-		gracePeriod = DefaultCleanupGracePeriod
-	}
-	return TContext{
-		Context:            ctx,
-		testingTB:          testingTB{TB: tb},
-		cleanupGracePeriod: gracePeriod,
-	}
-}
 
 // withTB constructs a new TContext with a different TB instance.
 //
@@ -302,6 +317,12 @@ func (tCtx TContext) withTB(tb TB) TContext {
 		logger := newLogger(tb, false /* don't buffer logs in sub-test */)
 		tCtx.Context = klog.NewContext(tCtx.Context, logger)
 	}
+
+	// Sub-tests don't go through Init, so without this call they
+	// wouldn't show up in the "Currently running" list of a
+	// progress report.
+	defaultProgressReporter.trackRunningTest(tb)
+
 	return tCtx.WithCancel()
 }
 
@@ -369,7 +390,7 @@ func (tCtx TContext) WithContext(ctx context.Context) TContext {
 
 // WithValue wraps [context.WithValue] such that the result is again a TContext.
 func (tCtx TContext) WithValue(key, val any) TContext {
-	ctx := context.WithValue(tCtx, key, val)
+	ctx := context.WithValue(tCtx.Context, key, val)
 	return tCtx.WithContext(ctx)
 }
 
@@ -429,7 +450,7 @@ type TContext struct {
 	// for Cancel
 	cancel func(cause error)
 
-	// steps is a concatenation ("step1: step2: step3: ") of steps passed to WithStep.
+	// steps is a concatenation ("step1/step2/step3: ") of steps passed to WithStep.
 	// It's empty if there are no steps.
 	steps string
 
@@ -543,7 +564,7 @@ func (tCtx TContext) CleanupCtx(cb func(TContext)) {
 		// context then has *no* deadline. In the code path above for
 		// Ginkgo, Ginkgo is more sophisticated and also applies
 		// timeouts to cleanup calls which accept a context.
-		childCtx := tCtx.WithContext(context.WithoutCancel(tCtx))
+		childCtx := tCtx.WithContext(context.WithoutCancel(tCtx.Context))
 		cb(childCtx)
 	})
 }
