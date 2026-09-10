@@ -219,13 +219,6 @@ func (l *lists) CompileOptions() []cel.EnvOption {
 	return options
 }
 
-// IncludesOption returns the EnvOption to register the includes function directly.
-func IncludesOption() cel.EnvOption {
-	return cel.Function("includes",
-		cel.MemberOverload("list_includes_dyn_dyn", []*cel.Type{cel.DynType, cel.DynType}, cel.BoolType,
-			cel.BinaryBinding(includes)))
-}
-
 func (*lists) ProgramOptions() []cel.ProgramOption {
 	return []cel.ProgramOption{}
 }

@@ -647,16 +647,6 @@ func newCompiler(features Features) *compiler {
 				deviceTypeV136ConsumableCapacityListTypeAttributes,
 			},
 		},
-		{
-			IntroducedVersion: version.MajorMinor(1, 36),
-			FeatureEnabled: func() bool {
-				return features.EnableListTypeAttributes
-			},
-			EnvOptions: []cel.EnvOption{
-				// TODO(https://github.com/kubernetes/kubernetes/issues/140074): Remove in 1.38 when 1.36 support is dropped and includes is natively provided by Lists(ListsVersion(1)) starting in 1.37.
-				library.IncludesOption(),
-			},
-		},
 	}
 	envset, err := envset.Extend(versioned...)
 	if err != nil {
