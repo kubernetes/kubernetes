@@ -51,6 +51,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 		podMemoryRequest                string
 		containers                      []containerSpec
 		expectPodBlocks                 bool
+		allocationAffinity              []int
 		expectedAffinity                []int
 	}{
 		{
@@ -63,6 +64,18 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			},
 			expectPodBlocks:  true,
 			expectedAffinity: []int{0},
+		},
+		{
+			description:                     "Pod topology hint is restored from a non-zero NUMA node",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			podMemoryRequest:                "128Mi",
+			containers: []containerSpec{
+				{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
+			},
+			expectPodBlocks:    true,
+			allocationAffinity: []int{1},
+			expectedAffinity:   []int{1},
 		},
 		{
 			description:                     "Pod topology hint is restored from a multi-container pod allocation",
@@ -137,6 +150,12 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				},
 			}
 			affinity := topologymanager.NewFakeManager(logger)
+			if tc.allocationAffinity != nil {
+				affinity = topologymanager.NewFakeManagerWithHint(logger, &topologymanager.TopologyHint{
+					NUMANodeAffinity: newNUMAAffinity(tc.allocationAffinity...),
+					Preferred:        true,
+				})
+			}
 
 			// Create new manager
 			sDir := t.TempDir()
@@ -184,7 +203,8 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			}
 
 			// Re-create manager to simulate restart
-			mgr2, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
+			restoredAffinity := topologymanager.NewFakeManager(logger)
+			mgr2, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, restoredAffinity)
 			if err != nil {
 				t.Fatalf("could not create manager 2: %v", err)
 			}
