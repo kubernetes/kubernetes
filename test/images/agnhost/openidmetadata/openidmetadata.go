@@ -30,9 +30,9 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
-	"github.com/go-jose/go-jose/v4/jwt"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 )
