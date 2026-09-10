@@ -343,6 +343,10 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	pluginCommandGroup := plugin.GetPluginCommandGroup(cmds)
 	groups = append(groups, pluginCommandGroup)
 
+	// Add alias command group to the list of command groups.
+	aliasCommandGroup := kuberc.GetAliasesCommandGroup(cmds, pref, o.Arguments)
+	groups = append(groups, aliasCommandGroup)
+
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
 	utilcomp.SetFactoryForCompletion(f)
