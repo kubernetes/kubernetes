@@ -33,6 +33,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -49,6 +50,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"golang.org/x/time/rate"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -222,7 +224,6 @@ type jwtAuthenticator struct {
 	// When lifecycleCtx is cancelled, this authenticator will return
 	// an error on token authentication requests and will report as being
 	// unhealthy.
-	// TODO(everettraven): Make this being cancelled cause health checks to fail.
 	lifecycleCtx context.Context
 }
 
@@ -308,7 +309,6 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 		return nil, fmt.Errorf("oidc: Client and EgressLookup are mutually exclusive")
 	}
 
-	// TODO(everettraven): Add a new round-tripper that enforces a rate limit for JWKS fetching.
 	client := opts.Client
 
 	if client == nil {
@@ -467,7 +467,13 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 					clientWithJWKSMetrics.Transport = withMetricsRoundTripper(client.Transport, providerJSON.JWKSURL, issuerURL, opts.APIServerID, lifecycleCtx)
 					client = &clientWithJWKSMetrics
 
-					remoteKeySet := oidc.NewRemoteKeySet(oidc.ClientContext(lifecycleCtx, client), providerJSON.JWKSURL)
+					clientWithJWKSRateLimiting := *client
+					clientWithJWKSRateLimiting.Transport = &rateLimitedRoundTripper{
+						base:    client.Transport,
+						limiter: rate.NewLimiter(rate.Limit(0.1), 3), // 6 requests per minute with a burst of 3.
+					}
+
+					remoteKeySet := oidc.NewRemoteKeySet(oidc.ClientContext(lifecycleCtx, &clientWithJWKSRateLimiting), providerJSON.JWKSURL)
 					authn.setVerifier(&idTokenVerifier{oidc.NewVerifier(issuerURL, remoteKeySet, verifierConfig), audiences})
 					return true, nil
 				}
@@ -614,6 +620,26 @@ func (t *discoveryURLRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 		return t.base.RoundTrip(clone)
 	}
 	return t.base.RoundTrip(req)
+}
+
+// rateLimitedRoundTripper is a http.RoundTripper that
+// enforces a rate limit on successful requests.
+type rateLimitedRoundTripper struct {
+	base    http.RoundTripper
+	limiter *rate.Limiter
+}
+
+func (t *rateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	tokenReservation := t.limiter.Reserve()
+	if !tokenReservation.OK() {
+		return nil, errors.New("client has issued too many requests")
+	}
+
+	resp, err := t.base.RoundTrip(req)
+	if err != nil || resp == nil || resp.StatusCode != http.StatusOK {
+		tokenReservation.Cancel()
+	}
+	return resp, err
 }
 
 // untrustedIssuer extracts an untrusted "iss" claim from the given JWT token,
@@ -988,6 +1014,10 @@ func (a *jwtAuthenticator) AuthenticateToken(ctx context.Context, token string) 
 }
 
 func (a *jwtAuthenticator) HealthCheck() error {
+	if err := a.lifecycleCtx.Err(); err != nil {
+		return fmt.Errorf("oidc: authenticator for issuer %q is not healthy due to lifecycle context cancellation: %w", a.jwtAuthenticator.Issuer.URL, err)
+	}
+
 	if holder := *a.healthCheck.Load(); holder.err != nil {
 		return fmt.Errorf("oidc: authenticator for issuer %q is not healthy: %w", a.jwtAuthenticator.Issuer.URL, holder.err)
 	}
