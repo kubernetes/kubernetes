@@ -455,8 +455,10 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 // can no longer serve events; the returned count is then meaningless.
 func (c *cacheWatcher) streamInterval(cacheInterval *watchCacheInterval, resourceVersion *uint64) (int, error) {
 	eventCount := 0
+	eventBuffer := &watchCacheEvent{}
 	for {
-		event, err := cacheInterval.Next()
+		// potentially loads next event into eventbuffer; otherwise returns pointer to event.
+		event, err := cacheInterval.LoadNext(eventBuffer)
 		if err != nil {
 			return eventCount, err
 		}
