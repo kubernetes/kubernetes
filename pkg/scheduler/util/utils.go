@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -40,6 +41,8 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
+var maxPodStartTime = metav1.NewTime(time.Unix(0, math.MaxInt64).UTC())
+
 // GetPodFullName returns a name that uniquely identifies a pod.
 func GetPodFullName(pod *v1.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
@@ -47,14 +50,16 @@ func GetPodFullName(pod *v1.Pod) string {
 	return pod.Name + "_" + pod.Namespace
 }
 
-// GetPodStartTime returns start time of the given pod or current timestamp
+// GetPodStartTime returns start time of the given pod or a stable maximum timestamp
 // if it hasn't started yet.
 func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 	if pod.Status.StartTime != nil {
 		return pod.Status.StartTime
 	}
 	// Assumed pods and bound pods that haven't started don't have a StartTime yet.
-	return &metav1.Time{Time: time.Now()}
+	// Treat them as newer than started pods without generating a timestamp during
+	// sorting, which would break sort's strict weak ordering.
+	return &maxPodStartTime
 }
 
 // GetEarliestPodStartTime returns the earliest start time of all pods that
