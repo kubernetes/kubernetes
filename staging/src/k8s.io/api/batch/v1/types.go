@@ -311,7 +311,7 @@ type JobSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:minimum=0
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	Parallelism *int32 `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
 	// Specifies the desired number of successfully finished pods the
@@ -322,7 +322,7 @@ type JobSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:minimum=0
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	Completions *int32 `json:"completions,omitempty" protobuf:"varint,2,opt,name=completions"`
 
 	// Specifies the duration in seconds relative to the startTime that the job
@@ -332,7 +332,7 @@ type JobSpec struct {
 	// resumed again.
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:minimum=0
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,3,opt,name=activeDeadlineSeconds"`
 
 	// Specifies the policy of handling failed pods. In particular, it allows to
@@ -360,7 +360,7 @@ type JobSpec struct {
 	// When backoffLimitPerIndex is specified, backoffLimit defaults to 2147483647.
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:minimum=0
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	BackoffLimit *int32 `json:"backoffLimit,omitempty" protobuf:"varint,7,opt,name=backoffLimit"`
 
 	// Specifies the limit for the number of retries within an
@@ -371,7 +371,7 @@ type JobSpec struct {
 	// policy is Never. The field is immutable.
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:minimum=0
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	BackoffLimitPerIndex *int32 `json:"backoffLimitPerIndex,omitempty" protobuf:"varint,12,opt,name=backoffLimitPerIndex"`
 
 	// Specifies the maximal number of failed indexes before marking the Job as
@@ -384,7 +384,7 @@ type JobSpec struct {
 	// less than or equal to 10^4 when is completions greater than 10^5.
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:minimum=0
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("backoffLimitPerIndex")
 	MaxFailedIndexes *int32 `json:"maxFailedIndexes,omitempty" protobuf:"varint,13,opt,name=maxFailedIndexes"`
 
@@ -426,7 +426,7 @@ type JobSpec struct {
 	// the Job becomes eligible to be deleted immediately after it finishes.
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:minimum=0
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,8,opt,name=ttlSecondsAfterFinished"`
 
 	// completionMode specifies how Pod completions are tracked. It can be
