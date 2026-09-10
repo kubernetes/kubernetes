@@ -35,6 +35,7 @@ import (
 	"golang.org/x/oauth2"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 // CmdTestServiceAccountIssuerDiscovery is used by agnhost Cobra.
@@ -100,7 +101,7 @@ func main(cmd *cobra.Command, args []string) {
 }
 
 func validate(ctx context.Context, raw string) error {
-	tok, err := jwt.ParseSigned(raw)
+	tok, err := jwt.ParseSigned(raw, serviceaccount.AcceptableServiceAccountSignatureAlgorithms)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -127,6 +128,7 @@ func validate(ctx context.Context, raw string) error {
 	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
 	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
 	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 
 	validTok, err := iss.Verifier(&oidc.Config{
