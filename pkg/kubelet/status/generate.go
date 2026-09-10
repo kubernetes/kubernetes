@@ -18,12 +18,15 @@ package status
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/securitycontext"
+
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -44,6 +47,12 @@ const (
 	ReadinessGatesNotReady = "ReadinessGatesNotReady"
 	// RestartAllContainersStarted says that a container exited and triggered RestartAllContainer action.
 	RestartAllContainersStarted = "RestartAllContainersStarted"
+	// ImplicitlyInsecureUserID says a container is running as UID 0 without runAsUser set.
+	ImplicitlyInsecureUserID = "ImplicitlyInsecureUserID"
+	// ImplicitlyInsecureGroupID says a container is running as GID 0 without runAsGroup set.
+	ImplicitlyInsecureGroupID = "ImplicitlyInsecureGroupID"
+	// ImplicitlyInsecureUserAndGroupID says a container is implicitly running as both UID 0 and GID 0.
+	ImplicitlyInsecureUserAndGroupID = "ImplicitlyInsecureUserAndGroupID"
 )
 
 // GenerateContainersReadyCondition returns the status of "ContainersReady" condition.
@@ -356,4 +365,201 @@ func GenerateAllContainersRestartingCondition(pod *v1.Pod, podStatus *kubecontai
 		Reason:  RestartAllContainersStarted,
 		Message: "container exited with restart policy rule",
 	}
+}
+
+// findContainersMissingUserInfo returns names of containers the runtime hasn't reported user info for yet.
+func findContainersMissingUserInfo(pod *v1.Pod, containerStatuses []v1.ContainerStatus) []string {
+	var names []string
+	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, _ podutil.ContainerType) bool {
+		status, ok := podutil.GetContainerStatus(containerStatuses, container.Name)
+		if !ok || status.User == nil || status.User.Linux == nil {
+			names = append(names, container.Name)
+		}
+		return true
+	})
+	return names
+}
+
+// findRootContainers returns the names of containers running with an insecure ID, per isIDInsecure and explicit.
+func findRootContainers(pod *v1.Pod, containerStatuses []v1.ContainerStatus,
+	isIDInsecure func(status v1.ContainerStatus) bool,
+	effectiveRequestedID func(pod *v1.Pod, container *v1.Container) (*int64, bool),
+	explicit bool) []string {
+	var names []string
+	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, _ podutil.ContainerType) bool {
+		status, ok := podutil.GetContainerStatus(containerStatuses, container.Name)
+		if !ok || status.User == nil || status.User.Linux == nil || !isIDInsecure(status) {
+			return true
+		}
+		requestedID, requested := effectiveRequestedID(pod, container)
+		if explicit {
+			if requested && *requestedID == 0 {
+				names = append(names, container.Name)
+			}
+		} else if !requested {
+			names = append(names, container.Name)
+		}
+		return true
+	})
+	return names
+}
+
+// GenerateInsecureUserIDCondition returns the "InsecureUserID" condition.
+func GenerateInsecureUserIDCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, containerStatuses []v1.ContainerStatus) v1.PodCondition {
+	conditionType := v1.InsecureUserID
+	cond := v1.PodCondition{
+		Type:               conditionType,
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, conditionType),
+	}
+
+	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		cond.Status = v1.ConditionFalse
+		return cond
+	}
+
+	insecureContainerNames := findRootContainers(pod, containerStatuses,
+		func(status v1.ContainerStatus) bool { return status.User.Linux.UID == 0 },
+		securitycontext.DetermineEffectiveRunAsUser, false)
+
+	if len(insecureContainerNames) > 0 {
+		cond.Status = v1.ConditionTrue
+		cond.Reason = ImplicitlyInsecureUserID
+		cond.Message = fmt.Sprintf("container(s) %s running as UID 0 without runAsUser set", insecureContainerNames)
+		return cond
+	}
+
+	if unknownContainerNames := findContainersMissingUserInfo(pod, containerStatuses); len(unknownContainerNames) > 0 {
+		cond.Status = v1.ConditionUnknown
+		cond.Message = fmt.Sprintf("container(s) %s: UID not yet reported", unknownContainerNames)
+		return cond
+	}
+
+	cond.Status = v1.ConditionFalse
+	return cond
+}
+
+// findInsecureSupplementalGroupsContainers returns names of containers whose resolved
+// supplemental groups include GID 0, split by explicit vs. implicit.
+func findInsecureSupplementalGroupsContainers(pod *v1.Pod, containerStatuses []v1.ContainerStatus, explicit bool) []string {
+	podRequestsGID0AsSupplementalGroup := false
+	if sc := pod.Spec.SecurityContext; sc != nil {
+		if sc.FSGroup != nil && *sc.FSGroup == 0 {
+			podRequestsGID0AsSupplementalGroup = true
+		}
+		if slices.Contains(sc.SupplementalGroups, int64(0)) {
+			podRequestsGID0AsSupplementalGroup = true
+		}
+	}
+
+	var containerNames []string
+	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, _ podutil.ContainerType) bool {
+		status, ok := podutil.GetContainerStatus(containerStatuses, container.Name)
+		if !ok || status.User == nil || status.User.Linux == nil {
+			return true
+		}
+		// Note: CRI runtimes always mirror a container's own primary GID into its reported
+		// SupplementalGroups (containerd: https://github.com/containerd/containerd/blob/a8fc3a017297f9ac4a28b115f9b706a90f497851/pkg/oci/spec_opts.go#L134-L141,
+		// cri-o: https://github.com/cri-o/cri-o/blob/efbce04159ead73850f34c289f333126ae9b7b88/server/container_create.go#L366-L367).
+		// A primary GID of 0 is already covered by the primary-GID checks, so skip it here.
+		if status.User.Linux.GID == 0 {
+			return true
+		}
+		hasGID0AsSupplementalGroup := slices.Contains(status.User.Linux.SupplementalGroups, int64(0))
+		if hasGID0AsSupplementalGroup && explicit == podRequestsGID0AsSupplementalGroup {
+			containerNames = append(containerNames, container.Name)
+		}
+		return true
+	})
+	return containerNames
+}
+
+// GenerateInsecureGroupIDCondition returns the status of the "InsecureGroupID" condition.
+func GenerateInsecureGroupIDCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, containerStatuses []v1.ContainerStatus) v1.PodCondition {
+	conditionType := v1.InsecureGroupID
+	cond := v1.PodCondition{
+		Type:               conditionType,
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, conditionType),
+	}
+
+	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		cond.Status = v1.ConditionFalse
+		return cond
+	}
+
+	containersWithInsecurePrimaryGID := findRootContainers(pod, containerStatuses,
+		func(status v1.ContainerStatus) bool { return status.User.Linux.GID == 0 },
+		securitycontext.DetermineEffectiveRunAsGroup, false)
+	containersWithInsecureSupplementalGroup := findInsecureSupplementalGroupsContainers(pod, containerStatuses, false)
+
+	if len(containersWithInsecurePrimaryGID) > 0 || len(containersWithInsecureSupplementalGroup) > 0 {
+		cond.Status = v1.ConditionTrue
+		cond.Reason = ImplicitlyInsecureGroupID
+		var messages []string
+		if len(containersWithInsecurePrimaryGID) > 0 {
+			messages = append(messages, fmt.Sprintf("container(s) %s running as GID 0 without runAsGroup set", containersWithInsecurePrimaryGID))
+		}
+		if len(containersWithInsecureSupplementalGroup) > 0 {
+			messages = append(messages, fmt.Sprintf("container(s) %s running with GID 0 merged into supplementalGroups from the image (supplementalGroupsPolicy: Merge)", containersWithInsecureSupplementalGroup))
+		}
+		cond.Message = strings.Join(messages, "; ")
+		return cond
+	}
+
+	if unknownContainerNames := findContainersMissingUserInfo(pod, containerStatuses); len(unknownContainerNames) > 0 {
+		cond.Status = v1.ConditionUnknown
+		cond.Message = fmt.Sprintf("container(s) %s: GID not yet reported", unknownContainerNames)
+		return cond
+	}
+
+	cond.Status = v1.ConditionFalse
+	return cond
+}
+
+// IsPodExplicitlyInsecureUserID reports whether a container explicitly requests UID 0.
+func IsPodExplicitlyInsecureUserID(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool {
+	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		return false
+	}
+	return len(findRootContainers(pod, containerStatuses,
+		func(status v1.ContainerStatus) bool { return status.User.Linux.UID == 0 },
+		securitycontext.DetermineEffectiveRunAsUser, true)) > 0
+}
+
+// IsPodExplicitlyInsecureGroupID reports whether a container explicitly requests GID 0.
+func IsPodExplicitlyInsecureGroupID(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool {
+	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		return false
+	}
+	return len(findRootContainers(pod, containerStatuses,
+		func(status v1.ContainerStatus) bool { return status.User.Linux.GID == 0 },
+		securitycontext.DetermineEffectiveRunAsGroup, true)) > 0
+}
+
+// IsPodImplicitlyInsecurePrimaryGroupID reports whether a container's primary GID is
+// implicitly 0, ignoring supplemental groups.
+func IsPodImplicitlyInsecurePrimaryGroupID(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool {
+	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		return false
+	}
+	return len(findRootContainers(pod, containerStatuses,
+		func(status v1.ContainerStatus) bool { return status.User.Linux.GID == 0 },
+		securitycontext.DetermineEffectiveRunAsGroup, false)) > 0
+}
+
+// IsPodImplicitlyInsecureSupplementalGroups reports whether a container implicitly has
+// GID 0 as a supplemental group.
+func IsPodImplicitlyInsecureSupplementalGroups(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool {
+	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		return false
+	}
+	return len(findInsecureSupplementalGroupsContainers(pod, containerStatuses, false)) > 0
+}
+
+// IsPodExplicitlyInsecureSupplementalGroups reports whether a pod explicitly requests
+// GID 0 as a supplemental group.
+func IsPodExplicitlyInsecureSupplementalGroups(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool {
+	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		return false
+	}
+	return len(findInsecureSupplementalGroupsContainers(pod, containerStatuses, true)) > 0
 }
