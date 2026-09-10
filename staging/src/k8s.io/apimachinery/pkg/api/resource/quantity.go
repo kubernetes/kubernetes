@@ -695,14 +695,14 @@ func (q *Quantity) Cmp(y Quantity) int {
 	if q.d.Dec == nil && y.d.Dec == nil {
 		return q.i.Cmp(y.i)
 	}
-	return q.AsDec().Cmp(y.AsDec())
+	return cmpDec(q.AsDec(), y.AsDec())
 }
 
 // CmpInt64 returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
 // quantity is greater than y.
 func (q *Quantity) CmpInt64(y int64) int {
 	if q.d.Dec != nil {
-		return q.d.Dec.Cmp(inf.NewDec(y, inf.Scale(0)))
+		return cmpDec(q.d.Dec, inf.NewDec(y, inf.Scale(0)))
 	}
 	return q.i.Cmp(int64Amount{value: y})
 }
