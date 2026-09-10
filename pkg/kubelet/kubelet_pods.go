@@ -2032,6 +2032,12 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionTrue,
 	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodImplicitRootWarnings) {
+		allContainerStatuses = append(allContainerStatuses, s.EphemeralContainerStatuses...)
+		insecureImplicitUserIDCondition := status.GenerateInsecureImplicitUserIDCondition(pod, &oldPodStatus, allContainerStatuses)
+		insecureImplicitGroupIDCondition := status.GenerateInsecureImplicitGroupIDCondition(pod, &oldPodStatus, allContainerStatuses)
+		s.Conditions = append(s.Conditions, insecureImplicitUserIDCondition, insecureImplicitGroupIDCondition)
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
 		if podutil.AllContainersCouldRestart(&pod.Spec) {
 			s.Conditions = append(s.Conditions, status.GenerateAllContainersRestartingCondition(pod, podStatus, &oldPodStatus, s.Phase))
