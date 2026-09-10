@@ -277,3 +277,91 @@ func TestWindowsWatcherPollLoopEndToEnd(t *testing.T) {
 	}
 	cancel()
 }
+
+// TestWindowsWatcherPrunesBookkeeping verifies that inspection and seen
+// bookkeeping are pruned once the runtime removes a container (CRI GC), so the
+// maps do not retain an entry for every exited container the watcher has ever
+// observed on a long-lived kubelet.
+func TestWindowsWatcherPrunesBookkeeping(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+	cid := "container-gc"
+	runtime := &fakeRuntimeGetter{
+		containers: []*runtimeapi.Container{
+			{Id: cid, State: runtimeapi.ContainerState_CONTAINER_EXITED},
+		},
+		statuses: map[string]*runtimeapi.ContainerStatus{cid: normalExitedStatus(cid)},
+	}
+	w, _ := newTestWindowsWatcher(runtime)
+
+	w.reconcile(tCtx, logger)
+	assert.Contains(t, w.inspected, cid, "exited container should be inspected")
+
+	// The runtime garbage-collects the container: it no longer appears in the
+	// list (it may also be gone from status). The next reconcile must prune it.
+	runtime.containers = nil
+	delete(runtime.statuses, cid)
+	w.reconcile(tCtx, logger)
+	assert.Empty(t, w.inspected, "inspected bookkeeping must be pruned after the container is collected")
+	assert.Empty(t, w.seen, "seen bookkeeping must be pruned after the container is collected")
+}
+
+// TestWindowsWatcherDeferredReconcileAfterSeedFailure verifies that when the
+// startup seed list fails (a transient CRI error), the immediate reconcile is
+// deferred so surviving historical OOMs are not replayed as fresh events
+// against an empty baseline.
+func TestWindowsWatcherDeferredReconcileAfterSeedFailure(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+	containerName := fmt.Sprintf("app-%s", t.Name())
+	cid := "container-seed-fail"
+
+	failSeed := true
+	runtime := &failFirstListGetter{
+		fakeRuntimeGetter: fakeRuntimeGetter{
+			containers: []*runtimeapi.Container{
+				{Id: cid, State: runtimeapi.ContainerState_CONTAINER_EXITED},
+			},
+			statuses: map[string]*runtimeapi.ContainerStatus{cid: oomKilledStatus(cid, containerName)},
+		},
+		failList: func() bool { return failSeed },
+	}
+	fakeRecorder := record.NewFakeRecorder(10)
+	w := &windowsWatcher{recorder: fakeRecorder, containers: runtime, pollInterval: 20 * time.Millisecond, seen: map[string]struct{}{}, inspected: map[string]struct{}{}}
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+	go w.pollLoop(ctx, logger)
+
+	// The seed list fails, so no immediate reconcile runs against an empty
+	// baseline; allow brief time for any (wrong) immediate replay to surface.
+	time.Sleep(60 * time.Millisecond)
+	select {
+	case ev := <-fakeRecorder.Events:
+		t.Fatalf("did not expect a replayed historical OOM after a failed seed, got %q", ev)
+	default:
+	}
+
+	// Clear the simulated failure; a later seed+reconcile now sees the already
+	// OOMKilled container and must still not replay it as fresh.
+	failSeed = false
+	select {
+	case ev := <-fakeRecorder.Events:
+		t.Fatalf("did not expect an OOMKilled event for a pre-existing container after seed recovery, got %q", ev)
+	case <-time.After(200 * time.Millisecond):
+	}
+	cancel()
+}
+
+// failFirstListGetter fails ListContainers until the predicate returns false,
+// then behaves like its embedded fakeRuntimeGetter.
+type failFirstListGetter struct {
+	fakeRuntimeGetter
+	failList func() bool
+}
+
+func (f *failFirstListGetter) ListContainers(ctx context.Context, filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+	if f.failList != nil && f.failList() {
+		return nil, fmt.Errorf("injected CRI list failure")
+	}
+	return f.fakeRuntimeGetter.ListContainers(ctx, filter)
+}

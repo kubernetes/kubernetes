@@ -105,9 +105,25 @@ func (ow *windowsWatcher) pollLoop(ctx context.Context, logger klog.Logger) {
 	defer ticker.Stop()
 
 	// Seed the seen set with containers that are already OOMKilled so a kubelet
-	// restart does not replay historical kills as fresh events.
-	seedOOMKills(ctx, ow.containers, ow.seen, logger)
-	ow.reconcile(ctx, logger)
+	// restart does not replay historical kills as fresh events. Reconcile only
+	// after a successful seed (i.e. once a reliable baseline exists): if the
+	// initial list fails, an empty seen set would treat every surviving
+	// historical OOM as a fresh kill on the first pass. If the runtime is nil or
+	// the initial list errors, retry the seed on subsequent intervals rather
+	// than reconciling against that incomplete baseline.
+	for {
+		seeded := seedOOMKills(ctx, ow.containers, ow.seen, logger)
+		if seeded {
+			ow.reconcile(ctx, logger)
+			break
+		}
+		logger.V(2).Info("Windows OOM watcher baseline seed incomplete; retrying next interval")
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 
 	for {
 		select {
@@ -133,6 +149,13 @@ func (ow *windowsWatcher) reconcile(ctx context.Context, logger klog.Logger) {
 		logger.Error(err, "Windows OOM watcher failed to list containers")
 		return
 	}
+
+	// Prune inspection/seen bookkeeping against the current container list.
+	// CRI garbage collection removes completed containers, so without pruning the
+	// inspected set would retain a per-container entry for every exited container
+	// the watcher has ever seen, growing without bound on a long-lived kubelet
+	// even though the runtime has reclaimed the objects.
+	ow.pruneBookkeeping(containers)
 
 	// Only containers that are no longer running can carry a terminal exit
 	// reason, so short-circuit the per-container status lookup for anything
@@ -207,16 +230,50 @@ func (ow *windowsWatcher) reconcile(ctx context.Context, logger klog.Logger) {
 	}
 }
 
-// seedOOMKills records the ids of containers that are already OOMKilled when
-// the watcher starts so a kubelet restart does not replay historical kills.
-func seedOOMKills(ctx context.Context, containers containerStatusGetter, seen map[string]struct{}, logger klog.Logger) {
-	if containers == nil {
+// pruneBookkeeping drops inspected/seen entries for container IDs that are no
+// longer present in the latest successful ListContainers result, so the maps
+// stay bounded to currently-managed containers while retaining deduplication
+// for containers that still exist. pruneBookkeeping is called only after a
+// successful full list, so a transient list failure never clears state.
+// Callers must already hold the reconcile path; this locks ow.mu itself.
+func (ow *windowsWatcher) pruneBookkeeping(containers []*runtimeapi.Container) {
+	ow.mu.Lock()
+	defer ow.mu.Unlock()
+	if len(containers) == 0 {
+		// No containers currently exist; the runtime has reclaimed them all.
+		ow.inspected = make(map[string]struct{})
+		ow.seen = make(map[string]struct{})
 		return
+	}
+	live := make(map[string]struct{}, len(containers))
+	for _, c := range containers {
+		live[c.GetId()] = struct{}{}
+	}
+	for id := range ow.inspected {
+		if _, ok := live[id]; !ok {
+			delete(ow.inspected, id)
+		}
+	}
+	for id := range ow.seen {
+		if _, ok := live[id]; !ok {
+			delete(ow.seen, id)
+		}
+	}
+}
+
+// seedOOMKills records the ids of containers that are already OOMKilled when
+// the watcher starts so a kubelet restart does not replay historical kills. It
+// returns false when it could not establish a reliable baseline (no runtime, or
+// the initial list failed), so the caller can avoid reconciling against an
+// incomplete seen set that would replay historical kills as fresh events.
+func seedOOMKills(ctx context.Context, containers containerStatusGetter, seen map[string]struct{}, logger klog.Logger) bool {
+	if containers == nil {
+		return false
 	}
 	list, err := containers.ListContainers(ctx, nil)
 	if err != nil {
 		logger.V(2).Info("Windows OOM watcher failed to seed OOMKilled containers", "err", err)
-		return
+		return false
 	}
 	for _, c := range list {
 		if c.GetState() != runtimeapi.ContainerState_CONTAINER_EXITED {
@@ -230,4 +287,5 @@ func seedOOMKills(ctx context.Context, containers containerStatusGetter, seen ma
 			seen[c.GetId()] = struct{}{}
 		}
 	}
+	return true
 }

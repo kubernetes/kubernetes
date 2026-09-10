@@ -83,6 +83,16 @@ func TestGetRequestedContainersInfoWindows(t *testing.T) {
 		if info.Spec.Labels["io.kubernetes.container.name"] != want {
 			t.Errorf("Spec.Labels did not carry the container name, got %v", info.Spec.Labels)
 		}
+		// The CRI container list carries no CPU/memory specifications, so these
+		// must stay unadvertised to avoid publishing container_spec_cpu_shares=0
+		// and container_spec_memory_limit_bytes=0 series (the OOM counter is
+		// read back independently via OOMEventsForContainer(info.Name)).
+		if info.Spec.HasCpu {
+			t.Errorf("HasCpu must be false on synthetic records without CPU specs")
+		}
+		if info.Spec.HasMemory {
+			t.Errorf("HasMemory must be false on synthetic records without memory specs")
+		}
 	}
 
 	// A client without an enumerator must keep the historic no-op behavior.

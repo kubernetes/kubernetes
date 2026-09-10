@@ -85,9 +85,15 @@ func (cu *cadvisorClient) GetRequestedContainersInfo(containerName string, optio
 		info := &cadvisorapi.ContainerInfo{
 			Spec: cadvisorapi.ContainerSpec{
 				CreationTime: time.Unix(0, c.GetCreatedAt()),
-				HasCpu:       true,
-				HasMemory:    true,
-				Labels:       c.GetLabels(),
+				// HasCpu/HasMemory stay false: the CRI container list does not provide
+				// CPU or memory specifications, so advertising them would publish
+				// incorrect container_spec_cpu_shares=0 and
+				// container_spec_memory_limit_bytes=0 series. The OOM counter
+				// (container_oom_events_total) is read back separately from
+				// OOMEventsForContainer(info.Name) and does not depend on these flags.
+				HasCpu:    false,
+				HasMemory: false,
+				Labels:    c.GetLabels(),
 			},
 			Stats: []*cadvisorapi.ContainerStats{{Timestamp: now}},
 		}
