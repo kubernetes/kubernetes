@@ -2194,7 +2194,7 @@ type PodCertificateProjection struct {
 	// The type of keypair Kubelet will generate for the pod.
 	//
 	// Valid values are "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384",
-	// "ECDSAP521", and "ED25519".
+	// "ECDSAP521", "ED25519", "MLDSA44", "MLDSA65", and "MLDSA87".
 	//
 	// +required
 	KeyType string `json:"keyType,omitempty" protobuf:"bytes,2,rep,name=keyType"`
