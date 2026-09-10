@@ -102,7 +102,8 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
 	// Map each container to a pod and update the PodStats with container data.
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
-	for key, cinfo := range filteredInfos {
+	podsWithLiveContainers := make(map[statsapi.PodReference]bool)
+	for key, cinfo := range infos {
 		// On systemd using devicemapper each mount into the container has an
 		// associated cgroup. We ignore them to ensure we do not get duplicate
 		// entries in our summary. For details on .mount units:
@@ -123,6 +124,11 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 			podStats = &statsapi.PodStats{PodRef: ref}
 			podToStats[ref] = podStats
 		}
+
+		if _, found := filteredInfos[key]; !found {
+			continue
+		}
+		podsWithLiveContainers[ref] = true
 
 		// Update the PodStats entry with the stats from the container by
 		// adding it to podStats.Containers.
@@ -148,31 +154,18 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 		podStats.ProcessStats = mergeProcessStats(podStats.ProcessStats, cadvisorInfoToProcessStats(&cinfo))
 	}
 
-	// A Running pod can have no live container samples during restart backoff.
-	// Its volumes are still mounted, so retain the pod for storage collection
-	// without bringing back the filtered container stats.
-	seenPods := make(map[statsapi.PodReference]bool)
-	for key, cinfo := range infos {
-		if strings.HasSuffix(key, ".mount") || !isPodManagedContainer(logger, &cinfo) {
-			continue
-		}
-		ref := buildPodRef(cinfo.Spec.Labels)
-		if _, found := podToStats[ref]; found || seenPods[ref] {
-			continue
-		}
-		seenPods[ref] = true
-		podStatus, found := p.statusProvider.GetPodStatus(types.UID(ref.UID))
-		if found && podStatus.Phase == v1.PodRunning {
-			podToStats[ref] = &statsapi.PodStats{PodRef: ref}
-		}
-	}
-
 	// Add each PodStats to the result.
 	result := make([]statsapi.PodStats, 0, len(podToStats))
 	for _, podStats := range podToStats {
+		podUID := types.UID(podStats.PodRef.UID)
+		status, found := p.statusProvider.GetPodStatus(podUID)
+		// A Running pod's volumes remain mounted during restart backoff,
+		// even when all of its container samples have been filtered out.
+		if !podsWithLiveContainers[podStats.PodRef] && (!found || status.Phase != v1.PodRunning) {
+			continue
+		}
 		makePodStorageStats(logger, podStats, &rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, false)
 
-		podUID := types.UID(podStats.PodRef.UID)
 		// Lookup the pod-level cgroup's CPU and memory stats
 		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
 		if podInfo != nil {
@@ -186,7 +179,6 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 			// ProcessStats were accumulated as the containers were iterated.
 		}
 
-		status, found := p.statusProvider.GetPodStatus(podUID)
 		if found && status.StartTime != nil && !status.StartTime.IsZero() {
 			podStats.StartTime = *status.StartTime
 			// only append stats if we were able to get the start time of the pod
