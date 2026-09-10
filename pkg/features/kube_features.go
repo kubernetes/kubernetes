@@ -565,6 +565,14 @@ const (
 	// Enables scheduler-triggered preemption for deferred in-place pod vertical scaling pods.
 	InPlacePodVerticalScalingSchedulerPreemption featuregate.Feature = "InPlacePodVerticalScalingSchedulerPreemption"
 
+	// owner: @thockin @priyankasaggu11929
+	// kep: https://kep.k8s.io/2172
+	//
+	// Enables kubelet to report InsecureUserID/InsecureGroupID pod conditions
+	// when a container is observed running as UID/GID 0 without the pod or
+	// container spec explicitly requesting it via runAsUser/runAsGroup.
+	InsecurePodWarnings featuregate.Feature = "InsecurePodWarnings"
+
 	// owner: @tetianakh
 	//
 	// Enables the fast path for inter-pod affinity calculations when the topology key is kubernetes.io/hostname.
@@ -1666,6 +1674,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	InsecurePodWarnings: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	InterPodAffinityHostnameFastPath: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2576,6 +2588,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingMemoryBackedVolumes: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
 
 	InPlacePodVerticalScalingSchedulerPreemption: {InPlacePodVerticalScaling},
+
+	InsecurePodWarnings: {},
 
 	InterPodAffinityHostnameFastPath: {},
 
