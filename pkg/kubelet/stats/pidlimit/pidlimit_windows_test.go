@@ -19,8 +19,29 @@ limitations under the License.
 package pidlimit
 
 import (
+	"errors"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
+
+func TestStatsWindowsGetPerformanceInfoError(t *testing.T) {
+	originalGetPerformanceInfo := getPerformanceInfo
+	t.Cleanup(func() {
+		getPerformanceInfo = originalGetPerformanceInfo
+	})
+	getPerformanceInfo = func() (*winstats.PerformanceInformation, error) {
+		return nil, errors.New("performance info unavailable")
+	}
+
+	stats, err := Stats()
+	if err != nil {
+		t.Fatalf("Stats() must suppress performance info errors to preserve the summary, got: %v", err)
+	}
+	if stats != nil {
+		t.Fatalf("Stats() must omit unavailable PID rlimit stats, got: %+v", stats)
+	}
+}
 
 func TestStatsWindows(t *testing.T) {
 	stats, err := Stats()
