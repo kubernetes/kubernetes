@@ -311,6 +311,9 @@ type InitOption = initoption.InitOption
 //	   })
 //
 // withTB sets up cancellation for the sub-test and uses per-test output.
+//
+// Like [Init], it cancels the returned TContext automatically when the
+// sub-test ends.
 func (tCtx TContext) withTB(tb TB) TContext {
 	tCtx.testingTB.TB = tb
 	if tCtx.perTestHeader != nil {
@@ -323,7 +326,15 @@ func (tCtx TContext) withTB(tb TB) TContext {
 	// progress report.
 	defaultProgressReporter.trackRunningTest(tb)
 
-	return tCtx.WithCancel()
+	// Cancellation for sync tests has to be handled differently,
+	// see run below.
+	tCtx = tCtx.WithCancel()
+	if !tCtx.isSyncTest {
+		runWhenDone(tb, func() {
+			tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
+		})
+	}
+	return tCtx
 }
 
 // run implements the different Run and SyncTest methods. It's not an exported
@@ -343,6 +354,11 @@ func run(tCtx TContext, name string, syncTest bool, cb func(tCtx TContext)) bool
 				// so this seems okay.
 				tCtx.isSyncTest = true
 				tCtx = tCtx.WithoutCancel().withTB(t)
+				// runWhenDone's context.AfterFunc runs in a new goroutine,
+				// which synctest has no reason to schedule before its
+				// deadlock check fires the instant cb returns. Cancel
+				// synchronously here instead.
+				defer tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
 				cb(tCtx)
 			}
 			if name != "" {
