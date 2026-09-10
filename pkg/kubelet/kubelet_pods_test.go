@@ -9708,3 +9708,108 @@ func TestMakeMountsBindMountOptions(t *testing.T) {
 	assert.Equal(t, []string{"noexec", "nosuid"}, mounts[0].BindMountOptions)
 	assert.Empty(t, mounts[1].BindMountOptions)
 }
+
+func TestUpdateInsecurePodCountMetric(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	metrics.Register()
+	metrics.InsecurePodCount.Reset()
+
+	linuxUser := func(uid, gid int64, supplementalGroups ...int64) *v1.ContainerUser {
+		return &v1.ContainerUser{Linux: &v1.LinuxContainerUser{UID: uid, GID: gid, SupplementalGroups: supplementalGroups}}
+	}
+	newPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default", UID: types.UID(name)},
+			Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "c1"}}},
+		}
+	}
+
+	bothInsecure := newPod("both-insecure")
+	kl.statusManager.SetPodStatus(logger, bothInsecure, v1.PodStatus{
+		Conditions:        []v1.PodCondition{{Type: v1.InsecureUserID, Status: v1.ConditionTrue}},
+		ContainerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(0, 0)}},
+	})
+
+	uidOnlyInsecure := newPod("uid-only-insecure")
+	kl.statusManager.SetPodStatus(logger, uidOnlyInsecure, v1.PodStatus{
+		Conditions:        []v1.PodCondition{{Type: v1.InsecureUserID, Status: v1.ConditionTrue}},
+		ContainerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(0, 1000)}},
+	})
+
+	gidOnlyInsecure := newPod("gid-only-insecure")
+	kl.statusManager.SetPodStatus(logger, gidOnlyInsecure, v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 0)}},
+	})
+
+	supplementalGroupOnlyInsecure := newPod("supplemental-group-only-insecure")
+	kl.statusManager.SetPodStatus(logger, supplementalGroupOnlyInsecure, v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 1000, 0, 1000)}},
+	})
+
+	secure := newPod("secure")
+	kl.statusManager.SetPodStatus(logger, secure, v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 1000, 1000)}},
+	})
+
+	noImplicitStatus := newPod("no-implicit-status") // never had SetPodStatus called
+
+	explicitUID := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "explicit-uid", Namespace: "default", UID: "explicit-uid"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "c1", SecurityContext: &v1.SecurityContext{RunAsUser: ptr.To[int64](0)}}},
+		},
+	}
+	kl.statusManager.SetPodStatus(logger, explicitUID, v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(0, 0)}},
+	})
+
+	explicitViaEphemeral := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "explicit-via-ephemeral", Namespace: "default", UID: "explicit-via-ephemeral"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "c1"}},
+			EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{
+				Name:            "debug",
+				SecurityContext: &v1.SecurityContext{RunAsUser: ptr.To[int64](0), RunAsGroup: ptr.To[int64](0)},
+			}}},
+		},
+	}
+	kl.statusManager.SetPodStatus(logger, explicitViaEphemeral, v1.PodStatus{
+		ContainerStatuses:          []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 1000)}},
+		EphemeralContainerStatuses: []v1.ContainerStatus{{Name: "debug", User: linuxUser(0, 0)}},
+	})
+
+	explicitSupplementalGroup := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "explicit-supplemental-group", Namespace: "default", UID: "explicit-supplemental-group"},
+		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{SupplementalGroups: []int64{0}},
+			Containers:      []v1.Container{{Name: "c1"}},
+		},
+	}
+	kl.statusManager.SetPodStatus(logger, explicitSupplementalGroup, v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 1000, 0, 1000)}},
+	})
+
+	noExplicitStatus := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "no-explicit-status", Namespace: "default", UID: "no-explicit-status"}}
+
+	kl.updateInsecurePodCountMetric([]*v1.Pod{
+		bothInsecure, uidOnlyInsecure, gidOnlyInsecure, supplementalGroupOnlyInsecure, secure, noImplicitStatus,
+		explicitUID, explicitViaEphemeral, explicitSupplementalGroup, noExplicitStatus,
+	})
+
+	want := `
+		# HELP kubelet_insecure_pods [ALPHA] Number of active pods with a container running as root (UID/GID 0), labeled by declaration (implicit: no runAsUser/runAsGroup set, explicit: runAsUser/runAsGroup/supplementalGroups set to 0) and id_type (uid, gid, or supplementalgroups).
+		# TYPE kubelet_insecure_pods gauge
+		kubelet_insecure_pods{declaration="explicit",id_type="gid"} 1
+		kubelet_insecure_pods{declaration="explicit",id_type="supplementalgroups"} 1
+		kubelet_insecure_pods{declaration="explicit",id_type="uid"} 2
+		kubelet_insecure_pods{declaration="implicit",id_type="gid"} 3
+		kubelet_insecure_pods{declaration="implicit",id_type="supplementalgroups"} 1
+		kubelet_insecure_pods{declaration="implicit",id_type="uid"} 2
+	`
+	if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(want), metrics.InsecurePodCount.FQName()); err != nil {
+		t.Error(err)
+	}
+}

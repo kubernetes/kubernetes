@@ -1373,6 +1373,9 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	metrics.ActivePodCount.WithLabelValues("").Set(float64(len(activeRegularPods)))
 	metrics.ActivePodCount.WithLabelValues("true").Set(float64(len(activeStaticPods)))
 	metrics.MirrorPodCount.Set(float64(len(mirrorPods)))
+	if utilfeature.DefaultFeatureGate.Enabled(features.InsecurePodWarnings) {
+		kl.updateInsecurePodCountMetric(activePods)
+	}
 
 	// At this point, the pod worker is aware of which pods are not desired (SyncKnownPods).
 	// We now look through the set of active pods for those that the pod worker is not aware of
@@ -2081,6 +2084,62 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 	}
 
 	return *s
+}
+
+// emitInsecureIDEvent emits a Warning Event if userIDCondition/groupIDCondition is True.
+func (kl *Kubelet) emitInsecureIDEvent(pod *v1.Pod, userIDCondition, groupIDCondition v1.PodCondition) {
+	userInsecure := userIDCondition.Status == v1.ConditionTrue
+	groupInsecure := groupIDCondition.Status == v1.ConditionTrue
+
+	switch {
+	case userInsecure && groupInsecure:
+		kl.insecureIDEventRecorder.Eventf(pod, v1.EventTypeWarning, status.ImplicitlyInsecureUserAndGroupID,
+			"%s; %s", userIDCondition.Message, groupIDCondition.Message)
+	case userInsecure:
+		kl.insecureIDEventRecorder.Eventf(pod, v1.EventTypeWarning, userIDCondition.Reason, "%s", userIDCondition.Message)
+	case groupInsecure:
+		kl.insecureIDEventRecorder.Eventf(pod, v1.EventTypeWarning, groupIDCondition.Reason, "%s", groupIDCondition.Message)
+	}
+}
+
+// updateInsecurePodCountMetric updates the InsecurePodCount gauge from activePods.
+func (kl *Kubelet) updateInsecurePodCountMetric(activePods []*v1.Pod) {
+	var insecureUIDPodCount, insecureGIDPodCount, insecureSupplementalGroupsPodCount int
+	var explicitUIDPodCount, explicitGIDPodCount, explicitSupplementalGroupsPodCount int
+	for _, pod := range activePods {
+		podStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
+		if !ok {
+			continue
+		}
+		if _, condition := podutil.GetPodConditionFromList(podStatus.Conditions, v1.InsecureUserID); condition != nil && condition.Status == v1.ConditionTrue {
+			insecureUIDPodCount++
+		}
+		containerStatuses := make([]v1.ContainerStatus, 0, len(podStatus.InitContainerStatuses)+len(podStatus.ContainerStatuses)+len(podStatus.EphemeralContainerStatuses))
+		containerStatuses = append(containerStatuses, podStatus.InitContainerStatuses...)
+		containerStatuses = append(containerStatuses, podStatus.ContainerStatuses...)
+		containerStatuses = append(containerStatuses, podStatus.EphemeralContainerStatuses...)
+		if status.IsPodImplicitlyInsecurePrimaryGroupID(pod, containerStatuses) {
+			insecureGIDPodCount++
+		}
+		if status.IsPodImplicitlyInsecureSupplementalGroups(pod, containerStatuses) {
+			insecureSupplementalGroupsPodCount++
+		}
+		if status.IsPodExplicitlyInsecureUserID(pod, containerStatuses) {
+			explicitUIDPodCount++
+		}
+		if status.IsPodExplicitlyInsecureGroupID(pod, containerStatuses) {
+			explicitGIDPodCount++
+		}
+		if status.IsPodExplicitlyInsecureSupplementalGroups(pod, containerStatuses) {
+			explicitSupplementalGroupsPodCount++
+		}
+	}
+	metrics.InsecurePodCount.WithLabelValues("implicit", "uid").Set(float64(insecureUIDPodCount))
+	metrics.InsecurePodCount.WithLabelValues("implicit", "gid").Set(float64(insecureGIDPodCount))
+	metrics.InsecurePodCount.WithLabelValues("implicit", "supplementalgroups").Set(float64(insecureSupplementalGroupsPodCount))
+	metrics.InsecurePodCount.WithLabelValues("explicit", "uid").Set(float64(explicitUIDPodCount))
+	metrics.InsecurePodCount.WithLabelValues("explicit", "gid").Set(float64(explicitGIDPodCount))
+	metrics.InsecurePodCount.WithLabelValues("explicit", "supplementalgroups").Set(float64(explicitSupplementalGroupsPodCount))
 }
 
 // sortPodIPs return the PodIPs sorted and truncated by the cluster IP family preference.
