@@ -28,6 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
+var getPerformanceInfo = winstats.GetPerformanceInfo
+
 // Stats provides basic information about max and current process count.
 //
 // Windows has no system-wide PID ceiling analogous to Linux kernel.pid_max:
@@ -38,7 +40,7 @@ import (
 // process count alone; a real per-Job-Object limit would require plumbing the
 // kubelet's own Job Object limits through to this package (tracked separately).
 func Stats() (*statsapi.RlimitStats, error) {
-	info, err := winstats.GetPerformanceInfo()
+	info, err := getPerformanceInfo()
 	if err != nil {
 		// Best-effort PID stats: a failed optional process-count read must not
 		// discard the otherwise-valid node, disk, and pod summary (the summary
