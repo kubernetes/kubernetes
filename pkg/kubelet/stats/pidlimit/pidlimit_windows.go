@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
@@ -39,7 +40,12 @@ import (
 func Stats() (*statsapi.RlimitStats, error) {
 	info, err := winstats.GetPerformanceInfo()
 	if err != nil {
-		return nil, err
+		// Best-effort PID stats: a failed optional process-count read must not
+		// discard the otherwise-valid node, disk, and pod summary (the summary
+		// provider treats an rlimit error as fatal). Omit unavailable fields and
+		// defer to the existing log so pressure checks on other signals proceed.
+		klog.ErrorS(err, "Failed to get Windows performance info for PID stats; omitting PID rlimit")
+		return nil, nil
 	}
 
 	numProcs := int64(info.ProcessCount)
