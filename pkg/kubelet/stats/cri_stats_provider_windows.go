@@ -20,7 +20,6 @@ package stats
 
 import (
 	"fmt"
-	"runtime"
 	"time"
 
 	"github.com/Microsoft/hnslib"
@@ -31,6 +30,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	"k8s.io/utils/ptr"
 )
 
@@ -67,11 +67,15 @@ func (s networkStats) GetHNSEndpointStats(endpointName string) (*hnslib.HNSEndpo
 // /stats/summary. The underlying computation is fixed in the runtime; this guard
 // only prevents physically impossible values from leaking into the summary API.
 func maxWindowsUsageNanoCores() uint64 {
-	// runtime.NumCPU on Windows returns the number of logical processors visible to
-	// this process (the host count for process-isolated containers and the guest
-	// count for Hyper-V isolated ones). Either is a valid upper bound because real
-	// CPU-busy time cannot exceed the physical cores available in the partition.
-	return uint64(runtime.NumCPU()) * uint64(time.Second/time.Nanosecond)
+	// winstats.ProcessorCount returns the number of logical processors across all
+	// processor groups on the machine (used to populate MachineInfo.NumCores). This
+	// is the node's CPU capacity and is the correct upper bound for usageNanoCores:
+	// a single workload cannot consume more CPU time than exists on the node.
+	// runtime.NumCPU is not used here because it reports only the processors visible
+	// to the kubelet process, which can be narrower than the node when the kubelet
+	// service has a restricted CPU affinity, and it only covers one processor group
+	// on hosts with more than 64 logical processors.
+	return uint64(winstats.ProcessorCount()) * uint64(time.Second/time.Nanosecond)
 }
 
 // capWindowsUsageNanoCores clamps a reported usageNanoCores value so that it can never

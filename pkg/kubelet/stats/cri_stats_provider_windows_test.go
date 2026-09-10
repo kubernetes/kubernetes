@@ -18,7 +18,6 @@ package stats
 
 import (
 	"reflect"
-	"runtime"
 	"testing"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	"k8s.io/kubernetes/pkg/volume"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
@@ -577,7 +577,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 }
 
 func Test_maxWindowsUsageNanoCores(t *testing.T) {
-	want := uint64(runtime.NumCPU()) * uint64(time.Second/time.Nanosecond)
+	want := uint64(winstats.ProcessorCount()) * uint64(time.Second/time.Nanosecond)
 	if got := maxWindowsUsageNanoCores(); got != want {
 		t.Errorf("maxWindowsUsageNanoCores() = %d, want %d", got, want)
 	}
