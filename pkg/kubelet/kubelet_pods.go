@@ -2025,6 +2025,20 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 		}
 	}
 
+	// Compute the pod-level resources status only after the phase is fully
+	// resolved: pods that are no longer running (including pods still shown as
+	// Running in their API status while terminating or already terminated)
+	// report their effective allocated resources instead of reading back a
+	// pod cgroup that may already be gone.
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		s.Resources = kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldPodStatus, s.Phase)
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		}
+		s.AllocatedResources = resourcehelper.PodRequests(pod, opts)
+	}
+
 	kl.probeManager.UpdatePodStatus(ctx, pod, s)
 
 	// update the allocated resources status
@@ -2157,7 +2171,6 @@ func (kl *Kubelet) sortPodIPs(podIPs []string) []string {
 // the given internal pod status and the previous state of the pod from the API.
 // It is purely transformative and does not alter the kubelet state at all.
 func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, oldPodStatus v1.PodStatus) *v1.PodStatus {
-	logger := klog.FromContext(ctx)
 	var apiPodStatus v1.PodStatus
 
 	// copy pod status IPs to avoid race conditions with PodStatus #102806
@@ -2234,15 +2247,6 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		podRestarting,
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		apiPodStatus.Resources = kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldPodStatus)
-		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-		}
-		apiPodStatus.AllocatedResources = resourcehelper.PodRequests(pod, opts)
-	}
-
 	return &apiPodStatus
 }
 
@@ -2292,8 +2296,15 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 	return allocatedResources
 }
 
-func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, allocatedPod *v1.Pod, oldPodStatus v1.PodStatus) *v1.ResourceRequirements {
-	if allocatedPod.Status.Phase != v1.PodRunning {
+// convertToAPIPodLevelResourcesStatus returns the pod-level resources to
+// report in the pod status. phase is the pod phase computed by the caller
+// (generateAPIPodStatus), which is more current than the possibly stale
+// allocatedPod.Status.Phase: during teardown the API status can still say
+// Running after the pod is no longer running and its cgroup is gone.
+// Non-running pods report their effective allocated resources, mirroring what
+// convertToAPIContainerStatuses does for non-running containers.
+func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, allocatedPod *v1.Pod, oldPodStatus v1.PodStatus, phase v1.PodPhase) *v1.ResourceRequirements {
+	if phase != v1.PodRunning {
 		return getEffectiveAllocatedResources(allocatedPod)
 	}
 
@@ -2304,20 +2315,26 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	pcm := kl.containerManager.NewPodContainerManager()
 	memoryConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceMemory)
 	if err != nil {
-		logger.Error(err, "failed to read memory cgroup config for the pod", "podName", allocatedPod.Name)
+		if logPodCgroupReadError(logger, err, "failed to read memory cgroup config for the pod", allocatedPod) {
+			// Teardown removed the pod cgroup while the pod was still
+			// running: report the effective allocated resources instead of
+			// cgroup readback values.
+			return getEffectiveAllocatedResources(allocatedPod)
+		}
 	}
-	memoryLimit := cm.MemoryLimitsFromConfig(memoryConfig)
 	cpuConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceCPU)
 	if err != nil {
-		logger.Error(err, "failed to read memory cgroup limits for the pod", "podName", allocatedPod.Name)
-
+		if logPodCgroupReadError(logger, err, "failed to read cpu cgroup config for the pod", allocatedPod) {
+			return getEffectiveAllocatedResources(allocatedPod)
+		}
 	}
 
+	memoryLimit := cm.MemoryLimitsFromConfig(memoryConfig)
 	cpuRequest := cm.CPURequestsFromConfig(cpuConfig)
 	cpuLimit := cm.CPULimitsFromConfig(cpuConfig)
 
 	preserveOldResourcesValue := func(rName v1.ResourceName, oldStatusResource, resource v1.ResourceList) {
-		if allocatedPod.Status.Phase == v1.PodRunning && oldPodStatus.Phase == v1.PodRunning && oldPodStatus.Resources != nil {
+		if phase == v1.PodRunning && oldPodStatus.Phase == v1.PodRunning && oldPodStatus.Resources != nil {
 			if r, exists := oldStatusResource[rName]; exists {
 				resource[rName] = r.DeepCopy()
 			}
@@ -2429,6 +2446,20 @@ func hasContainer(pod *v1.Pod, name string, mask podutil.ContainerType) bool {
 			return true
 		}
 	}
+	return false
+}
+
+// logPodCgroupReadError logs a failed pod cgroup read and reports whether the
+// pod cgroup is gone. ENOENT is expected when teardown races the status
+// computation for a pod that is still running, so it is logged at V(4)
+// instead of error level. errors.Is is used (rather than os.IsNotExist)
+// because the read errors are wrapped with %w.
+func logPodCgroupReadError(logger klog.Logger, err error, msg string, pod *v1.Pod) (cgroupGone bool) {
+	if goerrors.Is(err, os.ErrNotExist) {
+		logger.V(4).Info(msg, "err", err, "pod", klog.KObj(pod))
+		return true
+	}
+	logger.Error(err, msg, "pod", klog.KObj(pod))
 	return false
 }
 
