@@ -154,9 +154,15 @@ func (a int64Amount) Cmp(b int64Amount) int {
 	case a.scale == b.scale:
 		// compare only the unscaled portion
 	case a.scale > b.scale:
-		result, remainder, exact := divideByScaleInt64(b.value, a.scale-b.scale)
+		// Widen before subtracting: the difference of two int32 scales does not
+		// have to fit one, and a wrapped negative reaches a zero divisor.
+		diff := int64(a.scale) - int64(b.scale)
+		if diff >= 18 {
+			return cmpDec(a.AsDec(), b.AsDec())
+		}
+		result, remainder, exact := divideByScaleInt64(b.value, Scale(diff))
 		if !exact {
-			return a.AsDec().Cmp(b.AsDec())
+			return cmpDec(a.AsDec(), b.AsDec())
 		}
 		if result == a.value {
 			switch {
@@ -170,9 +176,13 @@ func (a int64Amount) Cmp(b int64Amount) int {
 		}
 		b.value = result
 	default:
-		result, remainder, exact := divideByScaleInt64(a.value, b.scale-a.scale)
+		diff := int64(b.scale) - int64(a.scale)
+		if diff >= 18 {
+			return cmpDec(a.AsDec(), b.AsDec())
+		}
+		result, remainder, exact := divideByScaleInt64(a.value, Scale(diff))
 		if !exact {
-			return a.AsDec().Cmp(b.AsDec())
+			return cmpDec(a.AsDec(), b.AsDec())
 		}
 		if result == b.value {
 			switch {
@@ -195,6 +205,39 @@ func (a int64Amount) Cmp(b int64Amount) int {
 	default:
 		return 1
 	}
+}
+
+// decimalExponentBounds brackets the e for which 10^(e-1) <= |c|*10^-s < 10^e,
+// for a non-zero c. An n-bit magnitude has at least n/4 and at most n/3+1
+// decimal digits, so neither bound has to count them.
+func decimalExponentBounds(bitLen int, s int64) (lo, hi int64) {
+	n := int64(bitLen)
+	return n/4 - s, n/3 + 1 - s
+}
+
+// cmpDec compares x and y. inf.Dec.Cmp aligns the two scales by writing their
+// difference out in digits, and a parsed exponent sets that difference, so
+// settle what the magnitudes already decide before reaching it.
+func cmpDec(x, y *inf.Dec) int {
+	xSign, ySign := x.Sign(), y.Sign()
+	switch {
+	case xSign != ySign:
+		if xSign > ySign {
+			return 1
+		}
+		return -1
+	case xSign == 0:
+		return 0
+	}
+	xLo, xHi := decimalExponentBounds(x.UnscaledBig().BitLen(), int64(x.Scale()))
+	yLo, yHi := decimalExponentBounds(y.UnscaledBig().BitLen(), int64(y.Scale()))
+	switch {
+	case xLo > yHi:
+		return xSign
+	case xHi < yLo:
+		return -xSign
+	}
+	return x.Cmp(y)
 }
 
 // Add adds two int64Amounts together, matching scales. It will return false and not mutate
