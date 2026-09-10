@@ -60,7 +60,7 @@ const (
 	unixPathMax = 108
 
 	// rollingUpdateUIDHashBytes is how much of the SHA-256 digest of a pod UID
-	// is base64-encoded when the full UID does not fit in the registration socket
+	// is base64-encoded when the full UID does not fit in a rolling-update socket
 	// path. 8 bytes (64 bits) is ample for node-local uniqueness during rolling
 	// updates.
 	rollingUpdateUIDHashBytes = 8
@@ -95,6 +95,21 @@ func RollingUpdateRegistrarSocketFile(registryDir, driverName string, podUID typ
 		}
 	}
 	return candidates[len(candidates)-1]
+}
+
+// rollingUpdatePluginSocketFile returns the automatic DRA service socket
+// basename for rolling updates. Keep the pod UID visible when possible. The
+// fallback omits the ".sock" suffix so that the shortened basename also fits
+// with the longest valid driver name under the default plugin directory.
+func rollingUpdatePluginSocketFile(pluginDir string, podUID types.UID) string {
+	uid := string(podUID)
+	basename := "dra-" + uid + ".sock"
+	if len(path.Join(pluginDir, basename)) < unixPathMax {
+		return basename
+	}
+
+	uidHash := sha256Sum(uid)
+	return "dra-" + base64.RawURLEncoding.EncodeToString(uidHash[:rollingUpdateUIDHashBytes])
 }
 
 func sha256Sum(data string) [32]byte {
@@ -447,9 +462,9 @@ func PluginListener(listen func(ctx context.Context, path string) (net.Listener,
 // in parallel while a newer instance replaces the older. When enabled, both
 // instances must share the same plugin data directory and driver name.
 // They create different registration sockets (and DRA gRPC sockets) so the
-// kubelet can connect to both at the same time. The default registration socket
-// basename is chosen to fit within AF_UNIX path limits (see
-// [RollingUpdateRegistrarSocketFile]).
+// kubelet can connect to both at the same time. Automatic socket basenames are
+// shortened when necessary to keep the default paths within AF_UNIX limits
+// (see [RollingUpdateRegistrarSocketFile] for registration socket naming).
 //
 // There is no guarantee which of the two instances are used by kubelet.
 // For example, it can happen that a claim gets prepared by one instance
@@ -922,10 +937,6 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	if o.rollingUpdateUID != "" && o.pluginRegistrationEndpoint.file != "" {
 		return nil, errors.New("rolling updates and explicit registration socket filename are mutually exclusive")
 	}
-	uidPart := ""
-	if o.rollingUpdateUID != "" {
-		uidPart = "-" + string(o.rollingUpdateUID)
-	}
 	if o.pluginRegistrationEndpoint.file == "" {
 		if o.rollingUpdateUID != "" {
 			o.pluginRegistrationEndpoint.file = RollingUpdateRegistrarSocketFile(o.pluginRegistrationEndpoint.dir, o.driverName, o.rollingUpdateUID)
@@ -937,7 +948,11 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		o.pluginDataDirectoryPath = path.Join(KubeletPluginsDir, o.driverName)
 	}
 	if o.pluginSocket == "" {
-		o.pluginSocket = "dra" + uidPart + ".sock" // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
+		if o.rollingUpdateUID != "" {
+			o.pluginSocket = rollingUpdatePluginSocketFile(o.pluginDataDirectoryPath, o.rollingUpdateUID)
+		} else {
+			o.pluginSocket = "dra.sock" // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
+		}
 	}
 
 	d := &Helper{
