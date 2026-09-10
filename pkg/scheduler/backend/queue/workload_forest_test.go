@@ -17,6 +17,7 @@ limitations under the License.
 package queue
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -1194,6 +1195,149 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			// Note: Children are sorted by name in buildPodGroupInfoForCPG, so it is deterministic.
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
 				t.Errorf("Unexpected PodGroupInfo (-want,+got)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestWorkloadForest_ValidateHierarchy(t *testing.T) {
+	tests := []struct {
+		name                       string
+		isCompositePodGroupEnabled bool
+		initialPodGroups           []*schedulingv1beta1.PodGroup
+		initialCPGs                []*schedulingv1alpha3.CompositePodGroup
+		key                        fwk.EntityKey
+		wantErrSub                 string
+		expectError                bool
+	}{
+		{
+			name:                       "single pod group without parent",
+			isCompositePodGroupEnabled: true,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("ns").Name("pg1").Obj(),
+			},
+			key:         fwk.PodGroupKey("ns", "pg1"),
+			expectError: false,
+		},
+		{
+			name:                       "valid 2 levels (PG -> CPG1)",
+			isCompositePodGroupEnabled: true,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("ns").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg1").Obj(),
+			},
+			key:         fwk.PodGroupKey("ns", "pg1"),
+			expectError: false,
+		},
+		{
+			name:                       "valid 4 levels (PG -> CPG1 -> CPG2 -> CPG3)",
+			isCompositePodGroupEnabled: true,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("ns").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg2").ParentCompositePodGroup("cpg3").Obj(),
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg3").Obj(),
+			},
+			key:         fwk.PodGroupKey("ns", "pg1"),
+			expectError: false,
+		},
+		{
+			name:                       "depth exceeds WorkloadMaxTreeDepth (5 levels: PG -> CPG1 -> CPG2 -> CPG3 -> CPG4)",
+			isCompositePodGroupEnabled: true,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("ns").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg2").ParentCompositePodGroup("cpg3").Obj(),
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg3").ParentCompositePodGroup("cpg4").Obj(),
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg4").Obj(),
+			},
+			key:         fwk.PodGroupKey("ns", "pg1"),
+			expectError: true,
+			wantErrSub:  "hierarchy depth 5 exceeds maximum allowed depth 4",
+		},
+		{
+			name:                       "direct cycle in CPG (CPG1 -> CPG1)",
+			isCompositePodGroupEnabled: true,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("ns").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			key:         fwk.PodGroupKey("ns", "pg1"),
+			expectError: true,
+			wantErrSub:  "cycle detected in hierarchy",
+		},
+		{
+			name:                       "indirect cycle in CPGs (CPG1 -> CPG2 -> CPG1)",
+			isCompositePodGroupEnabled: true,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("ns").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+				st.MakeCompositePodGroup().Namespace("ns").Name("cpg2").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			key:         fwk.PodGroupKey("ns", "pg1"),
+			expectError: true,
+			wantErrSub:  "cycle detected in hierarchy",
+		},
+		{
+			name:                       "missing parent composite pod group",
+			isCompositePodGroupEnabled: true,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("ns").Name("pg1").ParentCompositePodGroup("cpg-missing").Obj(),
+			},
+			key:         fwk.PodGroupKey("ns", "pg1"),
+			expectError: true,
+			wantErrSub:  "compositepodgroup/ns/cpg-missing not found in workload forest",
+		},
+		{
+			name:                       "pod group not found in forest",
+			isCompositePodGroupEnabled: true,
+			key:                        fwk.PodGroupKey("ns", "pg-nonexistent"),
+			expectError:                true,
+			wantErrSub:                 "podgroup/ns/pg-nonexistent not found in workload forest",
+		},
+		{
+			name:                       "composite pod group feature disabled ignores parent pointer",
+			isCompositePodGroupEnabled: false,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("ns").Name("pg1").ParentCompositePodGroup("cpg-missing").Obj(),
+			},
+			key:         fwk.PodGroupKey("ns", "pg1"),
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wf := newWorkloadForest(tt.isCompositePodGroupEnabled)
+			for _, pg := range tt.initialPodGroups {
+				wf.addGenericPodGroup(fwk.NewGenericPodGroup(pg))
+			}
+			for _, cpg := range tt.initialCPGs {
+				wf.addGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
+			}
+
+			err := wf.validateHierarchy(tt.key)
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErrSub)
+				}
+				if tt.wantErrSub != "" && !strings.Contains(err.Error(), tt.wantErrSub) {
+					t.Fatalf("expected error containing %q, got %q", tt.wantErrSub, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("expected no error, got: %v", err)
+				}
 			}
 		})
 	}

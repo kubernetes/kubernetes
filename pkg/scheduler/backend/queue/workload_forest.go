@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -237,5 +238,34 @@ func (wf *workloadForest) buildQueuedPodGroupInfo(logger klog.Logger, rootLookup
 	return &framework.QueuedPodGroupInfo{
 		PodGroupInfo:   wf.buildPodGroupInfo(logger, gpg, sets.New[fwk.EntityKey]()),
 		QueuedPodInfos: make(map[fwk.EntityKey][]*framework.QueuedPodInfo),
+	}
+}
+
+// validateHierarchy validates that the hierarchy starting from key (PodGroup) up to its root
+// has no cycles, does not exceed WorkloadMaxTreeDepth, and all ancestor groups exist in the forest.
+func (wf *workloadForest) validateHierarchy(key fwk.EntityKey) error {
+	depth := 1
+	visited := sets.New[fwk.EntityKey]()
+	currentKey := key
+
+	for {
+		if visited.Has(currentKey) {
+			return fmt.Errorf("cycle detected in hierarchy at %s", currentKey.String())
+		}
+		if depth > schedulingv1alpha3.WorkloadMaxTreeDepth {
+			return fmt.Errorf("hierarchy depth %d exceeds maximum allowed depth %d at %s", depth, schedulingv1alpha3.WorkloadMaxTreeDepth, currentKey.String())
+		}
+		visited.Insert(currentKey)
+
+		gpg, ok := wf.podGroups[currentKey]
+		if !ok {
+			return fmt.Errorf("%s not found in workload forest", currentKey.String())
+		}
+		if !wf.isCompositePodGroupEnabled || !gpg.HasParent() {
+			return nil
+		}
+		parentKey, _ := gpg.GetParentKey()
+		depth++
+		currentKey = parentKey
 	}
 }

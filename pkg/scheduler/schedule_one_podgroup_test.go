@@ -561,6 +561,69 @@ func TestValidatePodGroup(t *testing.T) {
 			enableCompositePodGroup:        true,
 			expectError:                    false,
 		},
+		{
+			name:              "CPG success when tree depth is exactly WorkloadMaxTreeDepth (4 levels)",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			profiles: profile.Map{
+				"": nil,
+			},
+			enableCompositePodGroup: true,
+			expectError:             false,
+		},
+		{
+			name:              "CPG failure when tree depth exceeds WorkloadMaxTreeDepth (5 levels)",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-3").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-3").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			profiles: profile.Map{
+				"": nil,
+			},
+			enableCompositePodGroup: true,
+			expectError:             true,
+		},
+		{
+			name:              "CPG failure when child branch exceeds WorkloadMaxTreeDepth without pods in that branch",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-3").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-4").ParentCompositePodGroup("cpg-3").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			profiles: profile.Map{
+				"": nil,
+			},
+			enableCompositePodGroup: true,
+			expectError:             true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -610,6 +673,107 @@ func TestValidatePodGroup(t *testing.T) {
 			} else {
 				if err != nil {
 					t.Errorf("Expected no error, but got: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateHierarchy(t *testing.T) {
+	cpg1 := st.MakeCompositePodGroup().Namespace("ns").Name("cpg1").Obj()
+	cpg2 := st.MakeCompositePodGroup().Namespace("ns").Name("cpg2").Obj()
+	cpg3 := st.MakeCompositePodGroup().Namespace("ns").Name("cpg3").Obj()
+	cpg4 := st.MakeCompositePodGroup().Namespace("ns").Name("cpg4").Obj()
+	pg := st.MakePodGroup().Namespace("ns").Name("pg").Obj()
+
+	cycleRoot := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1)}
+	cycleChild := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg2)}
+	cycleRoot.Children = []*framework.PodGroupInfo{cycleChild}
+	cycleChild.Children = []*framework.PodGroupInfo{cycleRoot}
+
+	tests := []struct {
+		name        string
+		root        fwk.PodGroupInfo
+		wantErrSub  string
+		expectError bool
+	}{
+		{
+			name:        "nil root",
+			root:        nil,
+			expectError: false,
+		},
+		{
+			name:        "single root (depth 1)",
+			root:        &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg)},
+			expectError: false,
+		},
+		{
+			name: "valid 4 levels",
+			root: &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
+				Children: []*framework.PodGroupInfo{
+					{
+						GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg2),
+						Children: []*framework.PodGroupInfo{
+							{
+								GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg3),
+								Children: []*framework.PodGroupInfo{
+									{GenericPodGroup: fwk.NewGenericPodGroup(pg)},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "5 levels exceeds max depth",
+			root: &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
+				Children: []*framework.PodGroupInfo{
+					{
+						GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg2),
+						Children: []*framework.PodGroupInfo{
+							{
+								GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg3),
+								Children: []*framework.PodGroupInfo{
+									{
+										GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg4),
+										Children: []*framework.PodGroupInfo{
+											{GenericPodGroup: fwk.NewGenericPodGroup(pg)},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectError: true,
+			wantErrSub:  "hierarchy depth 5 exceeds maximum allowed depth 4",
+		},
+		{
+			name:        "cycle detected",
+			root:        cycleRoot,
+			expectError: true,
+			wantErrSub:  "cycle detected in hierarchy",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateHierarchy(tt.root)
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErrSub)
+				}
+				if tt.wantErrSub != "" && !strings.Contains(err.Error(), tt.wantErrSub) {
+					t.Fatalf("expected error containing %q, got %q", tt.wantErrSub, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("expected no error, got: %v", err)
 				}
 			}
 		})

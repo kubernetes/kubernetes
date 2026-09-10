@@ -3781,6 +3781,197 @@ func TestGatedPodFlushFrequency(t *testing.T) {
 	}
 }
 
+func TestValidateIncompletePodGroupPods(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.CompositePodGroup:               true,
+		features.TopologyAwareWorkloadScheduling: true,
+	})
+
+	flushDuration := 5 * time.Minute
+
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		initialPodGroups    []*schedulingv1beta1.PodGroup
+		initialCPGs         []*schedulingv1alpha3.CompositePodGroup
+		stepDuration        time.Duration
+		wantCondition       bool
+		wantConditionReason string
+		wantConditionSubMsg string
+		wantApiActionsCount int
+		wantIncomplete      bool
+		wantActiveQLen      int
+	}{
+		{
+			name: "young pod waiting less than timeout is skipped",
+			pod:  st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg2").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("default").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			stepDuration:   2 * time.Minute,
+			wantCondition:  false,
+			wantIncomplete: true,
+			wantActiveQLen: 0,
+		},
+		{
+			name: "pod waiting longer than timeout with cycle is patched as unschedulable",
+			pod:  st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg2").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("default").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			stepDuration:        6 * time.Minute,
+			wantCondition:       true,
+			wantConditionReason: v1.PodReasonUnschedulable,
+			wantConditionSubMsg: "cycle detected in hierarchy",
+			wantApiActionsCount: 1,
+			wantIncomplete:      true,
+			wantActiveQLen:      0,
+		},
+		{
+			name: "pod waiting longer than timeout with depth exceeding max is patched as unschedulable",
+			pod:  st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg2").ParentCompositePodGroup("cpg3").Obj(),
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg3").ParentCompositePodGroup("cpg4").Obj(),
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg4").Obj(),
+			},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("default").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			stepDuration:        6 * time.Minute,
+			wantCondition:       true,
+			wantConditionReason: v1.PodReasonUnschedulable,
+			wantConditionSubMsg: "hierarchy depth 5 exceeds maximum allowed depth 4",
+			wantApiActionsCount: 1,
+			wantIncomplete:      true,
+			wantActiveQLen:      0,
+		},
+		{
+			name: "pod waiting longer than timeout with missing parent is patched as unschedulable",
+			pod:  st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("default").Name("pg1").ParentCompositePodGroup("cpg-missing").Obj(),
+			},
+			stepDuration:        6 * time.Minute,
+			wantCondition:       true,
+			wantConditionReason: v1.PodReasonUnschedulable,
+			wantConditionSubMsg: "compositepodgroup/default/cpg-missing not found in workload forest",
+			wantApiActionsCount: 1,
+			wantIncomplete:      true,
+			wantActiveQLen:      0,
+		},
+		{
+			name: "pod already having identical condition is not re-patched",
+			pod: func() *v1.Pod {
+				pod := st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Conditions([]v1.PodCondition{
+					{
+						Type:    v1.PodScheduled,
+						Status:  v1.ConditionFalse,
+						Reason:  v1.PodReasonUnschedulable,
+						Message: "cycle detected in hierarchy at compositepodgroup/default/cpg1",
+					},
+				}).Obj()
+				return pod
+			}(),
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+				st.MakeCompositePodGroup().Namespace("default").Name("cpg2").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Namespace("default").Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			stepDuration:        6 * time.Minute,
+			wantCondition:       true,
+			wantConditionReason: v1.PodReasonUnschedulable,
+			wantConditionSubMsg: "cycle detected in hierarchy at compositepodgroup/default/cpg1",
+			wantApiActionsCount: 0,
+			wantIncomplete:      true,
+			wantActiveQLen:      0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := testingclock.NewFakeClock(time.Now())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			cs := fake.NewClientset(tt.pod)
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithClient(cs),
+				WithPodMaxInIncompletePodsDuration(flushDuration),
+				WithIncompletePodGroupPodsPeriod(flushDuration))
+
+			for _, cpg := range tt.initialCPGs {
+				q.AddGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(cpg))
+			}
+			for _, pg := range tt.initialPodGroups {
+				q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg))
+			}
+
+			pInfo := &framework.QueuedPodInfo{
+				PodInfo: &framework.PodInfo{Pod: tt.pod},
+				QueueingParams: framework.QueueingParams{
+					Timestamp: c.Now(),
+				},
+			}
+			q.incompletePodGroupPods.add(pInfo)
+
+			c.Step(tt.stepDuration)
+			cs.ClearActions()
+			q.validateIncompletePodGroupPods(logger)
+
+			if tt.wantIncomplete && q.incompletePodGroupPods.get(tt.pod) == nil {
+				t.Fatalf("Expected pod to remain in incompletePodGroupPods")
+			}
+			if !tt.wantIncomplete && q.incompletePodGroupPods.get(tt.pod) != nil {
+				t.Fatalf("Expected pod to be removed from incompletePodGroupPods")
+			}
+			if q.activeQ.len() != tt.wantActiveQLen {
+				t.Fatalf("Expected activeQ len %d, got %d", tt.wantActiveQLen, q.activeQ.len())
+			}
+
+			if tt.wantApiActionsCount != len(cs.Actions()) {
+				t.Fatalf("Expected %d API actions, got %d: %v", tt.wantApiActionsCount, len(cs.Actions()), cs.Actions())
+			}
+
+			podObj, err := cs.CoreV1().Pods(tt.pod.Namespace).Get(ctx, tt.pod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get pod from clientset: %v", err)
+			}
+			_, cond := podutil.GetPodCondition(&podObj.Status, v1.PodScheduled)
+			if tt.wantCondition {
+				if cond == nil {
+					t.Fatalf("Expected PodScheduled condition on pod")
+				}
+				if cond.Status != v1.ConditionFalse {
+					t.Fatalf("Expected ConditionFalse, got %v", cond.Status)
+				}
+				if cond.Reason != tt.wantConditionReason {
+					t.Fatalf("Expected Reason %s, got %s", tt.wantConditionReason, cond.Reason)
+				}
+				if tt.wantConditionSubMsg != "" && !strings.Contains(cond.Message, tt.wantConditionSubMsg) {
+					t.Fatalf("Expected condition message to contain %q, got %q", tt.wantConditionSubMsg, cond.Message)
+				}
+			} else {
+				if cond != nil {
+					t.Fatalf("Expected no PodScheduled condition on pod, got %v", cond)
+				}
+			}
+		})
+	}
+}
+
 // TestAddAttemptedPodGroupIfNeeded verifies that AddAttemptedPodGroupIfNeeded
 // correctly handles pod groups with or without failed plugins.
 func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {

@@ -129,6 +129,8 @@ type schedulerOptions struct {
 	podInitialBackoffSeconds          int64
 	podMaxBackoffSeconds              int64
 	podMaxInUnschedulablePodsDuration time.Duration
+	podMaxInIncompletePodsDuration    time.Duration
+	incompletePodGroupPodsPeriod      time.Duration
 	maxBatchAge                       time.Duration
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry frameworkruntime.Registry
@@ -227,6 +229,20 @@ func WithPodMaxInUnschedulablePodsDuration(duration time.Duration) Option {
 	}
 }
 
+// WithPodMaxInIncompletePodsDuration sets podMaxInIncompletePodsDuration for PriorityQueue.
+func WithPodMaxInIncompletePodsDuration(duration time.Duration) Option {
+	return func(o *schedulerOptions) {
+		o.podMaxInIncompletePodsDuration = duration
+	}
+}
+
+// WithIncompletePodGroupPodsPeriod sets incompletePodGroupPodsPeriod for PriorityQueue.
+func WithIncompletePodGroupPodsPeriod(duration time.Duration) Option {
+	return func(o *schedulerOptions) {
+		o.incompletePodGroupPodsPeriod = duration
+	}
+}
+
 // WithMaxBatchAge sets maxBatchAge for OpportunisticBatching, the default value is 500ms.
 func WithMaxBatchAge(maxBatchAge time.Duration) Option {
 	return func(o *schedulerOptions) {
@@ -264,6 +280,8 @@ var defaultSchedulerOptions = schedulerOptions{
 	podInitialBackoffSeconds:          int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:              int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 	podMaxInUnschedulablePodsDuration: internalqueue.DefaultPodMaxInUnschedulablePodsDuration,
+	podMaxInIncompletePodsDuration:    internalqueue.DefaultIncompletePodGroupPodsPeriod,
+	incompletePodGroupPodsPeriod:      internalqueue.DefaultIncompletePodGroupPodsPeriod,
 	maxBatchAge:                       frameworkruntime.DefaultMaxBatchAge,
 	parallelism:                       int32(parallelize.DefaultParallelism),
 	// Ideally we would statically set the default profile here, but we can't because
@@ -331,6 +349,11 @@ func New(ctx context.Context,
 		podSigners[profileName] = profile.SignPod
 	}
 
+	var apiDispatcher fwk.APIDispatcher
+	if comps.apiDispatcher != nil {
+		apiDispatcher = comps.apiDispatcher
+	}
+
 	podQueue := internalqueue.NewSchedulingQueue(
 		profiles[comps.options.profiles[0].SchedulerName].QueueSortFunc(),
 		informerFactory,
@@ -339,11 +362,14 @@ func New(ctx context.Context,
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(options.podMaxBackoffSeconds)*time.Second),
 		internalqueue.WithPodLister(podLister),
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
+		internalqueue.WithPodMaxInIncompletePodsDuration(options.podMaxInIncompletePodsDuration),
+		internalqueue.WithIncompletePodGroupPodsPeriod(options.incompletePodGroupPodsPeriod),
 		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
 		internalqueue.WithQueueingHintMapPerProfile(queueingHintsPerProfile),
 		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
 		internalqueue.WithMetricsRecorder(comps.metricsRecorder),
-		internalqueue.WithAPIDispatcher(comps.apiDispatcher),
+		internalqueue.WithAPIDispatcher(apiDispatcher),
+		internalqueue.WithClient(client),
 		internalqueue.WithPodSigners(podSigners),
 	)
 

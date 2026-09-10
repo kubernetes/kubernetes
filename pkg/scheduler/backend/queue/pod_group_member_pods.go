@@ -107,6 +107,17 @@ func (p *podGroupMemberPods) list() []*v1.Pod {
 	return pods
 }
 
+// listPodInfos returns all tracked queued pod infos.
+func (p *podGroupMemberPods) listPodInfos() []*framework.QueuedPodInfo {
+	var pInfos []*framework.QueuedPodInfo
+	for _, pgPods := range p.podGroupToPodInfos {
+		for _, pInfo := range pgPods {
+			pInfos = append(pInfos, pInfo)
+		}
+	}
+	return pInfos
+}
+
 // clear removes and returns all pod infos for a specific pod group namespace and name.
 // It also decrements the metric counter for all cleared pods.
 func (p *podGroupMemberPods) clear(namespace, name string) []*framework.QueuedPodInfo {

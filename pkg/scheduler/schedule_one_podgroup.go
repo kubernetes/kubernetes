@@ -25,10 +25,12 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
@@ -176,12 +178,43 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 	}
 }
 
+// validateHierarchy checks that the group hierarchy does not exceed WorkloadMaxTreeDepth and contains no cycles.
+func validateHierarchy(root fwk.PodGroupInfo) error {
+	if root == nil || root.GetType() == fwk.PodGroupKeyType {
+		return nil
+	}
+	visited := sets.New[fwk.EntityKey]()
+	var walk func(node fwk.PodGroupInfo, depth int) error
+	walk = func(node fwk.PodGroupInfo, depth int) error {
+		key := node.GetKey()
+		if visited.Has(key) {
+			return fmt.Errorf("cycle detected in hierarchy at %s", key.String())
+		}
+		if depth > schedulingv1alpha3.WorkloadMaxTreeDepth {
+			return fmt.Errorf("hierarchy depth %d exceeds maximum allowed depth %d at %s", depth, schedulingv1alpha3.WorkloadMaxTreeDepth, key.String())
+		}
+		visited.Insert(key)
+		for _, child := range node.GetChildren() {
+			if err := walk(child, depth+1); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return walk(root, 1)
+}
+
 // validatePodGroup ensures that:
 // - all Pods in a group hierarchy have matching scheduler name,
 // - all Pods in a group hierarchy have the same preemption policy,
 // - the root group has the same priority as all the Pods.
 // - the root group has the same preemption policy as all the Pods.
+// - the pod group hierarchy does not exceed the maximum allowed tree depth and has no cycles.
 func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupInfo) error {
+	if err := validateHierarchy(podGroupInfo.PodGroupInfo); err != nil {
+		return err
+	}
+
 	schedulerName := ""
 	podGroupPriority := podGroupInfo.GetPriority()
 
