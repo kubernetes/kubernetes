@@ -2306,7 +2306,7 @@ var map_ResourceFieldSelector = map[string]string{
 	"":              "ResourceFieldSelector represents container resources (cpu, memory) and their output format",
 	"containerName": "Container name: required for volumes, optional for env vars",
 	"resource":      "Required: resource to select",
-	"divisor":       "Specifies the output format of the exposed resources, defaults to \"1\"",
+	"divisor":       "Divisor optionally indicates how the resource from the container should be scaled. If unset or 0, the resource is not scaled (divisor is treated as 1).",
 }
 
 func (ResourceFieldSelector) SwaggerDoc() map[string]string {

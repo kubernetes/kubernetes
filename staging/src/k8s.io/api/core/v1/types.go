@@ -2811,7 +2811,8 @@ type ResourceFieldSelector struct {
 	ContainerName string `json:"containerName,omitempty" protobuf:"bytes,1,opt,name=containerName"`
 	// Required: resource to select
 	Resource string `json:"resource" protobuf:"bytes,2,opt,name=resource"`
-	// Specifies the output format of the exposed resources, defaults to "1"
+	// Divisor optionally indicates how the resource from the container should be scaled.
+	// If unset or 0, the resource is not scaled (divisor is treated as 1).
 	// +optional
 	Divisor resource.Quantity `json:"divisor,omitempty" protobuf:"bytes,3,opt,name=divisor"`
 }

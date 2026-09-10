@@ -30860,7 +30860,7 @@ func schema_k8sio_api_core_v1_ResourceFieldSelector(ref common.ReferenceCallback
 					},
 					"divisor": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the output format of the exposed resources, defaults to \"1\"",
+							Description: "Divisor optionally indicates how the resource from the container should be scaled. If unset or 0, the resource is not scaled (divisor is treated as 1).",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
