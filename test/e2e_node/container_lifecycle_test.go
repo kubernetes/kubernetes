@@ -2202,6 +2202,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							Delay:    600,
 							ExitCode: 0,
 						}),
+						Lifecycle: &v1.Lifecycle{
+							PostStart: startedPostStartGate(),
+						},
 						RestartPolicy: &containerRestartPolicyAlways,
 					},
 					{
@@ -2219,6 +2222,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							Delay:    600,
 							ExitCode: 0,
 						}),
+						Lifecycle: &v1.Lifecycle{
+							PostStart: startedPostStartGate(),
+						},
 						RestartPolicy: &containerRestartPolicyAlways,
 					},
 					{
