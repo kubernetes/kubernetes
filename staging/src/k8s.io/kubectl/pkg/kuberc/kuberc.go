@@ -36,6 +36,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/kubectl/pkg/config"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 )
 
 const (
@@ -58,6 +60,7 @@ var _ = clientcmdapi.AllowlistEntry(config.AllowlistEntry{})
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
 	AddFlags(flags *pflag.FlagSet)
+	Read(args []string, errOut io.Writer) (*config.Preference, error)
 	Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error)
 }
 
@@ -68,6 +71,10 @@ type Preferences struct {
 
 	aliases map[string]struct{}
 	policy  clientcmdapi.PluginPolicy
+
+	// memoization (cache)
+	kuberc *config.Preference
+	read   bool
 }
 
 // NewPreferences returns initialized Preferences object.
@@ -91,6 +98,38 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 	flags.String("kuberc", "", "Path to the kuberc file to use for preferences. This can be disabled by exporting KUBECTL_KUBERC=false feature gate or turning off the feature KUBERC=off.")
 }
 
+func (p *Preferences) Read(args []string, errOut io.Writer) (*config.Preference, error) {
+	if p.read {
+		return p.kuberc, nil
+	}
+
+	kubercPath, err := getExplicitKuberc(args)
+	if err != nil {
+		return nil, err
+	}
+
+	kuberc, err := p.getPreferencesFunc(kubercPath, errOut)
+	if err != nil {
+		return nil, fmt.Errorf("kuberc error %w", err)
+	}
+
+	if kuberc == nil {
+		return nil, nil
+	}
+
+	p.convertPluginPolicy(kuberc)
+
+	err = p.validate(kuberc)
+	if err != nil {
+		return nil, err
+	}
+
+	p.kuberc = kuberc
+	p.read = true
+
+	return kuberc, nil
+}
+
 // Apply firstly applies the aliases in the preferences file and secondly overrides
 // the default values of flags.
 func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error) {
@@ -98,24 +137,11 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclio
 		return args, nil
 	}
 
-	kubercPath, err := getExplicitKuberc(args)
+	kuberc, err := p.Read(args, errOut)
 	if err != nil {
 		return args, err
-	}
-	kuberc, err := p.getPreferencesFunc(kubercPath, errOut)
-	if err != nil {
-		return args, fmt.Errorf("kuberc error %w", err)
-	}
-
-	if kuberc == nil {
+	} else if kuberc == nil {
 		return args, nil
-	}
-
-	p.convertPluginPolicy(kuberc)
-
-	err = p.validate(kuberc)
-	if err != nil {
-		return args, err
 	}
 
 	p.applyPluginPolicy(kubeConfigFlags, kuberc)
@@ -257,16 +283,10 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 			break
 		}
 
-		commands := strings.Fields(alias.Command)
-		existingCmd, flags, err := rootCmd.Find(commands)
+		aliasCmd, err := BuildAliasCommand(rootCmd, alias)
 		if err != nil {
-			return args, fmt.Errorf("command %q not found to set alias %q: %v", alias.Command, alias.Name, flags)
+			return args, err
 		}
-
-		newCmd := *existingCmd
-		newCmd.Use = alias.Name
-		newCmd.Aliases = []string{}
-		aliasCmd := &newCmd
 
 		if alias.Name == commandName {
 			aliasArgs = &aliasing{
@@ -349,6 +369,23 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	}
 
 	return args, nil
+}
+
+// BuildAliasCommand resolves the underlying command referenced by alias.Command
+// and returns a copy of it renamed to alias.Name, suitable for registration
+// in the command tree or for listing (e.g. in help output).
+func BuildAliasCommand(rootCmd *cobra.Command, alias config.AliasOverride) (*cobra.Command, error) {
+	commands := strings.Fields(alias.Command)
+	existingCmd, flags, err := rootCmd.Find(commands)
+	if err != nil {
+		return nil, fmt.Errorf("command %q not found to set alias %q: %v", alias.Command, alias.Name, flags)
+	}
+
+	newCmd := *existingCmd
+	newCmd.Use = alias.Name
+	newCmd.Aliases = []string{}
+
+	return &newCmd, nil
 }
 
 // LoadKuberc returns the correct kuberc file. Explicitly specified is always highest priority.
@@ -535,4 +572,47 @@ func (p *Preferences) validate(plugin *config.Preference) error {
 	}
 
 	return nil
+}
+
+func GetAliasesCommandGroup(kubectl *cobra.Command, p PreferencesHandler, args []string) templates.CommandGroup {
+	// Find root level
+	return templates.CommandGroup{
+		Message:  i18n.T("Aliases provided by kuberc:"),
+		Commands: registerAliasCommands(kubectl, p, args),
+	}
+}
+
+// registerAliasCommand allows adding Cobra command to the command tree or extracting them for usage in
+// e.g. the help function or for registering the completion function
+func registerAliasCommands(kubectl *cobra.Command, p PreferencesHandler, args []string) (cmds []*cobra.Command) {
+	streams := genericclioptions.IOStreams{
+		In:     &bytes.Buffer{},
+		Out:    io.Discard,
+		ErrOut: io.Discard,
+	}
+
+	kuberc, err := p.Read(args, streams.ErrOut)
+	if err != nil || kuberc == nil {
+		return []*cobra.Command{}
+	}
+
+	userDefinedCommands := []*cobra.Command{}
+	for _, alias := range kuberc.Aliases {
+		aliasCmd, err := BuildAliasCommand(kubectl, alias)
+		if err != nil {
+			continue
+		}
+
+		aliasCmd.Short = strings.Join(
+			append(
+				append([]string{alias.Command}, alias.PrependArgs...),
+				alias.AppendArgs...,
+			),
+			" ",
+		)
+
+		userDefinedCommands = append(userDefinedCommands, aliasCmd)
+	}
+
+	return userDefinedCommands
 }

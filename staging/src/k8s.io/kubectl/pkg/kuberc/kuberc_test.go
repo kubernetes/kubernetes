@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -3198,6 +3199,124 @@ credentialPluginPolicy: ""
 				require.Error(t, err, "expected error, but error was nil")
 			} else {
 				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestRegisterAliasCommands(t *testing.T) {
+	tests := []struct {
+		name               string
+		nestedCmds         []fakeCmds[string]
+		args               []string
+		getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
+		expectedCmdNames   []string
+		expectedCmdCount   int
+	}{
+		{
+			name: "single alias registered",
+			nestedCmds: []fakeCmds[string]{
+				{
+					name: "command1",
+					flags: []fakeFlag[string]{
+						{
+							name:  "firstflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"getcmd",
+			},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Aliases: []config.AliasOverride{
+						{
+							Name:    "getcmd",
+							Command: "command1",
+						},
+					},
+				}, nil
+			},
+			expectedCmdNames: []string{"getcmd"},
+			expectedCmdCount: 1,
+		},
+		{
+			name: "duplicate alias names deduplicated",
+			nestedCmds: []fakeCmds[string]{
+				{name: "command1"},
+			},
+			args: []string{"root", "getcmd"},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Aliases: []config.AliasOverride{
+						{Name: "getcmd", Command: "command1"},
+						{Name: "getcmd", Command: "command1"},
+					},
+				}, nil
+			},
+			expectedCmdNames: []string{},
+			expectedCmdCount: 0,
+		},
+		{
+			name: "no aliases in kuberc",
+			nestedCmds: []fakeCmds[string]{
+				{name: "command1"},
+			},
+			args: []string{"root", "getcmd"},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Aliases: []config.AliasOverride{},
+				}, nil
+			},
+			expectedCmdNames: []string{},
+			expectedCmdCount: 0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rootCmd := &cobra.Command{
+				Use: "root",
+			}
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			addCommands(rootCmd, test.nestedCmds)
+			pref.getPreferencesFunc = test.getPreferencesFunc
+
+			group := GetAliasesCommandGroup(rootCmd, pref, test.args)
+
+			if len(group.Commands) != test.expectedCmdCount {
+				t.Fatalf("expected %d command(s), got %d", test.expectedCmdCount, len(group.Commands))
+			}
+
+			seen := map[string]bool{}
+			for _, c := range group.Commands {
+				if !slices.Contains(test.expectedCmdNames, c.Name()) {
+					t.Fatalf("unexpected command %s, expected one of %v", c.Name(), test.expectedCmdNames)
+				}
+				if seen[c.Name()] {
+					t.Fatalf("duplicate command %s in group.Commands", c.Name())
+				}
+				seen[c.Name()] = true
 			}
 		})
 	}
