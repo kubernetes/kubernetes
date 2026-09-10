@@ -892,7 +892,7 @@ function construct-windows-kubeproxy-flags {
   # port usage for services.
   # https://techcommunity.microsoft.com/t5/networking-blog/direct-server-return-dsr-in-a-nutshell/ba-p/693710
   if [[ "${WINDOWS_ENABLE_DSR:-}" == "true" ]]; then
-    flags+=" --feature-gates=WinDSR=true --enable-dsr=true "
+    flags+=" --enable-dsr=true "
   fi
 
   # Configure flags with explicit empty string values. We can't escape
