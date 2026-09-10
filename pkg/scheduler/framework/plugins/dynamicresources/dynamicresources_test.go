@@ -112,6 +112,7 @@ var (
 	driver                              = "some-driver"
 	driver2                             = "some-driver-2"
 	sharedDeviceName                    = "shared-instance"
+	sharedDeviceName2                   = "shared-instance-2"
 	podName                             = "my-pod"
 	podUID                              = "1234"
 	podGroupName                        = "my-podgroup"
@@ -430,6 +431,20 @@ var (
 			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
 		}(),
 	}
+	allocationResultWithSharedDevice2 = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  sharedDeviceName2,
+				Request: "req-1",
+				ShareID: ptr.To(types.UID("share-456")), // Shared device allocation
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
 	allocationResultWithConsumedCapacity = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
@@ -724,6 +739,9 @@ var (
 					Obj()
 	allocatedClaimWithSharedDevice = st.FromResourceClaim(pendingClaim).
 					Allocation(allocationResultWithSharedDevice).
+					Obj()
+	allocatedClaimWithSharedDevice2 = st.FromResourceClaim(pendingClaim2).
+					Allocation(allocationResultWithSharedDevice2).
 					Obj()
 	allocatedClaimWithConsumedCapacity = st.FromResourceClaim(pendingClaim).
 						Allocation(allocationResultWithConsumedCapacity).
@@ -5738,50 +5756,59 @@ func TestGatherAllocatedState(t *testing.T) {
 }
 func testGatherAllocatedState(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
-		allocatedResourceClaims   []*resourceapi.ResourceClaim
-		inflightResourceClaims    map[types.UID]*resourceapi.ResourceClaim
-		enabledConsumableCapacity bool
-		expectErr                 bool
-		expectedIDAllocated       int
-		expectedSharedIDAllocated int
-		expectedConsumedCapacity  string
+		allocatedResourceClaims          []*resourceapi.ResourceClaim
+		inflightResourceClaims           map[types.UID]*resourceapi.ResourceClaim
+		enabledConsumableCapacity        bool
+		expectErr                        bool
+		expectedAllocatedDeviceIDs       int
+		expectedAllocatedSharedDeviceIDs int
+		expectedConsumedCapacity         string
 	}{
 		"no-claims": {
-			expectedIDAllocated:       0,
-			expectedSharedIDAllocated: 0,
+			expectedAllocatedDeviceIDs:       0,
+			expectedAllocatedSharedDeviceIDs: 0,
 		},
 		"single-allocated-claim": {
 			allocatedResourceClaims: []*resourceapi.ResourceClaim{
 				allocatedClaim,
 			},
-			expectedIDAllocated:       1,
-			expectedSharedIDAllocated: 0,
+			expectedAllocatedDeviceIDs:       1,
+			expectedAllocatedSharedDeviceIDs: 0,
 		},
 		"single-allocated-claim-with-shared-device": {
 			enabledConsumableCapacity: true,
 			allocatedResourceClaims: []*resourceapi.ResourceClaim{
 				allocatedClaimWithSharedDevice,
 			},
-			expectedIDAllocated:       0,
-			expectedSharedIDAllocated: 1,
+			expectedAllocatedDeviceIDs:       0,
+			expectedAllocatedSharedDeviceIDs: 1,
+		},
+		"multiple-allocated-claims-with-distinct-shared-devices": {
+			enabledConsumableCapacity: true,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithSharedDevice,
+				allocatedClaimWithSharedDevice2,
+			},
+			expectedAllocatedDeviceIDs:       0,
+			expectedAllocatedSharedDeviceIDs: 2,
 		},
 		"single-allocated-claim-with-capacity": {
 			enabledConsumableCapacity: true,
 			allocatedResourceClaims: []*resourceapi.ResourceClaim{
 				allocatedClaimWithConsumedCapacity,
 			},
-			expectedIDAllocated:       0,
-			expectedSharedIDAllocated: 1,
-			expectedConsumedCapacity:  "1",
+			expectedAllocatedDeviceIDs:       0,
+			expectedAllocatedSharedDeviceIDs: 1,
+			expectedConsumedCapacity:         "1",
 		},
 		"disabled-single-allocated-claim-with-capacity": {
 			enabledConsumableCapacity: false,
 			allocatedResourceClaims: []*resourceapi.ResourceClaim{
 				allocatedClaimWithConsumedCapacity,
 			},
-			expectedIDAllocated:       1,
-			expectedSharedIDAllocated: 0,
-			expectedConsumedCapacity:  "",
+			expectedAllocatedDeviceIDs:       1,
+			expectedAllocatedSharedDeviceIDs: 0,
+			expectedConsumedCapacity:         "",
 		},
 		"mixed-allocated-claim": {
 			enabledConsumableCapacity: true,
@@ -5789,9 +5816,9 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 				allocatedClaim,
 				allocatedClaimWithConsumedCapacity,
 			},
-			expectedIDAllocated:       1,
-			expectedSharedIDAllocated: 1,
-			expectedConsumedCapacity:  "1",
+			expectedAllocatedDeviceIDs:       1,
+			expectedAllocatedSharedDeviceIDs: 1,
+			expectedConsumedCapacity:         "1",
 		},
 		"add-inflight-allocated-claim-with-capacity": {
 			enabledConsumableCapacity: true,
@@ -5802,9 +5829,20 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 			inflightResourceClaims: map[types.UID]*resourceapi.ResourceClaim{
 				"claim-2-uid": allocatedClaimWithConsumedCapacity2,
 			},
-			expectedIDAllocated:       1,
-			expectedSharedIDAllocated: 2,
-			expectedConsumedCapacity:  "2",
+			expectedAllocatedDeviceIDs:       1,
+			expectedAllocatedSharedDeviceIDs: 1,
+			expectedConsumedCapacity:         "2",
+		},
+		"add-inflight-allocated-claim-with-distinct-shared-device": {
+			enabledConsumableCapacity: true,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithSharedDevice,
+			},
+			inflightResourceClaims: map[types.UID]*resourceapi.ResourceClaim{
+				"claim-2-uid": allocatedClaimWithSharedDevice2,
+			},
+			expectedAllocatedDeviceIDs:       0,
+			expectedAllocatedSharedDeviceIDs: 2,
 		},
 		"disabled-inflight-allocated-claim-with-capacity": {
 			enabledConsumableCapacity: false,
@@ -5815,9 +5853,9 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 			inflightResourceClaims: map[types.UID]*resourceapi.ResourceClaim{
 				"claim-2-uid": allocatedClaimWithConsumedCapacity2,
 			},
-			expectedIDAllocated:       2,
-			expectedSharedIDAllocated: 0,
-			expectedConsumedCapacity:  "",
+			expectedAllocatedDeviceIDs:       2,
+			expectedAllocatedSharedDeviceIDs: 0,
+			expectedConsumedCapacity:         "",
 		},
 	}
 	for name, tc := range testcases {
@@ -5870,11 +5908,11 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 			aggregatedCapacity := allocatedState.AggregatedCapacity
 
 			// Verify the counts match expectations
-			if allocatedDeviceIDs.Len() != tc.expectedIDAllocated {
-				tCtx.Errorf("expected %d allocated device IDs, got %d", tc.expectedIDAllocated, allocatedDeviceIDs.Len())
+			if allocatedDeviceIDs.Len() != tc.expectedAllocatedDeviceIDs {
+				tCtx.Errorf("expected %d allocated device IDs, got %d", tc.expectedAllocatedDeviceIDs, allocatedDeviceIDs.Len())
 			}
-			if allocatedSharedDeviceIDs.Len() != tc.expectedSharedIDAllocated {
-				tCtx.Errorf("expected %d allocated shared device IDs, got %d", tc.expectedSharedIDAllocated, allocatedSharedDeviceIDs.Len())
+			if allocatedSharedDeviceIDs.Len() != tc.expectedAllocatedSharedDeviceIDs {
+				tCtx.Errorf("expected %d allocated shared device IDs, got %d", tc.expectedAllocatedSharedDeviceIDs, allocatedSharedDeviceIDs.Len())
 			}
 
 			// Verify aggregated capacity is initialized
