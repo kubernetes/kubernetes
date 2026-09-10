@@ -64,6 +64,7 @@ type LeaseCandidateSpec struct {
 	// binaryVersion is the binary version. It must be in a semver format without leading `v`.
 	// This field is required.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	BinaryVersion string `json:"binaryVersion" protobuf:"bytes,4,name=binaryVersion"`
 	// emulationVersion is the emulation version. It must be in a semver format without leading `v`.
 	// EmulationVersion must be less than or equal to BinaryVersion.

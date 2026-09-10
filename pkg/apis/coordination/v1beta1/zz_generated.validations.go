@@ -137,6 +137,71 @@ func Validate_LeaseCandidate(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field coordinationv1beta1.LeaseCandidate.Spec has no validation
+	{ // field coordinationv1beta1.LeaseCandidate.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1beta1.LeaseCandidateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_LeaseCandidateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1beta1.LeaseCandidate) *coordinationv1beta1.LeaseCandidateSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_LeaseCandidateSpec validates an instance of LeaseCandidateSpec according
+// to declarative validation rules in the API schema.
+func Validate_LeaseCandidateSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1beta1.LeaseCandidateSpec) (errs field.ErrorList) {
+
+	// field coordinationv1beta1.LeaseCandidateSpec.LeaseName has no validation
+	// field coordinationv1beta1.LeaseCandidateSpec.PingTime has no validation
+	// field coordinationv1beta1.LeaseCandidateSpec.RenewTime has no validation
+
+	{ // field coordinationv1beta1.LeaseCandidateSpec.BinaryVersion
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1beta1.LeaseCandidateSpec) *string {
+				return &oldObj.BinaryVersion
+			})
+		errs = append(errs, fn(fldPath.Child("binaryVersion"), &obj.BinaryVersion, oldVal, oldObj != nil)...)
+	}
+
+	// field coordinationv1beta1.LeaseCandidateSpec.EmulationVersion has no validation
+	// field coordinationv1beta1.LeaseCandidateSpec.Strategy has no validation
 	return errs
 }
