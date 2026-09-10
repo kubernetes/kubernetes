@@ -8049,10 +8049,10 @@ type LimitRangeItem struct {
 	// Min usage constraints on this kind by resource name.
 	// +optional
 	Min ResourceList `json:"min,omitempty" protobuf:"bytes,3,rep,name=min,casttype=ResourceList,castkey=ResourceName"`
-	// Default is the default value applied to a container's resource limits (not requests) for the named resource, if the container does not specify its ownlimit. Commonly referred to as the 'default limit.' See DefaultRequest for the equivalent behavior on resource requests.
+	// Default specifies resource limit values by resource name. These are applied to containers which do not specify their own limits for those resources.
 	// +optional
 	Default ResourceList `json:"default,omitempty" protobuf:"bytes,4,rep,name=default,casttype=ResourceList,castkey=ResourceName"`
-	// DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.
+	// DefaultRequest specifies resource request values by resource name. These are applied to containers which do not specify their own requests for those resources.
 	// +optional
 	DefaultRequest ResourceList `json:"defaultRequest,omitempty" protobuf:"bytes,5,rep,name=defaultRequest,casttype=ResourceList,castkey=ResourceName"`
 	// MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.

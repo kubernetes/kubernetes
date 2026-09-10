@@ -33,9 +33,9 @@ type LimitRangeItemApplyConfiguration struct {
 	Max *corev1.ResourceList `json:"max,omitempty"`
 	// Min usage constraints on this kind by resource name.
 	Min *corev1.ResourceList `json:"min,omitempty"`
-	// Default is the default value applied to a container's resource limits (not requests) for the named resource, if the container does not specify its ownlimit. Commonly referred to as the 'default limit.' See DefaultRequest for the equivalent behavior on resource requests.
+	// Default specifies resource limit values by resource name. These are applied to containers which do not specify their own limits for those resources.
 	Default *corev1.ResourceList `json:"default,omitempty"`
-	// DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.
+	// DefaultRequest specifies resource request values by resource name. These are applied to containers which do not specify their own requests for those resources.
 	DefaultRequest *corev1.ResourceList `json:"defaultRequest,omitempty"`
 	// MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.
 	MaxLimitRequestRatio *corev1.ResourceList `json:"maxLimitRequestRatio,omitempty"`
