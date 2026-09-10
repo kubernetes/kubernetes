@@ -210,3 +210,19 @@ func TestDetermineEffectiveRunAsUser(t *testing.T) {
 		})
 	}
 }
+
+func TestDetermineEffectiveRunAsGroup_Overriding(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{RunAsGroup: ptr.To[int64](0)},
+		},
+	}
+	container := &v1.Container{
+		SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](1000)},
+	}
+
+	runAsGroup, ok := DetermineEffectiveRunAsGroup(pod, container)
+	if !ok || runAsGroup == nil || *runAsGroup != 1000 {
+		t.Errorf("DetermineEffectiveRunAsGroup(%v, %v) = %v, %v, want 1000, true", pod, container, runAsGroup, ok)
+	}
+}
