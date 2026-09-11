@@ -30,6 +30,8 @@ type FakePodContainerManager struct {
 	sync.Mutex
 	CalledFunctions []string
 	Cgroups         map[types.UID]CgroupName
+	// PodCgroupConfig is returned by GetPodCgroupConfig per resource; absent entries read back as nil.
+	PodCgroupConfig map[v1.ResourceName]*ResourceConfig
 }
 
 var _ PodContainerManager = &FakePodContainerManager{}
@@ -113,11 +115,11 @@ func (cm *FakePodContainerManager) GetPodCgroupMemoryUsage(_ *v1.Pod) (uint64, e
 	return 0, nil
 }
 
-func (cm *FakePodContainerManager) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName) (*ResourceConfig, error) {
+func (cm *FakePodContainerManager) GetPodCgroupConfig(_ *v1.Pod, rName v1.ResourceName) (*ResourceConfig, error) {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodCgroupConfig")
-	return nil, nil
+	return cm.PodCgroupConfig[rName], nil
 }
 
 func (cm *FakePodContainerManager) SetPodCgroupConfig(_ klog.Logger, _ *v1.Pod, _ *ResourceConfig) error {

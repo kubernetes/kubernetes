@@ -369,6 +369,8 @@ type ContainerResources struct {
 	MemoryRequest *resource.Quantity
 	// Memory limit enforced on the container
 	MemoryLimit *resource.Quantity
+	// True when the runtime reports an unlimited (-1) CPU quota, so a nil CPULimit is intentional
+	CPUQuotaUnlimited bool
 }
 
 // Status represents the status of a container.
