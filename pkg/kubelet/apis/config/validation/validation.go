@@ -19,6 +19,7 @@ package validation
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"time"
 	"unicode"
 
@@ -180,6 +181,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
+	}
+	if kc.ClientCertificateKeyAlgorithm != nil && !slices.Contains(kubeletconfig.ValidCertificateKeyAlgorithms, *kc.ClientCertificateKeyAlgorithm) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: clientCertificateKeyAlgorithm %q is not a supported algorithm", *kc.ClientCertificateKeyAlgorithm))
+	}
+	if kc.ServerCertificateKeyAlgorithm != nil && !slices.Contains(kubeletconfig.ValidCertificateKeyAlgorithms, *kc.ServerCertificateKeyAlgorithm) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverCertificateKeyAlgorithm %q is not a supported algorithm", *kc.ServerCertificateKeyAlgorithm))
 	}
 	if kc.RunOnce {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: runOnce (--runOnce) %v, Runonce mode has been deprecated and should not be set", kc.RunOnce))

@@ -892,6 +892,56 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: `invalid configuration: duplicate sysctl "net.ipv4.ip_forward" found in defaultPodSysctls`,
+		}, {
+			name: "valid ClientCertificateKeyAlgorithm ECDSA-P256",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ClientCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmECDSAP256)
+				return conf
+			},
+		}, {
+			name: "valid ClientCertificateKeyAlgorithm ML-DSA-65",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ClientCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmMLDSA65)
+				return conf
+			},
+		}, {
+			name: "valid ClientCertificateKeyAlgorithm nil",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ClientCertificateKeyAlgorithm = nil
+				return conf
+			},
+		}, {
+			name: "invalid ClientCertificateKeyAlgorithm",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ClientCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmType("INVALID"))
+				return conf
+			},
+			errMsg: `invalid configuration: clientCertificateKeyAlgorithm "INVALID" is not a supported algorithm`,
+		}, {
+			name: "valid ServerCertificateKeyAlgorithm RSA-4096",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmRSA4096)
+				return conf
+			},
+		}, {
+			name: "valid ServerCertificateKeyAlgorithm ML-DSA-87",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmMLDSA87)
+				return conf
+			},
+		}, {
+			name: "valid ServerCertificateKeyAlgorithm nil",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = nil
+				return conf
+			},
+		}, {
+			name: "invalid ServerCertificateKeyAlgorithm",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmType("BOGUS"))
+				return conf
+			},
+			errMsg: `invalid configuration: serverCertificateKeyAlgorithm "BOGUS" is not a supported algorithm`,
 		},
 	}
 
