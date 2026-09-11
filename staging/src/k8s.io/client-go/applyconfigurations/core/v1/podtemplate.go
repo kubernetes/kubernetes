@@ -33,10 +33,10 @@ import (
 // PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplateApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Template defines the pods that will be created from this pod template.
+	// template defines the pods that will be created from this pod template.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Template *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }

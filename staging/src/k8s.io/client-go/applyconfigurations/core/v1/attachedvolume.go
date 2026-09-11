@@ -27,9 +27,9 @@ import (
 //
 // AttachedVolume describes a volume attached to a node
 type AttachedVolumeApplyConfiguration struct {
-	// Name of the attached volume
+	// name of the attached volume
 	Name *corev1.UniqueVolumeName `json:"name,omitempty"`
-	// DevicePath represents the device path where the volume should be available
+	// devicePath represents the device path where the volume should be available
 	DevicePath *string `json:"devicePath,omitempty"`
 }
 

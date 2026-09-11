@@ -42,24 +42,24 @@ import (
 // Instead of using this type, create a locally provided and used type that is well-focused on your reference.
 // For example, ServiceReferences for admission registration: https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533 .
 type ObjectReferenceApplyConfiguration struct {
-	// Kind of the referent.
+	// kind of the referent.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	Kind *string `json:"kind,omitempty"`
-	// Namespace of the referent.
+	// namespace of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
 	Namespace *string `json:"namespace,omitempty"`
-	// Name of the referent.
+	// name of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	Name *string `json:"name,omitempty"`
-	// UID of the referent.
+	// uid of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
 	UID *types.UID `json:"uid,omitempty"`
-	// API version of the referent.
+	// apiVersion of the referent.
 	APIVersion *string `json:"apiVersion,omitempty"`
-	// Specific resourceVersion to which this reference is made, if any.
+	// resourceVersion to which this reference is made, if any.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
 	ResourceVersion *string `json:"resourceVersion,omitempty"`
-	// If referring to a piece of an object instead of an entire object, this string
+	// fieldPath refers to a piece of an object instead of an entire object, this string
 	// should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
 	// For example, if the object reference is to a container within a pod, this would take on a value like:
 	// "spec.containers{name}" (where "name" refers to the name of the container that triggered

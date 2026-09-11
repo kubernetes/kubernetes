@@ -30,13 +30,13 @@ import (
 // to Container and allows separate documentation for the fields of EphemeralContainer.
 // When a new field is added to Container it must be added here as well.
 type EphemeralContainerCommonApplyConfiguration struct {
-	// Name of the ephemeral container specified as a DNS_LABEL.
+	// name of the ephemeral container specified as a DNS_LABEL.
 	// This name must be unique among all containers, init containers and ephemeral containers.
 	Name *string `json:"name,omitempty"`
-	// Container image name.
+	// image is the container's image name.
 	// More info: https://kubernetes.io/docs/concepts/containers/images
 	Image *string `json:"image,omitempty"`
-	// Entrypoint array. Not executed within a shell.
+	// command forms the entrypoint array. Not executed within a shell.
 	// The image's ENTRYPOINT is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
@@ -45,7 +45,7 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	Command []string `json:"command,omitempty"`
-	// Arguments to the entrypoint.
+	// args sets arguments to the entrypoint.
 	// The image's CMD is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
@@ -54,50 +54,54 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	Args []string `json:"args,omitempty"`
-	// Container's working directory.
+	// workingDir sets the container's working directory.
 	// If not specified, the container runtime's default will be used, which
 	// might be configured in the container image.
 	// Cannot be updated.
 	WorkingDir *string `json:"workingDir,omitempty"`
-	// Ports are not allowed for ephemeral containers.
+	// ports are not allowed for ephemeral containers.
 	Ports []ContainerPortApplyConfiguration `json:"ports,omitempty"`
-	// List of sources to populate environment variables in the container.
+	// envFrom is a list of sources to populate environment variables in the container.
 	// The keys defined within a source may consist of any printable ASCII characters except '='.
 	// When a key exists in multiple
 	// sources, the value associated with the last source will take precedence.
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
 	EnvFrom []EnvFromSourceApplyConfiguration `json:"envFrom,omitempty"`
-	// List of environment variables to set in the container.
+	// env is a list of environment variables to set in the container.
 	// Cannot be updated.
 	Env []EnvVarApplyConfiguration `json:"env,omitempty"`
-	// Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
+	// resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
 	// already allocated to the pod.
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
-	// Resources resize policy for the container.
+	// resizePolicy for container Resources.
 	ResizePolicy []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
-	// Restart policy for the container to manage the restart behavior of each
+	// restartPolicy for the container to manage the restart behavior of each
 	// container within a pod.
 	// You cannot set this field on ephemeral containers.
 	RestartPolicy *corev1.ContainerRestartPolicy `json:"restartPolicy,omitempty"`
-	// Represents a list of rules to be checked to determine if the
+	// restartPolicyRules represents a list of rules to be checked to determine if the
 	// container should be restarted on exit. You cannot set this field on
 	// ephemeral containers.
 	RestartPolicyRules []ContainerRestartRuleApplyConfiguration `json:"restartPolicyRules,omitempty"`
-	// Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
+	// volumeMounts defines Pod volumes to mount into the container's filesystem.
+	// Subpath mounts are not allowed for ephemeral containers.
 	// Cannot be updated.
 	VolumeMounts []VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
 	// volumeDevices is the list of block devices to be used by the container.
 	VolumeDevices []VolumeDeviceApplyConfiguration `json:"volumeDevices,omitempty"`
+	// livenessProbe defines a probe for container liveness.
 	// Probes are not allowed for ephemeral containers.
 	LivenessProbe *ProbeApplyConfiguration `json:"livenessProbe,omitempty"`
+	// readinessProbe defines a probe for container readiness.
 	// Probes are not allowed for ephemeral containers.
 	ReadinessProbe *ProbeApplyConfiguration `json:"readinessProbe,omitempty"`
+	// startupProbe defines a probe for container startup.
 	// Probes are not allowed for ephemeral containers.
 	StartupProbe *ProbeApplyConfiguration `json:"startupProbe,omitempty"`
-	// Lifecycle is not allowed for ephemeral containers.
+	// lifecycle is not allowed for ephemeral containers.
 	Lifecycle *LifecycleApplyConfiguration `json:"lifecycle,omitempty"`
-	// Optional: Path at which the file to which the container's termination message
+	// terminationMessagePath is a path at which the file to which the container's termination message
 	// will be written is mounted into the container's filesystem.
 	// Message written is intended to be brief final status, such as an assertion failure message.
 	// Will be truncated by the node if greater than 4096 bytes. The total message length across
@@ -105,7 +109,7 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	// Defaults to /dev/termination-log.
 	// Cannot be updated.
 	TerminationMessagePath *string `json:"terminationMessagePath,omitempty"`
-	// Indicate how the termination message should be populated. File will use the contents of
+	// terminationMessagePolicy indicates how the termination message should be populated. File will use the contents of
 	// terminationMessagePath to populate the container status message on both success and failure.
 	// FallbackToLogsOnError will use the last chunk of container log output if the termination
 	// message file is empty and the container exited with an error.
@@ -113,20 +117,19 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	// Defaults to File.
 	// Cannot be updated.
 	TerminationMessagePolicy *corev1.TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty"`
-	// Image pull policy.
-	// One of Always, Never, IfNotPresent.
+	// imagePullPolicy is one of Always, Never, IfNotPresent.
 	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
 	ImagePullPolicy *corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-	// Optional: SecurityContext defines the security options the ephemeral container should be run with.
+	// securityContext defines the security options the ephemeral container should be run with.
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	SecurityContext *SecurityContextApplyConfiguration `json:"securityContext,omitempty"`
-	// Whether this container should allocate a buffer for stdin in the container runtime. If this
+	// stdin specifies whether this container should allocate a buffer for stdin in the container runtime. If this
 	// is not set, reads from stdin in the container will always result in EOF.
 	// Default is false.
 	Stdin *bool `json:"stdin,omitempty"`
-	// Whether the container runtime should close the stdin channel after it has been opened by
+	// stdinOnce specidies whether the container runtime should close the stdin channel after it has been opened by
 	// a single attach. When stdin is true the stdin stream will remain open across multiple attach
 	// sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the
 	// first client attaches to stdin, and then remains open and accepts data until the client disconnects,
@@ -134,7 +137,7 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	// flag is false, a container processes that reads from stdin will never receive an EOF.
 	// Default is false
 	StdinOnce *bool `json:"stdinOnce,omitempty"`
-	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
+	// tty specifies whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	TTY *bool `json:"tty,omitempty"`
 }

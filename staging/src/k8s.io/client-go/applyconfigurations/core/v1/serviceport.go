@@ -28,16 +28,16 @@ import (
 //
 // ServicePort contains information on service's port.
 type ServicePortApplyConfiguration struct {
-	// The name of this port within the service. This must be a DNS_LABEL.
+	// name of this port within the service. This must be a DNS_LABEL.
 	// All ports within a ServiceSpec must have unique names. When considering
 	// the endpoints for a Service, this must match the 'name' field in the
 	// EndpointPort.
 	// Optional if only one ServicePort is defined on this service.
 	Name *string `json:"name,omitempty"`
-	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
+	// protocol is the IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
 	// Default is TCP.
 	Protocol *corev1.Protocol `json:"protocol,omitempty"`
-	// The application protocol for this port.
+	// appProtocol is the application protocol for this port.
 	// This is used as a hint for implementations to offer richer behavior for protocols that they understand.
 	// This field follows standard Kubernetes label syntax.
 	// Valid values are either:
@@ -53,9 +53,9 @@ type ServicePortApplyConfiguration struct {
 	// * Other protocols should use implementation-defined prefixed names such as
 	// mycompany.com/my-custom-protocol.
 	AppProtocol *string `json:"appProtocol,omitempty"`
-	// The port that will be exposed by this service.
+	// port that will be exposed by this service.
 	Port *int32 `json:"port,omitempty"`
-	// Number or name of the port to access on the pods targeted by the service.
+	// targetPort is the number or name of the port to access on the pods targeted by the service.
 	// Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
 	// If this is a string, it will be looked up as a named port in the
 	// target Pod's container ports. If this is not specified, the value
@@ -64,7 +64,7 @@ type ServicePortApplyConfiguration struct {
 	// omitted or set equal to the 'port' field.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
 	TargetPort *intstr.IntOrString `json:"targetPort,omitempty"`
-	// The port on each node on which this service is exposed when type is
+	// nodePort is the port on each node on which this service is exposed when type is
 	// NodePort or LoadBalancer.  Usually assigned by the system. If a value is
 	// specified, in-range, and not in use it will be used, otherwise the
 	// operation will fail.  If not specified, a port will be allocated if this

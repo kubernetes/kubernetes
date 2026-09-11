@@ -27,13 +27,14 @@ import (
 //
 // ServiceSpec describes the attributes that a user creates on a service.
 type ServiceSpecApplyConfiguration struct {
-	// The list of ports that are exposed by this service.
+	// ports that are exposed by this service.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	Ports []ServicePortApplyConfiguration `json:"ports,omitempty"`
-	// Route service traffic to pods with label keys and values matching this
-	// selector. If empty or not present, the service is assumed to have an
-	// external process managing its endpoints, which Kubernetes will not
-	// modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
+	// selector is a label query to route service traffic. Routes service traffic
+	// to pods with label keys and values matching this selector. If empty or not
+	// present, the service is assumed to have an external process managing its
+	// endpoints, which Kubernetes will not modify.
+	// Only applies to types ClusterIP, NodePort, and LoadBalancer.
 	// Ignored if type is ExternalName.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/
 	Selector map[string]string `json:"selector,omitempty"`
@@ -53,7 +54,7 @@ type ServiceSpecApplyConfiguration struct {
 	// field will be wiped when updating a Service to type ExternalName.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	ClusterIP *string `json:"clusterIP,omitempty"`
-	// ClusterIPs is a list of IP addresses assigned to this service, and are
+	// clusterIPs is a list of IP addresses assigned to this service, and are
 	// usually assigned randomly.  If an address is specified manually, is
 	// in-range (as per system configuration), and is not in use, it will be
 	// allocated to the service; otherwise creation of the service will fail.
@@ -100,13 +101,13 @@ type ServiceSpecApplyConfiguration struct {
 	// at a node with this IP.  A common example is external load-balancers
 	// that are not part of the Kubernetes system.
 	ExternalIPs []string `json:"externalIPs,omitempty"`
-	// Supports "ClientIP" and "None". Used to maintain session affinity.
+	// sessionAffinity supports "ClientIP" and "None". Used to maintain session affinity.
 	// Enable client IP based session affinity.
 	// Must be ClientIP or None.
 	// Defaults to None.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	SessionAffinity *corev1.ServiceAffinity `json:"sessionAffinity,omitempty"`
-	// Only applies to Service Type: LoadBalancer.
+	// loadBalancerIP only applies to Service Type: LoadBalancer.
 	// This feature depends on whether the underlying cloud-provider supports specifying
 	// the loadBalancerIP when a load balancer is created.
 	// This field will be ignored if the cloud-provider does not support the feature.
@@ -114,9 +115,9 @@ type ServiceSpecApplyConfiguration struct {
 	// Using it is non-portable and it may not support dual-stack.
 	// Users are encouraged to use implementation-specific annotations when available.
 	LoadBalancerIP *string `json:"loadBalancerIP,omitempty"`
-	// If specified and supported by the platform, this will restrict traffic through the cloud-provider
-	// load-balancer will be restricted to the specified client IPs. This field will be ignored if the
-	// cloud-provider does not support the feature."
+	// loadBalancerSourceRanges (if specified and supported by the platform) will restrict traffic through
+	// the cloud-provider load-balancer to the specified client IPs. This field will be ignored if the
+	// cloud-provider does not support the feature.
 	// More info: https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/
 	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty"`
 	// externalName is the external reference that discovery mechanisms will
@@ -160,7 +161,7 @@ type ServiceSpecApplyConfiguration struct {
 	PublishNotReadyAddresses *bool `json:"publishNotReadyAddresses,omitempty"`
 	// sessionAffinityConfig contains the configurations of session affinity.
 	SessionAffinityConfig *SessionAffinityConfigApplyConfiguration `json:"sessionAffinityConfig,omitempty"`
-	// IPFamilies is a list of IP families (e.g. IPv4, IPv6) assigned to this
+	// ipFamilies is a list of IP families (e.g. IPv4, IPv6) assigned to this
 	// service. This field is usually assigned automatically based on cluster
 	// configuration and the ipFamilyPolicy field. If this field is specified
 	// manually, the requested family is available in the cluster,
@@ -177,7 +178,7 @@ type ServiceSpecApplyConfiguration struct {
 	// clusterIPs field, if specified. Both clusterIPs and ipFamilies are
 	// governed by the ipFamilyPolicy field.
 	IPFamilies []corev1.IPFamily `json:"ipFamilies,omitempty"`
-	// IPFamilyPolicy represents the dual-stack-ness requested or required by
+	// ipFamilyPolicy represents the dual-stack-ness requested or required by
 	// this Service. If there is no value provided, then this field will be set
 	// to SingleStack. Services can be "SingleStack" (a single IP family),
 	// "PreferDualStack" (two IP families on dual-stack configured clusters or
@@ -205,14 +206,14 @@ type ServiceSpecApplyConfiguration struct {
 	// This field can only be set when creating or updating a Service to type 'LoadBalancer'.
 	// Once set, it can not be changed. This field will be wiped when a service is updated to a non 'LoadBalancer' type.
 	LoadBalancerClass *string `json:"loadBalancerClass,omitempty"`
-	// InternalTrafficPolicy describes how nodes distribute service traffic they
+	// internalTrafficPolicy describes how nodes distribute service traffic they
 	// receive on the ClusterIP. If set to "Local", the proxy will assume that pods
 	// only want to talk to endpoints of the service on the same node as the pod,
 	// dropping the traffic if there are no local endpoints. The default value,
 	// "Cluster", uses the standard behavior of routing to all endpoints evenly
 	// (possibly modified by topology and other features).
 	InternalTrafficPolicy *corev1.ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty"`
-	// TrafficDistribution offers a way to express preferences for how traffic
+	// trafficDistribution offers a way to express preferences for how traffic
 	// is distributed to Service endpoints. Implementations can use this field
 	// as a hint, but are not required to guarantee strict adherence. If the
 	// field is not set, the implementation will apply its default routing

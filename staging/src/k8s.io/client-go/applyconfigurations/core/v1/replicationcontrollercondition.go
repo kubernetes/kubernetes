@@ -28,15 +28,15 @@ import (
 //
 // ReplicationControllerCondition describes the state of a replication controller at a certain point.
 type ReplicationControllerConditionApplyConfiguration struct {
-	// Type of replication controller condition.
+	// type of replication controller condition.
 	Type *corev1.ReplicationControllerConditionType `json:"type,omitempty"`
-	// Status of the condition, one of True, False, Unknown.
+	// status of the condition, one of True, False, Unknown.
 	Status *corev1.ConditionStatus `json:"status,omitempty"`
-	// The last time the condition transitioned from one status to another.
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
-	// The reason for the condition's last transition.
+	// reason for the condition's last transition.
 	Reason *string `json:"reason,omitempty"`
-	// A human readable message indicating details about the transition.
+	// message is a human readable string indicating details about the transition.
 	Message *string `json:"message,omitempty"`
 }
 

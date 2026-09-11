@@ -27,16 +27,16 @@ import (
 //
 // A single application container that you want to run within a pod.
 type ContainerApplyConfiguration struct {
-	// Name of the container specified as a DNS_LABEL.
+	// name of the container specified as a DNS_LABEL.
 	// Each container in a pod must have a unique name (DNS_LABEL).
 	// Cannot be updated.
 	Name *string `json:"name,omitempty"`
-	// Container image name.
+	// image is the name of container image that the container is running.
 	// More info: https://kubernetes.io/docs/concepts/containers/images
 	// This field is optional to allow higher level config management to default or override
 	// container images in workload controllers like Deployments and StatefulSets.
 	Image *string `json:"image,omitempty"`
-	// Entrypoint array. Not executed within a shell.
+	// command forms the entrypoint array. Not executed within a shell.
 	// The container image's ENTRYPOINT is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
@@ -45,7 +45,7 @@ type ContainerApplyConfiguration struct {
 	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	Command []string `json:"command,omitempty"`
-	// Arguments to the entrypoint.
+	// args sets arguments to the entrypoint.
 	// The container image's CMD is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
@@ -54,12 +54,12 @@ type ContainerApplyConfiguration struct {
 	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	Args []string `json:"args,omitempty"`
-	// Container's working directory.
+	// workingDir sets the container's working directory.
 	// If not specified, the container runtime's default will be used, which
 	// might be configured in the container image.
 	// Cannot be updated.
 	WorkingDir *string `json:"workingDir,omitempty"`
-	// List of ports to expose from the container. Not specifying a port here
+	// ports to expose from the container. Not specifying a port here
 	// DOES NOT prevent that port from being exposed. Any port which is
 	// listening on the default "0.0.0.0" address inside a container will be
 	// accessible from the network.
@@ -67,24 +67,24 @@ type ContainerApplyConfiguration struct {
 	// For more information See https://github.com/kubernetes/kubernetes/issues/108255.
 	// Cannot be updated.
 	Ports []ContainerPortApplyConfiguration `json:"ports,omitempty"`
-	// List of sources to populate environment variables in the container.
+	// envFrom is a list of sources to populate environment variables in the container.
 	// The keys defined within a source may consist of any printable ASCII characters except '='.
 	// When a key exists in multiple
 	// sources, the value associated with the last source will take precedence.
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
 	EnvFrom []EnvFromSourceApplyConfiguration `json:"envFrom,omitempty"`
-	// List of environment variables to set in the container.
+	// env is a list of environment variables to set in the container.
 	// Cannot be updated.
 	Env []EnvVarApplyConfiguration `json:"env,omitempty"`
-	// Compute Resources required by this container.
+	// resources required by this container, regards compute.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
-	// Resources resize policy for the container.
+	// resizePolicy for container Resources.
 	// This field cannot be set on ephemeral containers.
 	ResizePolicy []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
-	// RestartPolicy defines the restart behavior of individual containers in a pod.
+	// restartPolicy defines the restart behavior of individual containers in a pod.
 	// This overrides the pod-level restart policy. When this field is not specified,
 	// the restart behavior is defined by the Pod's restart policy and the container type.
 	// Additionally, setting the RestartPolicy as "Always" for the init container will
@@ -100,7 +100,7 @@ type ContainerApplyConfiguration struct {
 	// init container is started, or after any startupProbe has successfully
 	// completed.
 	RestartPolicy *corev1.ContainerRestartPolicy `json:"restartPolicy,omitempty"`
-	// Represents a list of rules to be checked to determine if the
+	// restartPolicyRules represents a list of rules to be checked to determine if the
 	// container should be restarted on exit. The rules are evaluated in
 	// order. Once a rule matches a container exit condition, the remaining
 	// rules are ignored. If no rule matches the container exit condition,
@@ -112,22 +112,22 @@ type ContainerApplyConfiguration struct {
 	// When rules are specified, container MUST set RestartPolicy explicitly
 	// even it if matches the Pod's RestartPolicy.
 	RestartPolicyRules []ContainerRestartRuleApplyConfiguration `json:"restartPolicyRules,omitempty"`
-	// Pod volumes to mount into the container's filesystem.
+	// volumeMounts are pod volumes to mount into the container's filesystem.
 	// Cannot be updated.
 	VolumeMounts []VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
 	// volumeDevices is the list of block devices to be used by the container.
 	VolumeDevices []VolumeDeviceApplyConfiguration `json:"volumeDevices,omitempty"`
-	// Periodic probe of container liveness.
+	// livenessProbe is a periodic probe of container liveness.
 	// Container will be restarted if the probe fails.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	LivenessProbe *ProbeApplyConfiguration `json:"livenessProbe,omitempty"`
-	// Periodic probe of container service readiness.
+	// readinessProbe is a periodic probe of container service readiness.
 	// Container will be removed from service endpoints if the probe fails.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	ReadinessProbe *ProbeApplyConfiguration `json:"readinessProbe,omitempty"`
-	// StartupProbe indicates that the Pod has successfully initialized.
+	// startupProbe indicates that the Pod has successfully initialized.
 	// If specified, no other probes are executed until this completes successfully.
 	// If this probe fails, the Pod will be restarted, just as if the livenessProbe failed.
 	// This can be used to provide different probe parameters at the beginning of a Pod's lifecycle,
@@ -135,10 +135,10 @@ type ContainerApplyConfiguration struct {
 	// This cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	StartupProbe *ProbeApplyConfiguration `json:"startupProbe,omitempty"`
-	// Actions that the management system should take in response to container lifecycle events.
+	// lifecycle lists the actions that the management system should take in response to container lifecycle events.
 	// Cannot be updated.
 	Lifecycle *LifecycleApplyConfiguration `json:"lifecycle,omitempty"`
-	// Optional: Path at which the file to which the container's termination message
+	// terminationMessagePath is the path at which the file to which the container's termination message
 	// will be written is mounted into the container's filesystem.
 	// Message written is intended to be brief final status, such as an assertion failure message.
 	// Will be truncated by the node if greater than 4096 bytes. The total message length across
@@ -146,7 +146,7 @@ type ContainerApplyConfiguration struct {
 	// Defaults to /dev/termination-log.
 	// Cannot be updated.
 	TerminationMessagePath *string `json:"terminationMessagePath,omitempty"`
-	// Indicate how the termination message should be populated. File will use the contents of
+	// terminationMessagePolicy indicate how the termination message should be populated. File will use the contents of
 	// terminationMessagePath to populate the container status message on both success and failure.
 	// FallbackToLogsOnError will use the last chunk of container log output if the termination
 	// message file is empty and the container exited with an error.
@@ -154,21 +154,20 @@ type ContainerApplyConfiguration struct {
 	// Defaults to File.
 	// Cannot be updated.
 	TerminationMessagePolicy *corev1.TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty"`
-	// Image pull policy.
-	// One of Always, Never, IfNotPresent.
+	// imagePullPolicy is one of Always, Never, IfNotPresent.
 	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
 	ImagePullPolicy *corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-	// SecurityContext defines the security options the container should be run with.
+	// securityContext defines the security options the container should be run with.
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 	SecurityContext *SecurityContextApplyConfiguration `json:"securityContext,omitempty"`
-	// Whether this container should allocate a buffer for stdin in the container runtime. If this
+	// stdin indicates whether this container should allocate a buffer for stdin in the container runtime. If this
 	// is not set, reads from stdin in the container will always result in EOF.
 	// Default is false.
 	Stdin *bool `json:"stdin,omitempty"`
-	// Whether the container runtime should close the stdin channel after it has been opened by
+	// stdinOnce indicates whether the container runtime should close the stdin channel after it has been opened by
 	// a single attach. When stdin is true the stdin stream will remain open across multiple attach
 	// sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the
 	// first client attaches to stdin, and then remains open and accepts data until the client disconnects,
@@ -176,7 +175,7 @@ type ContainerApplyConfiguration struct {
 	// flag is false, a container processes that reads from stdin will never receive an EOF.
 	// Default is false
 	StdinOnce *bool `json:"stdinOnce,omitempty"`
-	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
+	// tty indicates whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	TTY *bool `json:"tty,omitempty"`
 }

@@ -23,7 +23,7 @@ package v1
 //
 // HostIP represents a single IP address allocated to the host.
 type HostIPApplyConfiguration struct {
-	// IP is the IP address assigned to the host
+	// ip is the IP address assigned to the host
 	IP *string `json:"ip,omitempty"`
 }
 

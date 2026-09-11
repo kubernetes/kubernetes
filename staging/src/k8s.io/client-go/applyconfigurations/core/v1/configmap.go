@@ -33,21 +33,21 @@ import (
 // ConfigMap holds configuration data for pods to consume.
 type ConfigMapApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Immutable, if set to true, ensures that data stored in the ConfigMap cannot
-	// be updated (only object metadata can be modified).
+	// immutable ensures that data stored in the ConfigMap cannot be updated
+	// (only object metadata can be modified), if set to true.
 	// If not set to true, the field can be modified at any time.
 	// Defaulted to nil.
 	Immutable *bool `json:"immutable,omitempty"`
-	// Data contains the configuration data.
+	// data contains the configuration data.
 	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
 	// Values with non-UTF-8 byte sequences must use the BinaryData field.
 	// The keys stored in Data must not overlap with the keys in
 	// the BinaryData field, this is enforced during validation process.
 	Data map[string]string `json:"data,omitempty"`
-	// BinaryData contains the binary data.
+	// binaryData contains the binary data.
 	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
 	// BinaryData can contain byte sequences that are not in the UTF-8 range.
 	// The keys stored in BinaryData must not overlap with the ones in

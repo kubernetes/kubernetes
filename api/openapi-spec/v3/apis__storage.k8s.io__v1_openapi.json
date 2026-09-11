@@ -514,7 +514,7 @@
         "description": "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
         "properties": {
           "nodeSelectorTerms": {
-            "description": "Required. A list of node selector terms. The terms are ORed.",
+            "description": "nodeSelectorTerms is a list of node selector terms. The terms are ORed.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorTerm"
             },
@@ -533,16 +533,16 @@
         "properties": {
           "key": {
             "default": "",
-            "description": "The label key that the selector applies to.",
+            "description": "key is the label that the selector applies to.",
             "type": "string"
           },
           "operator": {
             "default": "",
-            "description": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
+            "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
             "type": "string"
           },
           "values": {
-            "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
+            "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
             "items": {
               "type": "string"
             },
@@ -560,7 +560,7 @@
         "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.",
         "properties": {
           "matchExpressions": {
-            "description": "A list of node selector requirements by node's labels.",
+            "description": "matchExpressions is a list of node selector requirements by node's labels.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
             },
@@ -568,7 +568,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "matchFields": {
-            "description": "A list of node selector requirements by node's fields.",
+            "description": "matchFields is a list of node selector requirements by node's fields.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
             },
@@ -583,31 +583,31 @@
         "description": "ObjectReference contains enough information to let you inspect or modify the referred object.",
         "properties": {
           "apiVersion": {
-            "description": "API version of the referent.",
+            "description": "apiVersion of the referent.",
             "type": "string"
           },
           "fieldPath": {
-            "description": "If referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]. For example, if the object reference is to a container within a pod, this would take on a value like: \"spec.containers{name}\" (where \"name\" refers to the name of the container that triggered the event) or if no container name is specified \"spec.containers[2]\" (container with index 2 in this pod). This syntax is chosen only to have some well-defined way of referencing a part of an object.",
+            "description": "fieldPath refers to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]. For example, if the object reference is to a container within a pod, this would take on a value like: \"spec.containers{name}\" (where \"name\" refers to the name of the container that triggered the event) or if no container name is specified \"spec.containers[2]\" (container with index 2 in this pod). This syntax is chosen only to have some well-defined way of referencing a part of an object.",
             "type": "string"
           },
           "kind": {
-            "description": "Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "description": "kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
             "type": "string"
           },
           "name": {
-            "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+            "description": "name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
             "type": "string"
           },
           "namespace": {
-            "description": "Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
+            "description": "namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
             "type": "string"
           },
           "resourceVersion": {
-            "description": "Specific resourceVersion to which this reference is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency",
+            "description": "resourceVersion to which this reference is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency",
             "type": "string"
           },
           "uid": {
-            "description": "UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids",
+            "description": "uid of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids",
             "type": "string"
           }
         },
@@ -662,7 +662,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.CephFSPersistentVolumeSource"
               }
             ],
-            "description": "cephFS represents a Ceph FS mount on the host that shares a pod's lifetime. Deprecated: CephFS is deprecated and the in-tree cephfs type is no longer supported."
+            "description": "cephfs represents a Ceph FS mount on the host that shares a pod's lifetime. Deprecated: CephFS is deprecated and the in-tree cephfs type is no longer supported."
           },
           "cinder": {
             "allOf": [
@@ -831,10 +831,10 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.StorageOSPersistentVolumeSource"
               }
             ],
-            "description": "storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod. Deprecated: StorageOS is deprecated and the in-tree storageos type is no longer supported. More info: https://examples.k8s.io/volumes/storageos/README.md"
+            "description": "storageos represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod. Deprecated: StorageOS is deprecated and the in-tree storageos type is no longer supported. More info: https://examples.k8s.io/volumes/storageos/README.md"
           },
           "volumeAttributesClassName": {
-            "description": "Name of VolumeAttributesClass to which this persistent volume belongs. Empty value is not allowed. When this field is not set, it indicates that this volume does not belong to any VolumeAttributesClass. This field is mutable and can be changed by the CSI driver after a volume has been updated successfully to a new class. For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound PersistentVolumeClaims during the binding process.",
+            "description": "volumeAttributesClassName is the name of the VolumeAttributesClass to which this persistent volume belongs. Empty value  is not allowed. When this field is not set, it indicates that this volume does not belong to any VolumeAttributesClass. This field is mutable and can be changed by the CSI driver after a volume has been updated successfully to a new class. For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound PersistentVolumeClaims during the binding process.",
             "type": "string"
           },
           "volumeMode": {
@@ -874,7 +874,7 @@
         "description": "PortworxVolumeSource represents a Portworx volume resource.",
         "properties": {
           "fsType": {
-            "description": "fSType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+            "description": "fsType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
             "type": "string"
           },
           "readOnly": {
@@ -1094,11 +1094,11 @@
         "properties": {
           "key": {
             "default": "",
-            "description": "The label key that the selector applies to.",
+            "description": "key is the label that the selector applies to.",
             "type": "string"
           },
           "values": {
-            "description": "An array of string values. One value must match the label to be selected. Each entry in Values is ORed.",
+            "description": "values is an array of string values. One value must match the label to be selected. Each entry in Values is ORed.",
             "items": {
               "type": "string"
             },
@@ -1116,7 +1116,7 @@
         "description": "A topology selector term represents the result of label queries. A null or empty topology selector term matches no objects. The requirements of them are ANDed. It provides a subset of functionality as NodeSelectorTerm. This is an alpha feature and may change in the future.",
         "properties": {
           "matchLabelExpressions": {
-            "description": "A list of topology selector requirements by labels.",
+            "description": "matchLabelExpressions is a list of topology selector requirements by labels.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.TopologySelectorLabelRequirement"
             },
