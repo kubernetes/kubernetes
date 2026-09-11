@@ -65,7 +65,7 @@ func TestSchedulerFeatureGateSetupIsolation(t *testing.T) {
 	if err := gate.AddDependencies(map[featuregate.Feature][]featuregate.Feature{external: {}}); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if err := SetupCurrentKubernetesSpecificFeatureGates(gate); err != nil {
 			t.Fatalf("registration %d failed: %v", i+1, err)
 		}
