@@ -633,9 +633,12 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		return nil, errors.New("must specify a CommonName")
 	}
 
-	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+	keyUsage := x509.KeyUsageDigitalSignature
 	if isCA {
 		keyUsage |= x509.KeyUsageCertSign
+	}
+	if canAlgorithmDoKeyEncipherment(cfg.EncryptionAlgorithm) {
+		keyUsage |= x509.KeyUsageKeyEncipherment
 	}
 
 	RemoveDuplicateAltNames(&cfg.AltNames)
@@ -681,7 +684,10 @@ func NewSelfSignedCACert(cfg *CertConfig, key crypto.Signer) (*x509.Certificate,
 	}
 	serial = new(big.Int).Add(serial, big.NewInt(1))
 
-	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign
+	keyUsage := x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign
+	if canAlgorithmDoKeyEncipherment(cfg.EncryptionAlgorithm) {
+		keyUsage |= x509.KeyUsageKeyEncipherment
+	}
 
 	notBefore := time.Now().UTC()
 	if !cfg.NotBefore.IsZero() {
@@ -773,4 +779,10 @@ func VerifyCertChain(cert *x509.Certificate, intermediates []*x509.Certificate, 
 	}
 
 	return nil
+}
+
+// canAlgorithmDoKeyEncipherment checks if the given algorithm type can be used for key encipherment.
+// Currently only RSA can do it from the list of supported algorithms.
+func canAlgorithmDoKeyEncipherment(alg kubeadmapi.EncryptionAlgorithmType) bool {
+	return rsaKeySizeFromAlgorithmType(alg) != 0 // Only RSA returns a key size != 0
 }
