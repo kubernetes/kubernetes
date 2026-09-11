@@ -2129,7 +2129,7 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 		},
 		"valid-update-keeps-stored-attribute-name-with-extra-slash": {
 			// A slice stored before the key format was enforced keeps working
-			// as long as its attributes are not touched.
+			// as long as its spec is not changed.
 			oldResourceSlice: func() *resourceapi.ResourceSlice {
 				slice := validResourceSlice.DeepCopy()
 				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
@@ -2140,7 +2140,7 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
 		},
 		"invalid-update-touches-stored-attribute-name-with-extra-slash": {
-			// Rewriting the attributes re-validates them, so the stored key is
+			// Changing the spec revalidates all of it, so the stored key is
 			// reported.
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes"), "x.example.com/y/z", "must not contain more than one slash"),
@@ -2233,13 +2233,21 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 		},
 		"valid-old-effect": {
 			oldResourceSlice: invalidResourceSliceWithTaints,
+			update:           func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"invalid-old-effect-with-changed-spec": {
+			wantFailures:     field.ErrorList{field.NotSupported(field.NewPath("spec", "devices").Index(0).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone})}.MarkCoveredByDeclarative(),
+			oldResourceSlice: invalidResourceSliceWithTaints,
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				slice.Spec.Devices[0].Attributes["foo"] = resourceapi.DeviceAttribute{StringValue: ptr.To("bar")}
 				return slice
 			},
 		},
 		"invalid-new-effect-in-new-device": {
-			wantFailures:     field.ErrorList{field.NotSupported(field.NewPath("spec", "devices").Index(1).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone})}.MarkCoveredByDeclarative(),
+			wantFailures: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "devices").Index(0).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone}),
+				field.NotSupported(field.NewPath("spec", "devices").Index(1).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone}),
+			}.MarkCoveredByDeclarative(),
 			oldResourceSlice: invalidResourceSliceWithTaints,
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				device := slice.Spec.Devices[0].DeepCopy()
