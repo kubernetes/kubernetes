@@ -3,7 +3,7 @@ kind: PodGroup
 metadata:
   name: gang-{{.Index}}
 spec:
-  priority: {{if .priority}}{{AddInt 0 .priority}}{{else}}8888888{{end}}
+  priority: {{if .priority}}{{AddInt 0 .priority}}{{else}}10000{{end}}
   schedulingPolicy:
     gang:
       minCount: {{.podsPerGroup}}
