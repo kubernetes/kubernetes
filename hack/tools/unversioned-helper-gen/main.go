@@ -184,12 +184,15 @@ func extractAndRemoveTag(f *ast.File) (string, error) {
 			}
 			newList = append(newList, comment)
 		}
+		group.List = newList
 		if len(newList) > 0 {
-			group.List = newList
 			newComments = append(newComments, group)
 		}
 	}
 	f.Comments = newComments
+	if f.Doc != nil && len(f.Doc.List) == 0 {
+		f.Doc = nil
+	}
 
 	if !tagFound {
 		return "", fmt.Errorf("no %s tag found", TagName)
@@ -209,7 +212,7 @@ func parseTag(commentText string, prefix string) (string, bool) {
 	if !strings.HasPrefix(trimmed, prefix) {
 		return "", false
 	}
-	return strings.TrimPrefix(trimmed, prefix), true
+	return strings.TrimSpace(strings.TrimPrefix(trimmed, prefix)), true
 }
 
 // extractAndRemovePkgTag extracts the target package path from the comment group
@@ -226,6 +229,9 @@ func (g *generator) extractAndRemovePkgTag(group *ast.CommentGroup) (string, boo
 		if trimmed, ok := parseTag(comment.Text, PkgTagPrefix); ok {
 			if found {
 				return "", false, fmt.Errorf("multiple %s tags found in comment group", PkgTagName)
+			}
+			if trimmed == "" {
+				return "", false, fmt.Errorf("tag %s cannot be empty", PkgTagName)
 			}
 			tagValue = trimmed
 			found = true
@@ -277,7 +283,11 @@ func validateTag(tag string) (string, error) {
 	if relPath == "" {
 		return "", fmt.Errorf("destination path cannot be empty")
 	}
-	return relPath, nil
+	clean := filepath.Clean(relPath)
+	if clean == "." || strings.HasPrefix(clean, "..") || strings.HasPrefix(clean, "/") {
+		return "", fmt.Errorf("destination package %q escapes repository root", tag)
+	}
+	return clean, nil
 }
 
 // translateAST modifies the AST to adapt it for the destination package.
@@ -287,16 +297,12 @@ func (g *generator) translateAST(fset *token.FileSet, f *ast.File, input, output
 
 	g.commentsToRemove = make(map[*ast.CommentGroup]bool)
 
-	selfAlias, err := g.updateImports(f, outputImport)
+	coreAlias, err := g.updateImports(f, outputImport)
 	if err != nil {
 		return err
 	}
 
-	if outputImport != "" {
-		astutil.DeleteImport(fset, f, outputImport)
-	}
-
-	rewriteReferences(f, selfAlias)
+	rewriteReferences(f, coreAlias)
 
 	// Filter out empty comment groups
 	if len(g.commentsToRemove) > 0 {
@@ -314,22 +320,17 @@ func (g *generator) translateAST(fset *token.FileSet, f *ast.File, input, output
 
 // updateImports updates the import paths in the AST.
 // It translates versioned API imports (currently only v1 core) to their internal counterparts.
-// It returns the alias used for the outputImport, if it was imported, which is used later
-// to remove self-references.
+// It returns the alias used for the versioned core API, which is used to rewrite references.
 func (g *generator) updateImports(f *ast.File, outputImport string) (string, error) {
-	var selfAlias string
+	var coreAlias string
 	for _, imp := range f.Imports {
 		path := strings.Trim(imp.Path.Value, `"`)
 
 		if outputImport != "" && path == outputImport {
-			if imp.Name != nil {
-				selfAlias = imp.Name.Name
-			} else {
-				// If imported without alias, we assume it refers to the package name
-				// which matches the target package name we set.
-				selfAlias = f.Name.Name
-			}
-			continue
+			return "", fmt.Errorf("input file cannot import target package %q", outputImport)
+		}
+		if path == "k8s.io/kubernetes/pkg/apis/core" {
+			return "", fmt.Errorf("input file cannot directly import internal core package %q", path)
 		}
 
 		// Check for unversioned-pkg redirection annotation
@@ -338,6 +339,15 @@ func (g *generator) updateImports(f *ast.File, outputImport string) (string, err
 			return "", err
 		}
 		if found {
+			if path == "k8s.io/api/core/v1" {
+				return "", fmt.Errorf("k8s.io/api/core/v1 is translated automatically and cannot have %s tag", PkgTagName)
+			}
+			if outputImport != "" && targetPkg == outputImport {
+				return "", fmt.Errorf("import cannot be redirected to target package %q", outputImport)
+			}
+			if targetPkg == "k8s.io/kubernetes/pkg/apis/core" {
+				return "", fmt.Errorf("import cannot be redirected to internal core package %q", targetPkg)
+			}
 			var origAlias string
 			if imp.Name != nil {
 				origAlias = imp.Name.Name
@@ -353,6 +363,18 @@ func (g *generator) updateImports(f *ast.File, outputImport string) (string, err
 		// TODO: extend this to work for types outside of core.
 		if strings.HasPrefix(path, `k8s.io/api/`) {
 			if path == `k8s.io/api/core/v1` {
+				const internalCore = "k8s.io/kubernetes/pkg/apis/core"
+				if outputImport != "" && outputImport == internalCore {
+					return "", fmt.Errorf("cannot translate %s: target package is %q", path, outputImport)
+				}
+				if coreAlias != "" {
+					return "", fmt.Errorf("duplicate import of %s", path)
+				}
+				if imp.Name != nil {
+					coreAlias = imp.Name.Name
+				} else {
+					coreAlias = "v1"
+				}
 				imp.Path.Value = `"k8s.io/kubernetes/pkg/apis/core"`
 				imp.Name = &ast.Ident{Name: "core"}
 			} else {
@@ -360,26 +382,21 @@ func (g *generator) updateImports(f *ast.File, outputImport string) (string, err
 			}
 		}
 	}
-	return selfAlias, nil
+	return coreAlias, nil
 }
 
 // rewriteReferences updates references in the AST.
-// It replaces "v1" package qualifier with "core" (matching the translated import).
-// It also removes the package qualifier for the package we are generating into (selfAlias)
-// because those types are now local to the generated package.
-func rewriteReferences(f *ast.File, selfAlias string) {
+// It replaces the core API package qualifier with "core" (matching the translated import).
+func rewriteReferences(f *ast.File, coreAlias string) {
+	if coreAlias == "" {
+		return
+	}
 	astutil.Apply(f, func(c *astutil.Cursor) bool {
 		switch n := c.Node().(type) {
 		case *ast.SelectorExpr:
 			if ident, ok := n.X.(*ast.Ident); ok {
-				// TODO: generalize this for types outside of core.
-				if ident.Name == "v1" {
+				if ident.Name == coreAlias && (ident.Obj == nil || ident.Obj.Kind == ast.Pkg) {
 					ident.Name = "core"
-				} else if selfAlias != "" && ident.Name == selfAlias {
-					// If the selector was the alias for the internal package, drop it.
-					// e.g., if we imported the target package as "helper", and we had "helper.SomeType",
-					// we rewrite it to just "SomeType" since we are now in that package.
-					c.Replace(n.Sel)
 				}
 			}
 		}
@@ -396,14 +413,42 @@ func (g *generator) writeGeneratedFile(fset *token.FileSet, f *ast.File, input, 
 
 	// Inject the header before the package declaration
 	header := g.getGeneratedHeader(input)
-	pkgDecl := "package " + pkg
-	outStr := bytes.Replace(buf.Bytes(), []byte(pkgDecl), []byte(header+pkgDecl), 1)
+	offset, err := findPackageDecl(buf.Bytes(), pkg)
+	if err != nil {
+		return err
+	}
 
-	if err := os.WriteFile(output, outStr, 0644); err != nil {
+	var out bytes.Buffer
+	out.Grow(buf.Len() + len(header))
+	out.Write(buf.Bytes()[:offset])
+	out.WriteString(header)
+	out.Write(buf.Bytes()[offset:])
+
+	if err := os.WriteFile(output, out.Bytes(), 0644); err != nil {
 		return fmt.Errorf("failed to write output %s: %v", output, err)
 	}
 	fmt.Fprintf(os.Stderr, "Generated %s from %s\n", output, input)
 	return nil
+}
+
+func findPackageDecl(src []byte, pkg string) (int, error) {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "", src, parser.PackageClauseOnly|parser.ParseComments)
+	if err != nil {
+		return -1, fmt.Errorf("failed to parse package declaration: %v", err)
+	}
+	if f.Name.Name != pkg {
+		return -1, fmt.Errorf("expected package %q, found package %q", pkg, f.Name.Name)
+	}
+	targetPos := f.Package
+	if f.Doc != nil {
+		targetPos = f.Doc.Pos()
+	}
+	file := fset.File(targetPos)
+	if file == nil {
+		return -1, fmt.Errorf("missing token file for package declaration")
+	}
+	return file.Offset(targetPos), nil
 }
 
 // getOutputImportPath gets the import path that refers to the output package.
@@ -435,7 +480,7 @@ func (g *generator) getRelativeSourcePath(inputPath string) string {
 	if err != nil {
 		return inputPath
 	}
-	return relInput
+	return filepath.ToSlash(relInput)
 }
 
 type generator struct {
