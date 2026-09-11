@@ -128,12 +128,11 @@ var _ = SIGDescribe("user namespaces kubeconfig tests", "[LinuxOnly]", feature.U
 	})
 })
 
+// hasKubeletUsernsMappings reports whether the kubelet uses subordinate IDs configured for
+// its account, in the kubelet's lookup order, failing closed when they cannot be read.
 func hasKubeletUsernsMappings() (bool, error) {
-	if _, err := user.Lookup(kubeletUserForUsernsMapping); err != nil {
-		var e user.UnknownUserError
-		if errors.As(err, &e) {
-			err = nil
-		}
+	found, err := kubeletUserExists()
+	if err != nil || !found {
 		return false, err
 	}
 	cmdBin, err := exec.LookPath(getsubuidsBinary)
@@ -143,37 +142,56 @@ func hasKubeletUsernsMappings() (bool, error) {
 		}
 		return false, err
 	}
+	// The kubelet treats a getsubids failure as fatal from here on, since it cannot tell
+	// an account with no ranges from an unreachable backend, so this does not swallow it.
 	outUids, err := getsubids(cmdBin, kubeletUserForUsernsMapping)
 	if err != nil {
 		return false, err
 	}
 	if outUids == "" {
-		return false, nil
+		return false, fmt.Errorf("getsubids printed no range for user %q", kubeletUserForUsernsMapping)
 	}
 	outGids, err := getsubids(cmdBin, "-g", kubeletUserForUsernsMapping)
 	if err != nil {
 		return false, err
 	}
-	if string(outUids) != string(outGids) {
+	if outUids != outGids {
 		return false, fmt.Errorf("user %q has different subuids and subgids: %q vs %q", kubeletUserForUsernsMapping, outUids, outGids)
 	}
 	return true, nil
 }
 
-// getsubids runs the getsubids command to fetch subuid mappings for a user.
-// If the command fails with "Error fetching ranges", it returns an empty string
-// to indicate that no subuid mappings were found, which is not considered an error.
-// Otherwise, it returns the output of the command as a string.
-// (e.g., "0: user 100000 65536")
+// kubeletUserExists resolves the kubelet account through getent, so an NSS account is seen,
+// and through os/user when getent cannot be run, which is the kubelet's own order.
+func kubeletUserExists() (bool, error) {
+	getent, err := exec.LookPath("getent")
+	if err != nil {
+		if _, err := user.Lookup(kubeletUserForUsernsMapping); err != nil {
+			if _, ok := errors.AsType[user.UnknownUserError](err); ok {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	}
+	err = exec.Command(getent, "passwd", kubeletUserForUsernsMapping).Run()
+	if err == nil {
+		return true, nil
+	}
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok && exitErr.ExitCode() == 2 {
+		return false, nil // getent(1): 2 = key not found
+	}
+	return false, fmt.Errorf("looking up user %q via getent: %w", kubeletUserForUsernsMapping, err)
+}
+
+// getsubids runs getsubids for a user and returns its output, such as "0: user 100000 65536".
+// A failing command comes back as an error, which is how the kubelet treats it as well.
 func getsubids(cmdBin string, cmdArgs ...string) (string, error) {
 	var stderr bytes.Buffer
 	cmd := exec.Command(cmdBin, cmdArgs...)
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		if strings.TrimSpace(stderr.String()) == "Error fetching ranges" {
-			return "", nil // No subuid mappings found, this is not an error
-		}
 		return "", fmt.Errorf("failed to run %v: %w (stderr=%q)", cmd.Args, err, stderr.String())
 	}
 	return strings.TrimSpace(string(out)), nil
