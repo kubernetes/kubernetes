@@ -84,8 +84,10 @@ func TestGetConntrackMax(t *testing.T) {
 }
 
 type fakeConntracker struct {
+	hashsize int
+	err      error
+
 	called []string
-	err    error
 }
 
 func (fc *fakeConntracker) SetMax(ctx context.Context, max int) error {
@@ -112,6 +114,13 @@ func (fc *fakeConntracker) SetUDPStreamTimeout(ctx context.Context, seconds int)
 	fc.called = append(fc.called, fmt.Sprintf("SetUDPStreamTimeout(%d)", seconds))
 	return fc.err
 }
+func (fc *fakeConntracker) GetHashsize(ctx context.Context) (int, error) {
+	return fc.hashsize, fc.err
+}
+func (fc *fakeConntracker) SetHashsize(ctx context.Context, value int) error {
+	fc.called = append(fc.called, fmt.Sprintf("SetHashsize(%d)", value))
+	return fc.err
+}
 func (fc *fakeConntracker) DetectNumCPU() int {
 	return 8
 }
@@ -121,8 +130,9 @@ func TestSetupConntrack(t *testing.T) {
 	tests := []struct {
 		name         string
 		config       kubeproxyconfig.KubeProxyConntrackConfiguration
-		expect       []string
+		hashsize     int
 		conntrackErr error
+		expect       []string
 		wantErr      bool
 	}{
 		{
@@ -135,7 +145,7 @@ func TestSetupConntrack(t *testing.T) {
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				MaxPerCore: ptr.To(int32(12)),
 			},
-			expect: []string{"SetMax(96)"},
+			expect: []string{"SetMax(96)", "SetHashsize(24)"},
 		},
 		{
 			name: "SetMax is not called if conntrack.maxPerCore is 0",
@@ -143,6 +153,14 @@ func TestSetupConntrack(t *testing.T) {
 				MaxPerCore: ptr.To(int32(0)),
 			},
 			expect: nil,
+		},
+		{
+			name: "SetHashsize is not called if max is wrong but hashsize is correct",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			hashsize: 24,
+			expect:   []string{"SetMax(96)"},
 		},
 		{
 			name: "SetTCPEstablishedTimeout is called if conntrack.tcpEstablishedTimeout is specified",
@@ -227,7 +245,7 @@ func TestSetupConntrack(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fc := &fakeConntracker{err: test.conntrackErr}
+			fc := &fakeConntracker{hashsize: test.hashsize, err: test.conntrackErr}
 			err := setSysctls(ctx, fc, &test.config)
 			if test.wantErr && err == nil {
 				t.Errorf("Test %q: Expected error, got nil", test.name)

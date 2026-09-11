@@ -54,6 +54,11 @@ type conntrackConfigurer interface {
 	// SetUDPStreamTimeout adjusts nf_conntrack_udp_timeout_stream.
 	SetUDPStreamTimeout(ctx context.Context, seconds int) error
 
+	// GetHashsize gets the conntrack module "hashsize" parameter
+	GetHashsize(ctx context.Context) (int, error)
+	// SetHashsize sets the conntrack module "hashsize" parameter
+	SetHashsize(ctx context.Context, value int) error
+
 	// DetectNumCPU returns the number of CPU cores in the system
 	DetectNumCPU() int
 }
@@ -67,6 +72,18 @@ func setSysctls(ctx context.Context, ct conntrackConfigurer, config *kubeproxyco
 		err := ct.SetMax(ctx, max)
 		if err != nil {
 			return err
+		}
+
+		// Check if hashsize is large enough for the nf_conntrack_max value.
+		hashsize, err := ct.GetHashsize(ctx)
+		if err != nil {
+			return err
+		}
+		if hashsize < max/4 {
+			err = ct.SetHashsize(ctx, max/4)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -152,18 +169,7 @@ func (rct realConntrackConfigurer) SetMax(ctx context.Context, max int) error {
 	if err := rct.setIntSysCtl(ctx, "nf_conntrack_max", max); err != nil {
 		return err
 	}
-
-	// Check if hashsize is large enough for the nf_conntrack_max value.
-	hashsize, err := readIntStringFile("/sys/module/nf_conntrack/parameters/hashsize")
-	if err != nil {
-		return err
-	}
-	if hashsize >= (max / 4) {
-		return nil
-	}
-
-	logger.Info("Setting conntrack hashsize", "conntrackHashsize", max/4)
-	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
+	return nil
 }
 
 func (rct realConntrackConfigurer) SetTCPEstablishedTimeout(ctx context.Context, seconds int) error {
@@ -200,14 +206,15 @@ func (rct realConntrackConfigurer) setIntSysCtl(ctx context.Context, name string
 	return nil
 }
 
-func readIntStringFile(filename string) (int, error) {
-	b, err := os.ReadFile(filename)
+func (rct realConntrackConfigurer) GetHashsize(_ context.Context) (int, error) {
+	b, err := os.ReadFile("/sys/module/nf_conntrack/parameters/hashsize")
 	if err != nil {
 		return -1, err
 	}
 	return strconv.Atoi(strings.TrimSpace(string(b)))
 }
 
-func writeIntStringFile(filename string, value int) error {
-	return os.WriteFile(filename, []byte(strconv.Itoa(value)), 0640)
+func (rct realConntrackConfigurer) SetHashsize(ctx context.Context, value int) error {
+	klog.FromContext(ctx).Info("Setting conntrack hashsize", "conntrackHashsize", value)
+	return os.WriteFile("/sys/module/nf_conntrack/parameters/hashsize", []byte(strconv.Itoa(value)), 0640)
 }
