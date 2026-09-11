@@ -17,6 +17,7 @@ limitations under the License.
 package keyutil
 
 import (
+	"crypto/mldsa"
 	"os"
 	"testing"
 )
@@ -193,4 +194,43 @@ func TestReadPublicKeys(t *testing.T) {
 		t.Fatalf("expected 1 keys, got %d", len(keys))
 	}
 
+}
+
+func TestMarshalParseMLDSAKey(t *testing.T) {
+	testCases := []struct {
+		name   string
+		params mldsa.Parameters
+	}{
+		{name: "ML-DSA-44", params: mldsa.MLDSA44()},
+		{name: "ML-DSA-65", params: mldsa.MLDSA65()},
+		{name: "ML-DSA-87", params: mldsa.MLDSA87()},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			key, err := mldsa.GenerateKey(tc.params)
+			if err != nil {
+				t.Fatalf("failed to generate key: %v", err)
+			}
+
+			pemData, err := MarshalPrivateKeyToPEM(key)
+			if err != nil {
+				t.Fatalf("failed to marshal key to PEM: %v", err)
+			}
+
+			parsed, err := ParsePrivateKeyPEM(pemData)
+			if err != nil {
+				t.Fatalf("failed to parse PEM key: %v", err)
+			}
+
+			parsedMLDSA, ok := parsed.(*mldsa.PrivateKey)
+			if !ok {
+				t.Fatalf("expected *mldsa.PrivateKey, got %T", parsed)
+			}
+
+			if !key.Equal(parsedMLDSA) {
+				t.Error("parsed key does not match original")
+			}
+		})
+	}
 }

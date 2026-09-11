@@ -1624,3 +1624,54 @@ func certificateString(c *tls.Certificate) string {
 	}
 	return c.Leaf.Subject.CommonName
 }
+
+func TestMLDSAKeyGeneratorFunc(t *testing.T) {
+	testCases := []struct {
+		name      string
+		algorithm string
+		wantErr   bool
+	}{
+		{name: "ML-DSA-44", algorithm: "ML-DSA-44"},
+		{name: "ML-DSA-65", algorithm: "ML-DSA-65"},
+		{name: "ML-DSA-87", algorithm: "ML-DSA-87"},
+		{name: "invalid", algorithm: "ML-DSA-99", wantErr: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			genFunc := MLDSAKeyGeneratorFunc(tc.algorithm)
+			key, err := genFunc()
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if key == nil {
+				t.Fatal("expected non-nil key")
+			}
+			if key.Public() == nil {
+				t.Fatal("expected non-nil public key")
+			}
+		})
+	}
+}
+
+func TestValidateKeyStrengthMLDSA(t *testing.T) {
+	testCases := []string{"ML-DSA-44", "ML-DSA-65", "ML-DSA-87"}
+	for _, algo := range testCases {
+		t.Run(algo, func(t *testing.T) {
+			genFunc := MLDSAKeyGeneratorFunc(algo)
+			key, err := genFunc()
+			if err != nil {
+				t.Fatalf("failed to generate key: %v", err)
+			}
+			if err := validateKeyStrength(key); err != nil {
+				t.Errorf("expected ML-DSA key to pass validation, got: %v", err)
+			}
+		})
+	}
+}

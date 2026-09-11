@@ -124,7 +124,7 @@ func NewKubeletServerCertificateManager(logger klog.Logger, kubeClient clientset
 
 	getTemplate := newGetTemplateFn(nodeName, getAddresses)
 
-	m, err := certificate.NewManager(&certificate.Config{
+	config := certificate.Config{
 		ClientsetFn:             clientsetFn,
 		GetTemplate:             getTemplate,
 		SignerName:              certificates.KubeletServingSignerName,
@@ -132,7 +132,11 @@ func NewKubeletServerCertificateManager(logger klog.Logger, kubeClient clientset
 		CertificateStore:        certificateStore,
 		CertificateRotation:     certificateRotationAge,
 		CertificateRenewFailure: certificateRenewFailure,
-	})
+	}
+	if kubeCfg.ServerCertificateKeyAlgorithm != "" {
+		config.GenerateKey = certificate.MLDSAKeyGeneratorFunc(kubeCfg.ServerCertificateKeyAlgorithm)
+	}
+	m, err := certificate.NewManager(&config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize server certificate manager: %v", err)
 	}
@@ -207,6 +211,7 @@ func NewKubeletClientCertificateManager(
 	certFile string,
 	keyFile string,
 	clientsetFn certificate.ClientsetFunc,
+	keyAlgorithm string,
 ) (certificate.Manager, error) {
 	logger = logger.WithName("clientCertificateManager")
 
@@ -231,7 +236,7 @@ func NewKubeletClientCertificateManager(
 	)
 	legacyregistry.Register(certificateRenewFailure)
 
-	m, err := certificate.NewManager(&certificate.Config{
+	config := certificate.Config{
 		ClientsetFn: clientsetFn,
 		Template: &x509.CertificateRequest{
 			Subject: pkix.Name{
@@ -250,7 +255,11 @@ func NewKubeletClientCertificateManager(
 
 		CertificateStore:        certificateStore,
 		CertificateRenewFailure: certificateRenewFailure,
-	})
+	}
+	if keyAlgorithm != "" {
+		config.GenerateKey = certificate.MLDSAKeyGeneratorFunc(keyAlgorithm)
+	}
+	m, err := certificate.NewManager(&config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate manager: %v", err)
 	}

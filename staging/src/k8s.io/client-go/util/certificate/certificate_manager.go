@@ -21,6 +21,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -28,6 +29,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -777,6 +779,23 @@ func generateKeyFuncImpl() (crypto.Signer, error) {
 	return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 }
 
+// MLDSAKeyGeneratorFunc returns a GenerateKey function for the specified ML-DSA algorithm.
+// Valid values: "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+func MLDSAKeyGeneratorFunc(algorithm string) func() (crypto.Signer, error) {
+	return func() (crypto.Signer, error) {
+		switch strings.ToUpper(algorithm) {
+		case "ML-DSA-44":
+			return mldsa.GenerateKey(mldsa.MLDSA44())
+		case "ML-DSA-65":
+			return mldsa.GenerateKey(mldsa.MLDSA65())
+		case "ML-DSA-87":
+			return mldsa.GenerateKey(mldsa.MLDSA87())
+		default:
+			return nil, fmt.Errorf("unsupported ML-DSA algorithm: %s", algorithm)
+		}
+	}
+}
+
 func (m *manager) generateCSR() (template *x509.CertificateRequest, csrPEM []byte, keyPEM []byte, key interface{}, err error) {
 	generateKey := m.generateKey
 	if generateKey == nil {
@@ -845,6 +864,8 @@ func validateKeyStrength(key crypto.Signer) error {
 			return fmt.Errorf("ECDSA key curve %s (%d bits) is below the minimum of %d",
 				k.Curve.Params().Name, bits, minECDSAKeyBits)
 		}
+	case *mldsa.PrivateKey:
+		// ML-DSA keys are inherently strong (NIST security levels 2, 3, and 5).
 	}
 	return nil
 }

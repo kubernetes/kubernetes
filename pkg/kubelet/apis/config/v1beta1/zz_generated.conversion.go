@@ -564,6 +564,8 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.TLSMinVersion = in.TLSMinVersion
 	out.RotateCertificates = in.RotateCertificates
 	out.ServerTLSBootstrap = in.ServerTLSBootstrap
+	out.ClientCertificateKeyAlgorithm = in.ClientCertificateKeyAlgorithm
+	out.ServerCertificateKeyAlgorithm = in.ServerCertificateKeyAlgorithm
 	if err := Convert_v1beta1_KubeletAuthentication_To_config_KubeletAuthentication(&in.Authentication, &out.Authentication, s); err != nil {
 		return err
 	}
@@ -775,6 +777,8 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.TLSMinVersion = in.TLSMinVersion
 	out.RotateCertificates = in.RotateCertificates
 	out.ServerTLSBootstrap = in.ServerTLSBootstrap
+	out.ClientCertificateKeyAlgorithm = in.ClientCertificateKeyAlgorithm
+	out.ServerCertificateKeyAlgorithm = in.ServerCertificateKeyAlgorithm
 	if err := Convert_config_KubeletAuthentication_To_v1beta1_KubeletAuthentication(&in.Authentication, &out.Authentication, s); err != nil {
 		return err
 	}

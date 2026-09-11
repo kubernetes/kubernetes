@@ -1044,7 +1044,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 
 		kubeClientConfigOverrides(s, clientConfig)
 
-		clientCertificateManager, err := buildClientCertificateManager(logger, certConfig, clientConfig, s.CertDirectory, nodeName)
+		clientCertificateManager, err := buildClientCertificateManager(logger, certConfig, clientConfig, s.CertDirectory, nodeName, s.ClientCertificateKeyAlgorithm)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1146,7 +1146,7 @@ func updateDialer(clientConfig *restclient.Config) (func(), error) {
 // buildClientCertificateManager creates a certificate manager that will use certConfig to request a client certificate
 // if no certificate is available, or the most recent clientConfig (which is assumed to point to the cert that the manager will
 // write out).
-func buildClientCertificateManager(logger klog.Logger, certConfig, clientConfig *restclient.Config, certDir string, nodeName types.NodeName) (certificate.Manager, error) {
+func buildClientCertificateManager(logger klog.Logger, certConfig, clientConfig *restclient.Config, certDir string, nodeName types.NodeName, keyAlgorithm string) (certificate.Manager, error) {
 	newClientsetFn := func(current *tls.Certificate) (clientset.Interface, error) {
 		// If we have a valid certificate, use that to fetch CSRs. Otherwise use the bootstrap
 		// credentials. In the future it would be desirable to change the behavior of bootstrap
@@ -1173,6 +1173,7 @@ func buildClientCertificateManager(logger klog.Logger, certConfig, clientConfig 
 		clientConfig.CertFile,
 		clientConfig.KeyFile,
 		newClientsetFn,
+		keyAlgorithm,
 	)
 }
 

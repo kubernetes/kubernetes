@@ -114,7 +114,15 @@ func MarshalPrivateKeyToPEM(privateKey crypto.PrivateKey) ([]byte, error) {
 		}
 		return pem.EncodeToMemory(block), nil
 	default:
-		return nil, fmt.Errorf("private key is not a recognized type: %T", privateKey)
+		derBytes, err := x509.MarshalPKCS8PrivateKey(t)
+		if err != nil {
+			return nil, fmt.Errorf("private key is not a recognized type: %T", privateKey)
+		}
+		block := &pem.Block{
+			Type:  PrivateKeyBlockType,
+			Bytes: derBytes,
+		}
+		return pem.EncodeToMemory(block), nil
 	}
 }
 
@@ -188,7 +196,7 @@ func ParsePrivateKeyPEM(keyData []byte) (interface{}, error) {
 	}
 
 	// we read all the PEM blocks and didn't recognize one
-	return nil, fmt.Errorf("data does not contain a valid RSA or ECDSA private key")
+	return nil, fmt.Errorf("data does not contain a valid private key")
 }
 
 // ParsePublicKeysPEM is a helper function for reading an array of rsa.PublicKey or ecdsa.PublicKey from a PEM-encoded byte array.

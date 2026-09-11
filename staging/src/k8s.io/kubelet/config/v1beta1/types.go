@@ -221,6 +221,18 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	ServerTLSBootstrap bool `json:"serverTLSBootstrap,omitempty"`
+	// clientCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// client certificate signing requests during certificate rotation.
+	// Valid values are: "" (default, ECDSA P-256), "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+	// Default: ""
+	// +optional
+	ClientCertificateKeyAlgorithm string `json:"clientCertificateKeyAlgorithm,omitempty"`
+	// serverCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// server certificate signing requests during certificate rotation.
+	// Valid values are: "" (default, ECDSA P-256), "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+	// Default: ""
+	// +optional
+	ServerCertificateKeyAlgorithm string `json:"serverCertificateKeyAlgorithm,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated.
 	// Defaults:
 	//   anonymous:
