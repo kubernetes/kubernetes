@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/utils/lru"
 	"k8s.io/utils/ptr"
 )
 
@@ -102,24 +103,25 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		return nil, err
 	}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:               recorder,
-		cpuCFSQuota:            false,
-		cpuCFSQuotaPeriod:      metav1.Duration{Duration: time.Millisecond * 100},
-		livenessManager:        proberesults.NewManager(),
-		startupManager:         proberesults.NewManager(),
-		machineInfo:            machineInfo,
-		osInterface:            osInterface,
-		containerManager:       cm.NewFakeContainerManager(),
-		runtimeHelper:          runtimeHelper,
-		runtimeService:         runtimeService,
-		imageService:           imageService,
-		seccompProfileRoot:     fakeSeccompProfileRoot,
-		internalLifecycle:      cm.NewFakeInternalContainerLifecycle(),
-		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
-		logManager:             logManager,
-		memoryThrottlingFactor: 0.9,
-		podLogsDirectory:       fakePodLogsDirectory,
-		actuatedState:          state.NewStateMemory(nil),
+		recorder:                    recorder,
+		cpuCFSQuota:                 false,
+		cpuCFSQuotaPeriod:           metav1.Duration{Duration: time.Millisecond * 100},
+		livenessManager:             proberesults.NewManager(),
+		startupManager:              proberesults.NewManager(),
+		machineInfo:                 machineInfo,
+		osInterface:                 osInterface,
+		containerManager:            cm.NewFakeContainerManager(),
+		runtimeHelper:               runtimeHelper,
+		runtimeService:              runtimeService,
+		imageService:                imageService,
+		seccompProfileRoot:          fakeSeccompProfileRoot,
+		internalLifecycle:           cm.NewFakeInternalContainerLifecycle(),
+		logReduction:                logreduction.NewLogReduction(identicalErrorDelay),
+		logManager:                  logManager,
+		memoryThrottlingFactor:      0.9,
+		podLogsDirectory:            fakePodLogsDirectory,
+		actuatedState:               state.NewStateMemory(nil),
+		createContainerFailureCache: lru.New(maxContainerStartFailureCacheEntries),
 	}
 
 	// Initialize swap controller availability check (always false for tests)
