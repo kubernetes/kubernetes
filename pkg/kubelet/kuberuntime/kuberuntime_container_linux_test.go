@@ -3003,3 +3003,27 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 		assert.False(t, ok, "memory.high should NOT be set when container memory req==limit, even if pod is Burstable")
 	})
 }
+
+func TestToKubeContainerResourcesUnlimitedQuota(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		quota     int64
+		period    int64
+		wantLimit int64 // milliCPU; 0 means no limit is reported
+	}{
+		{"an unlimited quota reports resources with no limit", -1, 100000, 0},
+		{"a finite quota reports the limit", 200000, 100000, 2000},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := toKubeContainerResources(&runtimeapi.ContainerResources{Linux: &runtimeapi.LinuxContainerResources{CpuQuota: tc.quota, CpuPeriod: tc.period}})
+			require.NotNil(t, got)
+			if tc.wantLimit == 0 {
+				assert.Nil(t, got.CPULimit)
+			} else {
+				assert.Equal(t, tc.wantLimit, got.CPULimit.MilliValue())
+			}
+		})
+	}
+	// Without a period the runtime reported nothing, so the whole resources block is nil (unread), not "no limit".
+	assert.Nil(t, toKubeContainerResources(&runtimeapi.ContainerResources{Linux: &runtimeapi.LinuxContainerResources{CpuQuota: -1}}))
+}
