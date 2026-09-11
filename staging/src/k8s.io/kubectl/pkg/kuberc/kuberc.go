@@ -121,6 +121,9 @@ func (p *Preferences) Read(args []string, errOut io.Writer) (*config.Preference,
 	}
 
 	p.convertPluginPolicy(kuberc)
+	if err := p.validate(kuberc); err != nil {
+		return nil, err
+	}
 
 	p.cache = cachedPreference{value: kuberc, read: true}
 	return kuberc, nil
@@ -138,10 +141,6 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclio
 		return args, err
 	} else if kuberc == nil {
 		return args, nil
-	}
-
-	if err = p.validate(kuberc); err != nil {
-		return nil, err
 	}
 
 	p.applyPluginPolicy(kubeConfigFlags, kuberc)
@@ -577,28 +576,17 @@ func (p *Preferences) validate(plugin *config.Preference) error {
 	return nil
 }
 
-func GetAliasesCommandGroup(kubectl *cobra.Command, p PreferencesHandler, args []string) templates.CommandGroup {
+func GetAliasesCommandGroup(kubectl *cobra.Command, kuberc *config.Preference) templates.CommandGroup {
 	// Find root level
 	return templates.CommandGroup{
 		Message:  i18n.T("Aliases provided by kuberc:"),
-		Commands: registerAliasCommands(kubectl, p, args),
+		Commands: registerAliasCommands(kubectl, kuberc),
 	}
 }
 
 // registerAliasCommand allows adding Cobra command to the command tree or extracting them for usage in
 // e.g. the help function or for registering the completion function
-func registerAliasCommands(kubectl *cobra.Command, p PreferencesHandler, args []string) (cmds []*cobra.Command) {
-	streams := genericclioptions.IOStreams{
-		In:     &bytes.Buffer{},
-		Out:    io.Discard,
-		ErrOut: io.Discard,
-	}
-
-	kuberc, err := p.Read(args, streams.ErrOut)
-	if err != nil || kuberc == nil {
-		return []*cobra.Command{}
-	}
-
+func registerAliasCommands(kubectl *cobra.Command, kuberc *config.Preference) (cmds []*cobra.Command) {
 	userDefinedCommands := []*cobra.Command{}
 	for _, alias := range kuberc.Aliases {
 		_, err := BuildAliasCommand(kubectl, alias)
