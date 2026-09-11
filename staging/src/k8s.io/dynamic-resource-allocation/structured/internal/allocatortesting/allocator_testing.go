@@ -970,6 +970,7 @@ type AllocatorTestCase struct {
 
 	expectResults []any
 	expectError   types.GomegaMatcher // can be used to check for no error or match specific error
+	expectErrorIs error               // optional error to check with errors.Is
 
 	// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
 	// which doesn't provide the stats and also falls over with excessive runtime for them.
@@ -1718,6 +1719,36 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
+		"all-devices-of-invalid-pool": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				},
+			})),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				// This simulates the problem that can
+				// (theoretically) occur when the resource
+				// slice controller wants to publish a pool
+				// with two slices but ends up creating some
+				// identical slices under different names
+				// because its informer cache was out-dated on
+				// another sync (see
+				// resourceslicecontroller.go).
+				sliceA := sliceWithOneDevice(slice1, node1, pool1, driverA).obj()
+				sliceA.Spec.Pool.ResourceSliceCount = 2
+				sliceB := sliceA.DeepCopy()
+				sliceB.Name += "-2"
+				return []*resourceapi.ResourceSlice{sliceA, sliceB}
+			}(),
+			node: node(node1, region1),
+
+			expectResults: nil,
+			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: asks for all devices, but resource pool driver-a/pool-1 is currently invalid")),
+			expectErrorIs: internal.ErrFailedAllocationOnNode,
+		},
 		"all-devices-with-consumed-counters": {
 			features: Features{
 				PartitionableDevices: true,
@@ -1798,6 +1829,7 @@ func TestAllocator(t *testing.T,
 
 			expectResults: nil,
 			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: asks for all devices, but resource pool driver-a/pool-1 is currently being updated")),
+			expectErrorIs: internal.ErrFailedAllocationOnNode,
 		},
 		"all-devices-plus-another": {
 			claimsToAllocate: objects(
@@ -9283,6 +9315,9 @@ func RunTestAllocator(t *testing.T,
 				matchError = gomega.Not(gomega.HaveOccurred())
 			}
 			g.Expect(err).To(matchError)
+			if tc.expectErrorIs != nil {
+				g.Expect(err).To(gomega.MatchError(tc.expectErrorIs))
+			}
 
 			t.Logf("name: %s", name)
 			// replace any share id with fixed value for testing
