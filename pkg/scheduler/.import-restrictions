@@ -2,8 +2,6 @@ rules:
   # Allow only specific k8s.io/kubernetes dependencies currently used
   - selectorRegexp: ^k8s[.]io/kubernetes/pkg/api/v1/pod$
     allowedPrefixes: [ "" ]
-  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/apis/core/v1/helper$
-    allowedPrefixes: [ "" ]
   - selectorRegexp: ^k8s[.]io/kubernetes/pkg/apis/scheduling$
     allowedPrefixes: [ "" ]
   - selectorRegexp: ^k8s[.]io/kubernetes/pkg/controller/volume/persistentvolume/testing$
