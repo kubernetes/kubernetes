@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"slices"
 	"sync"
 	"testing"
 
@@ -808,6 +807,149 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 		actualGroupNames = sets.NewString(groupNamesFromList(apiGroupList)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
 			"%s: Expected after invalidation groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+	}
+}
+
+// Tests function "ServerResourcesForGroupVersion" when the "unaggregated" discovery is returned.
+func TestMemCacheServerResourcesForGroupVersion(t *testing.T) {
+	tests := []struct {
+		name              string
+		groupVersion      string
+		apiGroup          *metav1.APIGroup
+		resourcesMap      map[string]*metav1.APIResourceList
+		expectedResources []string
+	}{
+		{
+			name:         "Legacy discovery format: 0 resource",
+			groupVersion: "apps/v1",
+			apiGroup: &metav1.APIGroup{
+				Name: "apps",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{
+						GroupVersion: "apps/v1",
+						Version:      "v1",
+					},
+				},
+			},
+			resourcesMap: map[string]*metav1.APIResourceList{
+				"apps/v1": &metav1.APIResourceList{
+					APIResources: []metav1.APIResource{},
+				},
+			},
+			expectedResources: []string{},
+		},
+		{
+			name:         "Legacy discovery format: 2 resources",
+			groupVersion: "batch/v1",
+			apiGroup: &metav1.APIGroup{
+				Name: "batch",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{
+						GroupVersion: "batch/v1",
+						Version:      "v1",
+					},
+				},
+			},
+			resourcesMap: map[string]*metav1.APIResourceList{
+				"batch/v1": &metav1.APIResourceList{
+					APIResources: []metav1.APIResource{
+						{Name: "cronjobs"},
+						{Name: "jobs"},
+					},
+				},
+			},
+			expectedResources: []string{
+				"cronjobs",
+				"jobs",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		mux := http.NewServeMux()
+
+		mux.HandleFunc("/apis", func(w http.ResponseWriter, r *http.Request) {
+			apis := &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{*test.apiGroup},
+			}
+			output, err := json.Marshal(apis)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+			// Content-type is "unaggregated" discovery format -- no resources returned.
+			w.Header().Set("Content-Type", discovery.AcceptV1)
+			w.WriteHeader(http.StatusOK)
+			w.Write(output)
+		})
+
+		mux.HandleFunc("/apis/{group}", func(w http.ResponseWriter, r *http.Request) {
+			group := r.PathValue("group")
+			if group != test.apiGroup.Name {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			output, err := json.Marshal(test.apiGroup)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+			// Content-type is "unaggregated" discovery format -- no resources returned.
+			w.Header().Set("Content-Type", discovery.AcceptV1)
+			w.WriteHeader(http.StatusOK)
+			w.Write(output)
+		})
+
+		mux.HandleFunc("/apis/{group}/{version}", func(w http.ResponseWriter, r *http.Request) {
+			group := r.PathValue("group")
+			if group != test.apiGroup.Name {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			version := r.PathValue("version")
+			gv := fmt.Sprintf("%s/%s", group, version)
+			output, err := json.Marshal(test.resourcesMap[gv])
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+			// Content-type is "unaggregated" discovery format -- no resources returned.
+			w.Header().Set("Content-Type", discovery.AcceptV1)
+			w.WriteHeader(http.StatusOK)
+			w.Write(output)
+		})
+
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		})
+		server := httptest.NewServer(mux)
+		defer server.Close()
+		client := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+		memClient := memCacheClient{
+			delegate:               client,
+			groupToServerResources: map[string]*cacheEntry{},
+		}
+		assert.False(t, memClient.Fresh())
+		apiResourceList, err := memClient.ServerResourcesForGroupVersion(test.groupVersion)
+		require.NoError(t, err)
+		assert.False(t, memClient.receivedAggregatedDiscovery)
+		assert.True(t, memClient.Fresh())
+		// Test the expected resources are returned for the aggregated format.
+		expectedResourceNames := sets.NewString(test.expectedResources...)
+		actualResourceNames := sets.NewString(resourceNamesFromResourceLists([]*metav1.APIResourceList{apiResourceList})...)
+		assert.True(t, expectedResourceNames.Equal(actualResourceNames),
+			"%s: Expected after invalidation resources (%s), got (%s)", test.name, expectedResourceNames.List(), actualResourceNames.List())
+		// Invalidate the cache and retrieve the server groups and resources again.
+		memClient.Invalidate()
+		assert.False(t, memClient.Fresh())
+		apiResourceList, err = memClient.ServerResourcesForGroupVersion(test.groupVersion)
+		require.NoError(t, err)
+		assert.False(t, memClient.receivedAggregatedDiscovery)
+		// Test the expected resources are returned for the aggregated format.
+		actualResourceNames = sets.NewString(resourceNamesFromResourceLists([]*metav1.APIResourceList{apiResourceList})...)
+		assert.True(t, expectedResourceNames.Equal(actualResourceNames),
+			"%s: Expected after invalidation resources (%s), got (%s)", test.name, expectedResourceNames.List(), actualResourceNames.List())
 	}
 }
 
@@ -1640,510 +1782,12 @@ func TestMemCacheAggregatedServerGroups(t *testing.T) {
 	}
 }
 
-// Tests function "ServerResourcesForGroupVersion" when the "unaggregated" discovery is returned.
-func TestMemCacheServerResourcesForGroupVersion(t *testing.T) {
-	tests := []struct {
-		name              string
-		groupVersion      string
-		apiGroup          *metav1.APIGroup
-		resourcesMap      map[string]*metav1.APIResourceList
-		expectedResources []string
-	}{
-		{
-			name:         "Legacy discovery format: 0 resource",
-			groupVersion: "apps/v1",
-			apiGroup: &metav1.APIGroup{
-				Name: "apps",
-				Versions: []metav1.GroupVersionForDiscovery{
-					{
-						GroupVersion: "apps/v1",
-						Version:      "v1",
-					},
-				},
-			},
-			resourcesMap: map[string]*metav1.APIResourceList{
-				"apps/v1": &metav1.APIResourceList{
-					APIResources: []metav1.APIResource{},
-				},
-			},
-			expectedResources: []string{},
-		},
-		{
-			name:         "Legacy discovery format: 2 resources",
-			groupVersion: "batch/v1",
-			apiGroup: &metav1.APIGroup{
-				Name: "batch",
-				Versions: []metav1.GroupVersionForDiscovery{
-					{
-						GroupVersion: "batch/v1",
-						Version:      "v1",
-					},
-				},
-			},
-			resourcesMap: map[string]*metav1.APIResourceList{
-				"batch/v1": &metav1.APIResourceList{
-					APIResources: []metav1.APIResource{
-						{Name: "cronjobs"},
-						{Name: "jobs"},
-					},
-				},
-			},
-			expectedResources: []string{
-				"cronjobs",
-				"jobs",
-			},
-		},
-	}
-
-	for _, test := range tests {
-		mux := http.NewServeMux()
-
-		mux.HandleFunc("/apis", func(w http.ResponseWriter, r *http.Request) {
-			apis := &metav1.APIGroupList{
-				Groups: []metav1.APIGroup{*test.apiGroup},
-			}
-			output, err := json.Marshal(apis)
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-				return
-			}
-			// Content-type is "unaggregated" discovery format -- no resources returned.
-			w.Header().Set("Content-Type", discovery.AcceptV1)
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		})
-
-		mux.HandleFunc("/apis/{group}", func(w http.ResponseWriter, r *http.Request) {
-			group := r.PathValue("group")
-			if group != test.apiGroup.Name {
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-			output, err := json.Marshal(test.apiGroup)
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-				return
-			}
-			// Content-type is "unaggregated" discovery format -- no resources returned.
-			w.Header().Set("Content-Type", discovery.AcceptV1)
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		})
-
-		mux.HandleFunc("/apis/{group}/{version}", func(w http.ResponseWriter, r *http.Request) {
-			group := r.PathValue("group")
-			if group != test.apiGroup.Name {
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-			version := r.PathValue("version")
-			gv := fmt.Sprintf("%s/%s", group, version)
-			output, err := json.Marshal(test.resourcesMap[gv])
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-				return
-			}
-			// Content-type is "unaggregated" discovery format -- no resources returned.
-			w.Header().Set("Content-Type", discovery.AcceptV1)
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		})
-
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		})
-		server := httptest.NewServer(mux)
-		defer server.Close()
-		client := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
-		memClient := memCacheClient{
-			delegate:               client,
-			groupToServerResources: map[string]*cacheEntry{},
-		}
-		assert.False(t, memClient.Fresh())
-		apiResourceList, err := memClient.ServerResourcesForGroupVersion(test.groupVersion)
-		require.NoError(t, err)
-		assert.False(t, memClient.receivedAggregatedDiscovery)
-		assert.True(t, memClient.Fresh())
-		// Test the expected resources are returned for the aggregated format.
-		expectedResourceNames := sets.NewString(test.expectedResources...)
-		actualResourceNames := sets.NewString(resourceNamesFromResourceLists([]*metav1.APIResourceList{apiResourceList})...)
-		assert.True(t, expectedResourceNames.Equal(actualResourceNames),
-			"%s: Expected after invalidation resources (%s), got (%s)", test.name, expectedResourceNames.List(), actualResourceNames.List())
-		// Invalidate the cache and retrieve the server groups and resources again.
-		memClient.Invalidate()
-		assert.False(t, memClient.Fresh())
-		apiResourceList, err = memClient.ServerResourcesForGroupVersion(test.groupVersion)
-		require.NoError(t, err)
-		assert.False(t, memClient.receivedAggregatedDiscovery)
-		// Test the expected resources are returned for the aggregated format.
-		actualResourceNames = sets.NewString(resourceNamesFromResourceLists([]*metav1.APIResourceList{apiResourceList})...)
-		assert.True(t, expectedResourceNames.Equal(actualResourceNames),
-			"%s: Expected after invalidation resources (%s), got (%s)", test.name, expectedResourceNames.List(), actualResourceNames.List())
-	}
-}
-
-// Tests function "ServerGroupsAndResources" when the "unaggregated" discovery is returned.
-func TestMemCacheServerGroupsAndResources(t *testing.T) {
-	tests := []struct {
-		name                  string
-		corev1                *metav1.APIVersions
-		apis                  *metav1.APIGroupList
-		resourcesMap          map[string]*metav1.APIResourceList
-		expectedGroupNames    []string
-		expectedGroupVersions []string
-		expectedResources     []string
-	}{
-		{
-			name: "Legacy discovery format: 1 version at /api, 1 group at /apis, 0 resource",
-			corev1: &metav1.APIVersions{
-				Versions: []string{
-					"v1",
-				},
-			},
-			apis: &metav1.APIGroupList{
-				Groups: []metav1.APIGroup{
-					{
-						Name: "extensions",
-						Versions: []metav1.GroupVersionForDiscovery{
-							{
-								Version:      "v1beta1",
-								GroupVersion: "extensions/v1beta1",
-							},
-						},
-					},
-				},
-			},
-			resourcesMap: map[string]*metav1.APIResourceList{
-				"v1": &metav1.APIResourceList{
-					GroupVersion: "v1",
-					APIResources: []metav1.APIResource{},
-				},
-				"extensions/v1beta1": &metav1.APIResourceList{
-					GroupVersion: "extensions/v1beta1",
-					APIResources: []metav1.APIResource{},
-				},
-			},
-			expectedGroupNames:    []string{"", "extensions"},
-			expectedGroupVersions: []string{"v1", "extensions/v1beta1"},
-			expectedResources:     []string{},
-		},
-		{
-			name: "Legacy discovery format: 1 version at /api, 2 groups/1 version at /apis, 4 resources at apps/v1 GroupVersion",
-			corev1: &metav1.APIVersions{
-				Versions: []string{
-					"v1",
-				},
-			},
-			apis: &metav1.APIGroupList{
-				Groups: []metav1.APIGroup{
-					{
-						Name: "apps",
-						Versions: []metav1.GroupVersionForDiscovery{
-							{
-								GroupVersion: "apps/v1",
-								Version:      "v1",
-							},
-						},
-					},
-					{
-						Name: "extensions",
-						Versions: []metav1.GroupVersionForDiscovery{
-							{
-								GroupVersion: "extensions/v1beta1",
-								Version:      "v1beta1",
-							},
-						},
-					},
-				},
-			},
-			resourcesMap: map[string]*metav1.APIResourceList{
-				"v1": &metav1.APIResourceList{
-					GroupVersion: "v1",
-					APIResources: []metav1.APIResource{},
-				},
-				"apps/v1": &metav1.APIResourceList{
-					GroupVersion: "apps/v1",
-					APIResources: []metav1.APIResource{
-						{Name: "daemonsets"},
-						{Name: "deployments"},
-						{Name: "replicasets"},
-						{Name: "statefulset"},
-					},
-				},
-				"extensions/v1beta1": &metav1.APIResourceList{
-					GroupVersion: "extensions/v1beta1",
-					APIResources: []metav1.APIResource{},
-				},
-			},
-			expectedGroupNames:    []string{"", "apps", "extensions"},
-			expectedGroupVersions: []string{"v1", "apps/v1", "extensions/v1beta1"},
-			expectedResources:     []string{"daemonsets", "deployments", "replicasets", "statefulset"},
-		},
-		{
-			name: "Legacy discovery format: 1 version at /api, 3 groups/2 versions at /apis, 8 resources at different GroupVersions",
-			corev1: &metav1.APIVersions{
-				Versions: []string{
-					"v1",
-				},
-			},
-			apis: &metav1.APIGroupList{
-				Groups: []metav1.APIGroup{
-					{
-						Name: "apps",
-						Versions: []metav1.GroupVersionForDiscovery{
-							{
-								GroupVersion: "apps/v1",
-								Version:      "v1",
-							},
-						},
-					},
-					{
-						Name: "apps",
-						Versions: []metav1.GroupVersionForDiscovery{
-							{
-								GroupVersion: "apps/v1beta1",
-								Version:      "v1beta1",
-							},
-						},
-					},
-					{
-						Name: "batch",
-						Versions: []metav1.GroupVersionForDiscovery{
-							{
-								GroupVersion: "batch/v1",
-								Version:      "v1",
-							},
-						},
-					},
-					{
-						Name: "batch",
-						Versions: []metav1.GroupVersionForDiscovery{
-							{
-								GroupVersion: "batch/v1beta1",
-								Version:      "v1beta1",
-							},
-						},
-					},
-					{
-						Name: "extensions",
-						Versions: []metav1.GroupVersionForDiscovery{
-							{
-								GroupVersion: "extensions/v1beta1",
-								Version:      "v1beta1",
-							},
-						},
-					},
-					{
-						Name: "extensions",
-						Versions: []metav1.GroupVersionForDiscovery{
-							{
-								GroupVersion: "extensions/v1alpha1",
-								Version:      "v1alpha1",
-							},
-						},
-					},
-				},
-			},
-			resourcesMap: map[string]*metav1.APIResourceList{
-				"v1": &metav1.APIResourceList{
-					GroupVersion: "v1",
-					APIResources: []metav1.APIResource{},
-				},
-				"apps/v1": &metav1.APIResourceList{
-					GroupVersion: "apps/v1",
-					APIResources: []metav1.APIResource{
-						{Name: "daemonsets"},
-						{Name: "deployments"},
-						{Name: "replicasets"},
-						{Name: "statefulset"},
-					},
-				},
-				"apps/v1beta1": &metav1.APIResourceList{
-					GroupVersion: "apps/v1beta1",
-					APIResources: []metav1.APIResource{
-						{Name: "replicasets"},
-					},
-				},
-				"batch/v1": &metav1.APIResourceList{
-					GroupVersion: "batch/v1",
-					APIResources: []metav1.APIResource{
-						{Name: "cronjobs"},
-						{Name: "jobs"},
-					},
-				},
-				"batch/v1beta1": &metav1.APIResourceList{
-					GroupVersion: "batch/v1beta1",
-					APIResources: []metav1.APIResource{
-						{Name: "jobs"},
-					},
-				},
-				"extensions/v1beta1": &metav1.APIResourceList{
-					GroupVersion: "extensions/v1beta1",
-					APIResources: []metav1.APIResource{},
-				},
-				"extensions/v1alpha1": &metav1.APIResourceList{
-					GroupVersion: "extensions/v1alpha1",
-					APIResources: []metav1.APIResource{},
-				},
-			},
-			expectedGroupNames: []string{
-				"",
-				"apps",
-				"batch",
-				"extensions",
-			},
-			expectedGroupVersions: []string{
-				"v1",
-				"apps/v1",
-				"batch/v1",
-				"batch/v1beta1",
-				"extensions/v1beta1",
-				"extensions/v1alpha1",
-			},
-			expectedResources: []string{
-				"daemonsets",
-				"deployments",
-				"replicasets",
-				"statefulset",
-				"cronjobs",
-				"jobs",
-			},
-		},
-	}
-
-	for _, test := range tests {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
-			output, err := json.Marshal(test.corev1)
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-				return
-			}
-			// Content-type is "unaggregated" discovery format -- no resources returned.
-			w.Header().Set("Content-Type", discovery.AcceptV1)
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		})
-
-		mux.HandleFunc("/api/{version}", func(w http.ResponseWriter, r *http.Request) {
-			version := r.PathValue("version")
-			output, err := json.Marshal(test.resourcesMap[version])
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-				return
-			}
-			// Content-type is "unaggregated" discovery format -- no resources returned.
-			w.Header().Set("Content-Type", discovery.AcceptV1)
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		})
-
-		mux.HandleFunc("/apis", func(w http.ResponseWriter, r *http.Request) {
-			output, err := json.Marshal(test.apis)
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-				return
-			}
-			// Content-type is "unaggregated" discovery format -- no resources returned.
-			w.Header().Set("Content-Type", discovery.AcceptV1)
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		})
-
-		mux.HandleFunc("/apis/{group}", func(w http.ResponseWriter, r *http.Request) {
-			group := r.PathValue("group")
-			index := slices.IndexFunc(test.apis.Groups, func(g metav1.APIGroup) bool {
-				return group == g.Name
-			})
-			output, err := json.Marshal(test.apis.Groups[index])
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-				return
-			}
-			// Content-type is "unaggregated" discovery format -- no resources returned.
-			w.Header().Set("Content-Type", discovery.AcceptV1)
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		})
-
-		mux.HandleFunc("/apis/{group}/{version}", func(w http.ResponseWriter, r *http.Request) {
-			group := r.PathValue("group")
-			version := r.PathValue("version")
-			gv := fmt.Sprintf("%s/%s", group, version)
-			output, err := json.Marshal(test.resourcesMap[gv])
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-				return
-			}
-			// Content-type is "unaggregated" discovery format -- no resources returned.
-			w.Header().Set("Content-Type", discovery.AcceptV1)
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		})
-
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		})
-		server := httptest.NewServer(mux)
-		defer server.Close()
-		client := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
-		memClient := memCacheClient{
-			delegate:               client,
-			groupToServerResources: map[string]*cacheEntry{},
-		}
-		assert.False(t, memClient.Fresh())
-		apiGroups, apiResourceLists, err := memClient.ServerGroupsAndResources()
-		require.NoError(t, err)
-		assert.False(t, memClient.receivedAggregatedDiscovery)
-		assert.True(t, memClient.Fresh())
-		// Test the expected groups are returned for the aggregated format.
-		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
-		actualGroupNames := sets.NewString(groupNames(apiGroups)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
-		// Test the expected resources are returned for the aggregated format.
-		expectedResourceNames := sets.NewString(test.expectedResources...)
-		actualResourceNames := sets.NewString(resourceNamesFromResourceLists(apiResourceLists)...)
-		assert.True(t, expectedResourceNames.Equal(actualResourceNames),
-			"%s: Expected after invalidation resources (%s), got (%s)", test.name, expectedResourceNames.List(), actualResourceNames.List())
-		// Test the expected group versions for the aggregated discovery is correct.
-		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
-		actualGroupVersions := sets.NewString(groupVersions(apiGroups)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
-		// Invalidate the cache and retrieve the server groups and resources again.
-		memClient.Invalidate()
-		assert.False(t, memClient.Fresh())
-		apiGroups, apiResourceLists, err = memClient.ServerGroupsAndResources()
-		require.NoError(t, err)
-		assert.False(t, memClient.receivedAggregatedDiscovery)
-		// Test the expected groups are returned for the aggregated format.
-		actualGroupNames = sets.NewString(groupNames(apiGroups)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected after invalidation groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
-		// Test the expected resources are returned for the aggregated format.
-		actualResourceNames = sets.NewString(resourceNamesFromResourceLists(apiResourceLists)...)
-		assert.True(t, expectedResourceNames.Equal(actualResourceNames),
-			"%s: Expected after invalidation resources (%s), got (%s)", test.name, expectedResourceNames.List(), actualResourceNames.List())
-	}
-}
-
 func resourceNamesFromResourceLists(resourceLists []*metav1.APIResourceList) []string {
 	result := []string{}
 	for _, resourceList := range resourceLists {
 		for _, resource := range resourceList.APIResources {
 			result = append(result, resource.Name)
 		}
-	}
-	return result
-}
-
-func groupNames(groups []*metav1.APIGroup) []string {
-	result := []string{}
-	for _, group := range groups {
-		result = append(result, group.Name)
 	}
 	return result
 }
@@ -2161,16 +1805,6 @@ func preferredVersionsFromList(groups *metav1.APIGroupList) []string {
 	for _, group := range groups.Groups {
 		preferredGV := group.PreferredVersion.GroupVersion
 		result = append(result, preferredGV)
-	}
-	return result
-}
-
-func groupVersions(groups []*metav1.APIGroup) []string {
-	result := []string{}
-	for _, group := range groups {
-		for _, version := range group.Versions {
-			result = append(result, version.GroupVersion)
-		}
 	}
 	return result
 }
