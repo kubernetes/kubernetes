@@ -5861,7 +5861,8 @@ message ResourceFieldSelector {
   // Required: resource to select
   optional string resource = 2;
 
-  // Specifies the output format of the exposed resources, defaults to "1"
+  // Divisor optionally indicates how the resource from the container should be scaled.
+  // If unset or 0, the resource is not scaled (divisor is treated as 1).
   // +optional
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity divisor = 3;
 }

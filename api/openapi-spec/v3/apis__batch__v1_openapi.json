@@ -3595,7 +3595,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
               }
             ],
-            "description": "Specifies the output format of the exposed resources, defaults to \"1\""
+            "description": "Divisor optionally indicates how the resource from the container should be scaled. If unset or 0, the resource is not scaled (divisor is treated as 1)."
           },
           "resource": {
             "default": "",

@@ -2490,7 +2490,8 @@ type ResourceFieldSelector struct {
 	ContainerName string
 	// Required: resource to select
 	Resource string
-	// Specifies the output format of the exposed resources, defaults to "1"
+	// Divisor optionally indicates how the resource from the container should be scaled.
+	// If unset or 0, the resource is not scaled (divisor is treated as 1).
 	// +optional
 	Divisor resource.Quantity
 }
