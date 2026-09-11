@@ -2226,6 +2226,10 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 
 	cpuRequest := cm.CPURequestsFromConfig(cpuConfig)
 	cpuLimit := cm.CPULimitsFromConfig(cpuConfig)
+	// A -1 quota with a period is the CFS "no limit" value, not an unread one.
+	cpuQuotaUnlimited := cpuConfig != nil && cpuConfig.CPUPeriod != nil && *cpuConfig.CPUPeriod > 0 && cpuConfig.CPUQuota != nil && *cpuConfig.CPUQuota == -1
+	// A pod with no CPU limit reads the same -1, so only drop a limit the pod declares.
+	podHasCPULimit := allocatedPod.Spec.Resources != nil && !allocatedPod.Spec.Resources.Limits.Cpu().IsZero()
 
 	preserveOldResourcesValue := func(rName v1.ResourceName, oldStatusResource, resource v1.ResourceList) {
 		if allocatedPod.Status.Phase == v1.PodRunning && oldPodStatus.Phase == v1.PodRunning && oldPodStatus.Resources != nil {
@@ -2296,6 +2300,10 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		if cpuLimit.MilliValue() > cm.MinMilliCPULimit || resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
 			resources.Limits[v1.ResourceCPU] = cpuLimit.DeepCopy()
 		}
+	} else if cpuQuotaUnlimited && podHasCPULimit && !kl.containerManager.PodHasExclusiveCPUs(logger, allocatedPod) {
+		// No limit is enforced, so the API omits it. A pod with exclusive CPUs reads -1
+		// by design and keeps its limit, as its containers do.
+		delete(resources.Limits, v1.ResourceCPU)
 	} else {
 		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits)
 
@@ -2499,6 +2507,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				// Default the CPU limit to match the request, as it must for exclusive CPU allocation.
 				if kl.containerManager.ContainerHasExclusiveCPUs(logger, pod, allocatedContainer) {
 					resources.Limits[v1.ResourceCPU] = resources.Requests[v1.ResourceCPU].DeepCopy()
+				} else if cStatus.Resources != nil {
+					// A reported status without a CPU limit means no limit; a nil (unread) status falls back.
+					delete(resources.Limits, v1.ResourceCPU)
 				} else {
 					preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
 				}
