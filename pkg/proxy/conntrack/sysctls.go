@@ -53,10 +53,13 @@ type conntrackConfigurer interface {
 	SetUDPTimeout(ctx context.Context, seconds int) error
 	// SetUDPStreamTimeout adjusts nf_conntrack_udp_timeout_stream.
 	SetUDPStreamTimeout(ctx context.Context, seconds int) error
+
+	// DetectNumCPU returns the number of CPU cores in the system
+	DetectNumCPU() int
 }
 
 func setSysctls(ctx context.Context, ct conntrackConfigurer, config *kubeproxyconfig.KubeProxyConntrackConfiguration) error {
-	max, err := getConntrackMax(ctx, config, detectNumCPU())
+	max, err := getConntrackMax(ctx, config, ct.DetectNumCPU())
 	if err != nil {
 		return err
 	}
@@ -128,19 +131,19 @@ func getConntrackMax(ctx context.Context, config *kubeproxyconfig.KubeProxyConnt
 	return 0, nil
 }
 
-// detectNumCPU returns the CPU count used to size nf_conntrack_max. That limit
+type realConntrackConfigurer struct {
+}
+
+// DetectNumCPU returns the CPU count used to size nf_conntrack_max. That limit
 // is host-wide, so it must be based on the node's CPU count, not runtime.NumCPU():
 // runtime.NumCPU() honors the process cpuset and undercounts when kube-proxy
 // runs under a static CPU policy. cpuset.NumCPU() reads the node's online CPU
 // count from sysfs instead, falling back to runtime.NumCPU() if it can't.
-func detectNumCPU() int {
+func (rct realConntrackConfigurer) DetectNumCPU() int {
 	if n, err := cpuset.NumCPU(); err == nil && n > 0 {
 		return n
 	}
 	return runtime.NumCPU()
-}
-
-type realConntrackConfigurer struct {
 }
 
 func (rct realConntrackConfigurer) SetMax(ctx context.Context, max int) error {
