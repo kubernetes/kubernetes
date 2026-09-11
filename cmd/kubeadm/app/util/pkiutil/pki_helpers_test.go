@@ -1043,3 +1043,14 @@ func TestRSAKeySizeFromAlgorithmType(t *testing.T) {
 		})
 	}
 }
+
+func TestCanAlgorithmDoKeyEncipherment(t *testing.T) {
+	alg := kubeadmapi.EncryptionAlgorithmRSA2048
+	if !canAlgorithmDoKeyEncipherment(alg) {
+		t.Errorf("expected algorithm %q to be able to do encipherment", alg)
+	}
+	alg = kubeadmapi.EncryptionAlgorithmECDSAP256
+	if canAlgorithmDoKeyEncipherment(alg) {
+		t.Errorf("expected algorithm %q to not be able to do encipherment", alg)
+	}
+}
