@@ -23,6 +23,9 @@ limitations under the License.
 // This version improves on the v1beta3 format by fixing some minor issues and adding a few new fields.
 //
 // A list of changes since v1beta3:
+// v1.38:
+//   - Add "ML-DSA-44", "ML-DSA-65" and "ML-DSA-87"to the allowed encryption algorithm options for `ClusterConfiguration.EncryptionAlgorithm`.
+//
 // v1.35:
 //   - Add `HTTPEndpoints` field to `ClusterConfiguration.Etcd.ExternalEtcd` that can be used to configure the HTTP endpoints for etcd communication in v1beta4.
 //     This field is used to separate the HTTP traffic (such as /metrics and /health endpoints) from the gRPC traffic handled by Endpoints.
