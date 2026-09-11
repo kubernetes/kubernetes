@@ -17,7 +17,9 @@ limitations under the License.
 package features
 
 import (
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -304,6 +306,11 @@ const (
 	// co-ordinate better with cluster-autoscaler for storage limits.
 	VolumeLimitScaling featuregate.Feature = "VolumeLimitScaling"
 )
+
+func init() {
+	// Scheduler packages use the default gate even when the internal Kubernetes features package is not imported.
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
+}
 
 // defaultVersionedKubernetesFeatureGates consists of all known scheduler-specific feature keys with VersionedSpecs.
 // To add a new feature, define a key for it above and add it here. The features will be
