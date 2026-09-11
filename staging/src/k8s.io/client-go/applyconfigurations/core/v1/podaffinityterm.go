@@ -32,7 +32,7 @@ import (
 // the label with key <topologyKey> matches that of any node on which
 // a pod of the set of pods is running
 type PodAffinityTermApplyConfiguration struct {
-	// A label query over a set of resources, in this case pods.
+	// labelSelector is a label query over a set of resources, in this case pods.
 	// If it's null, this PodAffinityTerm matches with no Pods.
 	LabelSelector *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
 	// namespaces specifies a static list of namespace names that the term applies to.
@@ -40,19 +40,20 @@ type PodAffinityTermApplyConfiguration struct {
 	// and the ones selected by namespaceSelector.
 	// null or empty namespaces list and null namespaceSelector means "this pod's namespace".
 	Namespaces []string `json:"namespaces,omitempty"`
+	// topologyKey steers where the pod will or won't be located.
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
 	// whose value of the label with key topologyKey matches that of any node on which any of the
 	// selected pods is running.
 	// Empty topologyKey is not allowed.
 	TopologyKey *string `json:"topologyKey,omitempty"`
-	// A label query over the set of namespaces that the term applies to.
+	// namespaceSelector is a label query over the set of namespaces that the term applies to.
 	// The term is applied to the union of the namespaces selected by this field
 	// and the ones listed in the namespaces field.
 	// null selector and null or empty namespaces list means "this pod's namespace".
 	// An empty selector ({}) matches all namespaces.
 	NamespaceSelector *metav1.LabelSelectorApplyConfiguration `json:"namespaceSelector,omitempty"`
-	// MatchLabelKeys is a set of pod label keys to select which pods will
+	// matchLabelKeys is a set of pod label keys to select which pods will
 	// be taken into consideration. The keys are used to lookup values from the
 	// incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)`
 	// to select the group of existing pods which pods will be taken into consideration
@@ -61,7 +62,7 @@ type PodAffinityTermApplyConfiguration struct {
 	// The same key is forbidden to exist in both matchLabelKeys and labelSelector.
 	// Also, matchLabelKeys cannot be set when labelSelector isn't set.
 	MatchLabelKeys []string `json:"matchLabelKeys,omitempty"`
-	// MismatchLabelKeys is a set of pod label keys to select which pods will
+	// mismatchLabelKeys is a set of pod label keys to select which pods will
 	// be taken into consideration. The keys are used to lookup values from the
 	// incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)`
 	// to select the group of existing pods which pods will be taken into consideration

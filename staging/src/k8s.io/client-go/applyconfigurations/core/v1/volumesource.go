@@ -66,8 +66,7 @@ type VolumeSourceApplyConfiguration struct {
 	// glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime.
 	// Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported.
 	Glusterfs *GlusterfsVolumeSourceApplyConfiguration `json:"glusterfs,omitempty"`
-	// persistentVolumeClaimVolumeSource represents a reference to a
-	// PersistentVolumeClaim in the same namespace.
+	// persistentVolumeClaim is a reference to the user's PVC in the same namespace.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
 	PersistentVolumeClaim *PersistentVolumeClaimVolumeSourceApplyConfiguration `json:"persistentVolumeClaim,omitempty"`
 	// rbd represents a Rados Block Device mount on the host that shares a pod's lifetime.
@@ -82,7 +81,7 @@ type VolumeSourceApplyConfiguration struct {
 	// are redirected to the cinder.csi.openstack.org CSI driver.
 	// More info: https://examples.k8s.io/mysql-cinder-pd/README.md
 	Cinder *CinderVolumeSourceApplyConfiguration `json:"cinder,omitempty"`
-	// cephFS represents a Ceph FS mount on the host that shares a pod's lifetime.
+	// cephfs represents a Ceph FS mount on the host that shares a pod's lifetime.
 	// Deprecated: CephFS is deprecated and the in-tree cephfs type is no longer supported.
 	CephFS *CephFSVolumeSourceApplyConfiguration `json:"cephfs,omitempty"`
 	// flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running.
@@ -121,7 +120,7 @@ type VolumeSourceApplyConfiguration struct {
 	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// Deprecated: ScaleIO is deprecated and the in-tree scaleIO type is no longer supported.
 	ScaleIO *ScaleIOVolumeSourceApplyConfiguration `json:"scaleIO,omitempty"`
-	// storageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
+	// storageos represents a StorageOS volume attached and mounted on Kubernetes nodes.
 	// Deprecated: StorageOS is deprecated and the in-tree storageos type is no longer supported.
 	StorageOS *StorageOSVolumeSourceApplyConfiguration `json:"storageos,omitempty"`
 	// csi (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers.

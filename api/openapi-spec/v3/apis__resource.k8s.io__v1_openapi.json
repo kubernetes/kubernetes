@@ -5,7 +5,7 @@
         "description": "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
         "properties": {
           "nodeSelectorTerms": {
-            "description": "Required. A list of node selector terms. The terms are ORed.",
+            "description": "nodeSelectorTerms is a list of node selector terms. The terms are ORed.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorTerm"
             },
@@ -24,16 +24,16 @@
         "properties": {
           "key": {
             "default": "",
-            "description": "The label key that the selector applies to.",
+            "description": "key is the label that the selector applies to.",
             "type": "string"
           },
           "operator": {
             "default": "",
-            "description": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
+            "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
             "type": "string"
           },
           "values": {
-            "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
+            "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
             "items": {
               "type": "string"
             },
@@ -51,7 +51,7 @@
         "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.",
         "properties": {
           "matchExpressions": {
-            "description": "A list of node selector requirements by node's labels.",
+            "description": "matchExpressions is a list of node selector requirements by node's labels.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
             },
@@ -59,7 +59,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "matchFields": {
-            "description": "A list of node selector requirements by node's fields.",
+            "description": "matchFields is a list of node selector requirements by node's fields.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
             },

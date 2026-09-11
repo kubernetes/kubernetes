@@ -29,15 +29,15 @@ import (
 // The node this Taint is attached to has the "effect" on
 // any pod that does not tolerate the Taint.
 type TaintApplyConfiguration struct {
-	// Required. The taint key to be applied to a node.
+	// key for the taint to be applied to a node.
 	Key *string `json:"key,omitempty"`
-	// The taint value corresponding to the taint key.
+	// value of taint corresponding to the taint key.
 	Value *string `json:"value,omitempty"`
-	// Required. The effect of the taint on pods
+	// effect of the taint on pods
 	// that do not tolerate the taint.
 	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
 	Effect *corev1.TaintEffect `json:"effect,omitempty"`
-	// TimeAdded represents the time at which the taint was added.
+	// timeAdded represents the time at which the taint was added.
 	TimeAdded *metav1.Time `json:"timeAdded,omitempty"`
 }
 

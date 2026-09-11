@@ -24,10 +24,9 @@ package v1
 // DownwardAPIVolumeSource represents a volume containing downward API info.
 // Downward API volumes support ownership management and SELinux relabeling.
 type DownwardAPIVolumeSourceApplyConfiguration struct {
-	// Items is a list of downward API volume file
+	// items is a list of downward API volume file
 	Items []DownwardAPIVolumeFileApplyConfiguration `json:"items,omitempty"`
-	// Optional: mode bits to use on created files by default. Must be a
-	// Optional: mode bits used to set permissions on created files by default.
+	// defaultMode is the mode bits to use on created files by default.
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
 	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
 	// Defaults to 0644.

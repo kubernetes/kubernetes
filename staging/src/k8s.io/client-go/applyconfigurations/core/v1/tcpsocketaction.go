@@ -27,11 +27,11 @@ import (
 //
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketActionApplyConfiguration struct {
-	// Number or name of the port to access on the container.
+	// port is the number or name of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
 	Port *intstr.IntOrString `json:"port,omitempty"`
-	// Optional: Host name to connect to, defaults to the pod IP.
+	// host name to connect to, defaults to the pod IP.
 	Host *string `json:"host,omitempty"`
 }
 

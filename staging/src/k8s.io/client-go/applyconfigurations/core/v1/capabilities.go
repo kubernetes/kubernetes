@@ -27,9 +27,9 @@ import (
 //
 // Adds and removes POSIX capabilities from running containers.
 type CapabilitiesApplyConfiguration struct {
-	// Added capabilities
+	// add specifies added POSIX capabilities
 	Add []corev1.Capability `json:"add,omitempty"`
-	// Removed capabilities
+	// drop specifies removed POSIX capabilities
 	Drop []corev1.Capability `json:"drop,omitempty"`
 }
 

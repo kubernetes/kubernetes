@@ -29,40 +29,40 @@ import (
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
 type PodSecurityContextApplyConfiguration struct {
-	// The SELinux context to be applied to all containers.
+	// seLinuxOptions configures the SELinux specific settings applied to all containers.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
 	// container.  May also be set in SecurityContext.  If set in
 	// both SecurityContext and PodSecurityContext, the value specified in SecurityContext
 	// takes precedence for that container.
 	// Note that this field cannot be set when spec.os.name is windows.
 	SELinuxOptions *SELinuxOptionsApplyConfiguration `json:"seLinuxOptions,omitempty"`
-	// The Windows specific settings applied to all containers.
+	// windowsOptions configures the Windows specific settings applied to all containers.
 	// If unspecified, the options within a container's SecurityContext will be used.
 	// If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// Note that this field cannot be set when spec.os.name is linux.
 	WindowsOptions *WindowsSecurityContextOptionsApplyConfiguration `json:"windowsOptions,omitempty"`
-	// The UID to run the entrypoint of the container process.
+	// runAsUser sets the UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in SecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence
 	// for that container.
 	// Note that this field cannot be set when spec.os.name is windows.
 	RunAsUser *int64 `json:"runAsUser,omitempty"`
-	// The GID to run the entrypoint of the container process.
+	// runAsGroup sets the GID to run the entrypoint of the container process.
 	// Uses runtime default if unset.
 	// May also be set in SecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence
 	// for that container.
 	// Note that this field cannot be set when spec.os.name is windows.
 	RunAsGroup *int64 `json:"runAsGroup,omitempty"`
-	// Indicates that the container must run as a non-root user.
+	// runAsNonRoot indicates that the container must run as a non-root user.
 	// If true, the Kubelet will validate the image at runtime to ensure that it
 	// does not run as UID 0 (root) and fail to start the container if it does.
 	// If unset or false, no such validation will be performed.
 	// May also be set in SecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty"`
-	// A list of groups applied to the first process run in each container, in
+	// supplementalGroups is a list of groups applied to the first process run in each container, in
 	// addition to the container's primary GID and fsGroup (if specified).  If
 	// the SupplementalGroupsPolicy feature is enabled, the
 	// supplementalGroupsPolicy field determines whether these are in addition
@@ -72,14 +72,14 @@ type PodSecurityContextApplyConfiguration struct {
 	// supplementalGroupsPolicy field.
 	// Note that this field cannot be set when spec.os.name is windows.
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
-	// Defines how supplemental groups of the first container processes are calculated.
+	// supplementalGroupsPolicy defines how supplemental groups of the first container processes are calculated.
 	// Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
 	// (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
 	// and the container runtime must implement support for this feature.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// TODO: update the default value to "Merge" when spec.os.name is not windows in v1.34
 	SupplementalGroupsPolicy *corev1.SupplementalGroupsPolicy `json:"supplementalGroupsPolicy,omitempty"`
-	// A special supplemental group that applies to all containers in a pod.
+	// fsGroup is a special supplemental group that applies to all containers in a pod.
 	// Some volume types allow the Kubelet to change the ownership of that volume
 	// to be owned by the pod:
 	//
@@ -90,7 +90,7 @@ type PodSecurityContextApplyConfiguration struct {
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	// Note that this field cannot be set when spec.os.name is windows.
 	FSGroup *int64 `json:"fsGroup,omitempty"`
-	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+	// sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
 	// sysctls (by the container runtime) might fail to launch.
 	// Note that this field cannot be set when spec.os.name is windows.
 	Sysctls []SysctlApplyConfiguration `json:"sysctls,omitempty"`
@@ -102,7 +102,7 @@ type PodSecurityContextApplyConfiguration struct {
 	// Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used.
 	// Note that this field cannot be set when spec.os.name is windows.
 	FSGroupChangePolicy *corev1.PodFSGroupChangePolicy `json:"fsGroupChangePolicy,omitempty"`
-	// The seccomp options to use by the containers in this pod.
+	// seccompProfile sets the seccomp options to use by the containers in this pod.
 	// Note that this field cannot be set when spec.os.name is windows.
 	SeccompProfile *SeccompProfileApplyConfiguration `json:"seccompProfile,omitempty"`
 	// appArmorProfile is the AppArmor options to use by the containers in this pod.
