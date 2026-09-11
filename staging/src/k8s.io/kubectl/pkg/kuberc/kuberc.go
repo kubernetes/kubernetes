@@ -64,6 +64,11 @@ type PreferencesHandler interface {
 	Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error)
 }
 
+type cachedPreference struct {
+	value *config.Preference
+	read  bool
+}
+
 // Preferences stores the kuberc file coming either from environment variable
 // or file from set in flag or the default kuberc path.
 type Preferences struct {
@@ -72,9 +77,7 @@ type Preferences struct {
 	aliases map[string]struct{}
 	policy  clientcmdapi.PluginPolicy
 
-	// memoization (cache)
-	kuberc *config.Preference
-	read   bool
+	cache cachedPreference
 }
 
 // NewPreferences returns initialized Preferences object.
@@ -99,8 +102,8 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 }
 
 func (p *Preferences) Read(args []string, errOut io.Writer) (*config.Preference, error) {
-	if p.read {
-		return p.kuberc, nil
+	if p.cache.read {
+		return p.cache.value, nil
 	}
 
 	kubercPath, err := getExplicitKuberc(args)
@@ -119,14 +122,7 @@ func (p *Preferences) Read(args []string, errOut io.Writer) (*config.Preference,
 
 	p.convertPluginPolicy(kuberc)
 
-	err = p.validate(kuberc)
-	if err != nil {
-		return nil, err
-	}
-
-	p.kuberc = kuberc
-	p.read = true
-
+	p.cache = cachedPreference{value: kuberc, read: true}
 	return kuberc, nil
 }
 
@@ -142,6 +138,10 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclio
 		return args, err
 	} else if kuberc == nil {
 		return args, nil
+	}
+
+	if err = p.validate(kuberc); err != nil {
+		return nil, err
 	}
 
 	p.applyPluginPolicy(kubeConfigFlags, kuberc)
@@ -355,11 +355,13 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		// We are appending the additional args defined in kuberc in here and
 		// expect that it will be passed along to the actual command.
 		rootCmd.SetArgs(args[1:])
+
 		// Remove alias arg to add the remaining arguments that are not flags nor part of the preferences
 		sanitizedArgs := strings.ReplaceAll(strings.Join(args[1:], " "), foundAliasCmd.Name(), "")
 		if len(sanitizedArgs) > 0 {
 			aliasArgs.originalCommand.WriteString(fmt.Sprintf(" %s", sanitizedArgs))
 		}
+
 		// Add annotation to trace back command built without aliases applied
 		if aliasArgs.command.Annotations == nil {
 			aliasArgs.command.Annotations = make(map[string]string, 1)
@@ -383,6 +385,7 @@ func BuildAliasCommand(rootCmd *cobra.Command, alias config.AliasOverride) (*cob
 
 	newCmd := *existingCmd
 	newCmd.Use = alias.Name
+	newCmd.Short = buildFullAliasDescription(alias)
 	newCmd.Aliases = []string{}
 
 	return &newCmd, nil
@@ -598,21 +601,36 @@ func registerAliasCommands(kubectl *cobra.Command, p PreferencesHandler, args []
 
 	userDefinedCommands := []*cobra.Command{}
 	for _, alias := range kuberc.Aliases {
-		aliasCmd, err := BuildAliasCommand(kubectl, alias)
+		_, err := BuildAliasCommand(kubectl, alias)
 		if err != nil {
 			continue
 		}
 
-		aliasCmd.Short = strings.Join(
-			append(
-				append([]string{alias.Command}, alias.PrependArgs...),
-				alias.AppendArgs...,
-			),
-			" ",
-		)
-
-		userDefinedCommands = append(userDefinedCommands, aliasCmd)
+		userDefinedCommands = append(userDefinedCommands, &cobra.Command{
+			Use:                alias.Name,
+			Short:              buildFullAliasDescription(alias),
+			DisableFlagParsing: true,
+			Run:                func(cmd *cobra.Command, args []string) {},
+		})
 	}
 
 	return userDefinedCommands
+}
+
+// buildFullAliasDescription creates a description showing the full expanded command
+// including prependArgs, appendArgs, and default flag values
+func buildFullAliasDescription(alias config.AliasOverride) string {
+	parts := []string{alias.Command}
+
+	if len(alias.PrependArgs) > 0 {
+		parts = append(parts, alias.PrependArgs...)
+	}
+	for _, option := range alias.Options {
+		parts = append(parts, fmt.Sprintf("--%s=%s", option.Name, option.Default))
+	}
+	if len(alias.AppendArgs) > 0 {
+		parts = append(parts, alias.AppendArgs...)
+	}
+
+	return fmt.Sprintf(i18n.T("Alias for '%s'"), strings.Join(parts, " "))
 }

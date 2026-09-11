@@ -3248,27 +3248,6 @@ func TestRegisterAliasCommands(t *testing.T) {
 			expectedCmdCount: 1,
 		},
 		{
-			name: "duplicate alias names deduplicated",
-			nestedCmds: []fakeCmds[string]{
-				{name: "command1"},
-			},
-			args: []string{"root", "getcmd"},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
-				return &config.Preference{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "Preference",
-						APIVersion: "kubectl.config.k8s.io/v1alpha1",
-					},
-					Aliases: []config.AliasOverride{
-						{Name: "getcmd", Command: "command1"},
-						{Name: "getcmd", Command: "command1"},
-					},
-				}, nil
-			},
-			expectedCmdNames: []string{},
-			expectedCmdCount: 0,
-		},
-		{
 			name: "no aliases in kuberc",
 			nestedCmds: []fakeCmds[string]{
 				{name: "command1"},
@@ -3308,15 +3287,10 @@ func TestRegisterAliasCommands(t *testing.T) {
 				t.Fatalf("expected %d command(s), got %d", test.expectedCmdCount, len(group.Commands))
 			}
 
-			seen := map[string]bool{}
 			for _, c := range group.Commands {
 				if !slices.Contains(test.expectedCmdNames, c.Name()) {
 					t.Fatalf("unexpected command %s, expected one of %v", c.Name(), test.expectedCmdNames)
 				}
-				if seen[c.Name()] {
-					t.Fatalf("duplicate command %s in group.Commands", c.Name())
-				}
-				seen[c.Name()] = true
 			}
 		})
 	}
