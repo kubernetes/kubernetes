@@ -402,215 +402,264 @@ func TestStaticPolicyMetricsInitialization(t *testing.T) {
 	}
 }
 
-func TestStaticPolicyMetricsContainerAllocation(t *testing.T) {
+func TestStaticPolicyMetricsContainerAllocationAndRelease(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	allCPUs := cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)
-	idle := cpuMetricsSnapshot{
-		exclusiveCPUs:   0,
-		sharedPoolMilli: 7000,
-		perNUMA:         map[string]float64{"0": 0},
-	}
+	idle := cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 7000, perNUMA: map[string]float64{"0": 0}}
 
-	setup := func(t *testing.T) (*staticPolicy, *mockState) {
-		p := newMetricsTestPolicy(t, topoSingleSocketHT, 1, cpuset.New(0), nil)
-		st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: allCPUs}
-		require.NoError(t, p.Start(logger, st))
-		assertCPUMetrics(t, idle)
-		return p, st
-	}
+	p := newMetricsTestPolicy(t, topoSingleSocketHT, 1, cpuset.New(0), nil)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, idle)
 
-	t.Run("allocation and full release", func(t *testing.T) {
-		p, st := setup(t)
-		pod := makePod("podUID", "cont", "2", "2")
+	pod := makePod("podUID", "cont", "2", "2")
 
-		require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
+	require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
 
-		require.NoError(t, p.RemoveContainer(logger, st, "podUID", "cont"))
-		assertCPUMetrics(t, idle)
-	})
-
-	t.Run("init container CPU reuse counted once", func(t *testing.T) {
-		p, st := setup(t)
-		pod := makeMultiContainerPod(
-			[]struct{ request, limit string }{{"4000m", "4000m"}},
-			[]struct{ request, limit string }{{"2000m", "2000m"}})
-
-		require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.InitContainers[0], lifecycle.AddOperation))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 4, sharedPoolMilli: 3000, perNUMA: map[string]float64{"0": 4}})
-
-		// The app container reuses 2 CPUs of the init container, so the gauges must not change.
-		require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 4, sharedPoolMilli: 3000, perNUMA: map[string]float64{"0": 4}})
-
-		require.NoError(t, p.RemoveContainer(logger, st, "podUID", "initContainer-0"))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
-
-		require.NoError(t, p.RemoveContainer(logger, st, "podUID", "appContainer-0"))
-		assertCPUMetrics(t, idle)
-	})
-
-	t.Run("allocation skipped for a container already present in the state", func(t *testing.T) {
-		p, st := setup(t)
-		pod := makePod("podUID", "cont", "2", "2")
-
-		require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
-
-		require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
-	})
-
-	t.Run("failed allocation leaves the metrics unchanged", func(t *testing.T) {
-		p, st := setup(t)
-		pod := makePod("podUID", "cont", "9", "9")
-
-		require.Error(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
-		assertCPUMetrics(t, idle)
-	})
-
-	t.Run("release of an unknown pod container leaves the metrics unchanged", func(t *testing.T) {
-		p, st := setup(t)
-
-		require.NoError(t, p.RemoveContainer(logger, st, "no-such-pod", "no-such-cont"))
-		assertCPUMetrics(t, idle)
-	})
-
-	t.Run("release of an unknown container leaves the metrics unchanged", func(t *testing.T) {
-		p, st := setup(t)
-
-		pod := makePod("podUID", "cont", "2", "2")
-
-		require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
-
-		require.NoError(t, p.RemoveContainer(logger, st, "podUID", "no-such-container"))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
-	})
+	require.NoError(t, p.RemoveContainer(logger, st, "podUID", "cont"))
+	assertCPUMetrics(t, idle)
 }
 
-func TestStaticPolicyMetricsPodLevelAllocation(t *testing.T) {
+func TestStaticPolicyMetricsInitContainerCPUReuseCountedOnce(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	p := newMetricsTestPolicy(t, topoSingleSocketHT, 1, cpuset.New(0), nil)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 7000, perNUMA: map[string]float64{"0": 0}})
+
+	pod := makeMultiContainerPod(
+		[]struct{ request, limit string }{{"4000m", "4000m"}},
+		[]struct{ request, limit string }{{"2000m", "2000m"}})
+
+	require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.InitContainers[0], lifecycle.AddOperation))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 4, sharedPoolMilli: 3000, perNUMA: map[string]float64{"0": 4}})
+
+	// The app container reuses 2 CPUs of the init container, so the gauges must not change.
+	require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 4, sharedPoolMilli: 3000, perNUMA: map[string]float64{"0": 4}})
+
+	require.NoError(t, p.RemoveContainer(logger, st, "podUID", "initContainer-0"))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
+
+	require.NoError(t, p.RemoveContainer(logger, st, "podUID", "appContainer-0"))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 7000, perNUMA: map[string]float64{"0": 0}})
+}
+
+func TestStaticPolicyMetricsAllocationSkippedForContainerAlreadyInState(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	p := newMetricsTestPolicy(t, topoSingleSocketHT, 1, cpuset.New(0), nil)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 7000, perNUMA: map[string]float64{"0": 0}})
+
+	pod := makePod("podUID", "cont", "2", "2")
+
+	require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
+
+	require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
+}
+
+func TestStaticPolicyMetricsFailedContainerAllocation(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	idle := cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 7000, perNUMA: map[string]float64{"0": 0}}
+
+	p := newMetricsTestPolicy(t, topoSingleSocketHT, 1, cpuset.New(0), nil)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, idle)
+
+	// More exclusive CPUs than the node has, so the allocation must fail.
+	pod := makePod("podUID", "cont", "9", "9")
+
+	require.Error(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	assertCPUMetrics(t, idle)
+}
+
+func TestStaticPolicyMetricsReleaseOfUnknownPod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	idle := cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 7000, perNUMA: map[string]float64{"0": 0}}
+
+	p := newMetricsTestPolicy(t, topoSingleSocketHT, 1, cpuset.New(0), nil)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, idle)
+
+	require.NoError(t, p.RemoveContainer(logger, st, "no-such-pod", "no-such-cont"))
+	assertCPUMetrics(t, idle)
+}
+
+func TestStaticPolicyMetricsReleaseOfUnknownContainer(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	p := newMetricsTestPolicy(t, topoSingleSocketHT, 1, cpuset.New(0), nil)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 7000, perNUMA: map[string]float64{"0": 0}})
+
+	pod := makePod("podUID", "cont", "2", "2")
+
+	require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
+
+	require.NoError(t, p.RemoveContainer(logger, st, "podUID", "no-such-container"))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}})
+}
+
+func TestStaticPolicyMetricsPodLevelAllocationAndRelease(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
+
+	logger, _ := ktesting.NewTestContext(t)
+	hint := &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true}
+
+	p := newMetricsTestPolicy(t, topoDualSocketHT, 1, cpuset.New(0), hint)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}})
+
+	pod := makePodWithContainersAndPodLevelResources("plrm-pod", "4", "4", nil, []containerSpec{
+		{name: "gu-container", request: "2", limit: "2"},
+		{name: "shared-container"},
+	})
+
+	require.NoError(t, p.AllocatePod(logger, st, pod, lifecycle.AddOperation))
+	busy := cpuMetricsSnapshot{
+		exclusiveCPUs:   4,
+		sharedPoolMilli: 7000,
+		perNUMA:         map[string]float64{"0": 4, "1": 0},
+	}
+	assertCPUMetrics(t, busy)
+
+	// The whole bubble stays out of the shared pool until the last container of the pod is removed.
+	require.NoError(t, p.RemoveContainer(logger, st, "plrm-pod", "gu-container"))
+	assertCPUMetrics(t, busy)
+
+	require.NoError(t, p.RemoveContainer(logger, st, "plrm-pod", "shared-container"))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}})
+}
+
+func TestStaticPolicyMetricsPodLevelAllocationRollback(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
 
 	logger, _ := ktesting.NewTestContext(t)
 	hint := &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true}
 	allCPUs := cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
-	idle := cpuMetricsSnapshot{
-		exclusiveCPUs:   0,
-		sharedPoolMilli: 11000,
-		perNUMA:         map[string]float64{"0": 0, "1": 0},
-	}
+	idle := cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}}
 
-	setup := func(t *testing.T) (*staticPolicy, *mockState) {
-		p := newMetricsTestPolicy(t, topoDualSocketHT, 1, cpuset.New(0), hint)
-		st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: allCPUs}
-		require.NoError(t, p.Start(logger, st))
-		assertCPUMetrics(t, idle)
-		return p, st
-	}
+	p := newMetricsTestPolicy(t, topoDualSocketHT, 1, cpuset.New(0), hint)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: allCPUs}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, idle)
 
-	t.Run("whole bubble counted on allocation, released with the last container", func(t *testing.T) {
-		p, st := setup(t)
-		pod := makePodWithContainersAndPodLevelResources("plrm-pod", "4", "4", nil, []containerSpec{
-			{name: "gu-container", request: "2", limit: "2"},
-			{name: "shared-container"},
-		})
-
-		require.NoError(t, p.AllocatePod(logger, st, pod, lifecycle.AddOperation))
-		busy := cpuMetricsSnapshot{
-			exclusiveCPUs:   4,
-			sharedPoolMilli: 7000,
-			perNUMA:         map[string]float64{"0": 4, "1": 0},
-		}
-		assertCPUMetrics(t, busy)
-
-		require.NoError(t, p.RemoveContainer(logger, st, "plrm-pod", "gu-container"))
-		assertCPUMetrics(t, busy)
-
-		require.NoError(t, p.RemoveContainer(logger, st, "plrm-pod", "shared-container"))
-		assertCPUMetrics(t, idle)
+	// The containers request more exclusive CPUs than the pod-level budget, so
+	// partitioning the bubble must fail after the bubble has been allocated.
+	pod := makePodWithContainersAndPodLevelResources("rollback-pod", "3", "3", nil, []containerSpec{
+		{name: "gu-container-1", request: "2", limit: "2"},
+		{name: "gu-container-2", request: "2", limit: "2"},
 	})
 
-	t.Run("failed bubble partitioning rolls the allocation back", func(t *testing.T) {
-		p, st := setup(t)
-		// The containers request more exclusive CPUs than the pod-level
-		// budget, so partitioning the bubble must fail after the bubble has
-		// been allocated.
-		pod := makePodWithContainersAndPodLevelResources("rollback-pod", "3", "3", nil, []containerSpec{
-			{name: "gu-container-1", request: "2", limit: "2"},
-			{name: "gu-container-2", request: "2", limit: "2"},
-		})
+	require.Error(t, p.AllocatePod(logger, st, pod, lifecycle.AddOperation))
 
-		require.Error(t, p.AllocatePod(logger, st, pod, lifecycle.AddOperation))
+	assertCPUMetrics(t, idle)
+	require.True(t, st.GetDefaultCPUSet().Equals(allCPUs), "default CPU set should be restored, got %s", st.GetDefaultCPUSet())
+	_, hasPodCPUSet := st.GetPodCPUSet("rollback-pod")
+	require.False(t, hasPodCPUSet, "pod-level CPU set should be removed")
+	require.Empty(t, st.GetCPUAssignments(), "container assignments should be removed")
+}
 
-		assertCPUMetrics(t, idle)
-		require.True(t, st.GetDefaultCPUSet().Equals(allCPUs), "default CPU set should be restored, got %s", st.GetDefaultCPUSet())
-		_, hasPodCPUSet := st.GetPodCPUSet("rollback-pod")
-		require.False(t, hasPodCPUSet, "pod-level CPU set should be removed")
-		require.Empty(t, st.GetCPUAssignments(), "container assignments should be removed")
-	})
+func TestStaticPolicyMetricsPodLevelRollbackReleasesStoredAssignments(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
 
-	t.Run("rollback releases the container assignments already present in the state", func(t *testing.T) {
-		p := newMetricsTestPolicy(t, topoDualSocketHT, 1, cpuset.New(0), hint)
-		bubble := cpuset.New(2, 4, 8, 10)
-		st := &mockState{
-			assignments: state.ContainerCPUAssignments{
-				"plrm-pod": {
-					"gu-container":     cpuset.New(2, 8),
-					"shared-container": cpuset.New(4, 10),
-				},
+	logger, _ := ktesting.NewTestContext(t)
+	hint := &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true}
+	allCPUs := cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+	bubble := cpuset.New(2, 4, 8, 10)
+
+	p := newMetricsTestPolicy(t, topoDualSocketHT, 1, cpuset.New(0), hint)
+	st := &mockState{
+		assignments: state.ContainerCPUAssignments{
+			"plrm-pod": {
+				"gu-container":     cpuset.New(2, 8),
+				"shared-container": cpuset.New(4, 10),
 			},
-			podAssignments: state.PodCPUAssignments{
-				"plrm-pod": state.PodEntry{CPUSet: bubble},
-			},
-			defaultCPUSet: allCPUs.Difference(bubble),
-		}
-		require.NoError(t, p.Start(logger, st))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 4, sharedPoolMilli: 7000, perNUMA: map[string]float64{"0": 4, "1": 0}})
+		},
+		podAssignments: state.PodCPUAssignments{
+			"plrm-pod": state.PodEntry{CPUSet: bubble},
+		},
+		defaultCPUSet: allCPUs.Difference(bubble),
+	}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 4, sharedPoolMilli: 7000, perNUMA: map[string]float64{"0": 4, "1": 0}})
 
-		p.releasePodAllocation(logger, st, "plrm-pod", bubble)
+	p.releasePodAllocation(logger, st, "plrm-pod", bubble)
 
-		assertCPUMetrics(t, idle)
-		require.True(t, st.GetDefaultCPUSet().Equals(allCPUs), "default CPU set should be restored, got %s", st.GetDefaultCPUSet())
-		_, hasPodCPUSet := st.GetPodCPUSet("plrm-pod")
-		require.False(t, hasPodCPUSet, "pod-level CPU set should be removed")
-		require.Empty(t, st.GetCPUAssignments(), "container assignments should be removed")
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}})
+	require.True(t, st.GetDefaultCPUSet().Equals(allCPUs), "default CPU set should be restored, got %s", st.GetDefaultCPUSet())
+	_, hasPodCPUSet := st.GetPodCPUSet("plrm-pod")
+	require.False(t, hasPodCPUSet, "pod-level CPU set should be removed")
+	require.Empty(t, st.GetCPUAssignments(), "container assignments should be removed")
+}
+
+func TestStaticPolicyMetricsPodLevelNonIntegralCPUs(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
+
+	logger, _ := ktesting.NewTestContext(t)
+	hint := &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true}
+	idle := cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}}
+
+	p := newMetricsTestPolicy(t, topoDualSocketHT, 1, cpuset.New(0), hint)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, idle)
+
+	pod := makePodWithContainersAndPodLevelResources("shared-pod", "1500m", "1500m", nil, []containerSpec{
+		{name: "container"},
 	})
 
-	t.Run("pod with non-integral pod-level CPUs leaves the metrics unchanged", func(t *testing.T) {
-		p, st := setup(t)
-		pod := makePodWithContainersAndPodLevelResources("shared-pod", "1500m", "1500m", nil, []containerSpec{
-			{name: "container"},
-		})
+	require.NoError(t, p.AllocatePod(logger, st, pod, lifecycle.AddOperation))
+	assertCPUMetrics(t, idle)
+}
 
-		require.NoError(t, p.AllocatePod(logger, st, pod, lifecycle.AddOperation))
-		assertCPUMetrics(t, idle)
+func TestStaticPolicyMetricsPodLevelNonIntegralCPUsWithIntegralContainer(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
+
+	logger, _ := ktesting.NewTestContext(t)
+	hint := &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true}
+	idle := cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}}
+
+	p := newMetricsTestPolicy(t, topoDualSocketHT, 1, cpuset.New(0), hint)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)}
+	require.NoError(t, p.Start(logger, st))
+	assertCPUMetrics(t, idle)
+
+	pod := makePodWithContainersAndPodLevelResources("mixed-pod", "3500m", "3500m", nil, []containerSpec{
+		{name: "gu-container", request: "2", limit: "2"},
+		{name: "shared-container"},
 	})
 
-	t.Run("pod with non-integral pod-level CPUs and an integral container", func(t *testing.T) {
-		p, st := setup(t)
-		pod := makePodWithContainersAndPodLevelResources("mixed-pod", "3500m", "3500m", nil, []containerSpec{
-			{name: "gu-container", request: "2", limit: "2"},
-			{name: "shared-container"},
-		})
+	// No bubble: non-integral pod-level CPUs make the pod ineligible for a pod-scope allocation.
+	require.NoError(t, p.AllocatePod(logger, st, pod, lifecycle.AddOperation))
+	assertCPUMetrics(t, idle)
+	_, hasPodCPUSet := st.GetPodCPUSet("mixed-pod")
+	require.False(t, hasPodCPUSet, "no pod-level CPU set should be allocated")
 
-		// No bubble: non-integral pod-level CPUs make the pod ineligible for a pod-scope allocation.
-		require.NoError(t, p.AllocatePod(logger, st, pod, lifecycle.AddOperation))
-		assertCPUMetrics(t, idle)
-		_, hasPodCPUSet := st.GetPodCPUSet("mixed-pod")
-		require.False(t, hasPodCPUSet, "no pod-level CPU set should be allocated")
+	// The integral container still gets a node-scope exclusive allocation through the container-scope path.
+	require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 9000, perNUMA: map[string]float64{"0": 2, "1": 0}})
 
-		// The integral container still gets a node-scope exclusive allocation through the container-scope path.
-		require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 9000, perNUMA: map[string]float64{"0": 2, "1": 0}})
+	require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[1], lifecycle.AddOperation))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 9000, perNUMA: map[string]float64{"0": 2, "1": 0}})
 
-		require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[1], lifecycle.AddOperation))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 9000, perNUMA: map[string]float64{"0": 2, "1": 0}})
-
-		require.NoError(t, p.RemoveContainer(logger, st, "mixed-pod", "gu-container"))
-		assertCPUMetrics(t, idle)
-	})
+	require.NoError(t, p.RemoveContainer(logger, st, "mixed-pod", "gu-container"))
+	assertCPUMetrics(t, idle)
 }
 
 func TestStaticPolicyMetricsPerNUMA(t *testing.T) {
@@ -645,59 +694,59 @@ func TestStaticPolicyMetricsPerNUMA(t *testing.T) {
 	assertCPUMetrics(t, idle)
 }
 
-func TestStaticPolicyMetricsRestartConsistency(t *testing.T) {
+func TestStaticPolicyMetricsRestartConsistencyContainerScope(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 
-	simulateRestart := func(t *testing.T, p *staticPolicy, st state.State) {
-		t.Helper()
-		resetCPUMetrics()
-		p.initializeMetrics(logger, st)
+	p := newMetricsTestPolicy(t, topoSingleSocketHT, 1, cpuset.New(0), nil)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)}
+	require.NoError(t, p.Start(logger, st))
+
+	pod := makeMultiContainerPod(
+		[]struct{ request, limit string }{{"4000m", "4000m"}},
+		[]struct{ request, limit string }{{"2000m", "2000m"}})
+	require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.InitContainers[0], lifecycle.AddOperation))
+	require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	busy := readCPUMetrics(t)
+
+	// A kubelet restart recomputes the gauges from the checkpointed state, which
+	// must report the same values as the allocation path, even though the app
+	// container reuses CPUs of the init container.
+	resetCPUMetrics()
+	p.initializeMetrics(logger, st)
+
+	assertCPUMetrics(t, busy)
+}
+
+func TestStaticPolicyMetricsRestartConsistencyPodLevelPartiallyReleased(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
+
+	logger, _ := ktesting.NewTestContext(t)
+	hint := &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true}
+
+	p := newMetricsTestPolicy(t, topoDualSocketHT, 1, cpuset.New(0), hint)
+	st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)}
+	require.NoError(t, p.Start(logger, st))
+
+	pod := makePodWithContainersAndPodLevelResources("plrm-pod", "4", "4", nil, []containerSpec{
+		{name: "gu-container", request: "2", limit: "2"},
+		{name: "shared-container"},
+	})
+	require.NoError(t, p.AllocatePod(logger, st, pod, lifecycle.AddOperation))
+	busy := cpuMetricsSnapshot{
+		exclusiveCPUs:   4,
+		sharedPoolMilli: 7000,
+		perNUMA:         map[string]float64{"0": 4, "1": 0},
 	}
+	assertCPUMetrics(t, busy)
 
-	t.Run("container-scope allocations with init container reuse", func(t *testing.T) {
-		p := newMetricsTestPolicy(t, topoSingleSocketHT, 1, cpuset.New(0), nil)
-		st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)}
-		require.NoError(t, p.Start(logger, st))
+	require.NoError(t, p.RemoveContainer(logger, st, "plrm-pod", "gu-container"))
 
-		pod := makeMultiContainerPod(
-			[]struct{ request, limit string }{{"4000m", "4000m"}},
-			[]struct{ request, limit string }{{"2000m", "2000m"}})
-		require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.InitContainers[0], lifecycle.AddOperation))
-		require.NoError(t, p.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
-		busy := readCPUMetrics(t)
+	// The whole bubble must still be accounted after a kubelet restart, even though some container assignments are gone.
+	resetCPUMetrics()
+	p.initializeMetrics(logger, st)
+	assertCPUMetrics(t, busy)
 
-		simulateRestart(t, p, st)
-		assertCPUMetrics(t, busy)
-	})
-
-	t.Run("pod-level allocation partially released before the restart", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
-
-		hint := &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true}
-		p := newMetricsTestPolicy(t, topoDualSocketHT, 1, cpuset.New(0), hint)
-		st := &mockState{assignments: state.ContainerCPUAssignments{}, defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)}
-		require.NoError(t, p.Start(logger, st))
-
-		pod := makePodWithContainersAndPodLevelResources("plrm-pod", "4", "4", nil, []containerSpec{
-			{name: "gu-container", request: "2", limit: "2"},
-			{name: "shared-container"},
-		})
-		require.NoError(t, p.AllocatePod(logger, st, pod, lifecycle.AddOperation))
-		busy := cpuMetricsSnapshot{
-			exclusiveCPUs:   4,
-			sharedPoolMilli: 7000,
-			perNUMA:         map[string]float64{"0": 4, "1": 0},
-		}
-		assertCPUMetrics(t, busy)
-
-		require.NoError(t, p.RemoveContainer(logger, st, "plrm-pod", "gu-container"))
-
-		// The whole bubble must still be accounted after the restart, even though some container assignments are gone.
-		simulateRestart(t, p, st)
-		assertCPUMetrics(t, busy)
-
-		require.NoError(t, p.RemoveContainer(logger, st, "plrm-pod", "shared-container"))
-		assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}})
-	})
+	require.NoError(t, p.RemoveContainer(logger, st, "plrm-pod", "shared-container"))
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}})
 }
