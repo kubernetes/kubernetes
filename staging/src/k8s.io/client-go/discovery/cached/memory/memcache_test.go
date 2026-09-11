@@ -1960,7 +1960,7 @@ func TestMemCacheServerGroupsAndResources(t *testing.T) {
 					},
 				},
 				"apps/v1beta1": &metav1.APIResourceList{
-					GroupVersion: "apps/v1",
+					GroupVersion: "apps/v1beta1",
 					APIResources: []metav1.APIResource{
 						{Name: "replicasets"},
 					},
