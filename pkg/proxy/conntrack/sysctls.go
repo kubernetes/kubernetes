@@ -55,10 +55,13 @@ type conntrackConfigurer interface {
 	SetUDPTimeout(ctx context.Context, seconds int) error
 	// SetUDPStreamTimeout adjusts nf_conntrack_udp_timeout_stream.
 	SetUDPStreamTimeout(ctx context.Context, seconds int) error
+
+	// DetectNumCPU returns the number of CPU cores in the system
+	DetectNumCPU() int
 }
 
 func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
-	max, err := getConntrackMax(ctx, config, detectNumCPU())
+	max, err := getConntrackMax(ctx, config, ct.DetectNumCPU())
 	if err != nil {
 		return err
 	}
@@ -130,16 +133,16 @@ func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntr
 	return 0, nil
 }
 
-func detectNumCPU() int {
+type realConntrackConfigurer struct {
+}
+
+func (rct realConntrackConfigurer) DetectNumCPU() int {
 	// try get numCPU from /sys firstly due to a known issue (https://github.com/kubernetes/kubernetes/issues/99225)
 	_, numCPU, err := machine.GetTopology(sysfs.NewRealSysFs())
 	if err != nil || numCPU < 1 {
 		return runtime.NumCPU()
 	}
 	return numCPU
-}
-
-type realConntrackConfigurer struct {
 }
 
 func (rct realConntrackConfigurer) SetMax(ctx context.Context, max int) error {
