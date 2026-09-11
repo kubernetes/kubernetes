@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim"
@@ -35,8 +36,8 @@ func newDeviceTaintEvictionControllerDescriptor() *ControllerDescriptor {
 		constructor: newDeviceTaintEvictionController,
 		requiredFeatureGates: []featuregate.Feature{
 			// TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing these feature gates.
-			features.DynamicResourceAllocation,
-			features.DRADeviceTaints,
+			schedulerfeatures.DynamicResourceAllocation,
+			schedulerfeatures.DRADeviceTaints,
 		},
 	}
 }
@@ -70,7 +71,7 @@ func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 		aliases:     []string{"resource-claim-controller"},
 		constructor: newResourceClaimController,
 		requiredFeatureGates: []featuregate.Feature{
-			features.DynamicResourceAllocation, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
+			schedulerfeatures.DynamicResourceAllocation, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
 		},
 	}
 }

@@ -31,7 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -127,7 +127,7 @@ func computeDriverStates(claim *resourceapi.ResourceClaim) (map[string]state.Dri
 			}
 		}
 
-		if len(skippedOps) > 0 && !utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) {
+		if len(skippedOps) > 0 && !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAOptionalNodeOperations) {
 			return nil, errors.New("DRAOptionalNodeOperations feature gate is disabled on kubelet")
 		}
 

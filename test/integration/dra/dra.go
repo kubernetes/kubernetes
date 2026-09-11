@@ -42,9 +42,9 @@ import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -101,7 +101,7 @@ const (
 // featureNodeSetups maps feature gates to functions that configure the nodes
 // for that specific feature.
 var featureNodeSetups = map[featuregate.Feature]func(tCtx ktesting.TContext, nodes []*v1.Node){
-	features.DRAOptionalNodeOperations: func(tCtx ktesting.TContext, nodes []*v1.Node) {
+	schedulerfeatures.DRAOptionalNodeOperations: func(tCtx ktesting.TContext, nodes []*v1.Node) {
 		if len(nodes) == 0 {
 			return
 		}
@@ -144,7 +144,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 		"disabled": {
 			version:  "1.34", // In 1.34 it was still possible to disable DRA.
 			apis:     map[schema.GroupVersion]bool{resourceapi.SchemeGroupVersion: false},
-			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: false},
+			features: map[featuregate.Feature]bool{schedulerfeatures.DynamicResourceAllocation: false},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "APIDisabled", testAPIDisabled)
 				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, false) })
@@ -157,7 +157,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, false) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, true, features.DRADeviceCompatibilityGroups, features.DRAOptionalNodeOperations)
+					testPublishResourceSlices(tCtx, true, schedulerfeatures.DRADeviceCompatibilityGroups, schedulerfeatures.DRAOptionalNodeOperations)
 				})
 				runSubTest(tCtx, "EvictClusterWithV1Rule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useV1Rule) })
 				runSubTest(tCtx, "EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useNoRule) })
@@ -177,9 +177,9 @@ func run(tCtx ktesting.TContext, whatRE string) {
 		"compatibility-groups-without-consumable-capacity": {
 			apis: map[schema.GroupVersion]bool{},
 			features: map[featuregate.Feature]bool{
-				features.DRAConsumableCapacity:        false,
-				features.DRADeviceCompatibilityGroups: true,
-				features.DRAPartitionableDevices:      true,
+				schedulerfeatures.DRAConsumableCapacity:        false,
+				schedulerfeatures.DRADeviceCompatibilityGroups: true,
+				schedulerfeatures.DRAPartitionableDevices:      true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, true) })
@@ -203,7 +203,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, true, features.DRAPartitionableDevices, features.DRADeviceBindingConditions, features.DRAOptionalNodeOperations)
+					testPublishResourceSlices(tCtx, true, schedulerfeatures.DRAPartitionableDevices, schedulerfeatures.DRADeviceBindingConditions, schedulerfeatures.DRAOptionalNodeOperations)
 				})
 				runSubTest(tCtx, "ExplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, true) })
 				runSubTest(tCtx, "ImplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, false) })
@@ -230,7 +230,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions, features.DRAOptionalNodeOperations)
+					testPublishResourceSlices(tCtx, true, schedulerfeatures.DRADeviceTaints, schedulerfeatures.DRAPartitionableDevices, schedulerfeatures.DRADeviceBindingConditions, schedulerfeatures.DRAOptionalNodeOperations)
 				})
 			},
 		},
@@ -245,7 +245,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions, features.DRAOptionalNodeOperations)
+					testPublishResourceSlices(tCtx, true, schedulerfeatures.DRADeviceTaints, schedulerfeatures.DRAPartitionableDevices, schedulerfeatures.DRADeviceBindingConditions, schedulerfeatures.DRAOptionalNodeOperations)
 				})
 			},
 		},
@@ -253,8 +253,8 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			version: "1.36",
 			apis:    map[schema.GroupVersion]bool{},
 			features: map[featuregate.Feature]bool{
-				features.DRAResourceClaimDeviceStatus: false,
-				features.DRAPrioritizedList:           false,
+				schedulerfeatures.DRAResourceClaimDeviceStatus: false,
+				schedulerfeatures.DRAPrioritizedList:           false,
 			},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
@@ -267,13 +267,13 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				resourcev1beta2.SchemeGroupVersion: true,
 			},
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation:    true,
-				features.DRADeviceTaintRules:          true,
-				features.DRADeviceCompatibilityGroups: true,
+				schedulerfeatures.DynamicResourceAllocation:    true,
+				schedulerfeatures.DRADeviceTaintRules:          true,
+				schedulerfeatures.DRADeviceCompatibilityGroups: true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false, features.DRAOptionalNodeOperations)
+					testPublishResourceSlices(tCtx, false, schedulerfeatures.DRAOptionalNodeOperations)
 				})
 			},
 		},
@@ -287,22 +287,22 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				// Additional DRA feature gates go here,
 				// in alphabetical order,
 				// as needed by tests for them.
-				features.DRAAdminAccess:               true,
-				features.DRADeviceBindingConditions:   true,
-				features.DRAConsumableCapacity:        true,
-				features.DRADeviceCompatibilityGroups: true,
-				features.DRADeviceTaintRules:          true,
-				features.DRADerivedAttributes:         true,
-				features.DRAListTypeAttributes:        true,
-				features.DRAOptionalNodeOperations:    true,
-				features.DRAPartitionableDevices:      true,
-				features.DRAPrioritizedList:           true,
-				features.DRAResourceClaimDeviceStatus: true,
-				features.DRAExtendedResource:          true,
-				features.DRANodeAllocatableResources:  true,
-				features.DRAWorkloadResourceClaims:    true,
-				features.GenericWorkload:              true, // dependency of DRAWorkloadResourceClaims
-				features.NodeDeclaredFeatures:         true, // dependency of DRAOptionalNodeOperations
+				schedulerfeatures.DRAAdminAccess:               true,
+				schedulerfeatures.DRADeviceBindingConditions:   true,
+				schedulerfeatures.DRAConsumableCapacity:        true,
+				schedulerfeatures.DRADeviceCompatibilityGroups: true,
+				schedulerfeatures.DRADeviceTaintRules:          true,
+				schedulerfeatures.DRADerivedAttributes:         true,
+				schedulerfeatures.DRAListTypeAttributes:        true,
+				schedulerfeatures.DRAOptionalNodeOperations:    true,
+				schedulerfeatures.DRAPartitionableDevices:      true,
+				schedulerfeatures.DRAPrioritizedList:           true,
+				schedulerfeatures.DRAResourceClaimDeviceStatus: true,
+				schedulerfeatures.DRAExtendedResource:          true,
+				schedulerfeatures.DRANodeAllocatableResources:  true,
+				schedulerfeatures.DRAWorkloadResourceClaims:    true,
+				schedulerfeatures.GenericWorkload:              true, // dependency of DRAWorkloadResourceClaims
+				schedulerfeatures.NodeDeclaredFeatures:         true, // dependency of DRAOptionalNodeOperations
 			},
 			f: func(tCtx ktesting.TContext) {
 				// These tests must run in parallel as much as possible to keep overall runtime low!

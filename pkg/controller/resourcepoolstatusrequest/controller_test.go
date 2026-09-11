@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -917,7 +917,7 @@ func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaintRules, tc.enableTaintRules)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRADeviceTaintRules, tc.enableTaintRules)
 			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), tc.slices, tc.claims, tc.rules...))
 			if got := derefInt32(pool.TotalDevices); got != tc.wantTotal {
 				t.Errorf("TotalDevices = %d, want %d", got, tc.wantTotal)

@@ -28,6 +28,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
@@ -40,7 +41,7 @@ import (
 
 func TestDeclarativeValidate(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.DRANodeAllocatableResources: true,
+		schedulerfeatures.DRANodeAllocatableResources: true,
 	})
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
@@ -583,7 +584,7 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.DRANodeAllocatableResources: true,
+		schedulerfeatures.DRANodeAllocatableResources: true,
 	})
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {

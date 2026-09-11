@@ -48,12 +48,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	dracel "k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	corehelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // ResourceNormalizationRules handles the structural differences between v1beta1
@@ -411,8 +411,8 @@ func validateCELExpression(expression string, fldPath *field.Path, opts deviceVa
 	}
 
 	result := dracel.GetCompiler(dracel.Features{
-		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
-		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAListTypeAttributes),
 	}).CompileCELExpression(expression, dracel.Options{
 		EnvType:          &envType,
 		DerivedAttribute: derivedAttribute,
@@ -511,7 +511,7 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute")).MarkCoveredByDeclarative()...)
 	} else if constraint.DistinctAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute")).MarkCoveredByDeclarative()...)
-	} else if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
+	} else if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAConsumableCapacity) {
 		allErrs = append(allErrs, field.Required(fldPath, `exactly one of "matchAttribute" or "distinctAttribute" is required, but multiple fields are set`))
 	} else {
 		allErrs = append(allErrs, field.Required(fldPath.Child("matchAttribute"), ""))
@@ -1416,7 +1416,7 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 	// supported. When DRAFractionalCapacityRange is enabled, use decimal precision;
 	// otherwise, use integer-based keys.
 	quantityKeyFunc := quantityKeyInt
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAFractionalCapacityRange) {
 		quantityKeyFunc = quantityKeyAsDec
 	}
 
@@ -1463,7 +1463,7 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 		}
 	}
 	useMilli := false
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAFractionalCapacityRange) {
 		// The default is not part of the range, so rangeHasFractional does not see it.
 		// A fractional default with an integer range must still use the milli path, or the
 		// integer path reads default.Value() (which rounds) and accepts a non-multiple.

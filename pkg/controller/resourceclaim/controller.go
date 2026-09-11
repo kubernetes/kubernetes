@@ -55,9 +55,9 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -208,10 +208,10 @@ func NewController(
 		claimInformer,
 		templateInformer,
 		controllerFeatures{
-			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			GenericWorkload:        utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
-			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
-			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
+			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAAdminAccess),
+			GenericWorkload:        utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.GenericWorkload),
+			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAPrioritizedList),
+			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAWorkloadResourceClaims),
 		},
 	)
 }
@@ -1000,7 +1000,7 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 				// verbosity threshold so cluster admins can more easily
 				// identify when that happens because of this feature gate in
 				// normal production clusters.
-				logger.V(3).Info("Not reserving PodGroup ResourceClaim because feature is disabled", "feature", features.DRAWorkloadResourceClaims, "resourceClaim", klog.KObj(claim))
+				logger.V(3).Info("Not reserving PodGroup ResourceClaim because feature is disabled", "feature", schedulerfeatures.DRAWorkloadResourceClaims, "resourceClaim", klog.KObj(claim))
 				continue
 			}
 			logger.V(5).Info("Reserve claim", "resourceClaim", klog.KObj(claim), "reservedForResource", bindTo.Resource)
@@ -1073,7 +1073,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 	var claim *resourceapi.ResourceClaim
 	if isPodGroupClaim(bindTo) {
 		if !ec.features.WorkloadResourceClaims {
-			return nonRetryableError{fmt.Errorf("claim %s is a PodGroup claim but the %s feature is disabled", podClaim.Name, features.DRAWorkloadResourceClaims)}
+			return nonRetryableError{fmt.Errorf("claim %s is a PodGroup claim but the %s feature is disabled", podClaim.Name, schedulerfeatures.DRAWorkloadResourceClaims)}
 		}
 		claim, err = ec.findPodGroupResourceClaim(podGroup, schedulingapi.PodGroupResourceClaim{
 			Name: podClaim.Name,
@@ -1718,7 +1718,7 @@ func (ec *Controller) getPodGroup(pod *v1.Pod) (*schedulingapi.PodGroup, error) 
 		return nil, nil
 	}
 	if !ec.features.GenericWorkload {
-		return nil, nonRetryableError{fmt.Errorf("Pod is a member of PodGroup %s but %s feature is disabled", *pod.Spec.SchedulingGroup.PodGroupName, features.GenericWorkload)}
+		return nil, nonRetryableError{fmt.Errorf("Pod is a member of PodGroup %s but %s feature is disabled", *pod.Spec.SchedulingGroup.PodGroupName, schedulerfeatures.GenericWorkload)}
 	}
 	return ec.podGroupLister.PodGroups(pod.Namespace).Get(*pod.Spec.SchedulingGroup.PodGroupName)
 }

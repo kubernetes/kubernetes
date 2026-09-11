@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
@@ -1729,9 +1729,9 @@ func TestTopologyAwareSchedulingNominatedNode(t *testing.T) {
 
 func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.CompositePodGroup:               cpgEnabled,
-		features.GenericWorkload:                 true,
-		features.TopologyAwareWorkloadScheduling: true,
+		schedulerfeatures.CompositePodGroup:               cpgEnabled,
+		schedulerfeatures.GenericWorkload:                 true,
+		schedulerfeatures.TopologyAwareWorkloadScheduling: true,
 	})
 
 	testCtx := testutils.InitTestSchedulerWithNS(t, "tas",

@@ -24,9 +24,9 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/scheduling/podgroupprotection"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func newPodGroupProtectionControllerDescriptor() *ControllerDescriptor {
@@ -34,13 +34,13 @@ func newPodGroupProtectionControllerDescriptor() *ControllerDescriptor {
 		name:        names.PodGroupProtectionController,
 		constructor: newPodGroupProtectionController,
 		requiredFeatureGates: []featuregate.Feature{
-			features.GenericWorkload,
+			schedulerfeatures.GenericWorkload,
 		},
 	}
 }
 
 func newPodGroupProtectionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.GenericWorkload) {
 		return nil, nil
 	}
 	client, err := controllerContext.NewClient(controllerName)

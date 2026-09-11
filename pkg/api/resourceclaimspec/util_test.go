@@ -25,8 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -212,21 +212,21 @@ func TestDropDisabledDRADerivedAttributesFields(t *testing.T) {
 	}
 
 	t.Run("drop-on-create-when-feature-gate-disabled", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRADerivedAttributes, false)
 		newClaim := claim.DeepCopy()
 		DropDisabledFields(&newClaim.Spec, nil)
 		assert.Nil(t, newClaim.Spec.Devices.Requests[0].Exactly.DerivedAttributes)
 	})
 
 	t.Run("keep-on-create-when-feature-gate-enabled", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRADerivedAttributes, true)
 		newClaim := claim.DeepCopy()
 		DropDisabledFields(&newClaim.Spec, nil)
 		assert.NotNil(t, newClaim.Spec.Devices.Requests[0].Exactly.DerivedAttributes)
 	})
 
 	t.Run("keep-on-update-when-feature-gate-disabled-but-in-use", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRADerivedAttributes, false)
 		newClaim := claim.DeepCopy()
 		oldClaim := claim.DeepCopy()
 		DropDisabledFields(&newClaim.Spec, &oldClaim.Spec)

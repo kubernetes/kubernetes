@@ -53,6 +53,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/ptr"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -854,7 +855,7 @@ func TestGetResources(t *testing.T) {
 				manager.cache.add(test.claimInfo)
 			}
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAExtendedResource, true)
 			containerInfo, err := manager.GetResources(test.pod, test.container)
 			if test.wantErr {
 				assert.Error(t, err)
@@ -1281,10 +1282,10 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 			}
 
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAExtendedResource:       true,
-				features.DRAConsumableCapacity:     true,
-				features.DRAWorkloadResourceClaims: test.draWorkloadResourceClaimsEnabled,
-				features.GenericWorkload:           test.draWorkloadResourceClaimsEnabled, // dependency of DRAWorkloadResourceClaims
+				schedulerfeatures.DRAExtendedResource:       true,
+				schedulerfeatures.DRAConsumableCapacity:     true,
+				schedulerfeatures.DRAWorkloadResourceClaims: test.draWorkloadResourceClaimsEnabled,
+				schedulerfeatures.GenericWorkload:           test.draWorkloadResourceClaimsEnabled, // dependency of DRAWorkloadResourceClaims
 			})
 			err = manager.PrepareResources(backgroundCtx, test.pod)
 
@@ -1690,7 +1691,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 				manager.cache.add(test.claimInfo)
 			}
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAExtendedResource, true)
 			err = manager.UnprepareResources(tCtx, test.pod)
 
 			assert.Equal(t, test.expectedUnprepareCalls, draServerInfo.server.unprepareResourceCalls.Load())
@@ -1886,7 +1887,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 				manager.cache.add(test.claimInfo)
 			}
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAExtendedResource, true)
 			claimInfos, err := manager.GetContainerClaimInfos(test.pod, &test.pod.Spec.Containers[0])
 
 			if test.expectedErrMsg != "" {
@@ -3174,7 +3175,7 @@ func TestPrepareUnprepareResourcesSkipNodeOperations(t *testing.T) {
 			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAOptionalNodeOperations, false)
 			err = manager.PrepareResources(tCtx, pod)
 			require.ErrorContains(t, err, "DRAOptionalNodeOperations feature gate is disabled")
 			assert.Equal(t, uint32(0), draServerInfo.server.prepareResourceCalls.Load())
@@ -3188,7 +3189,7 @@ func TestPrepareUnprepareResourcesSkipNodeOperations(t *testing.T) {
 			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAOptionalNodeOperations, true)
 
 			err = manager.PrepareResources(tCtx, pod)
 			require.NoError(t, err)
@@ -3207,11 +3208,11 @@ func TestPrepareUnprepareResourcesSkipNodeOperations(t *testing.T) {
 			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAOptionalNodeOperations, true)
 			err = manager.PrepareResources(tCtx, pod)
 			require.NoError(t, err)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAOptionalNodeOperations, false)
 			err = manager.UnprepareResources(tCtx, pod)
 			require.NoError(t, err, "UnprepareResources must succeed during rollback even if feature gate is disabled")
 			assert.Equal(t, uint32(0), draServerInfo.server.unprepareResourceCalls.Load(), "NodeUnprepareResources must be skipped for SkipNodeOperationAll")
@@ -3229,7 +3230,7 @@ func TestPrepareUnprepareResourcesSkipNodeOperations(t *testing.T) {
 
 			draServerInfo.server.prepareResourcesResponse = genPrepareResourcesResponse(claim.UID)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAOptionalNodeOperations, true)
 
 			prepareCallsBefore := draServerInfo.server.prepareResourceCalls.Load()
 			err = manager.PrepareResources(tCtx, pod)
@@ -3251,11 +3252,11 @@ func TestPrepareUnprepareResourcesSkipNodeOperations(t *testing.T) {
 
 			draServerInfo.server.prepareResourcesResponse = genPrepareResourcesResponse(claim.UID)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAOptionalNodeOperations, true)
 			err = manager.PrepareResources(tCtx, pod)
 			require.NoError(t, err)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAOptionalNodeOperations, false)
 			err = manager.UnprepareResources(tCtx, pod)
 			require.NoError(t, err, "UnprepareResources must succeed during rollback even if feature gate is disabled")
 			assert.Equal(t, uint32(0), draServerInfo.server.unprepareResourceCalls.Load(), "NodeUnprepareResources must be skipped for SkipNodeOperationNodeUnprepareResources")

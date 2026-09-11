@@ -58,6 +58,7 @@ import (
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
@@ -7578,8 +7579,8 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			// TODO: this will be removed in 1.38.
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.36"))
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: tc.workloadWithJob,
-				features.WorkloadWithJob: tc.workloadWithJob,
+				schedulerfeatures.GenericWorkload: tc.workloadWithJob,
+				features.WorkloadWithJob:          tc.workloadWithJob,
 			})
 
 			jm, sharedInformers := newControllerFromClient(ctx, t, clientSet, controller.NoResyncPeriodFunc)

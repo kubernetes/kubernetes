@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -566,7 +567,7 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ContainerRestartRules:                true,
-		features.NodeDeclaredFeatures:                 true,
+		schedulerfeatures.NodeDeclaredFeatures:        true,
 		features.RestartAllContainersOnContainerExits: true,
 	})
 	for _, test := range tests {
@@ -718,7 +719,7 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 func TestGenerateAllContainersRestartingCondition(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ContainerRestartRules:                true,
-		features.NodeDeclaredFeatures:                 true,
+		schedulerfeatures.NodeDeclaredFeatures:        true,
 		features.RestartAllContainersOnContainerExits: true,
 	})
 

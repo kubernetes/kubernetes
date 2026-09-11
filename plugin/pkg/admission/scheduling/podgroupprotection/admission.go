@@ -26,8 +26,8 @@ import (
 	apiserveradmission "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -57,7 +57,7 @@ func newPlugin() *podGroupProtectionPlugin {
 }
 
 func (p *podGroupProtectionPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.enabled = featureGates.Enabled(features.GenericWorkload)
+	p.enabled = featureGates.Enabled(schedulerfeatures.GenericWorkload)
 	p.inspectedFeatureGates = true
 }
 

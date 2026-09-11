@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -823,7 +824,7 @@ func configureMemoryManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration,
 	return newCfg
 }
 
-var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithDisruptive(), framework.WithSerial(), feature.MemoryManager, feature.PodLevelResources, feature.PodLevelResourceManagers, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourceManagers), func() {
+var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithDisruptive(), framework.WithSerial(), feature.MemoryManager, feature.PodLevelResources, feature.PodLevelResourceManagers, framework.WithFeatureGate(schedulerfeatures.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourceManagers), func() {
 	f := framework.NewDefaultFramework("memory-manager-pod-level-resources")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

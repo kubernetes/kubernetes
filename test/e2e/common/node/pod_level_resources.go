@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -43,7 +44,7 @@ var (
 	cmd = e2epod.InfiniteSleepCommand
 )
 
-var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
+var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLevelResources, framework.WithFeatureGate(schedulerfeatures.PodLevelResources), func() {
 	f := framework.NewDefaultFramework("pod-level-resources-tests")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -544,7 +545,7 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 	})
 }
 
-var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial(), framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourcesFixDefaulting), func() {
+var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial(), framework.WithFeatureGate(schedulerfeatures.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourcesFixDefaulting), func() {
 	f := framework.NewDefaultFramework("pod-level-resources-fix-defaulting-tests")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

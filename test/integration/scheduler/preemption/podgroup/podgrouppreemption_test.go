@@ -45,8 +45,8 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -1129,11 +1129,11 @@ func TestPodGroupPreemption(t *testing.T) {
 		for _, cpgEnabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.PodLevelResources:               true,
-					features.GenericWorkload:                 true,
-					features.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
-					features.TopologyAwareWorkloadScheduling: true,
-					features.CompositePodGroup:               cpgEnabled,
+					schedulerfeatures.PodLevelResources:               true,
+					schedulerfeatures.GenericWorkload:                 true,
+					schedulerfeatures.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
+					schedulerfeatures.TopologyAwareWorkloadScheduling: true,
+					schedulerfeatures.CompositePodGroup:               cpgEnabled,
 				})
 				recorder := eventRecorder{}
 				registry := make(frameworkruntime.Registry)
@@ -1444,9 +1444,9 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 	for _, cpgEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("CPG enabled: %v)", cpgEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: cpgEnabled,
-				features.CompositePodGroup:               cpgEnabled,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+				schedulerfeatures.CompositePodGroup:               cpgEnabled,
 			})
 			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption-status")
 
@@ -1519,9 +1519,9 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 	for _, cpgEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("CPG enabled: %v", cpgEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: cpgEnabled,
-				features.CompositePodGroup:               cpgEnabled,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+				schedulerfeatures.CompositePodGroup:               cpgEnabled,
 			})
 
 			mockScorePlugin := "mockScorePlugin"
@@ -2327,10 +2327,10 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.CompositePodGroup:               true,
-				features.TopologyAwareWorkloadScheduling: true,
-				features.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.CompositePodGroup:               true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: true,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
 			})
 			registry := make(frameworkruntime.Registry)
 
@@ -2621,9 +2621,9 @@ func TestPodGroupCycleStatePreserved(t *testing.T) {
 	for _, cpgEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("CPG enabled: %v", cpgEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: cpgEnabled,
-				features.CompositePodGroup:               cpgEnabled,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+				schedulerfeatures.CompositePodGroup:               cpgEnabled,
 			})
 
 			stateSaverPluginName := "stateSaverPreFilterPlugin"
@@ -3638,8 +3638,8 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("TestDisablePodGroupPreemption (Async preemption enabled: %v)", asyncPreemptionEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:          true,
-				features.SchedulerAsyncPreemption: asyncPreemptionEnabled,
+				schedulerfeatures.GenericWorkload:          true,
+				schedulerfeatures.SchedulerAsyncPreemption: asyncPreemptionEnabled,
 			})
 
 			// Initialize scheduler, and disable preemption.
@@ -3712,7 +3712,7 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 // When adding new test cases for pod group preemption with waiting pods, add them to this test.
 func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload: true,
+		schedulerfeatures.GenericWorkload: true,
 	})
 	tests := []struct {
 		name      string

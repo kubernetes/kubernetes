@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	cm "k8s.io/kubernetes/pkg/kubelet/cm"
 	cmtesting "k8s.io/kubernetes/pkg/kubelet/cm/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -35,8 +35,8 @@ import (
 
 func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.PodLevelResources:                       true,
-		features.InPlacePodLevelResourcesVerticalScaling: true,
+		schedulerfeatures.PodLevelResources:                       true,
+		schedulerfeatures.InPlacePodLevelResourcesVerticalScaling: true,
 	})
 
 	testCases := []struct {

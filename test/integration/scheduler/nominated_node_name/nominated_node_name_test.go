@@ -32,6 +32,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -142,7 +143,7 @@ func TestNominatedNodeNameIsSetBeforePreBindAndWaitOnPermit(t *testing.T) {
 	for _, test := range tests {
 		for _, nnnForExpectationEnabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s (NominatedNodeName for expectation: %v)", test.name, nnnForExpectationEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, nnnForExpectationEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NominatedNodeNameForExpectation, nnnForExpectationEnabled)
 
 				testContext := testutils.InitTestAPIServer(t, "nnn-test", nil)
 
@@ -456,9 +457,9 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 
 				t.Run(fmt.Sprintf("%s (NominatedNodeName for expectation: %v, Clearing NNN: %v)", test.name, nnnForExpectationEnabled, clearNNNAfterBindingEnabled), func(t *testing.T) {
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-						features.NominatedNodeNameForExpectation:       nnnForExpectationEnabled,
-						features.ClearingNominatedNodeNameAfterBinding: clearNNNAfterBindingEnabled,
-						features.SchedulerAsyncPreemption:              true,
+						schedulerfeatures.NominatedNodeNameForExpectation: nnnForExpectationEnabled,
+						features.ClearingNominatedNodeNameAfterBinding:    clearNNNAfterBindingEnabled,
+						schedulerfeatures.SchedulerAsyncPreemption:        true,
 					})
 
 					// We need to use a custom preemption plugin to test async preemption behavior
@@ -791,7 +792,7 @@ func (p *mockQueueSortPlugin) Less(entity1, entity2 fwk.QueuedEntityInfo) bool {
 
 // TestSchedulerRestartWithNominatedNode checks that NNN properly reserves the pod's node despite scheduler restart during binding cycle.
 func TestSchedulerRestartWithNominatedNode(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NominatedNodeNameForExpectation, true)
 	testContext := testutils.InitTestAPIServer(t, "nnn-test", nil)
 	ctx, cancel := context.WithCancel(testContext.Ctx)
 	cs := testContext.ClientSet

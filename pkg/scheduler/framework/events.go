@@ -25,7 +25,7 @@ import (
 	"k8s.io/component-helpers/resource"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kube-scheduler/pkg/features"
 )
 
 // Special event labels.

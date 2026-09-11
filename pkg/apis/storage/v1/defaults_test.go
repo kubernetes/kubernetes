@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 	"k8s.io/kubernetes/pkg/features"
@@ -150,7 +151,7 @@ func TestSetDefaultSELinuxMountReadWriteOncePodDisabled(t *testing.T) {
 }
 
 func TestSetDefaultPreventPodSchedulingIfMissingVolumeLimitScalingEnabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.VolumeLimitScaling, true)
 	driver := &storagev1.CSIDriver{}
 
 	// field should be defaulted
@@ -165,7 +166,7 @@ func TestSetDefaultPreventPodSchedulingIfMissingVolumeLimitScalingEnabled(t *tes
 }
 
 func TestSetDefaultPreventPodSchedulingIfMissingVolumeLimitScalingDisabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.VolumeLimitScaling, false)
 	driver := &storagev1.CSIDriver{}
 
 	// field should not be defaulted

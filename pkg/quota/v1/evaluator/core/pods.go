@@ -35,11 +35,11 @@ import (
 	"k8s.io/utils/clock"
 
 	resourcehelper "k8s.io/component-helpers/resource"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -140,7 +140,7 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 	// missing container requests, for CPU/memory resources that have quotas set,
 	// is skipped when pod-level resources feature is enabled and resources are set
 	// at pod level.
-	if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if feature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		return nil
 	}
 
@@ -399,9 +399,9 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		UseStatusResources: feature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling),
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		SkipPodLevelResources: !feature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources),
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)

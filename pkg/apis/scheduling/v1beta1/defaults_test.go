@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -111,8 +111,8 @@ func TestSetDefaultsPodGroup(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:          tc.enablePodGroupPreemptionPolicy,
-				features.PodGroupPreemptionPolicy: tc.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.GenericWorkload:          tc.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.PodGroupPreemptionPolicy: tc.enablePodGroupPreemptionPolicy,
 			})
 
 			output := roundTrip(t, runtime.Object(tc.podGroup)).(*v1beta1.PodGroup)

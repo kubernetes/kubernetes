@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
@@ -421,7 +422,7 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 	}
 
 	podLevelAndContainerLevelRequests := []v1.ResourceList{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		podLevelAndContainerLevelRequests = append(podLevelAndContainerLevelRequests, pod.Spec.Resources.Requests)
 	}
 

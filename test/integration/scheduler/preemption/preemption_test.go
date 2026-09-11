@@ -39,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -999,12 +1000,12 @@ func TestPreemption(t *testing.T) {
 					// One API server per full flag combination. All flags including
 					// GenericWorkload and CompositePodGroup are consistent between API server and scheduler.
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-						features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
-						features.SchedulerAsyncAPICalls:                asyncAPICallsEnabled,
-						features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
-						features.GenericWorkload:                       fgKey.genericWorkloadEnabled,
-						features.CompositePodGroup:                     fgKey.compositePodGroupEnabled,
-						features.TopologyAwareWorkloadScheduling:       fgKey.compositePodGroupEnabled,
+						schedulerfeatures.SchedulerAsyncPreemption:        asyncPreemptionEnabled,
+						schedulerfeatures.SchedulerAsyncAPICalls:          asyncAPICallsEnabled,
+						features.ClearingNominatedNodeNameAfterBinding:    clearingNominatedNodeNameAfterBinding,
+						schedulerfeatures.GenericWorkload:                 fgKey.genericWorkloadEnabled,
+						schedulerfeatures.CompositePodGroup:               fgKey.compositePodGroupEnabled,
+						schedulerfeatures.TopologyAwareWorkloadScheduling: fgKey.compositePodGroupEnabled,
 					})
 					sharedAPICtx := testutils.InitTestAPIServer(t, "preemption", nil)
 
@@ -2514,10 +2515,10 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 			genericWorkloadEnabled := genericOpts.genericWorkloadEnabled
 			cpgEnabled := genericOpts.cpgEnabled
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                       genericWorkloadEnabled,
-				features.CompositePodGroup:                     cpgEnabled,
-				features.TopologyAwareWorkloadScheduling:       cpgEnabled,
-				features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
+				schedulerfeatures.GenericWorkload:                 genericWorkloadEnabled,
+				schedulerfeatures.CompositePodGroup:               cpgEnabled,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+				features.ClearingNominatedNodeNameAfterBinding:    clearingNominatedNodeNameAfterBinding,
 			})
 			sharedAPICtx := testutils.InitTestAPIServer(t, "preemption", nil)
 
@@ -2528,12 +2529,12 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 						t.Run(fmt.Sprintf("%s (%s)", test.name, nameSuffix), func(t *testing.T) {
 							// Feature gates map to test combinations.
 							featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-								features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
-								features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
-								features.InterPodAffinityHostnameFastPath:      fpEnabled,
-								features.GenericWorkload:                       genericWorkloadEnabled,
-								features.CompositePodGroup:                     cpgEnabled,
-								features.TopologyAwareWorkloadScheduling:       cpgEnabled,
+								schedulerfeatures.SchedulerAsyncPreemption:         asyncPreemptionEnabled,
+								features.ClearingNominatedNodeNameAfterBinding:     clearingNominatedNodeNameAfterBinding,
+								schedulerfeatures.InterPodAffinityHostnameFastPath: fpEnabled,
+								schedulerfeatures.GenericWorkload:                  genericWorkloadEnabled,
+								schedulerfeatures.CompositePodGroup:                cpgEnabled,
+								schedulerfeatures.TopologyAwareWorkloadScheduling:  cpgEnabled,
 							})
 
 							var filter tokenFilter

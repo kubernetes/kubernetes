@@ -39,11 +39,11 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	v1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func addPriorityClasses(ctrl *Plugin, priorityClasses []*scheduling.PriorityClass) error {
@@ -947,8 +947,8 @@ func TestAdmitPodGroup(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:          tt.enableGenericWorkload,
-				features.PodGroupPreemptionPolicy: tt.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.GenericWorkload:          tt.enableGenericWorkload,
+				schedulerfeatures.PodGroupPreemptionPolicy: tt.enablePodGroupPreemptionPolicy,
 			})
 
 			admissionPlugin := NewPlugin()
@@ -1245,10 +1245,10 @@ func TestAdmitCompositePodGroup(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 tt.enableCompositePodGroup,
-				features.TopologyAwareWorkloadScheduling: tt.enableCompositePodGroup,
-				features.CompositePodGroup:               tt.enableCompositePodGroup,
-				features.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.GenericWorkload:                 tt.enableCompositePodGroup,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: tt.enableCompositePodGroup,
+				schedulerfeatures.CompositePodGroup:               tt.enableCompositePodGroup,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
 			})
 
 			admissionPlugin := NewPlugin()

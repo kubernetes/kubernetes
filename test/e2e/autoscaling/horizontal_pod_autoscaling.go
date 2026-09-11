@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
@@ -69,13 +69,13 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 		})
 	})
 
-	f.Describe("Deployment (Pod-level Resources Resource Metric)", framework.WithFeatureGate(features.PodLevelResources), func() {
+	f.Describe("Deployment (Pod-level Resources Resource Metric)", framework.WithFeatureGate(schedulerfeatures.PodLevelResources), func() {
 		f.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUpPodLevelResources(ctx, "test-deployment-pod-level", e2eautoscaling.KindDeployment, autoscalingv2.ResourceMetricSourceType, f)
 		})
 	})
 
-	f.Describe("Deployment (Pod-level Resources ContainerResource Metric)", framework.WithFeatureGate(features.PodLevelResources), func() {
+	f.Describe("Deployment (Pod-level Resources ContainerResource Metric)", framework.WithFeatureGate(schedulerfeatures.PodLevelResources), func() {
 		f.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUpPodLevelResources(ctx, "test-deployment-pod-level", e2eautoscaling.KindDeployment, autoscalingv2.ContainerResourceMetricSourceType, f)
 		})

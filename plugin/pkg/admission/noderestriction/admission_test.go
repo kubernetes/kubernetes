@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
@@ -2900,7 +2901,7 @@ func TestAdmitResourceSlice(t *testing.T) {
 			if !test.featureEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DynamicResourceAllocation, test.featureEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, schedulerfeatures.DynamicResourceAllocation, test.featureEnabled)
 			a := &admitTestCase{
 				name:       name,
 				attributes: attributes,

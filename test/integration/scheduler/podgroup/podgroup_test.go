@@ -33,7 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	framework "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -656,9 +656,9 @@ func TestPodGroupScheduling(t *testing.T) {
 				}
 				t.Run(fmt.Sprintf("%s (TAS enabled: %v, CPG enabled: %v)", tt.name, tasEnabled, cpgEnabled), func(t *testing.T) {
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-						features.GenericWorkload:                 true,
-						features.TopologyAwareWorkloadScheduling: tasEnabled,
-						features.CompositePodGroup:               cpgEnabled,
+						schedulerfeatures.GenericWorkload:                 true,
+						schedulerfeatures.TopologyAwareWorkloadScheduling: tasEnabled,
+						schedulerfeatures.CompositePodGroup:               cpgEnabled,
 					})
 
 					testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-scheduling",
@@ -692,9 +692,9 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 	for _, cpgEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("CPG enabled: %v", cpgEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: cpgEnabled,
-				features.CompositePodGroup:               cpgEnabled,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+				schedulerfeatures.CompositePodGroup:               cpgEnabled,
 			})
 
 			node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
@@ -816,9 +816,9 @@ func TestPostFilterNotCalled(t *testing.T) {
 	for _, cpgEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("CPG enabled: %v", cpgEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: cpgEnabled,
-				features.CompositePodGroup:               cpgEnabled,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+				schedulerfeatures.CompositePodGroup:               cpgEnabled,
 			})
 
 			node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
@@ -956,9 +956,9 @@ func TestPodGroupPostFilterIteration(t *testing.T) {
 	for _, cpgEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("CPG enabled: %v", cpgEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: cpgEnabled,
-				features.CompositePodGroup:               cpgEnabled,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+				schedulerfeatures.CompositePodGroup:               cpgEnabled,
 			})
 
 			node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()

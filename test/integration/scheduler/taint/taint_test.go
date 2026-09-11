@@ -31,8 +31,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -689,7 +689,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		for _, enabled := range featureGateEnabled {
 			t.Run(fmt.Sprintf("%s (TaintToleration Comparison Operators enabled: %v)", test.name, enabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.TaintTolerationComparisonOperators: enabled,
+					schedulerfeatures.TaintTolerationComparisonOperators: enabled,
 				})
 
 				testCtx := testutils.InitTestScheduler(t, testCtx)

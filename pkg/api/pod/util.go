@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -422,12 +423,12 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidTopologySpreadConstraintLabelSelector:   false,
 		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
 		AllowNonLocalProjectedTokenPath:                     false,
-		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources),
 		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
-		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
+		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling),
+		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.MatchLabelKeysInPodTopologySpread),
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
-		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling),
 		InPlacePodVerticalScalingMemoryBackedVolumesEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
@@ -763,7 +764,7 @@ func dropDisabledFields(
 	dropDisabledGRPCContainerProbeTLS(podSpec, oldPodSpec)
 	dropDisabledEvictionResponders(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
 		// field is mutable for certain controllers. Let ValidatePodUpdate handle it.
 		for i := range podSpec.Containers {
@@ -979,7 +980,7 @@ func httpProbeProtocolInUse(podSpec *api.PodSpec) bool {
 func dropDisabledPodLevelResources(podSpec, oldPodSpec *api.PodSpec) {
 	// If the feature is disabled and not in use, drop Resources at the pod-level
 	// from PodSpec.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && !podLevelResourcesInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) && !podLevelResourcesInUse(oldPodSpec) {
 		podSpec.Resources = nil
 	}
 }
@@ -1030,13 +1031,13 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		podStatus = &api.PodStatus{}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && !podLevelStatusResourcesInUse(oldPodStatus) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) && !podLevelStatusResourcesInUse(oldPodStatus) {
 		// Drop Resources and AllocatedResources fields from PodStatus
 		podStatus.Resources = nil
 		podStatus.AllocatedResources = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop Resources fields
 		dropResourcesField := func(csl []api.ContainerStatus) {
 			for i := range csl {
@@ -1058,11 +1059,11 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		dropAllocatedResourcesField(podStatus.EphemeralContainerStatuses)
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
 		podStatus.ResourceClaimStatuses = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) && !draExendedResourceInUse(oldPodStatus) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) && !draExendedResourceInUse(oldPodStatus) {
 		podStatus.ExtendedResourceClaimStatus = nil
 	}
 
@@ -1138,7 +1139,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 // container specs and pod-level resource claims unless they are already used
 // by the old pod spec.
 func dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
 		dropResourceClaimRequests(podSpec.Containers)
 		dropResourceClaimRequests(podSpec.InitContainers)
 		dropEphemeralResourceClaimRequests(podSpec.EphemeralContainers)
@@ -1154,7 +1155,7 @@ func draExendedResourceInUse(podStatus *api.PodStatus) bool {
 }
 
 func dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus *api.PodStatus) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) || draNodeAllocatableResourceStatusInUse(oldPodStatus) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRANodeAllocatableResources) || draNodeAllocatableResourceStatusInUse(oldPodStatus) {
 		return
 	}
 	podStatus.NodeAllocatableResourceClaimStatuses = nil
@@ -1274,7 +1275,7 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 // dropDisabledNodeInclusionPolicyFields removes disabled fields from PodSpec related
 // to NodeInclusionPolicy only if it is not used by the old spec.
 func dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread) && podSpec != nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.NodeInclusionPolicyInPodTopologySpread) && podSpec != nil {
 		if !nodeTaintsPolicyInUse(oldPodSpec) {
 			for i := range podSpec.TopologySpreadConstraints {
 				podSpec.TopologySpreadConstraints[i].NodeTaintsPolicy = nil
@@ -1308,7 +1309,7 @@ func dropDisabledMatchLabelKeysFieldInPodAffinity(podSpec, oldPodSpec *api.PodSp
 // dropDisabledMatchLabelKeysFieldInTopologySpread removes disabled fields from PodSpec related
 // to MatchLabelKeys in TopologySpread only if it is not already used by the old spec.
 func dropDisabledMatchLabelKeysFieldInTopologySpread(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread) && !matchLabelKeysInTopologySpreadInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.MatchLabelKeysInPodTopologySpread) && !matchLabelKeysInTopologySpreadInUse(oldPodSpec) {
 		for i := range podSpec.TopologySpreadConstraints {
 			podSpec.TopologySpreadConstraints[i].MatchLabelKeys = nil
 		}
@@ -1934,7 +1935,7 @@ func taintTolerationComparisonOperatorsInUse(podSpec *api.PodSpec) bool {
 func allowTaintTolerationComparisonOperators(oldPodSpec *api.PodSpec) bool {
 	// allow the operators if the feature gate is enabled or the old pod spec uses
 	// comparison operators
-	if utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.TaintTolerationComparisonOperators) ||
 		taintTolerationComparisonOperatorsInUse(oldPodSpec) {
 		return true
 	}
@@ -2127,7 +2128,7 @@ func containerRestartRulesInUse(oldPodSpec *api.PodSpec) bool {
 // dropDisabledSchedulingGroup removes pod scheduling group from its spec
 // unless it is already used by the old pod spec.
 func dropDisabledSchedulingGroup(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && !schedulingGroupInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.GenericWorkload) && !schedulingGroupInUse(oldPodSpec) {
 		podSpec.SchedulingGroup = nil
 	}
 }
@@ -2251,7 +2252,7 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 //     for resources where all containers have limits. Step 2 must run first so that
 //     pod-level requests are complete before the max() comparison.
 func DefaultPodLevelResources(pod *api.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
 		return
 	}

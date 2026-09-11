@@ -26,7 +26,7 @@ import (
 	"time"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/utils/ptr"
 
@@ -278,7 +278,7 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 		return fmt.Errorf("storageClassName does not match")
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 		requestedVAC := ptr.Deref(claim.Spec.VolumeAttributesClassName, "")
 		volumeVAC := ptr.Deref(volume.Spec.VolumeAttributesClassName, "")
 		if requestedVAC != volumeVAC {
@@ -822,7 +822,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, c
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 			// There are two components to updating the current vac name, this controller and external-resizer.
 			// The controller ensures that the field is set properly when the volume is statically provisioned.
 			// It is safer for the controller to only set this field during binding, but not after. Without this

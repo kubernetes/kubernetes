@@ -34,6 +34,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/resourcepoolstatusrequest"
 	"k8s.io/kubernetes/pkg/features"
@@ -49,11 +50,11 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 	}{
 		"feature-enabled": {
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation:   true,
-				features.DRAResourcePoolStatus:       true,
-				features.DRAPartitionableDevices:     true,
-				features.DRAPartitionableDevicesType: true,
-				features.DRAConsumableCapacity:       true,
+				schedulerfeatures.DynamicResourceAllocation: true,
+				features.DRAResourcePoolStatus:              true,
+				schedulerfeatures.DRAPartitionableDevices:   true,
+				features.DRAPartitionableDevicesType:        true,
+				schedulerfeatures.DRAConsumableCapacity:     true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("ProcessRequest", testProcessResourcePoolStatusRequest)

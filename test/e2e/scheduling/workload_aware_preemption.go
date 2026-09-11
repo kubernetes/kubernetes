@@ -30,7 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -58,7 +58,7 @@ const (
 	podGroup
 )
 
-var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(features.GenericWorkload), func() {
+var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(schedulerfeatures.GenericWorkload), func() {
 	f := framework.NewDefaultFramework("workload-aware-preemption")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

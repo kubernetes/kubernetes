@@ -46,6 +46,7 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	resourcehelper "k8s.io/component-helpers/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -315,7 +316,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	cm.topologyManager.AddHintProvider(logger, cm.deviceManager)
 
 	// Initialize DRA manager
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		logger.Info("Creating Dynamic Resource Allocation (DRA) manager")
 		cm.draManager, err = dra.NewManager(logger, kubeClient, nodeConfig.KubeletRootDir)
 		if err != nil {
@@ -369,7 +370,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	if cm.deviceManager != nil {
 		sources["deviceManager"] = cm.deviceManager.Updates()
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) && cm.draManager != nil {
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatus) {
 			sources["draManager"] = cm.draManager.Updates()
 		}
@@ -643,7 +644,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
 
 	// Initialize DRA manager
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		err := cm.draManager.Start(ctx, dra.ActivePodsFunc(activePods), dra.GetNodeFunc(getNode), sourcesReady)
 		if err != nil {
 			return fmt.Errorf("start dra manager error: %w", err)
@@ -733,7 +734,7 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandlers() map[string]cache
 		pluginwatcherapi.DevicePlugin: cm.deviceManager.GetWatcherHandler(),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		res[pluginwatcherapi.DRAPlugin] = cm.draManager.GetWatcherHandler()
 	}
 
@@ -748,7 +749,7 @@ func (cm *containerManagerImpl) GetHealthCheckers() []healthz.HealthChecker {
 func (cm *containerManagerImpl) GetResources(ctx context.Context, pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	logger := klog.FromContext(ctx)
 	opts := &kubecontainer.RunContainerOptions{}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		resOpts, err := cm.draManager.GetResources(pod, container)
 		if err != nil {
 			return nil, err
@@ -1065,7 +1066,7 @@ func (cm *containerManagerImpl) GetPodMemory(_ klog.Logger, podUID string) []*po
 }
 
 func (cm *containerManagerImpl) GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		return []*podresourcesapi.DynamicResource{}
 	}
 
@@ -1151,7 +1152,7 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(logger klog.Logge
 	cm.deviceManager.UpdateAllocatedResourcesStatus(logger, pod, status)
 
 	// Update DRA resources if the feature is enabled and the manager exists
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) && cm.draManager != nil {
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatus) {
 			cm.draManager.UpdateAllocatedResourcesStatus(logger, pod, status)
 		}

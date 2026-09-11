@@ -32,7 +32,7 @@ import (
 	_ "k8s.io/component-base/logs/json/register"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	perf "k8s.io/kubernetes/test/integration/scheduler_perf"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
@@ -113,7 +113,7 @@ func setupFeatures(numNodeDeclaredFeatures int) func() {
 }
 
 func preInitNodeDeclaredFeatures(t ktesting.TContext, w *perf.Workload) (func(), error) {
-	if !w.FeatureGates[features.NodeDeclaredFeatures] {
+	if !w.FeatureGates[schedulerfeatures.NodeDeclaredFeatures] {
 		t.Logf("Skipping NodeDeclaredFeatures pre-init as the feature gate is disabled")
 		return func() {}, nil
 	}
@@ -132,7 +132,7 @@ func preInitNodeDeclaredFeatures(t ktesting.TContext, w *perf.Workload) (func(),
 }
 
 func updateNodesWithDeclaredFeatures(tCtx ktesting.TContext, scheduler *scheduler.Scheduler, w *perf.Workload, nodes *v1.NodeList) error {
-	if !w.FeatureGates[features.NodeDeclaredFeatures] {
+	if !w.FeatureGates[schedulerfeatures.NodeDeclaredFeatures] {
 		return nil
 	}
 	numNodeDeclaredFeatures, err := w.GetParam("numNodeDeclaredFeatures")

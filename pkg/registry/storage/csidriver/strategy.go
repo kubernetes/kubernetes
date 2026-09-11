@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
@@ -61,7 +62,7 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountTokenSecrets) {
 		csiDriver.Spec.ServiceAccountTokenInSecrets = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeLimitScaling) {
 		csiDriver.Spec.PreventPodSchedulingIfMissing = nil
 	}
 }
@@ -118,7 +119,7 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	}
 
 	if oldCSIDriver.Spec.PreventPodSchedulingIfMissing == nil &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+		!utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeLimitScaling) {
 		newCSIDriver.Spec.PreventPodSchedulingIfMissing = nil
 	}
 

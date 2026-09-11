@@ -39,6 +39,7 @@ import (
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -114,11 +115,11 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 		node.Status.Features = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && !nodeDeclaredFeaturesInUse(oldNode) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.NodeDeclaredFeatures) && !nodeDeclaredFeaturesInUse(oldNode) {
 		node.Status.DeclaredFeatures = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && !nodePodPreemptionPolicyInUse(oldNode) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption) && !nodePodPreemptionPolicyInUse(oldNode) {
 		node.Spec.PodPreemptionPolicy = nil
 	}
 }
@@ -144,7 +145,7 @@ func (nodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.Erro
 // mapped to whether each is enabled.
 func (nodeStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
 	return rest.DeclarativeValidationConfig{Options: map[string]bool{
-		string(features.InPlacePodVerticalScalingSchedulerPreemption): utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
+		string(schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption): utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption),
 	}}
 }
 

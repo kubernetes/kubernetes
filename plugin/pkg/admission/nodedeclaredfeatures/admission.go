@@ -36,10 +36,10 @@ import (
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apisresource "k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -90,8 +90,8 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 
 // SetFeatures sets the feature gates for the plugin.
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.nodeDeclaredFeatureGateEnabled = featureGates.Enabled(features.NodeDeclaredFeatures)
-	p.draNodeAllocatableResourcesGateEnabled = featureGates.Enabled(features.DRANodeAllocatableResources)
+	p.nodeDeclaredFeatureGateEnabled = featureGates.Enabled(schedulerfeatures.NodeDeclaredFeatures)
+	p.draNodeAllocatableResourcesGateEnabled = featureGates.Enabled(schedulerfeatures.DRANodeAllocatableResources)
 }
 
 // ValidateInitialization ensures that the plugin is properly initialized.

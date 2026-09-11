@@ -29,7 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 )
 
 // minRegularContainerMemory returns the minimum memory resource quantity
@@ -64,7 +64,7 @@ func remainingPodMemReqPerContainer(pod *v1.Pod) int64 {
 	numContainers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers)
 	// Aggregated requests of all containers (including DRA if enabled).
 	opts := resourcehelper.PodResourcesOptions{
-		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRANodeAllocatableResources),
 	}
 	aggrContainerReqs := resourcehelper.AggregateContainerRequests(pod, opts)
 	remainingMemory = pod.Spec.Resources.Requests.Memory().Value() - aggrContainerReqs.Memory().Value()

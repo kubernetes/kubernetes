@@ -33,8 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -522,7 +522,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, func
 })
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
+var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), feature.PodLevelResources, framework.WithFeatureGate(schedulerfeatures.PodLevelResources), func() {
 	f := framework.NewDefaultFramework("pod-level-hugepages-resources")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -539,7 +539,7 @@ var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), fea
 
 		// setup
 		ginkgo.JustBeforeEach(func(ctx context.Context) {
-			e2eskipper.SkipUnlessFeatureGateEnabled(features.PodLevelResources)
+			e2eskipper.SkipUnlessFeatureGateEnabled(schedulerfeatures.PodLevelResources)
 
 			setHugepages(ctx, hugepages)
 

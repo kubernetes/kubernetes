@@ -55,6 +55,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
@@ -4504,7 +4505,7 @@ func createJobWithDefaults(ctx context.Context, clientSet clientset.Interface, n
 func setup(t testing.TB, nsBaseName string) (framework.TearDownFunc, *restclient.Config, clientset.Interface, *v1.Namespace) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	flags := framework.DefaultTestServerFlags()
-	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+	if feature.DefaultFeatureGate.Enabled(schedulerfeatures.GenericWorkload) {
 		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1beta1=true")
 	}
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
@@ -4943,9 +4944,9 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 
 func TestJobGangScheduling(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:                 true,
-		features.WorkloadWithJob:                 true,
-		features.TopologyAwareWorkloadScheduling: true,
+		schedulerfeatures.GenericWorkload:                 true,
+		features.WorkloadWithJob:                          true,
+		schedulerfeatures.TopologyAwareWorkloadScheduling: true,
 	})
 
 	cases := map[string]struct {
@@ -5255,8 +5256,8 @@ func TestJobGangScheduling(t *testing.T) {
 
 func TestJobGangSchedulingElasticScaling(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload: true,
-		features.WorkloadWithJob: true,
+		schedulerfeatures.GenericWorkload: true,
+		features.WorkloadWithJob:          true,
 	})
 
 	closeFn, restConfig, clientSet, ns := setup(t, "gang-elastic")
@@ -5320,8 +5321,8 @@ func TestJobGangSchedulingElasticScaling(t *testing.T) {
 
 func TestJobGangSchedulingSuspendResume(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload: true,
-		features.WorkloadWithJob: true,
+		schedulerfeatures.GenericWorkload: true,
+		features.WorkloadWithJob:          true,
 	})
 
 	closeFn, restConfig, clientSet, ns := setup(t, "gang-suspend")
@@ -5407,8 +5408,8 @@ func TestJobGangSchedulingSuspendResume(t *testing.T) {
 // without the Job controller creating or taking ownership of a Workload.
 func TestJobDelegatedPodGroup(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload: true,
-		features.WorkloadWithJob: true,
+		schedulerfeatures.GenericWorkload: true,
+		features.WorkloadWithJob:          true,
 	})
 
 	closeFn, restConfig, clientSet, ns := setup(t, "delegated-podgroup")

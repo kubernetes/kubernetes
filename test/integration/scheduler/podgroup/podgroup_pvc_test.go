@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
@@ -131,9 +131,9 @@ func TestPodGroupSchedulingWithReadWriteOncePodPVC(t *testing.T) {
 		for _, cpgEnabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload:                 true,
-					features.TopologyAwareWorkloadScheduling: cpgEnabled,
-					features.CompositePodGroup:               cpgEnabled,
+					schedulerfeatures.GenericWorkload:                 true,
+					schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+					schedulerfeatures.CompositePodGroup:               cpgEnabled,
 				})
 
 				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-pvc",

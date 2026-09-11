@@ -35,9 +35,9 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
 
@@ -116,7 +116,7 @@ func (p *claimEvaluator) MatchingResources(items []corev1.ResourceName) []corev1
 			result = append(result, item)
 			continue
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) {
 			if strings.HasPrefix(string(item), corev1.ResourceImplicitExtendedClaimsPerClass /* by implicit extended resource name */) {
 				className := string(item[len(corev1.ResourceImplicitExtendedClaimsPerClass):])
 				if p.deviceClassMapping.GetExtendedResource(className) != "" {
@@ -288,7 +288,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) {
 		p.addExtendedResourceQuota(result, p.getVerifiedPodUsage(claim))
 	}
 

@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -302,7 +303,7 @@ func TestDoProbeWithContainerRestartRules(t *testing.T) {
 func TestDoProbeWithContainerRestartAllContainers(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ContainerRestartRules:                true,
-		features.NodeDeclaredFeatures:                 true,
+		schedulerfeatures.NodeDeclaredFeatures:        true,
 		features.RestartAllContainersOnContainerExits: true,
 	})
 	TestDoProbe(t)

@@ -28,6 +28,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
@@ -728,7 +729,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 	for testCaseName, testCase := range testCases {
 		t.Run(testCaseName, func(t *testing.T) {
 			if testCase.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 			}
 
 			value, err := getPageSizeMountOption(testCase.medium, testCase.pod)

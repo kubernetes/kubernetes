@@ -35,6 +35,7 @@ import (
 	"k8s.io/utils/clock"
 
 	resourcehelper "k8s.io/component-helpers/resource"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
@@ -171,7 +172,7 @@ func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttrib
 		if corev1helpers.TolerationsTolerateTaint(logger, attrs.Pod.Spec.Tolerations, &v1.Taint{
 			Key:    v1.TaintNodeMemoryPressure,
 			Effect: v1.TaintEffectNoSchedule,
-		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)) {
+		}, utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.TaintTolerationComparisonOperators)) {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 	}

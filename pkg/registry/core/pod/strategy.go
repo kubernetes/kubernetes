@@ -48,6 +48,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -403,7 +404,7 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	newPod.Spec = oldPod.Spec
 	// If PodLevelResources and InPlacePodLevelResourcesVerticalScaling feature gates is enabled,
 	// restore the saved pod-level resource requests to the new pod's spec.
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) {
 		newPod.Spec.Resources = newPodResources
 	}
 
@@ -940,7 +941,7 @@ func applyMatchLabelKeys(constraint *api.TopologySpreadConstraint, labels map[st
 }
 
 func mutateTopologySpreadConstraints(pod *api.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread) || !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge) || pod.Spec.TopologySpreadConstraints == nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.MatchLabelKeysInPodTopologySpread) || !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge) || pod.Spec.TopologySpreadConstraints == nil {
 		return
 	}
 	topologySpreadConstraints := pod.Spec.TopologySpreadConstraints

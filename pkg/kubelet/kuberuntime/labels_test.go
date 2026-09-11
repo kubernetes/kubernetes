@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -163,7 +163,7 @@ func TestContainerAnnotations(t *testing.T) {
 		PreStopHandler:            container.Lifecycle.PreStop,
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	// Test whether we can get right information from label
 	annotations := newContainerAnnotations(tCtx, container, pod, restartCount, opts)
 	containerInfo := getContainerInfoFromAnnotations(tCtx, annotations)

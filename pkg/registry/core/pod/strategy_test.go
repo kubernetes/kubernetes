@@ -45,6 +45,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ptr "k8s.io/utils/ptr"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -822,7 +823,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.plrEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, tc.plrEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, tc.plrFixUpdateEnabled)
 
 			podutil.DefaultPodLevelResources(tc.pod)
@@ -1012,7 +1013,7 @@ func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, true)
 
 			defaultContainers := []api.Container{
@@ -2272,7 +2273,7 @@ func TestNodeInclusionPolicyEnablementInCreating(t *testing.T) {
 			if !tc.enableNodeInclusionPolicy {
 				// TODO: this will be removed in 1.36
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)
 			}
 
 			pod := podtest.MakePod("foo", podtest.SetGeneration(1))
@@ -2300,7 +2301,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	)
 
 	// Enable the Feature Gate during the first rule creation
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeInclusionPolicyInPodTopologySpread, true)
 	ctx := genericapirequest.NewDefaultContext()
 
 	pod := podtest.MakePod("foo",
@@ -2329,7 +2330,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 	// Disable the Feature Gate and expect these fields still exist after updating.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeInclusionPolicyInPodTopologySpread, false)
 
 	updatedPod := createdPod.DeepCopy()
 	updatedPod.Labels = map[string]string{"foo": "bar"}
@@ -2349,7 +2350,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	}
 
 	// Enable the Feature Gate again to check whether configured fields still exist after updating.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeInclusionPolicyInPodTopologySpread, true)
 
 	updatedPod2 := updatedPod.DeepCopy()
 	updatedPod2.Labels = map[string]string{"foo": "fuz"}
@@ -2934,7 +2935,7 @@ func Test_mutateTopologySpreadConstraints(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.MatchLabelKeysInPodTopologySpread:              tc.matchLabelKeysEnabled,
+				schedulerfeatures.MatchLabelKeysInPodTopologySpread:     tc.matchLabelKeysEnabled,
 				features.MatchLabelKeysInPodTopologySpreadSelectorMerge: tc.matchLabelKeysSelectorMergeEnabled,
 			})
 
@@ -3122,7 +3123,7 @@ func TestUpdateLabelOnPodWithTopologySpreadConstraintsEnabled(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.MatchLabelKeysInPodTopologySpread:              tc.matchLabelKeysEnabled,
+				schedulerfeatures.MatchLabelKeysInPodTopologySpread:     tc.matchLabelKeysEnabled,
 				features.MatchLabelKeysInPodTopologySpreadSelectorMerge: tc.matchLabelKeysSelectorMergeEnabled,
 			})
 
@@ -4878,7 +4879,7 @@ func TestSchedulingGroupEnablement(t *testing.T) {
 	)
 
 	// Enable the Feature Gate during the Pod creation.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.GenericWorkload, true)
 
 	errs := Strategy.Validate(ctx, pod)
 	if len(errs) != 0 {
@@ -4893,7 +4894,7 @@ func TestSchedulingGroupEnablement(t *testing.T) {
 	}
 
 	// Disable the Feature Gate and check that the SchedulingGroup field still exists after updating.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.GenericWorkload, false)
 
 	updatedPod := createdPod.DeepCopy()
 	updatedPod.Labels = map[string]string{"foo": "bar"}
@@ -4911,7 +4912,7 @@ func TestSchedulingGroupEnablement(t *testing.T) {
 	}
 
 	// Enable the Feature Gate again to check that the SchedulingGroup field still exist after updating.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.GenericWorkload, true)
 
 	updatedPod2 := updatedPod.DeepCopy()
 	updatedPod2.Labels = map[string]string{"foo": "baz"}
@@ -4978,8 +4979,8 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		{
 			description: "drop disabled status fields/InPlacePodVerticalScaling=false",
 			features: map[featuregate.Feature]bool{
-				features.InPlacePodVerticalScaling: false,
-				features.DynamicResourceAllocation: false,
+				schedulerfeatures.InPlacePodVerticalScaling: false,
+				schedulerfeatures.DynamicResourceAllocation: false,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -5006,8 +5007,8 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		{
 			description: "drop disabled status fields/InPlacePodVerticalScaling=true",
 			features: map[featuregate.Feature]bool{
-				features.InPlacePodVerticalScaling: true,
-				features.DynamicResourceAllocation: false,
+				schedulerfeatures.InPlacePodVerticalScaling: true,
+				schedulerfeatures.DynamicResourceAllocation: false,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -5352,7 +5353,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		{
 			description: "preserve old ResourceClaimStatuses when misbehaving client clears them on terminating pod",
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
+				schedulerfeatures.DynamicResourceAllocation: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
@@ -5378,7 +5379,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		{
 			description: "preserve old ResourceClaimStatuses when omitted on non-terminating pod",
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
+				schedulerfeatures.DynamicResourceAllocation: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -5404,7 +5405,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		{
 			description: "allow explicit empty-slice removal of ResourceClaimStatuses on non-terminating pod",
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
+				schedulerfeatures.DynamicResourceAllocation: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -5430,7 +5431,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		{
 			description: "preserve old ExtendedResourceClaimStatus when misbehaving client clears it on terminating pod",
 			features: map[featuregate.Feature]bool{
-				features.DRAExtendedResource: true,
+				schedulerfeatures.DRAExtendedResource: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
@@ -5456,7 +5457,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		{
 			description: "preserve old ExtendedResourceClaimStatus when omitted on non-terminating pod",
 			features: map[featuregate.Feature]bool{
-				features.DRAExtendedResource: true,
+				schedulerfeatures.DRAExtendedResource: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -5482,7 +5483,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		{
 			description: "preserve old NodeAllocatableResourceClaimStatuses when misbehaving client clears them on terminating pod",
 			features: map[featuregate.Feature]bool{
-				features.DRANodeAllocatableResources: true,
+				schedulerfeatures.DRANodeAllocatableResources: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
@@ -5508,7 +5509,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		{
 			description: "preserve old NodeAllocatableResourceClaimStatuses when omitted on non-terminating pod",
 			features: map[featuregate.Feature]bool{
-				features.DRANodeAllocatableResources: true,
+				schedulerfeatures.DRANodeAllocatableResources: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -5534,7 +5535,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		{
 			description: "allow explicit empty-slice removal of NodeAllocatableResourceClaimStatuses on non-terminating pod",
 			features: map[featuregate.Feature]bool{
-				features.DRANodeAllocatableResources: true,
+				schedulerfeatures.DRANodeAllocatableResources: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -5561,7 +5562,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			if draEnabled, draExists := tc.features[features.DynamicResourceAllocation]; draExists && !draEnabled {
+			if draEnabled, draExists := tc.features[schedulerfeatures.DynamicResourceAllocation]; draExists && !draEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.features)

@@ -56,6 +56,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -94,7 +95,7 @@ const (
 
 // Tests depend on container runtime support for CDI and the DRA feature gate.
 // The "DRA" label is used to select tests related to DRA in a Ginkgo label filter.
-var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DynamicResourceAllocation), func() {
+var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.DynamicResourceAllocation, framework.WithFeatureGate(schedulerfeatures.DynamicResourceAllocation), func() {
 	f := framework.NewDefaultFramework("dra-node")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -1158,15 +1159,15 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 		// These tests validate that health status reporting works correctly for devices
 		// allocated with ShareID, ensuring both features integrate properly.
-		f.Context("Resource Health with ShareID", framework.WithFeatureGate(features.ResourceHealthStatus), framework.WithFeatureGate(features.DRAConsumableCapacity), f.WithSerial(), func() {
+		f.Context("Resource Health with ShareID", framework.WithFeatureGate(features.ResourceHealthStatus), framework.WithFeatureGate(schedulerfeatures.DRAConsumableCapacity), f.WithSerial(), func() {
 
 			ginkgo.BeforeEach(func() {
 				// Skip if feature gates are already enabled (we need to enable them ourselves)
 				if e2eskipper.IsFeatureGateEnabled(features.ResourceHealthStatus) {
 					e2eskipper.Skipf("feature %s is already enabled", features.ResourceHealthStatus)
 				}
-				if e2eskipper.IsFeatureGateEnabled(features.DRAConsumableCapacity) {
-					e2eskipper.Skipf("feature %s is already enabled", features.DRAConsumableCapacity)
+				if e2eskipper.IsFeatureGateEnabled(schedulerfeatures.DRAConsumableCapacity) {
+					e2eskipper.Skipf("feature %s is already enabled", schedulerfeatures.DRAConsumableCapacity)
 				}
 			})
 
@@ -1230,11 +1231,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			})
 		})
 
-		f.Context("Device ShareID", framework.WithFeatureGate(features.DRAConsumableCapacity), f.WithSerial(), func() {
+		f.Context("Device ShareID", framework.WithFeatureGate(schedulerfeatures.DRAConsumableCapacity), f.WithSerial(), func() {
 
 			ginkgo.BeforeEach(func() {
-				if e2eskipper.IsFeatureGateEnabled(features.DRAConsumableCapacity) {
-					e2eskipper.Skipf("feature %s is enabled", features.DRAConsumableCapacity)
+				if e2eskipper.IsFeatureGateEnabled(schedulerfeatures.DRAConsumableCapacity) {
+					e2eskipper.Skipf("feature %s is enabled", schedulerfeatures.DRAConsumableCapacity)
 				}
 			})
 

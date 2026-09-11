@@ -26,17 +26,17 @@ import (
 	rest "k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	features "k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/core/pod"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.DRANodeAllocatableResources: true,
+		schedulerfeatures.DRANodeAllocatableResources: true,
 	})
 	for _, apiVersion := range apiVersions {
 		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
@@ -94,7 +94,7 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.DRANodeAllocatableResources: true,
+		schedulerfeatures.DRANodeAllocatableResources: true,
 	})
 	for _, apiVersion := range apiVersions {
 		testCases := map[string]struct {

@@ -52,6 +52,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
 	"k8s.io/cri-streaming/pkg/streaming/remotecommand"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -3560,7 +3561,7 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ContainerRestartRules:                true,
-		features.NodeDeclaredFeatures:                 true,
+		schedulerfeatures.NodeDeclaredFeatures:        true,
 		features.RestartAllContainersOnContainerExits: true,
 	})
 	var (
@@ -4240,7 +4241,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ChangeContainerStatusOnKubeletRestart: false,
 		features.ContainerRestartRules:                 true,
-		features.NodeDeclaredFeatures:                  true,
+		schedulerfeatures.NodeDeclaredFeatures:         true,
 		features.RestartAllContainersOnContainerExits:  true,
 	})
 
@@ -5857,8 +5858,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger, tCtx := ktesting.NewTestContext(t)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResourcesVerticalScalingEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResourcesVerticalScalingEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
 
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
@@ -5884,7 +5885,7 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
 
@@ -6706,7 +6707,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 
 	nowTime := time.Now()
 	testContainerName := "ctr0"
@@ -9584,7 +9585,7 @@ func TestMakemountsSubpathCleanupAccumulation(t *testing.T) {
 }
 
 func TestRecordPodLevelResourcesAdmission(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 	_ = legacyregistry.Register(metrics.PodLevelResourcesAdmissionTotal)
 
 	metricHeader := `

@@ -41,8 +41,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/controller/resourcepoolstatusrequest/metrics"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -127,7 +127,7 @@ func NewController(
 
 	// Only consume the DeviceTaintRule informer when the gate is enabled, so
 	// clusters that don't serve the DeviceTaintRule API don't block on its cache sync.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaintRules) {
 		c.taintRuleLister = taintRuleInformer.Lister()
 		c.taintRuleSynced = taintRuleInformer.Informer().HasSynced
 	}
@@ -383,7 +383,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 	// DeviceTaintRules taint devices externally (admin-applied), independent of
 	// the driver's embedded taints. Only consulted when the gate is enabled.
 	var taintRules []*resourcev1.DeviceTaintRule
-	if c.taintRuleLister != nil && utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+	if c.taintRuleLister != nil && utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaintRules) {
 		taintRules, err = c.taintRuleLister.List(labels.Everything())
 		if err != nil {
 			logger.Error(err, "Failed to list DeviceTaintRules")

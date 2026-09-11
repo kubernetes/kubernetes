@@ -21,8 +21,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 	"k8s.io/utils/clock"
 )
@@ -35,7 +35,7 @@ func DefaultUpdateFilter() func(resource schema.GroupVersionResource, oldObj, ne
 			oldPod := oldObj.(*v1.Pod)
 			newPod := newObj.(*v1.Pod)
 			// when Resources changed
-			if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && hasResourcesChanged(oldPod, newPod) {
+			if feature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) && hasResourcesChanged(oldPod, newPod) {
 				return true
 			}
 

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -460,8 +461,8 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: tc.enableWorkloadWithJob,
-				features.WorkloadWithJob: tc.enableWorkloadWithJob,
+				schedulerfeatures.GenericWorkload: tc.enableWorkloadWithJob,
+				features.WorkloadWithJob:          tc.enableWorkloadWithJob,
 			})
 			ctx := genericapirequest.NewDefaultContext()
 

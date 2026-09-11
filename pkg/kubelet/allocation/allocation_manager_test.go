@@ -39,6 +39,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -167,7 +168,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, true)
 
 	tests := []struct {
 		name                         string
@@ -288,7 +289,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResizeEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResizeEnabled)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil)
 			pod := test.pod.DeepCopy()
 			allocationManager.(*manager).allocated.SetPodResourceInfo(logger, pod.UID, test.allocated)
@@ -310,7 +311,7 @@ func TestRetryPendingResizes(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
@@ -393,7 +394,7 @@ func TestRetryPendingResizes(t *testing.T) {
 		originalInProgressMsg = "original in-progress"
 		originalPendingMsg    = "original pending"
 	)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, true)
 	tests := []struct {
 		name                         string
 		originalRequests             v1.ResourceList
@@ -733,7 +734,7 @@ func TestRetryPendingResizes(t *testing.T) {
 			}
 			t.Run(fmt.Sprintf("%s/containerType=%s", tt.name, containerType), func(t *testing.T) {
 				if tt.inPlacePodLevelResizeEnabled {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodLevelResourcesVerticalScaling, true)
 				}
 				var originalPod *v1.Pod
 				var originalCtr *v1.Container
@@ -863,7 +864,7 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	nodeConfig := cm.NodeConfig{}
@@ -1103,7 +1104,7 @@ func TestRetryPendingResizesMemoryBackedVolumes(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	tCtx := ktesting.Init(t)
 
 	logger := klog.FromContext(tCtx)
@@ -1309,8 +1310,8 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 	metrics.PodInfeasibleResizes.Reset()
 
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.InPlacePodVerticalScaling: true,
-		features.NodeSwap:                  true,
+		schedulerfeatures.InPlacePodVerticalScaling: true,
+		features.NodeSwap: true,
 	})
 	logger, tCtx := ktesting.NewTestContext(t)
 	noSwapContainerName, swapContainerName := "test-container-noswap", "test-container-limitedswap"
@@ -1473,7 +1474,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	cpu500m := resource.MustParse("500m")
@@ -1728,7 +1729,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 		podResources       v1.ResourceList
 		containerResources v1.ResourceList
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, true)
 	testCases := []struct {
 		name                            string
 		initialAllocatedResourcesState  map[types.UID]resourceState
@@ -1903,7 +1904,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, tc.ipprPLRFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodLevelResourcesVerticalScaling, tc.ipprPLRFeatureGate)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{}, nil)
 
 			podForAllocation := func(uid types.UID, resources resourceState) *v1.Pod {
@@ -2167,7 +2168,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tc.ipprFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, tc.ipprFeatureGate)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{}, nil)
 
 			podForAllocation := func(uid types.UID, resources v1.ResourceList) *v1.Pod {
@@ -2346,11 +2347,11 @@ func TestIsResizeIncreasingRequests(t *testing.T) {
 		},
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, true)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.inPlacePodLevelResizeEnabled == true {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodLevelResourcesVerticalScaling, true)
 			}
 
 			testPod := &v1.Pod{
@@ -2421,7 +2422,7 @@ func TestSortPendingResizes(t *testing.T) {
 	mem500M := resource.MustParse("500Mi")
 	mem1000M := resource.MustParse("1Gi")
 	mem1500M := resource.MustParse("1500Mi")
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, true)
 	createTestPod := func(podNumber int) *v1.Pod {
 		return &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2454,7 +2455,7 @@ func TestSortPendingResizes(t *testing.T) {
 	// testPods[4] has been in a "deferred" state for longer than testPods[5].
 	// testPods[6] has no resize conditions yet, indicating it is a newer request than the other deferred resizes.
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodLevelResourcesVerticalScaling, true)
 
 	testPods[0].Spec.Resources = &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}}
 	testPods[1].Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}
@@ -2608,7 +2609,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_AddPod(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	tCtx := ktesting.Init(t)
 
 	tests := []struct {
@@ -2800,7 +2801,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_UpdatePodFromAllocation(t *testi
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 
 	tests := []struct {
 		name               string
@@ -3000,7 +3001,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	tCtx := ktesting.Init(t)
 
 	logger := klog.FromContext(tCtx)
@@ -3613,8 +3614,8 @@ func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klo
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, true)
 	logger, _ := ktesting.NewTestContext(t)
 
 	cpu1000m := resource.MustParse("1")

@@ -30,7 +30,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/utils/clock"
 )
 
@@ -59,11 +59,11 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 	if isEnabled(corev1.SchemeGroupVersion.WithResource("persistentvolumeclaims")) {
 		result = append(result, NewPersistentVolumeClaimEvaluator(f))
 	}
-	if isEnabled(resourcev1.SchemeGroupVersion.WithResource("resourceclaims")) && utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if isEnabled(resourcev1.SchemeGroupVersion.WithResource("resourceclaims")) && utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		var claimGetter resourceClaimPodOwnerGetter
 		var podLister corev1listers.PodLister
 		var deviceClassMapping *extendedresourcecache.ExtendedResourceCache
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) {
 			podLister = i.Core().V1().Pods().Lister()
 			logger := klog.FromContext(context.Background())
 			deviceClassMapping = extendedresourcecache.NewExtendedResourceCache(logger)

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/features"
@@ -200,7 +201,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		},
 	})
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		rules := []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
@@ -209,7 +210,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 			eventsRule(),
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAWorkloadResourceClaims) {
 			rules = append(rules,
 				rbacv1helpers.NewRule("get", "list", "watch").Groups(schedulingGroup).Resources("podgroups").RuleOrDie(),
 				rbacv1helpers.NewRule("update", "patch").Groups(schedulingGroup).Resources("podgroups/status").RuleOrDie(),
@@ -224,7 +225,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resource-claim-controller"},
 			Rules:      rules,
 		})
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaints) {
 			rules := []rbacv1.PolicyRule{
 				// Deletes pods to evict them.
 				rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
@@ -237,7 +238,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				eventsRule(),
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+			if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaintRules) {
 				rules = append(rules,
 					// Sets DeviceTaintRule conditions.
 					rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("devicetaintrules/status").RuleOrDie(),
@@ -491,7 +492,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "volumeattributesclass-protection-controller"},
 			Rules: []rbacv1.PolicyRule{
@@ -503,7 +504,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.GenericWorkload) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "podgroup-protection-controller"},
 			Rules: []rbacv1.PolicyRule{

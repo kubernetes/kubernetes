@@ -30,9 +30,9 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	resourcehelpers "k8s.io/component-helpers/resource"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -480,7 +480,7 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 // (including restartable init containers).
 // It returns a map of pod names to their calculated request values.
 func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceName) (map[string]int64, error) {
-	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources)
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
 		var request int64

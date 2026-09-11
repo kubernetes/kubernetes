@@ -47,7 +47,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -506,7 +506,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Delete the ResourceClaim. Deletion MUST succeed and resource usage count against the ResourceClaim object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 		[NotConformancePromotable] alpha feature
 	*/
-	f.It("should create a ResourceQuota and capture the life of a ResourceClaim", f.WithFeatureGate(features.DynamicResourceAllocation), f.WithLabel("DRA"), func(ctx context.Context) {
+	f.It("should create a ResourceQuota and capture the life of a ResourceClaim", f.WithFeatureGate(schedulerfeatures.DynamicResourceAllocation), f.WithLabel("DRA"), func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(ctx, f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -1282,7 +1282,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 })
 
-var _ = SIGDescribe("ResourceQuota", framework.WithFeatureGate(features.VolumeAttributesClass), func() {
+var _ = SIGDescribe("ResourceQuota", framework.WithFeatureGate(schedulerfeatures.VolumeAttributesClass), func() {
 	f := framework.NewDefaultFramework("resourcequota-volumeattributesclass")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

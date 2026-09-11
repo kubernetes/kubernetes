@@ -31,9 +31,9 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	schedulingv1listers "k8s.io/client-go/listers/scheduling/v1"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -201,7 +201,7 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 // admitPodGroup makes sure a new pod group does not set spec.Priority field. It also makes sure that
 // the PriorityClassName exists if it is provided and resolves the pod group priority from the PriorityClassName.
 func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.GenericWorkload) {
 		return nil
 	}
 
@@ -222,7 +222,7 @@ func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
 	pg.Spec.PriorityClassName = priorityClassName
 
 	var schedulingPreemptionPolicy scheduling.PreemptionPolicy
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) && preemptionPolicy != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodGroupPreemptionPolicy) && preemptionPolicy != nil {
 		switch *preemptionPolicy {
 		case apiv1.PreemptLowerPriority:
 			schedulingPreemptionPolicy = scheduling.PreemptLowerPriority
@@ -243,7 +243,7 @@ func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
 // It also makes sure that the PriorityClassName exists if it is provided and resolves
 // the composite pod group priority from the PriorityClassName.
 func (p *Plugin) admitCompositePodGroup(attributes admission.Attributes) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.CompositePodGroup) {
 		return nil
 	}
 
@@ -264,7 +264,7 @@ func (p *Plugin) admitCompositePodGroup(attributes admission.Attributes) error {
 	cpg.Spec.PriorityClassName = priorityClassName
 
 	var schedulingPreemptionPolicy scheduling.PreemptionPolicy
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) && preemptionPolicy != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodGroupPreemptionPolicy) && preemptionPolicy != nil {
 		switch *preemptionPolicy {
 		case apiv1.PreemptLowerPriority:
 			schedulingPreemptionPolicy = scheduling.PreemptLowerPriority

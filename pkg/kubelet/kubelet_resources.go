@@ -25,8 +25,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 // defaultPodLimitsForDownwardAPI copies the input pod, and optional container,
@@ -48,7 +48,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardAPI(ctx context.Context, pod *core
 		return nil, nil, fmt.Errorf("failed to find node object, expected a node")
 	}
 	allocatable := node.Status.Allocatable
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelLimitsSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) && resourcehelper.IsPodLevelLimitsSet(pod) {
 		allocatable = allocatable.DeepCopy()
 		// Resources supported by the Downward API
 		for _, resource := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage} {

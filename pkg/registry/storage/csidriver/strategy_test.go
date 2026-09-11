@@ -28,6 +28,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -519,7 +520,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 				features.SELinuxMountReadWriteOncePod:   test.seLinuxMountReadWriteOncePodEnabled,
 				features.MutableCSINodeAllocatableCount: test.mutableCSINodeAllocatableCountEnabled,
 				features.CSIServiceAccountTokenSecrets:  test.csiServiceAccountTokenSecretsEnabled,
-				features.VolumeLimitScaling:             test.volumeLimitScalingEnabled,
+				schedulerfeatures.VolumeLimitScaling:    test.volumeLimitScalingEnabled,
 			})
 
 			csiDriver := test.update.DeepCopy()
@@ -848,7 +849,7 @@ func TestCSIDriverValidation(t *testing.T) {
 				features.SELinuxMountReadWriteOncePod:   true,
 				features.MutableCSINodeAllocatableCount: true,
 				features.CSIServiceAccountTokenSecrets:  true,
-				features.VolumeLimitScaling:             true,
+				schedulerfeatures.VolumeLimitScaling:    true,
 			})
 
 			testValidation := func(csiDriver *storage.CSIDriver, apiVersion string) field.ErrorList {
@@ -1248,7 +1249,7 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.CSIServiceAccountTokenSecrets: test.csiServiceAccountTokenSecretsEnabled,
-				features.VolumeLimitScaling:            test.volumeLimitScalingEnabled,
+				schedulerfeatures.VolumeLimitScaling:   test.volumeLimitScalingEnabled,
 			})
 
 			csiDriver := test.csiDriver.DeepCopy()

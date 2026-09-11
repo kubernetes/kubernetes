@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -237,9 +237,9 @@ func TestNominatedNode(t *testing.T) {
 				for _, tt := range tests {
 					t.Run(fmt.Sprintf("%s (Async preemption: %v, Async API calls: %v, NNN for expectation: %v)", tt.name, asyncPreemptionEnabled, asyncAPICallsEnabled, nominatedNodeNameForExpectationEnabled), func(t *testing.T) {
 						featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-							features.SchedulerAsyncPreemption:        asyncPreemptionEnabled,
-							features.SchedulerAsyncAPICalls:          asyncAPICallsEnabled,
-							features.NominatedNodeNameForExpectation: nominatedNodeNameForExpectationEnabled,
+							schedulerfeatures.SchedulerAsyncPreemption:        asyncPreemptionEnabled,
+							schedulerfeatures.SchedulerAsyncAPICalls:          asyncAPICallsEnabled,
+							schedulerfeatures.NominatedNodeNameForExpectation: nominatedNodeNameForExpectationEnabled,
 						})
 
 						cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
@@ -407,7 +407,7 @@ func TestPreferNominatedNode(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.SchedulerAsyncPreemption, asyncPreemptionEnabled)
 
 				testCtx := initTestPreferNominatedNode(t, "perfer-nominated-node")
 				cs := testCtx.ClientSet

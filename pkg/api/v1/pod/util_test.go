@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -1334,7 +1335,7 @@ func TestContainerHasRestartablePolicy(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ContainerRestartRules:                true,
-		features.NodeDeclaredFeatures:                 true,
+		schedulerfeatures.NodeDeclaredFeatures:        true,
 		features.RestartAllContainersOnContainerExits: true,
 	})
 

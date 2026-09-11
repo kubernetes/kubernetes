@@ -36,6 +36,7 @@ import (
 	versionedinformers "k8s.io/client-go/informers"
 	certinformersv1 "k8s.io/client-go/informers/certificates/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -103,7 +104,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		switch configuredAuthorizer.Type {
 		case authzconfig.AuthorizerType(modes.ModeNode):
 			var slices resourceinformers.ResourceSliceInformer
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 				slices = config.VersionedInformerFactory.Resource().V1().ResourceSlices()
 			}
 			var podCertificateRequestInformer certinformersv1.PodCertificateRequestInformer

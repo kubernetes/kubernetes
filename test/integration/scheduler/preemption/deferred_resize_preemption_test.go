@@ -30,7 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -42,8 +42,8 @@ import (
 func TestDeferredResizePodPreemption(t *testing.T) {
 	// Setup API server with feature gates enabled
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.InPlacePodVerticalScaling:                    true,
-		features.InPlacePodVerticalScalingSchedulerPreemption: true,
+		schedulerfeatures.InPlacePodVerticalScaling:                    true,
+		schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption: true,
 	})
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
@@ -451,8 +451,8 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 
 func TestDeferredResizeQueueingHints(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.InPlacePodVerticalScaling:                    true,
-		features.InPlacePodVerticalScalingSchedulerPreemption: true,
+		schedulerfeatures.InPlacePodVerticalScaling:                    true,
+		schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption: true,
 	})
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
@@ -616,8 +616,8 @@ func TestDeferredResizeQueueingHints(t *testing.T) {
 
 func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.InPlacePodVerticalScaling:                    true,
-		features.InPlacePodVerticalScalingSchedulerPreemption: true,
+		schedulerfeatures.InPlacePodVerticalScaling:                    true,
+		schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption: true,
 	})
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
@@ -743,8 +743,8 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 func TestDeferredResizeQueueingHandlers(t *testing.T) {
 	t.Run("AddPod handler enqueues existing deferred pod on scheduler startup", func(t *testing.T) {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.InPlacePodVerticalScaling:                    true,
-			features.InPlacePodVerticalScalingSchedulerPreemption: true,
+			schedulerfeatures.InPlacePodVerticalScaling:                    true,
+			schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption: true,
 		})
 
 		cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
@@ -833,8 +833,8 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 
 	t.Run("UpdatePod handler enqueues pod when it transitions to deferred resize", func(t *testing.T) {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.InPlacePodVerticalScaling:                    true,
-			features.InPlacePodVerticalScalingSchedulerPreemption: true,
+			schedulerfeatures.InPlacePodVerticalScaling:                    true,
+			schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption: true,
 		})
 
 		cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
@@ -940,8 +940,8 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 
 	t.Run("UpdatePod handler removes pod from queue when deferred condition is cleared", func(t *testing.T) {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.InPlacePodVerticalScaling:                    true,
-			features.InPlacePodVerticalScalingSchedulerPreemption: true,
+			schedulerfeatures.InPlacePodVerticalScaling:                    true,
+			schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption: true,
 		})
 
 		cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
@@ -1035,8 +1035,8 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 
 	t.Run("DeletePod handler removes pod from both cache and scheduling queue when deleted", func(t *testing.T) {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.InPlacePodVerticalScaling:                    true,
-			features.InPlacePodVerticalScalingSchedulerPreemption: true,
+			schedulerfeatures.InPlacePodVerticalScaling:                    true,
+			schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption: true,
 		})
 
 		cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{

@@ -44,8 +44,8 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/utils/lru"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -529,7 +529,7 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 		// enforce pod limits on init containers
 		if limitType == corev1.LimitTypePod {
 			opts := podResourcesOptions{
-				PodLevelResourcesEnabled: feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+				PodLevelResourcesEnabled: feature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources),
 			}
 			podRequests := podRequests(pod, opts)
 			podLimits := podLimits(pod, opts)
