@@ -121,16 +121,23 @@ func (m *manager) probeVolumeHealth(ctx context.Context) {
 			continue
 		}
 
-		conditions, err := client.NodeGetVolumeHealth(ctx, vol.CSIVolumeHandle, vol.StagingPath, vol.PublishPath)
+		volumeHealthResult, err := client.NodeGetVolumeHealth(ctx, vol.CSIVolumeHandle, vol.StagingPath, vol.PublishPath)
 		if err != nil {
 			logger.V(4).Info("NodeGetVolumeHealth failed; leaving previous conditions unchanged",
 				"driver", vol.DriverName, "volume", vol.OuterVolumeName, "err", err)
 			continue
 		}
+		knownConditions := volumeHealthResult.Conditions
+		unknownConditions := volumeHealthResult.Unknown
 
+		unknownConditionsKeys := make([]unknownConditionKey, 0, len(unknownConditions))
+		for _, uc := range unknownConditions {
+			unknownConditionsKeys = append(unknownConditionsKeys, unknownConditionKey{status: uc.Status})
+		}
+		RecordUnknownCondition(vol.DriverName, ProbeVolume, unknownConditionsKeys)
 		// Dedup / PATCH suppression lives in status_manager.SetPodVolumeHealth.
 		if m.statusUpdater != nil {
-			m.statusUpdater.SetPodVolumeHealth(logger, vol.Pod.UID, vol.OuterVolumeName, conditions)
+			m.statusUpdater.SetPodVolumeHealth(logger, vol.Pod.UID, vol.OuterVolumeName, knownConditions)
 		}
 	}
 }
@@ -159,15 +166,23 @@ func (m *manager) probeStorageHealth(ctx context.Context) {
 				"driver", driverName, "err", err)
 			continue
 		}
+		knownConditions := backendHealth.Conditions
+		unknownConditions := backendHealth.Unknown
 
-		gaugeKeys := make([]storageHealthKey, 0, len(backendHealth))
-		for _, c := range backendHealth {
+		gaugeKeys := make([]storageHealthKey, 0, len(knownConditions))
+		for _, c := range knownConditions {
 			gaugeKeys = append(gaugeKeys, storageHealthKey{status: string(c.Status), reason: c.Reason})
 		}
 		setStorageHealthGauges(driverName, gaugeKeys)
 
+		unknownConditionsKeys := make([]unknownConditionKey, 0, len(unknownConditions))
+		for _, uc := range unknownConditions {
+			unknownConditionsKeys = append(unknownConditionsKeys, unknownConditionKey{status: uc.Status})
+		}
+		RecordUnknownCondition(driverName, ProbeStorage, unknownConditionsKeys)
+
 		// Dedup lives in nodeinfomanager.UpdateCSINodeStorageHealth.
-		if err := updater.UpdateCSINodeStorageHealth(driverName, backendHealth); err != nil {
+		if err := updater.UpdateCSINodeStorageHealth(driverName, knownConditions); err != nil {
 			logger.Error(err, "Failed to update CSINode storage health", "driver", driverName)
 		}
 	}
