@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	newestMinorVersionToTest            = 37
+	newestMinorVersionToTest            = 38
 	podOSBasedRestrictionEnabledVersion = 29
 )
 
