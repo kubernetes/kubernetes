@@ -880,7 +880,11 @@ func TestMemCacheServerResourcesForGroupVersion(t *testing.T) {
 			// Content-type is "unaggregated" discovery format -- no resources returned.
 			w.Header().Set("Content-Type", discovery.AcceptV1)
 			w.WriteHeader(http.StatusOK)
-			w.Write(output)
+			_, err = w.Write(output)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
 		})
 
 		mux.HandleFunc("/apis/{group}", func(w http.ResponseWriter, r *http.Request) {
@@ -897,7 +901,11 @@ func TestMemCacheServerResourcesForGroupVersion(t *testing.T) {
 			// Content-type is "unaggregated" discovery format -- no resources returned.
 			w.Header().Set("Content-Type", discovery.AcceptV1)
 			w.WriteHeader(http.StatusOK)
-			w.Write(output)
+			_, err = w.Write(output)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
 		})
 
 		mux.HandleFunc("/apis/{group}/{version}", func(w http.ResponseWriter, r *http.Request) {
@@ -916,7 +924,11 @@ func TestMemCacheServerResourcesForGroupVersion(t *testing.T) {
 			// Content-type is "unaggregated" discovery format -- no resources returned.
 			w.Header().Set("Content-Type", discovery.AcceptV1)
 			w.WriteHeader(http.StatusOK)
-			w.Write(output)
+			_, err = w.Write(output)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
 		})
 
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
