@@ -1542,6 +1542,18 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: leak_cleanup_deferred_total
+  subsystem: nodeport_repair
+  namespace: apiserver
+  help: 'Number of repair loop runs that deferred leaked port cleanup because the
+    Service informer was not proven up to date, broken down by reason: stale, error'
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - reason
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: port_errors_total
   subsystem: nodeport_repair
   namespace: apiserver

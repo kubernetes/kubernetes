@@ -25,12 +25,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	eventsv1client "k8s.io/client-go/kubernetes/typed/events/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -41,11 +46,16 @@ import (
 
 // See ipallocator/controller/repair.go; this is a copy for ports.
 type Repair struct {
-	interval      time.Duration
-	serviceClient corev1client.ServicesGetter
-	portRange     net.PortRange
-	alloc         rangeallocation.RangeRegistry
-	leaks         map[int]int // counter per leaked port
+	interval       time.Duration
+	serviceClient  corev1client.ServicesGetter
+	serviceLister  corelisters.ServiceLister
+	serviceStore   cache.Store
+	servicesSynced cache.InformerSynced
+	portRange      net.PortRange
+	alloc          rangeallocation.RangeRegistry
+	leaks          map[int]int // counter per leaked port
+
+	serviceCacheDeadline time.Time
 
 	broadcaster events.EventBroadcaster
 	recorder    events.EventRecorder
@@ -57,42 +67,59 @@ const numRepairsBeforeLeakCleanup = 3
 
 // NewRepair creates a controller that periodically ensures that all ports are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter, eventClient eventsv1client.EventsV1Interface, portRange net.PortRange, alloc rangeallocation.RangeRegistry) *Repair {
+// Services are read from the informer; serviceClient is used to check the
+// collection's resource version, or to list Services when the informer store
+// does not track its resource version.
+func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter, serviceInformer coreinformers.ServiceInformer, eventClient eventsv1client.EventsV1Interface, portRange net.PortRange, alloc rangeallocation.RangeRegistry) *Repair {
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: eventClient})
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "portallocator-repair-controller")
 
 	registerMetrics()
 
 	return &Repair{
-		interval:      interval,
-		serviceClient: serviceClient,
-		portRange:     portRange,
-		alloc:         alloc,
-		leaks:         map[int]int{},
-		broadcaster:   eventBroadcaster,
-		recorder:      recorder,
+		interval:       interval,
+		serviceClient:  serviceClient,
+		serviceLister:  serviceInformer.Lister(),
+		serviceStore:   serviceInformer.Informer().GetStore(),
+		servicesSynced: serviceInformer.Informer().HasSynced,
+		portRange:      portRange,
+		alloc:          alloc,
+		leaks:          map[int]int{},
+		broadcaster:    eventBroadcaster,
+		recorder:       recorder,
 	}
 }
 
-// RunUntil starts the controller until the provided ch is closed.
-func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
+// RunUntil starts the controller until stopCh is closed. initialServiceCacheDeadline
+// limits freshness checks until the first successful repair, so waiting for the
+// informer does not consume the caller's entire startup budget.
+func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}, initialServiceCacheDeadline time.Time) {
+	c.serviceCacheDeadline = initialServiceCacheDeadline
 	c.broadcaster.StartRecordingToSink(stopCh)
 	defer c.broadcaster.Shutdown()
 
+	if !cache.WaitForNamedCacheSync("portallocator-repair-controller", stopCh, c.servicesSynced) {
+		return
+	}
+
+	ctx := wait.ContextForChannel(stopCh)
 	var once sync.Once
 	wait.Until(func() {
-		if err := c.runOnce(); err != nil {
+		if err := c.runOnce(ctx); err != nil {
 			runtime.HandleError(err)
 			return
 		}
-		once.Do(onFirstSuccess)
+		once.Do(func() {
+			c.serviceCacheDeadline = time.Time{}
+			onFirstSuccess()
+		})
 	}, c.interval, stopCh)
 }
 
 // runOnce verifies the state of the port allocations and returns an error if an unrecoverable problem occurs.
-func (c *Repair) runOnce() error {
+func (c *Repair) runOnce(ctx context.Context) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		err := c.doRunOnce()
+		err := c.doRunOnce(ctx)
 		if err != nil {
 			nodePortRepairReconcileErrors.Inc()
 		}
@@ -101,7 +128,7 @@ func (c *Repair) runOnce() error {
 }
 
 // doRunOnce verifies the state of the port allocations and returns an error if an unrecoverable problem occurs.
-func (c *Repair) doRunOnce() error {
+func (c *Repair) doRunOnce(ctx context.Context) error {
 	// TODO: (per smarterclayton) if Get() or ListServices() is a weak consistency read,
 	// or if they are executed against different leaders,
 	// the ordering guarantee required to ensure no port is allocated twice is violated.
@@ -113,7 +140,7 @@ func (c *Repair) doRunOnce() error {
 	// important when we start apiserver and etcd at the same time.
 	var snapshot *api.RangeAllocation
 	var err error
-	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		snapshot, err = c.alloc.Get()
 		if err != nil {
 			runtime.HandleError(fmt.Errorf("unable to refresh the port allocations: %w", err))
@@ -134,14 +161,41 @@ func (c *Repair) doRunOnce() error {
 		return fmt.Errorf("unable to rebuild allocator from snapshot: %v", err)
 	}
 
-	// We explicitly send no resource version, since the resource version
-	// of 'snapshot' is from a different collection, it's not comparable to
-	// the service collection. The caching layer keeps per-collection RVs,
-	// and this is proper, since in theory the collections could be hosted
-	// in separate etcd (or even non-etcd) instances.
-	list, err := c.serviceClient.Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("unable to refresh the port block: %v", err)
+	// Before releasing unused ports, check that the informer has observed the
+	// Services in storage. The allocation snapshot's resource version cannot
+	// be used for this check because it belongs to a different collection.
+	var list []*corev1.Service
+	complete := true
+	cacheRV := c.serviceStore.LastStoreSyncResourceVersion()
+	if cacheRV == "" {
+		// Without AtomicFIFO, the store does not track its resource version,
+		// so read Services directly to safely detect unused ports.
+		svcList, err := c.serviceClient.Services(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("unable to refresh the port block: %w", err)
+		}
+		for i := range svcList.Items {
+			list = append(list, &svcList.Items[i])
+		}
+	} else {
+		// Bound periodic freshness checks by the repair interval. During startup,
+		// also honor the caller's deadline, shared across cache sync and retries,
+		// to leave time for persisting allocations and reporting first success.
+		deadline := time.Now().Add(c.interval)
+		if !c.serviceCacheDeadline.IsZero() && c.serviceCacheDeadline.Before(deadline) {
+			deadline = c.serviceCacheDeadline
+		}
+		readCtx, cancel := context.WithDeadline(ctx, deadline)
+		complete = c.serviceCacheIsFresh(readCtx)
+		cancel()
+		list, err = c.serviceLister.List(labels.Everything())
+		if err != nil {
+			return fmt.Errorf("unable to refresh the port block: %w", err)
+		}
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	rebuilt, err := portallocator.NewInMemory(c.portRange)
@@ -149,8 +203,7 @@ func (c *Repair) doRunOnce() error {
 		return fmt.Errorf("unable to create port allocator: %v", err)
 	}
 	// Check every Service's ports, and rebuild the state as we think it should be.
-	for i := range list.Items {
-		svc := &list.Items[i]
+	for _, svc := range list {
 		ports := collectServiceNodePorts(svc)
 		if len(ports) == 0 {
 			continue
@@ -194,6 +247,14 @@ func (c *Repair) doRunOnce() error {
 
 	// Check for ports that are left in the old set.  They appear to have been leaked.
 	stored.ForEach(func(port int) {
+		if !complete {
+			// If the informer is stale, these ports may still be in use. Keep
+			// them allocated and do not advance their leak cleanup counters.
+			if err := rebuilt.Allocate(port); err != nil {
+				runtime.HandleError(fmt.Errorf("the node port %d may have leaked, but can not be allocated: %w", port, err))
+			}
+			return
+		}
 		count, found := c.leaks[port]
 		switch {
 		case !found:
@@ -227,6 +288,35 @@ func (c *Repair) doRunOnce() error {
 		return fmt.Errorf("unable to persist the updated port allocations: %v", err)
 	}
 	return nil
+}
+
+// serviceCacheIsFresh gets the current Service collection resource version from
+// a live LIST and waits for the informer store to reach it. It returns false if
+// the request or comparison fails, or the context is canceled before the store
+// catches up. The caller must read the allocation snapshot before this check
+// and list Services from the informer afterwards to avoid releasing ports whose
+// Services have not reached the cache yet.
+func (c *Repair) serviceCacheIsFresh(ctx context.Context) bool {
+	live, err := c.serviceClient.Services(metav1.NamespaceAll).List(ctx, metav1.ListOptions{Limit: 1})
+	if err != nil {
+		nodePortRepairLeakCleanupDeferred.WithLabelValues("error").Inc()
+		runtime.HandleError(fmt.Errorf("unable to read the current services resource version, deferring leak cleanup: %w", err))
+		return false
+	}
+	err = wait.PollUntilContextCancel(ctx, 10*time.Millisecond, true, func(context.Context) (bool, error) {
+		cmp, err := resourceversion.CompareResourceVersion(c.serviceStore.LastStoreSyncResourceVersion(), live.ResourceVersion)
+		return cmp >= 0, err
+	})
+	if err != nil {
+		reason := "error"
+		if ctx.Err() != nil {
+			reason = "stale"
+		}
+		nodePortRepairLeakCleanupDeferred.WithLabelValues(reason).Inc()
+		runtime.HandleError(fmt.Errorf("service informer did not reach resource version %s (cache at %s), deferring leak cleanup: %w", live.ResourceVersion, c.serviceStore.LastStoreSyncResourceVersion(), err))
+		return false
+	}
+	return true
 }
 
 // collectServiceNodePorts returns nodePorts specified in the Service.
