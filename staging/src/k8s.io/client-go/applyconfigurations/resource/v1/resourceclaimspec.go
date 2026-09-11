@@ -23,7 +23,7 @@ package v1
 //
 // ResourceClaimSpec defines what is being requested in a ResourceClaim and how to configure it.
 type ResourceClaimSpecApplyConfiguration struct {
-	// Devices defines how to request devices.
+	// devices defines how to request devices.
 	Devices *DeviceClaimApplyConfiguration `json:"devices,omitempty"`
 }
 

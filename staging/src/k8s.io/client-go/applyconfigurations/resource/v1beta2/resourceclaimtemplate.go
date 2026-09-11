@@ -36,9 +36,9 @@ import (
 // feature gate.
 type ResourceClaimTemplateApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object metadata
+	// metadata is the standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Describes the ResourceClaim that is to be generated.
+	// spec describes the ResourceClaim that is to be generated.
 	//
 	// This field is immutable. A ResourceClaim will get created by the
 	// control plane for a Pod when needed and then not get updated
