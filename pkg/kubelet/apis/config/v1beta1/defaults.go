@@ -26,6 +26,7 @@ import (
 
 	// TODO: Cut references to k8s.io/kubernetes, eventually there should be none from this package
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cbconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
@@ -311,6 +312,13 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		if obj.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
 			obj.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: MaxContainerBackOff}
 		}
+	}
+
+	if obj.ClientCertificateKeyAlgorithm == "" {
+		obj.ClientCertificateKeyAlgorithm = string(cbconfig.EncryptionAlgorithmDefault)
+	}
+	if obj.ServerCertificateKeyAlgorithm == "" {
+		obj.ServerCertificateKeyAlgorithm = string(cbconfig.EncryptionAlgorithmDefault)
 	}
 
 	if localFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {

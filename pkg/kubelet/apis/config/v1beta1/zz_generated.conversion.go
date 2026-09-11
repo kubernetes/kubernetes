@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	componentbaseconfig "k8s.io/component-base/config"
 	apiv1 "k8s.io/component-base/tracing/api/v1"
 	configv1beta1 "k8s.io/kubelet/config/v1beta1"
 	config "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -564,6 +565,8 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.TLSMinVersion = in.TLSMinVersion
 	out.RotateCertificates = in.RotateCertificates
 	out.ServerTLSBootstrap = in.ServerTLSBootstrap
+	out.ClientCertificateKeyAlgorithm = componentbaseconfig.EncryptionAlgorithmType(in.ClientCertificateKeyAlgorithm)
+	out.ServerCertificateKeyAlgorithm = componentbaseconfig.EncryptionAlgorithmType(in.ServerCertificateKeyAlgorithm)
 	if err := Convert_v1beta1_KubeletAuthentication_To_config_KubeletAuthentication(&in.Authentication, &out.Authentication, s); err != nil {
 		return err
 	}
@@ -775,6 +778,8 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.TLSMinVersion = in.TLSMinVersion
 	out.RotateCertificates = in.RotateCertificates
 	out.ServerTLSBootstrap = in.ServerTLSBootstrap
+	out.ClientCertificateKeyAlgorithm = string(in.ClientCertificateKeyAlgorithm)
+	out.ServerCertificateKeyAlgorithm = string(in.ServerCertificateKeyAlgorithm)
 	if err := Convert_config_KubeletAuthentication_To_v1beta1_KubeletAuthentication(&in.Authentication, &out.Authentication, s); err != nil {
 		return err
 	}

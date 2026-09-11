@@ -70,6 +70,30 @@ type LeaderElectionConfiguration struct {
 	ResourceNamespace string
 }
 
+// EncryptionAlgorithmType defines the type of key algorithm used for certificate signing requests.
+type EncryptionAlgorithmType string
+
+const (
+	// EncryptionAlgorithmECDSAP256 defines the ECDSA encryption algorithm type with curve P256.
+	EncryptionAlgorithmECDSAP256 EncryptionAlgorithmType = "ECDSA-P256"
+	// EncryptionAlgorithmECDSAP384 defines the ECDSA encryption algorithm type with curve P384.
+	EncryptionAlgorithmECDSAP384 EncryptionAlgorithmType = "ECDSA-P384"
+	// EncryptionAlgorithmRSA2048 defines the RSA encryption algorithm type with key size 2048 bits.
+	EncryptionAlgorithmRSA2048 EncryptionAlgorithmType = "RSA-2048"
+	// EncryptionAlgorithmRSA3072 defines the RSA encryption algorithm type with key size 3072 bits.
+	EncryptionAlgorithmRSA3072 EncryptionAlgorithmType = "RSA-3072"
+	// EncryptionAlgorithmRSA4096 defines the RSA encryption algorithm type with key size 4096 bits.
+	EncryptionAlgorithmRSA4096 EncryptionAlgorithmType = "RSA-4096"
+	// EncryptionAlgorithmMLDSA44 defines the ML-DSA-44 encryption algorithm variant.
+	EncryptionAlgorithmMLDSA44 EncryptionAlgorithmType = "ML-DSA-44"
+	// EncryptionAlgorithmMLDSA65 defines the ML-DSA-65 encryption algorithm variant.
+	EncryptionAlgorithmMLDSA65 EncryptionAlgorithmType = "ML-DSA-65"
+	// EncryptionAlgorithmMLDSA87 defines the ML-DSA-87 encryption algorithm variant.
+	EncryptionAlgorithmMLDSA87 EncryptionAlgorithmType = "ML-DSA-87"
+	// EncryptionAlgorithmDefault is the default encryption algorithm (ECDSA P-256).
+	EncryptionAlgorithmDefault = EncryptionAlgorithmECDSAP256
+)
+
 // DebuggingConfiguration holds configuration for Debugging related features.
 type DebuggingConfiguration struct {
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/

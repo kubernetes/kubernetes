@@ -19,6 +19,7 @@ package validation
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"time"
 	"unicode"
 
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	cbconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
@@ -180,6 +182,23 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
+	}
+	validKeyAlgorithms := []cbconfig.EncryptionAlgorithmType{
+		"",
+		cbconfig.EncryptionAlgorithmECDSAP256,
+		cbconfig.EncryptionAlgorithmECDSAP384,
+		cbconfig.EncryptionAlgorithmRSA2048,
+		cbconfig.EncryptionAlgorithmRSA3072,
+		cbconfig.EncryptionAlgorithmRSA4096,
+		cbconfig.EncryptionAlgorithmMLDSA44,
+		cbconfig.EncryptionAlgorithmMLDSA65,
+		cbconfig.EncryptionAlgorithmMLDSA87,
+	}
+	if !slices.Contains(validKeyAlgorithms, kc.ClientCertificateKeyAlgorithm) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: clientCertificateKeyAlgorithm %q is not a supported algorithm", kc.ClientCertificateKeyAlgorithm))
+	}
+	if !slices.Contains(validKeyAlgorithms, kc.ServerCertificateKeyAlgorithm) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverCertificateKeyAlgorithm %q is not a supported algorithm", kc.ServerCertificateKeyAlgorithm))
 	}
 	if kc.RunOnce {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: runOnce (--runOnce) %v, Runonce mode has been deprecated and should not be set", kc.RunOnce))
