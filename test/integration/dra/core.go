@@ -555,7 +555,12 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 
 		controller, err := resourceslice.StartController(tCtx, opts)
 		tCtx.ExpectNoError(err, "start controller")
-		tCtx.Cleanup(controller.Stop)
+		// The controller must be stopped before tCtx gets canceled at the
+		// end of the (sub-)test, otherwise in-flight requests get aborted
+		// with a "context canceled" error which the ErrorHandler above
+		// treats as unexpected. Callers must "defer controller.Stop()"
+		// themselves instead of relying on tCtx.Cleanup, whose callbacks
+		// only run *after* automatic cancellation.
 
 		numSlices := 0
 		for _, pool := range resources.Pools {
@@ -574,6 +579,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 
 	runSubTest(tCtx, "create", func(tCtx ktesting.TContext) {
 		controller, getStats, expectedStats := setup(tCtx, resources)
+		defer controller.Stop()
 		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
 		expectSlices(tCtx, expectedSliceSpecs)
 		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
@@ -604,7 +610,8 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 	}
 
 	runSubTest(tCtx, "recreate-after-delete", func(tCtx ktesting.TContext) {
-		_, getStats, expectedStats := setup(tCtx, resources)
+		controller, getStats, expectedStats := setup(tCtx, resources)
+		defer controller.Stop()
 		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
 		expectSlices(tCtx, expectedSliceSpecs)
 		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
@@ -622,7 +629,8 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 	})
 
 	runSubTest(tCtx, "fix-after-update", func(tCtx ktesting.TContext) {
-		_, getStats, expectedStats := setup(tCtx, resources)
+		controller, getStats, expectedStats := setup(tCtx, resources)
+		defer controller.Stop()
 		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
 		expectSlices(tCtx, expectedSliceSpecs)
 		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
@@ -681,7 +689,8 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		}
 		slice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
 		tCtx.ExpectNoError(err, "create slice")
-		_, getStats, expectedStats := setup(tCtx, resources)
+		controller, getStats, expectedStats := setup(tCtx, resources)
+		defer controller.Stop()
 		expectedStats.NumCreates = 0
 		expectedStats.NumUpdates = 1
 		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
