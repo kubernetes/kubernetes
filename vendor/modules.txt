@@ -43,6 +43,9 @@ github.com/Microsoft/hnslib/internal/runhcs
 # github.com/NYTimes/gziphandler v1.1.1
 ## explicit; go 1.11
 github.com/NYTimes/gziphandler
+# github.com/anishathalye/porcupine v1.3.0
+## explicit; go 1.16
+github.com/anishathalye/porcupine
 # github.com/antlr4-go/antlr/v4 v4.13.1
 ## explicit; go 1.22
 github.com/antlr4-go/antlr/v4

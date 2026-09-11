@@ -28,6 +28,35 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 )
 
+// NewModelFromStorage initializes a State from storage by listing all objects under prefix.
+func NewModelFromStorage(prefix string, list runtime.Object, keyFunc func(runtime.Object) (string, error)) (*Model, error) {
+	state := NewEmptyModel(prefix)
+	accessor, err := meta.ListAccessor(list)
+	if err != nil {
+		return nil, err
+	}
+	var versioner = storage.APIObjectVersioner{}
+	rvStr := accessor.GetResourceVersion()
+	if len(rvStr) > 0 {
+		state.ResourceVersion, err = versioner.ParseResourceVersion(rvStr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	objs, err := meta.ExtractList(list)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range objs {
+		key, err := keyFunc(obj)
+		if err != nil {
+			return nil, err
+		}
+		state.Items[key] = obj.DeepCopyObject()
+	}
+	return state, nil
+}
+
 // NewEmptyModel returns a new Model with no items.
 func NewEmptyModel(prefix string) *Model {
 	return &Model{
