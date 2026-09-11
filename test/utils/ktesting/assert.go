@@ -234,6 +234,30 @@ func buildDescription(explain ...interface{}) string {
 	return fmt.Sprintf(explain[0].(string), explain[1:]...)
 }
 
+// Expect wraps [gomega.Expect] such that a failure will be reported via
+// [TContext.Fatal]. As with [gomega.Expect], additional values
+// may get passed. Those values then all must be nil for the assertion
+// to pass. This can be used with functions which return a value
+// plus error. The error gets checked automatically.
+//
+//	myAmazingThing := func(int, error) { ...}
+//	tCtx.Expect(myAmazingThing()).Should(gomega.Equal(1))
+func (tCtx TContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, true, actual, extra...)
+}
+
+// Require is an alias for Expect.
+func (tCtx TContext) Require(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, true, actual, extra...)
+}
+
+// Assert also wraps [gomega.Expect], but in contrast to Expect = Require,
+// it reports a failure through [TContext.Error]. This makes it possible
+// to test several different assertions.
+func (tCtx TContext) Assert(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, false, actual, extra...)
+}
+
 // Eventually wraps [gomega.Eventually]. Supported argument types are:
 //   - A function with a `tCtx ktesting.TContext` or `ctx context.Context`
 //     parameter plus additional parameters and arbitrary return values.

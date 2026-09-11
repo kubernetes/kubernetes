@@ -18,6 +18,7 @@ package ktesting
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"strings"
@@ -25,8 +26,6 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
-
-	"github.com/onsi/gomega"
 
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -95,6 +94,94 @@ type ContextTB interface {
 	TB
 	CleanupCtx(func(ctx context.Context))
 }
+
+// TContext implements [context.Context], [testing.TB] and some additional
+// methods. [TContext] is the public pointer type for referencing a TC.
+// Variables are usually called tCtx. To ensure that test code does not
+// use `t` directly unintentionally, it is recommended to use two functions:
+//
+//	func TestSomething(t *testing.T) { testSomething(ktesting.Init(t)) }
+//	func testSomething(tCtx ktesting.TContext) { ... }
+//
+// Log output is associated with the current test and includes a header similar
+// to klog, which enables post-processing to distinguish between log output
+// (starts with header) and failure messages (header comes later). Errors
+// ([Error], [Errorf]) are recorded with "ERROR" as prefix, fatal errors
+// ([Fatal], [Fatalf]) with "FATAL ERROR". Indention is used to ensure that
+// follow-up lines belonging to the same log entry can be handled properly
+// by post-processing and to make the header stand out more.
+//
+// tCtx provides features offered by Ginkgo also when using normal Go [testing]:
+//   - The context contains a deadline that expires soon enough before
+//     the overall timeout that cleanup code can still run.
+//   - Cleanup callbacks can get their own, separate contexts when
+//     registered via [CleanupCtx].
+//   - CTRL-C aborts, prints a progress report, and then cleans up
+//     before terminating.
+//   - SIGUSR1 prints a progress report without aborting.
+//
+// Progress reporting is more informative when doing polling with
+// [gomega.Eventually] and [gomega.Consistently]. Without that, it
+// can only report which tests are active.
+type TContext struct {
+	// Context makes the methods of the underlying context
+	// available. It must not be modified.
+	context.Context
+
+	// testingTB makes the methods of the underlying test implementation
+	// available. Its embedded TB must not be modified.
+	testingTB
+
+	// perTestHeader is an optional function which produces a klog-like perTestHeader when
+	// not using some global logger.
+	perTestHeader func() string
+
+	// for Cancel
+	cancel func(cause error)
+
+	// steps is a concatenation ("step1/step2/step3: ") of steps passed to WithStep.
+	// It's empty if there are no steps.
+	steps string
+
+	// for IsSyncTest
+	isSyncTest bool
+
+	// for WithNamespace
+	namespace string
+
+	// capture, if non-nil, changes Error/Errorf/Fatal/Fatalf/Fail/FailNow so
+	// that they intercept the problem and convert to errors. Log messages
+	// are passed through.
+	//
+	// Used by WithError.
+	capture *capture
+
+	// cleanupGracePeriod is the effective cleanup grace period for this context.
+	// It is always non-zero: both Init and InitCtx resolve it from the supplied
+	// options or fall back to DefaultCleanupGracePeriod.
+	cleanupGracePeriod time.Duration
+}
+
+type capture struct {
+	mutex  sync.Mutex
+	errors []error
+	failed bool
+}
+
+// testingTB is needed to avoid a name conflict
+// between field and method in tContext.
+type testingTB struct {
+	// TB makes the methods of the underlying test implementation available.
+	// In particular Helper must be called directly, not via a wrapper.
+	// It must not be modified.
+	TB
+}
+
+// InitOption is an alias for the options provided through the [initoption] package.
+//
+// They are in a separate package to separate the main API from the less
+// commonly used configuration and to simplify auto-completion.
+type InitOption = initoption.InitOption
 
 // Init can be called in a unit or integration test to create
 // a test context which:
@@ -195,6 +282,16 @@ func Init(tb TB, opts ...InitOption) TContext {
 	return tCtx
 }
 
+var timeNow = time.Now // Can be stubbed out for testing.
+
+func klogHeader() string {
+	now := timeNow()
+	_, month, day := now.Date()
+	hour, minute, second := now.Clock()
+	return fmt.Sprintf("I%02d%02d %02d:%02d:%02d.%06d]",
+		month, day, hour, minute, second, now.Nanosecond()/1000)
+}
+
 // InitCtx is a variant of [Init] which uses an already existing context and
 // whatever logger and timeouts are stored there.
 func InitCtx(ctx context.Context, tb TB, opts ...InitOption) TContext {
@@ -289,12 +386,6 @@ func newLogger(tb TB, bufferLogs bool) klog.Logger {
 	return logger
 }
 
-// InitOption is an alias for the options provided through the [initoption] package.
-//
-// They are in a separate package to separate the main API from the less
-// commonly used configuration and to simplify auto-completion.
-type InitOption = initoption.InitOption
-
 // withTB constructs a new TContext with a different TB instance.
 //
 // This is used internally to set up some of the context, in particular
@@ -337,56 +428,6 @@ func (tCtx TContext) withTB(tb TB) TContext {
 	return tCtx
 }
 
-// run implements the different Run and SyncTest methods. It's not an exported
-// method because tCtx.Run is more discoverable (same usage as
-// with normal Go).
-func run(tCtx TContext, name string, syncTest bool, cb func(tCtx TContext)) bool {
-	tCtx.Helper()
-	switch tb := tCtx.TB().(type) {
-	case *testing.T:
-		if syncTest {
-			f := func(t *testing.T) {
-				// We must not propagate the parent's
-				// cancellation channel into the bubble,
-				// it causes "panic: receive on synctest channel from outside bubble".
-				//
-				// Sync tests shouldn't need the overall suite timeout,
-				// so this seems okay.
-				tCtx.isSyncTest = true
-				tCtx = tCtx.WithoutCancel().withTB(t)
-				// runWhenDone's context.AfterFunc runs in a new goroutine,
-				// which synctest has no reason to schedule before its
-				// deadlock check fires the instant cb returns. Cancel
-				// synchronously here instead.
-				defer tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
-				cb(tCtx)
-			}
-			if name != "" {
-				return tb.Run(name, func(t *testing.T) { synctest.Test(t, f) })
-			}
-			synctest.Test(tb, f)
-			return true
-		}
-		return tb.Run(name, func(t *testing.T) {
-			cb(tCtx.withTB(t))
-		})
-	case *testing.B:
-		if !syncTest {
-			return tb.Run(name, func(b *testing.B) {
-				cb(tCtx.withTB(b))
-			})
-		}
-	}
-
-	what := "Run"
-	if syncTest {
-		what = "SyncTest"
-	}
-	tCtx.Fatalf("%s not implemented, underlying %T does not support it", what, tCtx.TB())
-
-	return false
-}
-
 // WithContext constructs a new TContext with a different Context instance.
 // This can be used in callbacks which receive a Context, for example
 // from Gomega:
@@ -404,12 +445,6 @@ func (tCtx TContext) WithContext(ctx context.Context) TContext {
 	return tCtx
 }
 
-// WithValue wraps [context.WithValue] such that the result is again a TContext.
-func (tCtx TContext) WithValue(key, val any) TContext {
-	ctx := context.WithValue(tCtx.Context, key, val)
-	return tCtx.WithContext(ctx)
-}
-
 type chainContext struct {
 	context.Context
 	previousCtx context.Context
@@ -422,86 +457,45 @@ func (ctx *chainContext) Value(key any) any {
 	return ctx.previousCtx.Value(key)
 }
 
-// TContext implements [context.Context], [testing.TB] and some additional
-// methods. [TContext] is the public pointer type for referencing a TC.
-// Variables are usually called tCtx. To ensure that test code does not
-// use `t` directly unintentionally, it is recommended to use two functions:
-//
-//	func TestSomething(t *testing.T) { testSomething(ktesting.Init(t)) }
-//	func testSomething(tCtx ktesting.TContext) { ... }
-//
-// Log output is associated with the current test and includes a header similar
-// to klog, which enables post-processing to distinguish between log output
-// (starts with header) and failure messages (header comes later). Errors
-// ([Error], [Errorf]) are recorded with "ERROR" as prefix, fatal errors
-// ([Fatal], [Fatalf]) with "FATAL ERROR". Indention is used to ensure that
-// follow-up lines belonging to the same log entry can be handled properly
-// by post-processing and to make the header stand out more.
-//
-// tCtx provides features offered by Ginkgo also when using normal Go [testing]:
-//   - The context contains a deadline that expires soon enough before
-//     the overall timeout that cleanup code can still run.
-//   - Cleanup callbacks can get their own, separate contexts when
-//     registered via [CleanupCtx].
-//   - CTRL-C aborts, prints a progress report, and then cleans up
-//     before terminating.
-//   - SIGUSR1 prints a progress report without aborting.
-//
-// Progress reporting is more informative when doing polling with
-// [gomega.Eventually] and [gomega.Consistently]. Without that, it
-// can only report which tests are active.
-type TContext struct {
-	// Context makes the methods of the underlying context
-	// available. It must not be modified.
-	context.Context
-
-	// testingTB makes the methods of the underlying test implementation
-	// available. Its embedded TB must not be modified.
-	testingTB
-
-	// perTestHeader is an optional function which produces a klog-like perTestHeader when
-	// not using some global logger.
-	perTestHeader func() string
-
-	// for Cancel
-	cancel func(cause error)
-
-	// steps is a concatenation ("step1/step2/step3: ") of steps passed to WithStep.
-	// It's empty if there are no steps.
-	steps string
-
-	// for IsSyncTest
-	isSyncTest bool
-
-	// for WithNamespace
-	namespace string
-
-	// capture, if non-nil, changes Error/Errorf/Fatal/Fatalf/Fail/FailNow so
-	// that they intercept the problem and convert to errors. Log messages
-	// are passed through.
-	//
-	// Used by WithError.
-	capture *capture
-
-	// cleanupGracePeriod is the effective cleanup grace period for this context.
-	// It is always non-zero: both Init and InitCtx resolve it from the supplied
-	// options or fall back to DefaultCleanupGracePeriod.
-	cleanupGracePeriod time.Duration
+// WithValue wraps [context.WithValue] such that the result is again a TContext.
+func (tCtx TContext) WithValue(key, val any) TContext {
+	ctx := context.WithValue(tCtx.Context, key, val)
+	return tCtx.WithContext(ctx)
 }
 
-type capture struct {
-	mutex  sync.Mutex
-	errors []error
-	failed bool
+// WithCancel sets up cancellation in a [TContext.Cleanup] callback and
+// constructs a new TContext where [TContext.Cancel] cancels only the new
+// context.
+func (tCtx TContext) WithCancel() TContext {
+	ctx, cancel := context.WithCancelCause(tCtx.Context)
+
+	tCtx.Context = ctx
+	tCtx.cancel = cancel
+	return tCtx
 }
 
-// testingTB is needed to avoid a name conflict
-// between field and method in tContext.
-type testingTB struct {
-	// TB makes the methods of the underlying test implementation available.
-	// In particular Helper must be called directly, not via a wrapper.
-	// It must not be modified.
-	TB
+// WithoutCancel causes the returned context to ignore cancellation of its parent.
+// Calling Cancel will only cancel the new context.
+// This matches [context.WithoutCancel].
+func (tCtx TContext) WithoutCancel() TContext {
+	ctx := context.WithoutCancel(tCtx.Context)
+
+	tCtx.Context = ctx
+	tCtx = tCtx.WithCancel() // Re-create a cancelable TContext.
+	return tCtx
+}
+
+// WithTimeout sets up new context with a timeout. Canceling the timeout gets
+// registered in a cleanup callback. [TContext.Cancel] cancels only
+// the new context. The cause is used as reason why the context is canceled
+// once the timeout is reached. It may be empty, in which case the usual
+// "context canceled" error is used.
+func (tCtx TContext) WithTimeout(timeout time.Duration, timeoutCause string) TContext {
+	ctx, cancel := withTimeout(tCtx.Context, tCtx.TB(), timeout, timeoutCause)
+
+	tCtx.Context = ctx
+	tCtx.cancel = cancel
+	return tCtx
 }
 
 // Parallel signals that this test is to be run in parallel with (and
@@ -591,7 +585,7 @@ func (tCtx TContext) CleanupCtx(cb func(TContext)) {
 // Only supported in Go unit tests or benchmarks. It fails the current
 // test when called elsewhere.
 func (tCtx TContext) Run(name string, cb func(tCtx TContext)) bool {
-	return run(tCtx, name, false, cb)
+	return tCtx.run(name, false, cb)
 }
 
 // SyncTest uses [synctest.Test] to execute the callback inside a bubble.
@@ -603,7 +597,54 @@ func (tCtx TContext) Run(name string, cb func(tCtx TContext)) bool {
 // Cleaning up on SIGINT is not available because code running inside a bubble
 // should not depend on outside input.
 func (tCtx TContext) SyncTest(name string, cb func(tCtx TContext)) bool {
-	return run(tCtx, name, true, cb)
+	return tCtx.run(name, true, cb)
+}
+
+func (tCtx TContext) run(name string, syncTest bool, cb func(tCtx TContext)) bool {
+	tCtx.Helper()
+	switch tb := tCtx.TB().(type) {
+	case *testing.T:
+		if syncTest {
+			f := func(t *testing.T) {
+				// We must not propagate the parent's
+				// cancellation channel into the bubble,
+				// it causes "panic: receive on synctest channel from outside bubble".
+				//
+				// Sync tests shouldn't need the overall suite timeout,
+				// so this seems okay.
+				tCtx.isSyncTest = true
+				tCtx = tCtx.WithoutCancel().withTB(t)
+				// runWhenDone's context.AfterFunc runs in a new goroutine,
+				// which synctest has no reason to schedule before its
+				// deadlock check fires the instant cb returns. Cancel
+				// synchronously here instead.
+				defer tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
+				cb(tCtx)
+			}
+			if name != "" {
+				return tb.Run(name, func(t *testing.T) { synctest.Test(t, f) })
+			}
+			synctest.Test(tb, f)
+			return true
+		}
+		return tb.Run(name, func(t *testing.T) {
+			cb(tCtx.withTB(t))
+		})
+	case *testing.B:
+		if !syncTest {
+			return tb.Run(name, func(b *testing.B) {
+				cb(tCtx.withTB(b))
+			})
+		}
+	}
+
+	what := "Run"
+	if syncTest {
+		what = "SyncTest"
+	}
+	tCtx.Fatalf("%s not implemented, underlying %T does not support it", what, tCtx.TB())
+
+	return false
 }
 
 // IsSyncTest returns true if the context was created by SyncTest.
@@ -646,6 +687,14 @@ func (tCtx TContext) Wait() {
 //	}
 func (tCtx TContext) TB() TB { return tCtx.testingTB.TB }
 
+// WithLogger constructs a new context with a different logger.
+func (tCtx TContext) WithLogger(logger klog.Logger) TContext {
+	ctx := klog.NewContext(tCtx.Context, logger)
+
+	tCtx.Context = ctx
+	return tCtx
+}
+
 // Logger returns a logger for the current test. This is a shortcut
 // for calling klog.FromContext.
 //
@@ -658,30 +707,6 @@ func (tCtx TContext) TB() TB { return tCtx.testingTB.TB }
 // TB.Helper can be called in those functions.
 func (tCtx TContext) Logger() klog.Logger {
 	return klog.FromContext(tCtx.Context)
-}
-
-// Expect wraps [gomega.Expect] such that a failure will be reported via
-// [TContext.Fatal]. As with [gomega.Expect], additional values
-// may get passed. Those values then all must be nil for the assertion
-// to pass. This can be used with functions which return a value
-// plus error. The error gets checked automatically.
-//
-//	myAmazingThing := func(int, error) { ...}
-//	tCtx.Expect(myAmazingThing()).Should(gomega.Equal(1))
-func (tCtx TContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
-	return gomegaAssertion(tCtx, true, actual, extra...)
-}
-
-// Require is an alias for Expect.
-func (tCtx TContext) Require(actual interface{}, extra ...interface{}) gomega.Assertion {
-	return gomegaAssertion(tCtx, true, actual, extra...)
-}
-
-// Assert also wraps [gomega.Expect], but in contrast to Expect = Require,
-// it reports a failure through [TContext.Error]. This makes it possible
-// to test several different assertions.
-func (tCtx TContext) Assert(actual interface{}, extra ...interface{}) gomega.Assertion {
-	return gomegaAssertion(tCtx, false, actual, extra...)
 }
 
 // WithNamespace creates a new context with a Kubernetes namespace name for retrieval through [Namespace].
@@ -699,3 +724,340 @@ func (tCtx TContext) WithNamespace(namespace string) TContext {
 func (tCtx TContext) Namespace() string {
 	return tCtx.namespace
 }
+
+// WithError creates a context where test failures are collected and stored in
+// the provided error instance when the caller is done. Use it like this:
+//
+//	func doSomething(tCtx ktesting.TContext) (finalErr error) {
+//	     tCtx, finalize := WithError(tCtx, &finalErr)
+//	     defer finalize()
+//	     ...
+//	     tCtx.Fatal("some failure")
+//
+// Any error already stored in the variable will get overwritten by finalize if
+// there were test failures, otherwise the variable is left unchanged.
+// If there were multiple test errors, then the error will wrap all of
+// them with errors.Join.
+//
+// Test failures are not propagated to the parent context.
+// WithRESTConfig initializes all client-go clients with new clients
+// created for the config. The current test name gets included in the UserAgent.
+func (tCtx TContext) WithError(err *error) (TContext, func()) {
+	tCtx.capture = &capture{}
+
+	return tCtx, func() {
+		// Recover has to be called in the deferred function. When called inside
+		// a function called by a deferred function (like finalize below), it
+		// returns nil.
+		if e := recover(); e != nil {
+			if _, ok := e.(fatalWithError); !ok {
+				// Not our own panic, pass it on instead of setting the error.
+				panic(e)
+			}
+		}
+
+		tCtx.finalize(err)
+	}
+}
+
+func (tCtx TContext) finalize(err *error) {
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
+
+	errs := tCtx.capture.errors
+	if tCtx.capture.failed && len(errs) == 0 {
+		errs = []error{errFailedWithNoExplanation}
+	}
+	if len(errs) == 0 {
+		return
+	}
+	*err = failures{errors.Join(errs...)}
+}
+
+type failures struct {
+	error
+}
+
+// Unwrap gives errors.Is and errors.As access to the individual errors
+// joined together by errors.Join in finalize. Embedding only promotes
+// Error() because the embedded field has the static type error, which
+// doesn't declare Unwrap, so it has to be forwarded explicitly here.
+func (e failures) Unwrap() []error {
+	if joined, ok := e.error.(interface{ Unwrap() []error }); ok {
+		return joined.Unwrap()
+	}
+	return nil
+}
+
+func (e failures) GomegaString() string {
+	// We don't need to repeat the string. Errors already get formatted once by Gomega itself,
+	// then it calls GomegaString for a summary that isn't necessary anymore.
+	return ""
+}
+
+// WithStep creates a context where a prefix is added to all errors and log
+// messages, similar to how errors are wrapped. This can be nested, leaving a
+// trail of "bread crumbs" that help figure out where in a test some problem
+// occurred or why some log output gets written:
+//
+//	ERROR: bake cake/set heat for baking: oven not found
+//
+// The string should describe the operation that is about to happen ("starting
+// the controller", "list items") or what is being operated on ("HTTP server").
+// Multiple different prefixes get concatenated with a slash, the same
+// separator klog uses for logger names (see below).
+//
+// The context's logger (as retrieved through [TContext.Logger] or
+// [klog.FromContext]) also gets updated by adding the step as name via
+// logr.Logger.WithName.
+func (tCtx TContext) WithStep(step string) TContext {
+	if tCtx.steps == "" {
+		tCtx.steps = step + ": "
+	} else {
+		tCtx.steps = strings.TrimSuffix(tCtx.steps, ": ") + "/" + step + ": "
+	}
+	logger := klog.FromContext(tCtx.Context).WithName(step)
+	tCtx.Context = klog.NewContext(tCtx.Context, logger)
+	return tCtx
+}
+
+// Step is useful when the context with the step information is
+// used more than once:
+//
+//	ktesting.Step(tCtx, "step 1", func(tCtx ktesting.TContext) {
+//	 tCtx.Log(...)
+//	    if (... ) {
+//	       tCtx.Failf(...)
+//	    }
+//	)}
+//
+// Inside the callback, the tCtx variable is the one where the step
+// has been added. This avoids the need to introduce multiple different
+// context variables and risk of using the wrong one.
+func (tCtx TContext) Step(step string, cb func(tCtx TContext)) {
+	tCtx.Helper()
+	cb(tCtx.WithStep(step))
+}
+
+// Value intercepts a search for the special "GINKGO_SPEC_CONTEXT" and
+// wraps the underlying reporter so that the recorded steps and the name of
+// the running test are visible in the progress report.
+func (tCtx TContext) Value(key any) any {
+	if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
+		// When we construct a new TContext, we have to be careful to not wrap
+		// our own TContext instance. Otherwise this tCtx.Context.Value call
+		// here will call TContext.Value once more and wrap a ginkgoReporter inside
+		// a ginkgoReporter recursively.
+		if reporter, ok := tCtx.Context.Value(key).(ginkgoReporter); ok {
+			return ginkgoReporter(&stepReporter{reporter: reporter, testName: tCtx.Name(), steps: tCtx.steps})
+		}
+	}
+	return tCtx.Context.Value(key)
+}
+
+type stepReporter struct {
+	reporter ginkgoReporter
+	testName string
+	steps    string
+}
+
+var _ ginkgoReporter = &stepReporter{}
+
+func (s *stepReporter) AttachProgressReporter(reporter func() string) func() {
+	return s.reporter.AttachProgressReporter(func() string {
+		report := s.steps + reporter()
+		return s.testName + ":\n" + indent(report, true)
+	})
+}
+
+// buildHeader handles:
+// - "ERROR:<non-empty prefix><optional header><suffix>" -> use both prefix and suffix when we have a header, otherwise just the suffix
+// - "<empty prefix><optional header><suffix>" -> use suffix only if we have a header
+func (tCtx TContext) buildHeader(prefix, suffix string) string {
+	if tCtx.perTestHeader != nil {
+		return prefix + tCtx.perTestHeader() + suffix
+	}
+	if prefix != "" {
+		return suffix
+	}
+	return ""
+}
+
+// indent either indents all follow-up lines or all lines including the first one.
+func indent(msg string, all bool) string {
+	header := ""
+	if all {
+		header = "\t"
+	}
+	return header + strings.ReplaceAll(msg, "\n", "\n\t")
+}
+
+func (tCtx TContext) Skip(args ...any) {
+	tCtx.Helper()
+	// Enable `go vet printf` by directly calling fmt.Sprintln.
+	msg := strings.TrimSpace(fmt.Sprintln(args...))
+	tCtx.TB().Skip("SKIP:", tCtx.buildHeader(" ", " ")+tCtx.steps+indent(msg, false))
+}
+
+func (tCtx TContext) Skipf(format string, args ...any) {
+	tCtx.Helper()
+	// Enable `go vet printf` by directly calling fmt.Sprintf.
+	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
+	tCtx.TB().Skip("SKIP:", tCtx.buildHeader(" ", " ")+tCtx.steps+indent(msg, false))
+}
+
+func (tCtx TContext) Log(args ...any) {
+	tCtx.Helper()
+	// Enable `go vet printf` by directly calling fmt.Sprintln.
+	msg := strings.TrimSpace(fmt.Sprintln(args...))
+	tCtx.TB().Log(tCtx.buildHeader("", " ") + tCtx.steps + indent(msg, false))
+}
+
+func (tCtx TContext) Logf(format string, args ...any) {
+	tCtx.Helper()
+	// Enable `go vet printf` by directly calling fmt.Sprintf.
+	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
+	tCtx.TB().Log(tCtx.buildHeader("", " ") + tCtx.steps + indent(msg, false))
+}
+
+// reportFailure writes msg to the underlying TB as an "ERROR" or "FATAL
+// ERROR", depending on fatal. testing.T itself already logs the source code
+// location of the call (via t.Helper() bookkeeping), so this does not also
+// dump a stack backtrace: only [TContext.ExpectNoError] and
+// [TContext.AssertNoError] do that, for a [FailureError] with a captured
+// backtrace from its original occurrence.
+func (tCtx TContext) reportFailure(fatal bool, msg string) {
+	tCtx.Helper()
+	if fatal {
+		// FATAL ERROR *before* header to make it stand out as failure.
+		tCtx.TB().Fatal("FATAL ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+		return
+	}
+	// ERROR *before* header to make it stand out as failure.
+	tCtx.TB().Error("ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+}
+
+func (tCtx TContext) Error(args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
+		msg := strings.TrimSpace(fmt.Sprintln(args...))
+		tCtx.reportFailure(false, msg)
+		return
+	}
+
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
+
+	// Gomega adds a leading newline in https://github.com/onsi/gomega/blob/f804ac6ada8d36164ecae0513295de8affce1245/internal/gomega.go#L37
+	// Let's strip that at start and end because ktesting will make errors
+	// stand out more with the "ERROR" prefix, so there's no need for additional
+	// line breaks. Besides, Sprintln (required for `go vet printf`) also
+	// adds a trailing newline that we don't want.
+	msg := strings.TrimSpace(fmt.Sprintln(args...))
+	tCtx.capture.errors = append(tCtx.capture.errors, FailureError{
+		Msg:            tCtx.steps + msg,
+		FullStackTrace: captureBacktrace(),
+	})
+	tCtx.capture.failed = true
+}
+
+func (tCtx TContext) Errorf(format string, args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
+		// Enable `go vet printf` by directly calling fmt.Sprintln.
+		msg := strings.TrimSpace(fmt.Sprintf(format, args...))
+		tCtx.reportFailure(false, msg)
+		return
+	}
+
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
+
+	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
+	tCtx.capture.errors = append(tCtx.capture.errors, FailureError{
+		Msg:            tCtx.steps + msg,
+		FullStackTrace: captureBacktrace(),
+	})
+	tCtx.capture.failed = true
+}
+
+func (tCtx TContext) Fail() {
+	if tCtx.capture == nil {
+		tCtx.TB().Fail()
+		return
+	}
+
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
+
+	tCtx.capture.errors = append(tCtx.capture.errors, FailureError{
+		Msg:            errFailedWithNoExplanation.Error(),
+		FullStackTrace: captureBacktrace(),
+	})
+	tCtx.capture.failed = true
+}
+
+func (tCtx TContext) FailNow() {
+	if tCtx.capture == nil {
+		tCtx.TB().FailNow()
+		return
+	}
+
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
+
+	if !tCtx.capture.failed {
+		tCtx.capture.errors = append(tCtx.capture.errors, FailureError{
+			Msg:            errFailedWithNoExplanation.Error(),
+			FullStackTrace: captureBacktrace(),
+		})
+	}
+	tCtx.capture.failed = true
+	panic(failed)
+}
+
+func (tCtx TContext) Failed() bool {
+	if tCtx.capture == nil {
+		return tCtx.TB().Failed()
+	}
+
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
+
+	return tCtx.capture.failed
+}
+
+func (tCtx TContext) Fatal(args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
+		// Enable `go vet printf` by directly calling fmt.Sprintln.
+		msg := strings.TrimSpace(fmt.Sprintln(args...))
+		tCtx.reportFailure(true, msg)
+	}
+
+	tCtx.Error(args...)
+	tCtx.FailNow()
+}
+
+func (tCtx TContext) Fatalf(format string, args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
+		// Enable `go vet printf` by directly calling fmt.Sprintf.
+		msg := strings.TrimSpace(fmt.Sprintf(format, args...))
+		tCtx.reportFailure(true, msg)
+		return
+	}
+
+	tCtx.Errorf(format, args...)
+	tCtx.FailNow()
+}
+
+// fatalWithError is the internal type that should never get propagated up. The
+// only case where that can happen is when the developer forgot to call
+// finalize via defer. The string explains that, in case that developers get to
+// see it.
+type fatalWithError string
+
+const failed = fatalWithError("WithError TContext encountered a fatal error, but the finalize function was not called via defer as it should have been.")
+
+var errFailedWithNoExplanation = errors.New("WithError context was marked as failed without recording an error")
