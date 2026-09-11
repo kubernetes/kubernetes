@@ -4900,6 +4900,29 @@ func TestDoBackOff(t *testing.T) {
 			expectedInBackOff: true,
 			expectedError:     kubecontainer.NewBackoffError(kubecontainer.ErrCrashLoopBackOff, fakeClock.Now().Add(time.Second)),
 		},
+		{
+			name: "no container status, never attempted — should not be in backoff",
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{},
+			},
+			backoff:           flowcontrol.NewFakeBackOff(time.Second, time.Minute, fakeClock),
+			expectedInBackOff: false,
+		},
+		{
+			name: "no container status, but CreateContainer already failed once (update-time backoff)",
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{}, // CreateContainer was rejected; no status was ever recorded
+			},
+			backoff: flowcontrol.NewFakeBackOff(time.Second, time.Minute, fakeClock),
+			backoffUpdateFn: func(backoff *flowcontrol.Backoff, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+				// Simulates the backOff.Next() call added to the start() closure when
+				// startContainer() fails with ErrCreateContainer/ErrCreateContainerConfig/etc.
+				key := GetBackoffKey(pod, &pod.Spec.Containers[0])
+				backoff.Next(key, fakeClock.Now())
+			},
+			expectedInBackOff: true,
+			expectedError:     kubecontainer.NewBackoffError(kubecontainer.ErrCrashLoopBackOff, fakeClock.Now().Add(time.Second)),
+		},
 	}
 
 	for _, tc := range tests {

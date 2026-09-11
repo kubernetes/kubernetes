@@ -1655,6 +1655,18 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 				metrics.StartedHostProcessContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
 			}
 			startContainerResult.Fail(err, msg)
+			// startContainer failed before the container ever reached a running state
+			// (e.g. CreateContainer was rejected because the memory limit is below the
+			// runtime's floor). Such attempts never produce a container status, so
+			// doBackOff's exit-time check below can never see them, and these failures
+			// would otherwise just repeat at the flat pod-worker retry period forever
+			// instead of escalating like other CrashLoopBackOff cases. Feed the same
+			// per-container backoff entry used by CrashLoopBackOff so these attempts
+			// get the same exponential backoff and status reporting.
+			if errors.Is(err, ErrCreateContainerConfig) || errors.Is(err, ErrPreCreateHook) || errors.Is(err, ErrCreateContainer) ||
+				errors.Is(err, ErrPreStartHook) || errors.Is(err, kubecontainer.ErrRunContainer) {
+				backOff.Next(GetBackoffKey(pod, spec.container), backOff.Clock.Now())
+			}
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
 			switch {
@@ -1821,6 +1833,22 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 // a detailed error message.
 func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, container *v1.Container, podStatus *kubecontainer.PodStatus, backOff *flowcontrol.Backoff) (bool, string, error) {
 	logger := klog.FromContext(ctx)
+	key := GetBackoffKey(pod, container)
+
+	// Containers that fail before ever reaching a running state (see the Next() call in
+	// the start() closure above) have no exited container status for the check below to
+	// find, so check the update-time based backoff first.
+	if backOff.IsInBackOffSinceUpdate(key, backOff.Clock.Now()) {
+		if containerRef, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
+			m.recorder.WithLogger(logger).Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
+				"Back-off restarting failed container %s in pod %s", container.Name, format.Pod(pod))
+		}
+		backoff := backOff.Get(key)
+		err := fmt.Errorf("back-off %s restarting failed container=%s pod=%s", backoff, container.Name, format.Pod(pod))
+		logger.V(3).Info("Back-off restarting failed container", "err", err.Error())
+		return true, err.Error(), kubecontainer.NewBackoffError(kubecontainer.ErrCrashLoopBackOff, backOff.Clock.Now().Add(backoff))
+	}
+
 	var cStatus *kubecontainer.Status
 	for _, c := range podStatus.ContainerStatuses {
 		if c.Name == container.Name && c.State == kubecontainer.ContainerStateExited {
@@ -1836,8 +1864,6 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 	logger.V(3).Info("Checking backoff for container in pod", "containerName", container.Name, "pod", klog.KObj(pod))
 	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
 	ts := cStatus.FinishedAt
-	// backOff requires a unique key to identify the container.
-	key := GetBackoffKey(pod, container)
 	if backOff.IsInBackOffSince(key, ts) {
 		if containerRef, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 			m.recorder.WithLogger(logger).Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
