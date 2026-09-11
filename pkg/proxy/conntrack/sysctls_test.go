@@ -88,9 +88,8 @@ type fakeConntracker struct {
 	err    error
 }
 
-// SetMax value is calculated based on the number of CPUs by getConntrackMax()
 func (fc *fakeConntracker) SetMax(ctx context.Context, max int) error {
-	fc.called = append(fc.called, "SetMax")
+	fc.called = append(fc.called, fmt.Sprintf("SetMax(%d)", max))
 	return fc.err
 }
 func (fc *fakeConntracker) SetTCPEstablishedTimeout(ctx context.Context, seconds int) error {
@@ -113,6 +112,9 @@ func (fc *fakeConntracker) SetUDPStreamTimeout(ctx context.Context, seconds int)
 	fc.called = append(fc.called, fmt.Sprintf("SetUDPStreamTimeout(%d)", seconds))
 	return fc.err
 }
+func (fc *fakeConntracker) DetectNumCPU() int {
+	return 8
+}
 
 func TestSetupConntrack(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
@@ -133,7 +135,7 @@ func TestSetupConntrack(t *testing.T) {
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				MaxPerCore: ptr.To(int32(12)),
 			},
-			expect: []string{"SetMax"},
+			expect: []string{"SetMax(96)"},
 		},
 		{
 			name: "SetMax is not called if conntrack.maxPerCore is 0",
