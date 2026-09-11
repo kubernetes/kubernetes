@@ -1099,3 +1099,138 @@ func TestRSAKeySizeFromAlgorithmType(t *testing.T) {
 		})
 	}
 }
+
+func TestCanAlgorithmDoKeyEncipherment(t *testing.T) {
+	tests := []struct {
+		algorithm kubeadmapi.EncryptionAlgorithmType
+		expected  bool
+	}{
+		{algorithm: "", expected: true},
+		{algorithm: "foo", expected: false},
+		{algorithm: kubeadmapi.EncryptionAlgorithmRSA2048, expected: true},
+		{algorithm: kubeadmapi.EncryptionAlgorithmRSA3072, expected: true},
+		{algorithm: kubeadmapi.EncryptionAlgorithmRSA4096, expected: true},
+		{algorithm: kubeadmapi.EncryptionAlgorithmECDSAP256, expected: false},
+		{algorithm: kubeadmapi.EncryptionAlgorithmECDSAP384, expected: false},
+		{algorithm: kubeadmapi.EncryptionAlgorithmMLDSA44, expected: false},
+		{algorithm: kubeadmapi.EncryptionAlgorithmMLDSA65, expected: false},
+		{algorithm: kubeadmapi.EncryptionAlgorithmMLDSA87, expected: false},
+	}
+	for _, rt := range tests {
+		t.Run(string(rt.algorithm), func(t *testing.T) {
+			actual := canAlgorithmDoKeyEncipherment(rt.algorithm)
+			if actual != rt.expected {
+				t.Errorf("expected algorithm %q to support key encipherment: %t, got: %t",
+					rt.algorithm, rt.expected, actual)
+			}
+		})
+	}
+}
+func TestNewCertUsages(t *testing.T) {
+	var (
+		expectedUsageNoKeyEncipherment = []x509.KeyUsage{
+			x509.KeyUsageDigitalSignature,
+		}
+		expectedUsageNoKeyEnciphermentCA = []x509.KeyUsage{
+			x509.KeyUsageDigitalSignature,
+			x509.KeyUsageCertSign,
+		}
+		expectedUsageKeyEncipherment = []x509.KeyUsage{
+			x509.KeyUsageDigitalSignature,
+			x509.KeyUsageKeyEncipherment,
+		}
+		expectedUsageKeyEnciphermentCA = []x509.KeyUsage{
+			x509.KeyUsageDigitalSignature,
+			x509.KeyUsageKeyEncipherment,
+			x509.KeyUsageCertSign,
+		}
+	)
+	tests := []struct {
+		algorithm        kubeadmapi.EncryptionAlgorithmType
+		expectedUsages   []x509.KeyUsage
+		expectedCAUsages []x509.KeyUsage
+	}{
+		{
+			algorithm:        kubeadmapi.EncryptionAlgorithmRSA2048,
+			expectedUsages:   expectedUsageKeyEncipherment,
+			expectedCAUsages: expectedUsageKeyEnciphermentCA,
+		},
+		{
+			algorithm:        kubeadmapi.EncryptionAlgorithmRSA3072,
+			expectedUsages:   expectedUsageKeyEncipherment,
+			expectedCAUsages: expectedUsageKeyEnciphermentCA,
+		},
+		{
+			algorithm:        kubeadmapi.EncryptionAlgorithmRSA4096,
+			expectedUsages:   expectedUsageKeyEncipherment,
+			expectedCAUsages: expectedUsageKeyEnciphermentCA,
+		},
+		{
+			algorithm:        kubeadmapi.EncryptionAlgorithmECDSAP256,
+			expectedUsages:   expectedUsageNoKeyEncipherment,
+			expectedCAUsages: expectedUsageNoKeyEnciphermentCA,
+		},
+		{
+			algorithm:        kubeadmapi.EncryptionAlgorithmECDSAP384,
+			expectedUsages:   expectedUsageNoKeyEncipherment,
+			expectedCAUsages: expectedUsageNoKeyEnciphermentCA,
+		},
+		{
+			algorithm:        kubeadmapi.EncryptionAlgorithmMLDSA44,
+			expectedUsages:   expectedUsageNoKeyEncipherment,
+			expectedCAUsages: expectedUsageNoKeyEnciphermentCA,
+		},
+		{
+			algorithm:        kubeadmapi.EncryptionAlgorithmMLDSA65,
+			expectedUsages:   expectedUsageNoKeyEncipherment,
+			expectedCAUsages: expectedUsageNoKeyEnciphermentCA,
+		},
+		{
+			algorithm:        kubeadmapi.EncryptionAlgorithmMLDSA87,
+			expectedUsages:   expectedUsageNoKeyEncipherment,
+			expectedCAUsages: expectedUsageNoKeyEnciphermentCA,
+		},
+	}
+
+	checkUsages := func(t *testing.T, cert *x509.Certificate, expectedUsages []x509.KeyUsage) {
+		t.Helper()
+
+		var expected x509.KeyUsage
+		for _, u := range expectedUsages {
+			expected |= u
+		}
+		if cert.KeyUsage != expected {
+			t.Errorf("expected key usages: %#x, got: %#x", expected, cert.KeyUsage)
+		}
+	}
+
+	for _, rt := range tests {
+		t.Run(string(rt.algorithm), func(t *testing.T) {
+			cfg := &CertConfig{
+				Config: certutil.Config{
+					CommonName: "test",
+					Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+				},
+				EncryptionAlgorithm: rt.algorithm,
+			}
+
+			caCert, err := NewSelfSignedCACert(cfg, rootCAKey)
+			if err != nil {
+				t.Fatalf("failed to create a self-signed CA certificate: %v", err)
+			}
+			checkUsages(t, caCert, rt.expectedCAUsages)
+
+			cert, err := NewSignedCert(cfg, rootCAKey, rootCACert, rootCAKey, true)
+			if err != nil {
+				t.Fatalf("failed to create a signed CA certificate: %v", err)
+			}
+			checkUsages(t, cert, rt.expectedCAUsages)
+
+			cert, err = NewSignedCert(cfg, rootCAKey, rootCACert, rootCAKey, false)
+			if err != nil {
+				t.Fatalf("failed to create a signed certificate: %v", err)
+			}
+			checkUsages(t, cert, rt.expectedUsages)
+		})
+	}
+}
