@@ -94,10 +94,8 @@ type SelectionPredicate struct {
 // returned by s.GetAttrs) match s.Label and s.Field. An error is
 // returned if s.GetAttrs fails.
 func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-		if matched, err := s.MatchesSharding(obj); err != nil || !matched {
-			return matched, err
-		}
+	if matched, err := s.MatchesSharding(obj); err != nil || !matched {
+		return matched, err
 	}
 	if s.labelFieldEmpty() {
 		return true, nil
@@ -192,13 +190,13 @@ func (s *SelectionPredicate) MatcherIndex(ctx context.Context) []MatchValue {
 // MatchesSharding returns true if the given object matches the sharding configuration.
 // If ShardSelector is set and non-empty, it delegates to ShardSelector.Matches().
 func (s *SelectionPredicate) MatchesSharding(obj runtime.Object) (bool, error) {
+	if s.ShardSelector == nil || s.ShardSelector.Empty() {
+		return true, nil
+	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
 		return true, nil
 	}
-	if s.ShardSelector != nil && !s.ShardSelector.Empty() {
-		return s.ShardSelector.Matches(obj)
-	}
-	return true, nil
+	return s.ShardSelector.Matches(obj)
 }
 
 // SetShardInfoOnList sets shard metadata on the list response if sharding is active.
