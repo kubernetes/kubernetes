@@ -26,6 +26,9 @@ import (
 	"strconv"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1040,6 +1043,12 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 			if errors.Is(err, io.EOF) {
 				logger.V(4).Info("Stream ended with EOF")
 				return nil
+			}
+			// The driver advertises the health service but does not support
+			// health reporting. Not an error, the caller stops watching.
+			if status.Code(err) == codes.Unimplemented {
+				logger.V(4).Info("Driver does not support WatchResources", "reason", err)
+				return err
 			}
 			// Other errors are unexpected, log & return.
 			logger.Error(err, "Error receiving from WatchResources stream")
