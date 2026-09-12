@@ -197,6 +197,18 @@ func TestIsMemberOf(t *testing.T) {
 	}
 }
 
+func TestPodInOrdinalRange(t *testing.T) {
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 1)
+	if !podInOrdinalRange(pod, set) {
+		t.Error("podInOrdinalRange returned false for a canonical Pod name")
+	}
+	pod.Name = set.Name + "-01"
+	if podInOrdinalRange(pod, set) {
+		t.Error("podInOrdinalRange returned true for a non-canonical Pod name")
+	}
+}
+
 func TestIdentityMatches(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
