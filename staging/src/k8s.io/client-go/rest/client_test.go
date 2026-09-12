@@ -90,11 +90,14 @@ func TestDoRequestSuccess(t *testing.T) {
 
 func TestDoRequestFailed(t *testing.T) {
 	status := &metav1.Status{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Status",
+			APIVersion: "v1",
+		},
 		Code:    http.StatusNotFound,
 		Status:  metav1.StatusFailure,
 		Reason:  metav1.StatusReasonNotFound,
-		Message: " \"\" not found",
-		Details: &metav1.StatusDetails{},
+		Message: "the server could not find the requested resource",
 	}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), status)
 	fakeHandler := utiltesting.FakeHandler{
