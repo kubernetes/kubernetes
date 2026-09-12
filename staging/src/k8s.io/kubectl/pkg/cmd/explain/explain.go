@@ -143,6 +143,9 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(f, parent, args)
 			cmdutil.CheckErr(err)
+			if cmd.Flags().Changed("api-version") && len(o.APIVersion) == 0 {
+				cmdutil.CheckErr(fmt.Errorf("--api-version cannot be empty"))
+			}
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
