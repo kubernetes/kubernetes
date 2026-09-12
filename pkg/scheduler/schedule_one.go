@@ -334,12 +334,19 @@ func (sched *Scheduler) bindingCycle(
 		if preFlightStatus.IsSuccess() || schedFramework.WillWaitOnPermit(ctx, assumedPod) {
 			// Add NominatedNodeName to tell the external components (e.g., the cluster autoscaler) that the pod is about to be bound to the node.
 			// We only do this when any of WaitOnPermit or PreBind will work because otherwise the pod will be soon bound anyway.
-			if err := updatePod(ctx, sched.client, schedFramework.APICacher(), assumedPod, nil, &fwk.NominatingInfo{
+			nominatingInfo := &fwk.NominatingInfo{
 				NominatedNodeName: scheduleResult.SuggestedHost,
 				NominatingMode:    fwk.ModeOverride,
-			}); err != nil {
+			}
+			// Nomination update is best-effort and should not block the binding cycle.
+			var err error
+			if apiCacher := schedFramework.APICacher(); apiCacher != nil {
+				_, err = dispatchPodStatusPatch(apiCacher, assumedPod, nil, nominatingInfo)
+			} else {
+				err = patchPodStatusSync(ctx, sched.client, assumedPod, nil, nominatingInfo)
+			}
+			if err != nil {
 				logger.Error(err, "Failed to update the nominated node name in the binding cycle", "pod", klog.KObj(assumedPod), "nominatedNodeName", scheduleResult.SuggestedHost)
-				// We continue the processing because it's not critical enough to stop binding cycles here.
 			}
 		}
 	}
@@ -365,9 +372,9 @@ func (sched *Scheduler) bindingCycle(
 	// We define the Pod as "unschedulable" only when Pods are rejected at specific extension points, and Permit is the last one in the scheduling/binding cycle.
 	// If a Pod fails on PreBind or Bind, it should be moved to BackoffQ for retry.
 	//
-	// We can call Done() here because
-	// we can free the cluster events stored in the scheduling queue sooner, which is worth for busy clusters memory consumption wise.
-	sched.SchedulingQueue.Done(assumedPod.UID)
+	// We call DoneSchedulingCycle() here to free the cluster events stored in the scheduling queue sooner,
+	// while keeping the pod tracked in in-flight pods until binding finishes.
+	sched.SchedulingQueue.DoneSchedulingCycle(assumedPod.UID)
 
 	// If we are going to run prebind plugins we put the pod in binding map to optimize preemption.
 	if preFlightStatus.IsSuccess() {
@@ -408,6 +415,9 @@ func (sched *Scheduler) bindingCycle(
 	}
 	// Run "postbind" plugins.
 	schedFramework.RunPostBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
+
+	// Mark pod as done in scheduling queue after successful binding.
+	sched.SchedulingQueue.Done(assumedPod.UID)
 
 	// At the end of a successful binding cycle, move up Pods if needed.
 	if len(podsToActivate.Map) != 0 {
@@ -732,15 +742,6 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
 func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
 	podInfo = podInfo.DeepCopy()
-	calledDone := false
-	defer func() {
-		if !calledDone {
-			// Basically, AddUnschedulablePodIfNotPresent calls DonePod internally.
-			// But, AddUnschedulablePodIfNotPresent isn't called in some corner cases.
-			// Here, we call DonePod explicitly to avoid leaking the pod.
-			sched.SchedulingQueue.Done(podInfo.Pod.UID)
-		}
-	}()
 
 	logger := klog.FromContext(ctx)
 	reason := v1.PodReasonSchedulerError
@@ -756,7 +757,6 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	}
 
 	pod := podInfo.Pod
-	nominatedPodInfo := podInfo.PodInfo
 	isDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod)
 	err := status.AsError()
 	errMsg := status.Message()
@@ -784,67 +784,154 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		utilruntime.HandleErrorWithContext(ctx, err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
 	}
 
+	var podCondition *v1.PodCondition
+	if err != nil {
+		podCondition = &v1.PodCondition{
+			Type:    v1.PodScheduled,
+			Status:  v1.ConditionFalse,
+			Reason:  reason,
+			Message: errMsg,
+		}
+	}
+
 	// Check if the Pod exists in informer cache.
 	podLister := podFwk.SharedInformerFactory().Core().V1().Pods().Lister()
 	cachedPod, e := podLister.Pods(pod.Namespace).Get(pod.Name)
 	if e != nil {
 		logger.Info("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", e)
-		// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
-	} else {
+		if isDeferredResize {
+			sched.SchedulingQueue.Done(pod.UID)
+			return
+		}
+		sched.finishFailureWithoutRequeue(ctx, podFwk, podInfo, nominatingInfo, podCondition)
+		return
+	}
+	if len(cachedPod.Spec.NodeName) != 0 && !isDeferredResize {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
 		// For deferred resize pods, being assigned to a node in the cache is expected and not an inconsistent extender binding timeout.
-		if len(cachedPod.Spec.NodeName) != 0 && !isDeferredResize {
-			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
-			// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
-		} else {
-			if cachedPod.UID != podInfo.Pod.UID {
-				logger.V(2).Info("Pod was recreated while handling scheduling failure. Skip requeueing and status updates.", "pod", klog.KObj(pod), "oldUID", podInfo.Pod.UID, "newUID", cachedPod.UID)
-				return
-			}
-			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
-			// ignore this err since apiserver doesn't properly validate affinity terms
-			// and we can't fix the validation for backwards compatibility.
-			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
-			pod = podInfo.Pod
-			nominatedPodInfo = podInfo.PodInfo
-			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
-			}
-			calledDone = true
-		}
+		logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
+		sched.finishFailureWithoutRequeue(ctx, podFwk, podInfo, nominatingInfo, podCondition)
+		return
 	}
-
-	// Deferred resize pods are already bound to and running on their assigned node. The scheduler only
-	// evaluates resize feasibility and executes preemption; Kubelet actuates the resize in-place.
-	// Return early to avoid binding operations or setting nominated node status.
-	if isDeferredResize {
+	if cachedPod.UID != podInfo.Pod.UID {
+		logger.V(2).Info("Pod was recreated while handling scheduling failure. Skip requeueing and status updates.", "pod", klog.KObj(pod), "oldUID", podInfo.Pod.UID, "newUID", cachedPod.UID)
+		sched.SchedulingQueue.Done(podInfo.Pod.UID)
 		return
 	}
 
+	// In the case where we requeue, DonePod is called internally by AddUnschedulablePodIfNotPresent.
+	//
+	// TODO: As the scheduling queue now tracks in-flight pods and automatically refreshes
+	// podInfo from the latest in-flight version during AddUnschedulablePodIfNotPresent,
+	// refreshing from the informer cache here might no longer be necessary.
+	// However, fully removing the informer lookup here requires auditing other consumers
+	// (e.g. nominator, patch) and refactoring associated unit tests.
+	//
+	// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
+	// ignore this err since apiserver doesn't properly validate affinity terms
+	// and we can't fix the validation for backwards compatibility.
+	podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
+
+	// Deferred resize pods are already bound to and running on their assigned node. The scheduler only
+	// evaluates resize feasibility and executes preemption; Kubelet actuates the resize in-place.
+	// Requeue to retry resize when capacity frees up, but skip condition/nomination updates.
+	if isDeferredResize {
+		sched.requeue(logger, podInfo)
+		return
+	}
+
+	sched.finishFailureWithRequeue(ctx, podFwk, podInfo, nominatingInfo, podCondition)
+}
+
+func (sched *Scheduler) recordFailure(logger klog.Logger, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, nominatingInfo *fwk.NominatingInfo, podCondition *v1.PodCondition) {
 	// Update the scheduling queue with the nominated pod information. Without
 	// this, there would be a race condition between the next scheduling cycle
 	// and the time the scheduler receives a Pod Update for the nominated pod.
 	// Here we check for nil only for tests.
 	if sched.SchedulingQueue != nil {
-		sched.SchedulingQueue.AddNominatedPod(logger, nominatedPodInfo, nominatingInfo)
+		sched.SchedulingQueue.AddNominatedPod(logger, podInfo.PodInfo, nominatingInfo)
 	}
 
-	if err == nil {
+	if podCondition == nil {
 		// Only tests can reach here.
 		return
 	}
 
-	msg := truncateMessage(errMsg)
+	pod := podInfo.Pod
+	msg := truncateMessage(podCondition.Message)
 	podFwk.EventRecorder().WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
-	if err := updatePod(ctx, sched.client, podFwk.APICacher(), pod, &v1.PodCondition{
-		Type:               v1.PodScheduled,
-		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled),
-		Status:             v1.ConditionFalse,
-		Reason:             reason,
-		Message:            errMsg,
-	}, nominatingInfo); err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod", "pod", klog.KObj(pod))
+	podCondition.ObservedGeneration = podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled)
+}
+
+func (sched *Scheduler) requeue(logger klog.Logger, podInfo *framework.QueuedPodInfo) {
+	if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to add unschedulable pod to queue", "pod", klog.KObj(podInfo.Pod))
+	}
+}
+
+func (sched *Scheduler) finishFailureWithRequeue(ctx context.Context, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, nominatingInfo *fwk.NominatingInfo, podCondition *v1.PodCondition) {
+	logger := klog.FromContext(ctx)
+
+	sched.recordFailure(logger, podFwk, podInfo, nominatingInfo, podCondition)
+	if podCondition == nil {
+		sched.requeue(logger, podInfo)
+		return
+	}
+
+	pod := podInfo.Pod
+	apiCacher := podFwk.APICacher()
+	isPodGroupMember := sched.genericWorkloadEnabled && pod.Spec.SchedulingGroup != nil
+
+	if apiCacher == nil {
+		sched.requeue(logger, podInfo)
+		if err := patchPodStatusSync(ctx, sched.client, pod, podCondition, nominatingInfo); err != nil {
+			utilruntime.HandleErrorWithLogger(logger, err, "Error updating pod", "pod", klog.KObj(pod))
+		}
+		return
+	}
+
+	onFinish, err := dispatchPodStatusPatch(apiCacher, pod, podCondition, nominatingInfo)
+	if err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Error dispatching pod status patch", "pod", klog.KObj(pod))
+		sched.requeue(logger, podInfo)
+		return
+	}
+
+	if isPodGroupMember {
+		sched.requeue(logger, podInfo)
+		waitPodStatusPatch(ctx, apiCacher, pod, onFinish)
+		return
+	}
+
+	bgCtx := context.WithoutCancel(ctx)
+	go func() {
+		waitPodStatusPatch(bgCtx, apiCacher, pod, onFinish)
+		sched.requeue(logger, podInfo)
+	}()
+}
+
+func (sched *Scheduler) finishFailureWithoutRequeue(ctx context.Context, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, nominatingInfo *fwk.NominatingInfo, podCondition *v1.PodCondition) {
+	pod := podInfo.Pod
+	// We need to call Done here because we don't call AddUnschedulablePodIfNotPresent in this case.
+	sched.SchedulingQueue.Done(pod.UID)
+
+	logger := klog.FromContext(ctx)
+	sched.recordFailure(logger, podFwk, podInfo, nominatingInfo, podCondition)
+	if podCondition == nil {
+		return
+	}
+
+	// Discarded pods do not re-enter the scheduling queue, so waiting for patch completion is unnecessary.
+	// Dispatch asynchronously when available to avoid blocking, falling back to synchronous patch otherwise.
+	var updateErr error
+	if apiCacher := podFwk.APICacher(); apiCacher != nil {
+		_, updateErr = dispatchPodStatusPatch(apiCacher, pod, podCondition, nominatingInfo)
+	} else {
+		updateErr = patchPodStatusSync(ctx, sched.client, pod, podCondition, nominatingInfo)
+	}
+	if updateErr != nil {
+		utilruntime.HandleErrorWithLogger(logger, updateErr, "Error updating pod", "pod", klog.KObj(pod))
 	}
 }
 
@@ -857,16 +944,26 @@ func truncateMessage(message string) string {
 	return message[:noteLengthLimit-len(suffix)] + suffix
 }
 
-func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.APICacher, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) error {
-	if apiCacher != nil {
-		// When API cacher is available, use it to patch the status.
-		var conditions []*v1.PodCondition
-		if condition != nil {
-			conditions = []*v1.PodCondition{condition}
-		}
-		_, err := apiCacher.PatchPodStatus(pod, conditions, nominatingInfo)
-		return err
+// dispatchPodStatusPatch enqueues a status patch to the API cacher without waiting.
+func dispatchPodStatusPatch(apiCacher fwk.APICacher, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
+	var conditions []*v1.PodCondition
+	if condition != nil {
+		conditions = []*v1.PodCondition{condition}
 	}
+	return apiCacher.PatchPodStatus(pod, conditions, nominatingInfo)
+}
+
+// waitPodStatusPatch waits for a dispatched status patch to complete and logs any error.
+func waitPodStatusPatch(ctx context.Context, apiCacher fwk.APICacher, pod *v1.Pod, onFinish <-chan error) {
+	if onFinish == nil || apiCacher == nil {
+		return
+	}
+	if err := apiCacher.WaitOnFinish(ctx, onFinish); err != nil {
+		utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod", "pod", klog.KObj(pod))
+	}
+}
+
+func patchPodStatusSync(ctx context.Context, client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) error {
 	logger := klog.FromContext(ctx)
 	logValues := []any{"pod", klog.KObj(pod)}
 	if condition != nil {
