@@ -251,6 +251,9 @@ func (c *CloudNodeLifecycleController) shutdownInCloudProvider(ctx context.Conte
 	if instanceV2, ok := c.cloud.InstancesV2(); ok {
 		shutdown, err := instanceV2.InstanceShutdown(ctx, node)
 		observeInstanceOp(instanceShutdownOp, err)
+		if err != nil && errors.Is(err, cloudprovider.InstanceNotFound) {
+			return false, nil
+		}
 		return shutdown, err
 	}
 
@@ -284,6 +287,9 @@ func (c *CloudNodeLifecycleController) ensureNodeExistsByProviderID(ctx context.
 			observeInstanceOp(instanceExistsOp, cloudprovider.InstanceNotFound)
 		} else {
 			observeInstanceOp(instanceExistsOp, err)
+		}
+		if err != nil && errors.Is(err, cloudprovider.InstanceNotFound) {
+			return false, nil
 		}
 		return exists, err
 	}
