@@ -2239,6 +2239,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true},
 	},
 
+	genericfeatures.AllocatorPoolBufferCap: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	genericfeatures.AllowParsingUserUIDFromCertAuth: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2805,6 +2809,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.APIServingWithRoutine: {},
 
 	genericfeatures.AggregatedDiscoveryRemoveBetaType: {},
+
+	genericfeatures.AllocatorPoolBufferCap: {},
 
 	genericfeatures.AllowParsingUserUIDFromCertAuth: {},
 
