@@ -140,14 +140,20 @@ func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
 		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
 	}
 	// Validate the streamtranslator metrics; should be one 200 success.
+	// Use polling to wait for the metric to be updated asynchronously.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
-		t.Fatal(err)
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		if testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...) == nil {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Failed to observe metric after waiting 2 seconds: %v", err)
 	}
 }
 
@@ -240,14 +246,20 @@ func TestStreamTranslator_LoopbackStdinToStderr(t *testing.T) {
 		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
 	}
 	// Validate the streamtranslator metrics; should be one 200 success.
+	// Use polling to wait for the metric to be updated asynchronously.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
-		t.Fatal(err)
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		if testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...) == nil {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Failed to observe metric after waiting 2 seconds: %v", err)
 	}
 }
 
@@ -355,14 +367,20 @@ func TestStreamTranslator_ErrorStream(t *testing.T) {
 		}
 	}
 	// Validate the streamtranslator metrics; an exit code error is considered 200 success.
+	// Use polling to wait for the metric to be updated asynchronously.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
-		t.Fatal(err)
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		if testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...) == nil {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Failed to observe metric after waiting 2 seconds: %v", err)
 	}
 }
 
@@ -464,14 +482,20 @@ func TestStreamTranslator_MultipleReadChannels(t *testing.T) {
 		t.Errorf("unexpected data received: %d sent: %d", len(stderrBytes), len(randomData))
 	}
 	// Validate the streamtranslator metrics; should have one 200 success.
+	// Use polling to wait for the metric to be updated asynchronously.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
-		t.Fatal(err)
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		if testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...) == nil {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Failed to observe metric after waiting 2 seconds: %v", err)
 	}
 }
 
@@ -693,14 +717,20 @@ func TestStreamTranslator_TTYResizeChannel(t *testing.T) {
 		}
 	}
 	// Validate the streamtranslator metrics; should have one 200 success.
+	// Use polling to wait for the metric to be updated asynchronously.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
-		t.Fatal(err)
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		if testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...) == nil {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Failed to observe metric after waiting 2 seconds: %v", err)
 	}
 }
 
@@ -838,14 +868,20 @@ func TestStreamTranslator_BlockRedirects(t *testing.T) {
 				}
 			}
 			// Validate the streamtranslator metrics; should have one 500 failure each loop.
+			// Use polling to wait for the metric to be updated asynchronously.
 			metricNames := []string{"apiserver_stream_translator_requests_total"}
 			expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="500"} 1
 `
-			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
-				t.Fatal(err)
+			if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+				if testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...) == nil {
+					return true, nil
+				}
+				return false, nil
+			}); err != nil {
+				t.Fatalf("Failed to observe metric after waiting 2 seconds: %v", err)
 			}
 		})
 	}
