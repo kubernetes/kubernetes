@@ -222,8 +222,25 @@ type PodGroupManager interface {
 	CompositePodGroups() CompositePodGroupLister
 	// BuildHierarchySnapshotFromPod builds a hierarchy snapshot from the given pod.
 	BuildHierarchySnapshotFromPod(pod *v1.Pod) (PodGroupManager, error)
-	// GetRootKeyForGroup returns the root key of the given EntityKey.
-	GetRootKeyForGroup(key EntityKey) (EntityKey, bool, error)
+	// FindRootKeyForGroup returns the root *EntityKey of the hierarchy for the given EntityKey,
+	// or nil if the root group was not found (i.e. does not exist).
+	FindRootKeyForGroup(key EntityKey) (*EntityKey, error)
+	// FindRootGroup traverses parent links from key to locate the top-most root entity in the hierarchy.
+	// It returns a *RootGroup containing the root's EntityKey alongside its authoritative API object and cache state,
+	// or nil if the root group was not found.
+	FindRootGroup(key EntityKey) (*RootGroup, error)
+}
+
+// RootGroup represents the apex of a scheduling hierarchy for a given entity (Pod, PodGroup, or CompositePodGroup).
+// In a nested gang-scheduling tree, the root is the top-most ancestor with no parent CompositePodGroup.
+// It embeds GenericPodGroup alongside the corresponding cache state (PodGroupState or CompositePodGroupState).
+type RootGroup struct {
+	// GenericPodGroup provides unified access to the underlying root PodGroup or CompositePodGroup object.
+	*GenericPodGroup
+	// PodGroupState holds the scheduler cache state corresponding to PodGroup when the root is a PodGroup.
+	PodGroupState PodGroupState
+	// CompositePodGroupState holds the scheduler cache state corresponding to CompositePodGroup when the root is a CompositePodGroup.
+	CompositePodGroupState CompositePodGroupState
 }
 
 // PodGroupState provides an interface to view the state of a single pod group.
@@ -251,4 +268,31 @@ type PodGroupState interface {
 type CompositePodGroupState interface {
 	// GetChildren returns the keys of child groups.
 	GetChildren() []EntityKey
+}
+
+// PodGroupHierarchyTracker incrementally tracks readiness quorum counts across CompositePodGroup hierarchies.
+type PodGroupHierarchyTracker interface {
+	// ReadyChildrenCount returns the number of ready child groups for a given entity key.
+	ReadyChildrenCount(key EntityKey) int
+
+	// OnPodAdd records a pod as active in its scheduling group and updates parent readiness if quorum is reached.
+	OnPodAdd(pod *v1.Pod)
+	// OnPodUpdate updates tracking state when a pod is modified.
+	OnPodUpdate(oldPod, newPod *v1.Pod)
+	// OnPodDelete removes a pod from its scheduling group and updates parent readiness if quorum is lost.
+	OnPodDelete(pod *v1.Pod)
+
+	// OnPodGroupAdd registers or updates a PodGroup in the hierarchy tracker and updates parent readiness if it is ready.
+	OnPodGroupAdd(pg *schedulingapi.PodGroup)
+	// OnPodGroupUpdate re-evaluates PodGroup readiness and updates parent readiness when its policy changes.
+	OnPodGroupUpdate(oldPG, newPG *schedulingapi.PodGroup)
+	// OnPodGroupDelete removes a PodGroup from tracking and updates parent readiness if it was ready.
+	OnPodGroupDelete(pg *schedulingapi.PodGroup)
+
+	// OnCompositePodGroupAdd registers or updates a CompositePodGroup in the hierarchy tracker and updates parent readiness if it is ready.
+	OnCompositePodGroupAdd(cpg *schedulingv1alpha3.CompositePodGroup)
+	// OnCompositePodGroupUpdate re-evaluates CompositePodGroup readiness and updates parent readiness when its policy changes.
+	OnCompositePodGroupUpdate(oldCPG, newCPG *schedulingv1alpha3.CompositePodGroup)
+	// OnCompositePodGroupDelete removes a CompositePodGroup from tracking and updates parent readiness if it was ready.
+	OnCompositePodGroupDelete(cpg *schedulingv1alpha3.CompositePodGroup)
 }

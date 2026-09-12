@@ -109,8 +109,8 @@ type Scheduler struct {
 	nominatedNodeNameForExpectationEnabled              bool
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
-
-	algorithm *SchedulingAlgorithm
+	algorithm                                           *SchedulingAlgorithm
+	podGroupHierarchyTracker                            fwk.PodGroupHierarchyTracker
 }
 
 // applyDefaultHandlers installs the default handlers. It must run after
@@ -382,6 +382,7 @@ func New(ctx context.Context,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
+		podGroupHierarchyTracker:                            comps.podGroupHierarchyTracker,
 	}
 	sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore))
 	sched.NextEntity = podQueue.Pop
