@@ -307,6 +307,7 @@ func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration
 		nodeName,
 		csiDriverLister,
 		volumeAttachmentLister,
+		factory.Core().V1().PersistentVolumes().Lister(),
 	)
 
 	plugMgr.Host = fakeAttachDetachVolumeHost
