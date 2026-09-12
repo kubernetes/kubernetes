@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -200,6 +201,9 @@ type NodeInfo struct {
 	// as int64, to avoid conversions and accessing map.
 	Allocatable *Resource
 
+	// requestedOverflow marks the totals saturated at the int64 limit; removal then recomputes from Pods.
+	requestedOverflow bool
+
 	// ImageStates holds the entry of an image if and only if this image is on the node. The entry can be used for
 	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
 	// state information.
@@ -304,15 +308,16 @@ func (n *NodeInfo) Snapshot() fwk.NodeInfo {
 // SnapshotConcrete returns a copy of this node, Except that ImageStates is copied without the Nodes field.
 func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	clone := &NodeInfo{
-		node:             n.node,
-		Requested:        n.Requested.Clone(),
-		NonZeroRequested: n.NonZeroRequested.Clone(),
-		Allocatable:      n.Allocatable.Clone(),
-		UsedPorts:        make(fwk.HostPortInfo),
-		ImageStates:      make(map[string]*fwk.ImageStateSummary),
-		PVCRefCounts:     make(map[string]int),
-		Generation:       n.Generation,
-		DeclaredFeatures: n.DeclaredFeatures.Clone(),
+		node:              n.node,
+		Requested:         n.Requested.Clone(),
+		NonZeroRequested:  n.NonZeroRequested.Clone(),
+		Allocatable:       n.Allocatable.Clone(),
+		requestedOverflow: n.requestedOverflow,
+		UsedPorts:         make(fwk.HostPortInfo),
+		ImageStates:       make(map[string]*fwk.ImageStateSummary),
+		PVCRefCounts:      make(map[string]int),
+		Generation:        n.Generation,
+		DeclaredFeatures:  n.DeclaredFeatures.Clone(),
 	}
 	if len(n.Pods) > 0 {
 		clone.Pods = append([]fwk.PodInfo(nil), n.Pods...)
@@ -460,23 +465,75 @@ func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 // The sign will be set to `+1` when AddPod and to `-1` when RemovePod.
 func (n *NodeInfo) update(podInfo fwk.PodInfo, sign int64) {
 	podResource := podInfo.CalculateResource()
-	n.Requested.MilliCPU += sign * podResource.Resource.GetMilliCPU()
-	n.Requested.Memory += sign * podResource.Resource.GetMemory()
-	n.Requested.EphemeralStorage += sign * podResource.Resource.GetEphemeralStorage()
-	if n.Requested.ScalarResources == nil && len(podResource.Resource.GetScalarResources()) > 0 {
-		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
+
+	switch {
+	case sign < 0:
+		// A saturated total cannot be decremented exactly, so rebuild from the
+		// pods that remain; RemovePod has already dropped this one. An unsaturated
+		// total is the exact sum of its pods, so a plain subtract stays exact.
+		if n.requestedOverflow {
+			n.recomputeRequested()
+		} else {
+			n.foldResource(podResource, -1)
+		}
+	case sign > 0:
+		// Requests project to non-negative int64s, so the totals only grow here;
+		// a checked add keeps them fail-closed if the sum passes int64.
+		if n.foldResource(podResource, 1) {
+			n.requestedOverflow = true
+		}
 	}
-	for rName, rQuant := range podResource.Resource.GetScalarResources() {
-		n.Requested.ScalarResources[rName] += sign * rQuant
-	}
-	n.NonZeroRequested.MilliCPU += sign * podResource.Non0CPU
-	n.NonZeroRequested.Memory += sign * podResource.Non0Mem
 
 	// Consume ports when pod added or release ports when pod removed.
 	n.updateUsedPorts(podInfo.GetPod(), sign > 0)
 	n.updatePVCRefCounts(podInfo.GetPod(), sign > 0)
 
 	n.Generation = nextGeneration()
+}
+
+// foldResource adds one pod's resources to the requested totals when sign is
+// positive and subtracts them when negative, reporting whether any field
+// saturated. Only the add can: a request projects to a non-negative int64.
+func (n *NodeInfo) foldResource(podResource fwk.PodResource, sign int64) bool {
+	var overflow, o bool
+	n.Requested.MilliCPU, o = addOrSub(n.Requested.MilliCPU, podResource.Resource.GetMilliCPU(), sign)
+	overflow = overflow || o
+	n.Requested.Memory, o = addOrSub(n.Requested.Memory, podResource.Resource.GetMemory(), sign)
+	overflow = overflow || o
+	n.Requested.EphemeralStorage, o = addOrSub(n.Requested.EphemeralStorage, podResource.Resource.GetEphemeralStorage(), sign)
+	overflow = overflow || o
+	scalars := podResource.Resource.GetScalarResources()
+	if n.Requested.ScalarResources == nil && len(scalars) > 0 {
+		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
+	}
+	for rName, rQuant := range scalars {
+		n.Requested.ScalarResources[rName], o = addOrSub(n.Requested.ScalarResources[rName], rQuant, sign)
+		overflow = overflow || o
+	}
+	n.NonZeroRequested.MilliCPU, o = addOrSub(n.NonZeroRequested.MilliCPU, podResource.Non0CPU, sign)
+	overflow = overflow || o
+	n.NonZeroRequested.Memory, o = addOrSub(n.NonZeroRequested.Memory, podResource.Non0Mem, sign)
+	overflow = overflow || o
+	return overflow
+}
+
+// recomputeRequested rebuilds the requested totals from the pods on the node.
+// It runs when a pod is removed from a node whose totals had saturated, since
+// subtracting from a saturated total would misreport what remains.
+func (n *NodeInfo) recomputeRequested() {
+	n.Requested.MilliCPU = 0
+	n.Requested.Memory = 0
+	n.Requested.EphemeralStorage = 0
+	n.Requested.ScalarResources = nil
+	n.NonZeroRequested.MilliCPU = 0
+	n.NonZeroRequested.Memory = 0
+	var overflow bool
+	for _, p := range n.Pods {
+		if n.foldResource(p.CalculateResource(), 1) {
+			overflow = true
+		}
+	}
+	n.requestedOverflow = overflow
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
@@ -1503,6 +1560,30 @@ func NewResource(rl v1.ResourceList) *Resource {
 	r := &Resource{}
 	r.Add(rl)
 	return r
+}
+
+// addChecked returns a + b, saturating to math.MaxInt64 or math.MinInt64 and
+// reporting true when the sum leaves int64. A wrapped accumulator would misreport
+// a node's requested totals, and a request can project to a value near the limit.
+func addChecked(a, b int64) (int64, bool) {
+	sum := a + b
+	if a > 0 && b > 0 && sum < 0 {
+		return math.MaxInt64, true
+	}
+	if a < 0 && b < 0 && sum >= 0 {
+		return math.MinInt64, true
+	}
+	return sum, false
+}
+
+// addOrSub adds b to a with a saturating add when sign is positive and subtracts
+// it plainly when negative. The plain subtract cannot underflow: it runs only on
+// a total that never saturated, so the total is the sum of its non-negative pods.
+func addOrSub(a, b, sign int64) (int64, bool) {
+	if sign < 0 {
+		return a - b, false
+	}
+	return addChecked(a, b)
 }
 
 // Add adds ResourceList into Resource.

@@ -17,6 +17,7 @@ limitations under the License.
 package noderesources
 
 import (
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -964,4 +965,72 @@ func BenchmarkNodeMatchCaching(b *testing.B) {
 			_, _ = scorer.getCachedNodeMatch(testNode.Name, "", false, nodeSelectorStr)
 		}
 	})
+}
+
+func TestSaturatingAdd(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b int64
+		want int64
+	}{
+		{"ordinary add", 100, 200, 300},
+		{"zero at the rail", math.MaxInt64, 0, math.MaxInt64},
+		{"exact rail does not saturate", math.MaxInt64 - 1, 1, math.MaxInt64},
+		{"one past the rail saturates", math.MaxInt64 - 1, 2, math.MaxInt64},
+		{"already at the rail", math.MaxInt64, 1, math.MaxInt64},
+		{"both at the rail", math.MaxInt64, math.MaxInt64, math.MaxInt64},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := saturatingAdd(tc.a, tc.b); got != tc.want {
+				t.Errorf("saturatingAdd(%d, %d) = %d, want %d", tc.a, tc.b, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCalculateNodeAllocatableRequestSaturatesRequested(t *testing.T) {
+	// A node total already saturated at MaxInt64 (e.g. many spec.nodeName-pinned pods)
+	// must not wrap negative when the scorer folds in the scored pod: it reads as free space.
+	tCtx := ktesting.Init(t)
+
+	node := st.MakeNode().Name("saturated-node").Capacity(map[v1.ResourceName]string{
+		v1.ResourceCPU:    "8",
+		v1.ResourceMemory: "16Gi",
+	}).Obj()
+
+	// A pod whose cpu/memory requests project to MaxInt64 saturates the node's Requested totals (#141305).
+	hugePod := st.MakePod().Name("huge").Namespace("ns").UID("huge").
+		Req(map[v1.ResourceName]string{
+			v1.ResourceCPU:    "9223372036854775807",
+			v1.ResourceMemory: "9223372036854775807",
+		}).Obj()
+
+	nodeInfo := framework.NewNodeInfo(hugePod)
+	nodeInfo.SetNode(node)
+
+	if got := nodeInfo.GetNonZeroRequested().GetMilliCPU(); got != math.MaxInt64 {
+		t.Fatalf("precondition: node requested milliCPU = %d, want MaxInt64 (NodeInfo did not saturate)", got)
+	}
+	if got := nodeInfo.GetNonZeroRequested().GetMemory(); got != math.MaxInt64 {
+		t.Fatalf("precondition: node requested memory = %d, want MaxInt64 (NodeInfo did not saturate)", got)
+	}
+
+	scorer := &resourceAllocationScorer{
+		resources: []config.ResourceSpec{
+			{Name: string(v1.ResourceCPU)},
+			{Name: string(v1.ResourceMemory)},
+		},
+	}
+
+	requested, allocated, _ := scorer.calculateNodeAllocatableRequest(tCtx, nodeInfo, []int64{1, 1}, nil)
+
+	for i, name := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
+		if allocated[i] != math.MaxInt64 {
+			t.Errorf("%s: allocated = %d, want MaxInt64", name, allocated[i])
+		}
+		if requested[i] != math.MaxInt64 {
+			t.Errorf("%s: requested = %d, want MaxInt64; a wrap to a negative reads as spare capacity", name, requested[i])
+		}
+	}
 }
