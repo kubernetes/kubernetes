@@ -29,11 +29,11 @@ import (
 //
 // ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.
 type ResourceClaimTemplateSpecApplyConfiguration struct {
-	// ObjectMeta may contain labels and annotations that will be copied into the ResourceClaim
+	// metadata may contain labels and annotations that will be copied into the ResourceClaim
 	// when creating it. No other fields are allowed and will be rejected during
 	// validation.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec for the ResourceClaim. The entire content is copied unchanged
+	// spec for the ResourceClaim. The entire content is copied unchanged
 	// into the ResourceClaim that gets created from this template. The
 	// same fields as in a ResourceClaim are also valid here.
 	Spec *ResourceClaimSpecApplyConfiguration `json:"spec,omitempty"`

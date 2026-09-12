@@ -23,7 +23,7 @@ import (
 
 // DeviceSelector must have exactly one field set.
 type DeviceSelector struct {
-	// CEL contains a CEL expression for selecting a device.
+	// cel contains a CEL expression for selecting a device.
 	//
 	// +optional
 	// +oneOf=SelectorType
@@ -32,7 +32,7 @@ type DeviceSelector struct {
 
 // CELDeviceSelector contains a CEL expression for selecting a device.
 type CELDeviceSelector struct {
-	// Expression is a CEL expression which evaluates a single device. It
+	// expression is a CEL expression which evaluates a single device. It
 	// must evaluate to true when the device under consideration satisfies
 	// the desired criteria, and false when it does not. Any other result
 	// is an error and causes allocation of devices to abort.
@@ -130,19 +130,19 @@ const CELSelectorExpressionMaxLength = 10 * 1024
 //
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 type DeviceTaint struct {
-	// The taint key to be applied to a device.
+	// key is the taint key to be applied to a device.
 	// Must be a label name.
 	//
 	// +required
 	Key string `json:"key" protobuf:"bytes,1,name=key"`
 
-	// The taint value corresponding to the taint key.
+	// value is the taint value corresponding to the taint key.
 	// Must be a label value.
 	//
 	// +optional
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 
-	// The effect of the taint on claims that do not tolerate the taint
+	// effect is the effect of the taint on claims that do not tolerate the taint
 	// and through such claims on the pods using them.
 	//
 	// Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
@@ -166,7 +166,7 @@ type DeviceTaint struct {
 	// which will enable adding new enums within a single release without
 	// ratcheting.
 
-	// TimeAdded represents the time at which the taint was added or
+	// timeAdded represents the time at which the taint was added or
 	// (only in a DeviceTaintRule) the effect was modified.
 	// Added automatically during create or update if not set.
 	//
@@ -216,17 +216,17 @@ const (
 // +k8s:supportsSubresource="/status"
 type DeviceTaintRule struct {
 	metav1.TypeMeta `json:""`
-	// Standard object metadata
+	// metadata is the standard object metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec specifies the selector and one taint.
+	// spec specifies the selector and one taint.
 	//
 	// Changing the spec automatically increments the metadata.generation number.
 	// +required
 	Spec DeviceTaintRuleSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
-	// Status provides information about what was requested in the spec.
+	// status provides information about what was requested in the spec.
 	//
 	// +optional
 	Status DeviceTaintRuleStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
@@ -234,7 +234,7 @@ type DeviceTaintRule struct {
 
 // DeviceTaintRuleSpec specifies the selector and one taint.
 type DeviceTaintRuleSpec struct {
-	// DeviceSelector defines which device(s) the taint is applied to.
+	// deviceSelector defines which device(s) the taint is applied to.
 	// All selector criteria must be satisfied for a device to
 	// match. The empty selector matches all devices. Without
 	// a selector, no devices are matches.
@@ -242,7 +242,7 @@ type DeviceTaintRuleSpec struct {
 	// +optional
 	DeviceSelector *DeviceTaintSelector `json:"deviceSelector,omitempty" protobuf:"bytes,1,opt,name=deviceSelector"`
 
-	// The taint that gets applied to matching devices.
+	// taint is the taint that gets applied to matching devices.
 	//
 	// +required
 	Taint DeviceTaint `json:"taint,omitempty" protobuf:"bytes,2,rep,name=taint"`
@@ -264,13 +264,13 @@ type DeviceTaintSelector struct {
 	//
 	// DeviceClassName *string `json:"deviceClassName,omitempty" protobuf:"bytes,1,opt,name=deviceClassName"`
 
-	// If driver is set, only devices from that driver are selected.
+	// driver is the driver name. If driver is set, only devices from that driver are selected.
 	// This fields corresponds to slice.spec.driver.
 	//
 	// +optional
 	Driver *string `json:"driver,omitempty" protobuf:"bytes,2,opt,name=driver"`
 
-	// If pool is set, only devices in that pool are selected.
+	// pool is the pool name. If pool is set, only devices in that pool are selected.
 	//
 	// Also setting the driver name may be useful to avoid
 	// ambiguity when different drivers use the same pool name,
@@ -282,7 +282,7 @@ type DeviceTaintSelector struct {
 	// +optional
 	Pool *string `json:"pool,omitempty" protobuf:"bytes,3,opt,name=pool"`
 
-	// If device is set, only devices with that name are selected.
+	// device is the name of the device. If device is set, only devices with that name are selected.
 	// This field corresponds to slice.spec.devices[].name.
 	//
 	// Setting also driver and pool may be required to avoid ambiguity,
@@ -307,7 +307,7 @@ type DeviceTaintSelector struct {
 
 // DeviceTaintRuleStatus provides information about an on-going pod eviction.
 type DeviceTaintRuleStatus struct {
-	// Conditions provide information about the state of the DeviceTaintRule
+	// conditions provide information about the state of the DeviceTaintRule
 	// and the cluster at some point in time,
 	// in a machine-readable and human-readable format.
 	//
@@ -370,18 +370,18 @@ type DeviceTaintRuleList struct {
 // Users should delete and recreate requests to get updated information.
 type ResourcePoolStatusRequest struct {
 	metav1.TypeMeta `json:""`
-	// Standard object metadata
+	// metadata is the standard object metadata.
 	// +required
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec defines the filters for which pools to include in the status.
+	// spec defines the filters for which pools to include in the status.
 	// The spec is immutable once created.
 	//
 	// +required
 	// +k8s:immutable
 	Spec ResourcePoolStatusRequestSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
-	// Status is populated by the controller with the calculated pool status.
+	// status is populated by the controller with the calculated pool status.
 	// When status is non-nil, the request is considered complete and the
 	// entire object becomes immutable.
 	//
@@ -392,7 +392,7 @@ type ResourcePoolStatusRequest struct {
 
 // ResourcePoolStatusRequestSpec defines the filters for the pool status request.
 type ResourcePoolStatusRequestSpec struct {
-	// Driver specifies the DRA driver name to filter pools.
+	// driver specifies the DRA driver name to filter pools.
 	// Only pools from ResourceSlices with this driver will be included.
 	// Must be a DNS subdomain (e.g., "gpu.example.com").
 	//
@@ -401,7 +401,7 @@ type ResourcePoolStatusRequestSpec struct {
 	// +k8s:format=k8s-long-name-caseless
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
 
-	// PoolName optionally filters to a specific pool name.
+	// poolName optionally filters to a specific pool name.
 	// If not specified, all pools from the specified driver are included.
 	// When specified, must be a non-empty valid resource pool name
 	// (DNS subdomains separated by "/").
@@ -411,7 +411,7 @@ type ResourcePoolStatusRequestSpec struct {
 	// +k8s:format=k8s-resource-pool-name
 	PoolName *string `json:"poolName,omitempty" protobuf:"bytes,2,opt,name=poolName"`
 
-	// Limit optionally specifies the maximum number of pools to return in the status.
+	// limit optionally specifies the maximum number of pools to return in the status.
 	// If more pools match the filter criteria, the response will be truncated
 	// (i.e., len(status.pools) < status.poolCount).
 	//
@@ -426,7 +426,7 @@ type ResourcePoolStatusRequestSpec struct {
 	// +k8s:maximum=1000
 	Limit *int32 `json:"limit,omitempty" protobuf:"varint,3,opt,name=limit"`
 
-	// DefaultPartitionTypeAttribute optionally names a device attribute (by its
+	// defaultPartitionTypeAttribute optionally names a device attribute (by its
 	// fully qualified name, e.g. "gpu.example.com/profile") to use as the default
 	// grouping attribute for partitionable devices whose slice has not declared
 	// one themselves.
@@ -455,7 +455,7 @@ const ResourcePoolStatusRequestLimitMax int32 = 1000
 
 // ResourcePoolStatusRequestStatus contains the calculated pool status information.
 type ResourcePoolStatusRequestStatus struct {
-	// PoolCount is the total number of pools that matched the filter criteria,
+	// poolCount is the total number of pools that matched the filter criteria,
 	// regardless of truncation. This helps users understand how many pools exist
 	// even when the response is truncated. A value of 0 means no pools matched
 	// the filter criteria.
@@ -465,7 +465,7 @@ type ResourcePoolStatusRequestStatus struct {
 	// +k8s:minimum=0
 	PoolCount *int32 `json:"poolCount,omitempty" protobuf:"varint,6,opt,name=poolCount"`
 
-	// Pools contains the first `spec.limit` matching pools, sorted by driver
+	// pools contains the first `spec.limit` matching pools, sorted by driver
 	// then pool name. If `len(pools) < poolCount`, the list was truncated.
 	// When omitted, no pools matched the request filters.
 	//
@@ -476,7 +476,7 @@ type ResourcePoolStatusRequestStatus struct {
 	// +k8s:maxItems=1000
 	Pools []PoolStatus `json:"pools,omitempty" protobuf:"bytes,2,rep,name=pools"`
 
-	// Conditions provide information about the state of the request.
+	// conditions provide information about the state of the request.
 	// A condition with type=Complete or type=Failed will always be set
 	// when the status is populated.
 	//
@@ -498,7 +498,7 @@ type ResourcePoolStatusRequestStatus struct {
 
 // PoolStatus contains status information for a single resource pool.
 type PoolStatus struct {
-	// Driver is the DRA driver name for this pool.
+	// driver is the DRA driver name for this pool.
 	// Must be a DNS subdomain (e.g., "gpu.example.com").
 	//
 	// +required
@@ -506,7 +506,7 @@ type PoolStatus struct {
 	// +k8s:format=k8s-long-name-caseless
 	Driver string `json:"driver,omitempty" protobuf:"bytes,1,name=driver"`
 
-	// PoolName is the name of the pool.
+	// poolName is the name of the pool.
 	// Must be a valid resource pool name (DNS subdomains separated by "/").
 	//
 	// +required
@@ -514,7 +514,7 @@ type PoolStatus struct {
 	// +k8s:format=k8s-resource-pool-name
 	PoolName string `json:"poolName,omitempty" protobuf:"bytes,2,name=poolName"`
 
-	// Generation is the pool generation observed across all ResourceSlices
+	// generation is the pool generation observed across all ResourceSlices
 	// in this pool. Only the latest generation is reported. During a generation
 	// rollout, if not all slices at the latest generation have been published,
 	// the pool is included with a validationError and device counts unset.
@@ -524,7 +524,7 @@ type PoolStatus struct {
 	// +k8s:minimum=0
 	Generation int64 `json:"generation" protobuf:"varint,9,opt,name=generation"`
 
-	// ResourceSliceCount is the number of ResourceSlices that make up this pool.
+	// resourceSliceCount is the number of ResourceSlices that make up this pool.
 	// May be unset when validationError is set.
 	//
 	// +optional
@@ -532,7 +532,7 @@ type PoolStatus struct {
 	// +k8s:minimum=1
 	ResourceSliceCount *int32 `json:"resourceSliceCount,omitempty" protobuf:"varint,8,opt,name=resourceSliceCount"`
 
-	// TotalDevices is the total number of devices in the pool across all slices.
+	// totalDevices is the total number of devices in the pool across all slices.
 	// A value of 0 means the pool has no devices.
 	// May be unset when validationError is set.
 	//
@@ -541,7 +541,7 @@ type PoolStatus struct {
 	// +k8s:minimum=0
 	TotalDevices *int32 `json:"totalDevices,omitempty" protobuf:"varint,4,opt,name=totalDevices"`
 
-	// AllocatedDevices is the number of devices currently allocated to claims.
+	// allocatedDevices is the number of devices currently allocated to claims.
 	// A value of 0 means no devices are allocated.
 	// May be unset when validationError is set.
 	//
@@ -550,7 +550,7 @@ type PoolStatus struct {
 	// +k8s:minimum=0
 	AllocatedDevices *int32 `json:"allocatedDevices,omitempty" protobuf:"varint,5,opt,name=allocatedDevices"`
 
-	// AvailableDevices is the number of devices available for allocation.
+	// availableDevices is the number of devices available for allocation.
 	// This equals TotalDevices - AllocatedDevices - UnavailableDevices.
 	// A value of 0 means no devices are currently available.
 	// May be unset when validationError is set.
@@ -560,7 +560,7 @@ type PoolStatus struct {
 	// +k8s:minimum=0
 	AvailableDevices *int32 `json:"availableDevices,omitempty" protobuf:"varint,6,opt,name=availableDevices"`
 
-	// UnavailableDevices is the number of devices that are not available
+	// unavailableDevices is the number of devices that are not available
 	// due to taints or other conditions, but are not allocated.
 	// A value of 0 means all unallocated devices are available.
 	// May be unset when validationError is set.
@@ -570,7 +570,7 @@ type PoolStatus struct {
 	// +k8s:minimum=0
 	UnavailableDevices *int32 `json:"unavailableDevices,omitempty" protobuf:"varint,7,opt,name=unavailableDevices"`
 
-	// NodeName is the node this pool is associated with.
+	// nodeName is the node this pool is associated with.
 	// When omitted, the pool is not associated with a specific node.
 	// Must be a valid DNS subdomain name (RFC1123).
 	//
@@ -579,7 +579,7 @@ type PoolStatus struct {
 	// +k8s:format=k8s-long-name
 	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
 
-	// ValidationError is set when the pool's data could not be fully
+	// validationError is set when the pool's data could not be fully
 	// validated (e.g., incomplete slice publication). When set, device
 	// count fields and ResourceSliceCount may be unset.
 	//
@@ -588,7 +588,7 @@ type PoolStatus struct {
 	// +k8s:maxBytes=256
 	ValidationError *string `json:"validationError,omitempty" protobuf:"bytes,10,opt,name=validationError"`
 
-	// PartitionSummary reports allocatability per (attribute, partition type)
+	// partitionSummary reports allocatability per (attribute, partition type)
 	// for a partitionable pool that publishes SharedCounters. Each entry names
 	// the grouping attribute it was resolved from: the PartitionTypeAttribute
 	// declared by a device's own slice, or for devices whose slice declares
@@ -607,7 +607,7 @@ type PoolStatus struct {
 	// +k8s:maxItems=32
 	PartitionSummary []PartitionTypeStatus `json:"partitionSummary,omitempty" protobuf:"bytes,11,rep,name=partitionSummary"`
 
-	// ShareableSummary reports aggregate capacity for a pool that contains
+	// shareableSummary reports aggregate capacity for a pool that contains
 	// devices with AllowMultipleAllocations. It is populated only when at
 	// least one device in the pool is shareable.
 	//
@@ -619,7 +619,7 @@ type PoolStatus struct {
 // PartitionTypeStatus reports allocatability for a single partition type,
 // identified by the value of a grouping attribute.
 type PartitionTypeStatus struct {
-	// Attribute is the fully qualified name of the device attribute whose value
+	// attribute is the fully qualified name of the device attribute whose value
 	// groups this entry. It is the PartitionTypeAttribute declared by the
 	// devices' own slice, or the default named in the request when their slice
 	// declares none.
@@ -628,20 +628,20 @@ type PartitionTypeStatus struct {
 	// +k8s:required
 	Attribute string `json:"attribute,omitempty" protobuf:"bytes,4,name=attribute"`
 
-	// Type is the partition type value (e.g. "Full" or "Half").
+	// type is the partition type value (e.g. "Full" or "Half").
 	//
 	// +required
 	// +k8s:required
 	Type string `json:"type,omitempty" protobuf:"bytes,1,name=type"`
 
-	// Total is the number of devices of this partition type in the pool.
+	// total is the number of devices of this partition type in the pool.
 	//
 	// +required
 	// +k8s:required
 	// +k8s:minimum=0
 	Total *int32 `json:"total,omitempty" protobuf:"varint,2,opt,name=total"`
 
-	// Allocatable is the number of additional devices of this partition type
+	// allocatable is the number of additional devices of this partition type
 	// that could still be allocated given current shared-counter consumption.
 	//
 	// +required
@@ -653,7 +653,7 @@ type PartitionTypeStatus struct {
 // ShareableSummaryStatus reports aggregate capacity for a pool that contains
 // devices with AllowMultipleAllocations.
 type ShareableSummaryStatus struct {
-	// FullyAvailableDevices is the number of shareable devices with no
+	// fullyAvailableDevices is the number of shareable devices with no
 	// capacity consumed.
 	//
 	// +required
@@ -661,7 +661,7 @@ type ShareableSummaryStatus struct {
 	// +k8s:minimum=0
 	FullyAvailableDevices *int32 `json:"fullyAvailableDevices,omitempty" protobuf:"varint,1,opt,name=fullyAvailableDevices"`
 
-	// PartiallyAvailableDevices is the number of shareable devices with some
+	// partiallyAvailableDevices is the number of shareable devices with some
 	// but not all capacity consumed.
 	//
 	// +required
@@ -669,7 +669,7 @@ type ShareableSummaryStatus struct {
 	// +k8s:minimum=0
 	PartiallyAvailableDevices *int32 `json:"partiallyAvailableDevices,omitempty" protobuf:"varint,2,opt,name=partiallyAvailableDevices"`
 
-	// Capacity reports aggregate total, consumed, and available amounts per
+	// capacity reports aggregate total, consumed, and available amounts per
 	// shareable capacity key across the pool.
 	//
 	// +optional
@@ -682,25 +682,25 @@ type ShareableSummaryStatus struct {
 // ShareableCapacityStatus reports aggregate amounts for a single shareable
 // capacity key.
 type ShareableCapacityStatus struct {
-	// Name is the capacity name.
+	// name is the capacity name.
 	//
 	// +required
 	// +k8s:required
 	Name string `json:"name,omitempty" protobuf:"bytes,1,name=name"`
 
-	// Total is the sum of this capacity across shareable devices in the pool.
+	// total is the sum of this capacity across shareable devices in the pool.
 	//
 	// +required
 	// +k8s:required
 	Total *resource.Quantity `json:"total,omitempty" protobuf:"bytes,2,opt,name=total"`
 
-	// Consumed is the amount drawn by current allocations.
+	// consumed is the amount drawn by current allocations.
 	//
 	// +required
 	// +k8s:required
 	Consumed *resource.Quantity `json:"consumed,omitempty" protobuf:"bytes,3,opt,name=consumed"`
 
-	// Available is Total minus Consumed, never negative.
+	// available is Total minus Consumed, never negative.
 	//
 	// +required
 	// +k8s:required

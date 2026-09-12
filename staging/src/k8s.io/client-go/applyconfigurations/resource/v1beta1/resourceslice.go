@@ -56,9 +56,9 @@ import (
 // feature gate.
 type ResourceSliceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object metadata
+	// metadata is the standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Contains the information published by the driver.
+	// spec contains the information published by the driver.
 	//
 	// Changing the spec automatically increments the metadata.generation number.
 	Spec *ResourceSliceSpecApplyConfiguration `json:"spec,omitempty"`
