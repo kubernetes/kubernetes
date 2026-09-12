@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -146,6 +147,22 @@ func CreateTestClient(logger klog.Logger) *fake.Clientset {
 			}
 		}
 		return true, updateAction.GetObject(), nil
+	})
+	fakeClient.AddReactor("create", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		createAction := action.(core.CreateAction)
+		node := createAction.GetObject().(*v1.Node)
+		nodes.Items = append(nodes.Items, *node)
+		return true, createAction.GetObject(), nil
+	})
+	fakeClient.AddReactor("get", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		getAction := action.(core.GetAction)
+		for _, n := range nodes.Items {
+			if n.Name == getAction.GetName() {
+				node := n
+				return true, &node, nil
+			}
+		}
+		return true, nil, apierrors.NewNotFound(v1.Resource("nodes"), getAction.GetName())
 	})
 	fakeClient.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.NodeList{}
