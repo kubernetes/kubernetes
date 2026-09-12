@@ -54,6 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclientwatch "k8s.io/client-go/rest/watch"
@@ -2220,15 +2221,7 @@ func TestWatchNonDefaultContentType(t *testing.T) {
 }
 
 func TestWatchUnknownContentType(t *testing.T) {
-	var table = []struct {
-		t   watch.EventType
-		obj runtime.Object
-	}{
-		{watch.Added, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
-		{watch.Modified, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "second"}}},
-		{watch.Deleted, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "last"}}},
-	}
-
+	handlerDone := make(chan struct{})
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -2241,20 +2234,40 @@ func TestWatchUnknownContentType(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
-		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)), scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion))
-		for _, item := range table {
-			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
-				panic(err)
-			}
-			flusher.Flush()
-		}
+		// Negotiation fails on the Content-Type header alone, so no events
+		// are written. Hold the stream open like a real watch: the client
+		// must not block waiting for the stream to end before returning the
+		// negotiation error.
+		<-handlerDone
 	}))
 	defer testServer.Close()
+	defer close(handlerDone)
 
 	s := testRESTClient(t, testServer)
-	_, err := s.Get().Prefix("path/to/watch/thing").Watch(context.Background())
-	if err == nil {
-		t.Fatalf("Expected to fail due to lack of known stream serialization for content type")
+	respCount := newCount()
+	inner := s.Client.Transport
+	s.Client.Transport = clientFunc(func(req *http.Request) (*http.Response, error) {
+		resp, err := inner.RoundTrip(req)
+		if err == nil {
+			resp.Body = &readTracker{delegated: resp.Body, count: respCount}
+		}
+		return resp, err
+	})
+	watchErr := make(chan error, 1)
+	go func() {
+		_, err := s.Get().Prefix("path/to/watch/thing").Watch(context.Background())
+		watchErr <- err
+	}()
+	select {
+	case err := <-watchErr:
+		if err == nil {
+			t.Fatalf("Expected to fail due to lack of known stream serialization for content type")
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("Watch did not return; blocked on the open watch stream?")
+	}
+	if got := respCount.getCloseCount(); got != 1 {
+		t.Errorf("Expected response body Close to be invoked 1 time, but got: %d", got)
 	}
 }
 
