@@ -1651,21 +1651,35 @@ func (pa *mockProposedAssignment) GetCycleState() fwk.CycleState {
 func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 	nodeName := "node1"
 	preemptorPod := st.MakePod().Name("p1").UID("p1").Obj()
-	preemptor := newPodGroupPreemptor(
-		newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod}),
-		false,
-	)
 
 	tests := []struct {
 		name             string
+		isCPG            bool
+		wantPreemptor    string
 		evaluationStatus *fwk.Status
 	}{
 		{
-			name:             "scheduling success",
+			name:             "podgroup scheduling success",
+			isCPG:            false,
+			wantPreemptor:    "podgroup",
 			evaluationStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name:             "scheduling error",
+			name:             "compositepodgroup scheduling success",
+			isCPG:            true,
+			wantPreemptor:    "compositepodgroup",
+			evaluationStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:             "podgroup scheduling error",
+			isCPG:            false,
+			wantPreemptor:    "podgroup",
+			evaluationStatus: fwk.NewStatus(fwk.Error, "failed to schedule"),
+		},
+		{
+			name:             "compositepodgroup scheduling error",
+			isCPG:            true,
+			wantPreemptor:    "compositepodgroup",
 			evaluationStatus: fwk.NewStatus(fwk.Error, "failed to schedule"),
 		},
 	}
@@ -1678,6 +1692,19 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+
+			var preemptor *podGroupPreemptor
+			if tt.isCPG {
+				preemptor = newPodGroupPreemptor(
+					newTestPodGroupInfo(nil, st.MakeCompositePodGroup().Name("preemptor-cpg").Priority(highPriority).Obj(), []*v1.Pod{preemptorPod}),
+					false,
+				)
+			} else {
+				preemptor = newPodGroupPreemptor(
+					newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod}),
+					false,
+				)
+			}
 
 			node := st.MakeNode().Name(nodeName).Obj()
 			victimPod := st.MakePod().Name("p2").UID("p2").Node(nodeName).Priority(lowPriority).Obj()
@@ -1728,8 +1755,9 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
+
 			expectedStatus := tt.evaluationStatus.Code().String()
-			stateBefore := captureEvaluationDurationMetric(testRegistry, "podgroup", expectedStatus)
+			stateBefore := captureEvaluationDurationMetric(testRegistry, tt.wantPreemptor, expectedStatus)
 
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
@@ -1739,11 +1767,11 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
-			stateAfter := captureEvaluationDurationMetric(testRegistry, "podgroup", expectedStatus)
+			stateAfter := captureEvaluationDurationMetric(testRegistry, tt.wantPreemptor, expectedStatus)
 
 			diff := stateAfter.count - stateBefore.count
 			if diff != 1 {
-				t.Errorf("Expected %s count delta to be 1, got %d", expectedStatus, diff)
+				t.Errorf("Expected %s count delta for %s to be 1, got %d", expectedStatus, tt.wantPreemptor, diff)
 			}
 		})
 	}
