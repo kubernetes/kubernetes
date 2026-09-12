@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -25,9 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	apiserverauthorizationv1 "k8s.io/apiserver/pkg/apis/authorization/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationv1internal "k8s.io/kubernetes/pkg/apis/authorization/v1"
 )
 
 // ResourceAttributesFrom combines the API object information and the user.Info from the context to build a full authorizer.AttributesRecord for resource access
@@ -237,4 +240,32 @@ func BuildEvaluationError(evaluationError error, attrs authorizer.AttributesReco
 		}
 	}
 	return strings.Join(evaluationErrors, "; ")
+}
+
+// SARStatusFromAuthorize invokes the authorizer as appropriate (with or without conditions support), and encodes the result into SAR status.
+func ConditionsAwareDecisionToSARStatus(ctx context.Context, attrs authorizer.AttributesRecord, decision authorizer.ConditionsAwareDecision) authorizationapi.SubjectAccessReviewStatus {
+	// Allow/Deny/NoOpinion decisions should be serialized as before, on the top-level SAR status.
+	if decision.IsUnconditional() {
+		return authorizationapi.SubjectAccessReviewStatus{
+			Allowed:         decision.IsAllow(),
+			Denied:          decision.IsDeny(),
+			Reason:          decision.Reason(),
+			EvaluationError: BuildEvaluationError(decision.Error(), attrs),
+		}
+	}
+	// ConditionsMap or Union decision should be put under status.conditionalDecision.
+	serializedv1 := apiserverauthorizationv1.SerializeConditionsAwareDecision(decision)
+	serializedinternal := &authorizationapi.ConditionsAwareDecision{}
+	if err := authorizationv1internal.Convert_v1_ConditionsAwareDecision_To_authorization_ConditionsAwareDecision(&serializedv1, serializedinternal, nil); err != nil {
+		// This conversion should never fail, but handle the case to be safe.
+		return authorizationapi.SubjectAccessReviewStatus{
+			Allowed:         false,
+			Denied:          true,
+			Reason:          "failed closed",
+			EvaluationError: BuildEvaluationError(err, attrs),
+		}
+	}
+	return authorizationapi.SubjectAccessReviewStatus{
+		ConditionalDecision: serializedinternal,
+	}
 }
