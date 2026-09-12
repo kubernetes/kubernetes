@@ -501,7 +501,10 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 	runtimeStatusResources := statusResources.GetLinux()
 	if runtimeStatusResources != nil {
 		var cpuLimit, memLimit, cpuRequest *resource.Quantity
+		var cpuQuotaUnlimited bool
 		if runtimeStatusResources.CpuPeriod > 0 {
+			// A quota of -1 is the CFS "no limit" value: the limit is absent by design, not unread.
+			cpuQuotaUnlimited = runtimeStatusResources.CpuQuota == -1
 			milliCPU := cm.QuotaToMilliCPU(runtimeStatusResources.CpuQuota, runtimeStatusResources.CpuPeriod)
 			if milliCPU > 0 {
 				cpuLimit = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
@@ -516,11 +519,12 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 		if runtimeStatusResources.MemoryLimitInBytes > 0 {
 			memLimit = resource.NewQuantity(runtimeStatusResources.MemoryLimitInBytes, resource.BinarySI)
 		}
-		if cpuLimit != nil || memLimit != nil || cpuRequest != nil {
+		if cpuLimit != nil || memLimit != nil || cpuRequest != nil || cpuQuotaUnlimited {
 			cStatusResources = &kubecontainer.ContainerResources{
-				CPULimit:    cpuLimit,
-				CPURequest:  cpuRequest,
-				MemoryLimit: memLimit,
+				CPULimit:          cpuLimit,
+				CPURequest:        cpuRequest,
+				MemoryLimit:       memLimit,
+				CPUQuotaUnlimited: cpuQuotaUnlimited,
 			}
 		}
 	}

@@ -19,6 +19,7 @@ limitations under the License.
 package cm
 
 import (
+	"math"
 	"reflect"
 	"strconv"
 	"testing"
@@ -32,6 +33,66 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/utils/ptr"
 )
+
+func TestMilliCPUToQuotaOverflow(t *testing.T) {
+	// The overflow boundary scales with the period, so pin CustomCPUCFSQuotaPeriod
+	// on to keep the non-default periods below from being overridden to QuotaPeriod.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUCFSQuotaPeriod, true)
+	for _, tc := range []struct {
+		name     string
+		milliCPU int64
+		period   int64
+		want     int64
+	}{
+		{"zero stays unset", 0, QuotaPeriod, 0},
+		{"a tiny limit rounds up to the minimum", 1, QuotaPeriod, MinQuotaPeriod},
+		{"an ordinary limit", 200, QuotaPeriod, 20000},
+		{"a hugely negative value floors to the minimum, not wrapping to a positive quota", math.MinInt64 + 1000000, QuotaPeriod, MinQuotaPeriod},
+		{"the local multiplication boundary now overflows the systemd conversion", math.MaxInt64 / QuotaPeriod, QuotaPeriod, -1},
+		{"a quota just under the systemd-multiply boundary is representable", 10000000000, QuotaPeriod, 1000000000000},
+		{"a quota past the systemd-multiply boundary is unlimited", 100000000000, QuotaPeriod, -1},
+		{"the last quota kept finite by the one-period headroom", math.MaxInt64/1000000 - 1000, 1000, math.MaxInt64/1000000 - 1000},
+		{"a backend-safe quota inside the headroom band maps to unlimited", math.MaxInt64/1000000 - 999, 1000, -1},
+		{"a quota the systemd round-up would overflow is unlimited", 92233720368, QuotaPeriod, -1},
+		{"a product that would overflow int64 becomes the unlimited sentinel", math.MaxInt64, QuotaPeriod, -1},
+		{"one milliCPU past the overflow boundary is unlimited", math.MaxInt64/QuotaPeriod + 1, QuotaPeriod, -1},
+		{"the 1ms-period boundary also overflows the systemd conversion", math.MaxInt64 / 1000, 1000, -1},
+		{"one past the boundary at a 1ms period is unlimited", math.MaxInt64/1000 + 1, 1000, -1},
+		{"the 1s-period boundary also overflows the systemd conversion", math.MaxInt64 / 1000000, 1000000, -1},
+		{"one past the boundary at a 1s period is unlimited", math.MaxInt64/1000000 + 1, 1000000, -1},
+		{"a zero period floors to the minimum instead of dividing by zero", 200, 0, MinQuotaPeriod},
+		{"a negative period cannot wrap to a positive quota", 3, math.MinInt64 / 2, MinQuotaPeriod},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := MilliCPUToQuota(tc.milliCPU, tc.period); got != tc.want {
+				t.Errorf("MilliCPUToQuota(%d, %d) = %d, want %d", tc.milliCPU, tc.period, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestMilliCPUToSharesOverflow(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		milliCPU int64
+		want     uint64
+	}{
+		{"zero maps to the kernel default", 0, MinShares},
+		{"a tiny limit rounds up to the minimum", 1, MinShares},
+		{"an ordinary limit", 2000, 2048},
+		{"a limit landing on the ceiling", 256000, MaxShares},
+		{"the exact multiplication boundary clamps to the ceiling", math.MaxInt64 / SharesPerCPU, MaxShares},
+		{"one past the multiplication boundary clamps to the ceiling", math.MaxInt64/SharesPerCPU + 1, MaxShares},
+		{"a product that overflows int64 clamps to the maximum, not the minimum", math.MaxInt64, MaxShares},
+		{"a hugely negative value floors to the minimum, not wrapping to the maximum", math.MinInt64 + 1000000, MinShares},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := MilliCPUToShares(tc.milliCPU); got != tc.want {
+				t.Errorf("MilliCPUToShares(%d) = %d, want %d", tc.milliCPU, got, tc.want)
+			}
+		})
+	}
+}
 
 // getResourceList returns a ResourceList with the
 // specified cpu and memory resource values
