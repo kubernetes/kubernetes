@@ -161,7 +161,8 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 		status, found := p.statusProvider.GetPodStatus(podUID)
 		// A Running pod's volumes remain mounted during restart backoff,
 		// even when all of its container samples have been filtered out.
-		if !podsWithLiveContainers[podStats.PodRef] && (!found || status.Phase != v1.PodRunning) {
+		if !found || status.StartTime == nil || status.StartTime.IsZero() ||
+			(!podsWithLiveContainers[podStats.PodRef] && status.Phase != v1.PodRunning) {
 			continue
 		}
 		makePodStorageStats(logger, podStats, &rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, false)
@@ -179,11 +180,8 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 			// ProcessStats were accumulated as the containers were iterated.
 		}
 
-		if found && status.StartTime != nil && !status.StartTime.IsZero() {
-			podStats.StartTime = *status.StartTime
-			// only append stats if we were able to get the start time of the pod
-			result = append(result, *podStats)
-		}
+		podStats.StartTime = *status.StartTime
+		result = append(result, *podStats)
 	}
 
 	return result, nil
