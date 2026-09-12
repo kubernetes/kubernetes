@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	nodetopology "k8s.io/component-helpers/node/topology"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
@@ -4094,4 +4095,63 @@ func TestProcessPodMarkPodNotReady(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestHandleDisruptionExitDoesNotPanicOnMissingNodeHealthEntry reproduces
+// https://github.com/kubernetes/kubernetes/issues/141572: a Node that has no
+// nodeHealthMap entry (e.g. because a previous cycle's health update was
+// short circuited by the lease cache consistency check) must not cause a nil
+// pointer dereference when the controller exits master disruption mode.
+func TestHandleDisruptionExitDoesNotPanicOnMissingNodeHealthEntry(t *testing.T) {
+	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "node0",
+			CreationTimestamp: fakeNow,
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:               v1.NodeReady,
+					Status:             v1.ConditionTrue,
+					LastHeartbeatTime:  fakeNow,
+					LastTransitionTime: fakeNow,
+				},
+			},
+		},
+	}
+
+	logger, ctx := ktesting.NewTestContext(t)
+	nodeController, err := newNodeLifecycleControllerFromClient(
+		ctx,
+		fake.NewSimpleClientset(),
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	nodeController.now = func() metav1.Time { return fakeNow }
+
+	// Register the zone as classifyNodes normally would, then force it into
+	// full disruption mode, as if the cluster is recovering from an outage.
+	nodeController.addPodEvictorForNewZone(logger, node)
+	zone := nodetopology.GetZoneKey(node)
+	nodeController.zoneStates[zone] = stateFullDisruption
+
+	// Deliberately leave nodeHealthMap empty: this Node has no entry, as
+	// happens when its update was skipped in an earlier cycle.
+	_, currentReadyCondition := controllerutil.GetNodeCondition(&node.Status, v1.NodeReady)
+	zoneToNodeConditions := map[string][]*v1.NodeCondition{
+		zone: {currentReadyCondition},
+	}
+
+	// Must not panic: exiting master disruption mode has to tolerate Nodes
+	// without a nodeHealthMap entry.
+	nodeController.handleDisruption(ctx, zoneToNodeConditions, []*v1.Node{node})
 }
