@@ -848,7 +848,7 @@ func TestRecreateStatefulSetUpdate(t *testing.T) {
 	}
 
 	newImage := "new-image"
-	updateSTS(t, stsClient, sts.Name, func(sts *appsv1.StatefulSet) {
+	updatedSTS := updateSTS(t, stsClient, sts.Name, func(sts *appsv1.StatefulSet) {
 		sts.Spec.Template.Spec.Containers[0].Image = newImage
 	})
 
@@ -881,8 +881,10 @@ func TestRecreateStatefulSetUpdate(t *testing.T) {
 			setPodsReadyCondition(t, c, &pendingPods, v1.ConditionTrue, time.Now())
 		}
 
-		return ss.Status.ReadyReplicas == *ss.Spec.Replicas &&
-			ss.Status.CurrentRevision == ss.Status.UpdateRevision, nil
+		return ss.Status.ObservedGeneration >= updatedSTS.Generation &&
+			ss.Status.ReadyReplicas == *ss.Spec.Replicas &&
+			ss.Status.CurrentRevision == ss.Status.UpdateRevision &&
+			ss.Status.CurrentRevision != oldCurrentRevision, nil
 	}); err != nil {
 		t.Fatalf("Timed out waiting for recreate update to complete: %v", err)
 	}
