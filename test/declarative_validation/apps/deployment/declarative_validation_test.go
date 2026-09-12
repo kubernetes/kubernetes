@@ -93,6 +93,13 @@ func TestDeclarativeValidate(t *testing.T) {
 					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				},
 			},
+			"selector required": {
+				input: mkDeployment(tweakSelectorLabels(nil)),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("spec").Child("selector"), "").MarkAlpha(),
+					field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
+				},
+			},
 		}
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
@@ -120,5 +127,62 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		meta.RunObjectMetaUpdateTestCases(t, ctx, mkDeployment(), registry.Strategy,
 			meta.WithStringentFinalizerValidation(),
 		)
+		testCases := map[string]struct {
+			oldObj       *apps.Deployment
+			updateObj    *apps.Deployment
+			expectedErrs field.ErrorList
+		}{
+			"valid update": {
+				oldObj:    mkDeployment(),
+				updateObj: mkDeployment(tweakReplicas(2)),
+			},
+			"selector changed": {
+				oldObj:    mkDeployment(),
+				updateObj: mkDeployment(tweakSelectorLabels(map[string]string{"name": "c"})),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+			"selector set from unset": {
+				oldObj:    mkDeployment(tweakSelectorLabels(nil)),
+				updateObj: mkDeployment(),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+			"selector unset from set": {
+				oldObj:    mkDeployment(),
+				updateObj: mkDeployment(tweakSelectorLabels(nil)),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("spec").Child("selector"), "").MarkAlpha(),
+					field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+		}
+		for k, tc := range testCases {
+			t.Run(k, func(t *testing.T) {
+				tc.oldObj.ResourceVersion = "1"
+				tc.updateObj.ResourceVersion = "2"
+				apitesting.VerifyUpdateValidationEquivalence(t, ctx, tc.updateObj, tc.oldObj, registry.Strategy, tc.expectedErrs)
+			})
+		}
+	}
+}
+
+func tweakSelectorLabels(labels map[string]string) func(*apps.Deployment) {
+	return func(deploy *apps.Deployment) {
+		if labels == nil {
+			deploy.Spec.Selector = nil
+			return
+		}
+		deploy.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
+	}
+}
+
+func tweakReplicas(replicas int32) func(*apps.Deployment) {
+	return func(deploy *apps.Deployment) {
+		deploy.Spec.Replicas = replicas
 	}
 }
