@@ -61,6 +61,8 @@ service ExternalJWTSigner {
     string header = 1;
   
     // The signature for the JWT.
+    // For ECDSA algorithms, the signature must be encoded according to RFC 7518
+    // section 3.4 using the fixed-length R || S (IEEE P1363) format, not ASN.1 DER.
     // Already wrapped in URL-safe base64, exactly as it appears in the final segment of the JWT.
     string signature = 2;
   }
