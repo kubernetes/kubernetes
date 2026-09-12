@@ -153,7 +153,7 @@ import (
 //
 // Examples:
 //
-//	authorizer.group('').resource('pods').namespace('default').check('create') // Checks if the principal (user or service account) is authorized create pods in the 'default' namespace.
+//	authorizer.group('').resource('pods').namespace('default').check('create') // Checks if the principal (user or service account) is authorized to create pods in the 'default' namespace.
 //	authorizer.path('/healthz').check('get') // Checks if the principal (user or service account) is authorized to make HTTP GET requests to the /healthz API path.
 //
 // allowed
@@ -165,7 +165,7 @@ import (
 //
 // Examples:
 //
-//	authorizer.group('').resource('pods').namespace('default').check('create').allowed() // Returns true if the principal (user or service account) is allowed create pods in the 'default' namespace.
+//	authorizer.group('').resource('pods').namespace('default').check('create').allowed() // Returns true if the principal (user or service account) is allowed to create pods in the 'default' namespace.
 //	authorizer.path('/healthz').check('get').allowed()  // Returns true if the principal (user or service account) is allowed to make HTTP GET requests to the /healthz API path.
 //
 // reason
