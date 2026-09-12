@@ -19,9 +19,13 @@ limitations under the License.
 package cm
 
 import (
+	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"testing"
+
+	libcontainercgroups "github.com/opencontainers/cgroups"
 )
 
 // TestNewCgroupName tests confirms that #68416 is fixed
@@ -204,6 +208,62 @@ func TestCpuWeightToCPUShares(t *testing.T) {
 		if actual := cpuWeightToCPUShares(testCase.cpuWeight); actual != testCase.expectedCpuShares {
 			t.Errorf("cpuWeight: %v, expectedCpuShares: %v, actualCpuShares: %v",
 				testCase.cpuWeight, testCase.expectedCpuShares, actual)
+		}
+	}
+}
+
+func TestReadCgroupMemoryConfig(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "cgroup_memory_test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	limitFile := "memory.max"
+	limitVal := "2097152"
+	if err := os.WriteFile(filepath.Join(tempDir, limitFile), []byte(limitVal), 0644); err != nil {
+		t.Fatalf("failed to write limit file: %v", err)
+	}
+
+	minVal := "102400"
+	lowVal := "204800"
+	highVal := "409600"
+	if err := os.WriteFile(filepath.Join(tempDir, "memory.min"), []byte(minVal), 0644); err != nil {
+		t.Fatalf("failed to write memory.min: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, "memory.low"), []byte(lowVal), 0644); err != nil {
+		t.Fatalf("failed to write memory.low: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, "memory.high"), []byte(highVal), 0644); err != nil {
+		t.Fatalf("failed to write memory.high: %v", err)
+	}
+
+	rc, err := readCgroupMemoryConfig(tempDir, limitFile)
+	if err != nil {
+		t.Fatalf("failed to read cgroup memory config: %v", err)
+	}
+
+	if rc.Memory == nil || *rc.Memory != 2097152 {
+		t.Errorf("expected Memory limit to be 2097152, got %v", rc.Memory)
+	}
+
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if rc.Unified == nil {
+			t.Errorf("expected Unified map to be populated in cgroup v2 mode")
+		} else {
+			if val, ok := rc.Unified["memory.min"]; !ok || val != minVal {
+				t.Errorf("expected memory.min to be %s, got %s", minVal, val)
+			}
+			if val, ok := rc.Unified["memory.low"]; !ok || val != lowVal {
+				t.Errorf("expected memory.low to be %s, got %s", lowVal, val)
+			}
+			if val, ok := rc.Unified["memory.high"]; !ok || val != highVal {
+				t.Errorf("expected memory.high to be %s, got %s", highVal, val)
+			}
+		}
+	} else {
+		if rc.Unified != nil {
+			t.Errorf("expected Unified map to be nil in cgroup v1 mode")
 		}
 	}
 }

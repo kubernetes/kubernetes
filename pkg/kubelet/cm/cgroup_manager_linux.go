@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -481,7 +482,21 @@ func readCgroupMemoryConfig(cgroupPath string, memLimitFile string) (*ResourceCo
 		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", memLimitFile, cgroupPath, err)
 	}
 	mLim := int64(memLimit)
-	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
-	return &ResourceConfig{Memory: &mLim}, nil
 
+	rc := &ResourceConfig{Memory: &mLim}
+
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		// Read memory.min, memory.low, and memory.high for cgroups v2
+		for _, param := range []string{Cgroup2MemoryMin, Cgroup2MemoryLow, Cgroup2MemoryHigh} {
+			val, err := fscommon.GetCgroupParamUint(cgroupPath, param)
+			if err == nil && val > 0 {
+				if rc.Unified == nil {
+					rc.Unified = make(map[string]string)
+				}
+				rc.Unified[param] = strconv.FormatUint(val, 10)
+			}
+		}
+	}
+
+	return rc, nil
 }
