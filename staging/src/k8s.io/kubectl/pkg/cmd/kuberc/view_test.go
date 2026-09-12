@@ -19,6 +19,7 @@ package kuberc
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -83,6 +84,29 @@ aliases:
 			outputFormat: "json",
 		},
 	}
+
+	t.Run("declining to generate a default kuberc", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		kubercPath := filepath.Join(tmpDir, "kuberc")
+
+		streams, in, out, _ := genericiooptions.NewTestIOStreams()
+		in.WriteString("n\n")
+		o := &ViewOptions{
+			KubeRCFile: kubercPath,
+			PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput("yaml"),
+			IOStreams:  streams,
+		}
+
+		if err := o.Run(); err != nil {
+			t.Fatalf("Run() unexpected error = %v", err)
+		}
+		if _, err := os.Stat(kubercPath); !os.IsNotExist(err) {
+			t.Errorf("expected no kuberc file to be created, stat returned: %v", err)
+		}
+		if got := out.String(); !strings.Contains(got, "kuberc file not found") {
+			t.Errorf("expected the missing-file notice in output, got: %q", got)
+		}
+	})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
