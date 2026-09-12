@@ -948,3 +948,75 @@ func TestResourceFullyQualifiedName(t *testing.T) {
 		})
 	}
 }
+
+func TestConditionReason(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid uuid with hyphens",
+		input:    "123e4567-e89b-12d3-a456-426614174000",
+		wantErrs: nil,
+	}, {
+		name:  "invalid uuid with hyphens uppercase",
+		input: "123E4567-E89B-12D3-A456-426614174000",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "123E4567-E89B-12D3-A456-426614174000", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+		},
+	}, {
+		name:  "invalid uuid with urn prefix",
+		input: "urn:uuid:123e4567-e89b-12d3-a456-426614174000",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "urn:uuid:123e4567-e89b-12d3-a456-426614174000", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+		},
+	}, {
+		name:  "invalid uuid without hyphens",
+		input: "123e4567e89b12d3a456426614174000",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "123e4567e89b12d3a456426614174000", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+		},
+	}, {
+		name:  "invalid: wrong length",
+		input: "123e4567-e89b-12d3-a456-42661417400",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "123e4567-e89b-12d3-a456-42661417400", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+		},
+	}, {
+		name:  "invalid: wrong characters",
+		input: "123e4567-e89b-12d3-a456-42661417400g",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "123e4567-e89b-12d3-a456-42661417400g", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+		},
+	}, {
+		name:  "invalid: misplaced hyphens",
+		input: "123e4567-e89b-12d3-a4564-26614174000",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "123e4567-e89b-12d3-a4564-26614174000", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+		},
+	}, {
+		name:  "empty string",
+		input: "",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+		},
+	}, {
+		name:  "not a uuid",
+		input: "not-a-uuid",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "not-a-uuid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailExact()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := validateConditionReasonMessage(ctx, operation.Operation{}, fldPath, &value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
