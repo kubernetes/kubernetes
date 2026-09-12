@@ -112,6 +112,9 @@ func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) err
 	c := time.After(time.Duration(seconds) * time.Second)
 	select {
 	case <-ctx.Done():
+		if errors.Is(context.Cause(ctx), kubecontainer.ErrContainerExited) {
+			return nil
+		}
 		// unexpected termination
 		metrics.LifecycleHandlerSleepTerminated.Inc()
 		return fmt.Errorf("container terminated before sleep hook finished")

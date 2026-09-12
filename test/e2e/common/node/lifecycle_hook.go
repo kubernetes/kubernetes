@@ -734,6 +734,42 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", framework.WithNodeConformance(), fun
 				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
 			}
 		})
+
+	})
+})
+
+// TODO: Move this test into the NodeConformance suite above after it is proven stable across supported runtimes.
+var _ = SIGDescribe("Lifecycle Sleep Hook when container exits", func() {
+	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action-container-exit")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	ginkgo.It("stops sleep action during pod termination", func(ctx context.Context) {
+		const (
+			containerLifetime = 10
+			sleepSeconds      = 30
+			gracePeriod       = 40
+			deletionTimeout   = 20 * time.Second
+		)
+		lifecycle := &v1.Lifecycle{
+			PreStop: &v1.LifecycleHandler{
+				Sleep: &v1.SleepAction{Seconds: sleepSeconds},
+			},
+		}
+		name := "pod-with-prestop-sleep-hook"
+		podWithHook := getPodWithHook(name, imageutils.GetE2EImage(imageutils.BusyBox), lifecycle)
+		podWithHook.Spec.Containers[0].Command = []string{"/bin/sleep", fmt.Sprintf("%d", containerLifetime)}
+		podWithHook.Spec.RestartPolicy = v1.RestartPolicyNever
+		podWithHook.Spec.TerminationGracePeriodSeconds = ptr.To[int64](gracePeriod)
+
+		ginkgo.By("create a pod whose container exits before the sleep action finishes")
+		podClient := e2epod.NewPodClient(f)
+		podClient.CreateSync(ctx, podWithHook)
+		ginkgo.By("delete the pod while its container is still running")
+		framework.ExpectNoError(podClient.Delete(ctx, name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(
+			e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, name, f.Namespace.Name, deletionTimeout),
+			"pod should finish terminating when its container exits",
+		)
 	})
 })
 
