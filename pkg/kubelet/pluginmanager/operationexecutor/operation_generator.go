@@ -177,7 +177,13 @@ func (og *operationGenerator) notifyPlugin(ctx context.Context, client registera
 		Error:            errStr,
 	}
 
-	if _, err := client.NotifyRegistrationStatus(ctx, status); err != nil {
+	// WaitForReady ensures that if the connection to the plugin dropped to
+	// IDLE/TRANSIENT_FAILURE while handler.RegisterPlugin was running (for
+	// example, a CSI driver's NodeGetInfo waiting on topology labels to
+	// propagate), this call blocks for the reconnect instead of failing
+	// fast, so the notification is still reliably delivered on the
+	// existing client.
+	if _, err := client.NotifyRegistrationStatus(ctx, status, grpc.WaitForReady(true)); err != nil {
 		return fmt.Errorf("%s: %w", errStr, err)
 	}
 
