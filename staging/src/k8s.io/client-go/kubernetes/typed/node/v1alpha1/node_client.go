@@ -28,12 +28,17 @@ import (
 
 type NodeV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	PodCheckpointsGetter
 	RuntimeClassesGetter
 }
 
 // NodeV1alpha1Client is used to interact with features provided by the node.k8s.io group.
 type NodeV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *NodeV1alpha1Client) PodCheckpoints(namespace string) PodCheckpointInterface {
+	return newPodCheckpoints(c, namespace)
 }
 
 func (c *NodeV1alpha1Client) RuntimeClasses() RuntimeClassInterface {

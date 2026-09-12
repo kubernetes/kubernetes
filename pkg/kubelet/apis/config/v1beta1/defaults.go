@@ -187,6 +187,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.RuntimeRequestTimeout == zeroDuration {
 		obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
 	}
+	if obj.PodCheckpointTimeout == zeroDuration {
+		obj.PodCheckpointTimeout = metav1.Duration{Duration: 15 * time.Second}
+	}
 	if obj.HairpinMode == "" {
 		obj.HairpinMode = kubeletconfigv1beta1.PromiscuousBridge
 	}

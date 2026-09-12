@@ -17,10 +17,10 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/node
 // +k8s:conversion-gen-external-types=k8s.io/api/node/v1alpha1
 
-// Default generation is explicitly disabled to preserve existing behavior.
-// If enabled corev1's SetDefaults_ResourceList (defaults.go)
-// will default RuntimeClass's overhead.podFixed field.
-// +k8s:defaulter-gen=false
+// RuntimeClass opts out at the type level to preserve its existing behavior;
+// PodCheckpoint needs covering defaults for its captured PodTemplateSpec.
+// +k8s:defaulter-gen=TypeMeta
+// +k8s:defaulter-gen-input=k8s.io/api/node/v1alpha1
 
 // +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-input=k8s.io/api/node/v1alpha1

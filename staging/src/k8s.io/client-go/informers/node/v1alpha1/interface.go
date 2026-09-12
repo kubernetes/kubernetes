@@ -24,6 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// PodCheckpoints returns a TypedPodCheckpointInformer.
+	PodCheckpoints() TypedPodCheckpointInformer
 	// RuntimeClasses returns a TypedRuntimeClassInformer.
 	RuntimeClasses() TypedRuntimeClassInformer
 }
@@ -37,6 +39,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// PodCheckpoints returns a TypedPodCheckpointInformer.
+func (v *version) PodCheckpoints() TypedPodCheckpointInformer {
+	return &podCheckpointInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // RuntimeClasses returns a TypedRuntimeClassInformer.

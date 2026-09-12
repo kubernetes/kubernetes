@@ -290,6 +290,11 @@ type KubeletConfiguration struct {
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	RuntimeRequestTimeout metav1.Duration
+	// podCheckpointTimeout is the maximum duration the kubelet allows a Pod
+	// checkpoint operation to run before it aborts the operation, bounding how
+	// long the Pod can stay frozen. The kubelet applies it as the deadline on
+	// the CheckpointPod CRI call and clamps spec.timeoutSeconds to it.
+	PodCheckpointTimeout metav1.Duration
 	// hairpinMode specifies how the Kubelet should configure the container
 	// bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to

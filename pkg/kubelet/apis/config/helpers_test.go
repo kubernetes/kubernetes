@@ -281,6 +281,7 @@ var (
 		"ReservedMemory",
 		"ReservedSystemCPUs",
 		"RegisterWithTaints",
+		"PodCheckpointTimeout.Duration",
 		"RuntimeRequestTimeout.Duration",
 		"RunOnce",
 		"SeccompDefault",
