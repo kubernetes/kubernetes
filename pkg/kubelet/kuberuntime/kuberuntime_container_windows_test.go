@@ -19,6 +19,8 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,10 +29,98 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
+
+// logBufferTB is a ktesting.TB that captures log output so tests can assert on
+// the warnings that the kubelet emits while building Windows container config.
+type logBufferTB struct {
+	strings.Builder
+}
+
+func (b *logBufferTB) Attr(key, value string)            {}
+func (b *logBufferTB) Chdir(dir string)                  {}
+func (b *logBufferTB) Cleanup(func())                    {}
+func (b *logBufferTB) Error(args ...any)                 {}
+func (b *logBufferTB) Errorf(format string, args ...any) {}
+func (b *logBufferTB) Fail()                             {}
+func (b *logBufferTB) FailNow()                          {}
+func (b *logBufferTB) Failed() bool                      { return false }
+func (b *logBufferTB) Fatal(args ...any)                 {}
+func (b *logBufferTB) Fatalf(format string, args ...any) {}
+func (b *logBufferTB) Helper()                           {}
+func (b *logBufferTB) Log(args ...any)                   { fmt.Fprintln(b, args...) }
+func (b *logBufferTB) Logf(format string, args ...any)   { fmt.Fprintf(b, format, args...) }
+func (b *logBufferTB) Name() string                      { return "logBufferTB" }
+func (b *logBufferTB) Setenv(key, value string)          {}
+func (b *logBufferTB) Skip(args ...any)                  {}
+func (b *logBufferTB) Skipf(format string, args ...any)  {}
+func (b *logBufferTB) SkipNow()                          {}
+func (b *logBufferTB) Skipped() bool                     { return false }
+func (b *logBufferTB) TempDir() string                   { return "" }
+
+func TestWarnIgnoredWindowsFields(t *testing.T) {
+	unmasked := v1.UnmaskedProcMount
+	localhostProfile := "profile.json"
+
+	tests := []struct {
+		name        string
+		podSc       *v1.PodSecurityContext
+		containerSc *v1.SecurityContext
+		wantLogs    []string
+	}{
+		{
+			name:        "no ignored fields requested",
+			podSc:       nil,
+			containerSc: nil,
+			wantLogs:    []string{},
+		},
+		{
+			name:        "procMount unmasked requested",
+			podSc:       &v1.PodSecurityContext{},
+			containerSc: &v1.SecurityContext{ProcMount: &unmasked},
+			wantLogs: []string{
+				"Windows containers do not support securityContext.procMount",
+			},
+		},
+		{
+			name:        "seccomp localhost requested at pod level",
+			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: &localhostProfile}},
+			containerSc: &v1.SecurityContext{},
+			wantLogs: []string{
+				"Windows containers do not support a seccomp profile of type Localhost",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			buf := &logBufferTB{}
+			tCtx := ktesting.Init(buf, initoption.BufferLogs(true))
+			logger := klog.FromContext(tCtx)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "new", UID: types.UID("12345678")},
+				Spec:       v1.PodSpec{SecurityContext: tc.podSc, Containers: []v1.Container{{Name: "foo", SecurityContext: tc.containerSc}}},
+			}
+
+			warnIgnoredWindowsFields(logger, pod, &pod.Spec.Containers[0])
+
+			got := buf.String()
+			for _, want := range tc.wantLogs {
+				assert.Contains(t, got, want, "expected log %q in output:\n%s", want, got)
+			}
+			if len(tc.wantLogs) == 0 {
+				assert.NotContains(t, got, "will be ignored", "expected no ignored-field warnings in output:\n%s", got)
+			}
+		})
+	}
+}
 
 func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
 	tCtx := ktesting.Init(t)
@@ -197,4 +287,27 @@ func TestCalculateWindowsResources(t *testing.T) {
 		windowsContainerResources := fakeRuntimeSvc.calculateWindowsResources(tCtx, &test.cpuLim, &test.memLim)
 		assert.Equal(t, test.expected, windowsContainerResources)
 	}
+}
+
+// TestWarnPodLevelIgnoredWindowsFields verifies that pod-level fields that
+// Windows ignores (fsGroup, fsGroupChangePolicy) produce exactly the expected
+// warnings from the dedicated pod-level helper. These are pod-wide settings, so
+// the helper is invoked once per pod rather than once per container.
+func TestWarnPodLevelIgnoredWindowsFields(t *testing.T) {
+	fsGroup := int64(1000)
+	always := v1.FSGroupChangeAlways
+	buf := &logBufferTB{}
+	tCtx := ktesting.Init(buf, initoption.BufferLogs(true))
+	logger := klog.FromContext(tCtx)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "new", UID: "12345678"},
+		Spec: v1.PodSpec{
+			Containers:      []v1.Container{{Name: "foo"}, {Name: "sidecar"}},
+			SecurityContext: &v1.PodSecurityContext{FSGroup: &fsGroup, FSGroupChangePolicy: &always},
+		},
+	}
+	warnPodLevelIgnoredWindowsFields(logger, pod)
+	got := buf.String()
+	assert.Contains(t, got, "Windows containers do not support securityContext.fsGroup", "expected fsGroup warning:\n%s", got)
+	assert.Contains(t, got, "Windows containers do not support securityContext.fsGroupChangePolicy", "expected fsGroupChangePolicy warning:\n%s", got)
 }
