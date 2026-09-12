@@ -110,6 +110,16 @@ func init() {
 	validCert = &cert
 }
 
+func makeCacheKey(t *testing.T, conf *api.ExecConfig, cluster *clientauthentication.Cluster) cacheKey {
+	t.Helper()
+
+	k, err := newCacheKey(conf, cluster)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
 func TestCacheKey(t *testing.T) {
 	c1 := &api.ExecConfig{
 		Command: "foo-bar",
@@ -260,13 +270,13 @@ func TestCacheKey(t *testing.T) {
 		StdinUnavailable: true,
 	}
 
-	key1 := cacheKey(c1, c1c)
-	key2 := cacheKey(c2, c2c)
-	key3 := cacheKey(c3, c3c)
-	key4 := cacheKey(c4, c4c)
-	key5 := cacheKey(c5, c5c)
-	key6 := cacheKey(c6, nil)
-	key7 := cacheKey(c7, nil)
+	key1 := makeCacheKey(t, c1, c1c)
+	key2 := makeCacheKey(t, c2, c2c)
+	key3 := makeCacheKey(t, c3, c3c)
+	key4 := makeCacheKey(t, c4, c4c)
+	key5 := makeCacheKey(t, c5, c5c)
+	key6 := makeCacheKey(t, c6, nil)
+	key7 := makeCacheKey(t, c7, nil)
 	if key1 != key2 {
 		t.Error("key1 and key2 didn't match")
 	}
