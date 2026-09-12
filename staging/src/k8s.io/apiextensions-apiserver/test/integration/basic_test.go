@@ -954,6 +954,84 @@ func TestNameConflict(t *testing.T) {
 	}
 }
 
+// TestNameConflictResolutionBySpecUpdate verifies that conditions are re-evaluated
+// even when the updated Spec.Names equals Status.AcceptedNames.
+func TestNameConflictResolutionBySpecUpdate(t *testing.T) {
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
+	_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxu2Definition := fixtures.NewNoxu2CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
+	noxu2Definition, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), noxu2Definition, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A NameConflict occurs
+	err = wait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, noxu2Definition.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		for _, condition := range crd.Status.Conditions {
+			if condition.Type == apiextensionsv1.NamesAccepted && condition.Status == apiextensionsv1.ConditionFalse {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Clear shortNames so that Spec.Names matches Status.AcceptedNames
+	err = wait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, noxu2Definition.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		crd.Spec.Names.ShortNames = nil
+		_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
+		if errors.IsConflict(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Names are now accepted
+	err = wait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, noxu2Definition.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		for _, condition := range crd.Status.Conditions {
+			if condition.Type == apiextensionsv1.NamesAccepted && condition.Status == apiextensionsv1.ConditionTrue {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestStatusGetAndPatch(t *testing.T) {
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
