@@ -180,6 +180,7 @@ type FlowSchemaSpec struct {
 	// if it is an empty slice, there will be no requests matching the FlowSchema.
 	// +listType=atomic
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	Rules []PolicyRulesWithSubjects `json:"rules,omitempty" protobuf:"bytes,4,rep,name=rules"`
 }
 
@@ -228,6 +229,7 @@ type PolicyRulesWithSubjects struct {
 	// +listType=atomic
 	// Required.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Subjects []Subject `json:"subjects" protobuf:"bytes,1,rep,name=subjects"`
 	// resourceRules is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
 	// target resource.
@@ -244,15 +246,19 @@ type PolicyRulesWithSubjects struct {
 
 // Subject matches the originator of a request, as identified by the request authentication system. There are three
 // ways of matching an originator; by user, group, or service account.
-// +union
 type Subject struct {
 	// kind indicates which one of the other fields is non-empty.
 	// Required
 	// +required
 	// +unionDiscriminator
+	// +k8s:alpha(since: "1.38")=+k8s:unionDiscriminator
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Kind SubjectKind `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// user matches based on username.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +unionMember=User
+	// +k8s:alpha(since: "1.38")=+k8s:unionMember(memberName: "User")
 	User *UserSubject `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
 	// group matches based on user group name.
 	// +optional
@@ -277,6 +283,7 @@ type UserSubject struct {
 	// name is the username that matches, or "*" to match all usernames.
 	// Required.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
