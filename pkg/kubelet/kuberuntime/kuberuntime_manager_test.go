@@ -5730,6 +5730,69 @@ func TestIncrementImageVolumeMetrics(t *testing.T) {
         		kubelet_image_volume_requested_total 3
 			`,
 		},
+		"with image pull error": {
+			err: fmt.Errorf("image pull failed: unauthorized"),
+			msg: "Failed to pull image",
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [BETA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [BETA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 0
+        		# HELP kubelet_image_volume_requested_total [BETA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 1
+			`,
+		},
+		"with ErrCreateContainerConfig": {
+			err: ErrCreateContainerConfig,
+			msg: "some config error",
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [BETA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [BETA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 0
+        		# HELP kubelet_image_volume_requested_total [BETA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 1
+			`,
+		},
+		"with ErrPreCreateHook": {
+			err: ErrPreCreateHook,
+			msg: "hook failed",
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [BETA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [BETA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 0
+        		# HELP kubelet_image_volume_requested_total [BETA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 1
+			`,
+		},
 		"without used volume": {
 			volumeMounts: []v1.VolumeMount{
 				{Name: "mount1"},
