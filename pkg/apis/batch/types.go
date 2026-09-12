@@ -795,4 +795,10 @@ type CronJobStatus struct {
 	// Information when was the last time the job successfully completed.
 	// +optional
 	LastSuccessfulTime *metav1.Time
+
+	// NextScheduleTime is the next time the CronJob is scheduled to create a Job,
+	// computed from the schedule and, if set, the time zone. It is not set when the
+	// CronJob is suspended or does not have a valid future schedule.
+	// +optional
+	NextScheduleTime *metav1.Time
 }
