@@ -232,7 +232,7 @@ func isRestartableInitContainer(container *v1.Container) bool {
 	return container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways
 }
 
-func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getResourceList func(container *v1.Container, containerStatus *v1.ContainerStatus, isResizeInfeasible bool) v1.ResourceList) v1.ResourceList {
+func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getResourceList func(container *v1.Container, containerStatus *v1.ContainerStatus, isResizeInfeasible bool) v1.ResourceList, dra draNodeAllocatableResources) v1.ResourceList {
 	var isResizeInfeasible bool
 	if opts.UseStatusResources {
 		isResizeInfeasible = IsPodResizeInfeasible(pod)
@@ -248,6 +248,7 @@ func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getR
 			containerResources = applyNonMissing(containerResources, opts.NonMissingContainerRequests)
 		}
 		addResourceList(result, containerResources)
+		addResourceList(result, dra.perContainer[container.Name])
 	}
 
 	restartableInitContainerResources := v1.ResourceList{}
@@ -268,6 +269,12 @@ func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getR
 		if len(opts.NonMissingContainerRequests) > 0 {
 			containerResources = applyNonMissing(containerResources, opts.NonMissingContainerRequests)
 		}
+		if draResources := dra.perContainer[container.Name]; len(draResources) > 0 {
+			combinedResources := v1.ResourceList{}
+			addResourceList(combinedResources, containerResources)
+			addResourceList(combinedResources, draResources)
+			containerResources = combinedResources
+		}
 		// Is the init container marked as a restartable init container?
 		if isRestartableInitContainer(&container) {
 			// and add them to the resulting cumulative container requests
@@ -285,6 +292,8 @@ func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getR
 		maxResourceList(initContainerResources, containerResources)
 	}
 	maxResourceList(result, initContainerResources)
+	// Pod fixed DRA claim resource quantities apply to the entire pod duration.
+	addResourceList(result, dra.podFixed)
 	return result
 }
 
@@ -295,13 +304,12 @@ func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getR
 func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	reqs := reuseOrClearResourceList(opts.Reuse)
+	draRes := getDRANodeAllocatableResources(pod, opts)
 	if !opts.UseStatusResources {
-		addResourceList(reqs, aggregateContainerResourcesByFn(pod, opts, containerSpecRequests))
-		addDRANodeAllocatableClaimResources(reqs, pod, opts)
+		addResourceList(reqs, aggregateContainerResourcesByFn(pod, opts, containerSpecRequests, draRes))
 	} else {
 		isResizeInfeasible := IsPodResizeInfeasible(pod)
-		specReqs := aggregateContainerResourcesByFn(pod, opts, containerSpecRequests)
-		addDRANodeAllocatableClaimResources(specReqs, pod, opts)
+		specReqs := aggregateContainerResourcesByFn(pod, opts, containerSpecRequests, draRes)
 		var allocatedReqs, actuatedReqs v1.ResourceList
 		// When pod-level status maps are populated, they already contain the aggregate values across all containers.
 		// When unpopulated (e.g., at creation time or when feature gates are disabled), we fall back to container status aggregation.
@@ -316,9 +324,8 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 		} else {
 			// DRA allocations are added to allocatedReqs here because Kubelet does not include DRA in pod.Status.ContainerStatuses[].AllocatedResources. Adding them prevents under-reporting.
 			// This is a temporary fallback until InPlacePodLevelResourcesVerticalScaling is Beta/GA on all nodes and pod-level status fields which natively include DRA are always available.
-			allocatedReqs = aggregateContainerResourcesByFn(pod, opts, containerAllocatedRequests)
-			addDRANodeAllocatableClaimResources(allocatedReqs, pod, opts)
-			actuatedReqs = aggregateContainerResourcesByFn(pod, opts, containerActuatedRequests)
+			allocatedReqs = aggregateContainerResourcesByFn(pod, opts, containerAllocatedRequests, draRes)
+			actuatedReqs = aggregateContainerResourcesByFn(pod, opts, containerActuatedRequests, draAlreadyIncluded())
 		}
 
 		if isResizeInfeasible {
@@ -417,13 +424,13 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 	opts.NonMissingContainerRequests = nil
 	// attempt to reuse the maps if passed, or allocate otherwise
 	limits := reuseOrClearResourceList(opts.Reuse)
+	draRes := getDRANodeAllocatableResources(pod, opts)
+	dropDRAValuesForUndeclaredLimits(pod, &draRes)
 	if !opts.UseStatusResources {
-		addResourceList(limits, aggregateContainerResourcesByFn(pod, opts, containerSpecLimits))
-		limits = addDRANodeAllocatableLimits(limits, pod, opts)
+		addResourceList(limits, aggregateContainerResourcesByFn(pod, opts, containerSpecLimits, draRes))
 	} else {
 		isResizeInfeasible := IsPodResizeInfeasible(pod)
-		specLimits := aggregateContainerResourcesByFn(pod, opts, containerSpecLimits)
-		specLimits = addDRANodeAllocatableLimits(specLimits, pod, opts)
+		specLimits := aggregateContainerResourcesByFn(pod, opts, containerSpecLimits, draRes)
 		var actuatedLimits v1.ResourceList
 		// When pod-level status maps are populated, they already contain the aggregate values across all containers.
 		// When unpopulated (e.g., at creation time or when feature gates are disabled), we fall back to container status aggregation.
@@ -433,8 +440,8 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 			actuatedLimits = pod.Status.Resources.Limits
 			// Kubelet includes DRA values when populating pod limits. Since pod.Status.Resources.Limits is updated based on cgroup settings, it already contains DRA values, so we should not add them again here.
 		} else {
-			actuatedLimits = aggregateContainerResourcesByFn(pod, opts, containerActuatedLimits)
 			// Kubelet considers DRA values while updating container limits. We should not be adding it here again.
+			actuatedLimits = aggregateContainerResourcesByFn(pod, opts, containerActuatedLimits, draAlreadyIncluded())
 		}
 
 		if isResizeInfeasible {
@@ -454,6 +461,45 @@ func addResourceList(list, newList v1.ResourceList) {
 		} else {
 			value.Add(quantity)
 			list[name] = value
+		}
+	}
+}
+
+// addResource adds quantity to list[name].
+func addResource(list v1.ResourceList, name v1.ResourceName, quantity resource.Quantity) {
+	q := list[name]
+	q.Add(quantity)
+	list[name] = q
+}
+
+// addDRAMappedResources adds each mapping's quantity to list.
+func addDRAMappedResources(list v1.ResourceList, mappings []v1.NodeAllocatableMappedResources) {
+	for _, mapping := range mappings {
+		if mapping.Quantity != nil {
+			addResource(list, mapping.Name, *mapping.Quantity)
+		}
+	}
+}
+
+// addDRAPerPodOverhead adds each overhead's PerPod quantity to list.
+func addDRAPerPodOverhead(list v1.ResourceList, overheads []v1.NodeAllocatableOverheadResources) {
+	for _, overhead := range overheads {
+		if overhead.PerPod != nil {
+			addResource(list, overhead.Name, *overhead.PerPod)
+		}
+	}
+}
+
+// addDRAPerContainerOverhead adds each overhead's PerContainer quantity multiplied by refs to list.
+func addDRAPerContainerOverhead(list v1.ResourceList, overheads []v1.NodeAllocatableOverheadResources, numRefs int64) {
+	if numRefs <= 0 {
+		return
+	}
+	for _, overhead := range overheads {
+		if overhead.PerContainer != nil {
+			quantity := overhead.PerContainer.DeepCopy()
+			quantity.Mul(numRefs)
+			addResource(list, overhead.Name, quantity)
 		}
 	}
 }
@@ -502,73 +548,117 @@ func GetContainerDRAAllocations(pod *v1.Pod, containerName string) v1.ResourceLi
 			continue
 		}
 		// Add Mapping resources
-		for _, mapping := range claimStatus.Mapping {
-			if mapping.Quantity != nil {
-				q := draAllocations[mapping.Name]
-				q.Add(*mapping.Quantity)
-				draAllocations[mapping.Name] = q
-			}
-		}
+		addDRAMappedResources(draAllocations, claimStatus.Mapping)
 
 		// Add Overhead resources
-		for _, overhead := range claimStatus.Overhead {
-			var quantity resource.Quantity
-			if overhead.PerPod != nil {
-				quantity.Add(*overhead.PerPod)
-			}
-			if overhead.PerContainer != nil {
-				quantity.Add(*overhead.PerContainer)
-			}
-			q := draAllocations[overhead.Name]
-			q.Add(quantity)
-			draAllocations[overhead.Name] = q
-		}
+		addDRAPerPodOverhead(draAllocations, claimStatus.Overhead)
+		addDRAPerContainerOverhead(draAllocations, claimStatus.Overhead, 1)
 	}
 	return draAllocations
 }
 
-func addDRANodeAllocatableLimits(specLimits v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
-	draResources := v1.ResourceList{}
-	addDRANodeAllocatableClaimResources(draResources, pod, opts)
-	for name, quantity := range draResources {
-		val, declared := specLimits[name]
-		// Only add DRA values if limits are explicitly declared in the spec. kubelet skips setting limits (unlimited) if not defined in spec.
-		// Hugepages is an exception as they are strictly non-overcommitable so DRA values are always added.
-		if declared || strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix) {
-			q := val
-			q.Add(quantity)
-			specLimits[name] = q
+// dropDRAValuesForUndeclaredLimits drops DRA resource quantities (in-place) for resources without limits
+// explicitly declared in the spec: kubelet skips setting limits (unlimited) if not defined in spec.
+// Hugepages is an exception as they are strictly non-overcommitable so DRA values are always kept.
+// Note: DRA node allocatable resources apply only to cpu, memory and hugepages.
+// TODO(pravk03): Update this as part of https://github.com/kubernetes/kubernetes/issues/140810.
+func dropDRAValuesForUndeclaredLimits(pod *v1.Pod, draRes *draNodeAllocatableResources) {
+	if len(draRes.podFixed) == 0 && len(draRes.perContainer) == 0 {
+		return
+	}
+	var declared sets.Set[v1.ResourceName]
+	filterFunc := func(draResources v1.ResourceList) {
+		for name := range draResources {
+			if strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix) {
+				continue
+			}
+			if declared == nil {
+				// Build a map the resource names with limits explicitly
+				// declared in any container. Built lazily on first use.
+				declared = sets.New[v1.ResourceName]()
+				for _, containers := range [][]v1.Container{pod.Spec.InitContainers, pod.Spec.Containers} {
+					for i := range containers {
+						for resName := range containers[i].Resources.Limits {
+							declared.Insert(resName)
+						}
+					}
+				}
+			}
+			if !declared.Has(name) {
+				delete(draResources, name)
+			}
 		}
 	}
-	return specLimits
+	filterFunc(draRes.podFixed)
+	for _, draResContainer := range draRes.perContainer {
+		filterFunc(draResContainer)
+	}
 }
 
-func addDRANodeAllocatableClaimResources(resources v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) {
-	if opts.UseDRANodeAllocatableResourceClaimStatus && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
-		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
-			// TODO(pravk03): Handle claim references by init containers and peak resource calculation based on that.
-			// Currently, any DRA allocation is always added into the pod footprint.
-			for _, mapping := range claimStatus.Mapping {
-				if mapping.Quantity != nil {
-					q := resources[mapping.Name]
-					q.Add(*mapping.Quantity)
-					resources[mapping.Name] = q
+// draNodeAllocatableResources holds the pod's node allocatable DRA claim resources.
+type draNodeAllocatableResources struct {
+	// podFixed is charged to this pod for its entire lifetime
+	// and must always be included for resource aggregation.
+	// From each NodeAllocatableResourceClaimStatus it includes:
+	//   - Mapping[].Quantity
+	//   - Overhead[].PerPod
+	podFixed v1.ResourceList
+	// perContainer holds Overhead[].PerContainer quantity for each referencing container,
+	// keyed by container name. It is charged only while the referencing container runs,
+	// like the container's own requests.
+	// For non-restartable init containers, it counts only towards that init container's
+	// peak candidate. References by container names not found in the pod spec are
+	// conservatively charged to podFixed.
+	perContainer map[string]v1.ResourceList
+}
+
+func getDRANodeAllocatableResources(pod *v1.Pod, opts PodResourcesOptions) draNodeAllocatableResources {
+	if !opts.UseDRANodeAllocatableResourceClaimStatus || len(pod.Status.NodeAllocatableResourceClaimStatuses) == 0 {
+		return draNodeAllocatableResources{}
+	}
+	podFixedDRARes := v1.ResourceList{}
+	var perContainerDRARes map[string]v1.ResourceList
+	for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+		// Mapping quantities and PerPod overhead are charged for the pod's entire lifetime,
+		// regardless of which containers reference the claim.
+		addDRAMappedResources(podFixedDRARes, claimStatus.Mapping)
+		addDRAPerPodOverhead(podFixedDRARes, claimStatus.Overhead)
+		perContainerOverhead := slices.ContainsFunc(claimStatus.Overhead, func(overhead v1.NodeAllocatableOverheadResources) bool {
+			return overhead.PerContainer != nil
+		})
+		if !perContainerOverhead {
+			continue
+		}
+
+		// Only PerContainer overhead needs the claim's references attributed to the
+		// referencing containers.
+		knownRefs := 0
+		for _, containers := range [][]v1.Container{pod.Spec.InitContainers, pod.Spec.Containers} {
+			for i := range containers {
+				name := containers[i].Name
+				if !slices.Contains(claimStatus.Containers, name) {
+					continue
 				}
-			}
-			for _, overhead := range claimStatus.Overhead {
-				var quantity resource.Quantity
-				if overhead.PerPod != nil {
-					quantity.Add(*overhead.PerPod)
+				knownRefs++
+				if perContainerDRARes == nil {
+					perContainerDRARes = map[string]v1.ResourceList{}
 				}
-				if overhead.PerContainer != nil && len(claimStatus.Containers) > 0 {
-					varOverhead := overhead.PerContainer.DeepCopy()
-					varOverhead.Mul(int64(len(claimStatus.Containers)))
-					quantity.Add(varOverhead)
+				if perContainerDRARes[name] == nil {
+					perContainerDRARes[name] = v1.ResourceList{}
 				}
-				q := resources[overhead.Name]
-				q.Add(quantity)
-				resources[overhead.Name] = q
+				addDRAPerContainerOverhead(perContainerDRARes[name], claimStatus.Overhead, 1)
 			}
 		}
+		// References by container names not found in the pod spec are conservatively
+		// charged for the pod's entire lifetime.
+		addDRAPerContainerOverhead(podFixedDRARes, claimStatus.Overhead, int64(len(claimStatus.Containers)-knownRefs))
 	}
+	return draNodeAllocatableResources{podFixed: podFixedDRARes, perContainer: perContainerDRARes}
+}
+
+// draAlreadyIncluded returns an empty value for draNodeAllocatableResources.
+// It exists for semantic meaning: the aggregated source already includes DRA quantities,
+// like actuated values read from cgroup settings, so there is nothing to add on top.
+func draAlreadyIncluded() draNodeAllocatableResources {
+	return draNodeAllocatableResources{}
 }

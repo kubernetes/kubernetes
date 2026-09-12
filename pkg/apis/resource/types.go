@@ -573,6 +573,9 @@ type NodeAllocatableOverhead struct {
 	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
 	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
 	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
+	// PerContainer overhead of a claim referenced by a non-restartable init container is
+	// counted towards the pod's peak resource calculation, like the init container's own
+	// requests, and not for the pod's entire duration.
 	// +optional
 	PerContainer *resource.Quantity
 }
