@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -383,7 +384,7 @@ func New(ctx context.Context,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
 	}
-	sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore))
+	sched.initAlgorithm(ctx, WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore))
 	sched.NextEntity = podQueue.Pop
 	sched.applyDefaultHandlers()
 
@@ -604,6 +605,12 @@ func (sched *Scheduler) CurrentCycle() int64 {
 //
 // CurrentCycle is passed as a bound method value, so a SchedulingQueue installed
 // after this call is still picked up.
-func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) {
-	sched.algorithm = NewSchedulingAlgorithm(sched.nodeInfoSnapshot, sched.Cache, append(opts, WithCurrentCycleProvider(sched.CurrentCycle))...)
+func (sched *Scheduler) initAlgorithm(ctx context.Context, opts ...AlgorithmOption) {
+	algorithm, err := NewSchedulingAlgorithm(sched.nodeInfoSnapshot, sched.Cache, append(opts, WithCurrentCycleProvider(sched.CurrentCycle))...)
+
+	if err != nil {
+		utilruntime.HandleErrorWithContext(ctx, err, "Scheduler cache must be instantiated before calling initAlgorithm")
+	}
+
+	sched.algorithm = algorithm
 }

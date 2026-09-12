@@ -529,7 +529,7 @@ func initScheduler(ctx context.Context, cache internalcache.Cache, queue interna
 		Profiles:        profile.Map{testSchedulerName: fwk},
 		logger:          logger,
 	}
-	s.initAlgorithm()
+	s.initAlgorithm(ctx)
 	s.applyDefaultHandlers()
 
 	return s, fwk, nil
