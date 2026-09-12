@@ -315,20 +315,24 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 // (namespace/name) for any ResourceClaim referenced by a pod.
 func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
-	if !ok {
+	if !ok || len(pod.Spec.ResourceClaims) == 0 {
 		// An index function that returns an error panics the informer, so we
 		// tolerate an unexpected object type by indexing it under no keys.
+		//
+		// Return early without allocating the set when there are no
+		// resource claims.
 		return nil, nil
 	}
-	keySet := sets.New[string]()
+	keys := make([]string, 0, len(pod.Spec.ResourceClaims))
 	for _, podClaim := range pod.Spec.ResourceClaims {
 		claimName, _, err := resourceclaim.Name(pod, &podClaim)
 		if err != nil || claimName == nil {
 			continue
 		}
-		keySet.Insert(pod.Namespace + "/" + *claimName)
+		// Duplicates are fine for the indexer
+		keys = append(keys, pod.Namespace+"/"+*claimName)
 	}
-	return keySet.UnsortedList(), nil
+	return keys, nil
 }
 
 // preQueueingHint returns the pods affected by a ResourceClaim event.
