@@ -3415,23 +3415,21 @@ func (pp *kubeletPodsProvider) GetPodByName(namespace, name string) (*v1.Pod, bo
 
 // ListenAndServePodResources runs the kubelet podresources grpc service.
 func (kl *Kubelet) ListenAndServePodResources(ctx context.Context) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
-		endpoint, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
-		if err != nil {
-			klog.FromContext(ctx).V(2).Info("Failed to get local endpoint for PodResources endpoint", "err", err)
-			return
-		}
-
-		providers := podresources.PodResourcesProviders{
-			Pods:             &kubeletPodsProvider{kl: kl},
-			Devices:          kl.containerManager,
-			Cpus:             kl.containerManager,
-			Memory:           kl.containerManager,
-			DynamicResources: kl.containerManager,
-		}
-
-		server.ListenAndServePodResources(ctx, endpoint, providers)
+	endpoint, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
+	if err != nil {
+		klog.FromContext(ctx).V(2).Info("Failed to get local endpoint for PodResources endpoint", "err", err)
+		return
 	}
+
+	providers := podresources.PodResourcesProviders{
+		Pods:             &kubeletPodsProvider{kl: kl},
+		Devices:          kl.containerManager,
+		Cpus:             kl.containerManager,
+		Memory:           kl.containerManager,
+		DynamicResources: kl.containerManager,
+	}
+
+	server.ListenAndServePodResources(ctx, endpoint, providers)
 }
 
 // ListenAndServePod initializes an HTTP server to serve the Pod API.
