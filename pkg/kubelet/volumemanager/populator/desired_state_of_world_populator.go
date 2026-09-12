@@ -37,9 +37,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -73,6 +76,7 @@ type DesiredStateOfWorldPopulator interface {
 type PodStateProvider interface {
 	ShouldPodContainersBeTerminating(types.UID) bool
 	ShouldPodRuntimeBeRemoved(types.UID) bool
+	IsPodForMirrorPodTerminatingByFullName(podFullname string) bool
 }
 
 // PodManager is the subset of methods the manager needs to observe the actual state of the kubelet.
@@ -182,6 +186,15 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods(ctx context.Context)
 		// Keep consistency of adding pod during reconstruction
 		if dswp.hasAddedPods && dswp.podStateProvider.ShouldPodContainersBeTerminating(pod.UID) {
 			// Do not (re)add volumes for pods that can't also be starting containers
+			continue
+		}
+
+		if dswp.hasAddedPods && kubelettypes.IsStaticPod(pod) &&
+			dswp.podStateProvider.IsPodForMirrorPodTerminatingByFullName(kubecontainer.BuildPodFullName(pod.Name, pod.Namespace)) {
+			// is there a static pod with the same name that is
+			// terminating or has requested a termination, if so
+			// let's wait until the terminating static pod with
+			// the same name cleans up completely
 			continue
 		}
 
