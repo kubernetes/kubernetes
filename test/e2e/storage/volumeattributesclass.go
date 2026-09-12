@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econformance "k8s.io/kubernetes/test/e2e/framework/conformance"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -169,5 +170,25 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(fea
 			}, nil
 		}))
 		framework.ExpectNoError(err, "timeout while waiting to confirm VolumeAttributesClass %q deletion", updatedVolumeAttributesClass.Name)
+	})
+
+	// TODO: Promote this test to framework.ConformanceIt after it has been stable for at least two weeks,
+	// then remove the legacy VolumeAttributesClass lifecycle test above.
+	framework.It("should support VolumeAttributesClass API operations", func(ctx context.Context) {
+		e2econformance.TestResource(ctx, f,
+			&e2econformance.ResourceTestcase[*storagev1.VolumeAttributesClass]{
+				GVR:        storagev1.SchemeGroupVersion.WithResource("volumeattributesclasses"),
+				Namespaced: new(bool),
+				InitialSpec: &storagev1.VolumeAttributesClass{
+					DriverName: "e2e-fake-csi-driver",
+					Parameters: map[string]string{"foo": "bar"},
+				},
+				UpdateSpec: func(obj *storagev1.VolumeAttributesClass) *storagev1.VolumeAttributesClass {
+					metav1.SetMetaDataLabel(&obj.ObjectMeta, "foo", "bar")
+					return obj
+				},
+				StrategicMergePatchSpec: `{"metadata": {"labels": {"foo": "bar"}}}`,
+			},
+		)
 	})
 })
