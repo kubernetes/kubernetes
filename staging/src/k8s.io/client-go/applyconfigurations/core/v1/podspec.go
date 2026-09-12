@@ -302,6 +302,18 @@ type PodSpecApplyConfiguration struct {
 	// Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set).
 	// This field can only be set on creation and is immutable afterwards.
 	EvictionResponders []EvictionResponderApplyConfiguration `json:"evictionResponders,omitempty"`
+	// allowDisruptionByPriorityGreaterThanOrEqual indicates that a PodDisruptionBudget set for this pod
+	// can only be violated during scheduler preemption by pods with a priority value greater than or
+	// equal to allowDisruptionByPriorityGreaterThanOrEqual. The value of
+	// allowDisruptionByPriorityGreaterThanOrEqual cannot be greater than the priority value of
+	// system-cluster-critical or system-node-critical.
+	// When the Priority Admission Controller is enabled, it prevents users from setting this field
+	// directly; the admission controller populates it from the pod's PriorityClassName.
+	// A null value indicates that the PodDisruptionBudget is allowed to be disrupted by any other pod
+	// with a higher priority.
+	// This field is alpha-level and is only honored when the DisruptionPolicyInPriorityClass
+	// feature gate is enabled.
+	AllowDisruptionByPriorityGreaterThanOrEqual *int32 `json:"allowDisruptionByPriorityGreaterThanOrEqual,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -717,5 +729,13 @@ func (b *PodSpecApplyConfiguration) WithEvictionResponders(values ...*EvictionRe
 		}
 		b.EvictionResponders = append(b.EvictionResponders, *values[i])
 	}
+	return b
+}
+
+// WithAllowDisruptionByPriorityGreaterThanOrEqual sets the AllowDisruptionByPriorityGreaterThanOrEqual field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowDisruptionByPriorityGreaterThanOrEqual field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithAllowDisruptionByPriorityGreaterThanOrEqual(value int32) *PodSpecApplyConfiguration {
+	b.AllowDisruptionByPriorityGreaterThanOrEqual = &value
 	return b
 }

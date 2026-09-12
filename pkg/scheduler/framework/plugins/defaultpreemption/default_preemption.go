@@ -411,11 +411,32 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	}
 
 	numViolatingVictim := 0
+	var mustGuaranteePDBVictims []*preemption.DomainVictim
 	for _, violatingVictim := range violatingVictims {
+		if pl.fts.EnableDisruptionPolicyInPriorityClass && mustGuaranteePDBForVictim(preemptor, violatingVictim.Victim) {
+			// This victim's priority class (or that of one of its pods) declares
+			// allowDisruptionByPriorityGreaterThanOrEqual at a priority higher than the
+			// preemptor's, so it must never be preempted while its PodDisruptionBudget
+			// would be violated. Reprieve it unconditionally rather than only best-effort.
+			if err := addVictim(violatingVictim.Victim); err != nil {
+				return nil, 0, fwk.AsStatus(err)
+			}
+			mustGuaranteePDBVictims = append(mustGuaranteePDBVictims, violatingVictim.Victim)
+			continue
+		}
 		if fits, err := reprieveVictim(violatingVictim.Victim); err != nil {
 			return nil, 0, fwk.AsStatus(err)
 		} else if !fits {
 			numViolatingVictim += violatingVictim.ViolateCount
+		}
+	}
+
+	if len(mustGuaranteePDBVictims) != 0 {
+		if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, cycleState, preemptor, nodeInfo); !status.IsSuccess() {
+			// The preemptor does not fit once every PDB-guaranteed victim is kept, so this
+			// node cannot be used for preemption without violating a PodDisruptionBudget
+			// that must be guaranteed for pods at this preemptor's priority.
+			return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "preemption would violate a PodDisruptionBudget guaranteed for pods at this priority")
 		}
 	}
 
@@ -438,6 +459,22 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	}
 
 	return victimPods, numViolatingVictim, nil
+}
+
+// mustGuaranteePDBForVictim returns true if victim must never be preempted while
+// violating its PodDisruptionBudget, because at least one of its pods has
+// spec.allowDisruptionByPriorityGreaterThanOrEqual set to a value greater than the
+// preemptor's priority. Callers must only call this when the
+// DisruptionPolicyInPriorityClass feature gate is enabled.
+func mustGuaranteePDBForVictim(preemptor *v1.Pod, victim preemption.Victim) bool {
+	preemptorPriority := corev1helpers.PodPriority(preemptor)
+	for _, pi := range victim.Pods() {
+		threshold := pi.GetPod().Spec.AllowDisruptionByPriorityGreaterThanOrEqual
+		if threshold != nil && preemptorPriority < *threshold {
+			return true
+		}
+	}
+	return false
 }
 
 // PodEligibleToPreemptOthers returns one bool and one string. The bool

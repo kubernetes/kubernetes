@@ -10020,6 +10020,13 @@ func (m *PodSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.AllowDisruptionByPriorityGreaterThanOrEqual != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.AllowDisruptionByPriorityGreaterThanOrEqual))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xe8
+	}
 	if len(m.EvictionResponders) > 0 {
 		for iNdEx := len(m.EvictionResponders) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -19264,6 +19271,9 @@ func (m *PodSpec) Size() (n int) {
 			n += 2 + l + sovGenerated(uint64(l))
 		}
 	}
+	if m.AllowDisruptionByPriorityGreaterThanOrEqual != nil {
+		n += 2 + sovGenerated(uint64(*m.AllowDisruptionByPriorityGreaterThanOrEqual))
+	}
 	return n
 }
 
@@ -23860,6 +23870,7 @@ func (this *PodSpec) String() string {
 		`HostnameOverride:` + valueToStringGenerated(this.HostnameOverride) + `,`,
 		`SchedulingGroup:` + strings.Replace(this.SchedulingGroup.String(), "PodSchedulingGroup", "PodSchedulingGroup", 1) + `,`,
 		`EvictionResponders:` + repeatedStringForEvictionResponders + `,`,
+		`AllowDisruptionByPriorityGreaterThanOrEqual:` + valueToStringGenerated(this.AllowDisruptionByPriorityGreaterThanOrEqual) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -56924,6 +56935,26 @@ func (m *PodSpec) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 45:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllowDisruptionByPriorityGreaterThanOrEqual", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.AllowDisruptionByPriorityGreaterThanOrEqual = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

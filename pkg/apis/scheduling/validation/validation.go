@@ -56,6 +56,9 @@ func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
 	if pc.PreemptionPolicy != nil {
 		allErrs = append(allErrs, apivalidation.ValidatePreemptionPolicy(pc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
 	}
+	if pc.AllowDisruptionByPriorityGreaterThanOrEqual != nil && *pc.AllowDisruptionByPriorityGreaterThanOrEqual > scheduling.SystemCriticalPriority {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("allowDisruptionByPriorityGreaterThanOrEqual"), *pc.AllowDisruptionByPriorityGreaterThanOrEqual, fmt.Sprintf("must not be greater than the priority value of system-cluster-critical or system-node-critical (%v)", scheduling.SystemCriticalPriority)))
+	}
 	return allErrs
 }
 
@@ -70,6 +73,8 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 	}
 	// preemptionPolicy is immutable.
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.PreemptionPolicy, oldPc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
+	// allowDisruptionByPriorityGreaterThanOrEqual is immutable.
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.AllowDisruptionByPriorityGreaterThanOrEqual, oldPc.AllowDisruptionByPriorityGreaterThanOrEqual, field.NewPath("allowDisruptionByPriorityGreaterThanOrEqual"))...)
 	return allErrs
 }
 

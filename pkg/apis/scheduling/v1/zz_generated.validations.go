@@ -92,5 +92,6 @@ func Validate_PriorityClass(
 	// field schedulingv1.PriorityClass.GlobalDefault has no validation
 	// field schedulingv1.PriorityClass.Description has no validation
 	// field schedulingv1.PriorityClass.PreemptionPolicy has no validation
+	// field schedulingv1.PriorityClass.AllowDisruptionByPriorityGreaterThanOrEqual has no validation
 	return errs
 }

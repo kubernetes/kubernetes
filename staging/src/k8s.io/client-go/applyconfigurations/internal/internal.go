@@ -7189,6 +7189,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: affinity
       type:
         namedType: io.k8s.api.core.v1.Affinity
+    - name: allowDisruptionByPriorityGreaterThanOrEqual
+      type:
+        scalar: numeric
     - name: automountServiceAccountToken
       type:
         scalar: boolean
@@ -15516,6 +15519,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.scheduling.v1.PriorityClass
   map:
     fields:
+    - name: allowDisruptionByPriorityGreaterThanOrEqual
+      type:
+        scalar: numeric
     - name: apiVersion
       type:
         scalar: string

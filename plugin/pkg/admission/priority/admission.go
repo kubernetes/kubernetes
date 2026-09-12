@@ -169,13 +169,18 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 		if pod.Spec.PreemptionPolicy == nil && oldPod.Spec.PreemptionPolicy != nil {
 			pod.Spec.PreemptionPolicy = oldPod.Spec.PreemptionPolicy
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DisruptionPolicyInPriorityClass) {
+			if pod.Spec.AllowDisruptionByPriorityGreaterThanOrEqual == nil && oldPod.Spec.AllowDisruptionByPriorityGreaterThanOrEqual != nil {
+				pod.Spec.AllowDisruptionByPriorityGreaterThanOrEqual = oldPod.Spec.AllowDisruptionByPriorityGreaterThanOrEqual
+			}
+		}
 		return nil
 	}
 
 	if operation == admission.Create {
 		var priority int32
 		var preemptionPolicy *apiv1.PreemptionPolicy
-		pcName, priority, preemptionPolicy, err := p.establishPriority(a, &pod.Spec.PriorityClassName)
+		pcName, priority, preemptionPolicy, allowDisruptionByPriorityGTE, err := p.establishPriority(a, &pod.Spec.PriorityClassName)
 		if err != nil {
 			return err
 		}
@@ -194,6 +199,13 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 			}
 			pod.Spec.PreemptionPolicy = &corePolicy
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DisruptionPolicyInPriorityClass) {
+			if pod.Spec.AllowDisruptionByPriorityGreaterThanOrEqual != nil {
+				return admission.NewForbidden(a, fmt.Errorf("allowDisruptionByPriorityGreaterThanOrEqual must not be provided in pod spec; it is populated by the priority admission controller from the given PriorityClass"))
+			}
+			pod.Spec.AllowDisruptionByPriorityGreaterThanOrEqual = allowDisruptionByPriorityGTE
+		}
 	}
 	return nil
 }
@@ -210,7 +222,7 @@ func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
 		return errors.NewBadRequest("resource was marked with kind PodGroup but was unable to be converted")
 	}
 
-	priorityClassName, priority, preemptionPolicy, err := p.establishPriority(attributes, &pg.Spec.PriorityClassName)
+	priorityClassName, priority, preemptionPolicy, _, err := p.establishPriority(attributes, &pg.Spec.PriorityClassName)
 	if err != nil {
 		return err
 	}
@@ -252,7 +264,7 @@ func (p *Plugin) admitCompositePodGroup(attributes admission.Attributes) error {
 		return errors.NewBadRequest("resource was marked with kind CompositePodGroup but was unable to be converted")
 	}
 
-	priorityClassName, priority, preemptionPolicy, err := p.establishPriority(attributes, &cpg.Spec.PriorityClassName)
+	priorityClassName, priority, preemptionPolicy, _, err := p.establishPriority(attributes, &cpg.Spec.PriorityClassName)
 	if err != nil {
 		return err
 	}
@@ -310,20 +322,20 @@ func (p *Plugin) validatePriorityClass(a admission.Attributes) error {
 // returning information contained there.
 // If the provided name is not empty, we get the priority class with such name and return
 // the information contained in that class.
-func (p *Plugin) establishPriority(attributes admission.Attributes, priorityClassName *string) (string, int32, *apiv1.PreemptionPolicy, error) {
+func (p *Plugin) establishPriority(attributes admission.Attributes, priorityClassName *string) (string, int32, *apiv1.PreemptionPolicy, *int32, error) {
 	if priorityClassName == nil || *priorityClassName == "" {
-		pcName, priority, preemptionPolicy, err := p.getDefaultPriority()
+		pcName, priority, preemptionPolicy, allowDisruptionByPriorityGTE, err := p.getDefaultPriority()
 		if err != nil {
-			return "", 0, nil, fmt.Errorf("error occurred while retrieving default priority class: %w", err)
+			return "", 0, nil, nil, fmt.Errorf("error occurred while retrieving default priority class: %w", err)
 		}
-		return pcName, priority, preemptionPolicy, nil
+		return pcName, priority, preemptionPolicy, allowDisruptionByPriorityGTE, nil
 	}
 	// Try resolving the priority class name.
 	pc, err := p.resolvePriorityClass(attributes, *priorityClassName)
 	if err != nil {
-		return "", 0, nil, err
+		return "", 0, nil, nil, err
 	}
-	return *priorityClassName, pc.Value, pc.PreemptionPolicy, nil
+	return *priorityClassName, pc.Value, pc.PreemptionPolicy, pc.AllowDisruptionByPriorityGreaterThanOrEqual, nil
 }
 
 func (p *Plugin) getDefaultPriorityClass() (*schedulingv1.PriorityClass, error) {
@@ -344,16 +356,16 @@ func (p *Plugin) getDefaultPriorityClass() (*schedulingv1.PriorityClass, error) 
 	return defaultPC, nil
 }
 
-func (p *Plugin) getDefaultPriority() (string, int32, *apiv1.PreemptionPolicy, error) {
+func (p *Plugin) getDefaultPriority() (string, int32, *apiv1.PreemptionPolicy, *int32, error) {
 	dpc, err := p.getDefaultPriorityClass()
 	if err != nil {
-		return "", 0, nil, err
+		return "", 0, nil, nil, err
 	}
 	if dpc != nil {
-		return dpc.Name, dpc.Value, dpc.PreemptionPolicy, nil
+		return dpc.Name, dpc.Value, dpc.PreemptionPolicy, dpc.AllowDisruptionByPriorityGreaterThanOrEqual, nil
 	}
 	preemptLowerPriority := apiv1.PreemptLowerPriority
-	return "", int32(scheduling.DefaultPriorityWhenNoDefaultClassExists), &preemptLowerPriority, nil
+	return "", int32(scheduling.DefaultPriorityWhenNoDefaultClassExists), &preemptLowerPriority, nil, nil
 }
 
 func (p *Plugin) resolvePriorityClass(attributes admission.Attributes, priorityClassName string) (*schedulingv1.PriorityClass, error) {
