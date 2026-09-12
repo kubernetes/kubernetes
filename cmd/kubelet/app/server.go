@@ -848,6 +848,17 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		if err != nil {
 			return err
 		}
+
+		// On Windows the cAdvisor client implements cadvisor.ContainerEnumeratorSetter,
+		// enabling per-container metrics (e.g. container_oom_events_total) by
+		// enumerating live CRI containers. The runtime service is initialized before
+		// this point (PreInitRuntimeService); Linux cAdvisor does not implement the
+		// optional setter, so this wiring is a harmless no-op there.
+		if enumerator, ok := kubeDeps.RemoteRuntimeService.(cadvisor.ContainerEnumerator); ok {
+			if setter, ok := kubeDeps.CAdvisorInterface.(cadvisor.ContainerEnumeratorSetter); ok {
+				setter.SetContainerEnumerator(enumerator)
+			}
+		}
 	}
 
 	// Setup event recorder if required.

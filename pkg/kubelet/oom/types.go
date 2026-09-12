@@ -20,7 +20,17 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+// containerStatusGetter is the subset of the CRI runtime service the Windows
+// OOM watcher needs to observe container exit reasons. The kubelet's
+// internalapi.RuntimeService satisfies it. It lives here (outside of any
+// *_windows.go file) only so the unsupported platform stub can share it.
+type containerStatusGetter interface {
+	ListContainers(ctx context.Context, filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error)
+	ContainerStatus(ctx context.Context, containerID string, verbose bool) (*runtimeapi.ContainerStatusResponse, error)
+}
 
 // Watcher defines the interface of OOM watchers.
 type Watcher interface {
