@@ -1138,3 +1138,100 @@ func TestTerminatingReplicas(t *testing.T) {
 		t.Fatalf("len(pods) = %d, want 7", len(pods.Items))
 	}
 }
+
+func TestReplicaSetScaleDownWithOrphanedPod(t *testing.T) {
+	tCtx, closeFn, rm, informers, clientSet := rmSetup(t)
+	defer closeFn()
+
+	ns := framework.CreateNamespaceOrDie(clientSet, "test-rs-scale-down-orphaned", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
+
+	rs := newRS("rs", ns.Name, 1)
+
+	// Create ReplicaSet
+	createdRSs, _ := createRSsPods(t, clientSet, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rs = createdRSs[0]
+
+	waitRSStable(t, clientSet, rs)
+
+	podClient := clientSet.CoreV1().Pods(ns.Name)
+	pods := getPods(t, podClient, labelMap())
+	if len(pods.Items) != 1 {
+		t.Fatalf("len(pods) = %d, want 1", len(pods.Items))
+	}
+	pod := &pods.Items[0]
+
+	// Orphan pod by updating labels.
+	newLabelMap := map[string]string{"foo": "baz"}
+	pod = updatePod(t, podClient, pod.Name, func(p *v1.Pod) {
+		p.Labels = newLabelMap
+	})
+
+	// Wait for the ReplicaSet controller to observe the label change and orphan the pod.
+	// Note: This test should pass even without this polling loop because the ReplicaSet controller
+	// sets a ResourceVersion precondition when deleting pods. If the controller tried to delete the pod
+	// before its cache saw the label update, the API server would reject it due to precondition failure.
+	// We wait here to make the test deterministic and ensure it exercises the orphaning logic.
+	if err := wait.PollUntilContextTimeout(tCtx, interval, timeout, true, func(c context.Context) (bool, error) {
+		newPod, err := podClient.Get(c, pod.Name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, err
+			}
+			return false, nil
+		}
+		return metav1.GetControllerOf(newPod) == nil, nil
+	}); err != nil {
+		t.Fatalf("Failed to verify ControllerRef for the pod %s is nil: %v", pod.Name, err)
+	}
+
+	// Wait for the ReplicaSet controller to create a replacement pod.
+	var replacementPod *v1.Pod
+	if err := wait.PollUntilContextTimeout(tCtx, interval, timeout, true, func(c context.Context) (bool, error) {
+		pods := getPods(t, podClient, labelMap())
+		if len(pods.Items) == 1 {
+			replacementPod = pods.Items[0].DeepCopy()
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Failed to wait for replacement pod to be created: %v", err)
+	}
+
+	// Give the ReplicaSet controller time to stabilize after creating the replacement Pod.
+	waitRSStable(t, clientSet, rs)
+
+	// Scale down to 0
+	scaleRS(t, clientSet, rs, 0)
+
+	// Verify that the replacement pod is deleted or has a deletion timestamp
+	if err := wait.PollUntilContextTimeout(tCtx, interval, timeout, true, func(c context.Context) (bool, error) {
+		p, err := podClient.Get(c, replacementPod.Name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		}
+		return p.DeletionTimestamp != nil, nil
+	}); err != nil {
+		t.Fatalf("Failed to verify replacement pod is deleted: %v", err)
+	}
+
+	// Verify that the orphaned Pod has not been deleted and is still orphaned.
+	orphanedPod, err := podClient.Get(tCtx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Pod should still exist because it was orphaned and is no longer managed by the ReplicaSet: %v", err)
+	}
+	if orphanedPod.DeletionTimestamp != nil {
+		t.Errorf("Pod should not be deleted, but it has a DeletionTimestamp")
+	}
+	if metav1.GetControllerOf(orphanedPod) != nil {
+		t.Errorf("Pod should still be orphaned, but it has a ControllerRef")
+	}
+	if orphanedPod.Labels["foo"] != "baz" {
+		t.Errorf("Pod labels should still be the new ones, got %v", orphanedPod.Labels)
+	}
+}
