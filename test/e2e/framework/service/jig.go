@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"math/rand"
 	"net"
@@ -49,8 +50,37 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// NodePortRange should match whatever the default/configured range is
+// NodePortRange is the range used by tests which create or validate NodePorts.
+// It must match the kube-apiserver --service-node-port-range setting and must
+// only be configured during startup, before tests begin running.
 var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
+
+type nodePortRangeValue struct{}
+
+func (nodePortRangeValue) String() string {
+	return NodePortRange.String()
+}
+
+func (nodePortRangeValue) Set(value string) error {
+	portRange, err := utilnet.ParsePortRange(value)
+	if err != nil {
+		return fmt.Errorf("parse service NodePort range %q: %w", value, err)
+	}
+	if portRange.Base < 1 || portRange.Size < 1 {
+		return fmt.Errorf("service NodePort range %q must be non-empty and contain only ports between 1 and 65535", value)
+	}
+
+	NodePortRange = *portRange
+	initializeStaticPortAllocator()
+	return nil
+}
+
+// RegisterFlags registers flags used by service tests. The flags must be
+// parsed during startup, before tests begin using the static port allocator.
+func RegisterFlags(flags *flag.FlagSet) {
+	usage := fmt.Sprintf("Port range reserved for Service NodePorts. Must match the kube-apiserver --service-node-port-range setting. (default %s)", NodePortRange.String())
+	flags.Var(nodePortRangeValue{}, "service-node-port-range", usage)
+}
 
 // It is copied from "k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 var errAllocated = errors.New("provided port is already allocated")
@@ -73,11 +103,15 @@ func calculateRange(size int32) int32 {
 
 var staticPortAllocator *staticPortRange
 
-// Initialize only once per test
 func init() {
+	initializeStaticPortAllocator()
+}
+
+func initializeStaticPortAllocator() {
+	rangeSize := int32(NodePortRange.Size)
 	staticPortAllocator = &staticPortRange{
 		baseport:      int32(NodePortRange.Base),
-		length:        calculateRange(int32(NodePortRange.Size)),
+		length:        min(calculateRange(rangeSize), rangeSize),
 		reservedPorts: sets.New[int32](),
 	}
 }
@@ -111,7 +145,7 @@ func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 func (s *staticPortRange) reservePort(port int32) bool {
 	s.Lock()
 	defer s.Unlock()
-	if port < s.baseport || port > s.baseport+s.length || s.reservedPorts.Has(port) {
+	if port < s.baseport || port >= s.baseport+s.length || s.reservedPorts.Has(port) {
 		return false
 	}
 	s.reservedPorts.Insert(port)
