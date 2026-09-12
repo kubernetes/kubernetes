@@ -392,7 +392,7 @@ func TestRunProbeHTTPGetHTTP2ProtocolFeatureGateDisabled(t *testing.T) {
 	// Gate off: kubelet silently falls back to HTTP/1.1 rather than
 	// failing with a gate error. The probe will fail with a connection
 	// error (no server), but must NOT fail due to the feature gate.
-	res, _, err := pb.runProbe(context.Background(), readiness, p, pod, status, container, containerID)
+	res, _, err := pb.runProbe(context.Background(), readiness, p, pod, status, container, containerID, nil)
 	if res == probe.Unknown {
 		t.Errorf("gate-off probe should fall back to HTTP/1.1, not return Unknown")
 	}
