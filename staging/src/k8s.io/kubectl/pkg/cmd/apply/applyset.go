@@ -258,6 +258,12 @@ func (a *ApplySet) AddLabels(objects ...*resource.Info) error {
 	return nil
 }
 
+// FetchParent fetches the current state of the ApplySet parent object.
+// This is a read-only operation suitable for use by diff and other read-only commands.
+func (a *ApplySet) FetchParent() error {
+	return a.fetchParent()
+}
+
 func (a *ApplySet) fetchParent() error {
 	helper := resource.NewHelper(a.client, a.parentRef.RESTMapping)
 	obj, err := helper.Get(a.parentRef.Namespace, a.parentRef.Name)
