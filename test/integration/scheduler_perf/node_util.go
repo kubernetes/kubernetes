@@ -81,7 +81,7 @@ func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy 
 }
 
 // PrepareNodes prepares countToStrategy test nodes.
-func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNodeIndex int) error {
+func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, _ int) error {
 	numNodes := 0
 	for _, v := range p.countToStrategy {
 		numNodes += v.Count
@@ -89,6 +89,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 
 	klog.Infof("Making %d nodes", numNodes)
 
+	createNodes := make([]*v1.Node, 0, numNodes)
 	for i := 0; i < numNodes; i++ {
 		baseNode, err := p.nodeTemplate.GetNodeTemplate(i, numNodes)
 		if err != nil {
@@ -108,8 +109,9 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 				node.Labels = make(map[string]string)
 			}
 			node.Labels["kubernetes.io/hostname"] = name
-			_, err = p.client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
+			node, err = p.client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
 			if err == nil {
+				createNodes = append(createNodes, node)
 				break
 			}
 		}
@@ -118,14 +120,10 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 		}
 	}
 
-	nodes, err := waitListAllNodes(ctx, p.client)
-	if err != nil {
-		return fmt.Errorf("listing nodes: %w", err)
-	}
-	index := nextNodeIndex
+	index := 0
 	for _, v := range p.countToStrategy {
 		for i := 0; i < v.Count; i, index = i+1, index+1 {
-			if err := DoPrepareNode(ctx, p.client, &nodes.Items[index], v.Strategy); err != nil {
+			if err := DoPrepareNode(ctx, p.client, createNodes[index], v.Strategy); err != nil {
 				return fmt.Errorf("aborting node preparation: %w", err)
 			}
 		}
