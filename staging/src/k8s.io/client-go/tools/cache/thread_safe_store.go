@@ -523,6 +523,9 @@ func (c *threadSafeMap) Resync() error {
 }
 
 func NewThreadSafeStore(indexers Indexers, indices Indices, opts ...ThreadSafeStoreOption) ThreadSafeStore {
+	if store := newArenaThreadSafeStoreOrNil(indexers, indices, opts...); store != nil {
+		return store
+	}
 	store := &threadSafeMap{
 		items: map[string]interface{}{},
 		index: &storeIndex{
