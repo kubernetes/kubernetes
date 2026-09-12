@@ -39,6 +39,10 @@ var (
 	)
 )
 
+type containerKey struct {
+	uid, namespace, pod, container string
+}
+
 type logMetricsCollector struct {
 	metrics.BaseStableCollector
 
@@ -73,9 +77,15 @@ func (c *logMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
 		return
 	}
 
+	seen := make(map[containerKey]bool)
 	for _, ps := range podStats {
 		for _, c := range ps.Containers {
 			if c.Logs != nil && c.Logs.UsedBytes != nil {
+				key := containerKey{ps.PodRef.UID, ps.PodRef.Namespace, ps.PodRef.Name, c.Name}
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
 				ch <- metrics.NewLazyConstMetric(
 					descLogSize,
 					metrics.GaugeValue,
