@@ -35,6 +35,10 @@ const (
 
 	// defaultUpperBoundCapacity should be able to keep the required history.
 	defaultUpperBoundCapacity = 100 * 1024
+
+	// shrinkStreakThreshold is the number of consecutive events that have to
+	// qualify for shrinking (see resizeCacheLocked) before capacity is halved.
+	shrinkStreakThreshold = 2
 )
 
 func newWatchCacheHistory(config *ImmutableWatchCacheConfig, eventFreshDuration time.Duration) *watchCacheHistory {
@@ -100,6 +104,10 @@ type watchCacheHistory struct {
 
 	// eventFreshDuration defines the minimum watch history watchcache will store.
 	eventFreshDuration time.Duration
+
+	// shrinkStreak counts how many consecutive events qualified for shrinking
+	// the cache; capacity is halved only when it reaches shrinkStreakThreshold.
+	shrinkStreak int
 }
 
 // Assumes that lock is already held for write.
@@ -115,22 +123,47 @@ func (w *watchCacheHistory) updateCache(event *watchCacheEvent) {
 }
 
 // resizeCacheLocked resizes the cache if necessary:
-// - increases capacity by 2x if cache is full and all cached events occurred within last eventFreshDuration.
-// - decreases capacity by 2x when recent quarter of events occurred outside of eventFreshDuration(protect watchCache from flapping).
+//   - increases capacity by 2x if cache is full and all cached events occurred within last eventFreshDuration.
+//   - decreases capacity by 2x when, for shrinkStreakThreshold consecutive events, the cache is full and:
+//     a) the recent quarter of events spans more than eventFreshDuration, and
+//     b) the incoming event's arrival interval is not shorter than the average interval
+//     of the recent quarter (i.e. the event rate is not accelerating).
 func (w *watchCacheHistory) resizeCacheLocked(eventTime time.Time) {
-	if w.isCacheFullLocked() && eventTime.Sub(w.cache[w.startIndex%w.capacity].RecordTime) < w.eventFreshDuration {
+	if !w.isCacheFullLocked() {
+		w.shrinkStreak = 0
+		return
+	}
+
+	// increase capacity quickly
+	if eventTime.Sub(w.cache[w.startIndex%w.capacity].RecordTime) < w.eventFreshDuration {
 		capacity := min(w.capacity*2, w.upperBoundCapacity)
 		if capacity > w.capacity {
 			w.doCacheResizeLocked(capacity)
 		}
+		w.shrinkStreak = 0
 		return
 	}
-	if w.isCacheFullLocked() && eventTime.Sub(w.cache[(w.endIndex-w.capacity/4)%w.capacity].RecordTime) > w.eventFreshDuration {
-		capacity := max(w.capacity/2, w.lowerBoundCapacity)
-		if capacity < w.capacity {
-			w.doCacheResizeLocked(capacity)
-		}
+
+	// decrease capacity carefully and slowly
+	quarter := max(w.capacity/4, 1)
+	quarterSpan := eventTime.Sub(w.cache[(w.endIndex-quarter)%w.capacity].RecordTime)
+	arrivalGap := eventTime.Sub(w.cache[(w.endIndex-1)%w.capacity].RecordTime)
+	if quarterSpan <= w.eventFreshDuration || arrivalGap*time.Duration(quarter) < quarterSpan {
+		w.shrinkStreak = 0
 		return
+	}
+
+	// wait for shrinkStreakThreshold consecutive shrink signals
+	w.shrinkStreak++
+	if w.shrinkStreak < shrinkStreakThreshold {
+		return
+	}
+
+	// halve the capacity
+	w.shrinkStreak = 0
+	capacity := max(w.capacity/2, w.lowerBoundCapacity)
+	if capacity < w.capacity {
+		w.doCacheResizeLocked(capacity)
 	}
 }
 
