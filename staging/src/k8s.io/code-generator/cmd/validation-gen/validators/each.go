@@ -52,10 +52,12 @@ func init() {
 type eachValTagValidator struct {
 	byPath    map[string]*listMetadata
 	validator TagValidationExtractor
+	prefix    string
 }
 
 func (evtv *eachValTagValidator) Init(cfg Config) {
 	evtv.validator = cfg.TagValidator
+	evtv.prefix = cfg.TagPrefix
 }
 
 func (eachValTagValidator) TagName() string {
@@ -150,6 +152,9 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 // this is a typedef to a list, this is the alias type, not the underlying
 // type.
 func (evtv eachValTagValidator) getValidations(fldPath *field.Path, t *types.Type, validations Validations) (Validations, error) {
+	if err := checkNoNonError(evtv.prefix+eachValTagName, validations); err != nil {
+		return Validations{}, err
+	}
 	switch util.NativeType(t).Kind {
 	case types.Slice, types.Array:
 		return evtv.getListValidations(fldPath, t, validations)
@@ -277,10 +282,12 @@ func (evtv eachValTagValidator) Docs() TagDoc {
 
 type eachKeyTagValidator struct {
 	validator TagValidationExtractor
+	prefix    string
 }
 
 func (ektv *eachKeyTagValidator) Init(cfg Config) {
 	ektv.validator = cfg.TagValidator
+	ektv.prefix = cfg.TagPrefix
 }
 
 func (eachKeyTagValidator) TagName() string {
@@ -357,6 +364,9 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 }
 
 func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Validations) (Validations, error) {
+	if err := checkNoNonError(ektv.prefix+eachKeyTagName, validations); err != nil {
+		return Validations{}, err
+	}
 	nt := util.NativeType(t)
 	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
@@ -368,6 +378,24 @@ func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Valida
 		Deferred:      wrapped.Deferred,
 		OpaqueKeyType: validations.OpaqueType,
 	}, nil
+}
+
+// checkNoNonError rejects validations that report no error of their own and
+// exist only to stop the validations after them, via ShortCircuit. Each
+// iteration tag runs as its own pass over the collection, so the later passes
+// run anyway and the internal stop signal surfaces as a spurious error.
+// Contrast the item tag, which emits a cohort per item, giving short-circuiting
+// somewhere to act.
+//
+// TODO: lift this by emitting all of a field's iteration tags as one pass,
+// whose per-element closure scopes short-circuiting to the element that failed.
+func checkNoNonError(iterTag string, validations Validations) error {
+	for _, fn := range validations.Functions {
+		if fn.Flags.IsSet(NonError) {
+			return fmt.Errorf("+%s does not support optional/non-error validations", iterTag)
+		}
+	}
+	return nil
 }
 
 // ForEachKey returns a validation that applies a function to each key of
