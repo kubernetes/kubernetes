@@ -276,6 +276,11 @@ var endpointDNATRegexp = regexp.MustCompile(`^dnat ip6* addr \. port to numgen r
 var endpointDNATEntryRegexp = regexp.MustCompile(`\d+ : (\S+) \. (\d+)`)
 var singleEndpointDNATRegexp = regexp.MustCompile(`^dnat ip6* addr \. port to (\S+) \. (\d+)$`)
 
+// Shared "dispatch-N" bucket chains: store a random slot in the
+// conntrack mark, then DNAT via the shared endpoints map keyed by
+// "destIP . protocol . destPort . mark".
+var endpointsMapDNATRegexp = regexp.MustCompile(`^ct mark set numgen random mod \d+ dnat ip6* addr \. port to ip6* daddr \. meta l4proto \. th dport \. ct mark map @(\S+)$`)
+
 var masqMarkRegexp = regexp.MustCompile(`^mark set mark or 0x[[:xdigit:]]+$`)
 var masqCheckRegexp = regexp.MustCompile(`^mark and 0x[[:xdigit:]]+ != 0 mark set mark xor 0x[[:xdigit:]]+`)
 var masqueradeRegexp = regexp.MustCompile(`^masquerade fully-random$`)
@@ -569,6 +574,22 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 
 					tracer.matches = append(tracer.matches, ruleObj.Rule)
 					tracer.outputs = append(tracer.outputs, net.JoinHostPort(endpointIP, endpointPort))
+				}
+				return true
+
+			case endpointsMapDNATRegexp.MatchString(rule):
+				// `^ct mark set numgen random mod \d+ dnat ip6* addr \. port to ip6* daddr \. meta l4proto \. th dport \. ct mark map @(\S+)$`
+				// Used by the shared bucket chains: looks up
+				// "destIP . protocol . destPort . slot" in the shared endpoints
+				// map and DNATs to the result. For tracePacket's purposes, we
+				// DNAT to *all* of this service's endpoints in the map.
+				match := endpointsMapDNATRegexp.FindStringSubmatch(rule)
+				mapName := match[1]
+				for _, element := range tracer.nft.Table.Maps[mapName].Elements {
+					if element.Key[0] == destIP && element.Key[1] == protocol && element.Key[2] == destPort {
+						tracer.matches = append(tracer.matches, ruleObj.Rule)
+						tracer.outputs = append(tracer.outputs, net.JoinHostPort(element.Value[0], element.Value[1]))
+					}
 				}
 				return true
 
