@@ -701,3 +701,110 @@ func TestEvictDuringNamespaceTerminating(t *testing.T) {
 		})
 	}
 }
+
+func TestEvictDuringRetryPodRecreatedOrRescheduled(t *testing.T) {
+	testPodUID := types.UID("test-uid-1")
+	testPodName := "test-pod"
+	testNamespace := "default"
+	targetNodeName := "node-1"
+
+	retryDelay := 5 * time.Millisecond
+	globalTimeout := 20 * retryDelay
+
+	tests := []struct {
+		description string
+		getPodFn    func(callCount int) (*corev1.Pod, error)
+		expectErr   bool
+	}{
+		{
+			description: "Pod recreated with different UID during eviction retry",
+			getPodFn: func(callCount int) (*corev1.Pod, error) {
+				return &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testPodName,
+						Namespace: testNamespace,
+						UID:       types.UID("test-uid-2-recreated"),
+					},
+					Spec: corev1.PodSpec{
+						NodeName: targetNodeName,
+					},
+				}, nil
+			},
+			expectErr: false,
+		},
+		{
+			description: "Pod rescheduled to different node during eviction retry",
+			getPodFn: func(callCount int) (*corev1.Pod, error) {
+				return &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testPodName,
+						Namespace: testNamespace,
+						UID:       testPodUID,
+					},
+					Spec: corev1.PodSpec{
+						NodeName: "node-2-other",
+					},
+				}, nil
+			},
+			expectErr: false,
+		},
+		{
+			description: "Pod deleted (NotFound) during eviction retry",
+			getPodFn: func(callCount int) (*corev1.Pod, error) {
+				return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, testPodName)
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			initialPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					UID:       testPodUID,
+				},
+				Spec: corev1.PodSpec{
+					NodeName: targetNodeName,
+				},
+			}
+
+			evictPods := []corev1.Pod{*initialPod}
+			k := fake.NewClientset(initialPod)
+			addEvictionSupport(t, k, "v1")
+
+			// Eviction always returns TooManyRequests (e.g. PDB violation)
+			k.PrependReactor("create", "pods", func(action ktest.Action) (bool, runtime.Object, error) {
+				if action.GetSubresource() != "eviction" {
+					return false, nil, nil
+				}
+				return true, nil, apierrors.NewTooManyRequests("Cannot evict pod as it would violate disruption budget", 0)
+			})
+
+			callCount := 0
+			k.PrependReactor("get", "pods", func(action ktest.Action) (bool, runtime.Object, error) {
+				callCount++
+				pod, err := test.getPodFn(callCount)
+				return true, pod, err
+			})
+
+			h := &Helper{
+				Client:               k,
+				DisableEviction:      false,
+				Out:                  os.Stdout,
+				ErrOut:               os.Stderr,
+				Timeout:              globalTimeout,
+				EvictErrorRetryDelay: retryDelay,
+			}
+
+			err := h.DeleteOrEvictPods(evictPods)
+			if test.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !test.expectErr && err != nil {
+				t.Fatalf("expected no error, got: %v", err)
+			}
+		})
+	}
+}
