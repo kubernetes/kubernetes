@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,6 +43,13 @@ type Decoder interface {
 	Close() error
 }
 
+type Framer interface {
+	// ReadFrame will return io.EOF when no more frames are available. The
+	// returned Frame must be released when the caller is done with it.
+	ReadFrame() (*Frame, error)
+	Close() error
+}
+
 // Serializer is a factory for creating encoders and decoders that work over streams.
 type Serializer interface {
 	NewEncoder(w io.Writer) Encoder
@@ -51,49 +59,70 @@ type Serializer interface {
 type decoder struct {
 	reader    io.ReadCloser
 	decoder   runtime.Decoder
-	buf       []byte
 	maxBytes  int
 	resetRead bool
+	pool      sync.Pool
 }
 
 // NewDecoder creates a streaming decoder that reads object chunks from r and decodes them with d.
 // The reader is expected to return ErrShortRead if the provided buffer is not large enough to read
 // an entire object.
 func NewDecoder(r io.ReadCloser, d runtime.Decoder) Decoder {
-	return &decoder{
+	decoder := &decoder{
 		reader:   r,
 		decoder:  d,
-		buf:      make([]byte, 1024),
 		maxBytes: 16 * 1024 * 1024,
 	}
+	decoder.pool.New = func() any {
+		return make([]byte, 1024)
+	}
+	return decoder
 }
 
 var ErrObjectTooLarge = fmt.Errorf("object to decode was longer than maximum allowed size")
 
 // Decode reads the next object from the stream and decodes it.
 func (d *decoder) Decode(defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	frame, err := d.ReadFrame()
+	if err != nil {
+		return nil, nil, err
+	}
+	defer frame.Release()
+	return d.decoder.Decode(frame.Data(), defaults, into)
+}
+
+// ReadFrame reads the next raw object frame from the stream.
+func (d *decoder) ReadFrame() (*Frame, error) {
+	buf := d.getBuffer()
 	base := 0
 	for {
-		n, err := d.reader.Read(d.buf[base:])
+		n, err := d.reader.Read(buf[base:])
 		if err == io.ErrShortBuffer {
 			if n == 0 {
-				return nil, nil, fmt.Errorf("got short buffer with n=0, base=%d, cap=%d", base, cap(d.buf))
+				d.putBuffer(buf)
+				return nil, fmt.Errorf("got short buffer with n=0, base=%d, cap=%d", base, cap(buf))
 			}
 			if d.resetRead {
 				continue
 			}
 			// double the buffer size up to maxBytes
-			if len(d.buf) < d.maxBytes {
+			if len(buf) < d.maxBytes {
 				base += n
-				d.buf = append(d.buf, make([]byte, len(d.buf))...)
+				newLen := len(buf) * 2
+				if newLen > d.maxBytes {
+					newLen = d.maxBytes
+				}
+				buf = append(buf, make([]byte, newLen-len(buf))...)
 				continue
 			}
 			// must read the rest of the frame (until we stop getting ErrShortBuffer)
 			d.resetRead = true
-			return nil, nil, ErrObjectTooLarge
+			d.putBuffer(buf)
+			return nil, ErrObjectTooLarge
 		}
 		if err != nil {
-			return nil, nil, err
+			d.putBuffer(buf)
+			return nil, err
 		}
 		if d.resetRead {
 			// now that we have drained the large read, continue
@@ -103,11 +132,47 @@ func (d *decoder) Decode(defaults *schema.GroupVersionKind, into runtime.Object)
 		base += n
 		break
 	}
-	return d.decoder.Decode(d.buf[:base], defaults, into)
+
+	return &Frame{data: buf[:base], release: d.putBuffer}, nil
+}
+
+type Frame struct {
+	data []byte
+
+	once    sync.Once
+	release func(buf []byte)
+}
+
+func (f *Frame) Data() []byte {
+	return f.data
+}
+
+func (f *Frame) Release() {
+	if f == nil {
+		return
+	}
+	f.once.Do(func() {
+		if f.release != nil {
+			f.release(f.data)
+		}
+		f.data = nil
+		f.release = nil
+	})
 }
 
 func (d *decoder) Close() error {
 	return d.reader.Close()
+}
+
+func (d *decoder) getBuffer() []byte {
+	return d.pool.Get().([]byte)
+}
+
+func (d *decoder) putBuffer(buf []byte) {
+	if cap(buf) > d.maxBytes {
+		return
+	}
+	d.pool.Put(buf[:cap(buf)])
 }
 
 type encoder struct {

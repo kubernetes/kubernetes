@@ -82,3 +82,51 @@ func TestDecoder(t *testing.T) {
 		t.Fatalf("unexpected %v %v", err, len(d.got))
 	}
 }
+
+func TestDecoderReadFrame(t *testing.T) {
+	frames := [][]byte{
+		make([]byte, 1025),
+		make([]byte, 1024*5),
+		make([]byte, 1024*1024*17),
+		make([]byte, 1025),
+	}
+	pr, pw := io.Pipe()
+	fw := framer.NewLengthDelimitedFrameWriter(pw)
+	go func() {
+		for i := range frames {
+			fw.Write(frames[i])
+		}
+		pw.Close()
+	}()
+
+	r := framer.NewLengthDelimitedFrameReader(pr)
+	dec, ok := NewDecoder(r, &fakeDecoder{}).(Framer)
+	if !ok {
+		t.Fatal("NewDecoder did not implement Framer")
+	}
+	frame, err := dec.ReadFrame()
+	if err != nil || !bytes.Equal(frame.Data(), frames[0]) {
+		t.Fatalf("unexpected %v %v", err, len(frame.Data()))
+	}
+	frame.Release()
+	frame.Release()
+
+	frame, err = dec.ReadFrame()
+	if err != nil || !bytes.Equal(frame.Data(), frames[1]) {
+		t.Fatalf("unexpected %v %v", err, len(frame.Data()))
+	}
+	frame.Release()
+
+	if frame, err = dec.ReadFrame(); err != ErrObjectTooLarge || frame != nil {
+		t.Fatalf("unexpected %v %#v", err, frame)
+	}
+	frame, err = dec.ReadFrame()
+	if err != nil || !bytes.Equal(frame.Data(), frames[3]) {
+		t.Fatalf("unexpected %v %v", err, len(frame.Data()))
+	}
+	frame.Release()
+
+	if frame, err = dec.ReadFrame(); err != io.EOF || frame != nil {
+		t.Fatalf("unexpected %v %#v", err, frame)
+	}
+}
