@@ -301,6 +301,79 @@ func TestToKubeContainerStatus(t *testing.T) {
 				StartedAt: time.Unix(0, startedAt),
 			},
 		},
+		"oom-killed container keeps the OOMKilled reason": {
+			input: &runtimeapi.ContainerStatus{
+				Id:         cid.ID,
+				Metadata:   meta,
+				Image:      imageSpec,
+				State:      runtimeapi.ContainerState_CONTAINER_EXITED,
+				CreatedAt:  createdAt,
+				StartedAt:  startedAt,
+				FinishedAt: finishedAt,
+				ExitCode:   int32(137),
+				Reason:     "OOMKilled",
+			},
+			expected: &kubecontainer.Status{
+				ID:         *cid,
+				Image:      imageSpec.Image,
+				State:      kubecontainer.ContainerStateExited,
+				CreatedAt:  time.Unix(0, createdAt),
+				StartedAt:  time.Unix(0, startedAt),
+				FinishedAt: time.Unix(0, finishedAt),
+				ExitCode:   137,
+				Reason:     "OOMKilled",
+			},
+		},
+		"sigterm exit is not reported as OOMKilled": {
+			// A runtime can report OOMKilled from the cgroup's cumulative
+			// oom_kill counter (e.g. a child process OOM-killed earlier) even
+			// though the container's main process exited from SIGTERM during a
+			// drain, eviction, or probe-triggered restart.
+			input: &runtimeapi.ContainerStatus{
+				Id:         cid.ID,
+				Metadata:   meta,
+				Image:      imageSpec,
+				State:      runtimeapi.ContainerState_CONTAINER_EXITED,
+				CreatedAt:  createdAt,
+				StartedAt:  startedAt,
+				FinishedAt: finishedAt,
+				ExitCode:   int32(143),
+				Reason:     "OOMKilled",
+			},
+			expected: &kubecontainer.Status{
+				ID:         *cid,
+				Image:      imageSpec.Image,
+				State:      kubecontainer.ContainerStateExited,
+				CreatedAt:  time.Unix(0, createdAt),
+				StartedAt:  time.Unix(0, startedAt),
+				FinishedAt: time.Unix(0, finishedAt),
+				ExitCode:   143,
+				Reason:     "Error",
+			},
+		},
+		"sigterm exit without an OOM claim is passed through": {
+			input: &runtimeapi.ContainerStatus{
+				Id:         cid.ID,
+				Metadata:   meta,
+				Image:      imageSpec,
+				State:      runtimeapi.ContainerState_CONTAINER_EXITED,
+				CreatedAt:  createdAt,
+				StartedAt:  startedAt,
+				FinishedAt: finishedAt,
+				ExitCode:   int32(143),
+				Reason:     "Error",
+			},
+			expected: &kubecontainer.Status{
+				ID:         *cid,
+				Image:      imageSpec.Image,
+				State:      kubecontainer.ContainerStateExited,
+				CreatedAt:  time.Unix(0, createdAt),
+				StartedAt:  time.Unix(0, startedAt),
+				FinishedAt: time.Unix(0, finishedAt),
+				ExitCode:   143,
+				Reason:     "Error",
+			},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			actual := m.toKubeContainerStatus(tCtx, podUID, test.input, cid.Type)
