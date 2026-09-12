@@ -880,6 +880,10 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		if !m.isDevicePluginResource(resource) {
 			continue
 		}
+		if needed == 0 {
+			logger.V(3).Info("Skipping allocation for zero device request", "resourceName", resource, "pod", klog.KObj(pod), "containerName", container.Name)
+			continue
+		}
 		// Updates allocatedDevices to garbage collect any stranded resources
 		// before doing the device plugin allocation.
 		if !allocatedDevicesUpdated {
