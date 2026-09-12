@@ -261,6 +261,91 @@ type AuthenticatorTokenWithHealthCheck interface {
 	HealthCheck() error
 }
 
+// jwksMinRefreshInterval bounds how often verifyingKeySet will force a fresh
+// JSON Web Key Set (JWKS) fetch in response to a verification failure, so that
+// a client presenting tokens with an unrecognized key ID cannot force
+// unbounded fetches against the identity provider's JWKS endpoint.
+const jwksMinRefreshInterval = time.Second
+
+// verifyingKeySet wraps an oidc.KeySet built from a JWKS URL. The vendored
+// go-oidc client's RemoteKeySet only refetches keys from the issuer once its
+// entire local cache is close to expiring; it does not refetch just because a
+// specific token's key ID is missing from an otherwise still-fresh cache, e.g.
+// right after the identity provider rotates its signing keys. That means a
+// legitimate token signed with a newly rotated key can be rejected with an
+// authentication error until the local JWKS cache happens to expire on its
+// own.
+//
+// verifyingKeySet works around this: whenever verification fails, it rebuilds
+// the underlying key set (which forces a fresh fetch from jwksURL) and retries
+// once, rate limited by jwksMinRefreshInterval to bound the cost of repeated
+// bad tokens against the identity provider's JWKS endpoint.
+//
+// It is only used when the issuer opts in via Issuer.JWKSRefreshOnUnknownKeyID;
+// otherwise a bare oidc.RemoteKeySet is used, preserving the default behavior.
+type verifyingKeySet struct {
+	ctx     context.Context
+	client  *http.Client
+	jwksURL string
+
+	mu          sync.Mutex
+	current     oidc.KeySet
+	lastRefresh time.Time
+}
+
+func newVerifyingKeySet(ctx context.Context, client *http.Client, jwksURL string) *verifyingKeySet {
+	return &verifyingKeySet{
+		ctx:         ctx,
+		client:      client,
+		jwksURL:     jwksURL,
+		current:     oidc.NewRemoteKeySet(oidc.ClientContext(ctx, client), jwksURL),
+		lastRefresh: time.Now(),
+	}
+}
+
+func (k *verifyingKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte, error) {
+	keySet := k.snapshot()
+
+	payload, err := keySet.VerifySignature(ctx, jwt)
+	if err == nil {
+		return payload, nil
+	}
+
+	refreshed := k.refresh(keySet)
+	if refreshed == nil {
+		return nil, err
+	}
+	return refreshed.VerifySignature(ctx, jwt)
+}
+
+func (k *verifyingKeySet) snapshot() oidc.KeySet {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return k.current
+}
+
+// refresh rebuilds the underlying key set if stale is still the active one and
+// at least jwksMinRefreshInterval has passed since the last rebuild. It
+// returns nil if the refresh was skipped because it was rate limited, or the
+// newly-active key set otherwise (either freshly built here, or built
+// concurrently by another caller while the lock was released).
+func (k *verifyingKeySet) refresh(stale oidc.KeySet) oidc.KeySet {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+
+	if k.current != stale {
+		// Someone else already refreshed while we were verifying.
+		return k.current
+	}
+	if time.Since(k.lastRefresh) < jwksMinRefreshInterval {
+		return nil
+	}
+
+	k.current = oidc.NewRemoteKeySet(oidc.ClientContext(k.ctx, k.client), k.jwksURL)
+	k.lastRefresh = time.Now()
+	return k.current
+}
+
 // New returns an authenticator that is asynchronously initialized when opts.KeySet is not set.
 // The input lifecycleCtx is used to:
 // - terminate background goroutines that are needed for asynchronous initialization
@@ -435,33 +520,43 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 					return false, nil
 				}
 
-				if utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfigurationJWKSMetrics) {
-					providerJSON := &struct {
-						JWKSURL string `json:"jwks_uri"`
-					}{}
+				providerJSON := &struct {
+					JWKSURL string `json:"jwks_uri"`
+				}{}
 
-					if err := provider.Claims(providerJSON); err != nil {
-						klog.Errorf("oidc authenticator: error getting JWKS URL: %v", err)
-						authn.healthCheck.Store(&errorHolder{err: err})
-						return false, nil
-					}
-					if len(providerJSON.JWKSURL) == 0 {
-						klog.Errorf("provider did not return JWKS URL")
-						authn.healthCheck.Store(&errorHolder{err: fmt.Errorf("provider did not return JWKS URL")})
-						return false, nil
-					}
-
-					clientWithJWKSMetrics := *client
-					clientWithJWKSMetrics.Transport = withMetricsRoundTripper(client.Transport, providerJSON.JWKSURL, issuerURL, opts.APIServerID, lifecycleCtx)
-					client = &clientWithJWKSMetrics
-
-					remoteKeySet := oidc.NewRemoteKeySet(oidc.ClientContext(lifecycleCtx, client), providerJSON.JWKSURL)
-					authn.setVerifier(&idTokenVerifier{oidc.NewVerifier(issuerURL, remoteKeySet, verifierConfig), audiences})
-					return true, nil
+				if err := provider.Claims(providerJSON); err != nil {
+					klog.Errorf("oidc authenticator: error getting JWKS URL: %v", err)
+					authn.healthCheck.Store(&errorHolder{err: err})
+					return false, nil
+				}
+				if len(providerJSON.JWKSURL) == 0 {
+					klog.Errorf("provider did not return JWKS URL")
+					authn.healthCheck.Store(&errorHolder{err: fmt.Errorf("provider did not return JWKS URL")})
+					return false, nil
 				}
 
-				verifier := provider.Verifier(verifierConfig)
-				authn.setVerifier(&idTokenVerifier{verifier, audiences})
+				jwksClient := client
+				if utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfigurationJWKSMetrics) {
+					clientWithJWKSMetrics := *client
+					clientWithJWKSMetrics.Transport = withMetricsRoundTripper(client.Transport, providerJSON.JWKSURL, issuerURL, opts.APIServerID, lifecycleCtx)
+					jwksClient = &clientWithJWKSMetrics
+				}
+
+				// Only use verifyingKeySet instead of a bare oidc.NewRemoteKeySet
+				// when opted in via Issuer.JWKSRefreshOnUnknownKeyID, so that a
+				// token signed with a key ID the local JWKS cache doesn't yet
+				// recognize (e.g. right after the provider rotates its signing
+				// keys) triggers a fresh JWKS fetch before authentication fails,
+				// instead of failing immediately. Unset/false preserves the
+				// default behavior: refresh only when the whole cache is near
+				// expiry.
+				var keySet oidc.KeySet
+				if opts.JWTAuthenticator.Issuer.JWKSRefreshOnUnknownKeyID {
+					keySet = newVerifyingKeySet(lifecycleCtx, jwksClient, providerJSON.JWKSURL)
+				} else {
+					keySet = oidc.NewRemoteKeySet(oidc.ClientContext(lifecycleCtx, jwksClient), providerJSON.JWKSURL)
+				}
+				authn.setVerifier(&idTokenVerifier{oidc.NewVerifier(issuerURL, keySet, verifierConfig), audiences})
 				return true, nil
 			})
 		}()
