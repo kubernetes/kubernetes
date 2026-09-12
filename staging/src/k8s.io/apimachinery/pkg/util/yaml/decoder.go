@@ -23,6 +23,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -131,7 +133,11 @@ func (d *YAMLToJSONDecoder) Decode(into interface{}) error {
 	if len(bytes) != 0 {
 		err := yaml.Unmarshal(bytes, into)
 		if err != nil {
-			return YAMLSyntaxError{err}
+			lineOffset := 0
+			if o, ok := d.reader.(documentLineOffsetReader); ok {
+				lineOffset = o.DocumentLineOffset()
+			}
+			return YAMLSyntaxError{err: err, lineOffset: lineOffset}
 		}
 	}
 	d.inputOffset += len(bytes)
@@ -265,12 +271,27 @@ func (e JSONSyntaxError) Error() string {
 }
 
 type YAMLSyntaxError struct {
-	err error
+	err        error
+	lineOffset int
 }
 
 func (e YAMLSyntaxError) Error() string {
-	return e.err.Error()
+	err := e.err.Error()
+	if e.lineOffset == 0 {
+		return err
+	}
+	matches := yamlLineRegexp.FindStringSubmatchIndex(err)
+	if matches == nil {
+		return err
+	}
+	line, parseErr := strconv.Atoi(err[matches[2]:matches[3]])
+	if parseErr != nil {
+		return err
+	}
+	return err[:matches[2]] + strconv.Itoa(line+e.lineOffset) + err[matches[3]:]
 }
+
+var yamlLineRegexp = regexp.MustCompile(`yaml: line ([0-9]+):`)
 
 // NewYAMLOrJSONDecoder returns a decoder that will process YAML documents
 // or JSON documents from the given reader as a stream. bufferSize determines
@@ -390,8 +411,15 @@ type Reader interface {
 	Read() ([]byte, error)
 }
 
+type documentLineOffsetReader interface {
+	DocumentLineOffset() int
+}
+
 type YAMLReader struct {
-	reader Reader
+	reader               *LineReader
+	lineOffset           int
+	pendingLineOffset    int
+	hasPendingLineOffset bool
 }
 
 func NewYAMLReader(r *bufio.Reader) *YAMLReader {
@@ -400,8 +428,19 @@ func NewYAMLReader(r *bufio.Reader) *YAMLReader {
 	}
 }
 
+func (r *YAMLReader) DocumentLineOffset() int {
+	return r.lineOffset
+}
+
 // Read returns a full YAML document.
 func (r *YAMLReader) Read() ([]byte, error) {
+	if r.hasPendingLineOffset {
+		r.lineOffset = r.pendingLineOffset
+		r.hasPendingLineOffset = false
+	} else {
+		r.lineOffset = 0
+	}
+
 	var buffer bytes.Buffer
 	for {
 		line, err := r.reader.Read()
@@ -412,17 +451,22 @@ func (r *YAMLReader) Read() ([]byte, error) {
 		sep := len([]byte(separator))
 		if i := bytes.Index(line, []byte(separator)); i == 0 {
 			// We have a potential document terminator
+			separatorLineOffset := r.reader.Lines() - 1
 			i += sep
 			trimmed := strings.TrimSpace(string(line[i:]))
 			// We only allow comments and spaces following the yaml doc separator, otherwise we'll return an error
 			if len(trimmed) > 0 && string(trimmed[0]) != "#" {
 				return nil, YAMLSyntaxError{
-					err: fmt.Errorf("invalid Yaml document separator: %s", trimmed),
+					err:        fmt.Errorf("invalid Yaml document separator: %s", trimmed),
+					lineOffset: separatorLineOffset,
 				}
 			}
 			if buffer.Len() != 0 {
+				r.pendingLineOffset = separatorLineOffset + 1
+				r.hasPendingLineOffset = true
 				return buffer.Bytes(), nil
 			}
+			r.lineOffset = separatorLineOffset
 			if err == io.EOF { //nolint:errorlint
 				return nil, err
 			}
@@ -440,6 +484,7 @@ func (r *YAMLReader) Read() ([]byte, error) {
 
 type LineReader struct {
 	reader *bufio.Reader
+	lines  int
 }
 
 // Read returns a single line (with '\n' ended) from the underlying reader.
@@ -457,7 +502,14 @@ func (r *LineReader) Read() ([]byte, error) {
 		buffer.Write(line)
 	}
 	buffer.WriteByte('\n')
+	if err != io.EOF || buffer.Len() > 1 { //nolint:errorlint
+		r.lines++
+	}
 	return buffer.Bytes(), err
+}
+
+func (r *LineReader) Lines() int {
+	return r.lines
 }
 
 // GuessJSONStream scans the provided reader up to size, looking
