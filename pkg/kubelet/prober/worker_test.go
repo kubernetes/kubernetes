@@ -26,7 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -1109,5 +1111,87 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
 			}
 		})
+	}
+}
+
+func TestProbeEventsWithThreshold(t *testing.T) {
+	_ = v1.AddToScheme(legacyscheme.Scheme)
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	fakeRecorder := record.NewFakeRecorder(10)
+	m.prober.recorder = fakeRecorder
+
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
+
+	// 1. Test Probe Success: no event recorded
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	w.doProbe(ctx)
+	if len(fakeRecorder.Events) != 0 {
+		t.Errorf("Expected 0 events on probe success, got %d", len(fakeRecorder.Events))
+	}
+
+	// 2. Test Probe Warning: event recorded with ContainerProbeWarning
+	m.prober.exec = fakeExecProber{probe.Warning, nil}
+	w.doProbe(ctx)
+	select {
+	case event := <-fakeRecorder.Events:
+		expected := "Warning ProbeWarning Liveness probe warning: "
+		if event != expected {
+			t.Errorf("Expected warning event %q, got %q", expected, event)
+		}
+	default:
+		t.Errorf("Expected event for probe warning")
+	}
+
+	// 3. Test Probe Failure - 1st failure (ignored, 1/3)
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	w.doProbe(ctx)
+	select {
+	case event := <-fakeRecorder.Events:
+		expected := "Warning ProbeFailureIgnored Liveness probe failed - ignored (1/3): "
+		if event != expected {
+			t.Errorf("Expected failure event %q, got %q", expected, event)
+		}
+	default:
+		t.Errorf("Expected event for 1st probe failure")
+	}
+
+	// 4. Test Probe Failure - 2nd failure (ignored, 2/3)
+	w.doProbe(ctx)
+	select {
+	case event := <-fakeRecorder.Events:
+		expected := "Warning ProbeFailureIgnored Liveness probe failed - ignored (2/3): "
+		if event != expected {
+			t.Errorf("Expected failure event %q, got %q", expected, event)
+		}
+	default:
+		t.Errorf("Expected event for 2nd probe failure")
+	}
+
+	// 5. Test Probe Failure - 3rd failure (threshold reached, 3/3)
+	w.doProbe(ctx)
+	select {
+	case event := <-fakeRecorder.Events:
+		expected := "Warning Unhealthy Liveness probe failed - threshold reached (3/3): "
+		if event != expected {
+			t.Errorf("Expected failure event %q, got %q", expected, event)
+		}
+	default:
+		t.Errorf("Expected event for 3rd probe failure")
+	}
+
+	// 6. Test Probe Error: event recorded for error state
+	w.onHold = false
+	m.prober.exec = fakeExecProber{probe.Unknown, fmt.Errorf("exec error")}
+	w.doProbe(ctx)
+	select {
+	case event := <-fakeRecorder.Events:
+		expected := "Warning Unhealthy Liveness probe errored and resulted in Failure state: exec error"
+		if event != expected {
+			t.Errorf("Expected error event %q, got %q", expected, event)
+		}
+	default:
+		t.Errorf("Expected event for probe error")
 	}
 }
