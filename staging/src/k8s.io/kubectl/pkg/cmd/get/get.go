@@ -475,6 +475,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		RequestChunksOf(chunkSize).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
+		IgnoreErrorsForCategoryExpansion(apierrors.IsForbidden).
 		Latest().
 		Flatten().
 		TransformRequests(o.transformRequests).
