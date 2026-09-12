@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -166,6 +167,9 @@ func BuildGenericConfig(
 		if accessor, err := meta.Accessor(obj); err == nil && accessor.GetManagedFields() != nil {
 			accessor.SetManagedFields(nil)
 		}
+		if pod, ok := obj.(*corev1.Pod); ok {
+			trimPodSpec(pod)
+		}
 		return obj, nil
 	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(
@@ -250,6 +254,34 @@ func BuildGenericConfig(
 	genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManager("apis")
 
 	return
+}
+
+// trimPodSpec clears Pod spec fields unused by admission/authorization code
+// reading off this shared cache, to shrink its memory footprint. See
+// https://github.com/kubernetes/kubernetes/issues/125469.
+//
+// Before reading a new Pod field from this cache, check it isn't cleared here.
+func trimPodSpec(pod *corev1.Pod) {
+	pod.Spec.RestartPolicy = ""
+	pod.Spec.TerminationGracePeriodSeconds = nil
+	pod.Spec.DNSPolicy = ""
+	pod.Spec.NodeSelector = nil
+	pod.Spec.DeprecatedServiceAccount = ""
+	pod.Spec.AutomountServiceAccountToken = nil
+	pod.Spec.ShareProcessNamespace = nil
+	pod.Spec.Hostname = ""
+	pod.Spec.Subdomain = ""
+	pod.Spec.SchedulerName = ""
+	pod.Spec.Tolerations = nil
+	pod.Spec.HostAliases = nil
+	pod.Spec.Priority = nil
+	pod.Spec.DNSConfig = nil
+	pod.Spec.ReadinessGates = nil
+	pod.Spec.EnableServiceLinks = nil
+	pod.Spec.PreemptionPolicy = nil
+	pod.Spec.TopologySpreadConstraints = nil
+	pod.Spec.SetHostnameAsFQDN = nil
+	pod.Spec.SchedulingGates = nil
 }
 
 // BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
