@@ -92,6 +92,15 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx contex
 	synthesized.MaskedPaths = securitycontext.ConvertToRuntimeMaskedPaths(effectiveSc.ProcMount)
 	synthesized.ReadonlyPaths = securitycontext.ConvertToRuntimeReadonlyPaths(effectiveSc.ProcMount)
 
+	if effectiveSc.CgroupOptions != nil && effectiveSc.CgroupOptions.MountMode != nil {
+		switch *effectiveSc.CgroupOptions.MountMode {
+		case v1.CgroupMountModeWritable:
+			synthesized.CgroupMountMode = runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE
+		case v1.CgroupMountModeReadOnly:
+			synthesized.CgroupMountMode = runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY
+		}
+	}
+
 	return synthesized, nil
 }
 

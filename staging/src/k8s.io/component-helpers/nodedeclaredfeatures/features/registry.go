@@ -24,6 +24,7 @@ import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/usernamespaceshostnetwork"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/volumebindmountoptions"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/writablecgroups"
 	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
@@ -40,4 +41,5 @@ var AllFeatures = []types.Feature{
 	dranodeallocatableresources.Feature,
 	volumebindmountoptions.Feature,
 	draoptionalnodeoperations.Feature,
+	writablecgroups.Feature,
 }

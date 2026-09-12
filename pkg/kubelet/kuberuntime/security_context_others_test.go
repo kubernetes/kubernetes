@@ -23,9 +23,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -175,5 +177,77 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		} else {
 			assert.NoError(t, err, test.desc)
 		}
+	}
+}
+
+func TestConvertToRuntimeSecurityContextCgroupOptions(t *testing.T) {
+	writable := v1.CgroupMountModeWritable
+	readOnly := v1.CgroupMountModeReadOnly
+
+	testCases := []struct {
+		desc                    string
+		sc                      *v1.SecurityContext
+		expectedCgroupMountMode runtimeapi.CgroupMountMode
+	}{
+		{
+			desc:                    "nil SecurityContext",
+			sc:                      nil,
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+		},
+		{
+			desc:                    "no CgroupOptions",
+			sc:                      &v1.SecurityContext{},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+		},
+		{
+			desc: "CgroupOptions with nil MountMode",
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+		},
+		{
+			desc: "CgroupOptions Writable",
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE,
+		},
+		{
+			desc: "CgroupOptions ReadOnly",
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &readOnly},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "bar",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "busybox",
+							SecurityContext: tc.sc,
+						},
+					},
+				},
+			}
+
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			result, err := m.determineEffectiveSecurityContext(tCtx, pod, &pod.Spec.Containers[0], nil, "")
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedCgroupMountMode, result.CgroupMountMode)
+		})
 	}
 }

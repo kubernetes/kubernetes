@@ -264,6 +264,7 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 			SupplementalGroupsPolicy:  features.SupplementalGroupsPolicy,
 			UserNamespacesHostNetwork: features.UserNamespacesHostNetwork,
 			MountOptions:              features.MountOptions,
+			SupportsCgroupMountMode:   features.SupportsCgroupMountMode,
 		}
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers, Features: retFeatures}

@@ -4420,6 +4420,111 @@ func TestDropSupplementalGroupsPolicy(t *testing.T) {
 	}
 }
 
+func TestDropCgroupOptions(t *testing.T) {
+	writable := api.CgroupMountModeWritable
+	podWithCgroupOptions := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+						SecurityContext: &api.SecurityContext{
+							CgroupOptions: &api.CgroupOptions{MountMode: &writable},
+						},
+					},
+				},
+			},
+		}
+	}
+	podWithoutCgroupOptions := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:            "c1",
+						Image:           "image",
+						SecurityContext: &api.SecurityContext{},
+					},
+				},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description      string
+		hasCgroupOptions bool
+		pod              func() *api.Pod
+	}{
+		{
+			description:      "with CgroupOptions",
+			hasCgroupOptions: true,
+			pod:              podWithCgroupOptions,
+		},
+		{
+			description:      "without CgroupOptions",
+			hasCgroupOptions: false,
+			pod:              podWithoutCgroupOptions,
+		},
+		{
+			description:      "is nil",
+			hasCgroupOptions: false,
+			pod:              func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasCgroupOptions, oldPod := oldPodInfo.hasCgroupOptions, oldPodInfo.pod()
+				newPodHasCgroupOptions, newPod := newPodInfo.hasCgroupOptions, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(
+					fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description),
+					func(t *testing.T) {
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupOptions, enabled)
+
+						var oldPodSpec *api.PodSpec
+						if oldPod != nil {
+							oldPodSpec = &oldPod.Spec
+						}
+						dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+						// old pod should never be changed
+						if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+							t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+						}
+						switch {
+						case enabled || oldPodHasCgroupOptions:
+							// new pod shouldn't change if feature enabled or if old pod has CgroupOptions set
+							if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+								t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+							}
+						case newPodHasCgroupOptions:
+							// new pod should be changed
+							if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+								t.Errorf("new pod was not changed")
+							}
+							// new pod should not have CgroupOptions
+							if !reflect.DeepEqual(newPod, podWithoutCgroupOptions()) {
+								t.Errorf("new pod has CgroupOptions: %v", cmp.Diff(newPod, podWithoutCgroupOptions()))
+							}
+						default:
+							// new pod should not need to be changed
+							if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+								t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+							}
+						}
+					},
+				)
+			}
+		}
+	}
+}
+
 func TestDropImageVolumes(t *testing.T) {
 	const (
 		volumeNameImage = "volume"

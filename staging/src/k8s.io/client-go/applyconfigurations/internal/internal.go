@@ -4655,6 +4655,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         scalar: string
+- name: io.k8s.api.core.v1.CgroupOptions
+  map:
+    fields:
+    - name: mountMode
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.CinderPersistentVolumeSource
   map:
     fields:
@@ -8162,6 +8168,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: capabilities
       type:
         namedType: io.k8s.api.core.v1.Capabilities
+    - name: cgroupOptions
+      type:
+        namedType: io.k8s.api.core.v1.CgroupOptions
     - name: privileged
       type:
         scalar: boolean

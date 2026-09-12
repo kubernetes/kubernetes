@@ -195,6 +195,15 @@ func (CephFSVolumeSource) SwaggerDoc() map[string]string {
 	return map_CephFSVolumeSource
 }
 
+var map_CgroupOptions = map[string]string{
+	"":          "CgroupOptions defines options for cgroup filesystem access.",
+	"mountMode": "mountMode controls whether the cgroup filesystem is mounted as writable. Defaults to \"ReadOnly\" if not specified.",
+}
+
+func (CgroupOptions) SwaggerDoc() map[string]string {
+	return map_CgroupOptions
+}
+
 var map_CinderPersistentVolumeSource = map[string]string{
 	"":          "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
 	"volumeID":  "volumeID used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
@@ -2554,6 +2563,7 @@ var map_SecurityContext = map[string]string{
 	"procMount":                "procMount denotes the type of proc mount to use for the containers. The default value is Default which uses the container runtime defaults for readonly paths and masked paths. Note that this field cannot be set when spec.os.name is windows.",
 	"seccompProfile":           "The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows.",
 	"appArmorProfile":          "appArmorProfile is the AppArmor options to use by this container. If set, this profile overrides the pod's appArmorProfile. Note that this field cannot be set when spec.os.name is windows.",
+	"cgroupOptions":            "cgroupOptions controls cgroup filesystem access and configuration. This allows unprivileged containers to manage their own cgroup hierarchies on cgroup v2 systems. Only effective on Linux containers with cgroup v2. Note that this field cannot be set when spec.os.name is windows.",
 }
 
 func (SecurityContext) SwaggerDoc() map[string]string {
