@@ -400,8 +400,14 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 	}
 	loadBalancers := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 	for _, lb := range lbs {
-		isIPv6 := (lb.Flags & LoadBalancerFlagsIPv6) == LoadBalancerFlagsIPv6
+		// PortMappings is populated by HNS and can be empty, for example when a load
+		// balancer is partially created. Such an entry cannot be keyed by port.
+		if len(lb.PortMappings) == 0 {
+			klog.V(2).InfoS("Skipping load balancer with no port mappings", "hnsLbID", lb.Id)
+			continue
+		}
 		portMap := lb.PortMappings[0]
+		isIPv6 := (lb.Flags & LoadBalancerFlagsIPv6) == LoadBalancerFlagsIPv6
 		// Compute hash from backends (endpoint IDs)
 		hash, err := hashEndpoints(lb.HostComputeEndpoints)
 		if err != nil {
