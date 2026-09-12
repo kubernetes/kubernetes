@@ -44,12 +44,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/klog/v2"
+	builder2 "k8s.io/kube-openapi/pkg/builder"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
+	openapihandler "k8s.io/kube-openapi/pkg/handler"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 var (
@@ -232,10 +238,27 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		// Together they serve the /openapi/v2 endpoint on a generic apiserver. A generic apiserver may
 		// choose to not enable OpenAPI by having null openAPIConfig, and thus OpenAPIVersionedService
 		// and StaticOpenAPISpec are both null. In that case we don't run the CRD OpenAPI controller.
-		if s.GenericAPIServer.StaticOpenAPISpec != nil {
+		// With the OpenAPIV2LazyBuild feature gate enabled, PrepareRun installs the v2 endpoint
+		// without building or retaining a base spec, so StaticOpenAPISpec is nil while
+		// OpenAPIVersionedService is not; the CRD OpenAPI controller then builds its base
+		// spec lazily on first use.
+		lazyV2 := s.GenericAPIServer.StaticOpenAPISpec == nil && s.GenericAPIServer.OpenAPIVersionedService != nil &&
+			utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIV2LazyBuild)
+		if s.GenericAPIServer.StaticOpenAPISpec != nil || lazyV2 {
 			if s.GenericAPIServer.OpenAPIVersionedService != nil {
 				openapiController := openapicontroller.NewController(s.Informers.Apiextensions().V1().CustomResourceDefinitions())
-				go openapiController.Run(s.GenericAPIServer.StaticOpenAPISpec, s.GenericAPIServer.OpenAPIVersionedService, hookContext.Done())
+				if lazyV2 {
+					go openapiController.RunWithLazyStaticSpec(func() (*spec.Swagger, error) {
+						staticSpec, err := builder2.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices()), c.GenericConfig.OpenAPIConfig)
+						if err != nil {
+							return nil, err
+						}
+						staticSpec.Definitions = openapihandler.PruneDefaults(staticSpec.Definitions)
+						return staticSpec, nil
+					}, s.GenericAPIServer.OpenAPIVersionedService, hookContext.Done())
+				} else {
+					go openapiController.Run(s.GenericAPIServer.StaticOpenAPISpec, s.GenericAPIServer.OpenAPIVersionedService, hookContext.Done())
+				}
 			}
 
 			if s.GenericAPIServer.OpenAPIV3VersionedService != nil {
