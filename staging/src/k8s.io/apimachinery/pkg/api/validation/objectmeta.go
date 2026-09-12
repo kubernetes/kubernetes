@@ -349,12 +349,14 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 
 	// Generation shouldn't be decremented
 	allErrs = append(allErrs, ValidateNonnegativeField(newMeta.GetGeneration(), fldPath.Child("generation")).MarkCoveredByDeclarative()...)
-	if newMeta.GetGeneration() < oldMeta.GetGeneration() {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.GetGeneration(), "must not be decremented"))
+	if oldMeta.GetGeneration() != 0 && newMeta.GetGeneration() == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.GetGeneration(), "field cannot be cleared once set").WithOrigin("update").MarkCoveredByDeclarative())
+	} else if newMeta.GetGeneration() < oldMeta.GetGeneration() {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.GetGeneration(), "must not be decremented").WithOrigin("monotonic").MarkCoveredByDeclarative())
 	}
 
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetName(), oldMeta.GetName(), fldPath.Child("name"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetNamespace(), oldMeta.GetNamespace(), fldPath.Child("namespace"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetNamespace(), oldMeta.GetNamespace(), fldPath.Child("namespace")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetUID(), oldMeta.GetUID(), fldPath.Child("uid")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetCreationTimestamp(), oldMeta.GetCreationTimestamp(), fldPath.Child("creationTimestamp")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionTimestamp(), oldMeta.GetDeletionTimestamp(), fldPath.Child("deletionTimestamp")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
