@@ -38,7 +38,7 @@ func CreateCRDUsingRemovedAPI(etcdClient *clientv3.Client, etcdStoragePrefix str
 	if err != nil {
 		return nil, err
 	}
-	return waitForCRDReady(crd, apiExtensionsClient, dynamicClientSet)
+	return WaitForCRDWatchCacheReady(crd, apiExtensionsClient, dynamicClientSet)
 }
 
 // CreateCRDUsingRemovedAPIWatchUnsafe creates a CRD directly using etcd.  This is must *ONLY* be used for checks of compatibility
