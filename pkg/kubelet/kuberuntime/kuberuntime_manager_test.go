@@ -118,6 +118,19 @@ func createTestRuntimeManager(ctx context.Context, opts ...testRuntimeManagerOpt
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
+type timestampedPodSandboxRuntimeService struct {
+	*apitest.FakeRuntimeService
+}
+
+func (r *timestampedPodSandboxRuntimeService) PodSandboxStatus(ctx context.Context, podSandboxID string, verbose bool) (*runtimeapi.PodSandboxStatusResponse, error) {
+	response, err := r.FakeRuntimeService.PodSandboxStatus(ctx, podSandboxID, verbose)
+	if response != nil {
+		// A non-zero timestamp selected the old EventedPLEG-specific status path.
+		response.Timestamp = time.Now().UnixNano()
+	}
+	return response, err
+}
+
 // sandboxTemplate is a sandbox template to create fake sandbox.
 type sandboxTemplate struct {
 	pod         *v1.Pod
@@ -333,6 +346,8 @@ func TestContainerRuntimeType(t *testing.T) {
 }
 
 func TestGetPodStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EventedPLEG, true)
+
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
@@ -365,12 +380,17 @@ func TestGetPodStatus(t *testing.T) {
 
 	runtimePod, err := m.GetPod(tCtx, pod.UID)
 	require.NoError(t, err)
+	// EventedPLEG is only a relist hint, so aggregate status fields returned by
+	// PodSandboxStatus must not change GenericPLEG's status collection path.
+	m.runtimeService = &timestampedPodSandboxRuntimeService{FakeRuntimeService: fakeRuntime}
 	podStatus, err := m.GetPodStatus(tCtx, runtimePod)
 	require.NoError(t, err)
 	assert.Equal(t, pod.UID, podStatus.ID)
 	assert.Equal(t, pod.Name, podStatus.Name)
 	assert.Equal(t, pod.Namespace, podStatus.Namespace)
 	assert.Equal(t, apitest.FakePodSandboxIPs, podStatus.IPs)
+	assert.Len(t, podStatus.ContainerStatuses, len(containers))
+	assert.Len(t, podStatus.ActiveContainerStatuses, len(containers))
 }
 
 func TestStopContainerWithNotFoundError(t *testing.T) {

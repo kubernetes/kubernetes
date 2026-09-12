@@ -583,7 +583,7 @@ func TestReinspect(t *testing.T) {
 
 			var expectedStatus *kubecontainer.PodStatus
 			if tc.updateCacheError == nil {
-				expectedStatus = &kubecontainer.PodStatus{ID: podID, TimeStamp: time.Now()}
+				expectedStatus = &kubecontainer.PodStatus{ID: podID}
 			}
 			if tc.expectUpdateCache {
 				if tc.podDeleted {
@@ -625,40 +625,6 @@ func TestReinspect(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestUpdateCacheUsesPodTimestampWhenEventedPLEGIsEnabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.EventedPLEG, true)
-
-	ctx := t.Context()
-	podID := types.UID("test-pod")
-	cachedTimestamp := time.Unix(0, 20)
-	statusTimestamp := time.Unix(0, 10)
-	podTimestamp := time.Unix(0, 30)
-
-	runtimeMock := containertest.NewMockRuntime(t)
-	cache := kubecontainer.NewCache()
-	pleg := NewGenericPLEG(
-		runtimeMock,
-		make(chan *PodLifecycleEvent, largeChannelCap),
-		&RelistDuration{RelistPeriod: time.Hour, RelistThreshold: 3 * time.Minute},
-		cache,
-		testingclock.NewFakeClock(time.Time{}),
-	).(*GenericPLEG)
-
-	cache.Set(podID, &kubecontainer.PodStatus{ID: podID}, nil, cachedTimestamp)
-
-	pod := &kubecontainer.Pod{ID: podID, Name: "name", Namespace: "ns", Timestamp: podTimestamp}
-	expectedStatus := &kubecontainer.PodStatus{ID: podID, TimeStamp: statusTimestamp}
-	runtimeMock.EXPECT().GetPodStatus(ctx, pod).Return(expectedStatus, nil)
-
-	status, err := pleg.updateCache(ctx, pod, podID)
-	require.NoError(t, err)
-	assert.Equal(t, expectedStatus, status)
-
-	cachedStatus, cachedErr := cache.Get(podID)
-	require.NoError(t, cachedErr)
-	assert.Equal(t, expectedStatus, cachedStatus)
 }
 
 // Test detecting sandbox state changes.
@@ -912,14 +878,14 @@ func TestWorkerLoop(t *testing.T) {
 		}).Once()
 		call = runtimeMock.EXPECT().GetPodStatus(mock.Anything, pod1).RunAndReturn(func(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
 			assert.Equal(t, pod1, pod)
-			return &kubecontainer.PodStatus{ID: pod1.ID, TimeStamp: time.Now()}, nil
+			return &kubecontainer.PodStatus{ID: pod1.ID, Name: "first"}, nil
 		}).NotBefore(call).Once()
 
 		pleg.workerLoopIteration(tCtx)
 
 		p1Status := requireUnblocked(t, p1res) // pod1 is now unblocked
 		assert.Equal(t, pod1.ID, p1Status.ID)
-		assert.Equal(t, time.Now(), p1Status.TimeStamp)
+		assert.Equal(t, "first", p1Status.Name)
 		requireBlocked(t, p2res) // pod2 is still blocked
 
 		p1NewRes := getNewerThanAsync(t, cache, pod1.ID, startTime.Add(2*time.Second))
@@ -936,7 +902,7 @@ func TestWorkerLoop(t *testing.T) {
 		}).NotBefore(call).Once()
 		call = runtimeMock.EXPECT().GetPodStatus(mock.Anything, pod2).RunAndReturn(func(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
 			assert.Equal(t, pod2, pod)
-			return &kubecontainer.PodStatus{ID: pod2.ID, TimeStamp: time.Now()}, nil
+			return &kubecontainer.PodStatus{ID: pod2.ID, Name: "pod2"}, nil
 		}).NotBefore(call).Once()
 
 		pleg.workerLoopIteration(tCtx)
@@ -945,7 +911,7 @@ func TestWorkerLoop(t *testing.T) {
 		p2Status := requireUnblocked(t, p2res)
 		assert.Equal(t, pod2.ID, p2Status.ID)
 		p1NewStatus := requireUnblocked(t, p1NewRes)
-		assert.Equal(t, p1Status, p1NewStatus) // Status timestamp should be unchanged
+		assert.Equal(t, p1Status, p1NewStatus) // Status should be unchanged.
 
 		// The pod2 relist request should NOT trigger a relist, since it was made before the global
 		// relist occurred. Drain it from the channel to verify (the mock will trigger an error if GetPod is called for it).
@@ -967,14 +933,14 @@ func TestWorkerLoop(t *testing.T) {
 		}).NotBefore(call).Once()
 		runtimeMock.EXPECT().GetPodStatus(mock.Anything, pod1).RunAndReturn(func(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
 			assert.Equal(t, pod1, pod)
-			return &kubecontainer.PodStatus{ID: pod1.ID, TimeStamp: time.Now()}, nil
+			return &kubecontainer.PodStatus{ID: pod1.ID, Name: "reinspected"}, nil
 		}).NotBefore(call).Once()
 
 		pleg.workerLoopIteration(tCtx)
 
 		p1ReinspectStatus := requireUnblocked(t, p1ReinpsectRes)
 		assert.Equal(t, pod1.ID, p1ReinspectStatus.ID)
-		assert.Equal(t, time.Now(), p1ReinspectStatus.TimeStamp) // Status timestamp should be updated.
+		assert.Equal(t, "reinspected", p1ReinspectStatus.Name)
 
 		// The pod1 relist request should NOT trigger a relist, since it was made before the global
 		// relist occurred. Drain it from the channel to verify (the mock will trigger an error if GetPod is called for it).
