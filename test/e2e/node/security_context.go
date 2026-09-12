@@ -25,14 +25,19 @@ package node
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -45,6 +50,16 @@ const SeccompProcStatusField = "Seccomp:"
 
 // ProcSelfStatusPath is the path to /proc/self/status.
 const ProcSelfStatusPath = "/proc/self/status"
+
+const selinuxTestMountPath = "/mounted_volume"
+
+var selinuxKeepAliveCommand = []string{"sleep", "infinity"}
+
+type selinuxVolumeFileSpec struct {
+	subpath string
+	content string
+	write   bool
+}
 
 func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 	podName := "security-context-" + string(uuid.NewUUID())
@@ -186,16 +201,28 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
-	f.It("should support volume SELinux relabeling", f.WithFlaky(), f.WithLabel("LinuxOnly"), func(ctx context.Context) {
-		testPodSELinuxLabeling(ctx, f, false, false)
-	})
+	f.Context("volume SELinux relabeling", feature.SELinux, func() {
+		f.It("should support volume SELinux relabeling", f.WithLabel("LinuxOnly"), func(ctx context.Context) {
+			testPodSELinuxLabeling(ctx, f, false, false, "kubernetes.io~empty-dir", emptyDirVolume("test-volume"), selinuxVolumeFileSpec{subpath: "TEST", content: "hello", write: true})
+		})
 
-	f.It("should support volume SELinux relabeling when using hostIPC", f.WithFlaky(), f.WithLabel("LinuxOnly"), func(ctx context.Context) {
-		testPodSELinuxLabeling(ctx, f, true, false)
-	})
+		f.It("should support volume SELinux relabeling when using hostIPC", f.WithLabel("LinuxOnly"), func(ctx context.Context) {
+			testPodSELinuxLabeling(ctx, f, true, false, "kubernetes.io~empty-dir", emptyDirVolume("test-volume"), selinuxVolumeFileSpec{subpath: "TEST", content: "hello", write: true})
+		})
 
-	f.It("should support volume SELinux relabeling when using hostPID", f.WithFlaky(), f.WithLabel("LinuxOnly"), func(ctx context.Context) {
-		testPodSELinuxLabeling(ctx, f, false, true)
+		f.It("should support volume SELinux relabeling when using hostPID", f.WithLabel("LinuxOnly"), func(ctx context.Context) {
+			testPodSELinuxLabeling(ctx, f, false, true, "kubernetes.io~empty-dir", emptyDirVolume("test-volume"), selinuxVolumeFileSpec{subpath: "TEST", content: "hello", write: true})
+		})
+
+		f.It("should support configmap volume SELinux relabeling", f.WithLabel("LinuxOnly"), func(ctx context.Context) {
+			configMap := createSELinuxRelabelConfigMap(ctx, f)
+			testPodSELinuxLabeling(ctx, f, false, false, "kubernetes.io~configmap", configMapVolume(configMap.Name), selinuxVolumeFileSpec{subpath: "initial", content: "data", write: false})
+		})
+
+		f.It("should support secret volume SELinux relabeling", f.WithLabel("LinuxOnly"), func(ctx context.Context) {
+			secret := createSELinuxRelabelSecret(ctx, f)
+			testPodSELinuxLabeling(ctx, f, false, false, "kubernetes.io~secret", secretVolume(secret.Name), selinuxVolumeFileSpec{subpath: "initial", content: "data", write: false})
+		})
 	})
 
 	ginkgo.It("should support seccomp unconfined on the container [LinuxOnly]", func(ctx context.Context) {
@@ -221,101 +248,172 @@ var _ = SIGDescribe("Security Context", func() {
 	})
 })
 
-func testPodSELinuxLabeling(ctx context.Context, f *framework.Framework, hostIPC bool, hostPID bool) {
-	// Write and read a file with an empty_dir volume
-	// with a pod with the MCS label s0:c0,c1
+func testPodSELinuxLabeling(ctx context.Context, f *framework.Framework, hostIPC bool, hostPID bool, volumePlugin string, volume v1.Volume, fileSpec selinuxVolumeFileSpec) {
+	volumeName := volume.Name
+	mountPath := selinuxTestMountPath
+	testFilePath := mountPath + "/" + fileSpec.subpath
+
+	// Write and read a file with a pod that has the MCS label s0:c0,c1.
 	pod := scTestPod(hostIPC, hostPID)
-	volumeName := "test-volume"
-	mountPath := "/mounted_volume"
-	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
-		{
-			Name:      volumeName,
-			MountPath: mountPath,
-		},
-	}
-	pod.Spec.Volumes = []v1.Volume{
-		{
-			Name: volumeName,
-			VolumeSource: v1.VolumeSource{
-				EmptyDir: &v1.EmptyDirVolumeSource{
-					Medium: v1.StorageMediumDefault,
-				},
-			},
-		},
-	}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{
+		Name:      volumeName,
+		MountPath: mountPath,
+	}}
+	pod.Spec.Volumes = []v1.Volume{volume}
 	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c0,c1",
 	}
-	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
+	pod.Spec.Containers[0].Command = selinuxKeepAliveCommand
 
 	client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 	pod, err := client.Create(ctx, pod, metav1.CreateOptions{})
-
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 
-	testContent := "hello"
-	testFilePath := mountPath + "/TEST"
 	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
-	err = tk.WriteFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath, testContent)
+	pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
+	requireSELinuxEnforcing(ctx, f.ClientSet, pod)
+
+	if fileSpec.write {
+		err = tk.WriteFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath, fileSpec.content)
+		framework.ExpectNoError(err)
+	}
 	content, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath)
 	framework.ExpectNoError(err)
-	gomega.Expect(content).To(gomega.ContainSubstring(testContent))
+	gomega.Expect(content).To(gomega.ContainSubstring(fileSpec.content))
 
 	foundPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
-	// Confirm that the file can be accessed from a second
-	// pod using host_path with the same MCS label
-	volumeHostPath := fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~empty-dir/%s", framework.TestContext.KubeletRootDir, foundPod.UID, volumeName)
+	// Confirm that the file can be accessed from a second pod using host_path with the same MCS label.
+	volumeHostPath := fmt.Sprintf("%s/pods/%s/volumes/%s/%s", framework.TestContext.KubeletRootDir, foundPod.UID, volumePlugin, volumeName)
 	ginkgo.By(fmt.Sprintf("confirming a container with the same label can read the file under --kubelet-root-dir=%s", framework.TestContext.KubeletRootDir))
 	pod = scTestPod(hostIPC, hostPID)
 	pod.Spec.NodeName = foundPod.Spec.NodeName
-	volumeMounts := []v1.VolumeMount{
-		{
-			Name:      volumeName,
-			MountPath: mountPath,
-		},
-	}
-	volumes := []v1.Volume{
-		{
-			Name: volumeName,
-			VolumeSource: v1.VolumeSource{
-				HostPath: &v1.HostPathVolumeSource{
-					Path: volumeHostPath,
-				},
+	volumeMounts := []v1.VolumeMount{{
+		Name:      volumeName,
+		MountPath: mountPath,
+	}}
+	hostPathVolumes := []v1.Volume{{
+		Name: volumeName,
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: volumeHostPath,
 			},
 		},
-	}
+	}}
 	pod.Spec.Containers[0].VolumeMounts = volumeMounts
-	pod.Spec.Volumes = volumes
+	pod.Spec.Volumes = hostPathVolumes
 	pod.Spec.Containers[0].Command = []string{"cat", testFilePath}
 	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c0,c1",
 	}
-	e2eoutput.TestContainerOutput(ctx, f, "Pod with same MCS label reading test file", pod, 0, []string{testContent})
+	e2eoutput.TestContainerOutput(ctx, f, "Pod with same MCS label reading test file", pod, 0, []string{fileSpec.content})
 
-	// Confirm that the same pod with a different MCS
-	// label cannot access the volume
+	// Confirm that a pod with a different MCS label cannot access the volume.
 	ginkgo.By("confirming a container with a different MCS label is unable to read the file")
 	pod = scTestPod(hostIPC, hostPID)
-	pod.Spec.Volumes = volumes
+	pod.Spec.NodeName = foundPod.Spec.NodeName
+	pod.Spec.Volumes = hostPathVolumes
 	pod.Spec.Containers[0].VolumeMounts = volumeMounts
-	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
+	pod.Spec.Containers[0].Command = selinuxKeepAliveCommand
 	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c2,c3",
 	}
-	_, err = client.Create(ctx, pod, metav1.CreateOptions{})
+	pod, err = client.Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
+	defer func() { _ = client.Delete(ctx, pod.Name, metav1.DeleteOptions{}) }()
+	framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
 
-	err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
-	framework.ExpectNoError(err, "Error waiting for pod to run %v", pod)
+	_, err = tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath)
+	gomega.Expect(err).To(gomega.HaveOccurred(), "expecting SELinux to not let the container with different MCS label to read the file")
+}
 
-	// for this to work, SELinux should be in enforcing mode, so let's check that
-	isEnforced, err := tk.ReadFileViaContainer(pod.Name, "test-container", "/sys/fs/selinux/enforce")
-	if err == nil && isEnforced == "1" {
-		_, err = tk.ReadFileViaContainer(pod.Name, "test-container", testFilePath)
-		gomega.Expect(err).To(gomega.HaveOccurred(), "expecting SELinux to not let the container with different MCS label to read the file")
+func requireSELinuxEnforcing(ctx context.Context, c clientset.Interface, pod *v1.Pod) {
+	node, err := c.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	nodeIP := ""
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeExternalIP && address.Address != "" {
+			nodeIP = address.Address
+			break
+		}
 	}
+	if nodeIP == "" {
+		for _, address := range node.Status.Addresses {
+			if address.Type == v1.NodeInternalIP && address.Address != "" {
+				nodeIP = address.Address
+				break
+			}
+		}
+	}
+	if nodeIP == "" {
+		e2eskipper.Skipf("SELinux test requires an SSH-reachable node IP (node=%s)", node.Name)
+	}
+
+	result, err := e2essh.NodeExec(ctx, nodeIP, "cat /sys/fs/selinux/enforce", framework.TestContext.Provider)
+	framework.ExpectNoError(err, "reading SELinux enforce status on node=%s", node.Name)
+	gomega.Expect(result.Code).To(gomega.BeZero(), "reading SELinux enforce status on node=%s: %s", node.Name, result.Stderr)
+	gomega.Expect(strings.TrimSpace(result.Stdout)).To(gomega.Equal("1"), "SELinux must be in enforcing mode for [Feature:SELinux] tests (node=%s)", node.Name)
+}
+
+func emptyDirVolume(volumeName string) v1.Volume {
+	return v1.Volume{
+		Name: volumeName,
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium: v1.StorageMediumDefault,
+			},
+		},
+	}
+}
+
+func configMapVolume(configMapName string) v1.Volume {
+	return v1.Volume{
+		Name: "test-volume",
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: configMapName},
+			},
+		},
+	}
+}
+
+func secretVolume(secretName string) v1.Volume {
+	return v1.Volume{
+		Name: "test-volume",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: secretName,
+			},
+		},
+	}
+}
+
+func createSELinuxRelabelConfigMap(ctx context.Context, f *framework.Framework) *v1.ConfigMap {
+	configMap, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "selinux-relabel-configmap-" + string(uuid.NewUUID()),
+		},
+		Data: map[string]string{
+			"initial": "data",
+		},
+	}, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+	return configMap
+}
+
+func createSELinuxRelabelSecret(ctx context.Context, f *framework.Framework) *v1.Secret {
+	secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "selinux-relabel-secret-" + string(uuid.NewUUID()),
+		},
+		StringData: map[string]string{
+			"initial": "data",
+		},
+	}, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+	return secret
 }
