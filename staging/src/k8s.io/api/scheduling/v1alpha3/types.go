@@ -664,10 +664,13 @@ type PodGroupStatus struct {
 	//   due to disruption such as preemption.
 	//
 	// Known reasons for the PodGroupInitiallyScheduled condition:
+	// - "Scheduled": All required pods in the PodGroup have been successfully scheduled.
 	// - "Unschedulable": The PodGroup cannot be scheduled due to resource constraints,
 	//   affinity/anti-affinity rules, or insufficient capacity for the gang.
 	// - "SchedulerError": The PodGroup cannot be scheduled due to some internal error
 	//   that happened during scheduling, for example due to nodeAffinity parsing errors.
+	// - "Invalid": Set to False when kube-scheduler detects an invalid group configuration
+	//   during runtime validation (such as conflicting scheduler names, or priority/preemption policy conflicts).
 	//
 	// Known reasons for the DisruptionTarget condition:
 	// - "PreemptionByScheduler": The PodGroup was preempted by the scheduler to make room for
@@ -708,14 +711,21 @@ const (
 
 // Well-known condition reasons for PodGroups.
 const (
-	// Unschedulable reason in the PodGroupInitiallyScheduled condition indicates that the PodGroup cannot be scheduled
+	// PodGroupReasonScheduled reason in the PodGroupInitiallyScheduled condition indicates that
+	// all required pods in the PodGroup have been successfully scheduled.
+	PodGroupReasonScheduled string = "Scheduled"
+	// PodGroupReasonUnschedulable reason in the PodGroupInitiallyScheduled condition indicates that the PodGroup cannot be scheduled
 	// due to resource constraints, affinity/anti-affinity rules, or insufficient capacity for the PodGroup.
 	PodGroupReasonUnschedulable string = "Unschedulable"
-	// SchedulerError reason in the PodGroupInitiallyScheduled condition means that some internal error happens
+	// PodGroupReasonSchedulerError reason in the PodGroupInitiallyScheduled condition means that some internal error happens
 	// during scheduling, for example due to nodeAffinity parsing errors.
 	PodGroupReasonSchedulerError string = "SchedulerError"
-	// PreemptionByScheduler reason in the DisruptionTarget condition indicates the PodGroup was preempted
-	// to make room for higher-priority PodGroups or Pods.
+	// PodGroupReasonInvalid reason in the PodGroupInitiallyScheduled condition indicates that
+	// kube-scheduler detected an invalid group configuration during runtime validation (such as
+	// conflicting scheduler names, or priority/preemption policy conflicts).
+	PodGroupReasonInvalid string = "Invalid"
+	// PodGroupReasonPreemptionByScheduler reason in the DisruptionTarget condition indicates the PodGroup was preempted
+	// to make room for higher-priority CompositePodGroups, PodGroups or Pods.
 	PodGroupReasonPreemptionByScheduler string = "PreemptionByScheduler"
 )
 
@@ -1392,8 +1402,9 @@ type CompositePodGroupStatus struct {
 	//   due to disruption such as preemption.
 	//
 	// Known reasons for the CompositePodGroupInitiallyScheduled condition:
-	// - "Unschedulable": The CompositePodGroup's subtree could not be placed due to resource constraints,
-	//   affinity/anti-affinity, or topological constraints.
+	// - "Scheduled": All required child groups and pods under this CompositePodGroup have been successfully scheduled.
+	// - "Unschedulable": The CompositePodGroup's subtree could not be placed, for example due to unmet
+	//   minGroupCount, placement constraints, or insufficient capacity for its child groups.
 	// - "SchedulerError": The CompositePodGroup cannot be scheduled due to some internal error
 	//   that occurred during scheduling.
 	// - "Invalid": Set to True when kube-scheduler detects an invalid group layout during
@@ -1427,3 +1438,26 @@ type CompositePodGroupSchedulingConstraints struct {
 	// +k8s:listType=atomic
 	Topology []TopologyConstraint `json:"topology,omitempty" protobuf:"bytes,1,rep,name=topology"`
 }
+
+// Well-known condition types for CompositePodGroups.
+const (
+	// CompositePodGroupInitiallyScheduled represents status of the scheduling process for this CompositePodGroup till first success.
+	CompositePodGroupInitiallyScheduled string = "CompositePodGroupInitiallyScheduled"
+)
+
+// Well-known condition reasons for CompositePodGroups.
+const (
+	// CompositePodGroupReasonScheduled reason in the CompositePodGroupInitiallyScheduled condition indicates that
+	// all required child groups and pods in the CompositePodGroup subtree have been successfully scheduled.
+	CompositePodGroupReasonScheduled string = "Scheduled"
+	// CompositePodGroupReasonUnschedulable reason in the CompositePodGroupInitiallyScheduled condition indicates that
+	// the CompositePodGroup cannot be scheduled, for example due to unmet minGroupCount, placement constraints,
+	// or insufficient capacity for its child groups.
+	CompositePodGroupReasonUnschedulable string = "Unschedulable"
+	// CompositePodGroupReasonSchedulerError reason in the CompositePodGroupInitiallyScheduled condition means that
+	// an internal error occurred during scheduling of the CompositePodGroup or its subtree.
+	CompositePodGroupReasonSchedulerError string = "SchedulerError"
+	// CompositePodGroupReasonInvalid reason in the CompositePodGroupInitiallyScheduled condition indicates that
+	// kube-scheduler detected an invalid group layout during runtime validation.
+	CompositePodGroupReasonInvalid string = "Invalid"
+)

@@ -21,8 +21,6 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -90,10 +88,8 @@ func TestPodGroupInterleaving(t *testing.T) {
 				},
 				{
 					Name: "Verify gang PodGroup condition is set to Unschedulable",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg-low",
-						ConditionStatus: metav1.ConditionFalse,
-						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						PodGroups: []string{"pg-low"},
 					},
 				},
 			},
@@ -213,10 +209,8 @@ func TestPodGroupInterleaving(t *testing.T) {
 				},
 				{
 					Name: "Verify gang PodGroup condition is set to Unschedulable",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg",
-						ConditionStatus: metav1.ConditionFalse,
-						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						PodGroups: []string{"pg"},
 					},
 				},
 			},

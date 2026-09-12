@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -190,6 +191,45 @@ func PatchPodGroupStatus(ctx context.Context, cs kubernetes.Interface, name stri
 
 	patchFn := func() error {
 		_, err := cs.SchedulingV1beta1().PodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+		return err
+	}
+
+	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
+}
+
+// PatchCompositePodGroupStatus calculates the delta bytes change from <old.Status> to <newStatus>,
+// and then submits a request to API server to patch the CompositePodGroup status changes.
+func PatchCompositePodGroupStatus(ctx context.Context, cs kubernetes.Interface, name string,
+	namespace string, oldStatus *schedulingv1alpha3.CompositePodGroupStatus,
+	newStatus *schedulingv1alpha3.CompositePodGroupStatus) error {
+	if newStatus == nil {
+		return nil
+	}
+
+	if oldStatus == nil {
+		oldStatus = &schedulingv1alpha3.CompositePodGroupStatus{}
+	}
+
+	oldData, err := json.Marshal(schedulingv1alpha3.CompositePodGroup{Status: *oldStatus})
+	if err != nil {
+		return err
+	}
+
+	newData, err := json.Marshal(schedulingv1alpha3.CompositePodGroup{Status: *newStatus})
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1alpha3.CompositePodGroup{})
+	if err != nil {
+		return fmt.Errorf("failed to create merge patch for composite podgroup %q/%q: %w", namespace, name, err)
+	}
+
+	if string(patchBytes) == "{}" {
+		return nil
+	}
+
+	patchFn := func() error {
+		_, err := cs.SchedulingV1alpha3().CompositePodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 		return err
 	}
 

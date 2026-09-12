@@ -35,6 +35,12 @@ import (
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = names.GangScheduling
+
+	minCountName      = "minCount"
+	minGroupCountName = "minGroupCount"
+
+	placementFeasibleUnschedulableMsgTemplate = "%s (%d) cannot be satisfied: %d scheduled, %d remaining"
+	placementFeasibleWaitMsgTemplate          = "%s (%d) is not yet satisfied: %d scheduled, %d remaining"
 )
 
 // GangScheduling is a plugin that enforces "all-or-nothing" scheduling for pods
@@ -349,35 +355,35 @@ func (pl *GangScheduling) isPGReady(snapshot fwk.PodGroupManager, namespace, pgN
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
 // In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
 func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args fwk.PlacementProgress) *fwk.Status {
-	minCount := getMinCount(podGroupInfo)
+	minCount, countName := getMinCount(podGroupInfo)
 	remaining := args.Remaining
 	scheduled := args.Scheduled
 
 	if remaining+scheduled < minCount {
-		// minCount can't be satisfied because there are not enough remaining pods.
-		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("minCount (%d) cannot be satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+		// minCount/minGroupCount can't be satisfied because there are not enough remaining pods/child groups.
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf(placementFeasibleUnschedulableMsgTemplate, countName, minCount, scheduled, remaining))
 	}
 
 	if scheduled < minCount {
-		// minCount might be satisfied once more remaining pods are evaluated.
-		return fwk.NewStatus(fwk.Wait, fmt.Sprintf("minCount (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+		// minCount/minGroupCount might be satisfied once more remaining pods/child groups are evaluated.
+		return fwk.NewStatus(fwk.Wait, fmt.Sprintf(placementFeasibleWaitMsgTemplate, countName, minCount, scheduled, remaining))
 	}
 
-	// minCount is satisfied.
+	// minCount/minGroupCount is satisfied.
 	return nil
 }
 
-// getMinCount returns the min count for a pod group or a composite pod group. For basic groups it returns 1.
-func getMinCount(podGroupInfo fwk.PodGroupInfo) int {
+// getMinCount returns the min count and field name for a pod group or a composite pod group. For basic groups it returns 1.
+func getMinCount(podGroupInfo fwk.PodGroupInfo) (int, string) {
 	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
 		if podGroupInfo.GetCompositePodGroup().Spec.SchedulingPolicy.Gang == nil {
-			return 1
+			return 1, minGroupCountName
 		}
-		return int(podGroupInfo.GetCompositePodGroup().Spec.SchedulingPolicy.Gang.MinGroupCount)
+		return int(podGroupInfo.GetCompositePodGroup().Spec.SchedulingPolicy.Gang.MinGroupCount), minGroupCountName
 	}
 	pg := podGroupInfo.GetPodGroup()
 	if pg.Spec.SchedulingPolicy.Gang == nil {
-		return 1
+		return 1, minCountName
 	}
-	return int(pg.Spec.SchedulingPolicy.Gang.MinCount)
+	return int(pg.Spec.SchedulingPolicy.Gang.MinCount), minCountName
 }
