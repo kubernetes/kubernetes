@@ -223,7 +223,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		return Function(eachValTagName, vfn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
+		return Function(eachValTagName, DefaultFlags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
 	})
 	// Only Functions/Deferred carry forward; element opacity becomes value opacity.
 	return Validations{
@@ -250,7 +250,7 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		return Function(eachValTagName, vfn.Flags, validateFunc, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
+		return Function(eachValTagName, DefaultFlags, validateFunc, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
 	})
 	return Validations{
 		Functions:     wrapped.Functions,
@@ -361,7 +361,7 @@ func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Valida
 	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		return Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{Function: vfn, ObjType: nt.Key}).WithComments(comm...)
+		return Function(eachKeyTagName, DefaultFlags, validateEachMapKey, WrapperFunction{Function: vfn, ObjType: nt.Key}).WithComments(comm...)
 	})
 	return Validations{
 		Functions:     wrapped.Functions,

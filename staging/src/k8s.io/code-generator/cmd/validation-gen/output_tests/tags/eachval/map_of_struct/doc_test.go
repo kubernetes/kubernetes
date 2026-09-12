@@ -18,6 +18,8 @@ package mapofstruct
 
 import (
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
@@ -35,5 +37,17 @@ func Test(t *testing.T) {
 		"mapField[b]":        {"field Struct.MapField[*]"},
 		"mapTypedefField[a]": {"field Struct.MapTypedefField[*]"},
 		"mapTypedefField[b]": {"field Struct.MapTypedefField[*]"},
+	})
+
+	// Iteration does not short-circuit. Value "x"'s required failure suppresses
+	// neither the maxLength tag on the same subfield nor the subfield(b) chain,
+	// for that value or any other.
+	st.Value(&Struct{
+		ShortCircuitField: map[string]ShortCircuitStruct{"x": {A: "", B: "p"}, "y": {A: "toolong", B: "q"}},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Required(field.NewPath("shortCircuitField").Key("x").Child("a"), ""),
+		field.TooLong(field.NewPath("shortCircuitField").Key("y").Child("a"), "", 3),
+		field.Invalid(field.NewPath("shortCircuitField").Key("x").Child("b"), "p", "").WithOrigin("validateFalse"),
+		field.Invalid(field.NewPath("shortCircuitField").Key("y").Child("b"), "q", "").WithOrigin("validateFalse"),
 	})
 }
