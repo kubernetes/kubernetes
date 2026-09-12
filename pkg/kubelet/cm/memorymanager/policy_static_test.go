@@ -774,7 +774,7 @@ func TestStaticPolicyStart(t *testing.T) {
 						{
 							NUMAAffinity: []int{0},
 							Type:         v1.ResourceMemory,
-							Size:         gb,
+							Size:         256 * mb,
 						},
 						{
 							NUMAAffinity: []int{0},
@@ -836,7 +836,7 @@ func TestStaticPolicyStart(t *testing.T) {
 						{
 							NUMAAffinity: []int{0},
 							Type:         v1.ResourceMemory,
-							Size:         gb,
+							Size:         256 * mb,
 						},
 						{
 							NUMAAffinity: []int{0},
@@ -1219,6 +1219,280 @@ func TestStaticPolicyStart(t *testing.T) {
 				t.Fatalf("The actual machine state: %v is different from the expected one: %v", machineState, testCase.expectedMachineState)
 			}
 		})
+	}
+}
+
+// TestStaticPolicyStartWithMemoryDrift verifies that a small change of the total
+// memory reported for a NUMA node across a restart (the kernel frees a varying
+// amount of boot-time memory, so cAdvisor reports a marginally different size -
+// see https://issue.k8s.io/131253) no longer prevents the static policy from
+// starting. A change that no longer fits the recorded assignments, or a drift
+// larger than the tolerated bound, must still fail.
+func TestStaticPolicyStartWithMemoryDrift(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	hugepages := func() *state.MemoryTable {
+		return &state.MemoryTable{Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb}
+	}
+	oneNodeMachineInfo := func(memory uint64) *cadvisorapi.MachineInfo {
+		return &cadvisorapi.MachineInfo{
+			Topology: []cadvisorapi.Node{
+				{
+					Id:        0,
+					Memory:    memory,
+					HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}},
+				},
+			},
+		}
+	}
+	systemReserved := systemReservedMemory{
+		0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb},
+	}
+
+	testCases := []testStaticPolicy{
+		{
+			description:         "should tolerate a small NUMA node memory drift when there are no assignments",
+			assignments:         state.ContainerMemoryAssignments{},
+			expectedAssignments: state.ContainerMemoryAssignments{},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 512 * mb, Free: 512 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+			},
+			// after the drift is tolerated the state is re-baselined onto the current machine
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 508 * mb, Free: 508 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2*gb - 4*mb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+			},
+			systemReserved: systemReserved,
+			machineInfo:    oneNodeMachineInfo(2*gb - 4*mb),
+			expectedError:  nil,
+		},
+		{
+			description: "should tolerate a small NUMA node memory drift when the assignments still fit",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 200 * mb}},
+				},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 200 * mb}},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 512 * mb, Free: 312 * mb, Reserved: 200 * mb, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 1,
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 508 * mb, Free: 308 * mb, Reserved: 200 * mb, SystemReserved: 512 * mb, TotalMemSize: 2*gb - 4*mb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 1,
+				},
+			},
+			systemReserved: systemReserved,
+			machineInfo:    oneNodeMachineInfo(2*gb - 4*mb),
+			expectedError:  nil,
+		},
+		{
+			description: "should still fail when a NUMA node memory reduction no longer fits the assignments",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 500 * mb}},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 512 * mb, Free: 12 * mb, Reserved: 500 * mb, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 1,
+				},
+			},
+			systemReserved: systemReserved,
+			machineInfo:    oneNodeMachineInfo(1600 * mb),
+			expectedError:  fmt.Errorf("[memorymanager] (pod: pod1, container: container1) the memory assignment does not fit the machine state"),
+		},
+		{
+			description: "should fail when the NUMA node memory drift exceeds the tolerated bound",
+			assignments: state.ContainerMemoryAssignments{},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 512 * mb, Free: 512 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+			},
+			systemReserved: systemReserved,
+			machineInfo:    oneNodeMachineInfo(2*gb - 300*mb),
+			expectedError:  fmt.Errorf("[memorymanager] the expected machine state is different from the real one"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			p, s, err := initTests(t, &testCase, nil, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			err = p.Start(logger, s)
+			if !reflect.DeepEqual(err, testCase.expectedError) {
+				t.Fatalf("The actual error: %v is different from the expected one: %v", err, testCase.expectedError)
+			}
+
+			if err != nil {
+				return
+			}
+
+			assignments := s.GetMemoryAssignments()
+			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
+				t.Fatalf("Actual assignments: %v is different from the expected one: %v", assignments, testCase.expectedAssignments)
+			}
+
+			machineState := s.GetMachineState()
+			if !areMachineStatesEqual(logger, machineState, testCase.expectedMachineState) {
+				t.Fatalf("The actual machine state: %v is different from the expected one: %v", machineState, testCase.expectedMachineState)
+			}
+		})
+	}
+}
+
+// TestStaticPolicyStartMemoryDriftBound checks the boundary of the tolerated
+// per-NUMA memory drift: a change up to maxTolerableMemoryDriftBytes is
+// accepted and re-baselined, while anything larger is treated as a real
+// topology change and still fails the start.
+func TestStaticPolicyStartMemoryDriftBound(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	const total = 8 * gb
+	driftError := fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+	makeCase := func(description string, drift uint64, expectedError error) testStaticPolicy {
+		return testStaticPolicy{
+			description: description,
+			assignments: state.ContainerMemoryAssignments{},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: total - 2*gb, Free: total - 2*gb, Reserved: 0, SystemReserved: gb, TotalMemSize: total},
+						hugepages1Gi:      {Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb},
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+			},
+			systemReserved: systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: gb}},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{Id: 0, Memory: total - drift, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+				},
+			},
+			expectedError: expectedError,
+		}
+	}
+	testCases := []testStaticPolicy{
+		makeCase("no drift", 0, nil),
+		makeCase("a few MiB is tolerated", 4*mb, nil),
+		makeCase("well below the bound is tolerated", 200*mb, nil),
+		makeCase("exactly at the bound is tolerated", maxTolerableMemoryDriftBytes, nil),
+		makeCase("just past the bound is rejected", maxTolerableMemoryDriftBytes+mb, driftError),
+		makeCase("a whole GiB is rejected", gb, driftError),
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			p, s, err := initTests(t, &testCase, nil, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if err := p.Start(logger, s); !reflect.DeepEqual(err, testCase.expectedError) {
+				t.Fatalf("Start error = %v, want %v", err, testCase.expectedError)
+			}
+		})
+	}
+}
+
+// TestStaticPolicyStartCrossNUMAMemoryDrift covers a cross-NUMA assignment: a
+// small per-node memory drift changes how the assignment is split between the
+// two NUMA nodes of its group while the group total stays the same, which must
+// still be tolerated and the assignment preserved.
+func TestStaticPolicyStartCrossNUMAMemoryDrift(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	hugepage := func() *state.MemoryTable {
+		return &state.MemoryTable{Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb}
+	}
+	tc := testStaticPolicy{
+		description: "cross-NUMA assignment tolerates a per-node drift that reshuffles the split",
+		assignments: state.ContainerMemoryAssignments{
+			"pod1": map[string][]state.Block{
+				"container1": {{NUMAAffinity: []int{0, 1}, Type: v1.ResourceMemory, Size: 7 * gb}},
+			},
+		},
+		machineState: state.NUMANodeMap{
+			0: &state.NUMANodeState{
+				MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+					v1.ResourceMemory: {Allocatable: 6 * gb, Free: 0, Reserved: 6 * gb, SystemReserved: gb, TotalMemSize: 8 * gb},
+					hugepages1Gi:      hugepage(),
+				},
+				Cells:               []int{0, 1},
+				NumberOfAssignments: 1,
+			},
+			1: &state.NUMANodeState{
+				MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+					v1.ResourceMemory: {Allocatable: 6 * gb, Free: 5 * gb, Reserved: gb, SystemReserved: gb, TotalMemSize: 8 * gb},
+					hugepages1Gi:      hugepage(),
+				},
+				Cells:               []int{0, 1},
+				NumberOfAssignments: 1,
+			},
+		},
+		systemReserved: systemReservedMemory{
+			0: map[v1.ResourceName]uint64{v1.ResourceMemory: gb},
+			1: map[v1.ResourceName]uint64{v1.ResourceMemory: gb},
+		},
+		machineInfo: &cadvisorapi.MachineInfo{
+			Topology: []cadvisorapi.Node{
+				{Id: 0, Memory: 8*gb - 4*mb, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+				{Id: 1, Memory: 8 * gb, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+			},
+		},
+		expectedError: nil,
+	}
+
+	p, s, err := initTests(t, &tc, nil, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if err := p.Start(logger, s); !reflect.DeepEqual(err, tc.expectedError) {
+		t.Fatalf("Start error = %v, want %v", err, tc.expectedError)
+	}
+	blocks := s.GetMemoryBlocks("pod1", "container1")
+	if len(blocks) != 1 || blocks[0].Size != 7*gb {
+		t.Fatalf("cross-NUMA assignment not preserved after restart: %+v", blocks)
 	}
 }
 
