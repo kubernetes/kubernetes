@@ -200,7 +200,11 @@ type ListSelectorTerm struct {
 	Value any
 }
 
-// TagStabilityLevel indicates the stability of a validation tag.
+// TagStabilityLevel indicates the stability of a validation tag. It describes
+// the tag itself and is surfaced in the generated tag documentation. It does
+// not constrain which APIs a tag may be used on: whether a change in validation
+// behavior is acceptable is a property of the API being validated, not of the
+// tag.
 type TagStabilityLevel string
 
 const (
@@ -214,12 +218,6 @@ const (
 	TagStabilityLevelStable TagStabilityLevel = "Stable"
 )
 
-var stabilityOrder = map[TagStabilityLevel]int{
-	TagStabilityLevelAlpha:  0,
-	TagStabilityLevelBeta:   1,
-	TagStabilityLevelStable: 2,
-}
-
 // Validation stability level denotes the stability of a validation.
 type ValidationStabilityLevel string
 
@@ -229,20 +227,6 @@ const (
 	// Beta denotes the declarative validations should be run with the handwritten validation. Declarative validations are authoritative.
 	ValidationStabilityLevelBeta ValidationStabilityLevel = "Beta"
 )
-
-// Compare returns an integer comparing two stability levels, or an error if either
-// stability level is unknown.
-func (s TagStabilityLevel) Compare(other TagStabilityLevel) (int, error) {
-	sOrder, okS := stabilityOrder[s]
-	if !okS {
-		return 0, fmt.Errorf("unknown stability level %q", s)
-	}
-	otherOrder, okOther := stabilityOrder[other]
-	if !okOther {
-		return 0, fmt.Errorf("unknown stability level %q", other)
-	}
-	return sOrder - otherOrder, nil
-}
 
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {

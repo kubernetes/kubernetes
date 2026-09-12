@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestGetStability(t *testing.T) {
+func TestStability(t *testing.T) {
 	tests := []struct {
 		tagName     string
 		expected    TagStabilityLevel
@@ -55,12 +55,12 @@ func TestGetStability(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.tagName, func(t *testing.T) {
-			got, err := GetStability(tt.tagName)
+			got, err := globalRegistry.Stability(tt.tagName)
 			if err != nil && !tt.expectError {
 				t.Errorf("Unexpected error: %v", err)
 			}
 			if got != tt.expected {
-				t.Errorf("GetStability(%q) = %v, want %v", tt.tagName, got, tt.expected)
+				t.Errorf("Stability(%q) = %v, want %v", tt.tagName, got, tt.expected)
 			}
 		})
 	}
