@@ -498,6 +498,13 @@ func AddDryRunFlag(cmd *cobra.Command) {
 		`Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`,
 	)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+	// Suggest "--dry-run=" (with no trailing space) so the user is guided toward
+	// the "--dry-run=client"/"--dry-run=server" form rather than the deprecated
+	// bare "--dry-run".
+	CheckErr(cmd.MarkFlagAppendEqual("dry-run"))
+	CheckErr(cmd.RegisterFlagCompletionFunc("dry-run", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+		return []string{"client", "none", "server"}, cobra.ShellCompDirectiveNoFileComp
+	}))
 }
 
 func AddFieldManagerFlagVar(cmd *cobra.Command, p *string, defaultFieldManager string) {
