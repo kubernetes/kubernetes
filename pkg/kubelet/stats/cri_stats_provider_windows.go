@@ -272,9 +272,11 @@ func addCRIPodNetworkStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSand
 
 func criInterfaceToWinSummary(criIface *runtimeapi.WindowsNetworkInterfaceUsage) statsapi.InterfaceStats {
 	return statsapi.InterfaceStats{
-		Name:    criIface.Name,
-		RxBytes: valueOfUInt64Value(criIface.RxBytes),
-		TxBytes: valueOfUInt64Value(criIface.TxBytes),
+		Name:      criIface.Name,
+		RxBytes:   valueOfUInt64Value(criIface.RxBytes),
+		RxDropped: valueOfUInt64Value(criIface.RxPacketsDropped),
+		TxBytes:   valueOfUInt64Value(criIface.TxBytes),
+		TxDropped: valueOfUInt64Value(criIface.TxPacketsDropped),
 	}
 }
 
