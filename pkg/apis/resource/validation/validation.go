@@ -801,6 +801,14 @@ func ValidateResourceSliceUpdate(resourceSlice, oldResourceSlice *resource.Resou
 }
 
 func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
+	// An unchanged spec is accepted as it is stored. Validation which was added
+	// after the object was written does not have to be satisfied retroactively,
+	// as long as the spec is left alone. Any change to it, including merely
+	// reordering devices, validates the whole spec.
+	if oldSpec != nil && apiequality.Semantic.DeepEqual(spec, oldSpec) {
+		return nil
+	}
+
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(spec.Driver, fldPath.Child("driver"))...)
 	allErrs = append(allErrs, validateResourcePool(spec.Pool, fldPath.Child("pool"))...)
@@ -867,8 +875,7 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	}
 	allErrs = append(allErrs, validateSet(spec.Devices, maxDevices,
 		func(device resource.Device, fldPath *field.Path) field.ErrorList {
-			oldDevice := lookupDevice(oldSpec, device.Name)
-			return validateDevice(device, oldDevice, fldPath, spec.PerDeviceNodeSelection)
+			return validateDevice(device, fldPath, spec.PerDeviceNodeSelection)
 		},
 		func(device resource.Device) string {
 			return device.Name
@@ -1013,19 +1020,6 @@ func haveConsumesCounters(spec *resource.ResourceSliceSpec) bool {
 	return false
 }
 
-func lookupDevice(spec *resource.ResourceSliceSpec, deviceName string) *resource.Device {
-	if spec == nil {
-		return nil
-	}
-	for i := range spec.Devices {
-		device := &spec.Devices[i]
-		if device.Name == deviceName {
-			return device
-		}
-	}
-	return nil
-}
-
 func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if counterSet.Name == "" {
@@ -1056,7 +1050,7 @@ func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field
 	return allErrs
 }
 
-func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath *field.Path, perDeviceNodeSelection *bool) field.ErrorList {
+func validateDevice(device resource.Device, fldPath *field.Path, perDeviceNodeSelection *bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allowMultipleAllocations := device.AllowMultipleAllocations != nil && *device.AllowMultipleAllocations
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
@@ -1074,24 +1068,16 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	}
 
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
-	// If the entire capacity is the same as before then validation can be skipped.
-	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
-	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Capacity, device.Capacity) {
-		if allowMultipleAllocations {
-			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
-		} else {
-			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
-		}
+	if allowMultipleAllocations {
+		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+	} else {
+		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
 	}
-	// If the entire set is the same as before then validation can be skipped.
-	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
-	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Taints, device.Taints) {
-		allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength,
-			func(taint resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
-				return validateDeviceTaint(taint, nil, fldPath)
-			},
-			fldPath.Child("taints"))...)
-	}
+	allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength,
+		func(taint resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
+			return validateDeviceTaint(taint, nil, fldPath)
+		},
+		fldPath.Child("taints"))...)
 
 	allErrs = append(allErrs, validateSet(device.ConsumesCounters, resource.ResourceSliceMaxDeviceCounterConsumptionsPerDevice,
 		validateDeviceCounterConsumption,
@@ -1163,15 +1149,20 @@ func validateNodeAllocatableResources(mappings map[corev1.ResourceName]resource.
 func validateNodeAllocatableMapping(mapping *resource.NodeAllocatableMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if mapping.CapacityKey != nil {
+		keyPath := fldPath.Child("capacityKey")
 		if *mapping.CapacityKey == "" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
+			allErrs = append(allErrs, field.Invalid(keyPath, "", "capacityKey must not be an empty string"))
+		} else if nameErrs := validateQualifiedName(*mapping.CapacityKey, keyPath); len(nameErrs) > 0 {
+			// A key which is not a valid name cannot be a key of the capacity
+			// map either, so report the format problem instead of "not found".
+			allErrs = append(allErrs, nameErrs...)
 		} else {
 			var exists bool
 			if capacities != nil {
 				_, exists = capacities[*mapping.CapacityKey]
 			}
 			if !exists {
-				allErrs = append(allErrs, field.NotFound(fldPath.Child("capacityKey"), *mapping.CapacityKey))
+				allErrs = append(allErrs, field.NotFound(keyPath, *mapping.CapacityKey))
 			}
 		}
 		if mapping.CapacityMultiplier == nil {
@@ -1626,17 +1617,8 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 		} else {
 			allErrs = append(allErrs, validateCIdentifier(parts[1], fldPath)...)
 		}
-		// TODO: This validation is incomplete. It should reject qualified names
-		// that contain more than one slash. Currently, names like "a/b/c" are not
-		// handled and are implicitly accepted.
-		//
-		// This needs to be fixed in two places:
-		// 1. Here in this function.
-		// 2. In the corresponding declarative validation utility `resourcesQualifiedName`
-		//    in `staging/src/k8s.io/apimachinery/pkg/api/validate/strfmt.go`.
-		//
-		// The fix should be introduced carefully, possibly using ratcheting to avoid
-		// breaking existing, non-compliant objects.
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, string(name), "must not contain more than one slash"))
 	}
 
 	return allErrs
