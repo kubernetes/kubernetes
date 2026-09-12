@@ -117,7 +117,18 @@
 # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
 # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
 - text: "must be marked as optional or required|is a non-pointer struct with no required fields."
-  path: "staging/src/k8s.io/api/(admissionregistration|autoscaling|certificates|core|extensions|networking)"
+  path: "staging/src/k8s.io/api/(admissionregistration|autoscaling|certificates|core|extensions)"
+
+# nonpointerstructs/optionalorrequired - IngressBackend and ServiceBackendPort are "oneOf"-shaped
+# structs (validation requires exactly one of Resource/Service, or Name/Number, to be set) but
+# neither individual field is itself marked required, so the linter can't see the real cross-field
+# constraint and would force the container to be marked +optional - which is misleading, since an
+# empty value does fail validation. Suppressing rather than mismarking (per danwinship's review on
+# #141944).
+- text: "field HTTPIngressPath.Backend (is a non-pointer struct with no required fields. It must be marked as optional.|must be marked as optional or required)"
+  path: "staging/src/k8s.io/api/networking/"
+- text: "field IngressServiceBackend.Port (is a non-pointer struct with no required fields. It must be marked as optional.|must be marked as optional or required)"
+  path: "staging/src/k8s.io/api/networking/v1/types.go"
 
 # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
 - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"

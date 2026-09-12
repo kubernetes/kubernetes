@@ -7,7 +7,7 @@ go 1.27.0
 godebug default=go1.27
 
 require (
-	google.golang.org/grpc v1.82.1
+	google.golang.org/grpc v1.82.2
 	google.golang.org/protobuf v1.36.12
 )
 

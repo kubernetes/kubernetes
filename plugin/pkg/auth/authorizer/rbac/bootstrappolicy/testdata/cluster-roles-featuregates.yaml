@@ -1434,6 +1434,13 @@ items:
     - list
     - watch
   - apiGroups:
+    - networking.k8s.io
+    resources:
+    - servicecidrs
+    verbs:
+    - list
+    - watch
+  - apiGroups:
     - ""
     - events.k8s.io
     resources:
@@ -1442,13 +1449,6 @@ items:
     - create
     - patch
     - update
-  - apiGroups:
-    - networking.k8s.io
-    resources:
-    - servicecidrs
-    verbs:
-    - list
-    - watch
   - apiGroups:
     - discovery.k8s.io
     resources:

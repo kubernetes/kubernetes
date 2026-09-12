@@ -115,3 +115,25 @@ func TestSnapshotListPrefix(t *testing.T) {
 		})
 	}
 }
+
+func TestSingleElementRange(t *testing.T) {
+	elem := testStorageElement("/pods/ns1/a", "a", 1)
+	for _, tc := range []struct {
+		name       string
+		r          Range
+		expectKeys []string
+	}{
+		{name: "single", r: SingleElementRange(elem), expectKeys: []string{"/pods/ns1/a"}},
+		{name: "empty", r: EmptyRange(), expectKeys: nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var keys []string
+			for e, err := range tc.r.All() {
+				require.NoError(t, err)
+				keys = append(keys, e.Key)
+			}
+			assert.Equal(t, tc.expectKeys, keys)
+			assert.Equal(t, len(tc.expectKeys), tc.r.Count())
+		})
+	}
+}

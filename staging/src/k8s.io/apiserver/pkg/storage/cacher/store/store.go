@@ -87,6 +87,30 @@ type Range interface {
 	Count() int
 }
 
+func SingleElementRange(elem *Element) Range {
+	return elements{elem}
+}
+
+func EmptyRange() Range {
+	return elements(nil)
+}
+
+type elements []*Element
+
+func (e elements) All() iter.Seq2[*Element, error] {
+	return func(yield func(*Element, error) bool) {
+		for _, elem := range e {
+			if !yield(elem, nil) {
+				return
+			}
+		}
+	}
+}
+
+func (e elements) Count() int {
+	return len(e)
+}
+
 type prefixRanger interface {
 	rangePrefix(prefix, continueKey string) iter.Seq2[*Element, error]
 	countPrefix(prefix, continueKey string) int

@@ -14,7 +14,7 @@ require (
 	github.com/onsi/gomega v1.40.0
 	github.com/stretchr/testify v1.12.1
 	go.etcd.io/etcd/client/pkg/v3 v3.7.1
-	google.golang.org/grpc v1.82.1
+	google.golang.org/grpc v1.82.2
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0

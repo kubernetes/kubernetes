@@ -745,8 +745,8 @@ func computeListLimit(opts storage.ListOptions) int64 {
 }
 
 type listResp struct {
-	Items           []interface{}
 	ResourceVersion uint64
+	store.Range
 }
 
 // GetList implements storage.Interface
@@ -789,26 +789,32 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if err != nil {
 		return err
 	}
-	span.AddEvent("Listed items from cache", attribute.Int("count", len(resp.Items)))
+	span.AddEvent("Listed items from cache")
 	var lastSelectedObjectKey string
 	var hasMoreListItems bool
+	var numFetched int
+	var totalCount int64
 	limit := computeListLimit(opts)
 	if opts.Predicate.Empty() {
 		// Every item matches, so the result size is known upfront and items can be
 		// copied directly into the result list without an intermediate slice.
-		count := len(resp.Items)
+		count := resp.Count()
+		totalCount = int64(count)
 		if limit > 0 && int64(count) > limit {
 			count = int(limit)
 			hasMoreListItems = true
 		}
 		listVal.Set(reflect.MakeSlice(listVal.Type(), count, count))
-		for i, obj := range resp.Items[:count] {
-			elem, ok := obj.(*store.Element)
-			if !ok {
-				return fmt.Errorf("non *store.Element returned from storage: %v", obj)
+		for elem, err := range resp.All() {
+			if err != nil {
+				return err
 			}
-			listVal.Index(i).Set(reflect.ValueOf(elem.Object).Elem())
+			listVal.Index(numFetched).Set(reflect.ValueOf(elem.Object).Elem())
 			lastSelectedObjectKey = elem.Key
+			numFetched++
+			if numFetched == count {
+				break
+			}
 		}
 	} else {
 		// store pointer of eligible objects,
@@ -816,10 +822,15 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
 		//   so we try to delay this action as much as possible
 		var selectedObjects []runtime.Object
-		for i, obj := range resp.Items {
-			elem, ok := obj.(*store.Element)
-			if !ok {
-				return fmt.Errorf("non *store.Element returned from storage: %v", obj)
+		for elem, err := range resp.All() {
+			if err != nil {
+				return err
+			}
+			numFetched++
+			if limit > 0 && int64(len(selectedObjects)) >= limit {
+				// Reaching an item past a full page is how we learn a continuation is needed.
+				hasMoreListItems = true
+				break
 			}
 			matched, err := opts.Predicate.Matches(elem.Object)
 			if err != nil {
@@ -828,10 +839,6 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			if matched {
 				selectedObjects = append(selectedObjects, elem.Object)
 				lastSelectedObjectKey = elem.Key
-			}
-			if limit > 0 && int64(len(selectedObjects)) >= limit {
-				hasMoreListItems = i < len(resp.Items)-1
-				break
 			}
 		}
 		if len(selectedObjects) == 0 {
@@ -846,20 +853,20 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			}
 		}
 	}
-	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
-	if c.versioner != nil {
-		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), int64(len(resp.Items)), hasMoreListItems, opts)
-		if err != nil {
-			return err
-		}
+    span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
+    if c.versioner != nil {
+        continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), totalCount, hasMoreListItems, opts)
+        if err != nil {
+            return err
+        }
 
-		if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
-			return err
-		}
-	}
-	opts.Predicate.SetShardInfoOnList(listObj)
-	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, len(resp.Items), listVal.Len())
-	return nil
+        if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
+            return err
+        }
+    }
+    opts.Predicate.SetShardInfoOnList(listObj)
+    metrics.RecordListCacheMetrics(c.groupResource, indexUsed, numFetched, listVal.Len())
+    return nil
 }
 
 // baseObjectThreadUnsafe omits locking for cachingObject.

@@ -26,13 +26,9 @@ import (
 	"testing"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -95,59 +91,6 @@ func TestGetsSelfAttributes(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name+"_v1beta1", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParseMajorMinor("1.32"))
-			respMu.Lock()
-			response = tc.userInfo
-			respMu.Unlock()
-
-			kubeClient, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
-				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-					opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
-					opts.Authorization.Modes = []string{"AlwaysAllow"}
-				},
-				ModifyServerConfig: func(config *controlplane.Config) {
-					// Unset BearerToken to disable BearerToken authenticator.
-					config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
-					config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-						respMu.RLock()
-						defer respMu.RUnlock()
-						return &authenticator.Response{User: response}, true, nil
-					})
-				},
-			})
-			defer tearDownFn()
-
-			resBeta, err := kubeClient.AuthenticationV1beta1().
-				SelfSubjectReviews().
-				Create(tCtx, &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if resBeta == nil {
-				t.Fatalf("empty response")
-			}
-
-			if resBeta.Status.UserInfo.Username != tc.expectedName {
-				t.Fatalf("unexpected username: wanted %s, got %s", tc.expectedName, resBeta.Status.UserInfo.Username)
-			}
-
-			if resBeta.Status.UserInfo.UID != tc.expectedUID {
-				t.Fatalf("unexpected uid: wanted %s, got %s", tc.expectedUID, resBeta.Status.UserInfo.UID)
-			}
-
-			if !reflect.DeepEqual(resBeta.Status.UserInfo.Groups, tc.expectedGroups) {
-				t.Fatalf("unexpected groups: wanted %v, got %v", tc.expectedGroups, resBeta.Status.UserInfo.Groups)
-			}
-
-			if !reflect.DeepEqual(resBeta.Status.UserInfo.Extra, tc.expectedExtra) {
-				t.Fatalf("unexpected extra: wanted %v, got %v", tc.expectedExtra, resBeta.Status.UserInfo.Extra)
-			}
-		})
-	}
-
-	for _, tc := range tests {
 		t.Run(tc.name+"_v1", func(t *testing.T) {
 			respMu.Lock()
 			response = tc.userInfo
@@ -203,47 +146,6 @@ func TestGetsSelfAttributesError(t *testing.T) {
 	toggle := &atomic.Value{}
 	toggle.Store(true)
 	expected := fmt.Errorf("Unauthorized")
-
-	t.Run("v1beta1", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParseMajorMinor("1.32"))
-		tCtx := ktesting.Init(t)
-		kubeClient, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
-			ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-				opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
-				opts.Authorization.Modes = []string{"AlwaysAllow"}
-			},
-			ModifyServerConfig: func(config *controlplane.Config) {
-				// Unset BearerToken to disable BearerToken authenticator.
-				config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
-				config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-					if toggle.Load().(bool) {
-						return &authenticator.Response{
-							User: &user.DefaultInfo{
-								Name: "alice",
-							},
-						}, true, nil
-					}
-
-					return nil, false, fmt.Errorf("test error")
-				})
-			},
-		})
-		defer tearDownFn()
-
-		toggle.Store(!toggle.Load().(bool))
-
-		_, err := kubeClient.AuthenticationV1beta1().
-			SelfSubjectReviews().
-			Create(tCtx, &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
-		if err == nil {
-			t.Fatalf("expected error: %v, got nil", err)
-		}
-
-		toggle.Store(!toggle.Load().(bool))
-		if expected.Error() != err.Error() {
-			t.Fatalf("expected error: %v, got %v", expected, err)
-		}
-	})
 
 	t.Run("v1", func(t *testing.T) {
 		tCtx := ktesting.Init(t)

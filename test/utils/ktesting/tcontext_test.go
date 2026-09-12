@@ -93,6 +93,41 @@ func TestCancelBeforeCleanup(t *testing.T) {
 	})
 }
 
+func TestRunCancelBeforeCleanup(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	tCtx.Run("sub", func(tCtx ktesting.TContext) {
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			// Blocks until the sub-test's context gets canceled automatically.
+			<-tCtx.Done()
+		}()
+
+		// See TestCancelBeforeCleanup: same reasoning applies to sub-tests.
+		tCtx.Cleanup(func() {
+			select {
+			case <-done:
+			case <-time.After(10 * time.Second):
+				t.Fatal("sub-test's TContext should already have been canceled by the time this Cleanup function runs")
+			}
+		})
+	})
+}
+
+func TestSyncTestAutoCancel(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	// Without synchronous cancellation before the callback returns, this
+	// goroutine would still be blocked and synctest would panic with
+	// "deadlock: main bubble goroutine has exited but blocked goroutines remain".
+	tCtx.SyncTest("sub", func(tCtx ktesting.TContext) {
+		go func() {
+			<-tCtx.Done()
+		}()
+	})
+}
+
 func TestNoDeadline(t *testing.T) {
 	mockT := &deadlineT{T: t, deadline: nil}
 	tCtx := ktesting.Init(mockT)
