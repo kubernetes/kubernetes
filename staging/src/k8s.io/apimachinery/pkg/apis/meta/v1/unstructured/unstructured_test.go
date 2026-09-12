@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	cborserializer "k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -473,4 +474,52 @@ func anyEqual(t *testing.T, a, b interface{}) bool {
 		t.Fatalf("unexpected value %v of type %T", a, a)
 	}
 	return true
+}
+
+func TestUnstructuredWithTypeMeta(t *testing.T) {
+	obj := (&unstructured.Unstructured{}).WithAPIVersion("apps/v1").WithKind("Deployment")
+	if got := obj.GetAPIVersion(); got != "apps/v1" {
+		t.Errorf("apiVersion: got %q, want %q", got, "apps/v1")
+	}
+	if got := obj.GetKind(); got != "Deployment" {
+		t.Errorf("kind: got %q, want %q", got, "Deployment")
+	}
+}
+
+func TestUnstructuredWithGroupVersionKind(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
+	obj := (&unstructured.Unstructured{}).WithGroupVersionKind(gvk)
+	if got := obj.GroupVersionKind(); got != gvk {
+		t.Errorf("GroupVersionKind: got %v, want %v", got, gvk)
+	}
+}
+
+func TestUnstructuredWithIdentity(t *testing.T) {
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
+	obj := (&unstructured.Unstructured{}).WithGroupVersionKind(gvk).WithNamespace("ns").WithName("n")
+	if got := obj.GetNamespace(); got != "ns" {
+		t.Errorf("namespace: got %q, want %q", got, "ns")
+	}
+	if got := obj.GetName(); got != "n" {
+		t.Errorf("name: got %q, want %q", got, "n")
+	}
+	if got := obj.GroupVersionKind(); got != gvk {
+		t.Errorf("GroupVersionKind: got %v, want %v", got, gvk)
+	}
+}
+
+func TestUnstructuredListWithTypeMeta(t *testing.T) {
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "PodList"}
+	list := (&unstructured.UnstructuredList{}).WithGroupVersionKind(gvk)
+	if got := list.GroupVersionKind(); got != gvk {
+		t.Errorf("GroupVersionKind: got %v, want %v", got, gvk)
+	}
+
+	list = (&unstructured.UnstructuredList{}).WithAPIVersion("v1").WithKind("PodList")
+	if got := list.GetAPIVersion(); got != "v1" {
+		t.Errorf("apiVersion: got %q, want %q", got, "v1")
+	}
+	if got := list.GetKind(); got != "PodList" {
+		t.Errorf("kind: got %q, want %q", got, "PodList")
+	}
 }
