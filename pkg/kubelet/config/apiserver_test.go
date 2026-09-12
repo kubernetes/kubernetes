@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type fakePodLW struct {
@@ -52,6 +53,8 @@ func (lw fakePodLW) IsWatchListSemanticsUnSupported() bool { return true }
 var _ cache.ListerWatcher = fakePodLW{}
 
 func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	pod1v1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "p"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
@@ -71,7 +74,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 
 	ch := make(chan sourceUpdate)
 
-	newSourceApiserverFromLW(lw, ch)
+	newSourceApiserverFromLW(tCtx, lw, ch)
 
 	update, ok := <-ch
 	if !ok {
@@ -133,6 +136,8 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 }
 
 func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	pod1 := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "one"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
@@ -149,7 +154,7 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 
 	ch := make(chan sourceUpdate)
 
-	newSourceApiserverFromLW(lw, ch)
+	newSourceApiserverFromLW(tCtx, lw, ch)
 
 	update, ok := <-ch
 	if !ok {
@@ -172,6 +177,8 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 }
 
 func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	// Setup fake api client.
 	fakeWatch := watch.NewFake()
 	lw := fakePodLW{
@@ -181,7 +188,7 @@ func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
 
 	ch := make(chan sourceUpdate)
 
-	newSourceApiserverFromLW(lw, ch)
+	newSourceApiserverFromLW(tCtx, lw, ch)
 
 	update, ok := <-ch
 	if !ok {
