@@ -694,6 +694,13 @@
   - 120
   - 300
   - 600
+- name: volume_operation_errors_total
+  help: Total volume operation errors
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - operation_name
+  - plugin_name
 - name: volume_operation_total_seconds
   help: Storage operation end to end duration in seconds
   type: Histogram
