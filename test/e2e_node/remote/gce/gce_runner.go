@@ -175,6 +175,9 @@ type GCEImageConfig struct {
 type GCEImage struct {
 	Image      string `json:"image,omitempty"`
 	ImageRegex string `json:"image_regex,omitempty"`
+	// ImageExcludeRegex drops dynamically selected images whose names match it.
+	// It is ignored when Image is set explicitly.
+	ImageExcludeRegex string `json:"image_exclude_regex,omitempty"`
 	// ImageFamily is the image family to use. The latest image from the image family will be used, e.g cos-81-lts.
 	ImageFamily     string    `json:"image_family,omitempty"`
 	ImageDesc       string    `json:"image_description,omitempty"`
@@ -185,18 +188,50 @@ type GCEImage struct {
 	Resources       Resources `json:"resources,omitempty"`
 }
 
-// getGCEImage returns the newest image matching imageRegex and imageFamily in project.
-func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) (string, error) {
-	data, err := runGCPCommandNoProject(gceImageListArgs(project, imageFamily)...)
+// gceImageLister runs the gcloud image listing; a var so tests can replace it.
+var gceImageLister = runGCPCommandNoProject
+
+// imageSelector is the compiled form of a config's image filters.
+type imageSelector struct {
+	include *regexp.Regexp
+	exclude *regexp.Regexp
+	family  string
+}
+
+// compileImageSelector compiles the include and exclude filters before the
+// listing, so a bad config regex fails without first paying for the gcloud call.
+func compileImageSelector(imageRegex, imageExcludeRegex, imageFamily string) (imageSelector, error) {
+	s := imageSelector{family: imageFamily}
+	var err error
+	if imageRegex != "" {
+		if s.include, err = regexp.Compile(imageRegex); err != nil {
+			return imageSelector{}, fmt.Errorf("failed to compile image_regex %q: %w", imageRegex, err)
+		}
+	}
+	if imageExcludeRegex != "" {
+		if s.exclude, err = regexp.Compile(imageExcludeRegex); err != nil {
+			return imageSelector{}, fmt.Errorf("failed to compile image_exclude_regex %q: %w", imageExcludeRegex, err)
+		}
+	}
+	return s, nil
+}
+
+// getGCEImage returns the newest image matching imageRegex and imageFamily in
+// project, dropping names that match imageExcludeRegex.
+func (g *GCERunner) getGCEImage(imageRegex, imageExcludeRegex, imageFamily string, project string) (string, error) {
+	selector, err := compileImageSelector(imageRegex, imageExcludeRegex, imageFamily)
+	if err != nil {
+		return "", err
+	}
+	data, err := gceImageLister(gceImageListArgs(project, imageFamily)...)
 	if err != nil {
 		return "", fmt.Errorf("failed to list images in project %q: %w", project, err)
 	}
 	var images []gceImage
-	err = json.Unmarshal(data, &images)
-	if err != nil {
+	if err := json.Unmarshal(data, &images); err != nil {
 		return "", fmt.Errorf("failed to parse images: %w", err)
 	}
-	return pickNewestImage(images, imageRegex, imageFamily, project)
+	return pickNewestImage(images, selector, project)
 }
 
 // gceImageListArgs returns the gcloud arguments to list candidate images.
@@ -212,20 +247,26 @@ func gceImageListArgs(project, imageFamily string) []string {
 	return args
 }
 
-// pickNewestImage returns the name of the newest image matching imageRegex and imageFamily.
-func pickNewestImage(images []gceImage, imageRegex, imageFamily, project string) (string, error) {
-	imageObjs := []imageObj{}
-	// Compile, not MustCompile: image_regex is user config and must not panic.
-	imageRe, err := regexp.Compile(imageRegex)
-	if err != nil {
-		return "", fmt.Errorf("failed to compile image_regex %q: %w", imageRegex, err)
+// regexpString returns re's pattern for logging, or "" when re is nil.
+func regexpString(re *regexp.Regexp) string {
+	if re == nil {
+		return ""
 	}
+	return re.String()
+}
+
+// pickNewestImage returns the name of the newest image the selector accepts.
+func pickNewestImage(images []gceImage, selector imageSelector, project string) (string, error) {
+	imageObjs := []imageObj{}
 	for _, instance := range images {
-		if imageRegex != "" && !imageRe.MatchString(instance.Name) {
+		if selector.include != nil && !selector.include.MatchString(instance.Name) {
+			continue
+		}
+		if selector.exclude != nil && selector.exclude.MatchString(instance.Name) {
 			continue
 		}
 		// gcloud's --filter=family is not guaranteed exact, so match here too.
-		if imageFamily != "" && instance.Family != imageFamily {
+		if selector.family != "" && instance.Family != selector.family {
 			continue
 		}
 		creationTime, err := time.Parse(time.RFC3339, instance.CreationTimestamp)
@@ -242,10 +283,18 @@ func pickNewestImage(images []gceImage, imageRegex, imageFamily, project string)
 	// Pick the latest image after sorting.
 	sort.Sort(byCreationTime(imageObjs))
 	if len(imageObjs) > 0 {
-		klog.V(4).Infof("found images %+v based on regex %q and family %q in project %q", imageObjs, imageRegex, imageFamily, project)
+		klog.V(4).Infof("found images %+v based on regex %q, exclude regex %q and family %q in project %q", imageObjs, regexpString(selector.include), regexpString(selector.exclude), selector.family, project)
 		return imageObjs[0].name, nil
 	}
-	return "", fmt.Errorf("found zero images based on regex %q and family %q in project %q", imageRegex, imageFamily, project)
+	return "", fmt.Errorf("found zero images based on regex %q, exclude regex %q and family %q in project %q", regexpString(selector.include), regexpString(selector.exclude), selector.family, project)
+}
+
+// validateImageSelector rejects an image_exclude_regex with no positive selector to refine.
+func validateImageSelector(shortName string, c GCEImage) error {
+	if c.Image == "" && c.ImageExcludeRegex != "" && c.ImageRegex == "" && c.ImageFamily == "" {
+		return fmt.Errorf("invalid config for %q: image_exclude_regex requires image_regex or image_family", shortName)
+	}
+	return nil
 }
 
 func (g *GCERunner) prepareGceImages() (*internalGCEImageConfig, error) {
@@ -273,12 +322,15 @@ func (g *GCERunner) prepareGceImages() (*internalGCEImageConfig, error) {
 		}
 
 		for shortName, imageConfig := range externalImageConfig.Images {
+			if err := validateImageSelector(shortName, imageConfig); err != nil {
+				return nil, err
+			}
 			var image string
 			if (imageConfig.ImageRegex != "" || imageConfig.ImageFamily != "") && imageConfig.Image == "" {
-				image, err = g.getGCEImage(imageConfig.ImageRegex, imageConfig.ImageFamily, imageConfig.Project)
+				image, err = g.getGCEImage(imageConfig.ImageRegex, imageConfig.ImageExcludeRegex, imageConfig.ImageFamily, imageConfig.Project)
 				if err != nil {
-					return nil, fmt.Errorf("Could not retrieve a image based on image regex %q and family %q: %v",
-						imageConfig.ImageRegex, imageConfig.ImageFamily, err)
+					return nil, fmt.Errorf("could not retrieve an image based on image regex %q, exclude regex %q, and family %q: %w",
+						imageConfig.ImageRegex, imageConfig.ImageExcludeRegex, imageConfig.ImageFamily, err)
 				}
 			} else {
 				image = imageConfig.Image
