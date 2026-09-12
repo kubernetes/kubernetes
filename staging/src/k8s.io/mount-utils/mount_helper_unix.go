@@ -103,10 +103,10 @@ func ParseMountInfo(filename string) ([]MountInfo, error) {
 	if err != nil {
 		return []MountInfo{}, err
 	}
-	contentStr := string(content)
-	infos := []MountInfo{}
+	lines := strings.Split(string(content), "\n")
+	infos := make([]MountInfo, 0, len(lines))
 
-	for _, line := range strings.Split(contentStr, "\n") {
+	for _, line := range lines {
 		if line == "" {
 			// the last split() item is empty string following the last \n
 			continue
