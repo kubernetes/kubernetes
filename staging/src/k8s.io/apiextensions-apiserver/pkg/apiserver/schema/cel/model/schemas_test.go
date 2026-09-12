@@ -819,3 +819,263 @@ func BenchmarkDeeplyNestedSchemaDeclType(b *testing.B) {
 		SchemaDeclType(benchmarkSchema, false)
 	}
 }
+
+func TestFoldAllOfBounds(t *testing.T) {
+	cases := []struct {
+		name   string
+		schema *schema.Structural
+		// want is the expected folded schema; nil means no folding is expected and the
+		// original schema pointer must be returned unchanged
+		want *schema.Structural
+	}{
+		{
+			name:   "no allOf",
+			schema: stringSchema(withMaxLength(10)),
+		},
+		{
+			name:   "allOf without max bounds",
+			schema: stringSchema(withAllOf(nestedVV(func(vv *schema.ValueValidation) { vv.MinLength = ptr.To[int64](5) }))),
+		},
+		{
+			name:   "maxLength from single allOf member",
+			schema: stringSchema(withAllOf(nestedMaxLength(10))),
+			want:   stringSchema(withAllOf(nestedMaxLength(10)), withMaxLength(10)),
+		},
+		{
+			name:   "tightest of multiple allOf maxLengths",
+			schema: stringSchema(withAllOf(nestedMaxLength(20), nestedMaxLength(10), nestedMaxLength(30))),
+			want:   stringSchema(withAllOf(nestedMaxLength(20), nestedMaxLength(10), nestedMaxLength(30)), withMaxLength(10)),
+		},
+		{
+			name: "maxLength nested in allOf inside allOf",
+			schema: stringSchema(withAllOf(nestedVV(func(vv *schema.ValueValidation) {
+				vv.AllOf = []schema.NestedValueValidation{*nestedMaxLength(5)}
+			}))),
+			want: stringSchema(withAllOf(nestedVV(func(vv *schema.ValueValidation) {
+				vv.AllOf = []schema.NestedValueValidation{*nestedMaxLength(5)}
+			})), withMaxLength(5)),
+		},
+		{
+			name:   "direct maxLength tighter than allOf",
+			schema: stringSchema(withAllOf(nestedMaxLength(20)), withMaxLength(10)),
+		},
+		{
+			name:   "allOf maxLength tighter than direct",
+			schema: stringSchema(withAllOf(nestedMaxLength(20)), withMaxLength(50)),
+			want:   stringSchema(withAllOf(nestedMaxLength(20)), withMaxLength(20)),
+		},
+		{
+			name: "maxLength in allOf not applied to array",
+			schema: &schema.Structural{
+				Generic: schema.Generic{Type: "array"},
+				Items:   stringSchema(),
+				ValueValidation: &schema.ValueValidation{
+					AllOf: []schema.NestedValueValidation{*nestedMaxLength(10)},
+				},
+			},
+		},
+		{
+			name: "maxItems from allOf member",
+			schema: &schema.Structural{
+				Generic: schema.Generic{Type: "array"},
+				Items:   stringSchema(),
+				ValueValidation: &schema.ValueValidation{
+					AllOf: []schema.NestedValueValidation{*nestedVV(func(vv *schema.ValueValidation) { vv.MaxItems = ptr.To[int64](5) })},
+				},
+			},
+			want: &schema.Structural{
+				Generic: schema.Generic{Type: "array"},
+				Items:   stringSchema(),
+				ValueValidation: &schema.ValueValidation{
+					MaxItems: ptr.To[int64](5),
+					AllOf:    []schema.NestedValueValidation{*nestedVV(func(vv *schema.ValueValidation) { vv.MaxItems = ptr.To[int64](5) })},
+				},
+			},
+		},
+		{
+			name: "maxProperties from allOf member",
+			schema: &schema.Structural{
+				Generic:              schema.Generic{Type: "object"},
+				AdditionalProperties: &schema.StructuralOrBool{Structural: stringSchema()},
+				ValueValidation: &schema.ValueValidation{
+					AllOf: []schema.NestedValueValidation{*nestedVV(func(vv *schema.ValueValidation) { vv.MaxProperties = ptr.To[int64](7) })},
+				},
+			},
+			want: &schema.Structural{
+				Generic:              schema.Generic{Type: "object"},
+				AdditionalProperties: &schema.StructuralOrBool{Structural: stringSchema()},
+				ValueValidation: &schema.ValueValidation{
+					MaxProperties: ptr.To[int64](7),
+					AllOf:         []schema.NestedValueValidation{*nestedVV(func(vv *schema.ValueValidation) { vv.MaxProperties = ptr.To[int64](7) })},
+				},
+			},
+		},
+		{
+			name: "maxLength from allOf member on int-or-string node",
+			schema: &schema.Structural{
+				Extensions: schema.Extensions{XIntOrString: true},
+				ValueValidation: &schema.ValueValidation{
+					AllOf: []schema.NestedValueValidation{*nestedMaxLength(10)},
+				},
+			},
+			want: &schema.Structural{
+				Extensions: schema.Extensions{XIntOrString: true},
+				ValueValidation: &schema.ValueValidation{
+					MaxLength: ptr.To[int64](10),
+					AllOf:     []schema.NestedValueValidation{*nestedMaxLength(10)},
+				},
+			},
+		},
+		{
+			name: "bound folded on nested property",
+			schema: &schema.Structural{
+				Generic: schema.Generic{Type: "object"},
+				Properties: map[string]schema.Structural{
+					"a": *stringSchema(withAllOf(nestedMaxLength(10))),
+					"b": *stringSchema(),
+				},
+			},
+			want: &schema.Structural{
+				Generic: schema.Generic{Type: "object"},
+				Properties: map[string]schema.Structural{
+					"a": *stringSchema(withAllOf(nestedMaxLength(10)), withMaxLength(10)),
+					"b": *stringSchema(),
+				},
+			},
+		},
+		{
+			name: "bound folded on array items",
+			schema: &schema.Structural{
+				Generic: schema.Generic{Type: "array"},
+				Items:   stringSchema(withAllOf(nestedMaxLength(10))),
+			},
+			want: &schema.Structural{
+				Generic: schema.Generic{Type: "array"},
+				Items:   stringSchema(withAllOf(nestedMaxLength(10)), withMaxLength(10)),
+			},
+		},
+		{
+			name: "bound folded on additionalProperties",
+			schema: &schema.Structural{
+				Generic:              schema.Generic{Type: "object"},
+				AdditionalProperties: &schema.StructuralOrBool{Structural: stringSchema(withAllOf(nestedMaxLength(10)))},
+			},
+			want: &schema.Structural{
+				Generic:              schema.Generic{Type: "object"},
+				AdditionalProperties: &schema.StructuralOrBool{Structural: stringSchema(withAllOf(nestedMaxLength(10)), withMaxLength(10))},
+			},
+		},
+		{
+			name: "descendant bounds inside allOf members are not folded",
+			schema: &schema.Structural{
+				Generic: schema.Generic{Type: "object"},
+				Properties: map[string]schema.Structural{
+					"a": *stringSchema(),
+				},
+				ValueValidation: &schema.ValueValidation{
+					AllOf: []schema.NestedValueValidation{
+						{Properties: map[string]schema.NestedValueValidation{"a": *nestedMaxLength(10)}},
+					},
+				},
+			},
+		},
+		{
+			name: "bounds inside anyOf and oneOf members are not folded",
+			schema: stringSchema(func(s *schema.Structural) {
+				s.ValueValidation = &schema.ValueValidation{
+					AnyOf: []schema.NestedValueValidation{*nestedMaxLength(10)},
+					OneOf: []schema.NestedValueValidation{*nestedMaxLength(20)},
+				}
+			}),
+		},
+		{
+			name: "bounds inside anyOf and oneOf members nested in allOf members are not folded",
+			schema: stringSchema(withAllOf(
+				nestedVV(func(vv *schema.ValueValidation) {
+					vv.AnyOf = []schema.NestedValueValidation{*nestedMaxLength(10)}
+				}),
+				nestedVV(func(vv *schema.ValueValidation) {
+					vv.OneOf = []schema.NestedValueValidation{*nestedMaxLength(20)}
+				}),
+			)),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			original := tc.schema.DeepCopy()
+			got := foldAllOfBounds(tc.schema)
+			if !reflect.DeepEqual(original, tc.schema) {
+				t.Errorf("input schema was mutated")
+			}
+			if tc.want == nil {
+				if got != tc.schema {
+					t.Errorf("expected the original schema pointer when no folding is needed, got a copy")
+				}
+				return
+			}
+			if got == tc.schema {
+				t.Errorf("expected a copy when folding is needed, got the original schema pointer")
+			}
+			if !reflect.DeepEqual(tc.want, got) {
+				t.Errorf("unexpected folded schema, want:\n%#v\ngot:\n%#v", tc.want, got)
+			}
+		})
+	}
+}
+
+// TestSchemaDeclTypeFoldsAllOfBounds verifies that bounds declared only inside allOf members
+// are reflected in DeclType.MaxElements, which drives CEL cost estimation.
+// See https://github.com/kubernetes/kubernetes/issues/134029.
+func TestSchemaDeclTypeFoldsAllOfBounds(t *testing.T) {
+	stringBounded := stringSchema(withAllOf(nestedMaxLength(10)))
+	if declType := SchemaDeclType(stringBounded, false); declType.MaxElements != 40 {
+		t.Errorf("expected MaxElements 40 (maxLength 10 in runes, 4 bytes per rune), got %d", declType.MaxElements)
+	}
+	intOrStringBounded := &schema.Structural{
+		Extensions: schema.Extensions{XIntOrString: true},
+		ValueValidation: &schema.ValueValidation{
+			AllOf: []schema.NestedValueValidation{*nestedMaxLength(10)},
+		},
+	}
+	if declType := SchemaDeclType(intOrStringBounded, false); declType.MaxElements != 40 {
+		t.Errorf("expected MaxElements 40 (maxLength 10 in runes, 4 bytes per rune), got %d", declType.MaxElements)
+	}
+}
+
+func stringSchema(opts ...func(*schema.Structural)) *schema.Structural {
+	result := &schema.Structural{Generic: schema.Generic{Type: "string"}}
+	for _, opt := range opts {
+		opt(result)
+	}
+	return result
+}
+
+func withMaxLength(maxLength int64) func(*schema.Structural) {
+	return func(s *schema.Structural) {
+		if s.ValueValidation == nil {
+			s.ValueValidation = &schema.ValueValidation{}
+		}
+		s.ValueValidation.MaxLength = new(maxLength)
+	}
+}
+
+func withAllOf(members ...*schema.NestedValueValidation) func(*schema.Structural) {
+	return func(s *schema.Structural) {
+		if s.ValueValidation == nil {
+			s.ValueValidation = &schema.ValueValidation{}
+		}
+		for _, member := range members {
+			s.ValueValidation.AllOf = append(s.ValueValidation.AllOf, *member)
+		}
+	}
+}
+
+func nestedMaxLength(maxLength int64) *schema.NestedValueValidation {
+	return nestedVV(func(vv *schema.ValueValidation) { vv.MaxLength = new(maxLength) })
+}
+
+func nestedVV(mutate func(*schema.ValueValidation)) *schema.NestedValueValidation {
+	result := &schema.NestedValueValidation{}
+	mutate(&result.ValueValidation)
+	return result
+}
