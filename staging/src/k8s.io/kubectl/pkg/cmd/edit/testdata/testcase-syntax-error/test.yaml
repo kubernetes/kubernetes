@@ -5,6 +5,8 @@ args:
 namespace: default
 expectedStdout:
 - "service/kubernetes edited"
+expectedStderr:
+- "The edited file had a syntax error:"
 expectedExitCode: 0
 steps:
 - type: request
