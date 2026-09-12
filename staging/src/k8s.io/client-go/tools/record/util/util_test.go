@@ -18,6 +18,7 @@ package util
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -26,14 +27,14 @@ import (
 func TestGenerateEventName(t *testing.T) {
 	timestamp := int64(105999103295324396)
 	testCases := []struct {
-		name     string
-		refName  string
-		expected string
+		name           string
+		refName        string
+		expectedPrefix string
 	}{
 		{
-			name:     "valid name",
-			refName:  "test-pod",
-			expected: "test-pod.178959f726d80ec",
+			name:           "valid name",
+			refName:        "test-pod",
+			expectedPrefix: "test-pod.178959f726d80ec.",
 		},
 		{
 			name:    "invalid name - too long",
@@ -62,11 +63,52 @@ func TestGenerateEventName(t *testing.T) {
 
 			}
 
-			if tc.expected != "" && (actual != tc.expected) {
-				t.Errorf("generateEventName(%s) returned %s expected %s", tc.refName, actual, tc.expected)
+			if tc.expectedPrefix != "" && !strings.HasPrefix(actual, tc.expectedPrefix) {
+				t.Errorf("generateEventName(%s) returned %s expected prefix %s", tc.refName, actual, tc.expectedPrefix)
 			}
 
 		})
 
+	}
+}
+
+// TestGenerateEventNameUniqueOnCollidingTimestamp guards against a regression
+// where two events for the same object, generated within the same timer tick
+// (e.g. on platforms with coarse timer resolution such as Windows), computed
+// to the same Event name and silently collided on the apiserver.
+// See https://github.com/kubernetes/kubernetes/issues/134993.
+func TestGenerateEventNameUniqueOnCollidingTimestamp(t *testing.T) {
+	timestamp := int64(105999103295324396)
+
+	first := GenerateEventName("test-pod", timestamp)
+	second := GenerateEventName("test-pod", timestamp)
+
+	if first == second {
+		t.Errorf("GenerateEventName produced the same name %q for two events sharing a timestamp", first)
+	}
+}
+
+// TestGenerateEventNameConcurrentUnique verifies GenerateEventName is safe to
+// call concurrently, which is the actual calling pattern from EventRecorder
+// implementations: controllers record events from arbitrary goroutines.
+func TestGenerateEventNameConcurrentUnique(t *testing.T) {
+	const n = 1000
+	names := make([]string, n)
+	var wg sync.WaitGroup
+	for i := range names {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			names[i] = GenerateEventName("test-pod", 105999103295324396)
+		}(i)
+	}
+	wg.Wait()
+
+	seen := make(map[string]bool, n)
+	for _, name := range names {
+		if seen[name] {
+			t.Fatalf("duplicate generated name %q under concurrent calls", name)
+		}
+		seen[name] = true
 	}
 }
