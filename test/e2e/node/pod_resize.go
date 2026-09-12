@@ -698,22 +698,15 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 	ginkgo.It("pod-resize-retry-deferred-test-1", func(ctx context.Context) {
 		// Deferred resize E2E test case #1 (2-Pod Scenario):
 		//     1. Assume Node CPU is divided into 10 "parts".
-		//     2. Create Pod A (5 parts) and Pod B (3 parts).
-		//     3. Verify remaining free CPU is < 3 parts (cannot fit Pod B's requested increase).
-		//     4. Resize Pod B to 6 parts. Verify the resize is deferred.
-		//     5. Resize Pod A down to 2 parts (frees up exactly 3 parts).
+		//     2. Create Pod A (7 parts) and Pod B (2 parts).
+		//     3. Verify remaining free CPU is < 5 parts (cannot fit Pod B's requested increase).
+		//     4. Resize Pod B to 7 parts. Verify the resize is deferred.
+		//     5. Resize Pod A down to 2 parts (frees up exactly 5 parts).
 		//     6. Verify Pod B's deferred resize has now completed successfully.
 
 		podClient := e2epod.NewPodClient(f)
-		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to get running nodes")
-		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
-		framework.Logf("Found %d schedulable nodes", len(nodes.Items))
-
 		ginkgo.By("Find node CPU resources available for allocation!")
-		node := nodes.Items[0]
-		nodeAllocatableCPU, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		node, nodeAllocatableCPU, nodeAvailableCPU := getBestNodeForResizeTest(ctx, f)
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), nodeAvailableCPU.MilliValue())
 
@@ -721,9 +714,9 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		onePartCPU := nodeAvailableCPU.MilliValue() / 10
 		framework.Logf("Node '%s' currently available MilliCPUs = %dm (1 part = %dm)", node.Name, nodeAvailableCPU.MilliValue(), onePartCPU)
 
-		// Pod A: 5 parts, Pod B: 3 parts
-		podACPU := resource.NewMilliQuantity(onePartCPU*5, resource.DecimalSI)
-		podBCPU := resource.NewMilliQuantity(onePartCPU*3, resource.DecimalSI)
+		// Pod A: 7 parts, Pod B: 2 parts
+		podACPU := resource.NewMilliQuantity(onePartCPU*7, resource.DecimalSI)
+		podBCPU := resource.NewMilliQuantity(onePartCPU*2, resource.DecimalSI)
 
 		framework.Logf("Pod A initial CPU request is '%dm'", podACPU.MilliValue())
 		framework.Logf("Pod B initial CPU request is '%dm'", podBCPU.MilliValue())
@@ -755,19 +748,19 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		gomega.Expect(podB.Status.Phase).To(gomega.Equal(v1.PodRunning))
 		gomega.Expect(podB.Generation).To(gomega.BeEquivalentTo(1))
 
-		ginkgo.By("Verify remaining CPU is less than the 3 parts required for Pod B's resize")
+		ginkgo.By("Verify remaining CPU is less than the 5 parts required for Pod B's resize")
 		_, nodeAvailableCPU2, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
 		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
 
-		threePartsCPU := onePartCPU * 3
-		framework.Logf("Remaining CPU = %dm. Pod B needs %dm more to resize.", nodeAvailableCPU2.MilliValue(), threePartsCPU)
-		gomega.Expect(nodeAvailableCPU2.MilliValue()).To(gomega.BeNumerically("<", threePartsCPU),
-			"Available CPU should be strictly less than 3 parts to ensure Pod B's resize is deferred")
+		fivePartsCPU := onePartCPU * 5
+		framework.Logf("Remaining CPU = %dm. Pod B needs %dm more to resize.", nodeAvailableCPU2.MilliValue(), fivePartsCPU)
+		gomega.Expect(nodeAvailableCPU2.MilliValue()).To(gomega.BeNumerically("<", fivePartsCPU),
+			"Available CPU should be strictly less than 5 parts to ensure Pod B's resize is deferred")
 
 		// Calculations for Resizing
-		// Pod B: Resize to 6 parts (needs 3 more parts)
-		podBResizedCPU := resource.NewMilliQuantity(onePartCPU*6, resource.DecimalSI)
-		// Pod A: Resize to 2 parts (drops 3 parts, freeing them up)
+		// Pod B: Resize to 7 parts (needs 5 more parts)
+		podBResizedCPU := resource.NewMilliQuantity(onePartCPU*7, resource.DecimalSI)
+		// Pod A: Resize to 2 parts (drops 5 parts, freeing them up)
 		podAResizedCPU := resource.NewMilliQuantity(onePartCPU*2, resource.DecimalSI)
 
 		patchPodBToDeferred := fmt.Sprintf(`{
@@ -792,13 +785,13 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
         	}
     	}`, podAResizedCPU.MilliValue(), podAResizedCPU.MilliValue())
 
-		ginkgo.By(fmt.Sprintf("Resize Pod B '%s' to 6 parts (will be deferred due to insufficient CPU)", podB.Name))
+		ginkgo.By(fmt.Sprintf("Resize Pod B '%s' to 7 parts (will be deferred due to insufficient CPU)", podB.Name))
 		podB, err = f.ClientSet.CoreV1().Pods(podB.Namespace).Patch(ctx,
 			podB.Name, types.StrategicMergePatchType, []byte(patchPodBToDeferred), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(err, "failed to patch Pod B for resize")
 		waitForPodDeferred(ctx, f, podB)
 
-		ginkgo.By(fmt.Sprintf("Resize Pod A '%s' down to 2 parts, freeing up exactly 3 parts for Pod B", podA.Name))
+		ginkgo.By(fmt.Sprintf("Resize Pod A '%s' down to 2 parts, freeing up exactly 5 parts for Pod B", podA.Name))
 		podA, err = f.ClientSet.CoreV1().Pods(podA.Namespace).Patch(ctx,
 			podA.Name, types.StrategicMergePatchType, []byte(patchPodAToMakeSpace), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(err, "failed to patch Pod A to free up space")
@@ -820,28 +813,24 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 
 	ginkgo.It("pod-resize-retry-deferred-test-2", func(ctx context.Context) {
 		// Deferred resize E2E test case #2:
-		//	   1. Create 5 pods on the node, where the first one has 2/3 of the node allocatable CPU,
-		//        and the remaining ones each have 1/16 of the node allocatable CPU.
-		//     2. Resize all remaining pods to request 2/3 of the node allocatable CPU, verify deferred.
+		//	   1. Create 5 pods on the node, where the first one has 15/20 of the available node CPU,
+		//        and the remaining ones each have 1/20 of the available node CPU.
+		//     2. Resize all remaining pods to request 15/20 of the available node CPU, verify deferred.
 		//     3. Delete the first pod, verify the pod with the highest priority has its resize accepted.
 		//     4. Repeat step 3 until all but the last pod has been deleted.
 
 		podClient := e2epod.NewPodClient(f)
-		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to get running nodes")
-		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
-		framework.Logf("Found %d schedulable nodes", len(nodes.Items))
-
 		ginkgo.By("Find node CPU and memory resources available for allocation!")
-		node := nodes.Items[0]
-
-		nodeAllocatableCPU, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		node, nodeAllocatableCPU, nodeAvailableCPU := getBestNodeForResizeTest(ctx, f)
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), nodeAvailableCPU.MilliValue())
 
-		majorityCPUQuantity := resource.NewMilliQuantity(2*nodeAvailableCPU.MilliValue()/3, resource.DecimalSI)
-		littleCPUQuantity := resource.NewMilliQuantity(nodeAvailableCPU.MilliValue()/16, resource.DecimalSI)
+		// Divide the available CPU into 20 parts:
+		// Pod 1 starts with 15 parts, Pods 2-5 start with 1 part each (19 parts total).
+		// When Pods 2-5 are resized to 15 parts, total requested becomes 33 parts (> 20 parts, deferred).
+		onePartCPU := nodeAvailableCPU.MilliValue() / 20
+		littleCPUQuantity := resource.NewMilliQuantity(onePartCPU, resource.DecimalSI)
+		majorityCPUQuantity := resource.NewMilliQuantity(onePartCPU*15, resource.DecimalSI)
 		containerWithMajorityCPU := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c",
@@ -871,11 +860,11 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
 		e2epod.SetNodeAffinity(&testPod1.Spec, node.Name)
 
-		ginkgo.By(fmt.Sprintf("Create pod '%s' with 2/3 of the node cpu", testPod1.Name))
+		ginkgo.By(fmt.Sprintf("Create pod '%s' with 15/20 of the available node cpu", testPod1.Name))
 		testPod1 = podClient.CreateSync(ctx, testPod1)
 		gomega.Expect(testPod1.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
-		// Create pod2 with 1/16 of the node allocatable CPU, with high priority based on priority class.
+		// Create pod2 with 1/20 of the available node CPU, with high priority based on priority class.
 		testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, containerWithLittleCPU, nil)
 		testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
 		pc, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{
@@ -892,34 +881,34 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		testPod2.Spec.PriorityClassName = pc.Name
 		e2epod.SetNodeAffinity(&testPod2.Spec, node.Name)
 
-		ginkgo.By(fmt.Sprintf("Create pod '%s' with 1/16 of the node cpu and high priority class", testPod2.Name))
+		ginkgo.By(fmt.Sprintf("Create pod '%s' with 1/20 of the available node cpu and high priority class", testPod2.Name))
 		testPod2 = podClient.CreateSync(ctx, testPod2)
 		gomega.Expect(testPod2.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
-		// Create pod3 with 1/16 of the node allocatable CPU, that is a "guaranteed" pod (all others should be "burstable").
+		// Create pod3 with 1/20 of the available node CPU, that is a "guaranteed" pod (all others should be "burstable").
 		testPod3 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod3", tStamp, containerWithLittleCPUGuaranteedQoS, nil)
 		testPod3 = e2epod.MustMixinRestrictedPodSecurity(testPod3)
 		e2epod.SetNodeAffinity(&testPod3.Spec, node.Name)
 
-		ginkgo.By(fmt.Sprintf("Create pod '%s' with 1/16 of the node cpu and guaranteed qos", testPod3.Name))
+		ginkgo.By(fmt.Sprintf("Create pod '%s' with 1/20 of the available node cpu and guaranteed qos", testPod3.Name))
 		testPod3 = podClient.CreateSync(ctx, testPod3)
 		gomega.Expect(testPod3.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
-		// Create pod4 with 1/16 of the node allocatable CPU.
+		// Create pod4 with 1/20 of the available node CPU.
 		testPod4 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod4", tStamp, containerWithLittleCPU, nil)
 		testPod4 = e2epod.MustMixinRestrictedPodSecurity(testPod4)
 		e2epod.SetNodeAffinity(&testPod4.Spec, node.Name)
 
-		ginkgo.By(fmt.Sprintf("Create pod '%s' with 1/16 of the node cpu", testPod4.Name))
+		ginkgo.By(fmt.Sprintf("Create pod '%s' with 1/20 of the available node cpu", testPod4.Name))
 		testPod4 = podClient.CreateSync(ctx, testPod4)
 		gomega.Expect(testPod4.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
-		// Create pod5 with 1/16 of the node allocatable CPU.
+		// Create pod5 with 1/20 of the available node CPU.
 		testPod5 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod5", tStamp, containerWithLittleCPU, nil)
 		testPod5 = e2epod.MustMixinRestrictedPodSecurity(testPod5)
 		e2epod.SetNodeAffinity(&testPod5.Spec, node.Name)
 
-		ginkgo.By(fmt.Sprintf("Create pod '%s' with 1/16 of the node cpu", testPod5.Name))
+		ginkgo.By(fmt.Sprintf("Create pod '%s' with 1/20 of the available node cpu", testPod5.Name))
 		testPod5 = podClient.CreateSync(ctx, testPod5)
 		gomega.Expect(testPod5.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
@@ -937,29 +926,31 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		// Resize requests are done in an arbitrary order, to verify that the priority based on priority class
 		// or qos class takes precedent over the order of the requests.
 
-		// Attempt pod4 resize request to 2/3 of the node allocatable CPU, verify deferred.
-		ginkgo.By(fmt.Sprintf("Resize pod '%s'", testPod4.Name))
+		// Attempt pod4 resize request to 15/20 of the available node CPU, verify deferred.
+		ginkgo.By(fmt.Sprintf("Resize pod '%s' to 15/20 of the available node cpu", testPod4.Name))
 		testPod4, err = f.ClientSet.CoreV1().Pods(testPod4.Namespace).Patch(ctx,
 			testPod4.Name, types.StrategicMergePatchType, []byte(patchTestPod), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(err, "failed to patch pod for resize")
 		waitForPodDeferred(ctx, f, testPod4)
 
-		// Attempt pod3 resize request to 2/3 of the node allocatable CPU, verify deferred.
-		ginkgo.By(fmt.Sprintf("Resize pod '%s'", testPod3.Name))
+		// Attempt pod3 resize request to 15/20 of the available node CPU, verify deferred.
+		ginkgo.By(fmt.Sprintf("Resize pod '%s' to 15/20 of the available node cpu", testPod3.Name))
 		testPod3, err = f.ClientSet.CoreV1().Pods(testPod3.Namespace).Patch(ctx,
 			testPod3.Name, types.StrategicMergePatchType, []byte(patchTestPod), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(err, "failed to patch pod for resize")
 		waitForPodDeferred(ctx, f, testPod3)
 
-		// Attempt pod2 resize request to 2/3 of the node allocatable CPU, verify deferred.
-		ginkgo.By(fmt.Sprintf("Resize pod '%s'", testPod2.Name))
+		// Attempt pod2 resize request to 15/20 of the available node CPU, verify deferred.
+		ginkgo.By(fmt.Sprintf("Resize pod '%s' to 15/20 of the available node cpu", testPod2.Name))
 		testPod2, err = f.ClientSet.CoreV1().Pods(testPod2.Namespace).Patch(ctx,
 			testPod2.Name, types.StrategicMergePatchType, []byte(patchTestPod), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(err, "failed to patch pod for resize")
 		waitForPodDeferred(ctx, f, testPod2)
 
-		// Attempt pod5 resize request to 2/3 of the node allocatable CPU, verify deferred.
-		ginkgo.By(fmt.Sprintf("Resize pod '%s'", testPod5.Name))
+		time.Sleep(1 * time.Second) // sleep to ensure testPod5's LastTransitionTime is later than testPod4's.
+
+		// Attempt pod5 resize request to 15/20 of the available node CPU, verify deferred.
+		ginkgo.By(fmt.Sprintf("Resize pod '%s' to 15/20 of the available node cpu", testPod5.Name))
 		testPod5, err = f.ClientSet.CoreV1().Pods(testPod5.Namespace).Patch(ctx,
 			testPod5.Name, types.StrategicMergePatchType, []byte(patchTestPod), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(err, "failed to patch pod for resize")
@@ -1054,21 +1045,13 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		//     6. Delete pod1, verify the chain of deferred resizes is actuated.
 
 		podClient := e2epod.NewPodClient(f)
-		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to get running nodes")
-		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
-		framework.Logf("Found %d schedulable nodes", len(nodes.Items))
-
 		ginkgo.By("Find node CPU and memory resources available for allocation!")
-		node := nodes.Items[0]
-
-		nodeAllocatableCPU, initNodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		node, nodeAllocatableCPU, initNodeAvailableCPU := getBestNodeForResizeTest(ctx, f)
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), initNodeAvailableCPU.MilliValue())
 
 		nodeAllocatableMem, initNodeAvailableMem, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceMemory)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		framework.ExpectNoError(err, "failed to get Memory resources available for allocation")
 		framework.Logf("Node '%s': NodeAllocatable Memory = %d. Memory currently available to allocate = %d.",
 			node.Name, nodeAllocatableMem.Value(), initNodeAvailableMem.Value())
 
@@ -1423,6 +1406,34 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 		}
 		return quota.Status.Used, nil
 	})).WithTimeout(framework.PollShortTimeout).ShouldNot(gomega.BeEmpty())
+}
+
+// getBestNodeForResizeTest finds and returns the schedulable node with the most available CPU
+// capacity, along with its allocatable and available CPU quantities.
+func getBestNodeForResizeTest(ctx context.Context, f *framework.Framework) (v1.Node, resource.Quantity, resource.Quantity) {
+	nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+	framework.ExpectNoError(err, "failed to get running nodes")
+	gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
+
+	var bestNode v1.Node
+	var bestAllocatable, bestAvailable resource.Quantity
+	found := false
+
+	for i := range nodes.Items {
+		n := nodes.Items[i]
+		allocatable, available, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &n, v1.ResourceCPU)
+		if err != nil {
+			continue
+		}
+		if !found || available.Cmp(bestAvailable) > 0 {
+			bestNode = n
+			bestAllocatable = allocatable
+			bestAvailable = available
+			found = true
+		}
+	}
+	gomega.Expect(found).To(gomega.BeTrue(), "failed to find any schedulable node with available resources")
+	return bestNode, bestAllocatable, bestAvailable
 }
 
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
