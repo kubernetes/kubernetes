@@ -524,6 +524,20 @@ func SetDefaults_PodLogOptions(obj *v1.PodLogOptions) {
 // while maintaining compatibility with the container-level specifications, as detailed
 // in KEP-2837: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#proposed-validation--defaulting-rules
 // TODO(ndixita): Remove defaultPodRequests once PodLevelResourcesFixDefaulting feature gate is GA.
+// hasAccountablePodLevelResource returns true if the pod-level requirements
+// contain at least one supported resource that participates in requests
+// accounting (i.e. is not limit-only, like pids).
+func hasAccountablePodLevelResource(resources *v1.ResourceRequirements) bool {
+	for _, resourceList := range []v1.ResourceList{resources.Requests, resources.Limits} {
+		for key := range resourceList {
+			if resourcehelper.IsSupportedPodLevelResource(key) && !resourcehelper.IsLimitOnlyPodLevelResource(key) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func defaultPodRequests(obj *v1.Pod) {
 	// We only populate defaults when the pod-level resources are partly specified already.
 	if obj.Spec.Resources == nil {
@@ -531,6 +545,14 @@ func defaultPodRequests(obj *v1.Pod) {
 	}
 
 	if len(obj.Spec.Resources.Limits) == 0 {
+		return
+	}
+
+	// Only default pod-level requests when the pod specifies at least one
+	// pod-level resource that participates in requests accounting. Limit-only
+	// resources (e.g. pids) must not trigger materialization of pod-level
+	// cpu/memory requests from container aggregates.
+	if !hasAccountablePodLevelResource(obj.Spec.Resources) {
 		return
 	}
 
@@ -558,7 +580,7 @@ func defaultPodRequests(obj *v1.Pod) {
 	// Defaulting for pod level hugepages requests is dependent on defaultHugePagePodLimits,
 	// if defaultHugePagePodLimits defined the limit, the request will be set here.
 	for key, podLim := range obj.Spec.Resources.Limits {
-		if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
+		if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && !resourcehelper.IsLimitOnlyPodLevelResource(key) {
 			podReqs[key] = podLim.DeepCopy()
 		}
 	}
@@ -585,6 +607,16 @@ func defaultHugePagePodLimits(pod *v1.Pod) {
 	}
 
 	if len(pod.Spec.Resources.Limits) == 0 && len(pod.Spec.Resources.Requests) == 0 {
+		return
+	}
+
+	// Only default pod-level hugepage limits when the pod specifies at least
+	// one pod-level resource that participates in requests accounting. A pod
+	// whose only pod-level entry is a limit-only resource (e.g. pids) has not
+	// opted into pod-level cpu/memory/hugepages semantics, and materializing
+	// hugepage limits for it would make an otherwise-valid pod fail the
+	// "HugePages require cpu or memory" validation.
+	if !hasAccountablePodLevelResource(pod.Spec.Resources) {
 		return
 	}
 
