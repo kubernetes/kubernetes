@@ -293,13 +293,40 @@ var _ = SIGDescribe("LocalStorageEviction", framework.WithSlow(), framework.With
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): evictionThreshold}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
+		emptyDirDiskHog := diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{})
+		expectedContainerUsage := resource.MustParse("1Gi")
+		emptyDirDiskHogContainerName := emptyDirDiskHog.Spec.Containers[0].Name
 
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1,
 				// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
 				// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
-				pod: diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
+				pod: emptyDirDiskHog,
+				verifyEvictionEvent: func(event *v1.Event) {
+					offendingContainers, found := event.Annotations[eviction.OffendingContainersKey]
+					if !found {
+						framework.Failf("Expected eviction event for pod %s to include annotation %s", emptyDirDiskHog.Name, eviction.OffendingContainersKey)
+					}
+					gomega.Expect(strings.Split(offendingContainers, ",")).To(gomega.ContainElement(emptyDirDiskHogContainerName),
+						"Expected %s annotation for pod %s to include container %s", eviction.OffendingContainersKey, emptyDirDiskHog.Name, emptyDirDiskHogContainerName)
+
+					usageString, found := event.Annotations[eviction.OffendingContainersUsageKey]
+					if !found {
+						framework.Failf("Expected eviction event for pod %s to include annotation %s", emptyDirDiskHog.Name, eviction.OffendingContainersUsageKey)
+					}
+					usageQuantities := strings.Split(usageString, ",")
+					gomega.Expect(usageQuantities).ToNot(gomega.BeEmpty(), "Expected %s annotation for pod %s to contain at least one quantity",
+						eviction.OffendingContainersUsageKey, emptyDirDiskHog.Name)
+					usageQuantity, err := resource.ParseQuantity(usageQuantities[0])
+					framework.ExpectNoError(err, "parsing pod %s's %s annotation as a quantity", emptyDirDiskHog.Name, eviction.OffendingContainersUsageKey)
+					gomega.Expect(usageQuantity.Cmp(expectedContainerUsage)).To(gomega.BeNumerically(">=", 0),
+						"Expected container ephemeral storage usage recorded in the eviction event for pod %s to be at least %s, but got %s instead",
+						emptyDirDiskHog.Name, expectedContainerUsage.String(), usageQuantity.String())
+					gomega.Expect(event.Message).To(gomega.ContainSubstring(
+						fmt.Sprintf("Container %s was using %s, request is 0, has larger consumption of %s.", emptyDirDiskHogContainerName, usageQuantity.String(), v1.ResourceEphemeralStorage),
+					), "Expected eviction message for pod %s to include the container-level ephemeral storage usage from the emptyDir volume", emptyDirDiskHog.Name)
+				},
 			},
 			{
 				evictionPriority: 0,
@@ -753,6 +780,7 @@ type podEvictSpec struct {
 
 	// Can be used in order to alter pod using runtime data
 	prePodCreationModificationFunc func(ctx context.Context, pod *v1.Pod)
+	verifyEvictionEvent            func(event *v1.Event)
 }
 
 // runEvictionTest sets up a testing environment given the provided pods, and checks a few things:
@@ -1082,6 +1110,9 @@ func verifyEvictionEvents(ctx context.Context, f *framework.Framework, testSpecs
 					gomega.Expect(usageQuantity.Cmp(request)).To(gomega.Equal(1), "Expected usage of offending container: %s in pod %s to exceed its request %s",
 						usageQuantity.String(), pod.Name, request.String())
 				}
+			}
+			if spec.verifyEvictionEvent != nil {
+				spec.verifyEvictionEvent(&event)
 			}
 		}
 	}
