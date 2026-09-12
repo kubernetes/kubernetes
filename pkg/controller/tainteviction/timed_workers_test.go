@@ -150,3 +150,87 @@ func TestCancelAndRead(t *testing.T) {
 		t.Errorf("Expected testVal = 4, got %v", lastVal)
 	}
 }
+
+func TestRunningWorkerCompletionDoesNotRemoveReplacement(t *testing.T) {
+	testCases := []struct {
+		name                  string
+		startFirstWorker      func(context.Context, *TimedWorkerQueue, *testingclock.FakeClock, time.Time, *WorkArgs)
+		expectCancelToSucceed bool
+	}{
+		{
+			name: "immediate worker",
+			startFirstWorker: func(ctx context.Context, queue *TimedWorkerQueue, fakeClock *testingclock.FakeClock, now time.Time, args *WorkArgs) {
+				queue.AddWork(ctx, args, now, now)
+			},
+			expectCancelToSucceed: false,
+		},
+		{
+			name: "scheduled worker already firing",
+			startFirstWorker: func(ctx context.Context, queue *TimedWorkerQueue, fakeClock *testingclock.FakeClock, now time.Time, args *WorkArgs) {
+				queue.AddWork(ctx, args, now, now.Add(time.Second))
+				fakeClock.Step(time.Second)
+			},
+			expectCancelToSucceed: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			now := time.Now()
+			fakeClock := testingclock.NewFakeClock(now)
+			started := make(chan struct{})
+			release := make(chan struct{})
+			startOnce := sync.Once{}
+
+			queue := CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
+				startOnce.Do(func() {
+					close(started)
+				})
+				<-release
+				return nil
+			})
+			queue.clock = fakeClock
+
+			args := NewWorkArgs("pod", "namespace")
+			key := args.KeyFromWorkArgs()
+			tc.startFirstWorker(ctx, queue, fakeClock, now, args)
+			select {
+			case <-started:
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed worker did not start")
+			}
+
+			if got := queue.CancelWork(logger, key); got != tc.expectCancelToSucceed {
+				t.Fatalf("CancelWork() = %v, want %v", got, tc.expectCancelToSucceed)
+			}
+
+			replacementFireAt := now.Add(10 * time.Second)
+			queue.AddWork(ctx, NewWorkArgs("pod", "namespace"), now.Add(2*time.Second), replacementFireAt)
+			replacement := queue.GetWorkerUnsafe(key)
+			if replacement == nil {
+				t.Fatal("replacement worker was not added")
+			}
+			if replacement.FireAt != replacementFireAt {
+				t.Fatalf("replacement worker FireAt = %v, want %v", replacement.FireAt, replacementFireAt)
+			}
+
+			close(release)
+			queue.workerWG.Wait()
+
+			replacement = queue.GetWorkerUnsafe(key)
+			if replacement == nil {
+				t.Fatal("running worker removed replacement worker on completion")
+			}
+			if replacement.FireAt != replacementFireAt {
+				t.Fatalf("replacement worker FireAt after stale completion = %v, want %v", replacement.FireAt, replacementFireAt)
+			}
+			if !queue.CancelWork(logger, key) {
+				t.Fatal("replacement worker was not cancellable after stale worker completed")
+			}
+			if got := queue.GetWorkerUnsafe(key); got != nil {
+				t.Fatalf("worker still present after cancellation: %#v", got)
+			}
+		})
+	}
+}
