@@ -43,6 +43,16 @@ func tweakPodSpec(podTweaks ...podtest.Tweak) func(*apps.ReplicaSet) {
 	}
 }
 
+func tweakSelectorLabels(labels map[string]string) func(obj *apps.ReplicaSet) {
+	return func(obj *apps.ReplicaSet) {
+		if labels == nil {
+			obj.Spec.Selector = nil
+			return
+		}
+		obj.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
+	}
+}
+
 func mkReplicaSet(tweaks ...func(*apps.ReplicaSet)) *apps.ReplicaSet {
 	rs := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -85,6 +95,13 @@ func TestDeclarativeValidate(t *testing.T) {
 					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				},
 			},
+			"selector required": {
+				input: mkReplicaSet(tweakSelectorLabels(nil)),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("spec").Child("selector"), "").MarkAlpha(),
+					field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
+				},
+			},
 		}
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
@@ -112,5 +129,42 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		meta.RunObjectMetaUpdateTestCases(t, ctx, mkReplicaSet(), registry.Strategy,
 			meta.WithStringentFinalizerValidation(),
 		)
+
+		testCases := map[string]struct {
+			oldObj       *apps.ReplicaSet
+			updateObj    *apps.ReplicaSet
+			expectedErrs field.ErrorList
+		}{
+			"selector changed": {
+				oldObj:    mkReplicaSet(),
+				updateObj: mkReplicaSet(tweakSelectorLabels(map[string]string{"name": "xyz"})),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+			"selector set from unset": {
+				oldObj:    mkReplicaSet(tweakSelectorLabels(nil)),
+				updateObj: mkReplicaSet(),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+			"selector unset from set": {
+				oldObj:    mkReplicaSet(),
+				updateObj: mkReplicaSet(tweakSelectorLabels(map[string]string{})),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec").Child("selector"), nil, "").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+		}
+		for k, tc := range testCases {
+			t.Run(k, func(t *testing.T) {
+				tc.oldObj.ResourceVersion = "1"
+				tc.updateObj.ResourceVersion = "2"
+				apitesting.VerifyUpdateValidationEquivalence(t, ctx, tc.updateObj, tc.oldObj, registry.Strategy, tc.expectedErrs)
+			})
+		}
 	}
 }
