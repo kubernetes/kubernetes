@@ -155,6 +155,9 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 			}
 			return nil, &httpstream.UpgradeFailureError{Cause: cause}
 		}
+		if resp != nil {
+			resp.Body.Close()
+		}
 		return nil, err
 	}
 
