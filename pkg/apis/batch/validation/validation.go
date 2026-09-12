@@ -887,9 +887,7 @@ func ValidateCronJobUpdate(job, oldJob *batch.CronJob, opts apivalidation.PodVal
 func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(spec.Schedule) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), "").MarkCoveredByDeclarative())
-	} else {
+	if len(spec.Schedule) != 0 {
 		allowTZInSchedule := false
 		if oldSpec != nil {
 			allowTZInSchedule = strings.Contains(oldSpec.Schedule, "TZ")
