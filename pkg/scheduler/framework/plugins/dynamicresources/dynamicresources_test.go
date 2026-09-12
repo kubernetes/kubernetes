@@ -5020,6 +5020,21 @@ func testIsSchedulableAfterTargetPodUpdate(tCtx ktesting.TContext) {
 			obj:      podWithClaimTemplateInStatus,
 			wantHint: fwk.QueueSkip,
 		},
+		"different-pod": {
+			// The update is for a different pod (different UID) than the one
+			// being evaluated. A pod's own generated-claim status update must
+			// not requeue other pods, otherwise a single pod update triggers a
+			// thundering herd across all DRA-rejected pods.
+			objs: []apiruntime.Object{pendingClaim},
+			pod: func() *v1.Pod {
+				pod := podWithClaimTemplate.DeepCopy()
+				pod.Name = "other-pod"
+				pod.UID = types.UID(podUID + "-other")
+				return pod
+			}(),
+			obj:      podWithClaimTemplateInStatus,
+			wantHint: fwk.QueueSkip,
+		},
 		"incomplete": {
 			objs: []apiruntime.Object{pendingClaim},
 			pod:  podWithTwoClaimTemplates,
@@ -6205,24 +6220,6 @@ func TestPreQueueingHint(t *testing.T) {
 			},
 			wantKeys: sets.New[string](), // no pod in indexer
 		},
-		"shared claim returns nil": {
-			newObj: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "shared-claim",
-					Namespace: "ns1",
-				},
-			},
-			wantKeys: sets.New[string](), // no pod in indexer
-		},
-		"claim with no matching pods returns empty set": {
-			newObj: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim-2",
-					Namespace: "ns1",
-				},
-			},
-			wantKeys: sets.New[string](), // no pod in indexer
-		},
 		"delete event uses oldObj": {
 			oldObj: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -6273,7 +6270,7 @@ func TestPreQueueingHint(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			logger := klog.Background()
+			logger := ktesting.Init(t).Logger()
 			pl := &DynamicResources{podIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc}), podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
 			got, err := pl.preQueueingHint(logger, tc.oldObj, tc.newObj)
 			if err != nil {
@@ -6307,7 +6304,7 @@ func TestPreQueueingHint(t *testing.T) {
 func TestPreQueueingHint_WithPodInIndexer(t *testing.T) {
 	// Verify that when a pod referencing a claim exists in the indexer,
 	// preQueueingHint returns that pod's key.
-	logger := klog.Background()
+	logger := ktesting.Init(t).Logger()
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
 
 	// Add a pod that references "claim-x" in namespace "ns1".
@@ -6342,7 +6339,7 @@ func TestPreQueueingHint_WithPodInIndexer(t *testing.T) {
 func TestPreQueueingHint_SharedClaimMultiplePods(t *testing.T) {
 	// Verify that for a shared claim referenced by multiple pods,
 	// preQueueingHint returns all referencing pods.
-	logger := klog.Background()
+	logger := ktesting.Init(t).Logger()
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
 
 	// Add multiple pods referencing the same shared claim.
@@ -6374,4 +6371,80 @@ func TestPreQueueingHint_SharedClaimMultiplePods(t *testing.T) {
 	if len(got.Pods) != 3 {
 		t.Errorf("expected 3 pods, got %d: %v", len(got.Pods), got.Pods)
 	}
+}
+
+// TestPreQueueingHint_DuplicateClaimRefs verifies that when a pod references the
+// same claim more than once, podResourceClaimIndexFunc returns duplicate keys (it
+// intentionally does not de-duplicate), yet the indexer and preQueueingHint still
+// return the pod exactly once.
+func TestPreQueueingHint_DuplicateClaimRefs(t *testing.T) {
+	logger := ktesting.Init(t).Logger()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
+
+	// Two pod claims referencing the same shared ResourceClaim.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "ns1"},
+		Spec: v1.PodSpec{
+			ResourceClaims: []v1.PodResourceClaim{
+				{Name: "a", ResourceClaimName: new("shared-claim")},
+				{Name: "b", ResourceClaimName: new("shared-claim")},
+			},
+		},
+	}
+	if err := indexer.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+
+	// The index function returns duplicate keys (de-dup intentionally removed).
+	keys, err := podResourceClaimIndexFunc(pod)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(keys) != 2 {
+		t.Errorf("expected 2 (duplicate) index keys, got %v", keys)
+	}
+
+	pl := &DynamicResources{podIndexer: indexer, podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
+	got, err := pl.preQueueingHint(logger, nil, &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "shared-claim", Namespace: "ns1"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.AllPods {
+		t.Fatal("expected AllPods=false, got true")
+	}
+	// Despite the duplicate index keys, the pod is returned exactly once.
+	if len(got.Pods) != 1 || got.Pods[0].Name != "my-pod" || got.Pods[0].Namespace != "ns1" {
+		t.Errorf("expected exactly [{my-pod ns1}], got %v", got.Pods)
+	}
+}
+
+func TestPreQueueingHintForPodUpdate(t *testing.T) {
+	logger := ktesting.Init(t).Logger()
+	pl := &DynamicResources{}
+
+	t.Run("narrows to the updated pod", func(t *testing.T) {
+		pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "ns1"}}
+		got, err := pl.preQueueingHintForPodUpdate(logger, nil, pod)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.AllPods {
+			t.Fatal("expected AllPods=false, got true")
+		}
+		if len(got.Pods) != 1 || got.Pods[0].Name != "my-pod" || got.Pods[0].Namespace != "ns1" {
+			t.Errorf("expected [{my-pod ns1}], got %v", got.Pods)
+		}
+	})
+
+	t.Run("falls back to AllPods on unexpected object", func(t *testing.T) {
+		got, err := pl.preQueueingHintForPodUpdate(logger, nil, "not-a-pod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !got.AllPods {
+			t.Errorf("expected AllPods=true for unexpected object, got %+v", got)
+		}
+	})
 }
