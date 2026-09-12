@@ -252,10 +252,7 @@ var formatLibraryDecls = map[string][]cel.FunctionOpt{
 	},
 	"format.named": {
 		cel.Overload("format-named", []*cel.Type{cel.StringType}, cel.OptionalType(apiservercel.FormatType), cel.UnaryBinding(func(name ref.Val) ref.Val {
-			nameString, ok := name.Value().(string)
-			if !ok {
-				return types.MaybeNoSuchOverloadErr(name)
-			}
+			nameString := name.Value().(string)
 
 			f, ok := ConstantFormats[nameString]
 			if !ok {
@@ -267,15 +264,8 @@ var formatLibraryDecls = map[string][]cel.FunctionOpt{
 }
 
 func formatValidate(arg1, arg2 ref.Val) ref.Val {
-	f, ok := arg1.Value().(apiservercel.Format)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	str, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg2)
-	}
+	f := arg1.Value().(apiservercel.Format)
+	str := arg2.Value().(string)
 
 	res := f.ValidateFunc(str)
 	if len(res) == 0 {
