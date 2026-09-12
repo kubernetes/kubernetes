@@ -60,6 +60,7 @@ var (
 	ErrObjectName = errors.New("cannot determine object name")
 )
 
+// WrongTypeError is returned when an object in the cache cannot be converted to the expected type.
 type WrongTypeError struct {
 	TypeName string
 	Object   interface{}
@@ -73,6 +74,7 @@ func (e WrongTypeError) Is(err error) bool {
 	return err == ErrWrongType
 }
 
+// NotFoundError is returned when an object cannot be found in the cache.
 type NotFoundError struct {
 	TypeName  string
 	ObjectKey string
@@ -86,6 +88,7 @@ func (e NotFoundError) Is(err error) bool {
 	return err == ErrNotFound
 }
 
+// ObjectNameError is returned when the name of an object cannot be determined.
 type ObjectNameError struct {
 	DetailedErr error
 }
