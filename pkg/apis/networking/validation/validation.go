@@ -659,7 +659,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 	}
 
 	if params.Scope == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), "").MarkCoveredByDeclarative())
 		return allErrs
 	}
 
