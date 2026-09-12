@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -1267,6 +1269,13 @@ eaVq8eqxqzGSxwanMrwbD/1PQ97kNdi53No=
 -----END PRIVATE KEY-----
 `
 
+// testGenerateEd25519KeyPEM is an Ed25519 private key fixture.
+// This key is for testing purposes only and is not considered secure.
+const testGenerateEd25519KeyPEM = `-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIAj5VQbcKpXshAc5NjYJ+6z9UJtiTbgQyWIi7RwNvQUF
+-----END PRIVATE KEY-----
+`
+
 func TestGenerateKeyConfig(t *testing.T) {
 	parsedECKey1 := parsePEMKey(t, testGenerateECKeyPEM1)
 	parsedECKey2 := parsePEMKey(t, testGenerateECKeyPEM2)
@@ -1358,6 +1367,36 @@ func TestValidateKeyStrength(t *testing.T) {
 			name:    "ECDSA P-256 is secure",
 			key:     parsePEMKey(t, testGenerateECKeyPEM1),
 			wantErr: false,
+		},
+		{
+			name:    "nil key is insecure",
+			key:     nil,
+			wantErr: true,
+		},
+		{
+			name:    "nil RSA key pointer is insecure",
+			key:     (*rsa.PrivateKey)(nil),
+			wantErr: true,
+		},
+		{
+			name:    "RSA key with nil N is insecure",
+			key:     &rsa.PrivateKey{},
+			wantErr: true,
+		},
+		{
+			name:    "nil ECDSA key pointer is insecure",
+			key:     (*ecdsa.PrivateKey)(nil),
+			wantErr: true,
+		},
+		{
+			name:    "ECDSA key with nil Curve is insecure",
+			key:     &ecdsa.PrivateKey{},
+			wantErr: true,
+		},
+		{
+			name:    "unsupported key type is insecure",
+			key:     parsePEMKey(t, testGenerateEd25519KeyPEM),
+			wantErr: true,
 		},
 	}
 
