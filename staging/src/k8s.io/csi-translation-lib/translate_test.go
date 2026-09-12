@@ -495,4 +495,41 @@ func TestPluginNameMappings(t *testing.T) {
 	}
 }
 
-// TODO: test for not modifying the original PV.
+func TestTranslateInTreePVToCSIDoesNotModifyInput(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	testCases := []struct {
+		name string
+		pv   *v1.PersistentVolume
+	}{
+		{
+			name: "GCE PD",
+			pv:   makeGCEPDPV(nil, nil),
+		},
+		{
+			name: "AWS EBS",
+			pv:   makeAWSEBSPV(nil, nil),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			original := tc.pv.DeepCopy()
+
+			ctl := New()
+
+			_, err := ctl.TranslateInTreePVToCSI(
+				logger,
+				tc.pv,
+			)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !reflect.DeepEqual(original, tc.pv) {
+				t.Fatalf("input PV was modified:\noriginal: %#v\nafter: %#v", original, tc.pv)
+			}
+		})
+	}
+}
