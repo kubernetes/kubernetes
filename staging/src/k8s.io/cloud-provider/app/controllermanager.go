@@ -181,11 +181,11 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	}
 
 	// Setup any health checks we will want to use.
-	var checks []healthz.HealthChecker
+	var readyzChecks []healthz.HealthChecker
 	var electionChecker *leaderelection.HealthzAdaptor
 	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
-		checks = append(checks, electionChecker)
+		readyzChecks = append(readyzChecks, electionChecker)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.CloudControllerManagerWebhook) {
@@ -198,10 +198,10 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		}
 	}
 
-	healthzHandler := controllerhealthz.NewMutableHealthzHandler(checks...)
+	readyzHandler := controllerhealthz.NewMutableHealthzHandler(readyzChecks...)
 	// Start the controller manager HTTP server
 	if c.SecureServing != nil {
-		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
+		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, readyzChecks)
 
 		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
 
@@ -220,7 +220,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
 		}
-		if err := startControllers(ctx, cloud, controllerContext, c, ctx.Done(), controllerInitializers, healthzHandler); err != nil {
+		if err := startControllers(ctx, cloud, controllerContext, c, ctx.Done(), controllerInitializers, readyzHandler); err != nil {
 			klog.Fatalf("error running controllers: %v", err)
 		}
 	}
