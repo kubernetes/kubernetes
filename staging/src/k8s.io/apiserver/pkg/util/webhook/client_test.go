@@ -121,11 +121,11 @@ func (f *fakeAuthInfoResolver) ClientConfigForService(serviceName, namespace str
 // fakeDynamicServiceResolver returns the next endpoint in the list for each request.
 type fakeDynamicServiceResolver struct {
 	endpoints []*url.URL
-	counter   int32
+	counter   atomic.Int32
 }
 
 func (f *fakeDynamicServiceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
-	val := atomic.AddInt32(&f.counter, 1) - 1
+	val := f.counter.Add(1) - 1
 	if val >= int32(len(f.endpoints)) {
 		val = int32(len(f.endpoints)) - 1
 	}
@@ -162,17 +162,17 @@ func TestWebhookClientIdleConnectionIPReuse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WebhookRoundTripLoadBalancing, tc.enableFeatureGate)
 
-			var serverACalls int32
+			var serverACalls atomic.Int32
 			serverA := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				atomic.AddInt32(&serverACalls, 1)
+				serverACalls.Add(1)
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte("ServerA"))
 			}))
 			defer serverA.Close()
 
-			var serverBCalls int32
+			var serverBCalls atomic.Int32
 			serverB := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				atomic.AddInt32(&serverBCalls, 1)
+				serverBCalls.Add(1)
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte("ServerB"))
 			}))
@@ -242,10 +242,10 @@ func TestWebhookClientIdleConnectionIPReuse(t *testing.T) {
 				t.Errorf("Expected Response %s, got %s", tc.expectedSecondResponse, string(res2))
 			}
 
-			if callsA := atomic.LoadInt32(&serverACalls); callsA != tc.expectedServerACalls {
+			if callsA := serverACalls.Load(); callsA != tc.expectedServerACalls {
 				t.Errorf("Expected %d calls to Server A, got %d", tc.expectedServerACalls, callsA)
 			}
-			if callsB := atomic.LoadInt32(&serverBCalls); callsB != tc.expectedServerBCalls {
+			if callsB := serverBCalls.Load(); callsB != tc.expectedServerBCalls {
 				t.Errorf("Expected %d calls to Server B, got %d", tc.expectedServerBCalls, callsB)
 			}
 		})
