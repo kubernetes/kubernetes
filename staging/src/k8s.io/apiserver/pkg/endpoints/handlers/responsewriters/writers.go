@@ -113,7 +113,7 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		encoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
 	}
 	if memoryAllocator != nil {
-		defer runtime.AllocatorPool.Put(memoryAllocator)
+		defer runtime.PutAllocator(memoryAllocator)
 	}
 
 	err := encoder.Encode(object, w)
