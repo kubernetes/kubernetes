@@ -52,7 +52,6 @@ type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
 type DeviceID = internal.DeviceID
 
-type SharedDeviceID = internal.SharedDeviceID
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
 type AllocatedState = internal.AllocatedState
@@ -963,7 +962,7 @@ type AllocatorTestCase struct {
 	features                 Features
 	claimsToAllocate         []wrapResourceClaim
 	allocatedDevices         []DeviceID
-	allocatedSharedDeviceIDs sets.Set[SharedDeviceID]
+	allocatedSharedDeviceIDs sets.Set[DeviceID]
 	allocatedCapacityDevices ConsumedCapacityCollection
 	classes                  []*resourceapi.DeviceClass
 	slices                   []*resourceapi.ResourceSlice
@@ -6722,7 +6721,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			allocatedSharedDeviceIDs: sets.New(
-				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+				MakeDeviceID(driverA, pool1, device1),
 			),
 			allocatedCapacityDevices: ConsumedCapacityCollection{
 				MakeDeviceID(driverA, pool1, device1): ConsumedCapacity{
@@ -6764,7 +6763,7 @@ func TestAllocator(t *testing.T,
 			// device1 already has a persisted shared allocation. It is represented
 			// only by a share ID, with no AggregatedCapacity entry.
 			allocatedSharedDeviceIDs: sets.New(
-				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+				MakeDeviceID(driverA, pool1, device1),
 			),
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1)),
@@ -6797,7 +6796,7 @@ func TestAllocator(t *testing.T,
 			// so a dedicated request must not be handed the device on top of it.
 			features: Features{ConsumableCapacity: true},
 			allocatedSharedDeviceIDs: sets.New(
-				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+				MakeDeviceID(driverA, pool1, device1),
 			),
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 1))),
 			classes:          objects(class(classA, driverA)),
@@ -6813,7 +6812,7 @@ func TestAllocator(t *testing.T,
 			// The guard drops device1 without aborting the search, so the request still lands on device2.
 			features: Features{ConsumableCapacity: true},
 			allocatedSharedDeviceIDs: sets.New(
-				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+				MakeDeviceID(driverA, pool1, device1),
 			),
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 1))),
 			classes:          objects(class(classA, driverA)),
@@ -6829,11 +6828,33 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
 		},
+		"consumable-capacity-dedicated-request-falls-back-past-multiple-persisted-shares": {
+			// The guard drops device1 and device2 without aborting the search, so the request lands on device3.
+			features: Features{ConsumableCapacity: true},
+			allocatedSharedDeviceIDs: sets.New(
+				MakeDeviceID(driverA, pool1, device1),
+				MakeDeviceID(driverA, pool1, device2),
+			),
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
+					device(device1, nil, nil),
+					device(device2, nil, nil),
+					device(device3, nil, nil),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
 		"consumable-capacity-with-admin-access-request-allowed-over-persisted-share": {
 			// Admin access skips the availability checks, so the live share does not withhold device1.
 			features: Features{ConsumableCapacity: true, AdminAccess: true},
 			allocatedSharedDeviceIDs: sets.New(
-				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+				MakeDeviceID(driverA, pool1, device1),
 			),
 			claimsToAllocate: func() []wrapResourceClaim {
 				c := claimWithRequest(claim0, req0, classA)
