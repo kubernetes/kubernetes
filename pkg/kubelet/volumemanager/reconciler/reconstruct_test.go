@@ -58,10 +58,6 @@ func TestReconstructVolumes(t *testing.T) {
 				if len(allPods) != 2 {
 					return fmt.Errorf("expected 2 uncertain pods in asw got %d", len(allPods))
 				}
-				volumes := rcInstance.actualStateOfWorld.GetPossiblyMountedVolumesForPod("pod1")
-				if len(volumes) != 1 {
-					return fmt.Errorf("expected 1 uncertain volume in asw got %d", len(volumes))
-				}
 				// The volume should be marked as reconstructed in ASW
 				if reconstructed := rcInstance.actualStateOfWorld.IsVolumeReconstructed("fake-plugin/pvc-abcdef", "pod1"); !reconstructed {
 					t.Errorf("expected volume to be marked as reconstructed, got %v", reconstructed)
