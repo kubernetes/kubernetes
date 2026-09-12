@@ -327,6 +327,12 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 }
 
 func (m *cgroupCommon) maybeSetHugetlb(logger klog.Logger, resourceConfig *ResourceConfig, resources *libcontainercgroups.Resources) {
+	// A nil map means hugepages were not specified, so leave the existing limits alone.
+	// An empty map still zeroes every supported page size.
+	if resourceConfig.HugePageLimit == nil {
+		return
+	}
+
 	// Check if hugetlb is supported.
 	if libcontainercgroups.IsCgroup2UnifiedMode() {
 		if !getSupportedUnifiedControllers().Has("hugetlb") {
