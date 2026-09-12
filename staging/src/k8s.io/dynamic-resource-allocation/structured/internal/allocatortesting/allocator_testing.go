@@ -88,6 +88,7 @@ const (
 	req2SubReq1 = "req-2/subReq-1"
 	claim0      = "claim-0"
 	claim1      = "claim-1"
+	claim2      = "claim-2"
 	slice1      = "slice-1"
 	slice2      = "slice-2"
 	slice3      = "slice-3"
@@ -246,6 +247,13 @@ func request(name, class string, count int64, selectors ...resourceapi.DeviceSel
 			Selectors:       selectors,
 		},
 	}
+}
+
+// adminRequest is request with AdminAccess set.
+func adminRequest(name, class string, count int64, selectors ...resourceapi.DeviceSelector) resourceapi.DeviceRequest {
+	r := request(name, class, count, selectors...)
+	r.Exactly.AdminAccess = new(true)
+	return r
 }
 
 func deviceRequest(name, class string, count int64) wrapDeviceRequest {
@@ -713,6 +721,13 @@ func deviceAllocationResult(request, driver, pool, device string, adminAccess bo
 	if adminAccess {
 		r.AdminAccess = &adminAccess
 	}
+	return r
+}
+
+// sharedDeviceAllocationResult is deviceAllocationResult for a share, which carries a ShareID.
+func sharedDeviceAllocationResult(request, driver, pool, device string, adminAccess bool) resourceapi.DeviceRequestAllocationResult {
+	r := deviceAllocationResult(request, driver, pool, device, adminAccess)
+	r.ShareID = &fixedShareID
 	return r
 }
 
@@ -4009,6 +4024,81 @@ func TestAllocator(t *testing.T,
 					deviceRequestAllocationResult(req3, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
 			},
 		},
+		"partitionable-devices-admin-backtracking-preserves-ordinary-share": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(
+				// claim0 pins device1 as the first share and reserves its single
+				// shared counter.
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].kind == "shared"`, driverA),
+						}}),
+				),
+				// claim1's req1 is administrative and first tries device1 as a share, which
+				// reserves nothing. The match-attribute constraint with req2 forces it to
+				// backtrack onto device2. That rollback must not drop device1's shared marker,
+				// which claim0 owns, or req3 would recharge the single counter and fail.
+				claimWithRequests(claim1,
+					[]resourceapi.DeviceConstraint{
+						{MatchAttribute: &stringAttribute, Requests: []string{req1, req2}},
+					},
+					adminRequest(req1, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].kind == "shared" || device.attributes["%s"].kind == "fallback"`, driverA, driverA),
+						}}),
+					adminRequest(req2, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].kind == "gate"`, driverA),
+						}}),
+					request(req3, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].kind == "shared"`, driverA),
+						}}),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					// device1: allow-multiple, no capacity, consumes the single counter.
+					// kind steers the selectors; stringAttribute steers the constraint.
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"kind":            {StringValue: new("shared")},
+						"stringAttribute": {StringValue: new("red")},
+					}).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+					// device2: the fallback for req1, matching req2's stringAttribute.
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"kind":            {StringValue: new("fallback")},
+						"stringAttribute": {StringValue: new("blue")},
+					}),
+					// device3: the only device req2 can take.
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"kind":            {StringValue: new("gate")},
+						"stringAttribute": {StringValue: new("blue")},
+					}),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+				),
+			),
+			node: node(node1, region1),
+			// The administrative req1 leaves no reservation of its own, so backtracking it
+			// off device1 must leave claim0's share, and its counter, untouched.
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
+				allocationResult(localNodeSelector(node1),
+					deviceAllocationResult(req1, driverA, pool1, device2, true),
+					deviceAllocationResult(req2, driverA, pool1, device3, true),
+					deviceRequestAllocationResult(req3, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
+			},
+		},
 		"partitionable-devices-prioritized-list": {
 			features: Features{
 				PrioritizedList:      true,
@@ -4119,6 +4209,819 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req1, driverA, pool1, device3, false),
+			)},
+		},
+		// device1 is allocated but the republished pool no longer declares it, and nothing
+		// records what it consumed. Granting device2 the whole 8Gi counter would hand out
+		// counters device1 may still hold, so the pool has to refuse instead.
+		"partitionable-devices-allocated-device-removed-from-slice": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// device2 is still allocated and still published. Administrative access to it must
+		// not be refused because device1 disappeared from the pool.
+		"partitionable-devices-admin-access-with-missing-peer": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, adminRequest(req0, classA, 1)),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+				MakeDeviceID(driverA, pool1, device2),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, true),
+			)},
+		},
+		// The counter set holds exactly what the allocated device2 already consumes.
+		// Administrative access to it reserves nothing, so it fits where an ordinary claim
+		// would not, and the scheduler never counts an admin result as allocated.
+		"partitionable-devices-admin-access-does-not-charge-counters": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, adminRequest(req0, classA, 1)),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device2),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, true),
+			)},
+		},
+		// An admin claim leaves no marker that the first ordinary share of the same device
+		// can read as a counter reservation. device1 already holds the whole counter set, so
+		// the ordinary claim has nothing left and the pair cannot both be satisfied.
+		"partitionable-devices-admin-access-does-not-seed-shared-counter-reservation": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, adminRequest(req0, classA, 1)),
+				claimWithRequest(claim1, req0, classA),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// Counters cover device2 exactly once. The admin claim reserves nothing, the first
+		// ordinary share reserves, and the second inherits that reservation, so all three
+		// fit where there is room for a single reservation.
+		"partitionable-devices-admin-then-two-shares-reserves-once": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, adminRequest(req0, classA, 1)),
+				claimWithRequest(claim1, req1, classA),
+				claimWithRequest(claim2, req2, classA),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), sharedDeviceAllocationResult(req0, driverA, pool1, device2, true)),
+				allocationResult(localNodeSelector(node1), sharedDeviceAllocationResult(req1, driverA, pool1, device2, false)),
+				allocationResult(localNodeSelector(node1), sharedDeviceAllocationResult(req2, driverA, pool1, device2, false)),
+			},
+		},
+		// Counters are sufficient, so only the incompatible group can reject the ordinary
+		// share. Administrative access must not have exempted it from that check.
+		"compatibility-groups-admin-then-share-incompatible": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+				CompatibilityGroups:  true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, adminRequest(req0, classA, 1)),
+				claimWithRequest(claim1, req1, classA),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							}, "vgpu",
+						),
+					),
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							}, "mig",
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// The same incompatible pair with only the administrative claim: it is still allowed,
+		// so the case above cannot pass by rejecting admin access itself.
+		"compatibility-groups-admin-access-with-incompatible-peer": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+				CompatibilityGroups:  true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, adminRequest(req0, classA, 1)),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							}, "vgpu",
+						),
+					),
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							}, "mig",
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), sharedDeviceAllocationResult(req0, driverA, pool1, device2, true)),
+			},
+		},
+		// Compatible groups: the administrative claim and the ordinary share both succeed, so
+		// the check above is not rejecting every mix of the two.
+		"compatibility-groups-admin-then-share-compatible": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+				CompatibilityGroups:  true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, adminRequest(req0, classA, 1)),
+				claimWithRequest(claim1, req1, classA),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							}, "mig",
+						),
+					),
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							}, "mig",
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), sharedDeviceAllocationResult(req0, driverA, pool1, device2, true)),
+				allocationResult(localNodeSelector(node1), sharedDeviceAllocationResult(req1, driverA, pool1, device2, false)),
+			},
+		},
+		// An administrative claim between two ordinary shares must leave the first share's
+		// reservation intact for the second to inherit.
+		"partitionable-devices-share-admin-share-preserves-reservation": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequest(claim0, req0, classA),
+				claimWithRequests(claim1, nil, adminRequest(req1, classA, 1)),
+				claimWithRequest(claim2, req2, classA),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), sharedDeviceAllocationResult(req0, driverA, pool1, device2, false)),
+				allocationResult(localNodeSelector(node1), sharedDeviceAllocationResult(req1, driverA, pool1, device2, true)),
+				allocationResult(localNodeSelector(node1), sharedDeviceAllocationResult(req2, driverA, pool1, device2, false)),
+			},
+		},
+		// Administrative access skips the accountability check, but the ordinary share that
+		// follows must still meet it: the pool no longer publishes the allocated device1.
+		"partitionable-devices-admin-then-share-with-missing-peer": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, adminRequest(req0, classA, 1)),
+				claimWithRequest(claim1, req1, classA),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// A missing device also blocks new counter reservations when its allocation is
+		// recorded as a shared (allow-multiple) one rather than a dedicated one.
+		"partitionable-devices-allocated-shared-device-removed-from-slice": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// Same as above, but device1's allocation is recorded only as aggregated
+		// consumed capacity (a manually constructed or future producer state that
+		// IsDeviceAllocated still counts as allocated), with no dedicated or shared
+		// entry. The pool no longer publishes device1, so the pool must fail closed
+		// here too, not just when the allocation is recorded dedicated or shared.
+		"partitionable-devices-allocated-capacity-device-removed-from-slice": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedCapacityDevices: ConsumedCapacityCollection{
+				MakeDeviceID(driverA, pool1, device1): ConsumedCapacity{
+					capacity0: new(one),
+				},
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// One allocation can be recorded as a share and as consumed capacity at once.
+		// Both name device1, so the pool holds one allocated device, not two, and
+		// device2 still fits in what device1 leaves behind.
+		"partitionable-devices-allocated-device-shared-and-capacity-counted-once": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			allocatedCapacityDevices: ConsumedCapacityCollection{
+				MakeDeviceID(driverA, pool1, device1): ConsumedCapacity{
+					capacity0: new(one),
+				},
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// device1 is allocated and still published, but only in a slice targeting another
+		// node. The pool must scan those slices too, so device1 counts as present (no fail
+		// closed) and its 8Gi is deducted, leaving device2 room to allocate.
+		"partitionable-devices-allocated-device-present-in-not-targeting-slice": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithDevices(slice2, node2, resourcePool(pool1, 3), driverA,
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// driver-b/pool-1 has an allocated device it no longer publishes, so that pool
+		// fails closed. The index is keyed by the full driver+pool ID, so driver-a/pool-1
+		// is untouched and its candidate device2 still allocates.
+		"partitionable-devices-missing-device-isolated-by-pool-id": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverB, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// device1 is still published, only by an obsolete generation (1); the resolved
+		// generation (2) drops it. Unlike the -removed-from-slice cases, this pins that
+		// presence is judged from the resolved generation, not every published slice.
+		"partitionable-devices-allocated-device-only-in-obsolete-generation": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				func() wrapResourceSliceWithDevices {
+					s := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+						device(device2, fromCounters, nil).withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1,
+								map[string]resource.Quantity{
+									"memory": resource.MustParse("8Gi"),
+								},
+							),
+						),
+					)
+					s.Spec.Pool.Generation = 2
+					return s
+				}(),
+				func() wrapResourceSliceWithCounterSets {
+					s := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+						counterSet(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("16Gi"),
+							},
+						),
+					)
+					s.Spec.Pool.Generation = 2
+					return s
+				}(),
+				func() wrapResourceSliceWithDevices {
+					s := sliceWithDevices(slice3, node1, resourcePool(pool1, 1), driverA,
+						device(device1, fromCounters, nil).withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1,
+								map[string]resource.Quantity{
+									"memory": resource.MustParse("8Gi"),
+								},
+							),
+						),
+					)
+					s.Spec.Pool.Generation = 1
+					return s
+				}(),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// Failing a pool closed must drop only that pool. pool1 cannot account for its
+		// allocated device1, but pool2 is intact and satisfies the claim.
+		"partitionable-devices-unaccountable-pool-does-not-block-a-valid-pool": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+				sliceWithDevices(slice3, node1, resourcePool(pool2, 2), driverA,
+					device(device3, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet2,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice4, node1, resourcePool(pool2, 2), driverA,
+					counterSet(counterSet2,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool2, device3, false),
+			)},
+		},
+		// Only counter-consuming candidates stop. device2 draws on the counter set the dropped
+		// device1 makes unaccountable, device3 draws on nothing.
+		"partitionable-devices-unaccountable-pool-still-allows-a-counterless-device": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+					device(device3, nil, nil),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+		// device2 already carries a share, so its counters were charged when that share was
+		// granted and an extra share must not charge them again. The guard sits behind that
+		// skip, so an unaccountable pool does not block the extra share.
+		"partitionable-devices-unaccountable-pool-still-allows-another-share": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device2), &fixedShareID),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceRequestAllocationResult(req0, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, nil),
 			)},
 		},
 		"partitionable-devices-multiple-capacity-pools": {
@@ -6835,11 +7738,9 @@ func TestAllocator(t *testing.T,
 			allocatedSharedDeviceIDs: sets.New(
 				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
 			),
-			claimsToAllocate: func() []wrapResourceClaim {
-				c := claimWithRequest(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].Exactly.AdminAccess = new(true)
-				return []wrapResourceClaim{c}
-			}(),
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, adminRequest(req0, classA, 1)),
+			),
 			classes: objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(
 				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
@@ -9466,4 +10367,213 @@ func (l informerLister[T]) Get(name string) (*T, error) {
 		}
 	}
 	return nil, apierrors.NewNotFound(schema.GroupResource{}, "not found")
+}
+
+// TestCounterPoolAccountabilityAcrossNodesWithUnderreportedSliceCount verifies that a node which
+// cannot account for a pool allocates nothing from it, even once another node has cached the
+// pool's counter baseline, and that refusing it leaves the pool usable for a node that can.
+func TestCounterPoolAccountabilityAcrossNodesWithUnderreportedSliceCount(t *testing.T,
+	newAllocator func(
+		ctx context.Context,
+		features Features,
+		allocateState AllocatedState,
+		classLister DeviceClassLister,
+		slices []*resourceapi.ResourceSlice,
+		celCache *cel.Cache,
+	) (Allocator, error)) {
+	memory := func(q string) map[string]resource.Quantity {
+		return map[string]resource.Quantity{"memory": resource.MustParse(q)}
+	}
+	consuming := func(name, q string) wrapDevice {
+		return device(name, fromCounters, nil).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, memory(q)))
+	}
+
+	// The pool holds three slices at one generation but every slice reports two, so each node
+	// takes its own two as the whole pool and never looks for the third. node-1 ends up
+	// publishing the allocated device1 and node-2 does not. A driver that reports the count
+	// correctly does not produce this, since the node seeing too few slices pulls in the rest,
+	// but the allocator must not let one node's view answer for another's regardless.
+	resourceSlices := unwrapResourceSlices(
+		sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, consuming(device1, "8Gi"), consuming(device2, "8Gi")),
+		sliceWithDevices(slice2, node2, resourcePool(pool1, 2), driverA, consuming(device3, "8Gi")),
+		sliceWithCounterSets(slice3, nodeSelectionAll, resourcePool(pool1, 2), driverA, counterSet(counterSet1, memory("16Gi"))),
+	)
+
+	allocatedState := AllocatedState{AllocatedDevices: sets.New(MakeDeviceID(driverA, pool1, device1))}
+	var classLister informerLister[resourceapi.DeviceClass]
+	for _, c := range objects(class(classA, driverA)) {
+		classLister.objs = append(classLister.objs, c.DeepCopy())
+	}
+	claims := unwrap(objects(claimWithRequest(claim0, req0, classA))...)
+
+	newFor := func(t *testing.T) (context.Context, Allocator) {
+		t.Helper()
+		_, ctx := ktesting.NewTestContext(t)
+		allocator, err := newAllocator(ctx, Features{PartitionableDevices: true}, allocatedState, classLister, resourceSlices, cel.NewCache(1, cel.Features{}))
+		if err != nil {
+			t.Fatalf("create allocator: %v", err)
+		}
+		return ctx, allocator
+	}
+	allocate := func(t *testing.T, ctx context.Context, allocator Allocator, n *v1.Node) []resourceapi.AllocationResult {
+		t.Helper()
+		results, err := allocator.Allocate(ctx, n, claims)
+		if err != nil {
+			t.Fatalf("allocate for %s: %v", n.Name, err)
+		}
+		return results
+	}
+
+	// node-1 accounts for device1 and can hand device2 the remaining half of the counter set.
+	// node-2 cannot account for device1, so it must allocate nothing. A nil want means empty.
+	type nodeCase struct {
+		node *v1.Node
+		want types.GomegaMatcher
+	}
+	accountable := nodeCase{node(node1, region1), allocationResult(localNodeSelector(node1),
+		deviceAllocationResult(req0, driverA, pool1, device2, false))}
+	unaccountable := nodeCase{node(node2, region1), nil}
+
+	expect := func(g gomega.Gomega, nc nodeCase, results []resourceapi.AllocationResult, context string) {
+		if nc.want == nil {
+			g.Expect(results).To(gomega.BeEmpty(), "%s allocated from a pool it cannot account for, %s", nc.node.Name, context)
+			return
+		}
+		g.Expect(results).To(gomega.ConsistOf(nc.want), "%s allocated something else, %s", nc.node.Name, context)
+	}
+
+	for _, tc := range []struct {
+		name        string
+		first, then nodeCase
+	}{
+		{"unaccountable node first", unaccountable, accountable},
+		{"accountable node first", accountable, unaccountable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := gomega.NewWithT(t)
+			ctx, shared := newFor(t)
+			expect(g, tc.first, allocate(t, ctx, shared, tc.first.node), "filtered first")
+			gotThen := allocate(t, ctx, shared, tc.then.node)
+			expect(g, tc.then, gotThen, "filtered after "+tc.first.node.Name)
+
+			// The same node on its own must reach the same result.
+			ctxFresh, fresh := newFor(t)
+			g.Expect(gotThen).To(gomega.Equal(allocate(t, ctxFresh, fresh, tc.then.node)),
+				"%s depended on %s being filtered first", tc.then.node.Name, tc.first.node.Name)
+		})
+	}
+
+	// Concurrent Allocate calls must reach the same per-node verdicts as the sequential
+	// runs while sharing the lazily built allocated-device index.
+	t.Run("concurrent nodes", func(t *testing.T) {
+		g := gomega.NewWithT(t)
+		ctx, shared := newFor(t)
+		type outcome struct {
+			nc      nodeCase
+			results []resourceapi.AllocationResult
+			err     error
+		}
+		start := make(chan struct{})
+		done := make(chan outcome, 2)
+		for _, nc := range []nodeCase{accountable, unaccountable} {
+			go func() {
+				<-start
+				// Allocate directly: t.Fatalf must not run outside the test goroutine.
+				results, err := shared.Allocate(ctx, nc.node, claims)
+				done <- outcome{nc: nc, results: results, err: err}
+			}()
+		}
+		close(start)
+		for range 2 {
+			got := <-done
+			if got.err != nil {
+				t.Errorf("allocate for %s: %v", got.nc.node.Name, got.err)
+				continue
+			}
+			expect(g, got.nc, got.results, "filtered concurrently")
+		}
+	})
+}
+
+// TestCompatibilityBaselineNotSeededByUnaccountablePool checks that a pool a node cannot account
+// for does not seed the compatibility baseline for a node that can. The baseline is cached per
+// pool and skips allocated devices the snapshot no longer publishes, so seeding it from an
+// incomplete view would let an incompatible device through on a complete one.
+func TestCompatibilityBaselineNotSeededByUnaccountablePool(t *testing.T,
+	newAllocator func(
+		ctx context.Context,
+		features Features,
+		allocateState AllocatedState,
+		classLister DeviceClassLister,
+		slices []*resourceapi.ResourceSlice,
+		celCache *cel.Cache,
+	) (Allocator, error)) {
+	// device1 is allocated and declares "mig"; the candidate device2 declares "vgpu", so the two
+	// cannot share counterSet1. node-1 publishes both, node-2 has dropped device1.
+	resourceSlices := unwrapResourceSlices(
+		sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+			device(device1, nil, nil).withDeviceCounterConsumption(
+				deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+			),
+			device(device2, nil, nil).withDeviceCounterConsumption(
+				deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "vgpu"),
+			),
+		),
+		sliceWithDevices(slice2, node2, resourcePool(pool1, 2), driverA,
+			device(device3, nil, nil).withDeviceCounterConsumption(
+				deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "vgpu"),
+			),
+		),
+		sliceWithCounterSets(slice3, nodeSelectionAll, resourcePool(pool1, 2), driverA,
+			counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+		),
+	)
+	allocatedState := AllocatedState{AllocatedDevices: sets.New(MakeDeviceID(driverA, pool1, device1))}
+	var classLister informerLister[resourceapi.DeviceClass]
+	for _, c := range objects(class(classA, driverA)) {
+		classLister.objs = append(classLister.objs, c.DeepCopy())
+	}
+	claims := unwrap(objects(claimWithRequest(claim0, req0, classA))...)
+
+	newFor := func(t *testing.T) (context.Context, Allocator) {
+		t.Helper()
+		_, ctx := ktesting.NewTestContext(t)
+		allocator, err := newAllocator(ctx, Features{PartitionableDevices: true, CompatibilityGroups: true},
+			allocatedState, classLister, resourceSlices, cel.NewCache(1, cel.Features{}))
+		if err != nil {
+			t.Fatalf("create allocator: %v", err)
+		}
+		return ctx, allocator
+	}
+	allocate := func(t *testing.T, ctx context.Context, allocator Allocator, n *v1.Node) []resourceapi.AllocationResult {
+		t.Helper()
+		results, err := allocator.Allocate(ctx, n, claims)
+		if err != nil {
+			t.Fatalf("allocate for %s: %v", n.Name, err)
+		}
+		return results
+	}
+
+	for _, tc := range []struct {
+		name        string
+		first, then *v1.Node
+	}{
+		{"unaccountable node first", node(node2, region1), node(node1, region1)},
+		{"accountable node first", node(node1, region1), node(node2, region1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := gomega.NewWithT(t)
+			ctx, alloc := newFor(t)
+			wantFirst := allocate(t, ctx, alloc, tc.first)
+			ctx, alloc = newFor(t)
+			wantThen := allocate(t, ctx, alloc, tc.then)
+			g.Expect(wantFirst).To(gomega.BeEmpty(), "%s must not co-allocate vgpu with the allocated mig device", tc.first.Name)
+			g.Expect(wantThen).To(gomega.BeEmpty(), "%s must not co-allocate vgpu with the allocated mig device", tc.then.Name)
+
+			ctx, shared := newFor(t)
+			g.Expect(allocate(t, ctx, shared, tc.first)).To(gomega.Equal(wantFirst))
+			g.Expect(allocate(t, ctx, shared, tc.then)).To(gomega.Equal(wantThen), "%s changed after %s was filtered", tc.then.Name, tc.first.Name)
+		})
+	}
+
 }
