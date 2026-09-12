@@ -319,6 +319,11 @@ func getAndValidateCounterSets(slices []*draapi.ResourceSlice) (map[draapi.Uniqu
 			if _, found := counterSets[counterSet.Name]; found {
 				return nil, fmt.Errorf("duplicate counter set name %s", counterSet.Name)
 			}
+			for counterName, counter := range counterSet.Counters {
+				if counter.Value.Sign() < 0 {
+					return nil, fmt.Errorf("counter %s in counter set %s has negative value %v", counterName, counterSet.Name, counter.Value)
+				}
+			}
 			counterSets[counterSet.Name] = &counterSet
 		}
 	}
@@ -350,9 +355,12 @@ func validateDeviceCounterConsumption(counterSets map[draapi.UniqueString]*draap
 					return fmt.Errorf("counter set %s not found", deviceCounterConsumption.CounterSet)
 				}
 
-				for counterName := range deviceCounterConsumption.Counters {
+				for counterName, counter := range deviceCounterConsumption.Counters {
 					if _, found := counterSet.Counters[counterName]; !found {
 						return fmt.Errorf("counter %s not found in counter set %s", counterName, counterSet.Name)
+					}
+					if counter.Value.Sign() < 0 {
+						return fmt.Errorf("consumed counter %s in counter set %s has negative value %v", counterName, deviceCounterConsumption.CounterSet, counter.Value)
 					}
 				}
 			}
