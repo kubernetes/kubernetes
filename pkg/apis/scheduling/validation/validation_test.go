@@ -148,7 +148,7 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 				ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
 				PreemptionPolicy: &preemptLowerPriority,
 			},
-			T: field.ErrorTypeForbidden,
+			T: field.ErrorTypeInvalid,
 		},
 		"change value": {
 			P: scheduling.PriorityClass{
@@ -156,7 +156,7 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 				Value:            101,
 				PreemptionPolicy: &preemptLowerPriority,
 			},
-			T: field.ErrorTypeForbidden,
+			T: field.ErrorTypeInvalid,
 		},
 		"change preemptionPolicy": {
 			P: scheduling.PriorityClass{

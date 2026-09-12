@@ -5,7 +5,6 @@
 # errorType, and origin match exactly OR wildcard with '*' (no implicit
 # wildcarding, so an entry can never silently overexclude). reason is
 # required.
-#
 # Example:
 #   - apiVersion: autoscaling/v1   # one specific rule
 #     kind: Scale
@@ -13,7 +12,6 @@
 #     errorType: FieldValueInvalid
 #     origin: minimum
 #     reason: tested separately
-#
 # Run hack/update-codegen.sh after editing.
 
 - apiVersion: extensions/v1beta1
@@ -22,3 +20,135 @@
   errorType: '*'
   origin: '*'
   reason: Not served by kube-apiserver.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.creationTimestamp
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.deletionGracePeriodSeconds
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.deletionTimestamp
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.generation
+  errorType: FieldValueInvalid
+  origin: minimum
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.managedFields[*].operation
+  errorType: FieldValueNotSupported
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.managedFields[*].operation
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.ownerReferences[*].apiVersion
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.ownerReferences[*].kind
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.ownerReferences[*].name
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.ownerReferences[*].uid
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  path: metadata.uid
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.creationTimestamp
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.deletionGracePeriodSeconds
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.deletionTimestamp
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.generation
+  errorType: FieldValueInvalid
+  origin: minimum
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.managedFields[*].operation
+  errorType: FieldValueNotSupported
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.managedFields[*].operation
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.ownerReferences[*].apiVersion
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.ownerReferences[*].kind
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.ownerReferences[*].name
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.ownerReferences[*].uid
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
+- apiVersion: scheduling.k8s.io/v1beta1
+  kind: PriorityClass
+  path: metadata.uid
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: Inherited ObjectMeta validation, not specific to this PR; tested at the ObjectMeta level.
