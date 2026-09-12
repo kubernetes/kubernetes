@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -1546,5 +1547,138 @@ func TestIsResourceExhaustError(t *testing.T) {
 				t.Errorf("Expected isResourceExhaustError to return %v, but got %v", tc.expected, actual)
 			}
 		})
+	}
+}
+
+// TestPluginConstructVolumeSpecFallsBackToGlobalMount covers issue #101791.
+//
+// Scenario: kubelet restarts, the pod-local vol_data.json is missing or
+// unreadable, but the global mount's vol_data.json (written by
+// csiAttacher.MountDevice) is intact. Before the fix, ConstructVolumeSpec
+// errored out, marking the volume as failed-reconstruction and letting the
+// global mount leak (corruption risk on RWO volumes).
+//
+// With the fix, ConstructVolumeSpec follows the mount reference the pod-local
+// bind mount still holds to the global mount it was staged at, and rebuilds
+// the spec from the vol_data.json stored beside it.
+func TestPluginConstructVolumeSpecFallsBackToGlobalMount(t *testing.T) {
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	const (
+		specVolID = "orphaned-pv"
+		volHandle = "orphaned-handle"
+	)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIGlobalMountReconstruction, true)
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+
+	// Arrange: pod-local mount dir exists but has NO vol_data.json
+	// (corrupt or wiped case).
+	podLocalDir := filepath.Join(tmpDir, "pods", "pod-uid", "volumes", "kubernetes.io~csi", specVolID)
+	if err := os.MkdirAll(filepath.Join(podLocalDir, "mount"), 0o755); err != nil {
+		t.Fatalf("setup pod-local dir: %v", err)
+	}
+
+	// Arrange: global mount dir has a complete vol_data.json with
+	// specVolID (as MountDevice now writes).
+	if resolved, err := filepath.EvalSymlinks(tmpDir); err == nil {
+		tmpDir = resolved
+		podLocalDir = filepath.Join(tmpDir, "pods", "pod-uid", "volumes", "kubernetes.io~csi", specVolID)
+	}
+	globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, testDriver, "anyhashhere")
+	if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
+		t.Fatalf("setup global dir: %v", err)
+	}
+	globalData := map[string]string{
+		volDataKey.specVolID:           specVolID,
+		volDataKey.volHandle:           volHandle,
+		volDataKey.driverName:          testDriver,
+		volDataKey.volumeLifecycleMode: string(storage.VolumeLifecyclePersistent),
+	}
+	if err := saveVolumeData(globalDataDir, volDataFileName, globalData); err != nil {
+		t.Fatalf("save global vol_data.json: %v", err)
+	}
+
+	// Arrange: the pod-local mount is still a bind mount of the global one,
+	// which is what the fallback follows.
+	fake, ok := plug.host.GetMounter().(*mount.FakeMounter)
+	if !ok {
+		t.Fatalf("expected a fake mounter, got %T", plug.host.GetMounter())
+	}
+	fake.MountPoints = []mount.MountPoint{
+		{Device: "/dev/sdb", Path: filepath.Join(globalDataDir, globalMountInGlobalPath)},
+		{Device: "/dev/sdb", Path: filepath.Join(podLocalDir, "mount")},
+	}
+
+	// Act
+	rec, err := plug.ConstructVolumeSpec(specVolID, podLocalDir)
+	if err != nil {
+		t.Fatalf("ConstructVolumeSpec did not fall back to global mount data: %v", err)
+	}
+
+	// Assert: spec carries the fields we stored in the global JSON.
+	if rec.Spec == nil || rec.Spec.PersistentVolume == nil || rec.Spec.PersistentVolume.Spec.CSI == nil {
+		t.Fatalf("ConstructVolumeSpec returned incomplete spec: %+v", rec)
+	}
+	csi := rec.Spec.PersistentVolume.Spec.CSI
+	if csi.Driver != testDriver {
+		t.Errorf("Driver: got %q, want %q", csi.Driver, testDriver)
+	}
+	if csi.VolumeHandle != volHandle {
+		t.Errorf("VolumeHandle: got %q, want %q", csi.VolumeHandle, volHandle)
+	}
+}
+
+// TestPluginConstructVolumeSpecGateOffKeepsOldBehavior is the other half of
+// issue #101791: with CSIGlobalMountReconstruction disabled, the very same
+// on-disk layout must still fail reconstruction exactly as it did before this
+// change. The gate is alpha and off by default, so this is what every cluster
+// gets until an operator opts in.
+func TestPluginConstructVolumeSpecGateOffKeepsOldBehavior(t *testing.T) {
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	const (
+		specVolID = "orphaned-pv"
+		volHandle = "orphaned-handle"
+	)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIGlobalMountReconstruction, false)
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+
+	// Same arrangement as the gate-on test, bind mount included, so that the
+	// only difference between the two is the gate.
+	if resolved, err := filepath.EvalSymlinks(tmpDir); err == nil {
+		tmpDir = resolved
+	}
+	podLocalDir := filepath.Join(tmpDir, "pods", "pod-uid", "volumes", "kubernetes.io~csi", specVolID)
+	if err := os.MkdirAll(filepath.Join(podLocalDir, "mount"), 0o755); err != nil {
+		t.Fatalf("setup pod-local dir: %v", err)
+	}
+	globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, testDriver, "anyhashhere")
+	if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
+		t.Fatalf("setup global dir: %v", err)
+	}
+	globalData := map[string]string{
+		volDataKey.specVolID:           specVolID,
+		volDataKey.volHandle:           volHandle,
+		volDataKey.driverName:          testDriver,
+		volDataKey.volumeLifecycleMode: string(storage.VolumeLifecyclePersistent),
+	}
+	if err := saveVolumeData(globalDataDir, volDataFileName, globalData); err != nil {
+		t.Fatalf("save global vol_data.json: %v", err)
+	}
+
+	fake, ok := plug.host.GetMounter().(*mount.FakeMounter)
+	if !ok {
+		t.Fatalf("expected a fake mounter, got %T", plug.host.GetMounter())
+	}
+	fake.MountPoints = []mount.MountPoint{
+		{Device: "/dev/sdb", Path: filepath.Join(globalDataDir, globalMountInGlobalPath)},
+		{Device: "/dev/sdb", Path: filepath.Join(podLocalDir, "mount")},
+	}
+
+	// Act + assert: the global file is ignored and reconstruction still fails.
+	if _, err := plug.ConstructVolumeSpec(specVolID, podLocalDir); err == nil {
+		t.Fatal("ConstructVolumeSpec succeeded with the gate off; the fallback must not run unless the feature is enabled")
 	}
 }

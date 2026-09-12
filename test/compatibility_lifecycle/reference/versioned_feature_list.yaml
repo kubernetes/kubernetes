@@ -333,6 +333,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.26"
+- name: CSIGlobalMountReconstruction
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: CSIServiceAccountTokenSecrets
   versionedSpecs:
   - default: true

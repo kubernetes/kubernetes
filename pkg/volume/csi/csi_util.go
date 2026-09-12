@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -88,6 +89,50 @@ func loadVolumeData(dir string, fileName string) (map[string]string, error) {
 	}
 
 	return data, nil
+}
+
+// findGlobalMountDataFromPodMount locates the CSI global mount that the given
+// pod-local mount is bound to, and returns its data directory along with the
+// parsed vol_data.json stored next to it.
+//
+// Used as a fallback when the pod-local vol_data.json is missing or corrupt
+// during kubelet volume reconstruction, see issue #101791. The mount table is
+// the authoritative link between the two: MountDevice stages the volume at
+// <pluginDir>/<driver>/<sha256(volumeHandle)>/globalmount and SetUpAt bind
+// mounts that into the pod directory, so the global mount is a mount reference
+// of the pod-local one. Matching on the directory name instead would be
+// ambiguous: an inline ephemeral volume is named after its entry in the pod
+// spec, which is not unique on the node, and it never stages a global mount of
+// its own, so every name match it produced would be someone else's volume.
+func findGlobalMountDataFromPodMount(host volume.VolumeHost, mountPath string) (string, map[string]string, error) {
+	podMountPath := filepath.Join(mountPath, "mount")
+	refs, err := volumeutil.GetReliableMountRefs(host.GetMounter(), podMountPath)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to read mount references for %q: %w", podMountPath, err)
+	}
+
+	for _, ref := range refs {
+		if filepath.Base(ref) != globalMountInGlobalPath {
+			continue
+		}
+		// A directory named globalmount that carries a vol_data.json with both
+		// keys MountDevice writes is a CSI global mount. Checking the contents
+		// rather than the path prefix keeps this correct when the kubelet root
+		// is reached through a symlink, where the mount table reports the
+		// resolved path and GetPluginDir does not.
+		dir := filepath.Dir(ref)
+		data, err := loadVolumeData(dir, volDataFileName)
+		if err != nil {
+			klog.V(4).Info(log("skipping mount reference %s with no readable volume data: %v", ref, err))
+			continue
+		}
+		if data[volDataKey.driverName] == "" || data[volDataKey.volHandle] == "" {
+			klog.V(4).Info(log("skipping mount reference %s, volume data names no driver or handle", ref))
+			continue
+		}
+		return dir, data, nil
+	}
+	return "", nil, fmt.Errorf("no CSI global mount is bind mounted at %q", podMountPath)
 }
 
 func getCSISourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, error) {
