@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	apistorage "k8s.io/apiserver/pkg/storage"
@@ -34,6 +35,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // namespaceStrategy implements behavior for Namespaces
@@ -97,7 +100,22 @@ func (namespaceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 // Validate validates a new namespace.
 func (namespaceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	namespace := obj.(*api.Namespace)
+	addDRAAdminAccessAuditAnnotation(ctx, namespace, nil)
 	return validation.ValidateNamespace(namespace)
+}
+
+func addDRAAdminAccessAuditAnnotation(ctx context.Context, namespace, oldNamespace *api.Namespace) {
+	if namespace.Labels[resourceapi.DRAAdminNamespaceLabelKey] != "true" {
+		return
+	}
+
+	// Avoid audit noise from unrelated updates when administrative access
+	// was already enabled for the namespace.
+	if oldNamespace != nil && oldNamespace.Labels[resourceapi.DRAAdminNamespaceLabelKey] == "true" {
+		return
+	}
+
+	audit.AddAuditAnnotation(ctx, resourceapi.DRAAdminNamespaceLabelKey, "true")
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -138,8 +156,13 @@ func (namespaceStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (namespaceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateNamespace(obj.(*api.Namespace))
-	return append(errorList, validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))...)
+	newNamespace := obj.(*api.Namespace)
+	oldNamespace := old.(*api.Namespace)
+
+	addDRAAdminAccessAuditAnnotation(ctx, newNamespace, oldNamespace)
+
+	errorList := validation.ValidateNamespace(newNamespace)
+	return append(errorList, validation.ValidateNamespaceUpdate(newNamespace, oldNamespace)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
