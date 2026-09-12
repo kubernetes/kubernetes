@@ -29,7 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -414,8 +414,8 @@ func TestApplySandboxResources(t *testing.T) {
 
 	for i, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.draEnabled)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRANodeAllocatableResources, test.draEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, test.podLevelResourcesEnabled)
 
 		err = m.applySandboxResources(tCtx, test.pod, config)
 		require.NoError(t, err)

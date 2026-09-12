@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -200,7 +201,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	// have been populated. When PodLevelResourcesFixDefaulting is enabled, this
 	// defaulting is deferred to PrepareForCreate so it runs after admission webhooks
 	// have injected all containers, giving a complete view of the pod.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
 		defaultHugePagePodLimits(obj)
 		defaultPodRequests(obj)

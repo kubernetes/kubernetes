@@ -22,8 +22,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -76,7 +76,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// adjustment. Otherwise, only container-level memory requests are used. See
 	// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#oom-score-adjustment
 	// for more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) &&
 		resourcehelper.IsPodLevelRequestsSet(pod) {
 		// TODO(ndixita): Refactor to use this formula in all cases, as
 		// remainingReqPerContainer will be 0 when pod-level resources are not set.
@@ -97,7 +97,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		// This ensures the OOM score adjustment i.e. minMemoryOomScoreAdjust
 		// calculation remains consistent
 		//  with how we handle pod-level memory requests for regular containers.
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) &&
 			resourcehelper.IsPodLevelRequestsSet(pod) {
 			minMemoryRequest += remainingReqPerContainer
 		}
@@ -142,7 +142,7 @@ func isSidecarContainer(pod *v1.Pod, container *v1.Container) bool {
 // is divided equally among the sharing containers.
 func getEffectiveContainerMemoryRequest(pod *v1.Pod, container *v1.Container) int64 {
 	memReq := container.Resources.Requests.Memory().Value()
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRANodeAllocatableResources) {
 		return memReq
 	}
 

@@ -26,7 +26,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 )
 
 const (
@@ -1081,8 +1081,8 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 	}
 	for name, test := range oomTests {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesFeatureEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, test.podLevelResourcesFeatureEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
 			listContainers := test.pod.Spec.InitContainers
 			listContainers = append(listContainers, test.pod.Spec.Containers...)
 			for _, container := range listContainers {

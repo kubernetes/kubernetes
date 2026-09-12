@@ -25,10 +25,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // deviceClassStrategy implements behavior for DeviceClass objects
@@ -97,7 +97,7 @@ func dropDisabledFields(newClass, oldClass *resource.DeviceClass) {
 }
 
 func dropDisabledDRAExtendedResourceFields(newClass, oldClass *resource.DeviceClass) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) {
 		return
 	}
 	if draExtendedResourceFeatureInUse(oldClass) {

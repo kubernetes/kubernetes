@@ -51,8 +51,8 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -95,16 +95,16 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 //   - client rate limit is set to 5000.
 func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
 	var runtimeConfig []string
-	if enabledFeatures[features.DynamicResourceAllocation] {
+	if enabledFeatures[schedulerfeatures.DynamicResourceAllocation] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapi.SchemeGroupVersion))
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcev1beta2.SchemeGroupVersion))
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcev1beta1.SchemeGroupVersion))
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcealpha.SchemeGroupVersion))
 	}
-	if enabledFeatures[features.GenericWorkload] {
+	if enabledFeatures[schedulerfeatures.GenericWorkload] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", schedulingapiv1beta1.SchemeGroupVersion))
 	}
-	if enabledFeatures[features.CompositePodGroup] {
+	if enabledFeatures[schedulerfeatures.CompositePodGroup] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", schedulingapiv1alpha3.SchemeGroupVersion))
 	}
 	customFlags := []string{
@@ -151,7 +151,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	runGC := util.CreateGCController(tCtx, tCtx, *cfg, informerFactory)
 	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, informerFactory)
 	runResourceClaimController := func() {}
-	if enabledFeatures[features.DynamicResourceAllocation] {
+	if enabledFeatures[schedulerfeatures.DynamicResourceAllocation] {
 		// Testing of DRA with inline resource claims depends on this
 		// controller for creating and removing ResourceClaims.
 		runResourceClaimController = util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory)

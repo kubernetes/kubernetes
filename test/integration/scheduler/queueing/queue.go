@@ -39,7 +39,7 @@ import (
 	"k8s.io/component-helpers/storage/volume"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -2572,12 +2572,12 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 // moved properly upon their registered events.
 func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	t.Helper()
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	if tt.EnableDRAExtendedResource {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAExtendedResource, true)
 	}
 	if tt.EnableNodeDeclaredFeatures {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, true)
 
 		mockFeature := ndftesting.NewMockFeature(t)
 		mockFeature.SetName("FeatureA")
@@ -2592,7 +2592,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	}
 	if tt.EnableGenericWorkload {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.GenericWorkload: true,
+			schedulerfeatures.GenericWorkload: true,
 		})
 	}
 	logger, _ := ktesting.NewTestContext(t)

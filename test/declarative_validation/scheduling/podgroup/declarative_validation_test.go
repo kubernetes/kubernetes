@@ -26,10 +26,10 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/scheduling/podgroup"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 
@@ -341,11 +341,11 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
-				features.CompositePodGroup:               tc.enableCompositePodGroup,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
+				schedulerfeatures.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs)
 		})
@@ -589,11 +589,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
-				features.CompositePodGroup:               tc.enableCompositePodGroup,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
+				schedulerfeatures.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			strategy := registry.NewStrategy()
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy, tc.expectedErrs)

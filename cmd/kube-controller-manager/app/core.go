@@ -38,6 +38,7 @@ import (
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	pkgcontroller "k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -772,7 +773,7 @@ func newVolumeAttributesClassProtectionControllerDescriptor() *ControllerDescrip
 		name:        names.VolumeAttributesClassProtectionController,
 		constructor: newVolumeAttributesClassProtectionController,
 		requiredFeatureGates: []featuregate.Feature{
-			features.VolumeAttributesClass,
+			schedulerfeatures.VolumeAttributesClass,
 		},
 	}
 }

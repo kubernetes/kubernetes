@@ -21,18 +21,18 @@ package allocation
 import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 )
 
 func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg, reason string) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		return false, "InPlacePodVerticalScaling is disabled", "feature_gate_off"
 	}
 	return true, "", ""
 }
 
 func IsInPlacePodLevelResourcesVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg, reason string) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) {
 		return false, "InPlacePodLevelResourcesVerticalScaling is disabled", "plr_feature_gate_off"
 	}
 	return true, "", ""

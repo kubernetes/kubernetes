@@ -39,6 +39,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -232,7 +233,7 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 				},
 			},
 			enableFeatures: map[featuregate.Feature]bool{
-				features.PodLevelResources: true,
+				schedulerfeatures.PodLevelResources: true,
 			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
@@ -270,8 +271,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			},
 			cpuSets: map[string]cpuset.CPUSet{},
 			enableFeatures: map[featuregate.Feature]bool{
-				features.PodLevelResources:        true,
-				features.PodLevelResourceManagers: true,
+				schedulerfeatures.PodLevelResources: true,
+				features.PodLevelResourceManagers:   true,
 			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod: 100000,
@@ -291,8 +292,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			},
 			cpuSets: map[string]cpuset.CPUSet{},
 			enableFeatures: map[featuregate.Feature]bool{
-				features.PodLevelResources:        true,
-				features.PodLevelResourceManagers: true,
+				schedulerfeatures.PodLevelResources: true,
+				features.PodLevelResourceManagers:   true,
 			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod: 100000,
@@ -312,8 +313,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			},
 			cpuSets: map[string]cpuset.CPUSet{},
 			enableFeatures: map[featuregate.Feature]bool{
-				features.PodLevelResources:        true,
-				features.PodLevelResourceManagers: false,
+				schedulerfeatures.PodLevelResources: true,
+				features.PodLevelResourceManagers:   false,
 			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
@@ -331,8 +332,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			containerResources: v1.ResourceRequirements{},
 			cpuSets:            map[string]cpuset.CPUSet{},
 			enableFeatures: map[featuregate.Feature]bool{
-				features.PodLevelResources:        true,
-				features.PodLevelResourceManagers: false,
+				schedulerfeatures.PodLevelResources: true,
+				features.PodLevelResourceManagers:   false,
 			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod: 100000,
@@ -367,7 +368,7 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			for feature, enabled := range test.enableFeatures {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, enabled)
 
-				if feature == features.PodLevelResources && test.podResources != nil {
+				if feature == schedulerfeatures.PodLevelResources && test.podResources != nil {
 					pod.Spec.Resources = test.podResources
 				}
 			}
@@ -809,7 +810,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.draNodeAllocatable)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRANodeAllocatableResources, test.draNodeAllocatable)
 		linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
 		assert.NoError(t, err)
 
@@ -1269,7 +1270,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 		}
 
 		testPod := &v1.Pod{}
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, test.podLevelResourcesEnabled)
 		if test.podLevelResourcesEnabled {
 			testPod.Spec.Resources = &test.podResources
 		}
@@ -1837,8 +1838,8 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, tc.draNodeAllocatable)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResources)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRANodeAllocatableResources, tc.draNodeAllocatable)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, tc.podLevelResources)
 
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2806,7 +2807,7 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 	m.memoryReservationPolicy = kubeletconfiginternal.NoneMemoryReservationPolicy
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 
 	containerRequest := resource.MustParse("256Mi")
 	containerLimit := resource.MustParse("512Mi")

@@ -54,6 +54,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/devicemetadata"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	testdriverapp "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
@@ -760,7 +761,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
 		}
 
-		framework.Context("partitionable typed view", f.WithFeatureGate(features.DRAPartitionableDevices), f.WithFeatureGate(features.DRAPartitionableDevicesType), func() {
+		framework.Context("partitionable typed view", f.WithFeatureGate(schedulerfeatures.DRAPartitionableDevices), f.WithFeatureGate(features.DRAPartitionableDevicesType), func() {
 			pnodes := drautils.NewNodes(f, 1, 1)
 			pdriver := drautils.NewDriver(f, pnodes, drautils.PartitionableResources(true))
 			pdriver.WithKubelet = false
@@ -777,7 +778,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			})
 		})
 
-		framework.Context("partitionable pool without a partition type", f.WithFeatureGate(features.DRAPartitionableDevices), func() {
+		framework.Context("partitionable pool without a partition type", f.WithFeatureGate(schedulerfeatures.DRAPartitionableDevices), func() {
 			cnodes := drautils.NewNodes(f, 1, 1)
 			cdriver := drautils.NewDriver(f, cnodes, drautils.PartitionableResources(false))
 			cdriver.WithKubelet = false
@@ -791,7 +792,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			})
 		})
 
-		framework.Context("shareable view", f.WithFeatureGate(features.DRAConsumableCapacity), func() {
+		framework.Context("shareable view", f.WithFeatureGate(schedulerfeatures.DRAConsumableCapacity), func() {
 			snodes := drautils.NewNodes(f, 1, 1)
 			sdriver := drautils.NewDriver(f, snodes, drautils.ShareableResources(2))
 			sdriver.WithKubelet = false
@@ -2318,7 +2319,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(tCtx, pod, expectedEnv...)
 		})
 
-		f.It("supports requests with alternatives", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
+		f.It("supports requests with alternatives", f.WithFeatureGate(schedulerfeatures.DRAPrioritizedList), func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
 			claimName := "external-multiclaim"
 			parameters, _ := b.ParametersEnv()
@@ -2399,7 +2400,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(tCtx, pod, expectedEnv...)
 		})
 
-		f.It("supports requests with alternatives", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
+		f.It("supports requests with alternatives", f.WithFeatureGate(schedulerfeatures.DRAPrioritizedList), func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
 			claimName := "external-multiclaim"
 			parameters, _ := b.ParametersEnv()
@@ -2856,20 +2857,20 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	framework.Context("control plane", func() { multiNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on multiple nodes", func() { multiNodeTests(true) })
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPrioritizedList), prioritizedListTests)
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(schedulerfeatures.DRAPrioritizedList), prioritizedListTests)
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), consumableCapacityTests)
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(schedulerfeatures.DRAConsumableCapacity), consumableCapacityTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta1 API", v1beta1Tests)
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta2 API", v1beta2Tests)
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPartitionableDevices), partitionableDevicesTests)
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(schedulerfeatures.DRAPartitionableDevices), partitionableDevicesTests)
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.DRAWorkloadResourceClaims), f.WithKubeletMinVersion("1.36"), podGroupResourceClaimTests)
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(schedulerfeatures.GenericWorkload), f.WithFeatureGate(schedulerfeatures.DRAWorkloadResourceClaims), f.WithKubeletMinVersion("1.36"), podGroupResourceClaimTests)
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAOptionalNodeOperations), optionalNodeOperationsTests)
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(schedulerfeatures.DRAOptionalNodeOperations), optionalNodeOperationsTests)
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRADeviceTaints), func() {
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(schedulerfeatures.DRADeviceTaints), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false), drautils.TaintAllDevices(resourceapi.DeviceTaint{
 			Key:    "example.com/taint",
@@ -2897,7 +2898,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(tCtx, pod)
 		})
 
-		f.It("DeviceTaintRule evicts pod", f.WithFeatureGate(features.DRADeviceTaintRules), func(ctx context.Context) {
+		f.It("DeviceTaintRule evicts pod", f.WithFeatureGate(schedulerfeatures.DRADeviceTaintRules), func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
 			pod, template := b.PodInline()
 			template.Spec.Spec.Devices.Requests[0].Exactly.Tolerations = []resourceapi.DeviceToleration{{
@@ -2959,7 +2960,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}))))
 		})
 
-		f.Context(f.WithFeatureGate(features.DRAWorkloadResourceClaims), f.WithFeatureGate(features.GenericWorkload), f.WithLabel("KubeletMinVersion:1.36"), func() {
+		f.Context(f.WithFeatureGate(schedulerfeatures.DRAWorkloadResourceClaims), f.WithFeatureGate(schedulerfeatures.GenericWorkload), f.WithLabel("KubeletMinVersion:1.36"), func() {
 			f.It("NoSchedule keeps pod with PodGroup claim pending", func(ctx context.Context) {
 				tCtx := f.TContext(ctx)
 				workload, template := b.WorkloadInline()
@@ -2983,7 +2984,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				b.TestPod(tCtx, pod)
 			})
 
-			f.It("DeviceTaintRule evicts pod with PodGroup claim", f.WithFeatureGate(features.DRADeviceTaintRules), func(ctx context.Context) {
+			f.It("DeviceTaintRule evicts pod with PodGroup claim", f.WithFeatureGate(schedulerfeatures.DRADeviceTaintRules), func(ctx context.Context) {
 				tCtx := f.TContext(ctx)
 				workload, template := b.WorkloadInline()
 				podGroupTemplate := workload.Spec.PodGroupTemplates[0]
@@ -3050,7 +3051,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	})
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRADeviceTaints), func() {
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(schedulerfeatures.DRADeviceTaints), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false), drautils.TaintAllDevices(resourceapi.DeviceTaint{
 			Key:    "example.com/taint",
@@ -3165,7 +3166,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	// Any test using implicit resource names (aka <class>.deviceclass.resource.k8s.io/devices) is limited
 	// to kubelet >= 1.35 because there was a bug in 1.34. Other tests can run with kubelet >= 1.34 when
 	// the feature was introduced.
-	framework.Context(f.WithFeatureGate(features.DRAExtendedResource), feature.DynamicResourceAllocation, func() {
+	framework.Context(f.WithFeatureGate(schedulerfeatures.DRAExtendedResource), feature.DynamicResourceAllocation, func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false))
 		b := drautils.NewBuilder(f, driver)
@@ -3655,7 +3656,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	})
 
-	framework.Context(f.WithFeatureGate(features.DRAExtendedResource), feature.DynamicResourceAllocation, func() {
+	framework.Context(f.WithFeatureGate(schedulerfeatures.DRAExtendedResource), feature.DynamicResourceAllocation, func() {
 		nodes := drautils.NewNodes(f, 2, 2)
 		nodes.NumReservedNodes = 1
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(2, false))
@@ -3841,7 +3842,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}).Should(gomega.MatchError(gomega.ContainSubstring("exceeded quota: object-count, requested: count/resourceclaims.resource.k8s.io=1, used: count/resourceclaims.resource.k8s.io=1, limited: count/resourceclaims.resource.k8s.io=1")), "creating second claim not allowed")
 		})
 
-		f.It("must be impossible for a node ServiceAccount to update the non-node ResourceClaim.Status.Devices once allocated", f.WithFeatureGate(features.DRAResourceClaimDeviceStatus), func(ctx context.Context) {
+		f.It("must be impossible for a node ServiceAccount to update the non-node ResourceClaim.Status.Devices once allocated", f.WithFeatureGate(schedulerfeatures.DRAResourceClaimDeviceStatus), func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
 			claim := b.ExternalClaim()
 			pod := b.PodExternal(claim.Name)
@@ -3888,7 +3889,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("cannot arbitrary-node:update"))
 		})
 
-		f.It("must be possible for a control-plane ServiceAccount to update the ResourceClaim.Status.Devices once allocated", f.WithFeatureGate(features.DRAResourceClaimDeviceStatus), func(ctx context.Context) {
+		f.It("must be possible for a control-plane ServiceAccount to update the ResourceClaim.Status.Devices once allocated", f.WithFeatureGate(schedulerfeatures.DRAResourceClaimDeviceStatus), func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
 			claim := b.ExternalClaim()
 			pod := b.PodExternal(claim.Name)
@@ -4216,7 +4217,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			mustDelete(f.ClientSet, "admin", createdClusterSlice)
 		})
 
-		f.It("must be possible for a node ServiceAccount to update the node ResourceClaim.Status.Devices once allocated", f.WithFeatureGate(features.DRAResourceClaimDeviceStatus), func(ctx context.Context) {
+		f.It("must be possible for a node ServiceAccount to update the node ResourceClaim.Status.Devices once allocated", f.WithFeatureGate(schedulerfeatures.DRAResourceClaimDeviceStatus), func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
 			claim := b.ExternalClaim()
 			pod := b.PodExternal(claim.Name)

@@ -27,10 +27,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // podGroupStrategy implements behavior for PodGroup objects.
@@ -82,10 +82,10 @@ func (*podGroupStrategy) Validate(ctx context.Context, obj runtime.Object) field
 // mapped to whether each is enabled.
 func (*podGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
 	return rest.DeclarativeValidationConfig{Options: map[string]bool{
-		string(features.TopologyAwareWorkloadScheduling): utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling),
-		string(features.DRAWorkloadResourceClaims):       utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
-		string(features.PodGroupPreemptionPolicy):        utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
-		string(features.CompositePodGroup):               utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup),
+		string(schedulerfeatures.TopologyAwareWorkloadScheduling): utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.TopologyAwareWorkloadScheduling),
+		string(schedulerfeatures.DRAWorkloadResourceClaims):       utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAWorkloadResourceClaims),
+		string(schedulerfeatures.PodGroupPreemptionPolicy):        utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodGroupPreemptionPolicy),
+		string(schedulerfeatures.CompositePodGroup):               utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.CompositePodGroup),
 	}}
 }
 
@@ -189,7 +189,7 @@ func dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup *scheduling.PodGr
 	if oldPodGroup != nil {
 		oldPodGroupSpec = &oldPodGroup.Spec
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldPodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldPodGroupSpec) {
 		// No need to drop anything.
 		return
 	}
@@ -200,7 +200,7 @@ func dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup *scheduling.PodGr
 // from the new PodGroup if the TopologyAwareWorkloadScheduling feature gate is disabled
 // and it was not used in the old PodGroup.
 func dropDisabledSchedulingConstraintsFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) || schedulingConstraintsInUse(oldPodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.TopologyAwareWorkloadScheduling) || schedulingConstraintsInUse(oldPodGroupSpec) {
 		// No need to drop anything.
 		return
 	}
@@ -210,7 +210,7 @@ func dropDisabledSchedulingConstraintsFields(podGroupSpec, oldPodGroupSpec *sche
 // dropDisabledDRAWorkloadResourceClaimsFields removes resource claim references
 // unless they are already used by the old PodGroup spec.
 func dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldPodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldPodGroupSpec) {
 		// No need to drop anything.
 		return
 	}
@@ -220,7 +220,7 @@ func dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec *
 // dropDisabledPreemptionPolicyField removes the PreemptionPolicy field unless it is
 // already used in the old PodGroup spec.
 func dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldPodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldPodGroupSpec) {
 		// No need to drop anything.
 		return
 	}
@@ -246,7 +246,7 @@ func parentCompositePodGroupNameInUse(podGroupSpec *scheduling.PodGroupSpec) boo
 // dropDisabledParentCompositePodGroupNameField removes the ParentCompositePodGroupName field
 // unless it is already used in the old PodGroup spec.
 func dropDisabledParentCompositePodGroupNameField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) || parentCompositePodGroupNameInUse(oldPodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.CompositePodGroup) || parentCompositePodGroupNameInUse(oldPodGroupSpec) {
 		// No need to drop anything.
 		return
 	}

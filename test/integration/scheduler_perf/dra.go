@@ -37,7 +37,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
@@ -158,8 +158,8 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	claimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
-		EnableDeviceTaintRules:   utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
-		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableDeviceTaintRules:   utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaintRules),
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAConsumableCapacity),
 		SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
 		KubeClient:               tCtx.Client(),
 	}
@@ -184,7 +184,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 			reflect.TypeFor[*v1.Node]():                   true,
 		},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaintRules) {
 		expectSyncResult.Synced[reflect.TypeFor[*resourceapi.DeviceTaintRule]()] = true
 	}
 	if diff := cmp.Diff(expectSyncResult, syncResult,
@@ -201,8 +201,8 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	}
 
 	celCache := cel.NewCache(10, cel.Features{
-		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
-		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAListTypeAttributes),
 	})
 
 	// Also wait for the assume cache to catch up.
@@ -262,12 +262,12 @@ claims:
 			AggregatedCapacity:       aggregatedCapacity,
 		}
 		allocator, err := structured.NewAllocator(tCtx, structured.Features{
-			PrioritizedList:      utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
-			AdminAccess:          utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
-			ConsumableCapacity:   utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
-			CompatibilityGroups:  utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceCompatibilityGroups),
+			PrioritizedList:      utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAPrioritizedList),
+			AdminAccess:          utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAAdminAccess),
+			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaints),
+			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAPartitionableDevices),
+			ConsumableCapacity:   utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAConsumableCapacity),
+			CompatibilityGroups:  utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceCompatibilityGroups),
 		}, allocatedState, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 

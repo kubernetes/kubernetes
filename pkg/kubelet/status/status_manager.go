@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1133,7 +1134,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	defer m.podStatusesLock.Unlock()
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		if conds, exists := m.podResizeConditions[uid]; exists {
 			m.observeDeferredResizeDuration(uid, conds.PodResizePending, metrics.DeferredResizeResolutionTerminated)
 			delete(m.podResizeConditions, uid)
@@ -1151,7 +1152,7 @@ func (m *manager) RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.U
 		if _, ok := podUIDs[key]; !ok {
 			logger.V(5).Info("Removing pod from status map", "podUID", key)
 			delete(m.podStatuses, key)
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 				if conds, exists := m.podResizeConditions[key]; exists {
 					m.observeDeferredResizeDuration(key, conds.PodResizePending, metrics.DeferredResizeResolutionTerminated)
 					delete(m.podResizeConditions, key)

@@ -55,6 +55,7 @@ import (
 	core "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -3206,7 +3207,7 @@ func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if !tc.featureGateEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.36"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, false)
 			}
 
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)

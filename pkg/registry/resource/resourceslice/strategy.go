@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
@@ -227,7 +228,7 @@ func draPartitionableDevicesTypeFeatureInUse(slice *resource.ResourceSlice) bool
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) || draDeviceTaintsFeatureInUse(oldSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaints) || draDeviceTaintsFeatureInUse(oldSlice) {
 		return
 	}
 
@@ -250,7 +251,7 @@ func draDeviceTaintsFeatureInUse(slice *resource.ResourceSlice) bool {
 }
 
 func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices) || draPartitionableDevicesFeatureInUse(oldSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAPartitionableDevices) || draPartitionableDevicesFeatureInUse(oldSlice) {
 		return
 	}
 
@@ -265,7 +266,7 @@ func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.Reso
 }
 
 func dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAResourceClaimDeviceStatus) ||
 		draBindingConditionsFeatureInUse(oldSlice) {
 		return
 	}
@@ -336,7 +337,7 @@ func draConsumableCapacityFeatureInUse(slice *resource.ResourceSlice) bool {
 // dropDisabledDRAConsumableCapacityFields drops AllowMultipleAllocations and RequestPolicy
 // fields from the new slice if they were not used in the old slice.
 func dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAConsumableCapacity) ||
 		draConsumableCapacityFeatureInUse(oldSlice) {
 		// No need to drop anything.
 		return
@@ -373,7 +374,7 @@ func draDeviceCompatibilityGroupsFeatureInUse(slice *resource.ResourceSlice) boo
 // DRADeviceCompatibilityGroups feature is disabled and the field was not
 // already in use in the old slice.
 func dropDisabledDRADeviceCompatibilityGroupsFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceCompatibilityGroups) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceCompatibilityGroups) ||
 		draDeviceCompatibilityGroupsFeatureInUse(oldSlice) {
 		// No need to drop anything.
 		return
@@ -387,7 +388,7 @@ func dropDisabledDRADeviceCompatibilityGroupsFields(newSlice, oldSlice *resource
 }
 
 func dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) || draNodeAllocatableResourcesFeatureInUse(oldSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRANodeAllocatableResources) || draNodeAllocatableResourcesFeatureInUse(oldSlice) {
 		return
 	}
 
@@ -410,7 +411,7 @@ func draNodeAllocatableResourcesFeatureInUse(slice *resource.ResourceSlice) bool
 }
 
 func dropDisableDRAListTypeAttributesFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAListTypeAttributes) ||
 		draListTypeAttributesFeatureInUse(oldSlice) {
 		return
 	}
@@ -454,7 +455,7 @@ func draListTypeAttributesFeatureInUse(slice *resource.ResourceSlice) bool {
 }
 
 func dropDisabledDRAOptionalNodeOperationsFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) || draOptionalNodeOperationsFeatureInUse(oldSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAOptionalNodeOperations) || draOptionalNodeOperationsFeatureInUse(oldSlice) {
 		return
 	}
 

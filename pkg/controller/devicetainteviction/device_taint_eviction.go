@@ -54,10 +54,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
-	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -732,7 +732,7 @@ func (tc *Controller) countTaintedDevices(rule *resourceapi.DeviceTaintRule) (nu
 // New creates a new Controller that will use passed clientset to communicate with the API server.
 // Spawns no goroutines. That happens in Run.
 func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, ruleInformer resourceinformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
-	return newWithFeatures(c, podInformer, claimInformer, sliceInformer, ruleInformer, classInformer, controllerName, utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims))
+	return newWithFeatures(c, podInformer, claimInformer, sliceInformer, ruleInformer, classInformer, controllerName, utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAWorkloadResourceClaims))
 }
 
 func newWithFeatures(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, ruleInformer resourceinformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string, workloadResourceClaimsEnabled bool) *Controller {
@@ -768,7 +768,7 @@ func newWithFeatures(c clientset.Interface, podInformer coreinformers.PodInforme
 	// The informer for DeviceTaintRules only gets instantiated if the corresponding
 	// feature is enabled. If disabled, nothings is done with (eviction) or for (status)
 	// any DeviceTaintRule.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaintRules) {
 		tc.ruleInformer = ruleInformer
 		tc.ruleLister = ruleInformer.Lister()
 		tc.haveSynced = append(tc.haveSynced, ruleInformer.Informer().HasSyncedChecker())

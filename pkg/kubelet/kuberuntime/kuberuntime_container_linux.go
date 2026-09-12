@@ -39,6 +39,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -99,7 +100,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(ctx context.Con
 // getCPULimit returns the CPU limit for the container to be used to calculate
 // Linux Container Resources.
 func getCPULimit(pod *v1.Pod, container *v1.Container, draAllocations v1.ResourceList) *resource.Quantity {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		// When container-level CPU limit is not set, the pod-level
 		// limit is used in the calculation for components relying on linux resource limits
 		// to be set.
@@ -125,7 +126,7 @@ func getCPULimit(pod *v1.Pod, container *v1.Container, draAllocations v1.Resourc
 // getMemoryLimit returns the memory limit for the container to be used to calculate
 // Linux Container Resources.
 func getMemoryLimit(pod *v1.Pod, container *v1.Container, draAllocations v1.ResourceList) *resource.Quantity {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		// When container-level memory limit is not set, the pod-level
 		// limit is used in the calculation for components relying on linux resource limits
 		// to be set.
@@ -173,7 +174,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 	}
 
 	draAllocations := make(v1.ResourceList)
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRANodeAllocatableResources) {
 		draAllocations = resourcehelper.GetContainerDRAAllocations(pod, container.Name)
 	}
 	memoryLimit := getMemoryLimit(pod, container, draAllocations)
@@ -220,7 +221,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 		// skip container-level memory.high — the pod cgroup's memory.high handles
 		// throttling hierarchically (kernel walks ancestors in try_charge_memcg).
 		skipContainerMemoryHigh := memoryLimitSpec == 0 &&
-			utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) &&
+			utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) &&
 			resourcehelper.IsPodLevelResourcesSet(pod) &&
 			!pod.Spec.Resources.Limits.Memory().IsZero()
 		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh && (memoryRequest != memoryLimitSpec || memoryRequest == 0) {
@@ -419,7 +420,7 @@ func GetHugepageLimitsFromResources(ctx context.Context, pod *v1.Pod, containerR
 
 	// When hugepage limits are specified at pod level and no hugepage limits are
 	// specified at container level, the container's cgroup will reflect the pod level limit.
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		for limitName, limitAmount := range pod.Spec.Resources.Limits {
 			readAndDefineRequiredHugepageLimit(ctx, requiredHugepageLimits, limitName, limitAmount)
 		}
@@ -450,7 +451,7 @@ func GetHugepageLimitsFromResources(ctx context.Context, pod *v1.Pod, containerR
 
 			// Determine if a pod-level limit is set for this specific hugepage resource.
 			podLevelLimitsSet := false
-			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && pod.Spec.Resources != nil {
+			if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) && pod.Spec.Resources != nil {
 				_, podLevelLimitsSet = pod.Spec.Resources.Limits[resourceObj]
 			}
 			_, containerSpecLimitsSet := containerResources.Limits[resourceObj]

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -126,7 +127,7 @@ func TestPodGroupProtectionControllerRBAC(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, test.enableFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.GenericWorkload, test.enableFeatureGate)
 
 			var foundRole *rbacv1.ClusterRole
 			for i, role := range ControllerRoles() {
@@ -211,8 +212,8 @@ func TestJobControllerSchedulingRules(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: tc.workloadWithJob,
-				features.WorkloadWithJob: tc.workloadWithJob,
+				schedulerfeatures.GenericWorkload: tc.workloadWithJob,
+				features.WorkloadWithJob:          tc.workloadWithJob,
 			})
 			got := hasSchedulingRules(ControllerRoles())
 			if got != tc.wantSchedulingRules {

@@ -38,6 +38,7 @@ import (
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -721,7 +722,7 @@ func (kl *Kubelet) setNodeStatus(ctx context.Context, node *v1.Node) {
 			logger.Error(err, "Failed to set some node status fields", "node", klog.KObj(node))
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && kl.nodeDeclaredFeatures != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.NodeDeclaredFeatures) && kl.nodeDeclaredFeatures != nil {
 		node.Status.DeclaredFeatures = kl.nodeDeclaredFeatures
 	}
 }

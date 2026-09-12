@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -112,7 +113,7 @@ func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
 func (p *pvcEvaluator) Matches(resourceQuota *corev1.ResourceQuota, item runtime.Object) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 		return generic.Matches(resourceQuota, item, p.MatchingResources, pvcMatchesScopeFunc)
 	}
 	return generic.Matches(resourceQuota, item, p.MatchingResources, generic.MatchesNoScopeFunc)
@@ -120,7 +121,7 @@ func (p *pvcEvaluator) Matches(resourceQuota *corev1.ResourceQuota, item runtime
 
 // MatchingScopes takes the input specified list of scopes and input object. Returns the set of scopes resource matches.
 func (p *pvcEvaluator) MatchingScopes(item runtime.Object, scopeSelectors []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 		matchedScopes := []corev1.ScopedResourceSelectorRequirement{}
 		for _, selector := range scopeSelectors {
 			match, err := pvcMatchesScopeFunc(selector, item)
@@ -139,7 +140,7 @@ func (p *pvcEvaluator) MatchingScopes(item runtime.Object, scopeSelectors []core
 // UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
 // It returns the scopes which are in limited scopes but don't have a corresponding covering quota scope
 func (p *pvcEvaluator) UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourceSelectorRequirement, matchedQuotaScopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 		uncoveredScopes := []corev1.ScopedResourceSelectorRequirement{}
 		for _, selector := range limitedScopes {
 			isCovered := false
@@ -248,7 +249,7 @@ func (p *pvcEvaluator) getStorageUsage(pvc *corev1.PersistentVolumeClaim) *resou
 
 // UsageStats calculates aggregate usage for the object.
 func (p *pvcEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 		return generic.CalculateUsageStats(options, p.listFuncByNamespace, pvcMatchesScopeFunc, p.Usage)
 	}
 	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
@@ -279,7 +280,7 @@ func RequiresQuotaReplenish(pvc, oldPVC *corev1.PersistentVolumeClaim) bool {
 			return true
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 		oldNames := getReferencedVolumeAttributesClassNames(oldPVC)
 		newNames := getReferencedVolumeAttributesClassNames(pvc)
 		if !oldNames.Equal(newNames) {

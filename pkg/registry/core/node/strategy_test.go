@@ -31,9 +31,9 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
@@ -421,7 +421,7 @@ func TestDropNodeDeclaredFeaturesFieldDuringCreate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if !tc.featureGateEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.36"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, false)
 			}
 
 			nodeCreate := tc.initialNode.DeepCopy()
@@ -523,7 +523,7 @@ func TestDropNodeDeclaredFeaturesFieldDuringUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if !tc.featureGateEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.36"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, false)
 			}
 
 			newNode := tc.newNode.DeepCopy()
@@ -613,7 +613,7 @@ func TestDropPodPreemptionPolicy(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tc.featureGateEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption, tc.featureGateEnabled)
 
 			newNode := tc.newNode.DeepCopy()
 			if tc.oldNode == nil {

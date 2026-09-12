@@ -25,10 +25,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -67,7 +67,7 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(ctx context.Context
 	if !kubetypes.IsCriticalPod(admitPod) {
 		return failureReasons, nil
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption) {
 		if operation == lifecycle.ResizeOperation {
 			// For in-place pod resizes, the scheduler owns all preemption decisions.
 			// When a resize cannot be accommodated immediately on the node, Kubelet defers the

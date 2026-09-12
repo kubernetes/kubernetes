@@ -48,6 +48,7 @@ import (
 	crierror "k8s.io/cri-api/pkg/errors"
 	remote "k8s.io/cri-client/pkg"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -693,7 +694,7 @@ func containerResourcesFromRequirements(podRequirements, containerRequirements *
 		cpuRequest:    containerRequirements.Requests.Cpu().MilliValue(),
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) {
 		return resources
 	}
 
@@ -749,7 +750,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	}
 
 	var actuatedPodResources *v1.ResourceRequirements
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) {
 		actuatedPodResources, _ = m.actuatedState.GetPodLevelResources(pod.UID)
 	}
 
@@ -826,7 +827,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 }
 
 func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		return
 	}
 	if _, ok := m.actuatedState.GetPodResourceInfo(allocatedPod.UID); ok {
@@ -1078,7 +1079,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && podContainerChanges.UpdatePodLevelResources {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) && podContainerChanges.UpdatePodLevelResources {
 			if err = updateActuatedPodLevelResources(rName); err != nil {
 				logger.Error(err, "Failed to update pod-level actuated resources", "resource", rName, "pod", klog.KObj(pod))
 			}
@@ -1503,7 +1504,7 @@ func (m *kubeGenericRuntimeManager) startingResizedContainer(logger klog.Logger,
 			logger.V(4).Info("Actuated resources missing for container", "pod", format.Pod(pod), "container", c.Name)
 		}
 		var actuatedPodResources *v1.ResourceRequirements
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) {
 			actuatedPodResources, _ = m.actuatedState.GetPodLevelResources(pod.UID)
 		}
 		desired := containerResourcesFromRequirements(pod.Spec.Resources, &c.Resources)
@@ -1548,7 +1549,7 @@ func (m *kubeGenericRuntimeManager) getContainersToReset(containers []v1.Contain
 }
 
 func (m *kubeGenericRuntimeManager) computePodLevelResourcesResizeAction(ctx context.Context, pod *v1.Pod) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) {
 		return false
 	}
 	logger := klog.FromContext(ctx)
@@ -1713,7 +1714,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		sysctl.ConvertPodSysctlsVariableToDotsSeparator(pod.Spec.SecurityContext)
 
 		// Prepare resources allocated by the Dynammic Resource Allocation feature for the pod
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 			if err := m.runtimeHelper.PrepareDynamicResources(ctx, pod); err != nil {
 				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 				if referr != nil {
@@ -2332,7 +2333,7 @@ func (m *kubeGenericRuntimeManager) ListPodSandboxMetrics(ctx context.Context) (
 
 func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error {
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		return nil
 	}
 
@@ -2404,7 +2405,7 @@ func (m *kubeGenericRuntimeManager) isContainerResourceResizeInProgress(allocate
 
 			actuatedResources, _ := m.actuatedState.GetContainerResources(allocatedPod.UID, allocatedContainer.Name)
 			allocatedResources := allocatedContainer.Resources
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+			if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) {
 				allocatedResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: allocatedPod.Spec.Resources, ContainerResources: &allocatedContainer.Resources})
 			}
 
@@ -2416,7 +2417,7 @@ func (m *kubeGenericRuntimeManager) isContainerResourceResizeInProgress(allocate
 }
 
 func (m *kubeGenericRuntimeManager) isPodLevelResourcesResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) {
 		return false
 	}
 

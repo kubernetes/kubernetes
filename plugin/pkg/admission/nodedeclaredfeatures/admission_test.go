@@ -36,9 +36,9 @@ import (
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	apisresource "k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestAdmission(t *testing.T) {
@@ -241,7 +241,7 @@ func TestAdmission(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if !tc.featureGateEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, tc.featureGateEnabled)
 			}
 
 			target, err := NewPlugin()
@@ -709,7 +709,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, !tc.draFeatureGateDisabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRANodeAllocatableResources, !tc.draFeatureGateDisabled)
 
 			client := fake.NewClientset(tc.nodes...)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)

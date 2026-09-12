@@ -37,8 +37,8 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/klog/v2/ktesting"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -605,7 +605,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			otherOwnedClaims = testCase.otherClaims
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAExtendedResource, true)
 			if testCase.evaluator == nil {
 				testCase.evaluator = evaluator
 			}
@@ -693,7 +693,7 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAExtendedResource, true)
 			actual := evaluator.MatchingResources(testCase.items)
 
 			if diff := cmp.Diff(testCase.want, actual); diff != "" {

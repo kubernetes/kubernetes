@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	e2efeature "k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -132,7 +132,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity scoring", func() {
 		for _, t := range tests {
 			test := t
 			f.It(test.name,
-				framework.WithFeatureGate(features.StorageCapacityScoring),
+				framework.WithFeatureGate(schedulerfeatures.StorageCapacityScoring),
 				func(ctx context.Context) {
 					nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 					framework.ExpectNoError(err, "get schedulable nodes")

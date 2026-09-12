@@ -36,6 +36,7 @@ import (
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
@@ -120,7 +121,7 @@ func TestNonPreemption(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.SchedulerAsyncPreemption, asyncPreemptionEnabled)
 
 				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{preemptor, victim})
 				preemptor.Spec.PreemptionPolicy = test.PreemptionPolicy
@@ -200,7 +201,7 @@ func TestDisablePreemption(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.SchedulerAsyncPreemption, asyncPreemptionEnabled)
 
 				pods := make([]*v1.Pod, len(test.existingPods))
 				// Create and run existingPods.
@@ -310,7 +311,7 @@ func TestPodPriorityResolution(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.Name, asyncPreemptionEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.SchedulerAsyncPreemption, asyncPreemptionEnabled)
 
 				pod, err := runPausePod(cs, test.Pod)
 				if err != nil {
@@ -402,7 +403,7 @@ func TestPreemptionStarvation(t *testing.T) {
 			for _, test := range tests {
 				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-						features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+						schedulerfeatures.SchedulerAsyncPreemption:     asyncPreemptionEnabled,
 						features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
 					})
 
@@ -516,7 +517,7 @@ func TestPreemptionRaces(t *testing.T) {
 			for _, test := range tests {
 				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-						features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+						schedulerfeatures.SchedulerAsyncPreemption:     asyncPreemptionEnabled,
 						features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
 					})
 
@@ -804,7 +805,7 @@ func TestPDBInPreemption(t *testing.T) {
 			for _, test := range tests {
 				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-						features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+						schedulerfeatures.SchedulerAsyncPreemption:     asyncPreemptionEnabled,
 						features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
 					})
 
@@ -1191,7 +1192,7 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 			for _, test := range tests {
 				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-						features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+						schedulerfeatures.SchedulerAsyncPreemption:     asyncPreemptionEnabled,
 						features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
 					})
 

@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
@@ -808,9 +808,9 @@ func TestPodGroupInterleaving(t *testing.T) {
 				}
 				t.Run(fmt.Sprintf("%s (TopologyAwareWorkloadScheduling: %v, CompositePodGroup: %v)", tt.name, tasEnabled, cpgEnabled), func(t *testing.T) {
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-						features.GenericWorkload:                 true,
-						features.TopologyAwareWorkloadScheduling: tasEnabled,
-						features.CompositePodGroup:               cpgEnabled,
+						schedulerfeatures.GenericWorkload:                 true,
+						schedulerfeatures.TopologyAwareWorkloadScheduling: tasEnabled,
+						schedulerfeatures.CompositePodGroup:               cpgEnabled,
 					})
 
 					testCtx := testutils.InitTestSchedulerWithOptions(

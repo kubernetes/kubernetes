@@ -33,8 +33,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -157,7 +157,7 @@ func TestPodConstraintsFunc(t *testing.T) {
 	}
 	evaluator := NewPodEvaluator(nil, clock.RealClock{})
 	for testName, test := range testCases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, test.podLevelResourcesEnabled)
 
 		err := evaluator.Constraints(test.required, test.pod)
 		switch {
@@ -654,7 +654,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 	t.Parallel()
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 			actual, err := evaluator.Usage(testCase.pod)
 			if err != nil {
 				t.Error(err)

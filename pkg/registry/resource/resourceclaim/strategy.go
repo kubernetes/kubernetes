@@ -37,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/dynamic-resource-allocation/structured"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/resourceclaimspec"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -217,7 +218,7 @@ func (r *resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, o
 
 		// Only authorize driver device status if the claim is actually allocated since
 		// we drop all the device status when the claim is deallocated.
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) &&
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAResourceClaimDeviceStatus) &&
 			newClaim.Status.Allocation != nil {
 			errs = append(errs, resourceutils.AuthorizedForDeviceStatus(ctx, field.NewPath("status", "devices"), r.authorizer, newClaim.Status, oldClaim.Status)...)
 		}
@@ -274,7 +275,7 @@ func dropDisabledStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 }
 
 func dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAAdminAccess) {
 		// No need to drop anything.
 		return
 	}
@@ -323,7 +324,7 @@ func isDRAResourceClaimDeviceStatusInUse(claim *resource.ResourceClaim) bool {
 
 func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 	// drop resourceClaim.Status.Devices field if feature gate is not enabled and it was not in use
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse(oldClaim) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse(oldClaim) {
 		newClaim.Status.Devices = nil
 	}
 }
@@ -335,7 +336,7 @@ func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource
 // this in the apiserver avoids having to update clients which might be unaware
 // of the status feature.
 func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse(oldClaim) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse(oldClaim) {
 		return
 	}
 
@@ -424,7 +425,7 @@ func draDeviceBindingConditionsInUse(claim *resource.ResourceClaim) bool {
 // dropDisabledDRAResourceClaimConsumableCapacityStatusFields drops any new feature fields
 // from the newClaim status if they were not used in the oldClaim.
 func dropDisabledDRAResourceClaimConsumableCapacityStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAConsumableCapacity) ||
 		draConsumableCapacityFeatureInUse(oldClaim) {
 		// No need to drop anything.
 		return
@@ -447,7 +448,7 @@ func dropDisabledDRAResourceClaimConsumableCapacityStatusFields(newClaim, oldCla
 // dropDeviceBindingConditionsFields drops any new feature fields
 // from the newClaim status if they were not used in the oldClaim.
 func dropDeviceBindingConditionsFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceBindingConditions) ||
 		draDeviceBindingConditionsInUse(oldClaim) {
 		// No need to drop anything.
 		return
@@ -462,7 +463,7 @@ func dropDeviceBindingConditionsFields(newClaim, oldClaim *resource.ResourceClai
 }
 
 func dropDisabledDRAOptionalNodeOperationsStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAOptionalNodeOperations) ||
 		draOptionalNodeOperationsStatusFeatureInUse(oldClaim) {
 		return
 	}

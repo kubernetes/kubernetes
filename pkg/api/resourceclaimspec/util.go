@@ -18,8 +18,8 @@ package resourceclaimspec
 
 import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // DropDisabledFields removes disabled fields from the spec unless they were in
@@ -39,7 +39,7 @@ func DropDisabledFields(new, old *resource.ResourceClaimSpec) {
 }
 
 func dropDisabledDRADeviceTaintsFields(new, old *resource.ResourceClaimSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaints) ||
 		draDeviceTaintsInUse(old) {
 		return
 	}
@@ -74,7 +74,7 @@ func draDeviceTaintsInUse(spec *resource.ResourceClaimSpec) bool {
 }
 
 func dropDisabledDRAPrioritizedListFields(new, old *resource.ResourceClaimSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAPrioritizedList) {
 		return
 	}
 	if draPrioritizedListFeatureInUse(old) {
@@ -101,7 +101,7 @@ func draPrioritizedListFeatureInUse(spec *resource.ResourceClaimSpec) bool {
 }
 
 func dropDisabledDRAAdminAccessFields(new, old *resource.ResourceClaimSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAAdminAccess) ||
 		DRAAdminAccessFeatureInUse(old) {
 		// No need to drop anything.
 		return
@@ -130,7 +130,7 @@ func DRAAdminAccessFeatureInUse(spec *resource.ResourceClaimSpec) bool {
 }
 
 func dropDisabledDRAResourceClaimConsumableCapacityFields(new, old *resource.ResourceClaimSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAConsumableCapacity) ||
 		DRAConsumableCapacityFeatureInUse(old) {
 		// No need to drop anything.
 		return
@@ -178,7 +178,7 @@ func DRAConsumableCapacityFeatureInUse(spec *resource.ResourceClaimSpec) bool {
 }
 
 func dropDisabledDRADerivedAttributesFields(new, old *resource.ResourceClaimSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADerivedAttributes) ||
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADerivedAttributes) ||
 		draDerivedAttributesInUse(old) {
 		return
 	}

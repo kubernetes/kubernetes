@@ -24,8 +24,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/component-helpers/storage/volume/assumecache"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -78,7 +78,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 			return nil, err
 		}
 
-		bestVol, err := volume.FindMatchingVolume(claim, volumes, nil /* node for topology binding*/, nil /* exclusion map */, delayBinding, utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass))
+		bestVol, err := volume.FindMatchingVolume(claim, volumes, nil /* node for topology binding*/, nil /* exclusion map */, delayBinding, utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass))
 		if err != nil {
 			return nil, err
 		}

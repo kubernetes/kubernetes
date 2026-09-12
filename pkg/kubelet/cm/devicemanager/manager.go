@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -872,7 +873,7 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		resource := string(k)
 		needed := int(v.Value())
 		logger.V(3).Info("Looking for needed resources", "resourceName", resource, "pod", klog.KObj(pod), "containerName", container.Name, "needed", needed)
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) && isDRAExtendedResource(pod, container.Name, resource) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) && isDRAExtendedResource(pod, container.Name, resource) {
 			// Skip extended resources managed by DRA
 			logger.V(3).Info("Skipping allocation for DRA-backed extended resource", "resourceName", resource, "pod", klog.KObj(pod), "containerName", container.Name)
 			continue
@@ -987,7 +988,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(ctx context.Context, pod *v1.
 		// A DRA-backed extended resource won't have device plugin state.
 		// We need to detect that and skip, because an earlier
 		// device-plugin resource with the same name may still be cached.
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) && isDRAExtendedResource(pod, container.Name, resource) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) && isDRAExtendedResource(pod, container.Name, resource) {
 			continue
 		}
 		if !m.isDevicePluginResource(resource) || v.Value() == 0 {

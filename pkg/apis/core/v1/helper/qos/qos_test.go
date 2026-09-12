@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	resourcehelper "k8s.io/component-helpers/resource"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -378,7 +379,7 @@ func TestComputePodQOS(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixKubeletQOSClass, testCase.podLevelResourcesFixKubeletQOSClassEnabled)
 			if actual := ComputePodQOS(testCase.pod); testCase.expected != actual {
 				t.Errorf("ComputePodQOS error: expected: %s, actual: %s;\npod = %s", testCase.expected, actual, prettyPrintPod(testCase.pod))

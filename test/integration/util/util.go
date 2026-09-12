@@ -57,6 +57,7 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
@@ -64,7 +65,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	"k8s.io/kubernetes/pkg/controlplane"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -544,7 +544,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 			if options.APIEnablement.RuntimeConfig == nil {
 				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{}
 			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 				options.APIEnablement.RuntimeConfig[resourceapi.SchemeGroupVersion.String()] = "true"
 				if utilfeature.DefaultMutableFeatureGate.EmulationVersion().LessThan(version.MustParse("v1.34.0")) {
 					// Cannot enable the resourceapi.SchemeGroupVersion when emulating < 1.34 unless
@@ -552,10 +552,10 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 					options.GenericServerRunOptions.RuntimeConfigEmulationForwardCompatible = true
 				}
 			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+			if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.GenericWorkload) {
 				options.APIEnablement.RuntimeConfig[schedulingapiv1beta1.SchemeGroupVersion.String()] = "true"
 			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+			if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.CompositePodGroup) {
 				options.APIEnablement.RuntimeConfig[schedulingapiv1alpha3.SchemeGroupVersion.String()] = "true"
 			}
 		},

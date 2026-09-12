@@ -22,15 +22,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	nodeapi "k8s.io/kubernetes/pkg/api/node"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // DropDisabledSpecFields removes disabled fields from the pv spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pv spec.
 func DropDisabledSpecFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.PersistentVolumeSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 		if oldPVSpec == nil || oldPVSpec.VolumeAttributesClassName == nil {
 			pvSpec.VolumeAttributesClassName = nil
 		}

@@ -26,6 +26,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	kcmfeatures "k8s.io/controller-manager/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 )
 
 // Every feature gate should have an entry here following this template:
@@ -152,12 +153,6 @@ const (
 	// Enable ClusterTrustBundle Kubelet projected volumes.  Depends on ClusterTrustBundle.
 	ClusterTrustBundleProjection featuregate.Feature = "ClusterTrustBundleProjection"
 
-	// owner: @tosi3k
-	// kep: https://kep.k8s.io/6012
-	//
-	// Enables support for CompositePodGroups.
-	CompositePodGroup featuregate.Feature = "CompositePodGroup"
-
 	// owner: @adrianreber
 	// kep: https://kep.k8s.io/2008
 	//
@@ -188,107 +183,6 @@ const (
 	// Enable usage of Provision of PVCs from snapshots in other namespaces
 	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
 
-	// owner: @ritazh
-	// kep: http://kep.k8s.io/5018
-	//
-	// Enables support for requesting admin access in a ResourceClaim.
-	// Admin access is granted even if a device is already in use and,
-	// depending on the DRA driver, may enable additional permissions
-	// when a container uses the allocated device.
-	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
-
-	// owner: @sunya-ch
-	// kep: https://kep.k8s.io/5075
-	//
-	// DRAConsumableCapacity
-	DRAConsumableCapacity featuregate.Feature = "DRAConsumableCapacity"
-
-	// owner: @gauravkghildiyal
-	// kep: http://kep.k8s.io/6080
-	//
-	// Enables support for derived attributes in Dynamic Resource Allocation (DRA).
-	DRADerivedAttributes featuregate.Feature = "DRADerivedAttributes"
-
-	// owner: @KobayashiD27
-	// kep: http://kep.k8s.io/5007
-	// alpha: v1.34
-	//
-	// Enables support for delaying the binding of pods
-	// which depend on devices with binding conditions.
-	//
-	// DRAResourceClaimDeviceStatus also needs to be
-	// enabled.
-	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
-
-	// owner: @omeryahud
-	// kep: https://kep.k8s.io/5963
-	//
-	// Enables drivers to declare opaque compatibility groups on each
-	// device.consumesCounters[] entry of a ResourceSlice. The scheduler then
-	// only co-allocates devices drawing from the same counter set when their
-	// declared groups intersect, moving detection of incompatible co-allocation
-	// (e.g. GPU MIG vs vGPU on one physical device) from preparation-time
-	// failure to scheduling-time rejection.
-	//
-	// DRAPartitionableDevices also needs to be enabled, since the field lives
-	// on consumesCounters[] entries which only exist for partitionable devices.
-	DRADeviceCompatibilityGroups featuregate.Feature = "DRADeviceCompatibilityGroups"
-
-	// owner: @pohly
-	// kep: http://kep.k8s.io/5055
-	//
-	// DeviceTaintRules allow administrators to add taints to devices.
-	DRADeviceTaintRules featuregate.Feature = "DRADeviceTaintRules"
-
-	// owner: @pohly
-	// kep: http://kep.k8s.io/5055
-	//
-	// Marking devices as tainted can prevent using them for new pods and/or
-	// cause pods using them to stop. Users can decide to tolerate taints.
-	DRADeviceTaints featuregate.Feature = "DRADeviceTaints"
-
-	// owner: @yliaog
-	// kep: http://kep.k8s.io/5004
-	//
-	// Enables support for providing extended resource requests backed by DRA.
-	DRAExtendedResource featuregate.Feature = "DRAExtendedResource"
-
-	// owner: @sunya-ch
-	// kep: https://kep.k8s.io/5075
-	//
-	// Enables fractional (milli-unit) values in CapacityRequestPolicyRange
-	// min, max, and step fields.
-	DRAFractionalCapacityRange featuregate.Feature = "DRAFractionalCapacityRange"
-
-	// owner: @everpeace
-	// kep: http://kep.k8s.io/5491
-	//
-	// Enable list type attributes for DRA devices in ResourceSlice
-	// and extends ResourceClaim's matchAttribute/distinctAttribute
-	// semantics so that they can work with list type attributes.
-	DRAListTypeAttributes featuregate.Feature = "DRAListTypeAttributes"
-
-	// owner: @pravk03
-	// kep: https://kep.k8s.io/5517
-	//
-	// Enables support for node allocatable resources backed by DRA.
-	DRANodeAllocatableResources featuregate.Feature = "DRANodeAllocatableResources"
-
-	// owner: @troychiu
-	// kep: http://kep.k8s.io/5945
-	//
-	// Enables support for declaring that node-local operations (preparation and
-	// clean-up) are optional for devices.
-	DRAOptionalNodeOperations featuregate.Feature = "DRAOptionalNodeOperations"
-
-	// owner: @mortent, @cici37
-	// kep: http://kep.k8s.io/4815
-	//
-	// Enables support for dynamically partitioning devices based on
-	// which parts of them were allocated during scheduling.
-	//
-	DRAPartitionableDevices featuregate.Feature = "DRAPartitionableDevices"
-
 	// owner: @nmn3m
 	// kep: http://kep.k8s.io/5677
 	//
@@ -298,21 +192,6 @@ const (
 	// (the field is only meaningful for pools with SharedCounters) and
 	// DRAResourcePoolStatus (the feature that consumes it).
 	DRAPartitionableDevicesType featuregate.Feature = "DRAPartitionableDevicesType"
-
-	// owner: @mortent
-	// kep: http://kep.k8s.io/4816
-	//
-	// Enables support for providing a prioritized list of requests
-	// for resources. The first entry that can be satisfied will
-	// be selected.
-	DRAPrioritizedList featuregate.Feature = "DRAPrioritizedList"
-
-	// owner: @LionelJouin
-	// kep: http://kep.k8s.io/4817
-	//
-	// Enables support the ResourceClaim.status.devices field and for setting this
-	// status from DRA drivers.
-	DRAResourceClaimDeviceStatus featuregate.Feature = "DRAResourceClaimDeviceStatus"
 
 	// owner: @aojea
 	// kep: http://kep.k8s.io/4817
@@ -330,20 +209,6 @@ const (
 	// Enables ResourcePoolStatusRequest API for querying DRA resource pool
 	// availability status.
 	DRAResourcePoolStatus featuregate.Feature = "DRAResourcePoolStatus"
-
-	// owner: @pohly
-	// kep: http://kep.k8s.io/4381
-	//
-	// Enables aborting the per-node Filter operation in the scheduler after
-	// a certain time (10 seconds by default, configurable in the DynamicResources
-	// scheduler plugin configuration).
-	DRASchedulerFilterTimeout featuregate.Feature = "DRASchedulerFilterTimeout"
-
-	// owner: @nojnhuh
-	// kep: https://kep.k8s.io/5729
-	//
-	// Enables support for reserving and replicating templated ResourceClaims for an entire PodGroup.
-	DRAWorkloadResourceClaims featuregate.Feature = "DRAWorkloadResourceClaims"
 
 	// owner: @VeraQin
 	// kep: https://kep.k8s.io/5996
@@ -378,14 +243,6 @@ const (
 	//
 	// DisableNodeKubeProxyVersion disable the status.nodeInfo.kubeProxyVersion field of v1.Node
 	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
-
-	// owner: @pohly
-	// kep: http://kep.k8s.io/4381
-	//
-	// Enables support for resources with custom parameters and a lifecycle
-	// that is independent of a Pod. Resource allocation is done by the scheduler
-	// based on "structured parameters".
-	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
 	// owner: @nispriha
 	// kep: https://kep.k8s.io/5502
@@ -441,11 +298,6 @@ const (
 	//
 	// Enables TLS support for gRPC health check probes.
 	GRPCContainerProbeTLS featuregate.Feature = "GRPCContainerProbeTLS"
-
-	// owner: @erictune @wojtek-t
-	//
-	// Enables support for generic Workload API.
-	GenericWorkload featuregate.Feature = "GenericWorkload"
 
 	// owner: @vinayakankugoyal @thockin
 	//
@@ -523,18 +375,6 @@ const (
 	// Enables adding the ImageVolume's digest to the pod's status.
 	ImageVolumeWithDigest featuregate.Feature = "ImageVolumeWithDigest"
 
-	// owner: @ndixita
-	// kep: https://kep.k8s.io/5419
-	//
-	// Enables specifying resources at pod-level.
-	InPlacePodLevelResourcesVerticalScaling featuregate.Feature = "InPlacePodLevelResourcesVerticalScaling"
-
-	// owner: @vinaykul,@tallclair
-	// kep: http://kep.k8s.io/1287
-	//
-	// Enables In-Place Pod Vertical Scaling
-	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
-
 	// owner: @tallclair @esotsal
 	//
 	// Allow resource resize for containers in Guaranteed pods with integer CPU requests ( default false ).
@@ -558,17 +398,6 @@ const (
 	//
 	// Allow in-place pod update of memory-backed volume size limit.
 	InPlacePodVerticalScalingMemoryBackedVolumes featuregate.Feature = "InPlacePodVerticalScalingMemoryBackedVolumes"
-
-	// owner: @natasha41575
-	// kep: https://kep.k8s.io/5836
-	//
-	// Enables scheduler-triggered preemption for deferred in-place pod vertical scaling pods.
-	InPlacePodVerticalScalingSchedulerPreemption featuregate.Feature = "InPlacePodVerticalScalingSchedulerPreemption"
-
-	// owner: @tetianakh
-	//
-	// Enables the fast path for inter-pod affinity calculations when the topology key is kubernetes.io/hostname.
-	InterPodAffinityHostnameFastPath featuregate.Feature = "InterPodAffinityHostnameFastPath"
 
 	// owner: @adrianmoisey @danwinship
 	// kep: https://kep.k8s.io/5495
@@ -696,12 +525,6 @@ const (
 	// Enables the MatchLabelKeys and MismatchLabelKeys in PodAffinity and PodAntiAffinity.
 	MatchLabelKeysInPodAffinity featuregate.Feature = "MatchLabelKeysInPodAffinity"
 
-	// owner: @denkensk
-	// kep: https://kep.k8s.io/3243
-	//
-	// Enable MatchLabelKeys in PodTopologySpread.
-	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
-
 	// owner: @mochizuki875
 	// kep: https://kep.k8s.io/3243
 	//
@@ -757,19 +580,6 @@ const (
 	// Gate for Node Lifecycle Controller to ensure that the Lease object actually is stale before marking a node unhealthy.
 	NodeControllerLeaseCircuitBreaker featuregate.Feature = "NodeControllerLeaseCircuitBreaker"
 
-	// owner: @pravk03, @tallclair
-	// kep: https://kep.k8s.io/5328
-	//
-	// Enables the DeclaredFeatures API in the NodeStatus, populated by the Kubelet. Also enables the scheduler filter using DeclaredFeatures.
-	NodeDeclaredFeatures featuregate.Feature = "NodeDeclaredFeatures"
-
-	// owner: @kerthcet
-	// kep: https://kep.k8s.io/3094
-	//
-	// Allow users to specify whether to take nodeAffinity/nodeTaint into consideration when
-	// calculating pod topology spread skew.
-	NodeInclusionPolicyInPodTopologySpread featuregate.Feature = "NodeInclusionPolicyInPodTopologySpread"
-
 	// owner: @rthallisey
 	// kep: https://kep.k8s.io/5683
 	//
@@ -788,22 +598,6 @@ const (
 	//
 	// Permits kubelet to run with swap enabled.
 	NodeSwap featuregate.Feature = "NodeSwap"
-
-	// owner: @sanposhiho, @wojtek-t
-	// kep: https://kep.k8s.io/5278
-	//
-	// Extends NominatedNodeName field to express expected pod placement, allowing
-	// both the scheduler and external components (e.g., Cluster Autoscaler, Karpenter, Kueue)
-	// to share pod placement intentions. This enables better coordination between
-	// components, prevents inappropriate node scale-downs, and helps the scheduler
-	// resume work after restarts.
-	NominatedNodeNameForExpectation featuregate.Feature = "NominatedNodeNameForExpectation"
-
-	// owner: @bwsalmon
-	// kep: https://kep.k8s.io/5598
-	//
-	// Enables opportunistic batching in the scheduler.
-	OpportunisticBatching featuregate.Feature = "OpportunisticBatching"
 
 	// owner: @tallclair
 	//
@@ -834,24 +628,12 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
-	// owner: @wojtek-t @argh4k
-	// kep: https://kep.k8s.io/5710
-	//
-	// Enables specifying PreemptionPolicy at podgroup level.
-	PodGroupPreemptionPolicy featuregate.Feature = "PodGroupPreemptionPolicy"
-
 	// owner: @KevinTMtz
 	// kep: https://kep.k8s.io/5526
 	//
 	// PodLevelResourceManagers enables pod-level resource management in the Topology, CPU, and Memory managers.
 	// This feature depends on the PodLevelResources feature.
 	PodLevelResourceManagers featuregate.Feature = "PodLevelResourceManagers"
-
-	// owner: @ndixita
-	// key: https://kep.k8s.io/2837
-	//
-	// Enables specifying resources at pod-level.
-	PodLevelResources featuregate.Feature = "PodLevelResources"
 
 	// owner: @ndixita
 	//
@@ -1017,32 +799,6 @@ const (
 	// Initial implementation focused on ReadWriteOncePod volumes.
 	SELinuxMountReadWriteOncePod featuregate.Feature = "SELinuxMountReadWriteOncePod"
 
-	// owner: @macsko
-	// kep: http://kep.k8s.io/5229
-	//
-	// Makes all API calls during scheduling asynchronous, by introducing a new kube-scheduler-wide way of handling such calls.
-	SchedulerAsyncAPICalls featuregate.Feature = "SchedulerAsyncAPICalls"
-
-	// owner: @sanposhiho
-	// kep: http://kep.k8s.io/4832
-	//
-	// Running some expensive operation within the scheduler's preemption asynchronously,
-	// which improves the scheduling latency when the preemption involves in.
-	SchedulerAsyncPreemption featuregate.Feature = "SchedulerAsyncPreemption"
-
-	// owner: @macsko
-	// kep: http://kep.k8s.io/5142
-	//
-	// Improves scheduling queue behavior by popping pods from the backoffQ when the activeQ is empty.
-	// This allows to process potentially schedulable pods ASAP, eliminating a penalty effect of the backoff queue.
-	SchedulerPopFromBackoffQ featuregate.Feature = "SchedulerPopFromBackoffQ"
-
-	// owner: @geetasg
-	// kep: https://kep.k8s.io/6132
-	//
-	// Enables PreQueueingHint extension point to narrow pod evaluation on events.
-	SchedulerPreQueueingHints featuregate.Feature = "SchedulerPreQueueingHints"
-
 	// owner: @atosatto @yuanchen8911
 	// kep: http://kep.k8s.io/3902
 	//
@@ -1128,13 +884,6 @@ const (
 	// which are not semantically significant (e.g. serialization differences or missing defaulted fields).
 	StatefulSetSemanticRevisionComparison featuregate.Feature = "StatefulSetSemanticRevisionComparison"
 
-	// owner: @cupnes
-	// kep: https://kep.k8s.io/4049
-	//
-	// Enables scoring nodes by available storage capacity with
-	// StorageCapacityScoring feature gate.
-	StorageCapacityScoring featuregate.Feature = "StorageCapacityScoring"
-
 	// owner: @ahutsunshine
 	//
 	// Allows namespace indexer for namespace scope resources in apiserver cache to accelerate list operations.
@@ -1167,19 +916,6 @@ const (
 	// unresponsive. The feature gate is enabled by default, but should only be used
 	// if the system supports the systemd watchdog feature and has it configured properly.
 	SystemdWatchdog = featuregate.Feature("SystemdWatchdog")
-
-	// owner: @helayoty
-	// kep: https://kep.k8s.io/5471
-	//
-	// Enables numeric comparison operators (Lt, Gt) for tolerations to match taints with threshold-based values.
-	TaintTolerationComparisonOperators featuregate.Feature = "TaintTolerationComparisonOperators"
-
-	// owner: @44past4
-	// kep: https://kep.k8s.io/5732
-	//
-	// Enables topology-aware workload scheduling feature in kube-scheduler and related PodGroup API fields.
-	// When enabled, scheduler will try various placements for a pod group and pick the best one.
-	TopologyAwareWorkloadScheduling featuregate.Feature = "TopologyAwareWorkloadScheduling"
 
 	// owner: @PiotrProkop
 	// kep: https://kep.k8s.io/3545
@@ -1225,26 +961,11 @@ const (
 	// Enables user namespace support for stateless pods.
 	UserNamespacesSupport featuregate.Feature = "UserNamespacesSupport"
 
-	// owner: @mattcarry, @sunnylovestiramisu
-	// kep: https://kep.k8s.io/3751
-	//
-	// Enables user specified volume attributes for persistent volumes, like iops and throughput.
-	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
-
 	// owner: @nispriha
 	// kep: https://kep.k8s.io/5855
 	//
 	// Enables bind mount options (noexec, nodev, nosuid) on volumeMounts.
 	VolumeBindMountOptions featuregate.Feature = "VolumeBindMountOptions"
-
-	// owner: @gnufied
-	// kep: https://kep.k8s.io/5030
-	// alpha: v1.35
-	// beta: v1.37
-	//
-	// Enables volume limit scaling for CSI drivers. This allows scheduler to
-	// co-ordinate better with cluster-autoscaler for storage limits.
-	VolumeLimitScaling featuregate.Feature = "VolumeLimitScaling"
 
 	// owner: @ksubrmnn
 	//
@@ -1376,10 +1097,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA}, // LockToDefault in 1.38
 	},
 
-	CompositePodGroup: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
 	ContainerCheckpoint: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
@@ -1398,86 +1115,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	DRAAdminAccess: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.36; remove in 1.39
-	},
-
-	DRAConsumableCapacity: {
-		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	DRADerivedAttributes: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	DRADeviceBindingConditions: {
-		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	DRADeviceCompatibilityGroups: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	DRADeviceTaintRules: {
-		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Beta},                    // Depends on an off-by-default beta API.
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: false}, // LockToDefault: true in 1.38; remove in 1.41
-	},
-
-	DRADeviceTaints: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: false}, // LockToDefault: true in 1.38; remove in 1.41
-	},
-
-	DRAExtendedResource: {
-		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.37; remove in 1.40
-	},
-
-	DRAFractionalCapacityRange: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.37")},
-	},
-
-	DRAListTypeAttributes: {
-		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	DRANodeAllocatableResources: {
-		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	DRAOptionalNodeOperations: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	DRAPartitionableDevices: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
-	},
-
 	DRAPartitionableDevicesType: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	DRAPrioritizedList: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-		// Remove completely in 1.40.
-	},
-
-	DRAResourceClaimDeviceStatus: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.40
 	},
 
 	DRAResourceClaimGranularStatusAuthorization: {
@@ -1486,15 +1125,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DRAResourcePoolStatus: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	DRASchedulerFilterTimeout: {
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	DRAWorkloadResourceClaims: {
-		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	DefaultPodSysctls: {
@@ -1517,14 +1147,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true}, // lock to default in 1.36 and remove in v1.39
-	},
-
-	DynamicResourceAllocation: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-		// TODO (https://github.com/kubernetes/kubernetes/issues/134459): remove completely in 1.38
 	},
 
 	EmptyDirVolumeMode: {
@@ -1561,11 +1183,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	GRPCContainerProbeTLS: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	GenericWorkload: {
-		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	GitRepoVolumeDriver: {
@@ -1634,17 +1251,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	InPlacePodLevelResourcesVerticalScaling: {
-		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	InPlacePodVerticalScaling: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.38
-	},
-
 	InPlacePodVerticalScalingExclusiveCPUs: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -1659,14 +1265,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	InPlacePodVerticalScalingMemoryBackedVolumes: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	InPlacePodVerticalScalingSchedulerPreemption: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	InterPodAffinityHostnameFastPath: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
@@ -1759,11 +1357,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
-	MatchLabelKeysInPodTopologySpread: {
-		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-	},
-
 	MatchLabelKeysInPodTopologySpreadSelectorMerge: {
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -1808,18 +1401,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	NodeDeclaredFeatures: {
-		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
-	NodeInclusionPolicyInPodTopologySpread: {
-		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	NodeLifecycleConditions: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -1835,15 +1416,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
-	},
-
-	NominatedNodeNameForExpectation: {
-		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	OpportunisticBatching: {
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	PLEGOnDemandRelist: {
@@ -1872,18 +1444,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	PodGroupPreemptionPolicy: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
 	PodLevelResourceManagers: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
-	},
-
-	PodLevelResources: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	PodLevelResourcesFixDefaulting: {
@@ -2014,22 +1577,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.39, locked to default in 1.36
 	},
 
-	SchedulerAsyncAPICalls: {
-		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Beta},
-	},
-
-	SchedulerAsyncPreemption: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	SchedulerPopFromBackoffQ: {
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-	},
-	SchedulerPreQueueingHints: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
 	SeparateTaintEvictionController: {
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37 (locked to default in 1.34)
@@ -2093,11 +1640,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	StorageCapacityScoring: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
-	},
-
 	StorageNamespaceIndex: {
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
@@ -2123,14 +1665,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	SystemdWatchdog: {
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remov in 1.37
-	},
-
-	TaintTolerationComparisonOperators: {
-		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	TopologyAwareWorkloadScheduling: {
-		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	TopologyManagerPolicyAlphaOptions: {
@@ -2164,20 +1698,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.39.
 	},
 
-	VolumeAttributesClass: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	VolumeBindMountOptions: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	VolumeLimitScaling: {
-		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	WinDSR: {
@@ -2405,6 +1927,205 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	schedulerfeatures.CompositePodGroup: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.DRAAdminAccess: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.36; remove in 1.39
+	},
+
+	schedulerfeatures.DRAConsumableCapacity: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.DRADerivedAttributes: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.DRADeviceBindingConditions: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.DRADeviceCompatibilityGroups: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.DRADeviceTaintRules: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Beta},                    // Depends on an off-by-default beta API.
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: false}, // LockToDefault: true in 1.38; remove in 1.41
+	},
+
+	schedulerfeatures.DRADeviceTaints: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: false}, // LockToDefault: true in 1.38; remove in 1.41
+	},
+
+	schedulerfeatures.DRAExtendedResource: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.37; remove in 1.40
+	},
+
+	schedulerfeatures.DRAFractionalCapacityRange: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.37")},
+	},
+
+	schedulerfeatures.DRAListTypeAttributes: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.DRANodeAllocatableResources: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.DRAOptionalNodeOperations: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.DRAPartitionableDevices: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.DRAPrioritizedList: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+		// Remove completely in 1.40.
+	},
+
+	schedulerfeatures.DRAResourceClaimDeviceStatus: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.40
+	},
+
+	schedulerfeatures.DRASchedulerFilterTimeout: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.DRAWorkloadResourceClaims: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.DynamicResourceAllocation: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+		// TODO (https://github.com/kubernetes/kubernetes/issues/134459): remove completely in 1.38
+	},
+
+	schedulerfeatures.GenericWorkload: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.InPlacePodLevelResourcesVerticalScaling: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.InPlacePodVerticalScaling: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.38
+	},
+
+	schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.InterPodAffinityHostnameFastPath: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.MatchLabelKeysInPodTopologySpread: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.NodeDeclaredFeatures: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	schedulerfeatures.NodeInclusionPolicyInPodTopologySpread: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	schedulerfeatures.NominatedNodeNameForExpectation: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.OpportunisticBatching: {
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.PodGroupPreemptionPolicy: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.PodLevelResources: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.SchedulerAsyncAPICalls: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.SchedulerAsyncPreemption: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.SchedulerPopFromBackoffQ: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+	schedulerfeatures.SchedulerPreQueueingHints: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.StorageCapacityScoring: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	schedulerfeatures.TaintTolerationComparisonOperators: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.TopologyAwareWorkloadScheduling: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	schedulerfeatures.VolumeAttributesClass: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	schedulerfeatures.VolumeLimitScaling: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	zpagesfeatures.ComponentFlagz: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -2457,8 +2178,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ClusterTrustBundleProjection: {ClusterTrustBundle},
 
-	CompositePodGroup: {GenericWorkload, TopologyAwareWorkloadScheduling},
-
 	ContainerCheckpoint: {},
 
 	ContainerRestartRules: {},
@@ -2469,45 +2188,11 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	CrossNamespaceVolumeDataSource: {},
 
-	DRAAdminAccess: {DynamicResourceAllocation},
+	DRAPartitionableDevicesType: {schedulerfeatures.DynamicResourceAllocation, schedulerfeatures.DRAPartitionableDevices, DRAResourcePoolStatus},
 
-	DRAConsumableCapacity: {DynamicResourceAllocation},
+	DRAResourceClaimGranularStatusAuthorization: {schedulerfeatures.DynamicResourceAllocation, schedulerfeatures.DRAResourceClaimDeviceStatus},
 
-	DRADerivedAttributes: {DynamicResourceAllocation},
-
-	DRADeviceBindingConditions: {DynamicResourceAllocation, DRAResourceClaimDeviceStatus},
-
-	DRADeviceCompatibilityGroups: {DynamicResourceAllocation, DRAPartitionableDevices},
-
-	DRADeviceTaintRules: {DRADeviceTaints}, // DynamicResourceAllocation is indirect.
-
-	DRADeviceTaints: {DynamicResourceAllocation},
-
-	DRAExtendedResource: {DynamicResourceAllocation},
-
-	DRAFractionalCapacityRange: {DRAConsumableCapacity},
-
-	DRAListTypeAttributes: {DynamicResourceAllocation},
-
-	DRANodeAllocatableResources: {DynamicResourceAllocation},
-
-	DRAOptionalNodeOperations: {DynamicResourceAllocation, NodeDeclaredFeatures},
-
-	DRAPartitionableDevices: {DynamicResourceAllocation},
-
-	DRAPartitionableDevicesType: {DynamicResourceAllocation, DRAPartitionableDevices, DRAResourcePoolStatus},
-
-	DRAPrioritizedList: {DynamicResourceAllocation},
-
-	DRAResourceClaimDeviceStatus: {}, // Soft dependency on DynamicResourceAllocation due to on/off-by-default conflict.
-
-	DRAResourceClaimGranularStatusAuthorization: {DynamicResourceAllocation, DRAResourceClaimDeviceStatus},
-
-	DRAResourcePoolStatus: {DynamicResourceAllocation},
-
-	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
-
-	DRAWorkloadResourceClaims: {DynamicResourceAllocation, GenericWorkload},
+	DRAResourcePoolStatus: {schedulerfeatures.DynamicResourceAllocation},
 
 	DefaultPodSysctls: {},
 
@@ -2516,8 +2201,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DisableCPUQuotaWithExclusiveCPUs: {},
 
 	DisableNodeKubeProxyVersion: {},
-
-	DynamicResourceAllocation: {},
 
 	EmptyDirVolumeMode: {},
 
@@ -2529,13 +2212,11 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ExecProbeTimeout: {},
 
-	ExtendWebSocketsToKubelet: {NodeDeclaredFeatures},
+	ExtendWebSocketsToKubelet: {schedulerfeatures.NodeDeclaredFeatures},
 
 	ExternalServiceAccountTokenSigner: {},
 
 	GRPCContainerProbeTLS: {},
-
-	GenericWorkload: {},
 
 	GitRepoVolumeDriver: {},
 
@@ -2543,7 +2224,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	GracefulNodeShutdownBasedOnPodPriority: {GracefulNodeShutdown},
 
-	H2CContainerProbe: {NodeDeclaredFeatures},
+	H2CContainerProbe: {schedulerfeatures.NodeDeclaredFeatures},
 
 	HPAConfigurableTolerance: {},
 
@@ -2563,27 +2244,19 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ImageVolumeWithDigest: {ImageVolume},
 
-	InPlacePodLevelResourcesVerticalScaling: {InPlacePodVerticalScaling, PodLevelResources, NodeDeclaredFeatures},
+	InPlacePodVerticalScalingExclusiveCPUs: {schedulerfeatures.InPlacePodVerticalScaling},
 
-	InPlacePodVerticalScaling: {},
+	InPlacePodVerticalScalingExclusiveMemory: {schedulerfeatures.InPlacePodVerticalScaling},
 
-	InPlacePodVerticalScalingExclusiveCPUs: {InPlacePodVerticalScaling},
+	InPlacePodVerticalScalingInitContainers: {schedulerfeatures.InPlacePodVerticalScaling, schedulerfeatures.NodeDeclaredFeatures},
 
-	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling},
-
-	InPlacePodVerticalScalingInitContainers: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
-
-	InPlacePodVerticalScalingMemoryBackedVolumes: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
-
-	InPlacePodVerticalScalingSchedulerPreemption: {InPlacePodVerticalScaling},
-
-	InterPodAffinityHostnameFastPath: {},
+	InPlacePodVerticalScalingMemoryBackedVolumes: {schedulerfeatures.InPlacePodVerticalScaling, schedulerfeatures.NodeDeclaredFeatures},
 
 	KubeProxyIPVS: {},
 
 	KubeProxyNFTablesLocalhostNodePorts: {},
 
-	KubeletAllocatedPodsEndpoint: {InPlacePodVerticalScaling},
+	KubeletAllocatedPodsEndpoint: {schedulerfeatures.InPlacePodVerticalScaling},
 
 	KubeletCgroupDriverFromCRI: {},
 
@@ -2613,9 +2286,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	MatchLabelKeysInPodAffinity: {},
 
-	MatchLabelKeysInPodTopologySpread: {},
-
-	MatchLabelKeysInPodTopologySpreadSelectorMerge: {MatchLabelKeysInPodTopologySpread},
+	MatchLabelKeysInPodTopologySpreadSelectorMerge: {schedulerfeatures.MatchLabelKeysInPodTopologySpread},
 
 	MaxUnavailableStatefulSet: {},
 
@@ -2633,19 +2304,11 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	NodeControllerLeaseCircuitBreaker: {featuregate.Feature(clientfeatures.AtomicFIFO)},
 
-	NodeDeclaredFeatures: {},
-
-	NodeInclusionPolicyInPodTopologySpread: {},
-
 	NodeLifecycleConditions: {},
 
 	NodeLogQuery: {},
 
 	NodeSwap: {},
-
-	NominatedNodeNameForExpectation: {},
-
-	OpportunisticBatching: {},
 
 	PLEGOnDemandRelist: {},
 
@@ -2657,15 +2320,11 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	PodDeletionCost: {},
 
-	PodGroupPreemptionPolicy: {GenericWorkload},
+	PodLevelResourceManagers: {schedulerfeatures.PodLevelResources},
 
-	PodLevelResourceManagers: {PodLevelResources},
+	PodLevelResourcesFixDefaulting: {schedulerfeatures.PodLevelResources},
 
-	PodLevelResources: {},
-
-	PodLevelResourcesFixDefaulting: {PodLevelResources},
-
-	PodLevelResourcesFixKubeletQOSClass: {PodLevelResources},
+	PodLevelResourcesFixKubeletQOSClass: {schedulerfeatures.PodLevelResources},
 
 	PodLogsQuerySplitStreams: {},
 
@@ -2697,13 +2356,13 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ReloadKubeletServerCertificateFile: {},
 
-	ResourceHealthStatus: {DynamicResourceAllocation},
+	ResourceHealthStatus: {schedulerfeatures.DynamicResourceAllocation},
 
 	ResourceHealthStatusMessage: {ResourceHealthStatus},
 
 	// RestartAllContainersOnContainerExits introduces a new container restart rule action.
 	// All restart rules will be dropped by API if ContainerRestartRules feature is not enabled.
-	RestartAllContainersOnContainerExits: {ContainerRestartRules, NodeDeclaredFeatures},
+	RestartAllContainersOnContainerExits: {ContainerRestartRules, schedulerfeatures.NodeDeclaredFeatures},
 
 	RotateKubeletServerCertificate: {},
 
@@ -2714,13 +2373,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	SELinuxMount: {},
 
 	SELinuxMountReadWriteOncePod: {},
-
-	SchedulerAsyncAPICalls: {},
-
-	SchedulerAsyncPreemption: {},
-
-	SchedulerPopFromBackoffQ:  {},
-	SchedulerPreQueueingHints: {},
 
 	SeparateTaintEvictionController: {},
 
@@ -2748,8 +2400,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	StatefulSetSemanticRevisionComparison: {},
 
-	StorageCapacityScoring: {},
-
 	StorageNamespaceIndex: {},
 
 	StorageVersionMigrator: {},
@@ -2760,10 +2410,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	SystemdWatchdog: {},
 
-	TaintTolerationComparisonOperators: {},
-
-	TopologyAwareWorkloadScheduling: {GenericWorkload},
-
 	TopologyManagerPolicyAlphaOptions: {},
 
 	TopologyManagerPolicyBetaOptions: {},
@@ -2772,15 +2418,11 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	TranslateStreamCloseWebsocketRequests: {},
 
-	UserNamespacesHostNetworkSupport: {UserNamespacesSupport, NodeDeclaredFeatures},
+	UserNamespacesHostNetworkSupport: {UserNamespacesSupport, schedulerfeatures.NodeDeclaredFeatures},
 
 	UserNamespacesSupport: {},
 
-	VolumeAttributesClass: {},
-
 	VolumeBindMountOptions: {},
-
-	VolumeLimitScaling: {},
 
 	WinDSR: {},
 
@@ -2792,7 +2434,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	WindowsHostNetwork: {},
 
-	WorkloadWithJob: {GenericWorkload},
+	WorkloadWithJob: {schedulerfeatures.GenericWorkload},
 
 	apiextensionsfeatures.CRDObservedGenerationTracking: {},
 
@@ -2872,6 +2514,85 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	kcmfeatures.CloudControllerManagerWatchBasedRoutesReconciliation: {},
 
 	kcmfeatures.CloudControllerManagerWebhook: {},
+
+	schedulerfeatures.CompositePodGroup: {schedulerfeatures.GenericWorkload, schedulerfeatures.TopologyAwareWorkloadScheduling},
+
+	schedulerfeatures.DRAAdminAccess: {schedulerfeatures.DynamicResourceAllocation},
+
+	schedulerfeatures.DRAConsumableCapacity: {schedulerfeatures.DynamicResourceAllocation},
+
+	schedulerfeatures.DRADerivedAttributes: {schedulerfeatures.DynamicResourceAllocation},
+
+	schedulerfeatures.DRADeviceBindingConditions: {schedulerfeatures.DynamicResourceAllocation, schedulerfeatures.DRAResourceClaimDeviceStatus},
+
+	schedulerfeatures.DRADeviceCompatibilityGroups: {schedulerfeatures.DynamicResourceAllocation, schedulerfeatures.DRAPartitionableDevices},
+
+	schedulerfeatures.DRADeviceTaintRules: {schedulerfeatures.DRADeviceTaints}, // DynamicResourceAllocation is indirect.
+
+	schedulerfeatures.DRADeviceTaints: {schedulerfeatures.DynamicResourceAllocation},
+
+	schedulerfeatures.DRAExtendedResource: {schedulerfeatures.DynamicResourceAllocation},
+
+	schedulerfeatures.DRAFractionalCapacityRange: {schedulerfeatures.DRAConsumableCapacity},
+
+	schedulerfeatures.DRAListTypeAttributes: {schedulerfeatures.DynamicResourceAllocation},
+
+	schedulerfeatures.DRANodeAllocatableResources: {schedulerfeatures.DynamicResourceAllocation},
+
+	schedulerfeatures.DRAOptionalNodeOperations: {schedulerfeatures.DynamicResourceAllocation, schedulerfeatures.NodeDeclaredFeatures},
+
+	schedulerfeatures.DRAPartitionableDevices: {schedulerfeatures.DynamicResourceAllocation},
+
+	schedulerfeatures.DRAPrioritizedList: {schedulerfeatures.DynamicResourceAllocation},
+
+	schedulerfeatures.DRAResourceClaimDeviceStatus: {}, // Soft dependency on DynamicResourceAllocation due to on/off-by-default conflict.
+
+	schedulerfeatures.DRASchedulerFilterTimeout: {schedulerfeatures.DynamicResourceAllocation},
+
+	schedulerfeatures.DRAWorkloadResourceClaims: {schedulerfeatures.DynamicResourceAllocation, schedulerfeatures.GenericWorkload},
+
+	schedulerfeatures.DynamicResourceAllocation: {},
+
+	schedulerfeatures.GenericWorkload: {},
+
+	schedulerfeatures.InPlacePodLevelResourcesVerticalScaling: {schedulerfeatures.InPlacePodVerticalScaling, schedulerfeatures.PodLevelResources, schedulerfeatures.NodeDeclaredFeatures},
+
+	schedulerfeatures.InPlacePodVerticalScaling: {},
+
+	schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption: {schedulerfeatures.InPlacePodVerticalScaling},
+
+	schedulerfeatures.InterPodAffinityHostnameFastPath: {},
+
+	schedulerfeatures.MatchLabelKeysInPodTopologySpread: {},
+
+	schedulerfeatures.NodeDeclaredFeatures: {},
+
+	schedulerfeatures.NodeInclusionPolicyInPodTopologySpread: {},
+
+	schedulerfeatures.NominatedNodeNameForExpectation: {},
+
+	schedulerfeatures.OpportunisticBatching: {},
+
+	schedulerfeatures.PodGroupPreemptionPolicy: {schedulerfeatures.GenericWorkload},
+
+	schedulerfeatures.PodLevelResources: {},
+
+	schedulerfeatures.SchedulerAsyncAPICalls: {},
+
+	schedulerfeatures.SchedulerAsyncPreemption: {},
+
+	schedulerfeatures.SchedulerPopFromBackoffQ:  {},
+	schedulerfeatures.SchedulerPreQueueingHints: {},
+
+	schedulerfeatures.StorageCapacityScoring: {},
+
+	schedulerfeatures.TaintTolerationComparisonOperators: {},
+
+	schedulerfeatures.TopologyAwareWorkloadScheduling: {schedulerfeatures.GenericWorkload},
+
+	schedulerfeatures.VolumeAttributesClass: {},
+
+	schedulerfeatures.VolumeLimitScaling: {},
 
 	zpagesfeatures.ComponentFlagz: {},
 

@@ -30,9 +30,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/structured"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -1280,8 +1280,8 @@ func TestValidateClaim(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAConsumableCapacity: scenario.consumableCapacityFeatureGate,
-				features.DRAListTypeAttributes: scenario.listTypeAttributesFeatureGate,
+				schedulerfeatures.DRAConsumableCapacity: scenario.consumableCapacityFeatureGate,
+				schedulerfeatures.DRAListTypeAttributes: scenario.listTypeAttributesFeatureGate,
 			})
 			errs := ValidateResourceClaim(scenario.claim)
 			assertFailures(t, scenario.wantFailures, errs)
@@ -2784,10 +2784,10 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAAdminAccess:               scenario.adminAccess,
-				features.DRAResourceClaimDeviceStatus: scenario.deviceStatusFeatureGate,
-				features.DRAPrioritizedList:           scenario.prioritizedListFeatureGate,
-				features.DRAConsumableCapacity:        scenario.consumableCapacityFeatureGate,
+				schedulerfeatures.DRAAdminAccess:               scenario.adminAccess,
+				schedulerfeatures.DRAResourceClaimDeviceStatus: scenario.deviceStatusFeatureGate,
+				schedulerfeatures.DRAPrioritizedList:           scenario.prioritizedListFeatureGate,
+				schedulerfeatures.DRAConsumableCapacity:        scenario.consumableCapacityFeatureGate,
 			})
 
 			scenario.oldClaim.ResourceVersion = "1"

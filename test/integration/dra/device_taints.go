@@ -35,8 +35,8 @@ import (
 	"k8s.io/client-go/informers"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	"k8s.io/client-go/tools/cache"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction"
-	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
@@ -143,7 +143,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 	// This works as long as this is the only test running it.
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	var ruleInformer resourceinformers.DeviceTaintRuleInformer
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaintRules) {
 		ruleInformer = informerFactory.Resource().V1().DeviceTaintRules()
 	}
 	controller := devicetainteviction.New(tCtx.Client(),

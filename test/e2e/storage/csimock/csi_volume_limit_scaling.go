@@ -29,7 +29,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("CSI Mock VolumeLimitScaling scheduling", framework.WithFeatureGate(features.VolumeLimitScaling), func() {
+var _ = utils.SIGDescribe("CSI Mock VolumeLimitScaling scheduling", framework.WithFeatureGate(schedulerfeatures.VolumeLimitScaling), func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-limit-sched")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

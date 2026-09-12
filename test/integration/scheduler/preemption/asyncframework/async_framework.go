@@ -37,7 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -211,9 +211,9 @@ type AsyncPreemptionTestConfig struct {
 // It enables required feature gates, creates required plugins and returns test context, preemption plugin and client set.
 func InitTestForAsyncPreemption(t *testing.T, config AsyncPreemptionTestConfig) (*testutils.TestContext, *defaultpreemption.DefaultPreemption, kubernetes.Interface) {
 	featuresOverrides := featuregatetesting.FeatureOverrides{
-		features.SchedulerAsyncAPICalls:   true,
-		features.SchedulerAsyncPreemption: true,
-		features.GenericWorkload:          config.EnableGenericWorkload,
+		schedulerfeatures.SchedulerAsyncAPICalls:   true,
+		schedulerfeatures.SchedulerAsyncPreemption: true,
+		schedulerfeatures.GenericWorkload:          config.EnableGenericWorkload,
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuresOverrides)
 

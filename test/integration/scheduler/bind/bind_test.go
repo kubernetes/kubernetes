@@ -24,7 +24,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutil "k8s.io/kubernetes/test/integration/util"
@@ -35,7 +35,7 @@ import (
 func TestDefaultBinder(t *testing.T) {
 	for _, asyncAPICallsEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("Async API calls enabled: %v", asyncAPICallsEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
 
 			testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, "", nil), 0)
 			testutil.SyncSchedulerInformerFactory(testCtx)

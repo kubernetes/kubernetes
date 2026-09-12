@@ -30,7 +30,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
@@ -836,9 +836,9 @@ func TestPodGroupQueueing(t *testing.T) {
 		for _, cpgEnabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload:                 true,
-					features.TopologyAwareWorkloadScheduling: cpgEnabled,
-					features.CompositePodGroup:               cpgEnabled,
+					schedulerfeatures.GenericWorkload:                 true,
+					schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+					schedulerfeatures.CompositePodGroup:               cpgEnabled,
 				})
 
 				var testCtx *testutils.TestContext
@@ -983,9 +983,9 @@ func TestPodGroupSequentialQueueing(t *testing.T) {
 		for _, cpgEnabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload:                 true,
-					features.TopologyAwareWorkloadScheduling: cpgEnabled,
-					features.CompositePodGroup:               cpgEnabled,
+					schedulerfeatures.GenericWorkload:                 true,
+					schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+					schedulerfeatures.CompositePodGroup:               cpgEnabled,
 				})
 
 				testCtx := testutils.InitTestSchedulerWithOptions(
@@ -1213,9 +1213,9 @@ func TestPodGroupRequeueRemainingOnSchedulingSuccess(t *testing.T) {
 		for _, cpgEnabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload:                 true,
-					features.TopologyAwareWorkloadScheduling: cpgEnabled,
-					features.CompositePodGroup:               cpgEnabled,
+					schedulerfeatures.GenericWorkload:                 true,
+					schedulerfeatures.TopologyAwareWorkloadScheduling: cpgEnabled,
+					schedulerfeatures.CompositePodGroup:               cpgEnabled,
 				})
 
 				var piPlugin *podInjectorPlugin

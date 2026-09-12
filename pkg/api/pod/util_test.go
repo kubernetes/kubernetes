@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -1216,11 +1217,11 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
 			overrides := featuregatetesting.FeatureOverrides{
-				features.DynamicResourceAllocation: tc.enabled,
-				features.DRAExtendedResource:       tc.extendedEnabled,
+				schedulerfeatures.DynamicResourceAllocation: tc.enabled,
+				schedulerfeatures.DRAExtendedResource:       tc.extendedEnabled,
 			}
 			if tc.enableDRANodeAllocatableResouces {
-				overrides[features.DRANodeAllocatableResources] = true
+				overrides[schedulerfeatures.DRANodeAllocatableResources] = true
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
 
@@ -1678,7 +1679,7 @@ func TestDropNodeInclusionPolicyFields(t *testing.T) {
 			if !test.enabled {
 				// TODO: this will be removed in 1.36
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, test.enabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeInclusionPolicyInPodTopologySpread, test.enabled)
 			}
 
 			dropDisabledFields(test.podSpec, nil, test.oldPodSpec, nil)
@@ -2672,7 +2673,7 @@ func Test_dropDisabledMatchLabelKeysFieldInTopologySpread(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, test.enabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.MatchLabelKeysInPodTopologySpread, test.enabled)
 
 			dropDisabledFields(test.podSpec, nil, test.oldPodSpec, nil)
 			if diff := cmp.Diff(test.wantPodSpec, test.podSpec); diff != "" {
@@ -3061,7 +3062,7 @@ func TestOldPodViolatesMatchLabelKeysValidationOption(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.MatchLabelKeysInPodTopologySpread:              tc.matchLabelKeysEnabled,
+				schedulerfeatures.MatchLabelKeysInPodTopologySpread:     tc.matchLabelKeysEnabled,
 				features.MatchLabelKeysInPodTopologySpreadSelectorMerge: tc.matchLabelKeysSelectorMergeEnabled,
 			})
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
@@ -3124,7 +3125,7 @@ func TestOldPodViolatesLegacyMatchLabelKeysValidationOption(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.MatchLabelKeysInPodTopologySpread:              tc.matchLabelKeysEnabled,
+				schedulerfeatures.MatchLabelKeysInPodTopologySpread:     tc.matchLabelKeysEnabled,
 				features.MatchLabelKeysInPodTopologySpreadSelectorMerge: tc.matchLabelKeysSelectorMergeEnabled,
 			})
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
@@ -3563,7 +3564,7 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 
 	for _, ippvsEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("InPlacePodVerticalScaling=%t", ippvsEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, ippvsEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, ippvsEnabled)
 
 			for _, oldPodInfo := range podInfo {
 				for _, newPodInfo := range podInfo {
@@ -3720,7 +3721,7 @@ func TestDropPodLevelResources(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, enabled)
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, enabled)
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -4885,7 +4886,7 @@ func TestValidateAllowSidecarResizePolicy(t *testing.T) {
 	for _, tc := range testCases {
 		for _, ippvsEnabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s/%t", tc.name, ippvsEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, ippvsEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, ippvsEnabled)
 
 				gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
 				expected := tc.wantOption || ippvsEnabled
@@ -6744,7 +6745,7 @@ func TestAllowTaintTolerationComparisonOperators(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, test.featureEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.TaintTolerationComparisonOperators, test.featureEnabled)
 			actual := allowTaintTolerationComparisonOperators(test.oldPodSpec)
 			if test.expected != actual {
 				t.Errorf("expected %v, got %v", test.expected, actual)
@@ -6828,7 +6829,7 @@ func TestDisabledSchedulingGroup(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, tc.enabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.GenericWorkload, tc.enabled)
 
 			oldPod := tc.oldPod.DeepCopy()
 			newPod := tc.newPod.DeepCopy()
@@ -7019,10 +7020,10 @@ func TestDropDisabledPodStatusFields_InPlacePodLevelResourcesVerticalScaling(t *
 			pod: func() *api.Pod { return nil },
 		},
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, true)
 	for _, ippvsEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("InPlacePodLevelResourcesVerticalScaling=%t", ippvsEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, ippvsEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodLevelResourcesVerticalScaling, ippvsEnabled)
 			for _, oldPodInfo := range testCases {
 				for _, newPodInfo := range testCases {
 					oldPodHasInPlacePodLevelResourcesVerticalScaling, oldPod := oldPodInfo.hasInPlacePodLevelResourcesVerticalScaling, oldPodInfo.pod()

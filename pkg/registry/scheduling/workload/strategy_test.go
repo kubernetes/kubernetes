@@ -31,8 +31,8 @@ import (
 
 	// Side-effect import: registers Workload with legacyscheme.Scheme so
 	// the ConvertToVersion calls below resolve the type.
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -485,10 +485,10 @@ func TestStrategyCreate(t *testing.T) {
 			workload := tc.obj.DeepCopy()
 
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
-				features.CompositePodGroup:               tc.enableCompositePodGroup,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 
 			Strategy.PrepareForCreate(ctx, workload)
@@ -1054,10 +1054,10 @@ func TestStrategyUpdate(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
-				features.CompositePodGroup:               tc.enableCompositePodGroup,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			oldWorkload := tc.oldObj.DeepCopy()
 			newWorkload := tc.newObj.DeepCopy()
@@ -1207,8 +1207,8 @@ func TestDropPodGroupTemplateResourceClaims(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAWorkloadResourceClaims: tc.enabled,
-				features.GenericWorkload:           tc.enabled,
+				schedulerfeatures.DRAWorkloadResourceClaims: tc.enabled,
+				schedulerfeatures.GenericWorkload:           tc.enabled,
 			})
 
 			oldWorkload := tc.oldWorkload.DeepCopy()
@@ -1327,9 +1327,9 @@ func TestDropCompositePodGroupTemplates(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.CompositePodGroup:               tc.enabled,
-				features.TopologyAwareWorkloadScheduling: tc.enabled,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.CompositePodGroup:               tc.enabled,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: tc.enabled,
 			})
 			var oldSpec *scheduling.WorkloadSpec
 			if tc.oldWorkload != nil {
@@ -1470,10 +1470,10 @@ func TestDropCompositePodGroupTemplatePreemptionPolicy(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.PodGroupPreemptionPolicy:        tc.enabled,
-				features.GenericWorkload:                 true,
-				features.CompositePodGroup:               true,
-				features.TopologyAwareWorkloadScheduling: true,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tc.enabled,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.CompositePodGroup:               true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: true,
 			})
 			var oldSpec *scheduling.WorkloadSpec
 			if tc.oldWorkload != nil {

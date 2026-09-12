@@ -33,6 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -2793,7 +2794,7 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
 			metrics.Register()
@@ -2909,7 +2910,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: false,
 			topology:  topoSingleSocketHT,
 		},
@@ -2924,7 +2925,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: false,
 			topology:  topoSingleSocketHT,
 		},
@@ -2939,7 +2940,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: false,
 			topology:  topoSingleSocketHT,
 		},
@@ -2956,7 +2957,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: false,
 			topology:  topoSingleSocketHT,
 		},
@@ -2972,7 +2973,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: true,
 			topology:  topoSingleSocketHT,
 		},
@@ -2989,7 +2990,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: false,
 			topology:  topoSingleSocketHT,
 		},
@@ -3005,7 +3006,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: false,
 			topology:  topoSingleSocketHT,
 		},
@@ -3020,7 +3021,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				[]*containerOptions{},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: true,
 			topology:  topoSingleSocketHT,
 		},
@@ -3035,7 +3036,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				[]*containerOptions{},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: false,
 			topology:  topoSingleSocketHT,
 		},
@@ -3050,7 +3051,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				[]*containerOptions{},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: true,
 			topology:  topoSingleSocketHT,
 		},
@@ -3066,7 +3067,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 				},
 			),
 			scope:     topologymanager.PodTopologyScope,
-			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			features:  map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
 			expectErr: false,
 			topology:  topoSingleSocketHT,
 		},

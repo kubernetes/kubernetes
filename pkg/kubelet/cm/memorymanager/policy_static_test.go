@@ -35,6 +35,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
@@ -2113,7 +2114,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 			if testCase.podLevelResourcesEnabled && !testCase.podLevelResourceManagersEnabled {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, false)
 			}
@@ -3974,7 +3975,7 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
 			p, s, err := initTests(t, &testCase, nil, nil)
@@ -4289,7 +4290,7 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
 			p, s, err := initTests(t, &testCase, nil, nil)
@@ -4763,7 +4764,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: nil,
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Valid: Only Guaranteed containers, PLR: Enabled, PLRM: Enabled",
@@ -4777,7 +4778,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: nil,
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Valid: Only podSharedPool containers, PLR: Enabled, PLRM: Enabled",
@@ -4791,7 +4792,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: nil,
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Valid: Pod-level == Guaranteed containers, has podSharedPool containers with request, PLR: Enabled, PLRM: Enabled",
@@ -4807,7 +4808,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: nil,
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Failure: Pod-level == Guaranteed containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
@@ -4822,7 +4823,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: fmt.Errorf("pod rejected, sum of exclusive container memory requests equals pod budget, leaving no memory for shared containers"),
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Valid: Pod-level resources with standard and restartable init containers, PLR: Enabled, PLRM: Enabled",
@@ -4838,7 +4839,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: nil,
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Valid: Pod-level resources equal init and standard container resources without non-guaranteed containers do not produce empty shared pool error, PLR: Enabled, PLRM: Enabled",
@@ -4853,7 +4854,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: nil,
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Failure: Pod-level resources when guaranteed sidecar that equals pod resources and then non-guaranteed init container produce empty shared pool error, PLR: Enabled, PLRM: Enabled",
@@ -4867,7 +4868,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: fmt.Errorf("pod rejected, pod has shared init containers but no memory available for them"),
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Valid: Pod-level resources when non-guaranteed standard init container first and then guaranteed sidecar container do not produce empty shared pool error, PLR: Enabled, PLRM: Enabled",
@@ -4881,7 +4882,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: nil,
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Valid: Pod-level resources when guaranteed standard init container first and then guaranteed sidecar container do not produce empty shared pool error, PLR: Enabled, PLRM: Enabled",
@@ -4895,7 +4896,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: nil,
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Failure: Pod-level == Restartable guaranteed init containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
@@ -4909,7 +4910,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: fmt.Errorf("pod rejected, sum of exclusive container memory requests equals pod budget, leaving no memory for shared containers"),
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 		{
 			name: "Valid: Pod-level resources with only restartable one init container and one standard container, PLR: Enabled, PLRM: Enabled",
@@ -4924,7 +4925,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 			),
 			scope:       topologymanager.PodTopologyScope,
 			expectedErr: nil,
-			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+			features:    map[featuregate.Feature]bool{schedulerfeatures.PodLevelResources: true, features.PodLevelResourceManagers: true},
 		},
 	}
 
@@ -5655,7 +5656,7 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
 			metrics.Register()

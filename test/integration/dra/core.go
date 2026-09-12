@@ -47,7 +47,7 @@ import (
 	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/integration/util"
@@ -374,14 +374,14 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		disabledFeaturesForSlice := sets.New[featuregate.Feature]()
 		for _, disabled := range disabledFeatures {
 			switch disabled {
-			case features.DRADeviceTaints:
+			case schedulerfeatures.DRADeviceTaints:
 				for e, device := range expectedSliceSpecs[i].Devices {
 					if device.Taints != nil {
 						expectedSliceSpecs[i].Devices[e].Taints = nil
 						disabledFeaturesForSlice.Insert(disabled)
 					}
 				}
-			case features.DRAPartitionableDevices:
+			case schedulerfeatures.DRAPartitionableDevices:
 				if expectedSliceSpecs[i].SharedCounters != nil {
 					expectedSliceSpecs[i].SharedCounters = nil
 					disabledFeaturesForSlice.Insert(disabled)
@@ -392,7 +392,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 						disabledFeaturesForSlice.Insert(disabled)
 					}
 				}
-			case features.DRADeviceBindingConditions:
+			case schedulerfeatures.DRADeviceBindingConditions:
 				for e, device := range expectedSliceSpecs[i].Devices {
 					if device.BindingConditions != nil || device.BindingFailureConditions != nil || device.BindsToNode != nil {
 						expectedSliceSpecs[i].Devices[e].BindingConditions = nil
@@ -401,12 +401,12 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 						disabledFeaturesForSlice.Insert(disabled)
 					}
 				}
-			case features.DRAOptionalNodeOperations:
+			case schedulerfeatures.DRAOptionalNodeOperations:
 				if expectedSliceSpecs[i].SkipNodeOperations != nil {
 					expectedSliceSpecs[i].SkipNodeOperations = nil
 					disabledFeaturesForSlice.Insert(disabled)
 				}
-			case features.DRADeviceCompatibilityGroups:
+			case schedulerfeatures.DRADeviceCompatibilityGroups:
 				for e := range expectedSliceSpecs[i].Devices {
 					for c := range expectedSliceSpecs[i].Devices[e].ConsumesCounters {
 						if expectedSliceSpecs[i].Devices[e].ConsumesCounters[c].CompatibilityGroups != nil {

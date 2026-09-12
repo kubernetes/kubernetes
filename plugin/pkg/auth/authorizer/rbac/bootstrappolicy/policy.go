@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -144,13 +145,13 @@ func viewRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses", "ingresses/status").RuleOrDie(),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaims/status", "resourceclaimtemplates").RuleOrDie())
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.GenericWorkload) {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads", "podgroups", "podgroups/status").RuleOrDie())
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.CompositePodGroup) {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("compositepodgroups", "compositepodgroups/status").RuleOrDie())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
@@ -194,13 +195,13 @@ func editRules() []rbacv1.PolicyRule {
 
 		rbacv1helpers.NewRule(ReadWrite...).Groups(coordinationGroup).Resources("leases").RuleOrDie(),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaimtemplates").RuleOrDie())
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.GenericWorkload) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie())
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.CompositePodGroup) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("compositepodgroups").RuleOrDie())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
@@ -289,7 +290,7 @@ func NodeRules() []rbacv1.PolicyRule {
 	nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
 
 	// DRA Resource Claims
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie())
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("deletecollection").Groups(resourceGroup).Resources("resourceslices").RuleOrDie())
 	}
@@ -658,7 +659,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csistoragecapacities").RuleOrDie(),
 	}
 	// Needed for dynamic resource allocation.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		kubeSchedulerRules = append(kubeSchedulerRules,
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("deviceclasses").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
@@ -666,12 +667,12 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
 		)
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) {
 			kubeSchedulerRules = append(kubeSchedulerRules,
 				rbacv1helpers.NewRule("create", "delete").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
 			)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRADeviceTaintRules) {
 			kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie())
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimGranularStatusAuthorization) {
@@ -680,11 +681,11 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.GenericWorkload) {
 		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("podgroups").RuleOrDie())
 		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources("podgroups/status").RuleOrDie())
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.CompositePodGroup) {
 		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("compositepodgroups").RuleOrDie())
 		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources("compositepodgroups/status").RuleOrDie())
 	}

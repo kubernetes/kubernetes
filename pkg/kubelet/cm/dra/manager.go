@@ -41,6 +41,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -264,7 +265,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	// when the driver never has been installed on the node and
 	// remains unavailable.
 	podResourceClaims := pod.Spec.ResourceClaims
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) {
 		if pod.Status.ExtendedResourceClaimStatus != nil {
 			extendedResourceClaim := v1.PodResourceClaim{
 				ResourceClaimName: &pod.Status.ExtendedResourceClaimStatus.ResourceClaimName,
@@ -556,7 +557,7 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 	}
 
 	// Collect extended resource claims if feature is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) && pod.Status.ExtendedResourceClaimStatus != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) && pod.Status.ExtendedResourceClaimStatus != nil {
 		claimName := pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
 		// if the container has requests for extended resources backed by DRA,
 		// they must have been allocated via the extendedResourceClaim created
@@ -644,7 +645,7 @@ func (m *Manager) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod) err
 			}
 			claimNames = append(claimNames, *claimName)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) {
 			if pod.Status.ExtendedResourceClaimStatus != nil {
 				claimNames = append(claimNames, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
 			}
@@ -837,7 +838,7 @@ func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) (
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) {
 		// Handle the special claim for extended resources backed by DRA in the pod
 		if pod.Status.ExtendedResourceClaimStatus != nil {
 			var hasExtendedResourceClaim bool
@@ -1173,5 +1174,5 @@ func (m *Manager) Updates() <-chan resourceupdates.Update {
 }
 
 func (*Manager) podGroupResourceClaimsEnabled() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAWorkloadResourceClaims)
+	return utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAWorkloadResourceClaims)
 }

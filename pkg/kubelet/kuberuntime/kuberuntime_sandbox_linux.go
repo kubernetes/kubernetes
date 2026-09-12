@@ -26,7 +26,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 
 	resourcehelper "k8s.io/component-helpers/resource"
 )
@@ -49,8 +49,8 @@ func (m *kubeGenericRuntimeManager) calculateSandboxResources(ctx context.Contex
 	logger := klog.FromContext(ctx)
 	opts := resourcehelper.PodResourcesOptions{
 		ExcludeOverhead:                          true,
-		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources),
+		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRANodeAllocatableResources),
 	}
 	req := resourcehelper.PodRequests(pod, opts)
 	lim := resourcehelper.PodLimits(pod, opts)

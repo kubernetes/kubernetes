@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corehelper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -455,7 +456,7 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 		return nil
 	}
 
-	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		logger.V(2).Info("Allocation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", podUID)
 		return nil
 	}
@@ -820,7 +821,7 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 
 	// If the pod has pod-level resources but the feature gate is disabled,
 	// log it and return nil hints to admit the pod without alignment.
-	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		logger.V(3).Info("Memory Manager pod hint generation skipped, pod is using pod-level resources but the PodLevelResourceManagers feature gate is not enabled", "podUID", pod.UID)
 		return nil
 	}
@@ -896,7 +897,7 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 
 	// If the pod has pod-level resources but the feature gate is disabled,
 	// log it and return nil hints to admit the pod without alignment.
-	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		logger.V(3).Info("Memory Manager pod hint generation skipped, pod is using pod-level resources but the PodLevelResourceManagers feature gate is not enabled", "podUID", pod.UID)
 		return nil
 	}

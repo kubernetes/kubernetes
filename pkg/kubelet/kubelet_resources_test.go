@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -99,7 +99,7 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	}
 	as := assert.New(t)
 	for idx, tc := range cases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, tc.podLevelResourcesEnabled)
 		actual, _, err := tk.kubelet.defaultPodLimitsForDownwardAPI(tCtx, tc.pod, nil)
 		as.NoError(err, "failed to default pod limits: %v", err)
 		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {

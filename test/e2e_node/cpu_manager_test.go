@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -2170,7 +2171,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 	})
 })
 
-var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithSerial(), feature.CPUManager, feature.PodLevelResources, feature.PodLevelResourceManagers, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourceManagers), func() {
+var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithSerial(), feature.CPUManager, feature.PodLevelResources, feature.PodLevelResourceManagers, framework.WithFeatureGate(schedulerfeatures.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourceManagers), func() {
 	f := framework.NewDefaultFramework("cpu-manager-pod-level-resources")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

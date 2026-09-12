@@ -27,7 +27,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/component-base/logs/json/register"
 	"k8s.io/dynamic-resource-allocation/structured"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	perf "k8s.io/kubernetes/test/integration/scheduler_perf"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
@@ -69,8 +69,8 @@ func TestSchedulerPerf(t *testing.T) {
 					// then we do not need and maybe even cannot turn them
 					// off (pre-alpha = feature doesn't event exist).
 					if gate.EmulationVersion().AtLeast(version.MustParse("1.34")) {
-						overrides[features.DRAConsumableCapacity] = false
-						overrides[features.DRADeviceBindingConditions] = false
+						overrides[schedulerfeatures.DRAConsumableCapacity] = false
+						overrides[schedulerfeatures.DRADeviceBindingConditions] = false
 					}
 					featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, overrides)
 					return nil, nil

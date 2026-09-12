@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	helpers "k8s.io/component-helpers/resource"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
@@ -1349,7 +1350,7 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 	})
 }
 
-var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (scheduler-focused)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
+var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (scheduler-focused)", framework.WithFeatureGate(schedulerfeatures.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-scheduler-tests")
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -1361,7 +1362,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (sched
 	doPodResizeSchedulerTests(f)
 })
 
-var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (deferred-resizes)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
+var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (deferred-resizes)", framework.WithFeatureGate(schedulerfeatures.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-deferred-resize-tests")
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -1373,7 +1374,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (defer
 	doPodResizeRetryDeferredTests(f)
 })
 
-var _ = SIGDescribe("Pod InPlace Resize Container (resource-quota)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
+var _ = SIGDescribe("Pod InPlace Resize Container (resource-quota)", framework.WithFeatureGate(schedulerfeatures.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-resource-quota-tests")
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -1386,7 +1387,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container (resource-quota)", framework.W
 	doPodResizeResourceQuotaTests(f)
 })
 
-var _ = SIGDescribe("Pod InPlace Resize Container (limit-ranger)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
+var _ = SIGDescribe("Pod InPlace Resize Container (limit-ranger)", framework.WithFeatureGate(schedulerfeatures.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-limit-ranger-tests")
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -1400,8 +1401,8 @@ var _ = SIGDescribe("Pod InPlace Resize Container (limit-ranger)", framework.Wit
 })
 
 var _ = SIGDescribe(framework.WithSerial(), framework.WithSlow(), "Pod InPlace Resize Container (deferred-resize-preemption)",
-	framework.WithFeatureGate(features.InPlacePodVerticalScaling),
-	framework.WithFeatureGate(features.InPlacePodVerticalScalingSchedulerPreemption),
+	framework.WithFeatureGate(schedulerfeatures.InPlacePodVerticalScaling),
+	framework.WithFeatureGate(schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption),
 	func() {
 		f := framework.NewDefaultFramework("pod-resize-deferred-preemption-tests")
 		ginkgo.BeforeEach(func(ctx context.Context) {

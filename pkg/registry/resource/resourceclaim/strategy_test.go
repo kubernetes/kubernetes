@@ -34,9 +34,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -550,7 +550,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"drop-fields-admin-access": {
 			obj:              objWithAdminAccess,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: false},
 			emulatedVersion:  "1.35",
 			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -561,7 +561,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"keep-fields-admin-access": {
 			obj:              objWithAdminAccess,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: true},
 			expectObj:        objWithAdminAccess,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 1 {
@@ -576,7 +576,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"drop-fields-device-taints": {
 			obj:              objWithDeviceTaints,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: false},
 			emulatedVersion:  "1.35",
 			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -587,7 +587,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"keep-fields-device-taints": {
 			obj:              objWithDeviceTaints,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: true},
 			expectObj:        objWithDeviceTaints,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -597,7 +597,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"drop-fields-device-taints-in-prioritized-list": {
 			obj:              objWithDeviceTaintsInPrioritizedList,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false, features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: false, schedulerfeatures.DRAPrioritizedList: true},
 			emulatedVersion:  "1.35",
 			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -608,7 +608,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"keep-fields-device-taints-in-prioritized-list": {
 			obj:              objWithDeviceTaintsInPrioritizedList,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true, features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: true, schedulerfeatures.DRAPrioritizedList: true},
 			expectObj:        objWithDeviceTaintsInPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -618,7 +618,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"drop-fields-prioritized-list": {
 			obj:                   objWithPrioritizedList,
-			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: false},
+			featureOverrides:      featuregatetesting.FeatureOverrides{schedulerfeatures.DRAPrioritizedList: false},
 			emulatedVersion:       "1.36",
 			expectValidationError: deviceRequestError,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -629,7 +629,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"keep-fields-prioritized-list": {
 			obj:              objWithPrioritizedList,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAPrioritizedList: true},
 			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -639,7 +639,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"admin-access-admin-namespace": {
 			obj:              objWithAdminAccess,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: true},
 			expectObj:        objWithAdminAccess,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 1 {
@@ -654,7 +654,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"admin-access-non-admin-namespace": {
 			obj:                   objWithAdminAccessInNonAdminNamespace,
-			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			featureOverrides:      featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: true},
 			expectObj:             objWithAdminAccessInNonAdminNamespace,
 			expectValidationError: adminAccessError,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -670,7 +670,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"keep-fields-consumable-capacity": {
 			obj:              objWithCapacityRequests,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAConsumableCapacity: true},
 			expectObj:        objWithCapacityRequests,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -680,7 +680,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"drop-fields-consumable-capacity-disabled-feature": {
 			obj:              objWithCapacityRequests,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAConsumableCapacity: false},
 			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -695,7 +695,7 @@ func TestStrategyCreate(t *testing.T) {
 				addDistinctAttribute(obj)
 				return obj
 			}(),
-			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false},
+			featureOverrides:      featuregatetesting.FeatureOverrides{schedulerfeatures.DRAConsumableCapacity: false},
 			expectValidationError: constraintError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -709,7 +709,7 @@ func TestStrategyCreate(t *testing.T) {
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false, features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAConsumableCapacity: false, schedulerfeatures.DRAPrioritizedList: true},
 			expectObj: func() *resource.ResourceClaim {
 				obj := objWithPrioritizedList.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, nil, true)
@@ -796,7 +796,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"drop-fields-admin-access": {
 			oldObj:           obj,
 			newObj:           objWithAdminAccess,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: false},
 			emulatedVersion:  "1.35",
 			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -808,7 +808,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-fields-admin-access": {
 			oldObj:                obj,
 			newObj:                objWithAdminAccess,
-			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			featureOverrides:      featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: true},
 			expectValidationError: fieldImmutableError, // Spec is immutable.
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -819,7 +819,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-existing-fields-admin-access": {
 			oldObj:           objWithAdminAccess,
 			newObj:           objWithAdminAccess,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: true},
 			expectObj:        objWithAdminAccess,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -830,7 +830,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"admin-access-admin-namespace": {
 			oldObj:           objWithAdminAccess,
 			newObj:           objWithAdminAccess,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: true},
 			expectObj:        objWithAdminAccess,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -841,7 +841,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"admin-access-non-admin-namespace": {
 			oldObj:                objInNonAdminNamespace,
 			newObj:                objWithAdminAccessInNonAdminNamespace,
-			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			featureOverrides:      featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: true},
 			expectValidationError: fieldImmutableError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -852,7 +852,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"drop-fields-prioritized-list": {
 			oldObj:                obj,
 			newObj:                objWithPrioritizedList,
-			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: false},
+			featureOverrides:      featuregatetesting.FeatureOverrides{schedulerfeatures.DRAPrioritizedList: false},
 			emulatedVersion:       "1.36",
 			expectValidationError: fieldImmutableError,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -864,7 +864,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-fields-prioritized-list": {
 			oldObj:                obj,
 			newObj:                objWithPrioritizedList,
-			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: true},
+			featureOverrides:      featuregatetesting.FeatureOverrides{schedulerfeatures.DRAPrioritizedList: true},
 			expectValidationError: fieldImmutableError, // Spec is immutable.
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -875,7 +875,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-existing-fields-prioritized-list": {
 			oldObj:           objWithPrioritizedList,
 			newObj:           objWithPrioritizedList,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAPrioritizedList: true},
 			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -886,7 +886,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-existing-fields-prioritized-list-disabled-feature": {
 			oldObj:           objWithPrioritizedList,
 			newObj:           objWithPrioritizedList,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAPrioritizedList: false},
 			emulatedVersion:  "1.36",
 			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -898,7 +898,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-existing-fields-consumable-capacity": {
 			oldObj:           objWithCapacityRequests,
 			newObj:           objWithCapacityRequests,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAConsumableCapacity: true},
 			expectObj:        objWithCapacityRequests,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -909,7 +909,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-existing-fields-consumable-capacity-disabled-feature": {
 			oldObj:           objWithCapacityRequests,
 			newObj:           objWithCapacityRequests,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAConsumableCapacity: false},
 			expectObj:        objWithCapacityRequests,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -920,7 +920,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"drop-fields-consumable-capacity-disabled-feature": {
 			oldObj:           obj,
 			newObj:           objWithCapacityRequests,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAConsumableCapacity: false},
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, nil, false)
@@ -943,7 +943,7 @@ func TestStrategyUpdate(t *testing.T) {
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false, features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAConsumableCapacity: false, schedulerfeatures.DRAPrioritizedList: true},
 			expectObj: func() *resource.ResourceClaim {
 				obj := objWithPrioritizedList.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, nil, true)
@@ -958,7 +958,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"drop-fields-device-taints": {
 			oldObj:           obj,
 			newObj:           objWithDeviceTaints,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false, features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: false, schedulerfeatures.DRAPrioritizedList: true},
 			emulatedVersion:  "1.35",
 			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -970,7 +970,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-fields-device-taints": {
 			oldObj:                obj,
 			newObj:                objWithDeviceTaints,
-			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true, features.DRAPrioritizedList: true},
+			featureOverrides:      featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: true, schedulerfeatures.DRAPrioritizedList: true},
 			expectValidationError: fieldImmutableError, // Spec is immutable, cannot add tolerations.
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -981,7 +981,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-existing-fields-device-taints": {
 			oldObj:           objWithDeviceTaints,
 			newObj:           objWithDeviceTaints,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true, features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: true, schedulerfeatures.DRAPrioritizedList: true},
 			expectObj:        objWithDeviceTaints,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -992,7 +992,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-existing-fields-device-taints-disabled-feature": {
 			oldObj:           objWithDeviceTaints,
 			newObj:           objWithDeviceTaints,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false, features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: false, schedulerfeatures.DRAPrioritizedList: true},
 			emulatedVersion:  "1.35",
 			expectObj:        objWithDeviceTaints,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -1004,7 +1004,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"drop-fields-device-taints-in-prioritized-list": {
 			oldObj:           objWithPrioritizedList,
 			newObj:           objWithDeviceTaintsInPrioritizedList,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false, features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: false, schedulerfeatures.DRAPrioritizedList: true},
 			emulatedVersion:  "1.35",
 			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -1016,7 +1016,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-fields-device-taints-in-prioritized-list": {
 			oldObj:                objWithPrioritizedList,
 			newObj:                objWithDeviceTaintsInPrioritizedList,
-			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true, features.DRAPrioritizedList: true},
+			featureOverrides:      featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: true, schedulerfeatures.DRAPrioritizedList: true},
 			expectValidationError: fieldImmutableError, // Spec is immutable, cannot add tolerations.
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -1027,7 +1027,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-existing-fields-device-taints-in-prioritized-list": {
 			oldObj:           objWithDeviceTaintsInPrioritizedList,
 			newObj:           objWithDeviceTaintsInPrioritizedList,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true, features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: true, schedulerfeatures.DRAPrioritizedList: true},
 			expectObj:        objWithDeviceTaintsInPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -1038,7 +1038,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-existing-fields-device-taints-in-prioritized-list-disabled-feature": {
 			oldObj:           objWithDeviceTaintsInPrioritizedList,
 			newObj:           objWithDeviceTaintsInPrioritizedList,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false, features.DRAPrioritizedList: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRADeviceTaints: false, schedulerfeatures.DRAPrioritizedList: true},
 			emulatedVersion:  "1.35",
 			expectObj:        objWithDeviceTaintsInPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -1140,7 +1140,7 @@ func TestStrategyCreateWithDerivedAttributes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, tc.derivedAttributes)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRADerivedAttributes, tc.derivedAttributes)
 			strategy := NewStrategy(mockNSClient, nil)
 
 			obj := tc.obj.DeepCopy()
@@ -1198,7 +1198,7 @@ func TestStrategyUpdateWithDerivedAttributes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, tc.derivedAttributes)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRADerivedAttributes, tc.derivedAttributes)
 			strategy := NewStrategy(mockNSClient, nil)
 
 			oldObj := tc.oldObj.DeepCopy()
@@ -1295,7 +1295,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		"drop-fields-admin-access": {
 			oldObj:           obj,
 			newObj:           objWithAdminAccessStatus,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: false},
 			emulatedVersion:  "1.35",
 			expectObj:        objWithStatus,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -1307,7 +1307,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		"keep-fields-admin-access": {
 			oldObj:           obj,
 			newObj:           objWithAdminAccessStatus,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: true},
 			expectObj: func() *resource.ResourceClaim {
 				expectObj := objWithAdminAccessStatus.DeepCopy()
 				// Spec remains unchanged.
@@ -1328,7 +1328,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		"keep-fields-admin-access-NonAdminNamespace": {
 			oldObj:                 objInNonAdminNamespace,
 			newObj:                 objWithAdminAccessStatusInNonAdminNamespace,
-			featureOverrides:       featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			featureOverrides:       featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: true},
 			expectValidationErrors: []string{adminAccessError},
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 1 {
@@ -1344,7 +1344,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		"keep-fields-admin-access-because-of-spec": {
 			oldObj:           objWithAdminAccess,
 			newObj:           objWithAdminAccessStatus,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: false},
 			emulatedVersion:  "1.35",
 			expectObj:        objWithAdminAccessStatus,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -1368,7 +1368,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				return oldObj
 			}(),
 			newObj:           objWithAdminAccessStatus,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAAdminAccess: false},
 			emulatedVersion:  "1.35",
 			expectObj: func() *resource.ResourceClaim {
 				oldObj := objWithAdminAccessStatus.DeepCopy()
@@ -1395,7 +1395,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: false},
 			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
@@ -1424,7 +1424,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: false},
 			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim { // Status is still there (as the status was set in the old object)
 				obj := obj.DeepCopy()
@@ -1453,7 +1453,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true},
 			expectObj: func() *resource.ResourceClaim { // Status is still there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
@@ -1481,7 +1481,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true},
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
@@ -1507,7 +1507,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			featureOverrides:       featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAAdminAccess: true},
+			featureOverrides:       featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRAAdminAccess: true},
 			expectValidationErrors: []string{deviceArbitraryNodeUpdateError},
 			expectObj: func() *resource.ResourceClaim { // Status is not updated
 				obj := obj.DeepCopy()
@@ -1557,7 +1557,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					Extra:  map[string][]string{"authentication.kubernetes.io/node-name": {"test-node"}},
 				})
 			},
-			featureOverrides:       featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAAdminAccess: true},
+			featureOverrides:       featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRAAdminAccess: true},
 			authz:                  &fakeAuthorizer{false},
 			expectValidationErrors: []string{deviceAssociatedNodeUpdateError},
 			expectObj: func() *resource.ResourceClaim {
@@ -1594,7 +1594,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 			authz:                  &fakeAuthorizer{false},
-			featureOverrides:       featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAAdminAccess: true},
+			featureOverrides:       featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRAAdminAccess: true},
 			expectValidationErrors: []string{bindingUpdateError},
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
@@ -1621,7 +1621,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: false},
 			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
@@ -1643,7 +1643,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRADeviceBindingConditions: true},
 		},
 		"keep-exist-fields-disable-bindingconditions-feature-gate": {
 			oldObj:    objWithDeviceBindingConditions,
@@ -1654,7 +1654,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRADeviceBindingConditions: false},
 		},
 		"drop-fields-binding-conditions": {
 			oldObj:    obj,
@@ -1665,7 +1665,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRADeviceBindingConditions: false},
 		},
 		"drop-fields-binding-conditions-disable-feature-gate": {
 			oldObj:    obj,
@@ -1676,7 +1676,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: false, features.DRADeviceBindingConditions: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: false, schedulerfeatures.DRADeviceBindingConditions: false},
 			emulatedVersion:  "1.36",
 		},
 		"drop-fields-binding-conditions-disable-binding-conditions-feature-gate": {
@@ -1688,7 +1688,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRADeviceBindingConditions: false},
 		},
 		"keep-fields-optional-node-operations": {
 			oldObj:    obj,
@@ -1699,7 +1699,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAOptionalNodeOperations: true},
 		},
 		"keep-existing-fields-disable-optional-node-operations-feature-gate": {
 			oldObj:    objWithSkipNodeOperationsStatus,
@@ -1710,7 +1710,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAOptionalNodeOperations: false},
 		},
 		"drop-fields-optional-node-operations": {
 			oldObj:    obj,
@@ -1721,7 +1721,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAOptionalNodeOperations: false},
 		},
 		"keep-fields-consumable-capacity-with-device-status": {
 			oldObj: func() *resource.ResourceClaim {
@@ -1739,7 +1739,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRAPrioritizedList: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRAConsumableCapacity: true, schedulerfeatures.DRAPrioritizedList: false},
 			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
@@ -1771,7 +1771,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRAConsumableCapacity: false},
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
@@ -1802,7 +1802,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: false, features.DRAConsumableCapacity: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: false, schedulerfeatures.DRAConsumableCapacity: true},
 			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
@@ -1832,7 +1832,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRAPrioritizedList: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRAConsumableCapacity: true, schedulerfeatures.DRAPrioritizedList: false},
 			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim {
 				obj := objWithPrioritizedList.DeepCopy()
@@ -1859,7 +1859,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAConsumableCapacity: false},
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, req0)
@@ -1879,7 +1879,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addDistinctAttribute(obj)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: true, features.DRAConsumableCapacity: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAPrioritizedList: true, schedulerfeatures.DRAConsumableCapacity: false},
 			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -1901,7 +1901,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRAConsumableCapacity: false},
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, req0)
@@ -1928,7 +1928,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{schedulerfeatures.DRAResourceClaimDeviceStatus: true, schedulerfeatures.DRAConsumableCapacity: false},
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, req0)

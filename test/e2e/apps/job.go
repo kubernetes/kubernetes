@@ -44,6 +44,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
@@ -1531,7 +1532,7 @@ done`}
 	})
 
 	framework.It("should create Workload and PodGroup for gang-eligible Job",
-		framework.WithFeatureGate(features.GenericWorkload),
+		framework.WithFeatureGate(schedulerfeatures.GenericWorkload),
 		framework.WithFeatureGate(features.WorkloadWithJob),
 		func(ctx context.Context) {
 			parallelism := int32(4)

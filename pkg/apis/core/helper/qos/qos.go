@@ -21,6 +21,7 @@ package qos
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -45,7 +46,7 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 // NOTE: This is tested in pkg/apis/core/v1/helper/qos/qos_test.go
 func ComputePodQOS(pod *core.Pod) core.PodQOSClass {
 	// When pod-level resources are specified, we use them to determine QoS class.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) &&
 		(pod.Spec.Resources != nil && (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) || helper.IsPodLevelResourcesSet(pod))) {
 		return requirementsQOS(pod.Spec.Resources)
 	}

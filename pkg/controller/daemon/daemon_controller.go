@@ -52,6 +52,7 @@ import (
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/metrics"
@@ -1426,7 +1427,7 @@ func nodeShouldRunDaemonPod(logger klog.Logger, node *v1.Node, ds *apps.DaemonSe
 		// Scheduled daemon pods should continue running if they tolerate NoExecute taint.
 		_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(logger, taints, tolerations, func(t *v1.Taint) bool {
 			return t.Effect == v1.TaintEffectNoExecute
-		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
+		}, utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.TaintTolerationComparisonOperators))
 		return false, !hasUntoleratedTaint
 	}
 
@@ -1441,7 +1442,7 @@ func predicates(logger klog.Logger, node *v1.Node, taints []v1.Taint, toleration
 	fitsNodeAffinity, _ = requiredNodeAffinity.Match(node)
 	_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(logger, taints, tolerations, func(t *v1.Taint) bool {
 		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
-	}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
+	}, utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.TaintTolerationComparisonOperators))
 	fitsTaints = !hasUntoleratedTaint
 	return
 }

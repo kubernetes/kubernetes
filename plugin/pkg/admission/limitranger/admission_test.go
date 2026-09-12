@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -485,7 +485,7 @@ func TestPodLimitFunc(t *testing.T) {
 	for i := range successCases {
 		test := successCases[i]
 		t.Run(test.pod.Name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, test.podLevelResourcesEnabled)
 			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
 			if err != nil {
 				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
@@ -698,7 +698,7 @@ func TestPodLimitFunc(t *testing.T) {
 	for i := range errorCases {
 		test := errorCases[i]
 		t.Run(test.pod.Name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, test.podLevelResourcesEnabled)
 			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
 			if err != nil {
 				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
@@ -821,7 +821,7 @@ func TestLimitRangerAllowPodResize(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "resize", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("expect error, but got nil")

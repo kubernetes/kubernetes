@@ -34,7 +34,7 @@ import (
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -1099,7 +1099,7 @@ func TestInterPodAffinity(t *testing.T) {
 	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s/InterPodAffinityHostnameFastPath=%v", test.name, interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
 
 				testCtx := initTest(t, "")
 				cs := testCtx.ClientSet
@@ -1328,7 +1328,7 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 
 			for _, cfg := range configs {
 				t.Run(cfg.name, func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, cfg.interPodAffinityHostnameFastPathEnabled)
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InterPodAffinityHostnameFastPath, cfg.interPodAffinityHostnameFastPathEnabled)
 					testCtx := initTest(t, "")
 
 					// Add a few nodes with labels
@@ -1773,7 +1773,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Enable the TaintTolerationComparisonOperators feature gate for Gt/Lt tests
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.TaintTolerationComparisonOperators, true)
 
 			testCtx := initTest(t, "taint-toleration-filter")
 			cs := testCtx.ClientSet
@@ -2200,7 +2200,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)
 
 			testCtx := initTest(t, "pts-predicate")
 			cs := testCtx.ClientSet
@@ -3127,7 +3127,7 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if !tt.featureEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, false)
 			}
 			testCtx := testutils.InitTestSchedulerWithNS(t, "node-features-filter")
 			cs := testCtx.ClientSet

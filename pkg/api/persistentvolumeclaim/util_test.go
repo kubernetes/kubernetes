@@ -30,6 +30,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -414,7 +415,7 @@ func TestDropDisabledVolumeAttributesClass(t *testing.T) {
 			if !test.vacEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, test.vacEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.VolumeAttributesClass, test.vacEnabled)
 			DropDisabledFields(&test.spec, &test.oldSpec)
 			if test.spec.VolumeAttributesClassName != test.wantVAC {
 				t.Errorf("expected vac was not met, test: %s, vacEnabled: %v, spec: %+v, expected VAC: %+v",
@@ -611,9 +612,9 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.RecoverVolumeExpansionFailure: test.enableRecoverVolumeExpansionFailure,
-				features.VolumeAttributesClass:         test.enableVolumeAttributesClass,
-				features.CSIVolumeHealth:               test.enableCSIVolumeHealth,
+				features.RecoverVolumeExpansionFailure:  test.enableRecoverVolumeExpansionFailure,
+				schedulerfeatures.VolumeAttributesClass: test.enableVolumeAttributesClass,
+				features.CSIVolumeHealth:                test.enableCSIVolumeHealth,
 			})
 
 			DropDisabledFieldsFromStatus(test.pvc, test.oldPVC)

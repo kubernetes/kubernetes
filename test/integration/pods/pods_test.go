@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ipprfeature "k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -855,7 +856,7 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 }
 
 func TestPodResizeRBAC(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil,
 		append(framework.DefaultTestServerFlags(), "--authorization-mode=RBAC"), framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -959,7 +960,7 @@ func TestPodResizeRBAC(t *testing.T) {
 }
 
 func TestPodResize(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -1478,10 +1479,10 @@ func TestDNSSearchValidation(t *testing.T) {
 
 func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.NodeDeclaredFeatures:                         true,
-		features.PodLevelResources:                            true,
-		features.InPlacePodLevelResourcesVerticalScaling:      true,
-		features.InPlacePodVerticalScalingMemoryBackedVolumes: true,
+		schedulerfeatures.NodeDeclaredFeatures:                    true,
+		schedulerfeatures.PodLevelResources:                       true,
+		schedulerfeatures.InPlacePodLevelResourcesVerticalScaling: true,
+		features.InPlacePodVerticalScalingMemoryBackedVolumes:     true,
 	})
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -1806,7 +1807,7 @@ func TestPodResizeValidation(t *testing.T) {
 }
 
 func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
@@ -2603,7 +2604,7 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 // ResourceClaimStatuses when a DRA-unaware client overwrites the status of a
 // running pod and omits fields that it does not know about.
 func TestDRAStatusPreservedOnStatusUpdate(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DynamicResourceAllocation, true)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()

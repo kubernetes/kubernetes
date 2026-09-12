@@ -43,6 +43,7 @@ import (
 	"k8s.io/component-helpers/storage/ephemeral"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
@@ -108,7 +109,7 @@ var (
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.expansionRecoveryEnabled = featureGates.Enabled(features.RecoverVolumeExpansionFailure)
-	p.dynamicResourceAllocationEnabled = featureGates.Enabled(features.DynamicResourceAllocation)
+	p.dynamicResourceAllocationEnabled = featureGates.Enabled(schedulerfeatures.DynamicResourceAllocation)
 	p.allowInsecureKubeletCertificateSigningRequests = featureGates.Enabled(features.AllowInsecureKubeletCertificateSigningRequests)
 	p.serviceAccountNodeAudienceRestriction = featureGates.Enabled(features.ServiceAccountNodeAudienceRestriction)
 	p.podCertificateRequestsEnabled = featureGates.Enabled(features.PodCertificateRequest)

@@ -83,6 +83,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -1100,7 +1101,7 @@ func NewMainKubelet(ctx context.Context,
 	handlers := []lifecycle.PodAdmitHandler{}
 	handlers = append(handlers, evictionAdmitHandler)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.NodeDeclaredFeatures) {
 		if status, err := klet.containerRuntime.Status(ctx); err == nil && status != nil {
 			klet.runtimeState.setRuntimeFeatures(status.Features)
 		} else if err != nil {
@@ -1151,7 +1152,7 @@ func NewMainKubelet(ctx context.Context,
 
 	handlers = append(handlers, lifecycle.NewPodFeaturesAdmitHandler())
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.NodeDeclaredFeatures) {
 		handlers = append(handlers, lifecycle.NewDeclaredFeaturesAdmitHandler(klet.nodeDeclaredFeaturesFramework, klet.nodeDeclaredFeaturesSet, klet.version))
 	}
 
@@ -2093,7 +2094,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
 		if kl.containerRuntime.IsPodResizeInProgress(pod, podStatus) {
 			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
@@ -2294,7 +2295,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		for _, r := range result.SyncResults {
 			if r.Action == kubecontainer.ResizePodInPlace && r.Error != nil {
 				// If the condition already exists, the observedGeneration does not get updated.
@@ -2442,7 +2443,7 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	// NOTE: resources must be unprepared AFTER all containers have stopped
 	// and BEFORE the pod status is changed on the API server
 	// to avoid race conditions with the resource deallocation code in kubernetes core.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 		if err := kl.UnprepareDynamicResources(ctx, pod); err != nil {
 			return err
 		}
@@ -2934,7 +2935,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 
 			kl.podCertificateManager.TrackPod(ctx, pod)
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 				// Backfill the queue of pending resizes, but only after all the pods have
 				// been added. This ensures that no resizes get resolved until all the
 				// existing pods are added.
@@ -2951,7 +2952,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			StartTime:  start,
 		})
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		kl.statusManager.BackfillPodResizeConditions(pods)
 		for _, uid := range pendingResizes {
 			kl.allocationManager.PushPendingResize(logger, uid)
@@ -2971,7 +2972,7 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 		oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
 		kl.podManager.UpdatePod(pod)
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 			// Skip pods that haven't been allocated yet to avoid counting them against
 			// node capacity before they've been admitted.
 			if !kl.allocationManager.HasPodAllocatedResources(pod.UID) {
@@ -2988,7 +2989,7 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 			if recordResizeOperations(oldPod, pod) {
 				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 				if updatedFromAllocation {
@@ -3004,7 +3005,7 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && oldPod != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.NodeDeclaredFeatures) && oldPod != nil {
 			oldPodInfo := &ndf.PodInfo{Spec: &oldPod.Spec, Status: &oldPod.Status}
 			newPodInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
 			reqs, err := kl.nodeDeclaredFeaturesFramework.InferForPodUpdate(oldPodInfo, newPodInfo, kl.version)
@@ -3051,7 +3052,7 @@ func recordResizeOperations(oldPod, newPod *v1.Pod) bool {
 // recordPodLevelResourceResizeOperations records if any of the pod level resources need to be resized, and returns
 // true if so
 func recordPodLevelResourceResizeOperations(oldPod, newPod *v1.Pod) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		return false
 	}
 
@@ -3160,7 +3161,7 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodsRemoved)
 	}
 }
@@ -3189,7 +3190,7 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 			// Static pods should be reconciled the same way as regular pods
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 			if hasPendingResizes && !retryPendingResizes && oldPod != nil {
 				// If the pod has reached a terminal phase, we retry all pending resizes.
 				// A terminated pod releases capacity even if its allocation has already
@@ -3203,9 +3204,9 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 				// resources changing.
 				opts := resourcehelper.PodResourcesOptions{
 					UseStatusResources:                             true,
-					SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-					InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
-					UseDRANodeAllocatableResourceClaimStatus:       utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+					SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources),
+					InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling),
+					UseDRANodeAllocatableResourceClaimStatus:       utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRANodeAllocatableResources),
 				}
 
 				// Ignore desired resources when aggregating the resources.
@@ -3260,7 +3261,7 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		if retryPendingResizes {
 			kl.allocationManager.RetryPendingResizes(ctx, triggerReason)
 		}
@@ -3676,7 +3677,7 @@ func (a *allocatedPodManager) getAllocatedPod(pod *v1.Pod) (*v1.Pod, bool) {
 	if pod == nil {
 		return nil, false
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		if allocatedPod, ok := a.allocationManager.UpdatePodFromAllocation(pod); ok {
 			return allocatedPod, true
 		}

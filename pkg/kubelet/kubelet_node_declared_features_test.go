@@ -26,12 +26,13 @@ import (
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 func TestDeclaredFeatureDiscovery(t *testing.T) {
-	podLevelResourcesIPPRFeatureGate := features.InPlacePodLevelResourcesVerticalScaling
+	podLevelResourcesIPPRFeatureGate := schedulerfeatures.InPlacePodLevelResourcesVerticalScaling
 	featureMaxVersion := version.MustParseSemantic("v1.36.0")
 	createMockFeature := func(t *testing.T, name string, cfg *ndf.NodeConfiguration) *ndftesting.MockFeature {
 		mockFeature := ndftesting.NewMockFeature(t)

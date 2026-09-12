@@ -31,8 +31,8 @@ import (
 
 	// Side-effect import: registers PodGroup with legacyscheme.Scheme so
 	// the ConvertToVersion calls below resolve the type.
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var podGroup = &scheduling.PodGroup{
@@ -275,9 +275,9 @@ func TestStrategyCreate(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			podGroup := tc.obj.DeepCopy()
 
@@ -438,9 +438,9 @@ func TestStrategyUpdate(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			podGroup := tc.oldObj.DeepCopy()
 			newPodGroup := tc.newObj.DeepCopy()
@@ -686,8 +686,8 @@ func TestDropPodGroupTemplateResourceClaims(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.description, func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.DRAWorkloadResourceClaims: tc.enabled,
-					features.GenericWorkload:           tc.enabled,
+					schedulerfeatures.DRAWorkloadResourceClaims: tc.enabled,
+					schedulerfeatures.GenericWorkload:           tc.enabled,
 				})
 
 				oldPodGroup := tc.oldPodGroup.DeepCopy()
@@ -818,8 +818,8 @@ func TestDropPodGroupTemplateResourceClaims(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.description, func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.DRAWorkloadResourceClaims: tc.enabled,
-					features.GenericWorkload:           tc.enabled,
+					schedulerfeatures.DRAWorkloadResourceClaims: tc.enabled,
+					schedulerfeatures.GenericWorkload:           tc.enabled,
 				})
 
 				oldPodGroup := tc.oldPodGroup.DeepCopy()
@@ -924,9 +924,9 @@ func TestDropPodGroupParentCompositePodGroupNameField(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: true,
-				features.CompositePodGroup:               tc.enabled,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: true,
+				schedulerfeatures.CompositePodGroup:               tc.enabled,
 			})
 			var oldSpec *scheduling.PodGroupSpec
 			if tc.oldPodGroup != nil {

@@ -28,6 +28,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -72,7 +73,7 @@ func (tb *mainTB) restore() {
 func TestMain(m *testing.M) {
 	tb := &mainTB{}
 	featuregatetesting.SetFeatureGatesDuringTest(tb, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		pkgfeatures.PodLevelResources:        true,
+		schedulerfeatures.PodLevelResources:  true,
 		pkgfeatures.PodLevelResourceManagers: true,
 	})
 	metrics.Register()
@@ -510,7 +511,7 @@ func TestStaticPolicyMetricsReleaseOfUnknownContainer(t *testing.T) {
 }
 
 func TestStaticPolicyMetricsPodLevelAllocationAndRelease(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
 
 	logger, _ := ktesting.NewTestContext(t)
@@ -543,7 +544,7 @@ func TestStaticPolicyMetricsPodLevelAllocationAndRelease(t *testing.T) {
 }
 
 func TestStaticPolicyMetricsPodLevelAllocationRollback(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
 
 	logger, _ := ktesting.NewTestContext(t)
@@ -573,7 +574,7 @@ func TestStaticPolicyMetricsPodLevelAllocationRollback(t *testing.T) {
 }
 
 func TestStaticPolicyMetricsPodLevelRollbackReleasesStoredAssignments(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
 
 	logger, _ := ktesting.NewTestContext(t)
@@ -607,7 +608,7 @@ func TestStaticPolicyMetricsPodLevelRollbackReleasesStoredAssignments(t *testing
 }
 
 func TestStaticPolicyMetricsPodLevelNonIntegralCPUs(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
 
 	logger, _ := ktesting.NewTestContext(t)
@@ -628,7 +629,7 @@ func TestStaticPolicyMetricsPodLevelNonIntegralCPUs(t *testing.T) {
 }
 
 func TestStaticPolicyMetricsPodLevelNonIntegralCPUsWithIntegralContainer(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
 
 	logger, _ := ktesting.NewTestContext(t)
@@ -718,7 +719,7 @@ func TestStaticPolicyMetricsRestartConsistencyContainerScope(t *testing.T) {
 }
 
 func TestStaticPolicyMetricsRestartConsistencyPodLevelPartiallyReleased(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
 
 	logger, _ := ktesting.NewTestContext(t)

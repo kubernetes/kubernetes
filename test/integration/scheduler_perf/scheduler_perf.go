@@ -43,7 +43,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -702,7 +702,7 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 
 	// We need to set emulation version for NodeDeclaredFeatures feature gate, which is locked at 1.37.
 	// Only emulate v1.36 when NodeDeclaredFeatures is explicitly disabled.
-	if ndfEnabled, exists := featureGates[features.NodeDeclaredFeatures]; exists && !ndfEnabled {
+	if ndfEnabled, exists := featureGates[schedulerfeatures.NodeDeclaredFeatures]; exists && !ndfEnabled {
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureGates)

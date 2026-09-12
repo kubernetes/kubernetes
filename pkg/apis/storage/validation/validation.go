@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -624,7 +625,7 @@ func validateServiceAccountTokenInSecrets(serviceAccountTokenInSecrets *bool, to
 // validatePreventPodSchedulingIfMissing validates that preventPodSchedulingIfMissing is not set when the VolumeLimitScaling feature gate is disabled.
 func validatePreventPodSchedulingIfMissing(preventPodSchedulingIfMissing *bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if preventPodSchedulingIfMissing == nil && utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+	if preventPodSchedulingIfMissing == nil && utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeLimitScaling) {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 

@@ -32,9 +32,9 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/resource"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -78,7 +78,7 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 
 // InspectFeatureGates sets the feature gates for the plugin.
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.inPlacePodVerticalScalingEnabled = featureGates.Enabled(features.InPlacePodVerticalScaling)
+	p.inPlacePodVerticalScalingEnabled = featureGates.Enabled(schedulerfeatures.InPlacePodVerticalScaling)
 }
 
 // ValidateInitialization ensures that the plugin is properly initialized.

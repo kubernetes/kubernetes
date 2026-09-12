@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -1539,7 +1540,7 @@ func Register() {
 		legacyregistry.MustRegister(LifecycleHandlerSleepTerminated)
 		legacyregistry.MustRegister(CgroupVersion)
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DynamicResourceAllocation) {
 			legacyregistry.MustRegister(
 				DRAOperationsDuration,
 				DRAGRPCOperationsDuration,
@@ -1556,7 +1557,7 @@ func Register() {
 			legacyregistry.MustRegister(ImageVolumeMountedErrorsTotal)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 			legacyregistry.MustRegister(ContainerRequestedResizes)
 			legacyregistry.MustRegister(PodResizeDurationMilliseconds)
 			legacyregistry.MustRegister(PodPendingResizes)
@@ -1577,7 +1578,7 @@ func Register() {
 		legacyregistry.MustRegister(PodRequestsList)
 		legacyregistry.MustRegister(PodRequestsGet)
 		legacyregistry.MustRegister(PodRequestsWatch)
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+		if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) {
 			legacyregistry.MustRegister(PodLevelResourcesAdmissionTotal)
 		}
 	})

@@ -36,7 +36,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -3699,7 +3699,7 @@ func TestEvictionMessage(t *testing.T) {
 			podMessage := ""
 			annotationsKeys := []string{OffendingContainersKey, OffendingContainersUsageKey}
 			if tc.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, true)
 				podMessage = fmt.Sprintf(podMessageFmt, pod.Name, tc.podMemoryStats, tc.podResources.Requests.Memory(), v1.ResourceMemory)
 				annotationsKeys = append(annotationsKeys, OffendingPodKey, OffendingPodUsageKey)
 			}

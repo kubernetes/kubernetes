@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -337,7 +337,7 @@ func TestValidateDeviceCapacity(t *testing.T) {
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAFractionalCapacityRange, scenario.fractionalCapacityRangeGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAFractionalCapacityRange, scenario.fractionalCapacityRangeGate)
 			errs := validateMultiAllocatableDeviceCapacity(scenario.capacity, capacityField)
 			assertFailures(t, scenario.wantFailures, errs)
 		})

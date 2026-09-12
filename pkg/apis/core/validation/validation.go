@@ -66,6 +66,7 @@ import (
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
@@ -1975,7 +1976,7 @@ var supportedVolumeModes = sets.New(core.PersistentVolumeBlock, core.PersistentV
 
 func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) PersistentVolumeSpecValidationOptions {
 	opts := PersistentVolumeSpecValidationOptions{
-		EnableVolumeAttributesClass:                  utilfeature.DefaultMutableFeatureGate.Enabled(features.VolumeAttributesClass),
+		EnableVolumeAttributesClass:                  utilfeature.DefaultMutableFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass),
 		AllowInvalidLabelValueInRequiredNodeAffinity: false,
 	}
 	if oldPv != nil && oldPv.Spec.VolumeAttributesClassName != nil {
@@ -2319,7 +2320,7 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 	}
 
 	if !apiequality.Semantic.DeepEqual(oldPv.Spec.VolumeAttributesClassName, newPv.Spec.VolumeAttributesClassName) {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update is forbidden when the VolumeAttributesClass feature gate is disabled"))
 		}
 		if opts.EnableVolumeAttributesClass {
@@ -2356,7 +2357,7 @@ func ValidationOptionsForPersistentVolumeClaimCreate() PersistentVolumeClaimSpec
 	return PersistentVolumeClaimSpecValidationOptions{
 		EnableRecoverFromExpansionFailure: utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
 		AllowInvalidLabelValueInSelector:  false,
-		EnableVolumeAttributesClass:       utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
+		EnableVolumeAttributesClass:       utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass),
 	}
 }
 
@@ -2393,7 +2394,7 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 func ValidationOptionsForPersistentVolumeClaimTemplate(claimTemplate, oldClaimTemplate *core.PersistentVolumeClaimTemplate) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
 		AllowInvalidLabelValueInSelector: false,
-		EnableVolumeAttributesClass:      utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
+		EnableVolumeAttributesClass:      utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass),
 	}
 	if oldClaimTemplate == nil {
 		// If there's no old PVC template, use the options based solely on feature enablement
@@ -2626,7 +2627,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
 	if !apiequality.Semantic.DeepEqual(oldPvc.Spec.VolumeAttributesClassName, newPvc.Spec.VolumeAttributesClassName) {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update is forbidden when the VolumeAttributesClass feature gate is disabled"))
 		}
 		if opts.EnableVolumeAttributesClass {
@@ -6744,7 +6745,7 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 		allErrs = append(allErrs, errs)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) && len(newPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRANodeAllocatableResources) && len(newPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
 		v1Pod := &v1.Pod{}
 		if err := corev1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
 			allErrs = append(allErrs, field.InternalError(specPath, fmt.Errorf("failed to convert pod for DRA validation: %w", err)))

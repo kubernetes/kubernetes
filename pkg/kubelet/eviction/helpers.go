@@ -30,9 +30,9 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
-	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	volumeutils "k8s.io/kubernetes/pkg/volume/util"
@@ -1252,7 +1252,7 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	}
 
 	// Pod level resources will be included in eviction message, along container resources
-	if resourceToReclaim == v1.ResourceMemory && utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if resourceToReclaim == v1.ResourceMemory && utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		if podRequest, ok := pod.Spec.Resources.Requests[resourceToReclaim]; ok && podStats.Memory != nil {
 			podUsage := memoryUsage(podStats.Memory)
 			message += fmt.Sprintf(podMessageFmt, pod.Name, podUsage.String(), podRequest.String(), resourceToReclaim)

@@ -21,6 +21,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -69,7 +70,7 @@ func SetDefaults_CSIDriver(obj *storagev1.CSIDriver) {
 		*(obj.Spec.SELinuxMount) = false
 	}
 
-	if obj.Spec.PreventPodSchedulingIfMissing == nil && utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+	if obj.Spec.PreventPodSchedulingIfMissing == nil && utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeLimitScaling) {
 		obj.Spec.PreventPodSchedulingIfMissing = new(bool)
 		*(obj.Spec.PreventPodSchedulingIfMissing) = false
 	}

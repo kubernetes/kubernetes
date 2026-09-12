@@ -26,6 +26,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -229,8 +230,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: tc.enableWorkloadWithJob,
-				features.WorkloadWithJob: tc.enableWorkloadWithJob,
+				schedulerfeatures.GenericWorkload: tc.enableWorkloadWithJob,
+				features.WorkloadWithJob:          tc.enableWorkloadWithJob,
 			})
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
@@ -420,8 +421,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: tc.enableWorkloadWithJob,
-				features.WorkloadWithJob: tc.enableWorkloadWithJob,
+				schedulerfeatures.GenericWorkload: tc.enableWorkloadWithJob,
+				features.WorkloadWithJob:          tc.enableWorkloadWithJob,
 			})
 			tc.old.ResourceVersion = "1"
 			tc.update.ResourceVersion = "2"

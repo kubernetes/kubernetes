@@ -39,6 +39,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
@@ -92,8 +93,8 @@ func newControllerWithSchedulingInformers(ctx context.Context, t *testing.T, kub
 	t.Helper()
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.36"))
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload: true,
-		features.WorkloadWithJob: true,
+		schedulerfeatures.GenericWorkload: true,
+		features.WorkloadWithJob:          true,
 	})
 	sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	jm, err := newControllerWithClock(ctx,
@@ -214,8 +215,8 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.36"))
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: tc.workloadWithJob,
-				features.WorkloadWithJob: tc.workloadWithJob,
+				schedulerfeatures.GenericWorkload: tc.workloadWithJob,
+				features.WorkloadWithJob:          tc.workloadWithJob,
 			})
 			if got := getManagementMode(tc.job); got != tc.wantMode {
 				t.Errorf("getManagementMode() = %v, want %v", got, tc.wantMode)

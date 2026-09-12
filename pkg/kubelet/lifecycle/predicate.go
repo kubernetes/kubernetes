@@ -26,6 +26,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -345,7 +346,7 @@ func rejectPodAdmissionBasedOnSupplementalGroupsPolicy(pod *v1.Pod, node *v1.Nod
 
 func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
 	isResourceBackedByDRA := func(resourceName v1.ResourceName, containerName string) bool {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAExtendedResource) {
 			return false
 		}
 		if pod.Status.ExtendedResourceClaimStatus == nil {
@@ -450,7 +451,7 @@ func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework
 		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(logger, nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			// Kubelet is only interested in the NoExecute taint.
 			return t.Effect == v1.TaintEffectNoExecute
-		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
+		}, utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.TaintTolerationComparisonOperators))
 		if isUntolerated {
 			reasons = append(reasons, &PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch})
 		}

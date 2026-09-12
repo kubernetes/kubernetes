@@ -23,9 +23,9 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -74,7 +74,7 @@ func (c *storageProtectionPlugin) Admit(ctx context.Context, a admission.Attribu
 	case pvcResource:
 		return c.admitPVC(a)
 	case vacResource:
-		if feature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		if feature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 			return c.admitVAC(a)
 		}
 		return nil

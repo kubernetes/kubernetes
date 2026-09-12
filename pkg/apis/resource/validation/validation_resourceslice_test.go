@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
@@ -2033,9 +2033,9 @@ func TestValidateResourceSlice(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRANodeAllocatableResources: scenario.enableDRANodeAllocatableResourcesFeatureGate,
-				features.DRAConsumableCapacity:       scenario.consumableCapacityFeatureGate,
-				features.DRAFractionalCapacityRange:  scenario.fractionalCapacityRangeFeatureGate,
+				schedulerfeatures.DRANodeAllocatableResources: scenario.enableDRANodeAllocatableResourcesFeatureGate,
+				schedulerfeatures.DRAConsumableCapacity:       scenario.consumableCapacityFeatureGate,
+				schedulerfeatures.DRAFractionalCapacityRange:  scenario.fractionalCapacityRangeFeatureGate,
 			})
 			errs := ValidateResourceSlice(scenario.slice)
 			assertFailures(t, scenario.wantFailures, errs)
@@ -2304,8 +2304,8 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAConsumableCapacity:      scenario.consumableCapacityFeatureGate,
-				features.DRAFractionalCapacityRange: scenario.fractionalCapacityRangeFeatureGate,
+				schedulerfeatures.DRAConsumableCapacity:      scenario.consumableCapacityFeatureGate,
+				schedulerfeatures.DRAFractionalCapacityRange: scenario.fractionalCapacityRangeFeatureGate,
 			})
 			scenario.oldResourceSlice.ResourceVersion = "1"
 			errs := ValidateResourceSliceUpdate(scenario.update(scenario.oldResourceSlice.DeepCopy()), scenario.oldResourceSlice)

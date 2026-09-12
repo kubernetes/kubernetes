@@ -33,7 +33,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	klogtesting "k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -905,7 +905,7 @@ func TestSyncToCheckpoint(t *testing.T) {
 
 func TestNewClaimInfoSkipNodeOperations(t *testing.T) {
 	t.Run("feature gate enabled", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAOptionalNodeOperations, true)
 		claim := &resourceapi.ResourceClaim{
 			ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "ns", UID: "uid"},
 			Status: resourceapi.ResourceClaimStatus{
@@ -947,7 +947,7 @@ func TestNewClaimInfoSkipNodeOperations(t *testing.T) {
 	})
 
 	t.Run("feature gate disabled", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAOptionalNodeOperations, false)
 		claim := &resourceapi.ResourceClaim{
 			ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "ns", UID: "uid"},
 			Status: resourceapi.ResourceClaimStatus{

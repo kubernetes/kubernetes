@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	podresourcetest "k8s.io/kubernetes/pkg/kubelet/apis/podresources/testing"
@@ -438,7 +439,7 @@ func TestListPodResourcesV1(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, tc.podLevelResourcesEnabled)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourcesEnabled)
 			}
 
@@ -644,7 +645,7 @@ func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, tc.podLevelResourcesEnabled)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourcesEnabled)
 			}
 
@@ -1005,7 +1006,7 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, tc.podLevelResourcesEnabled)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourcesEnabled)
 			}
 
@@ -1684,7 +1685,7 @@ func TestGetPodResourcesV1(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, tc.podLevelResourcesEnabled)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourcesEnabled)
 			}
 
@@ -2055,7 +2056,7 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.PodLevelResources, tc.podLevelResourcesEnabled)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourcesEnabled)
 			}
 

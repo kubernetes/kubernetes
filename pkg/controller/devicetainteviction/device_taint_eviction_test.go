@@ -52,10 +52,10 @@ import (
 	"k8s.io/component-base/featuregate"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	controllertestutil "k8s.io/kubernetes/pkg/controller/testutil"
-	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
@@ -64,10 +64,10 @@ func init() {
 	// We must not use Default*Mutable*FeatureGate directly here,
 	// otherwise hack/verify-test-featuregates.sh complains.
 	if err := utilfeature.DefaultFeatureGate.(featuregate.MutableVersionedFeatureGate).SetFromMap(map[string]bool{
-		string(features.DRADeviceTaints):           true,
-		string(features.DRADeviceTaintRules):       true,
-		string(features.DRAWorkloadResourceClaims): true,
-		string(features.GenericWorkload):           true, // Dependency of DRAWorkloadResourceClaims
+		string(schedulerfeatures.DRADeviceTaints):           true,
+		string(schedulerfeatures.DRADeviceTaintRules):       true,
+		string(schedulerfeatures.DRAWorkloadResourceClaims): true,
+		string(schedulerfeatures.GenericWorkload):           true, // Dependency of DRAWorkloadResourceClaims
 	}); err != nil {
 		panic(err)
 	}

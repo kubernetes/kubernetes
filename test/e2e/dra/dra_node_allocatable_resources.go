@@ -34,8 +34,8 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/dynamic-resource-allocation/resourceslice"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
@@ -1036,13 +1036,13 @@ func mapToResizableContainerInfo(containers []draContainerInfo) []podresize.Resi
 	return res
 }
 
-var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), "Node Allocatable Resources", feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DRANodeAllocatableResources), func() {
+var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), "Node Allocatable Resources", feature.DynamicResourceAllocation, framework.WithFeatureGate(schedulerfeatures.DRANodeAllocatableResources), func() {
 	f := framework.NewDefaultFramework("dra-node-allocatable-resources")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	doNodeAllocatableCgroupsTests(f)
 
-	f.Context("resize", framework.WithFeatureGate(features.InPlacePodLevelResourcesVerticalScaling), func() {
+	f.Context("resize", framework.WithFeatureGate(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling), func() {
 		doNodeAllocatableResizeTests(f)
 	})
 })

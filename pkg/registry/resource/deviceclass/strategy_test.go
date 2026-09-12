@@ -27,8 +27,8 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -97,7 +97,7 @@ func TestStrategyCreate(t *testing.T) {
 			if !tc.draExtendedResource {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResource)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAExtendedResource, tc.draExtendedResource)
 
 			Strategy.PrepareForCreate(ctx, obj)
 			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
@@ -179,7 +179,7 @@ func TestStrategyUpdate(t *testing.T) {
 			if !tc.draExtendedResource {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResource)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAExtendedResource, tc.draExtendedResource)
 
 			Strategy.PrepareForUpdate(ctx, newObj, oldObj)
 			if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {

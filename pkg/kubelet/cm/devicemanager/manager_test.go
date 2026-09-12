@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -2212,7 +2213,7 @@ func TestAdmitPodWithDRAResources(t *testing.T) {
 			if !test.enableFeatureGate {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAExtendedResource, test.enableFeatureGate)
 
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2342,7 +2343,7 @@ func TestGetDeviceRunContainerOptionsWithDRAResourceAndStaleDevicePluginState(t 
 			if !test.enableFeatureGate {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.DRAExtendedResource, test.enableFeatureGate)
 
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

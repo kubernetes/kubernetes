@@ -43,8 +43,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -316,7 +316,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 		Description: When there are Pods with various priority classes running the preemption,
 		the scheduler must prioritize the Pods with the higher priority class.
 	*/
-	framework.It("validates various priority Pods preempt expectedly with the async preemption", feature.SchedulerAsyncPreemption, framework.WithFeatureGate(features.SchedulerAsyncPreemption), func(ctx context.Context) {
+	framework.It("validates various priority Pods preempt expectedly with the async preemption", feature.SchedulerAsyncPreemption, framework.WithFeatureGate(schedulerfeatures.SchedulerAsyncPreemption), func(ctx context.Context) {
 		var podRes v1.ResourceList
 		// Create 10 pods per node that will eat up all the node's resources.
 		ginkgo.By("Create 10 low-priority pods on each node.")

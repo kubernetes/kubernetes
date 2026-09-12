@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -37,7 +38,7 @@ const (
 func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 	// Drop the contents of the volumeAttributesClassName if the VolumeAttributesClass
 	// feature gate is disabled.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 		if oldPVCSpec == nil || oldPVCSpec.VolumeAttributesClassName == nil {
 			pvcSpec.VolumeAttributesClassName = nil
 		}
@@ -89,7 +90,7 @@ func EnforceDataSourceBackwardsCompatibility(pvcSpec, oldPVCSpec *core.Persisten
 }
 
 func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.VolumeAttributesClass) {
 		if oldPVC == nil || oldPVC.Status.CurrentVolumeAttributesClassName == nil {
 			pvc.Status.CurrentVolumeAttributesClassName = nil
 		}

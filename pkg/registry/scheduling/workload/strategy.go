@@ -24,10 +24,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // workloadStrategy implements behavior for Workload objects.
@@ -56,10 +56,10 @@ func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.
 // mapped to whether each is enabled.
 func (workloadStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
 	return rest.DeclarativeValidationConfig{Options: map[string]bool{
-		string(features.TopologyAwareWorkloadScheduling): utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling),
-		string(features.DRAWorkloadResourceClaims):       utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
-		string(features.PodGroupPreemptionPolicy):        utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
-		string(features.CompositePodGroup):               utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup),
+		string(schedulerfeatures.TopologyAwareWorkloadScheduling): utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.TopologyAwareWorkloadScheduling),
+		string(schedulerfeatures.DRAWorkloadResourceClaims):       utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAWorkloadResourceClaims),
+		string(schedulerfeatures.PodGroupPreemptionPolicy):        utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodGroupPreemptionPolicy),
+		string(schedulerfeatures.CompositePodGroup):               utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.CompositePodGroup),
 	}}
 }
 
@@ -118,7 +118,7 @@ func dropDisabledWorkloadSpecFields(workloadSpec, oldWorkloadSpec *scheduling.Wo
 	if oldWorkloadSpec != nil {
 		oldCpgTemplates = oldWorkloadSpec.CompositePodGroupTemplates
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.CompositePodGroup) {
 		if oldWorkloadSpec == nil || len(oldWorkloadSpec.CompositePodGroupTemplates) == 0 {
 			if workloadSpec != nil {
 				workloadSpec.CompositePodGroupTemplates = nil
@@ -158,7 +158,7 @@ func dropDisabledCompositePodGroupTemplatesFields(templates, oldTemplates []sche
 		if oldTemplate != nil {
 			oldCpgTemplates = oldTemplate.CompositePodGroupTemplates
 		}
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.CompositePodGroup) {
 			if oldTemplate == nil || len(oldTemplate.CompositePodGroupTemplates) == 0 {
 				template.CompositePodGroupTemplates = nil
 			}
@@ -177,7 +177,7 @@ func dropDisabledCompositePodGroupTemplatesFields(templates, oldTemplates []sche
 // dropDisabledSchedulingConstraintsFields drops the SchedulingConstraints field
 // from the PodGroupTemplate if the TopologyAwareWorkloadScheduling feature gate is disabled.
 func dropDisabledSchedulingConstraintsFields(template, oldTemplate *scheduling.PodGroupTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) || schedulingConstraintsInUse(oldTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.TopologyAwareWorkloadScheduling) || schedulingConstraintsInUse(oldTemplate) {
 		return
 	}
 	template.SchedulingConstraints = nil
@@ -186,7 +186,7 @@ func dropDisabledSchedulingConstraintsFields(template, oldTemplate *scheduling.P
 // dropDisabledDRAWorkloadResourceClaimsFields removes resource claim references from
 // podGroupTemplates unless they are already used by the old Workload spec.
 func dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate *scheduling.PodGroupTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldTemplate) {
 		return
 	}
 	template.ResourceClaims = nil
@@ -196,7 +196,7 @@ func dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate *scheduli
 // from the PodGroupTemplate if the PodGroupPreemptionPolicy feature gate is disabled,
 // unless the field already used in the old PodGroupTemplate.
 func dropDisabledPGPreemptionPolicyFields(template, oldTemplate *scheduling.PodGroupTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldTemplate) {
 		return
 	}
 	template.PreemptionPolicy = nil
@@ -218,7 +218,7 @@ func preemptionPolicyInUse(pgt *scheduling.PodGroupTemplate) bool {
 // from the CompositePodGroupTemplate if the PodGroupPreemptionPolicy feature gate is disabled,
 // unless the field already used in the old CompositePodGroupTemplate.
 func dropDisabledCPGPreemptionPolicyFields(template, oldTemplate *scheduling.CompositePodGroupTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || cpgPreemptionPolicyInUse(oldTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodGroupPreemptionPolicy) || cpgPreemptionPolicyInUse(oldTemplate) {
 		return
 	}
 	template.PreemptionPolicy = nil

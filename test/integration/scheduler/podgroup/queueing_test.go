@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
@@ -233,9 +233,9 @@ func TestCPGQueueing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: true,
-				features.CompositePodGroup:               true,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: true,
+				schedulerfeatures.CompositePodGroup:               true,
 			})
 
 			testCtx := testutils.InitTestSchedulerWithOptions(

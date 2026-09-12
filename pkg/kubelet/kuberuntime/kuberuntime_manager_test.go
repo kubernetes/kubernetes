@@ -52,6 +52,7 @@ import (
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	crierror "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -911,7 +912,7 @@ func TestSyncPodWithRestartAllContainers(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ContainerRestartRules:                true,
-		features.NodeDeclaredFeatures:                 true,
+		schedulerfeatures.NodeDeclaredFeatures:        true,
 		features.RestartAllContainersOnContainerExits: true,
 	})
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
@@ -1500,7 +1501,7 @@ func TestComputePodActions(t *testing.T) {
 func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ContainerRestartRules:                true,
-		features.NodeDeclaredFeatures:                 true,
+		schedulerfeatures.NodeDeclaredFeatures:        true,
 		features.RestartAllContainersOnContainerExits: true,
 	})
 	t.Run("TestComputePodActions", TestComputePodActions)
@@ -3114,7 +3115,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is currently not supported on Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 
 	logger, tCtx := ktesting.NewTestContext(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
@@ -3145,7 +3146,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, true)
 	for desc, test := range map[string]struct {
 		setupFn                 func(*v1.Pod)
 		getExpectedPodActionsFn func(*v1.Pod, *kubecontainer.PodStatus) *podActions
@@ -3973,7 +3974,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.podLevelResizeEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodLevelResourcesVerticalScaling, test.podLevelResizeEnabled)
 			pod, status := makeBasePodAndStatus()
 			for idx := range pod.Spec.Containers {
 				// default resize policy when pod resize feature is enabled
@@ -4019,7 +4020,7 @@ func TestComputePodResizeActionForOOMKilledContainer(t *testing.T) {
 		t.Skip("in-place resize is only supported on Linux")
 	}
 	logger, tCtx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	require.NoError(t, err)
@@ -4066,7 +4067,7 @@ func TestComputePodResizeActionForOOMKilledInitContainer(t *testing.T) {
 		t.Skip("in-place resize is only supported on Linux")
 	}
 	logger, tCtx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	require.NoError(t, err)
@@ -4127,7 +4128,7 @@ func TestComputePodResizeActionForOOMKilledSidecarContainer(t *testing.T) {
 		t.Skip("in-place resize is only supported on Linux")
 	}
 	logger, tCtx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	require.NoError(t, err)
@@ -4197,7 +4198,7 @@ func TestComputePodResizeActionForOOMKilledSidecarContainer(t *testing.T) {
 
 func TestUpdatePodContainerResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
@@ -4474,7 +4475,7 @@ func TestDoPodResizeAction(t *testing.T) {
 	}
 
 	logger, tCtx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodVerticalScaling, true)
 	metrics.Register()
 	metrics.PodResizeDurationMilliseconds.Reset()
 
@@ -4837,7 +4838,7 @@ func TestDoPodResizeAction(t *testing.T) {
 			require.NoError(t, err)
 			m.cpuCFSQuota = true // Enforce CPU Limits
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, tc.enablePLR)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodLevelResourcesVerticalScaling, tc.enablePLR)
 
 			mockCM := cmtesting.NewMockContainerManager(t)
 			mockCM.EXPECT().PodHasExclusiveCPUs(logger, mock.Anything).Return(false).Maybe()
@@ -5783,7 +5784,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 		unstarted               bool // Whether the container is missing from the pod status
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.NodeDeclaredFeatures, true)
 	type testPLR struct {
 		allocated testResources
 		actuated  *testResources
@@ -6078,7 +6079,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inplacePodLevelResizeEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.InPlacePodLevelResourcesVerticalScaling, test.inplacePodLevelResizeEnabled)
 			_, _, m, err := createTestRuntimeManager(tCtx)
 			require.NoError(t, err)
 

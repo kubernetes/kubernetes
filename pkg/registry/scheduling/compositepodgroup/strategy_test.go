@@ -27,8 +27,8 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 
 	// Ensure all API groups are registered with the scheme
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -258,10 +258,10 @@ func TestStrategyCreate(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.CompositePodGroup:               true,
-				features.TopologyAwareWorkloadScheduling: true,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.CompositePodGroup:               true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: true,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			newCpg := tc.obj.DeepCopy()
 
@@ -438,10 +438,10 @@ func TestStrategyUpdate(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.CompositePodGroup:               true,
-				features.TopologyAwareWorkloadScheduling: true,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				schedulerfeatures.GenericWorkload:                 true,
+				schedulerfeatures.CompositePodGroup:               true,
+				schedulerfeatures.TopologyAwareWorkloadScheduling: true,
+				schedulerfeatures.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			oldCpg := tc.oldObj.DeepCopy()
 			newCpg := tc.newObj.DeepCopy()

@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
@@ -157,7 +158,7 @@ func NewManager(checkpointDirectory string,
 }
 
 func newStateImpl(logger klog.Logger, checkpointDirectory, checkpointName string) state.State {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		return state.NewNoopStateCheckpoint()
 	}
 
@@ -390,7 +391,7 @@ func (m *manager) isResizeIncreasingRequests(pod *v1.Pod) bool {
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources),
 	}
 	oldRequest := resourcehelper.PodRequests(allocatedPod, opts)
 	newRequest := resourcehelper.PodRequests(pod, opts)
@@ -439,7 +440,7 @@ func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.
 	}
 
 	updated := false
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) {
 		pod, updated = updatePodLevelResourcesFromAllocation(pod, allocated)
 	}
 	pod, updated = updateContainerResourcesFromAllocation(pod, allocated, updated)
@@ -528,7 +529,7 @@ func (m *manager) SetAllocatedResources(logger klog.Logger, pod *v1.Pod) error {
 // memory-backed emptyDir volume limits, and pod-level resources for the given pod.
 func ResourceInfoForPod(pod *v1.Pod) state.PodResourceInfo {
 	var podAlloc state.PodResourceInfo
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && pod.Spec.Resources != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodLevelResourcesVerticalScaling) && pod.Spec.Resources != nil {
 		podAlloc.PodLevelResources = pod.Spec.Resources.DeepCopy()
 	}
 	podAlloc.ContainerResources = make(map[string]v1.ResourceRequirements)
@@ -567,7 +568,7 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 		// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
 		pod, _ = m.UpdatePodFromAllocation(pod)
@@ -577,7 +578,7 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 	allocatedPods := m.getAllocatedPods(activePods)
 	ok, reason, message := m.canAdmitPod(ctx, allocatedPods, pod, lifecycle.AddOperation)
 
-	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if ok && utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
@@ -666,7 +667,7 @@ func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod 
 }
 
 func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.InPlacePodVerticalScaling) {
 		return activePods
 	}
 

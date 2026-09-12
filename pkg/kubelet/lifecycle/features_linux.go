@@ -22,11 +22,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/resource"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 )
 
 func isPodLevelResourcesSupported(pod *v1.Pod) PodAdmitResult {
-	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(schedulerfeatures.PodLevelResources)
 	if resource.IsPodLevelResourcesSet(pod) && !podLevelResourcesEnabled {
 		return PodAdmitResult{
 			Admit:   false,

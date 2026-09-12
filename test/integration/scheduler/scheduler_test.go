@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -1038,7 +1038,7 @@ func TestHostPorts(t *testing.T) {
 // 7. Create pod3 with Lt toleration for error-rate; it's unschedulable (node3's error-rate too high)
 // 8. Update node3's taint to acceptable error-rate; pod3 schedules on node3
 func TestTaintTolerationGtLtIntegration(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedulerfeatures.TaintTolerationComparisonOperators, true)
 
 	testCtx := testutils.InitTestSchedulerWithNS(t, "gt-lt-integration")
 

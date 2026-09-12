@@ -21,7 +21,7 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -56,7 +56,7 @@ func compatGroupsDevice(name, group string) resourceapi.Device {
 // fake DRA driver that advertises devices declaring compatibility groups on a
 // shared counter set. It only runs on clusters where the (alpha) feature gate is
 // enabled.
-var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.WithFeatureGate(features.DRADeviceCompatibilityGroups), func() {
+var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.WithFeatureGate(schedulerfeatures.DRADeviceCompatibilityGroups), func() {
 	f := framework.NewDefaultFramework("dra-compat-groups")
 
 	// The driver containers run privileged to manage /var/lib/kubelet/plugins.
