@@ -19,6 +19,7 @@ package generic_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -191,6 +192,61 @@ func TestPolicySourceBindsToPolicies(t *testing.T) {
 	require.Len(t, testContext.Source.Hooks()[0].Bindings, 1, "should have one binding")
 	require.Equal(t, "binding1", testContext.Source.Hooks()[0].Bindings[0].GetName(), "binding name should be binding1")
 
+}
+
+// TestPolicySourceCoreParamKindSurvivesUnbind checks that unbinding a policy
+// does not stop the shared informer backing a built-in paramKind. The factory
+// never restarts an informer it has already started, so stopping one freezes
+// its store for the life of the process.
+// Regression test for https://github.com/kubernetes/kubernetes/issues/130887.
+func TestPolicySourceCoreParamKindSurvivesUnbind(t *testing.T) {
+	t.Cleanup(generic.SetPolicyRefreshIntervalForTests(10 * time.Millisecond))
+
+	policy := &FakePolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-policy"},
+		ParamKind: &v1.ParamKind{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+	}
+	binding := &FakeBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-binding"},
+		PolicyName: "test-policy",
+		ParamRef:   &v1.ParamRef{Name: "param-1", Namespace: "default"},
+	}
+
+	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
+		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
+		func(fb *FakeBinding) generic.BindingAccessor { return fb },
+		func(fp *FakePolicy) generic.Evaluator { return nil },
+		makeTestDispatcher,
+		[]runtime.Object{policy, binding},
+		nil,
+	)
+	require.NoError(t, err)
+	defer testCancel()
+	require.NoError(t, testContext.Start())
+
+	// While bound, the param informer observes ConfigMaps created after the policy.
+	require.NoError(t, testContext.UpdateAndWait(&corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "param-1", Namespace: "default"},
+		Data:       map[string]string{"limit": "1"},
+	}), "param created while the policy is bound should become visible")
+
+	// Unbinding drops the paramKind and calls its cancel func.
+	require.NoError(t, testContext.DeleteAndWait(binding))
+	require.Empty(t, testContext.Source.Hooks(), "unbound policy should produce no hooks")
+
+	// Re-bind the policy, pointing at a param created after the unbind.
+	binding.ParamRef = &v1.ParamRef{Name: "param-2", Namespace: "default"}
+	require.NoError(t, testContext.UpdateAndWait(binding))
+
+	// The shared informer is still running, so the new param reaches its store.
+	require.NoError(t, testContext.UpdateAndWait(&corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "param-2", Namespace: "default"},
+		Data:       map[string]string{"limit": "2"},
+	}), "param created after the policy was re-bound should become visible")
 }
 
 type FakePolicy struct {
