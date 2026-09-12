@@ -904,7 +904,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	// Kubernetes release.
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, &output.TextPrinter{})
+			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, "", &output.TextPrinter{})
 			if diff := cmp.Diff(rt.expectedUpgrades, actualUpgrades); len(diff) > 0 {
 				t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades:\n%v\n\tgot:\n%v\n\tdiff:\n%v", rt.expectedUpgrades, actualUpgrades, diff)
 			}
