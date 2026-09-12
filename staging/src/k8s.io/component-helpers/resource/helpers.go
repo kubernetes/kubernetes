@@ -396,6 +396,18 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		applyPodLevelResources(limits, effectiveLims)
 	}
 
+	// When any container in a pod does not set a limit for cpu or memory, kubelet treats this
+	// as unlimited (and not zero) while configuring pod and container cgroups.
+	// We must exclude those limits here instead of returning partial limits.
+	for name := range limits {
+		switch name {
+		case v1.ResourceCPU, v1.ResourceMemory:
+			if !isLimitDeclared(pod, name, opts) {
+				delete(limits, name)
+			}
+		}
+	}
+
 	// Add overhead to non-zero limits if requested:
 	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
 		for name, quantity := range pod.Spec.Overhead {
@@ -407,6 +419,30 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	}
 
 	return limits
+}
+
+// isLimitDeclared reports whether the limit for resourceName is declared for the whole
+// pod: either a pod-level limit is set, or every container in the pod declares it.
+func isLimitDeclared(pod *v1.Pod, resourceName v1.ResourceName, opts PodResourcesOptions) bool {
+	// A pod-level limit bounds the whole pod, so it makes the limit well defined even when
+	// individual containers omit their own.
+	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
+		if limit, found := pod.Spec.Resources.Limits[resourceName]; found && !limit.IsZero() {
+			return true
+		}
+	}
+
+	for i := range pod.Spec.InitContainers {
+		if limit, found := pod.Spec.InitContainers[i].Resources.Limits[resourceName]; !found || limit.IsZero() {
+			return false
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if limit, found := pod.Spec.Containers[i].Resources.Limits[resourceName]; !found || limit.IsZero() {
+			return false
+		}
+	}
+	return true
 }
 
 // AggregateContainerLimits computes the aggregated resource limits of all the containers
