@@ -19,13 +19,16 @@ package apiserver
 import (
 	"net/http"
 	"net/url"
+	"strings"
 	"sync/atomic"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
@@ -120,6 +123,22 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Wrap the response writer so we can observe the actual HTTP status code
+	// emitted by the upgrade-aware proxy handler (or the proxyError calls
+	// below) and report it as a kube-aggregator request metric.
+	delegate := &endpointmetrics.ResponseWriterDelegator{ResponseWriter: w}
+	w = responsewriter.WrapForHTTP1Or2(delegate)
+	start := time.Now()
+	defer func() {
+		status := delegate.Status()
+		if status == 0 {
+			// No header was explicitly written; net/http defaults to 200 OK.
+			status = http.StatusOK
+		}
+		group, version := apiServiceGroupVersion(req, handlingInfo.name)
+		recordAggregatorRequest(endpointmetrics.NormalizedVerb(req), group, version, status, time.Since(start))
+	}()
+
 	if !handlingInfo.serviceAvailable {
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
 		return
@@ -185,6 +204,21 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	utilflowcontrol.RequestDelegated(req.Context())
 	handler.ServeHTTP(w, newReq)
+}
+
+// apiServiceGroupVersion returns the (group, version) labels to record for a
+// proxied request. It prefers RequestInfo (which is the value the rest of the
+// apiserver metrics report) and falls back to splitting the APIService name,
+// which is always of the form "<version>.<group>" (or just "<version>." for
+// the core group).
+func apiServiceGroupVersion(req *http.Request, apiServiceName string) (group, version string) {
+	if info, ok := genericapirequest.RequestInfoFrom(req.Context()); ok && info.IsResourceRequest {
+		return info.APIGroup, info.APIVersion
+	}
+	if version, group, ok := strings.Cut(apiServiceName, "."); ok {
+		return group, version
+	}
+	return "", apiServiceName
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
