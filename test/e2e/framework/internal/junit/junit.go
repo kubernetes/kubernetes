@@ -43,6 +43,10 @@ func WriteJUnitReport(report ginkgo.Report, filename string) error {
 		// All labels are also part of the spec texts in inline [] tags,
 		// so we don't need to write them separately.
 		OmitSpecLabels: true,
+
+		// Include report entries (e.g. attached via ginkgo.AddReportEntry)
+		// as <property> elements in their <testcase>.
+		IncludeReportEntries: true,
 	}
 
 	// Sort specs by full name. The default is by start (or completion?) time,
