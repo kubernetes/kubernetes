@@ -240,3 +240,22 @@ func TestPatchSubresource(t *testing.T) {
 		t.Errorf("unexpected pod status to be set to %s got: %s", expectedStatus, actualStatus)
 	}
 }
+
+func TestPatchEmptyType(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	stream, _, _, _ := genericiooptions.NewTestIOStreams()
+
+	o := NewPatchOptions(stream)
+	o.PatchType = ""
+	o.Patch = `{"metadata":{"labels":{"foo":"bar"}}}`
+
+	err := o.Validate()
+	if err == nil {
+		t.Fatalf("expected error for empty --type flag, but got none")
+	}
+	if !strings.Contains(err.Error(), "--type must be one of") {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
