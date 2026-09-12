@@ -558,14 +558,19 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 	pod4 := newStatefulSetPod(set, 4)
 	pod4.OwnerReferences = nil
 	pod4.Name = "x" + pod4.Name
+	// A leading-zero ordinal must stay unclaimed so it cannot hide the canonical Pod.
+	pod5 := newStatefulSetPod(set, 1)
+	pod5.OwnerReferences = nil
+	pod5.Name = set.Name + "-01"
 
 	_, ctx := ktesting.NewTestContext(t)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx, set, pod1, pod2, pod3, pod4)
+	ssc, _, om, _ := newFakeStatefulSetController(ctx, set, pod1, pod2, pod3, pod4, pod5)
 
 	om.podsIndexer.Add(pod1)
 	om.podsIndexer.Add(pod2)
 	om.podsIndexer.Add(pod3)
 	om.podsIndexer.Add(pod4)
+	om.podsIndexer.Add(pod5)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Fatal(err)
@@ -578,7 +583,7 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 	for _, pod := range pods {
 		got.Insert(pod.Name)
 	}
-	// pod2 should be claimed, pod3 and pod4 ignored
+	// pod2 should be claimed, pod3, pod4, and pod5 ignored.
 	want := sets.NewString(pod1.Name, pod2.Name)
 	if !got.Equal(want) {
 		t.Errorf("getPodsForStatefulSet() = %v, want %v", got, want)
@@ -643,11 +648,15 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 	pod4 := newStatefulSetPod(set, 4)
 	pod4.OwnerReferences = nil
 	pod4.Labels = nil
+	// A leading-zero ordinal must be released so it cannot hide the canonical Pod.
+	pod5 := newStatefulSetPod(set, 1)
+	pod5.Name = set.Name + "-01"
 
 	om.podsIndexer.Add(pod1)
 	om.podsIndexer.Add(pod2)
 	om.podsIndexer.Add(pod3)
 	om.podsIndexer.Add(pod4)
+	om.podsIndexer.Add(pod5)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Fatal(err)
@@ -661,7 +670,7 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 		got.Insert(pod.Name)
 	}
 
-	// Expect only pod1 (pod2 and pod3 should be released, pod4 ignored).
+	// Expect only pod1 (pod2, pod3, and pod5 should be released, pod4 ignored).
 	want := sets.NewString(pod1.Name)
 	if !got.Equal(want) {
 		t.Errorf("getPodsForStatefulSet() = %v, want %v", got, want)
