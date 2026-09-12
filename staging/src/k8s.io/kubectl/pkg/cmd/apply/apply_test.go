@@ -68,6 +68,7 @@ var (
 	fakeSchema            = sptest.Fake{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")}
 	fakeOpenAPIV3Legacy   = sptest.OpenAPIV3Getter{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "v3", "api", "v1.json")}
 	fakeOpenAPIV3AppsV1   = sptest.OpenAPIV3Getter{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "v3", "apis", "apps", "v1.json")}
+	fakeOpenAPIV3Apiext   = sptest.OpenAPIV3Getter{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "v3", "apis", "apiextensions.k8s.io", "v1.json")}
 	testingOpenAPISchemas = []testOpenAPISchema{AlwaysErrorsOpenAPISchema, FakeOpenAPISchema}
 
 	AlwaysErrorsOpenAPISchema = testOpenAPISchema{
@@ -311,6 +312,7 @@ const (
 	filenameRCLASTAPPLIED     = "../../../testdata/apply/rc-lastapplied.yaml"
 	filenameRCManagedFieldsLA = "../../../testdata/apply/rc-managedfields-lastapplied.yaml"
 	filenameSVC               = "../../../testdata/apply/service.yaml"
+	filenameCRDDryRun         = "../../../testdata/apply/crd-dryrun.yaml"
 	filenameRCSVC             = "../../../testdata/apply/rc-service.yaml"
 	filenameNoExistRC         = "../../../testdata/apply/rc-noexist.yaml"
 	filenameRCPatchTest       = "../../../testdata/apply/patch.json"
@@ -2273,6 +2275,87 @@ func TestApplyDryRunClientMergesWithServerState(t *testing.T) {
 	clusterIP, found, _ := unstructured.NestedString(result.Object, "spec", "clusterIP")
 	assert.True(t, found, "clusterIP should be preserved from server")
 	assert.Equal(t, "10.0.0.42", clusterIP)
+}
+
+func TestApplyDryRunClientCustomResourceDefinition(t *testing.T) {
+	// gh-139538: `apply --dry-run=client` on an existing CustomResourceDefinition
+	// builds a strategic-merge patch from the server's OpenAPI schema, but then
+	// applied it locally using kubectl's compiled-in scheme. apiextensions types
+	// are not registered in that scheme, so the lookup returned nil and the local
+	// apply failed with "applying patch locally: expected a struct, but received
+	// a nil". The patch must be applied locally using the same OpenAPI-derived
+	// metadata it was built with.
+	cmdtesting.InitTestErrorHandler(t)
+
+	const crdName = "bugs.bug-repro.example.com"
+	lastApplied := `{"apiVersion":"apiextensions.k8s.io/v1","kind":"CustomResourceDefinition","metadata":{"name":"` + crdName + `"},"spec":{"group":"bug-repro.example.com","names":{"kind":"Bug","plural":"bugs"},"scope":"Namespaced","versions":[{"name":"v1","served":true,"storage":true,"schema":{"openAPIV3Schema":{"type":"object"}}}]}}`
+
+	serverState := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "apiextensions.k8s.io/v1",
+		"kind":       "CustomResourceDefinition",
+		"metadata": map[string]any{
+			"name":        crdName,
+			"annotations": map[string]any{corev1.LastAppliedConfigAnnotation: lastApplied},
+			// A label that exists only on the live object (not in the manifest
+			// nor the last-applied config) so we can prove the patch merged
+			// against server state rather than just echoing the manifest.
+			"labels": map[string]any{"server-only": "kept"},
+		},
+		"spec": map[string]any{
+			"group": "bug-repro.example.com",
+			"names": map[string]any{"kind": "Bug", "plural": "bugs"},
+			"scope": "Namespaced",
+			"versions": []any{map[string]any{
+				"name": "v1", "served": true, "storage": true,
+				"schema": map[string]any{"openAPIV3Schema": map[string]any{"type": "object"}},
+			}},
+		},
+	}}
+	serverStateBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, serverState)
+	require.NoError(t, err)
+
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	tf.OpenAPIV3ClientFunc = func() (openapiclient.Client, error) {
+		c := openapitest.NewFakeClient()
+		c.PathsMap["apis/apiextensions.k8s.io/v1"] = openapitest.FakeGroupVersion{GVSpec: fakeOpenAPIV3Apiext.SchemaBytesOrDie()}
+		return c, nil
+	}
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.Method == http.MethodGet && req.URL.Path == "/customresourcedefinitions/"+crdName {
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(serverStateBytes))}, nil
+			}
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.Path)
+			return nil, nil
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	ioStreams, _, outBuf, errBuf := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
+	require.NoError(t, cmd.Flags().Set("filename", filenameCRDDryRun))
+	require.NoError(t, cmd.Flags().Set("dry-run", "client"))
+	require.NoError(t, cmd.Flags().Set("output", "json"))
+	cmd.Run(cmd, []string{})
+
+	// Before the fix this failed with "applying patch locally: expected a
+	// struct, but received a nil".
+	require.Empty(t, errBuf.String())
+
+	result := &unstructured.Unstructured{}
+	require.NoError(t, result.UnmarshalJSON(outBuf.Bytes()))
+
+	// The label from the manifest must be merged in by the client-side patch...
+	label, found, _ := unstructured.NestedString(result.Object, "metadata", "labels", "bug-repro")
+	assert.True(t, found, "label from manifest should be merged in")
+	assert.Equal(t, "true", label)
+	// ...while the live-only label is preserved, proving the strategic merge ran
+	// against server state rather than just printing the manifest.
+	serverOnly, found, _ := unstructured.NestedString(result.Object, "metadata", "labels", "server-only")
+	assert.True(t, found, "live-only label should be preserved by the merge")
+	assert.Equal(t, "kept", serverOnly)
 }
 
 func TestDontAllowApplyWithPodGeneratedName(t *testing.T) {
