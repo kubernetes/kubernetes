@@ -574,6 +574,10 @@ func ValidateIngressClassUpdate(newIngressClass, oldIngressClass *networking.Ing
 // validateIngressClassSpec ensures that IngressClassSpec fields are valid.
 func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if len(spec.Controller) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("controller"), "at least one controller is required")).MarkCoveredByDeclarative()
+		return allErrs
+	}
 	if len(spec.Controller) > maxLenIngressClassController {
 		allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), "" /*unused*/, maxLenIngressClassController))
 	}
@@ -585,7 +589,7 @@ func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.
 // validateIngressClassSpecUpdate ensures that IngressClassSpec updates are
 // valid.
 func validateIngressClassSpecUpdate(newSpec, oldSpec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
-	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller"))
+	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller")).MarkCoveredByDeclarative().WithOrigin("immutable")
 }
 
 // validateIngressTypedLocalObjectReference ensures that Parameters fields are valid.

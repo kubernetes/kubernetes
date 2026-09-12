@@ -61,6 +61,10 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.controller": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.parameters.kind": {
 				{ErrorType: "FieldValueRequired"},
 			},
