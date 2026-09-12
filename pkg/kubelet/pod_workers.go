@@ -806,19 +806,29 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 			// However, `filterOutInactivePods`, considers pods that are actively terminating as active. As a result, `IsPodKnownTerminated()` needs to return true and thus `terminatedAt` needs to be set.
 			if statusCache, err := p.podCache.Get(uid); err == nil {
 				if isPodStatusCacheTerminal(statusCache) {
-					// At this point we know:
-					// (1) The pod is terminal based on the config source.
-					// (2) The pod is terminal based on the runtime cache.
-					// This implies that this pod had already completed `SyncTerminatingPod` sometime in the past. The pod is likely being synced for the first time due to a kubelet restart.
-					// These pods need to complete SyncTerminatedPod to ensure that all resources are cleaned and that the status manager makes the final status updates for the pod.
-					// As a result, set finished: false, to ensure a Terminated event will be sent and `SyncTerminatedPod` will run.
-					status = &podSyncStatus{
-						terminatedAt:       now,
-						terminatingAt:      now,
-						syncedAt:           now,
-						startedTerminating: true,
-						finished:           false,
-						fullname:           kubecontainer.BuildPodFullName(name, ns),
+					// Check if the pod has actually been seen by the runtime (has containers or sandboxes).
+					// An empty status (no containers or sandboxes) means the pod never started, so we can mark it
+					// as finished immediately without going through SyncTerminatedPod.
+					if len(statusCache.ContainerStatuses) == 0 && len(statusCache.SandboxStatuses) == 0 {
+						// The pod is terminal based on config but has never been seen by the runtime.
+						// Mark it as terminated immediately so it will be considered inactive and not block pod admission.
+						status.terminatedAt = now
+						status.finished = true
+					} else {
+						// At this point we know:
+						// (1) The pod is terminal based on the config source.
+						// (2) The pod is terminal based on the runtime cache.
+						// This implies that this pod had already completed `SyncTerminatingPod` sometime in the past. The pod is likely being synced for the first time due to a kubelet restart.
+						// These pods need to complete SyncTerminatedPod to ensure that all resources are cleaned and that the status manager makes the final status updates for the pod.
+						// As a result, set finished: false, to ensure a Terminated event will be sent and `SyncTerminatedPod` will run.
+						status = &podSyncStatus{
+							terminatedAt:       now,
+							terminatingAt:      now,
+							syncedAt:           now,
+							startedTerminating: true,
+							finished:           false,
+							fullname:           kubecontainer.BuildPodFullName(name, ns),
+						}
 					}
 				}
 			}

@@ -749,25 +749,21 @@ func TestUpdatePod(t *testing.T) {
 			expectKnownTerminated: true,
 		},
 		{
-			name: "a pod that is terminal and has never started must be terminated if the runtime does not have a cached terminal state",
+			name: "a pod that is terminal and has never started must be terminated if the runtime has an empty status (cache miss)",
 			update: UpdatePodOptions{
 				UpdateType: kubetypes.SyncPodCreate,
 				Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
 			},
-			expect: hasCancelFn(&podSyncStatus{
-				fullname:      "done-pod_ns",
-				syncedAt:      time.Unix(1, 0),
-				terminatingAt: time.Unix(1, 0),
-				startedAt:     time.Unix(3, 0),
-				terminatedAt:  time.Unix(3, 0),
-				activeUpdate: &UpdatePodOptions{
-					Pod:            newPodWithPhase("1", "done-pod", v1.PodSucceeded),
-					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: intp(30)},
-				},
-				gracePeriod:        30,
-				startedTerminating: true,
-				finished:           true,
-			}),
+			runtimeStatus: &kubecontainer.PodStatus{
+				// Empty status (no containers or sandboxes) models a real cache miss
+				// where the pod has never been seen by the runtime
+			},
+			expect: &podSyncStatus{
+				fullname:     "done-pod_ns",
+				syncedAt:     time.Unix(1, 0),
+				terminatedAt: time.Unix(1, 0),
+				finished:     true,
+			},
 			expectKnownTerminated: true,
 		},
 		{
@@ -776,7 +772,13 @@ func TestUpdatePod(t *testing.T) {
 				UpdateType: kubetypes.SyncPodCreate,
 				Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
 			},
-			runtimeStatus: &kubecontainer.PodStatus{ /* we know about this pod */ },
+			runtimeStatus: &kubecontainer.PodStatus{
+				// Pod has been seen by runtime but is in terminal state
+				// Add a terminated container to distinguish from cache miss (empty status)
+				ContainerStatuses: []*kubecontainer.Status{
+					{State: kubecontainer.ContainerStateExited},
+				},
+			},
 			expectBeforeWorker: &podSyncStatus{
 				fullname:      "done-pod_ns",
 				syncedAt:      time.Unix(1, 0),
