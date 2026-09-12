@@ -23,7 +23,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"k8s.io/apiserver/pkg/storage"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -273,6 +276,30 @@ func TestSupportsRequestWatchProgress(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestRequestWatchProgressEtcdPermissionDenied verifies that when the etcd
+// Maintenance.Status RPC returns PermissionDenied (etcd >= 3.6 with a non-root
+// user, etcd-io/etcd#21466), RequestWatchProgress is assumed supported and the
+// check does not return an error (so the retry loop stops).
+func TestRequestWatchProgressEtcdPermissionDenied(t *testing.T) {
+	permErr := grpcstatus.Error(codes.PermissionDenied, "etcdserver: permission denied")
+
+	// Direct check: the endpoint helper must swallow PermissionDenied and report supported.
+	supported, err := endpointSupportsRequestWatchProgress(context.Background(),
+		&MockEtcdClient{EndpointVersion: []mockEndpointVersion{
+			{Endpoint: "localhost:2390", Error: permErr}}}, "localhost:2390")
+	require.NoError(t, err)
+	assert.True(t, supported, "PermissionDenied should be treated as supported, not disabled")
+
+	// End-to-end through the checker: feature ends up Supported, no error surfaced.
+	f := newDefaultFeatureSupportChecker()
+	mockClient := &MockEtcdClient{EndpointVersion: []mockEndpointVersion{
+		{Endpoint: "localhost:2390", Error: permErr}}}
+	for _, ep := range mockClient.Endpoints() {
+		require.NoError(t, f.clientSupportsRequestWatchProgress(context.Background(), mockClient, ep))
+	}
+	assert.True(t, f.Supports(storage.RequestWatchProgress))
 }
 
 func TestMarkUnsupported(t *testing.T) {
