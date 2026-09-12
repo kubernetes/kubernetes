@@ -6625,22 +6625,27 @@
     endpoint: /metrics
 - name: podgroup_schedule_attempts_total
   subsystem: scheduler
-  help: Number of attempts to schedule pod group, by the result and scheduler profile.
-    'unschedulable' means a pod group could not be scheduled, while 'error' means
-    an internal scheduler problem.
+  help: Number of attempts to schedule pod group, by the result, scheduler profile
+    and entity type ('podgroup' or 'compositepodgroup'). 'unschedulable' means a pod
+    group could not be scheduled, while 'error' means an internal scheduler problem.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - profile
   - result
+  - type
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
 - name: podgroup_scheduling_algorithm_duration_seconds
   subsystem: scheduler
-  help: Pod group scheduling algorithm latency in seconds
+  help: Pod group scheduling algorithm latency in seconds, by scheduler profile and
+    entity type ('podgroup' or 'compositepodgroup').
   type: Histogram
   stabilityLevel: ALPHA
+  labels:
+  - profile
+  - type
   buckets:
   - 0.001
   - 0.002
@@ -6662,12 +6667,14 @@
     endpoint: /metrics
 - name: podgroup_scheduling_attempt_duration_seconds
   subsystem: scheduler
-  help: Pod group scheduling attempt latency in seconds, by scheduler profile.
+  help: Pod group scheduling attempt latency in seconds, by result, scheduler profile
+    and entity type ('podgroup' or 'compositepodgroup').
   type: Histogram
   stabilityLevel: ALPHA
   labels:
   - profile
   - result
+  - type
   buckets:
   - 0.001
   - 0.002
