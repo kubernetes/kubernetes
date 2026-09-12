@@ -283,6 +283,11 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				continue
 			}
 			for k, v := range secretPayload {
+				if _, exists := payload[k]; exists {
+					// A later source wins the path — warn so operators can detect the misconfiguration.
+					klog.Warningf("projected volume %q: path %q from sources[%d] (secret %q) overwrites a path projected by an earlier source",
+						s.volName, k, sourceIndex, source.Secret.Name)
+				}
 				payload[k] = v
 			}
 		case source.ConfigMap != nil:
@@ -308,6 +313,10 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				continue
 			}
 			for k, v := range configMapPayload {
+				if _, exists := payload[k]; exists {
+					klog.Warningf("projected volume %q: path %q from sources[%d] (configMap %q) overwrites a path projected by an earlier source",
+						s.volName, k, sourceIndex, source.ConfigMap.Name)
+				}
 				payload[k] = v
 			}
 		case source.DownwardAPI != nil:
@@ -317,6 +326,10 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				continue
 			}
 			for k, v := range downwardAPIPayload {
+				if _, exists := payload[k]; exists {
+					klog.Warningf("projected volume %q: path %q from sources[%d] (downwardAPI) overwrites a path projected by an earlier source",
+						s.volName, k, sourceIndex)
+				}
 				payload[k] = v
 			}
 		case source.ServiceAccountToken != nil:
@@ -349,6 +362,10 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			if err != nil {
 				errlist = append(errlist, err)
 				continue
+			}
+			if _, exists := payload[tp.Path]; exists {
+				klog.Warningf("projected volume %q: path %q from sources[%d] (serviceAccountToken) overwrites a path projected by an earlier source",
+					s.volName, tp.Path, sourceIndex)
 			}
 			payload[tp.Path] = volumeutil.FileProjection{
 				Data:   []byte(tr.Status.Token),
@@ -387,6 +404,10 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				mode = 0600
 			}
 
+			if _, exists := payload[source.ClusterTrustBundle.Path]; exists {
+				klog.Warningf("projected volume %q: path %q from sources[%d] (clusterTrustBundle) overwrites a path projected by an earlier source",
+					s.volName, source.ClusterTrustBundle.Path, sourceIndex)
+			}
 			payload[source.ClusterTrustBundle.Path] = volumeutil.FileProjection{
 				Data:   trustAnchors,
 				Mode:   mode,
@@ -409,6 +430,10 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				credentialBundle := bytes.Buffer{}
 				credentialBundle.Write(key)
 				credentialBundle.Write(certificates)
+				if _, exists := payload[source.PodCertificate.CredentialBundlePath]; exists {
+					klog.Warningf("projected volume %q: path %q from sources[%d] (podCertificate) overwrites a path projected by an earlier source",
+						s.volName, source.PodCertificate.CredentialBundlePath, sourceIndex)
+				}
 				payload[source.PodCertificate.CredentialBundlePath] = volumeutil.FileProjection{
 					Data:   credentialBundle.Bytes(),
 					Mode:   mode,
@@ -416,6 +441,10 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				}
 			}
 			if source.PodCertificate.KeyPath != "" {
+				if _, exists := payload[source.PodCertificate.KeyPath]; exists {
+					klog.Warningf("projected volume %q: path %q from sources[%d] (podCertificate) overwrites a path projected by an earlier source",
+						s.volName, source.PodCertificate.KeyPath, sourceIndex)
+				}
 				payload[source.PodCertificate.KeyPath] = volumeutil.FileProjection{
 					Data:   key,
 					Mode:   mode,
@@ -423,6 +452,10 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				}
 			}
 			if source.PodCertificate.CertificateChainPath != "" {
+				if _, exists := payload[source.PodCertificate.CertificateChainPath]; exists {
+					klog.Warningf("projected volume %q: path %q from sources[%d] (podCertificate) overwrites a path projected by an earlier source",
+						s.volName, source.PodCertificate.CertificateChainPath, sourceIndex)
+				}
 				payload[source.PodCertificate.CertificateChainPath] = volumeutil.FileProjection{
 					Data:   certificates,
 					Mode:   mode,
