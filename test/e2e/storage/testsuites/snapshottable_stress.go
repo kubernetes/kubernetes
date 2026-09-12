@@ -120,7 +120,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("snapshottable-stress")
+	f := framework.NewFrameworkWithCustomTimeouts("snapshottable-stress", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
