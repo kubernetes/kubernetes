@@ -1659,7 +1659,9 @@ func (g *genValidations) emitCallsToValidators(c *generator.Context, validations
 				}
 			} else {
 				if isNonError {
+					// Nothing consumes the result, so the call stands alone.
 					emitCall()
+					sw.Do("\n", nil)
 				} else {
 					sw.Do("if e := ", nil)
 					emitCall()
@@ -1909,7 +1911,9 @@ func (g *genValidations) toGolangSourceDataLiteral(sw *generator.SnippetWriter, 
 			} else {
 				// Standard functions append errors to the list.
 				if isNonError {
+					// Nothing consumes the result, so the call stands alone.
 					g.emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
+					sw.Do("\n", nil)
 				} else {
 					sw.Do("errs = append(errs, ", nil)
 					g.emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
