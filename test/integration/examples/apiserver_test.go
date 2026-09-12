@@ -45,7 +45,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilcompatibility "k8s.io/apiserver/pkg/util/compatibility"
@@ -264,8 +263,6 @@ func TestFrontProxyConfig(t *testing.T) {
 		testFrontProxyConfig(t, false)
 	})
 	t.Run("WithUID", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 33))
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoteRequestHeaderUID, true)
 		testFrontProxyConfig(t, true)
 	})
 }
@@ -792,6 +789,14 @@ func runPreparedWardleServer(
 		if flunderBanningFeatureGate {
 			args = append(args, "--feature-gates", fmt.Sprintf("wardle:BanFlunder=%v", banFlunder))
 		}
+
+		// thaw before calling into the sample-apiserver which will freeze
+		utilfeature.DefaultMutableFeatureGate.(featuregatetesting.ThawableFeatureGate).ThawForTest()
+		t.Cleanup(func() {
+			// thaw when we're done so that other tests that set feature gates during testing can run
+			utilfeature.DefaultMutableFeatureGate.(featuregatetesting.ThawableFeatureGate).ThawForTest()
+		})
+
 		// TODO figure out how to actually make BinaryVersion/EmulationVersion work with Wardle and KAS at the same time when Alpha FG are being set
 		wardleCmd := sampleserver.NewCommandStartWardleServer(ctx, wardleOptions, withUID)
 		wardleCmd.SetArgs(args)
