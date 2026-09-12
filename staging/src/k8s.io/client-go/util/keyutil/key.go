@@ -308,7 +308,9 @@ func parseECPrivateKey(data []byte) (*ecdsa.PrivateKey, error) {
 	// Parse the key
 	var parsedKey interface{}
 	if parsedKey, err = x509.ParseECPrivateKey(data); err != nil {
-		return nil, err
+		if parsedKey, err = x509.ParsePKCS8PrivateKey(data); err != nil {
+			return nil, err
+		}
 	}
 
 	// Test if parsed key is an ECDSA Private Key
