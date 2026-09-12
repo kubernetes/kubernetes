@@ -53,17 +53,22 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 		klog.Warning("Authentication is disabled")
 		return handler
 	}
-	standardRequestHeaderConfig := &authenticatorfactory.RequestHeaderConfig{
-		UsernameHeaders:     headerrequest.StaticStringSlice{"X-Remote-User"},
-		UIDHeaders:          headerrequest.StaticStringSlice{"X-Remote-Uid"},
-		GroupHeaders:        headerrequest.StaticStringSlice{"X-Remote-Group"},
-		ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"X-Remote-Extra-"},
+	standardRequestHeaderConfig := &headerrequest.RequestHeaderConfig{
+		UsernameHeaders:     []string{"X-Remote-User"},
+		UIDHeaders:          []string{"X-Remote-Uid"},
+		GroupHeaders:        []string{"X-Remote-Group"},
+		ExtraHeaderPrefixes: []string{"X-Remote-Extra-"},
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		authenticationStart := time.Now()
 
 		if len(apiAuds) > 0 {
 			req = req.WithContext(authenticator.WithAudiences(req.Context(), apiAuds))
+		}
+		var requestHeaderSnapshot *headerrequest.RequestHeaderConfig
+		if requestHeaderConfig != nil && requestHeaderConfig.Config != nil {
+			requestHeaderSnapshot = requestHeaderConfig.Config.Snapshot()
+			req = req.WithContext(headerrequest.WithRequestHeaderConfig(req.Context(), requestHeaderSnapshot))
 		}
 		resp, ok, err := auth.AuthenticateRequest(req)
 		authenticationFinish := time.Now()
@@ -90,24 +95,10 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 		req.Header.Del("Authorization")
 
 		// delete standard front proxy headers
-		headerrequest.ClearAuthenticationHeaders(
-			req.Header,
-			standardRequestHeaderConfig.UsernameHeaders,
-			standardRequestHeaderConfig.UIDHeaders,
-			standardRequestHeaderConfig.GroupHeaders,
-			standardRequestHeaderConfig.ExtraHeaderPrefixes,
-		)
+		headerrequest.ClearAuthenticationHeadersFromConfig(req.Header, standardRequestHeaderConfig)
 
-		// also delete any custom front proxy headers
-		if requestHeaderConfig != nil {
-			headerrequest.ClearAuthenticationHeaders(
-				req.Header,
-				requestHeaderConfig.UsernameHeaders,
-				requestHeaderConfig.UIDHeaders,
-				requestHeaderConfig.GroupHeaders,
-				requestHeaderConfig.ExtraHeaderPrefixes,
-			)
-		}
+		// also delete any custom front proxy headers using the snapshot shared with authentication
+		headerrequest.ClearAuthenticationHeadersFromConfig(req.Header, requestHeaderSnapshot)
 
 		// http2 is an expensive protocol that is prone to abuse,
 		// see CVE-2023-44487 and CVE-2023-39325 for an example.

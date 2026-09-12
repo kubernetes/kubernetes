@@ -113,14 +113,7 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 	// front-proxy, BasicAuth methods, local first, then remote
 	// Add the front proxy authenticator if requested
 	if config.RequestHeaderConfig != nil {
-		requestHeaderAuthenticator := headerrequest.NewDynamicVerifyOptionsSecure(
-			config.RequestHeaderConfig.CAContentProvider.VerifyOptions,
-			config.RequestHeaderConfig.AllowedClientNames,
-			config.RequestHeaderConfig.UsernameHeaders,
-			config.RequestHeaderConfig.UIDHeaders,
-			config.RequestHeaderConfig.GroupHeaders,
-			config.RequestHeaderConfig.ExtraHeaderPrefixes,
-		)
+		requestHeaderAuthenticator := headerrequest.NewSecure(config.RequestHeaderConfig.Config, config.RequestHeaderConfig.CAContentProvider)
 		authenticators = append(authenticators, authenticator.WrapAudienceAgnosticRequest(config.APIAudiences, requestHeaderAuthenticator))
 	}
 
