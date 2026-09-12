@@ -32,7 +32,6 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const (
@@ -306,8 +305,15 @@ func (h *HTTPExtender) Filter(
 	} else if result.Nodes != nil {
 		nodeResult = make([]fwk.NodeInfo, len(result.Nodes.Items))
 		for i := range result.Nodes.Items {
-			nodeResult[i] = framework.NewNodeInfo()
-			nodeResult[i].SetNode(&result.Nodes.Items[i])
+			nodeName := result.Nodes.Items[i].Name
+			if n, ok := fromNodeName[nodeName]; ok {
+				// Keep the snapshot NodeInfo (pods, requested resources).
+				nodeResult[i] = n
+			} else {
+				return nil, nil, nil, fmt.Errorf(
+					"extender %q claims a filtered node %q which is not found in the input node list",
+					h.extenderURL, nodeName)
+			}
 		}
 	}
 

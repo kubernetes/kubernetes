@@ -18,6 +18,9 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -576,4 +579,102 @@ func TestConvertToVictims(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHTTPExtenderFilterReusesNodeInfo(t *testing.T) {
+	busyNode := createNode("busy")
+	idleNode := createNode("idle")
+
+	busyInfo := framework.NewNodeInfo(st.MakePod().Name("filler").UID("filler").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj())
+	busyInfo.SetNode(busyNode)
+	idleInfo := framework.NewNodeInfo()
+	idleInfo.SetNode(idleNode)
+
+	if busyInfo.GetRequested().GetMilliCPU() == 0 {
+		t.Fatal("precondition: busy node should have requested CPU")
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/filter", func(w http.ResponseWriter, r *http.Request) {
+		var args extenderv1.ExtenderArgs
+		if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		result := extenderv1.ExtenderFilterResult{}
+		if args.NodeNames != nil {
+			result.NodeNames = args.NodeNames
+		} else {
+			result.Nodes = args.Nodes
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(result)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	pod := st.MakePod().Name("incoming").UID("incoming").Obj()
+	nodes := []fwk.NodeInfo{busyInfo, idleInfo}
+
+	t.Run("nodeCacheCapable=false", func(t *testing.T) {
+		ext := &HTTPExtender{
+			extenderURL:      srv.URL,
+			filterVerb:       "filter",
+			client:           srv.Client(),
+			nodeCacheCapable: false,
+		}
+		got, _, _, err := ext.Filter(pod, nodes)
+		if err != nil {
+			t.Fatalf("Filter() unexpected error: %v", err)
+		}
+		if len(got) != 2 {
+			t.Fatalf("Filter() returned %d nodes, want 2", len(got))
+		}
+		if got[0] != busyInfo {
+			t.Fatalf("Filter() did not reuse the original busy NodeInfo")
+		}
+		if got[0].GetRequested().GetMilliCPU() == 0 {
+			t.Fatalf("busy node requested CPU was 0 after Filter")
+		}
+		if got[1] != idleInfo {
+			t.Fatalf("Filter() did not reuse the original idle NodeInfo")
+		}
+	})
+
+	t.Run("nodeCacheCapable=true", func(t *testing.T) {
+		ext := &HTTPExtender{
+			extenderURL:      srv.URL,
+			filterVerb:       "filter",
+			client:           srv.Client(),
+			nodeCacheCapable: true,
+		}
+		got, _, _, err := ext.Filter(pod, nodes)
+		if err != nil {
+			t.Fatalf("Filter() unexpected error: %v", err)
+		}
+		if len(got) != 2 || got[0] != busyInfo || got[1] != idleInfo {
+			t.Fatalf("Filter() did not reuse original NodeInfos: %#v", got)
+		}
+	})
+
+	t.Run("unknown node", func(t *testing.T) {
+		unknown := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			result := extenderv1.ExtenderFilterResult{
+				Nodes: &v1.NodeList{Items: []v1.Node{*createNode("missing")}},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(result)
+		}))
+		t.Cleanup(unknown.Close)
+		ext := &HTTPExtender{
+			extenderURL:      unknown.URL,
+			filterVerb:       "filter",
+			client:           unknown.Client(),
+			nodeCacheCapable: false,
+		}
+		_, _, _, err := ext.Filter(pod, nodes)
+		if err == nil {
+			t.Fatal("Filter() expected error for unknown node")
+		}
+	})
 }
