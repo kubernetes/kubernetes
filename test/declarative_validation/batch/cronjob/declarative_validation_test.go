@@ -79,6 +79,51 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				tweakJobTemplateBackoffLimitPerIndex(ptr.To[int32](1)),
 			),
 		},
+		"jobTemplate.spec.parallelism negative": {
+			input: mkCronJob(tweakJobTemplateParallelism(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "parallelism"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"jobTemplate.spec.completions negative": {
+			input: mkCronJob(tweakJobTemplateCompletions(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "completions"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"jobTemplate.spec.activeDeadlineSeconds negative": {
+			input: mkCronJob(tweakJobTemplateActiveDeadlineSeconds(ptr.To[int64](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "activeDeadlineSeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"jobTemplate.spec.backoffLimit negative": {
+			input: mkCronJob(tweakJobTemplateBackoffLimit(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "backoffLimit"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"jobTemplate.spec.backoffLimitPerIndex negative": {
+			input: mkCronJob(tweakJobTemplateBackoffLimitPerIndex(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "backoffLimitPerIndex"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"jobTemplate.spec.maxFailedIndexes negative": {
+			input: mkCronJob(
+				tweakJobTemplateBackoffLimitPerIndex(ptr.To[int32](1)),
+				tweakJobTemplateMaxFailedIndexes(ptr.To[int32](-1)),
+			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "maxFailedIndexes"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"jobTemplate.spec.ttlSecondsAfterFinished negative": {
+			input: mkCronJob(tweakJobTemplateTTLSecondsAfterFinished(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "ttlSecondsAfterFinished"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
 		"valid with basic scheduling policy": {
 			input:                 mkCronJob(tweakJobSchedulingBasic()),
 			enableWorkloadWithJob: true,
@@ -560,9 +605,39 @@ func tweakSchedule(schedule string) func(*batch.CronJob) {
 	}
 }
 
+func tweakJobTemplateParallelism(v *int32) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.JobTemplate.Spec.Parallelism = v
+	}
+}
+
+func tweakJobTemplateCompletions(v *int32) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.JobTemplate.Spec.Completions = v
+	}
+}
+
+func tweakJobTemplateActiveDeadlineSeconds(v *int64) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.JobTemplate.Spec.ActiveDeadlineSeconds = v
+	}
+}
+
+func tweakJobTemplateBackoffLimit(v *int32) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.JobTemplate.Spec.BackoffLimit = v
+	}
+}
+
 func tweakJobTemplateMaxFailedIndexes(v *int32) func(*batch.CronJob) {
 	return func(job *batch.CronJob) {
 		job.Spec.JobTemplate.Spec.MaxFailedIndexes = v
+	}
+}
+
+func tweakJobTemplateTTLSecondsAfterFinished(v *int32) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.JobTemplate.Spec.TTLSecondsAfterFinished = v
 	}
 }
 

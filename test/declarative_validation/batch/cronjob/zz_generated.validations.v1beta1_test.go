@@ -61,8 +61,24 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.jobTemplate.spec.activeDeadlineSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.jobTemplate.spec.backoffLimit": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"spec.jobTemplate.spec.backoffLimitPerIndex": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
+			},
+			"spec.jobTemplate.spec.completions": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.jobTemplate.spec.maxFailedIndexes": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.jobTemplate.spec.parallelism": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"spec.jobTemplate.spec.scheduling": {
 				{ErrorType: "FieldValueForbidden"},
@@ -127,6 +143,9 @@ func init() {
 			},
 			"spec.jobTemplate.spec.template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"spec.jobTemplate.spec.ttlSecondsAfterFinished": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"spec.schedule": {
 				{ErrorType: "FieldValueRequired"},

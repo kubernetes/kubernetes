@@ -73,6 +73,48 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkAlpha(),
 			},
 		},
+		"negative parallelism": {
+			input: mkJob(tweakParallelism(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "parallelism"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative completions": {
+			input: mkJob(tweakCompletions(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "completions"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative activeDeadlineSeconds": {
+			input: mkJob(tweakActiveDeadlineSeconds(ptr.To[int64](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "activeDeadlineSeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative backoffLimit": {
+			input: mkJob(tweakBackoffLimit(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "backoffLimit"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative backoffLimitPerIndex": {
+			input: mkJob(tweakBackoffLimitPerIndex(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "backoffLimitPerIndex"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative maxFailedIndexes": {
+			input: mkJob(tweakBackoffLimitPerIndex(ptr.To[int32](1)), tweakMaxFailedIndexes(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "maxFailedIndexes"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative ttlSecondsAfterFinished": {
+			input: mkJob(tweakTTLSecondsAfterFinished(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "ttlSecondsAfterFinished"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
 		"valid with basic scheduling policy": {
 			input:                 mkJob(setBasicPolicy()),
 			enableWorkloadWithJob: true,
@@ -294,6 +336,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "scheduling", "schedulingPolicy", "gang", "minCount"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"updating parallelism to negative": {
+			old:    mkJob(setResourceVersion("1"), tweakParallelism(ptr.To[int32](5))),
+			update: mkJob(setResourceVersion("1"), tweakParallelism(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "parallelism"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"updating backoffLimit to negative": {
+			old:    mkJob(setResourceVersion("1"), tweakBackoffLimit(ptr.To[int32](3))),
+			update: mkJob(setResourceVersion("1"), tweakBackoffLimit(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "backoffLimit"), nil, "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
 		"adding scheduling after creation is immutable": {
@@ -546,6 +602,36 @@ func addResourceClaims(claims ...schedulingv1alpha3.WorkloadPodGroupResourceClai
 			setGangPolicy(4)(job)
 		}
 		job.Spec.Scheduling.ResourceClaims = append(job.Spec.Scheduling.ResourceClaims, claims...)
+	}
+}
+
+func tweakParallelism(v *int32) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.Parallelism = v
+	}
+}
+
+func tweakCompletions(v *int32) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.Completions = v
+	}
+}
+
+func tweakActiveDeadlineSeconds(v *int64) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.ActiveDeadlineSeconds = v
+	}
+}
+
+func tweakBackoffLimit(v *int32) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.BackoffLimit = v
+	}
+}
+
+func tweakTTLSecondsAfterFinished(v *int32) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.TTLSecondsAfterFinished = v
 	}
 }
 
