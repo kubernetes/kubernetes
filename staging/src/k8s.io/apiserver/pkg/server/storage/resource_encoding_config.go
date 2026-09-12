@@ -209,8 +209,15 @@ func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example
 		}
 	}
 
-	// Getting here means every version of this kind was introduced after
-	// the emulation version, so the resource should not be served at this
-	// emulation version at all.
+	// Getting here means every version of this kind was introduced after the
+	// emulation version, so the resource should not be served at this emulation
+	// version at all. It still gets built before RemoveUnavailableKinds prunes
+	// it, so fall back to the highest-priority version that has the kind.
+	// binaryVersionOfResource is the group's preferred version, which is not
+	// guaranteed to have it.
+	if len(versions) > 0 {
+		return versions[0], nil
+	}
+
 	return binaryVersionOfResource, nil
 }
