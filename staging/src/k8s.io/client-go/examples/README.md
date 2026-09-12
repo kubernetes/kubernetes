@@ -32,6 +32,7 @@ import _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 
 - [**Managing resources with API**](./create-update-delete-deployment): Create,
   get, update, delete a Deployment resource.
+- [**Pod logs**](./pod-logs): Read recent container logs from Pods.
 
 ### Advanced Concepts
 
