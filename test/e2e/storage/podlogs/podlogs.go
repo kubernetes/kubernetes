@@ -28,6 +28,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"os"
 	"path"
 	"regexp"
@@ -39,6 +40,10 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
+
+// reconnectJitter bounds the random delay before reconnecting a broken log
+// stream, to avoid a thundering herd when many streams break at once.
+const reconnectJitter = 90 * time.Second
 
 // LogOutput determines where output from CopyAllLogs goes.
 //
@@ -122,6 +127,8 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 		started := map[string]bool{}
 		// Key is pod/container/container-id, value the time stamp of the last log line that has been seen.
 		latest := map[string]*meta.Time{}
+		// Key is pod/container name, value is the earliest time a reconnect is allowed.
+		retryAfter := map[string]time.Time{}
 
 		check := func() {
 			m.Lock()
@@ -154,7 +161,10 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 						// Don't attempt to get logs for a container unless it is running or has terminated.
 						// Trying to get a log would just end up with an error that we would have to suppress.
 						(pod.Status.ContainerStatuses[i].State.Running == nil &&
-							pod.Status.ContainerStatuses[i].State.Terminated == nil) {
+							pod.Status.ContainerStatuses[i].State.Terminated == nil) ||
+						// Still within the jittered reconnect delay after a broken stream?
+						// If yes, don't reconnect yet.
+						time.Now().Before(retryAfter[name]) {
 						continue
 					}
 
@@ -222,6 +232,7 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 						})
 					if err != nil {
 						closeOutput()
+						retryAfter[name] = time.Now().Add(rand.N(reconnectJitter))
 
 						// We do get "normal" errors here, like trying to read too early.
 						// We can ignore those.
@@ -250,6 +261,8 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 								}
 							}
 							active[name] = false
+							// Jitter reconnects to avoid a thundering herd.
+							retryAfter[name] = time.Now().Add(rand.N(reconnectJitter))
 							m.Unlock()
 							readCloser.Close()
 						}()
