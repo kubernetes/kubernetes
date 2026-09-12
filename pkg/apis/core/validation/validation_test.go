@@ -11075,6 +11075,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 
 			if tc.dnsPolicy == nil {
@@ -11330,7 +11331,6 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			opts := PodValidationOptions{
 				ResourceIsPod:            true,
 				PodLevelResourcesEnabled: true,
@@ -11357,6 +11357,7 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 	for k, v := range legacyValidationCases {
 		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			opts := PodValidationOptions{
 				ResourceIsPod:            true,
@@ -11497,7 +11498,6 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 	for k, tc := range failureCases {
 		t.Run(k, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			opts := PodValidationOptions{
 				ResourceIsPod:            true,
 				PodLevelResourcesEnabled: true,
@@ -19340,16 +19340,14 @@ func TestValidateServiceCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.disableRelaxedServiceNames {
+			if tc.disableRelaxedServiceNames || tc.legacyIPs {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.RelaxedServiceNameValidation: false,
+					features.RelaxedServiceNameValidation: !tc.disableRelaxedServiceNames,
+					features.StrictIPCIDRValidation:       !tc.legacyIPs,
 				})
 			}
 
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.StrictIPCIDRValidation: !tc.legacyIPs,
-			})
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
 			errs := ValidateServiceCreate(&svc)
@@ -20024,7 +20022,6 @@ func TestValidateNode(t *testing.T) {
 	}
 	for _, successCase := range successCases {
 		t.Run("", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			if errs := ValidateNode(&successCase); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
@@ -20052,6 +20049,7 @@ func TestValidateNode(t *testing.T) {
 	}
 	for name, legacyCase := range legacyValidationCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			if errs := ValidateNode(&legacyCase); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
@@ -20278,8 +20276,6 @@ func TestValidateNode(t *testing.T) {
 	}
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
-
 			errs := ValidateNode(&v)
 			if len(errs) == 0 {
 				t.Errorf("expected failure")
@@ -22031,7 +22027,6 @@ func TestValidateServiceUpdate(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.StrictIPCIDRValidation:       true,
 				features.RelaxedServiceNameValidation: !tc.disableRelaxedServiceNames,
 			})
 
@@ -24125,7 +24120,6 @@ func TestValidateEndpointsCreate(t *testing.T) {
 	}
 	for name, tc := range successCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errs := ValidateEndpointsCreate(&tc.endpoints)
 			if len(errs) != 0 {
 				t.Errorf("Expected no validation errors, got %v", errs)
@@ -24152,6 +24146,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 	}
 	for name, tc := range legacyValidationCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			errs := ValidateEndpointsCreate(&tc.endpoints)
 			if len(errs) != 0 {
@@ -24348,7 +24343,6 @@ func TestValidateEndpointsCreate(t *testing.T) {
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errs := ValidateEndpointsCreate(&v.endpoints)
 			// TODO: set .RequireOriginWhenInvalid() once metadata is done
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
@@ -26757,6 +26751,7 @@ func TestPodIPsValidation(t *testing.T) {
 
 	for i, testCase := range testCases {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
 			for j, oldTestCase := range testCases {
 				if oldTestCase.legacyIPs && !testCase.legacyIPs {
@@ -26890,6 +26885,7 @@ func TestHostIPsValidation(t *testing.T) {
 
 	for i, testCase := range testCases {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
 			for j, oldTestCase := range testCases {
 				if oldTestCase.legacyIPs && !testCase.legacyIPs {
@@ -28834,6 +28830,7 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			oldStatus := core.LoadBalancerStatus{}
 			if tc.tweakOldLBStatus != nil {
