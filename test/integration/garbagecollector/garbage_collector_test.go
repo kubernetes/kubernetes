@@ -1370,6 +1370,21 @@ func TestCascadingDeleteOnCRDConversionFailure(t *testing.T) {
 		t.Fatalf("Error updating CRD with conversion webhook: %v", err)
 	}
 
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+		groupResource, err := apiExtensionClient.Discovery().ServerResourcesForGroupVersion(newDefinition.Spec.Group + "/v1")
+		if err != nil {
+			return false, nil
+		}
+		for _, resource := range groupResource.APIResources {
+			if resource.Name == newDefinition.Spec.Names.Plural {
+				return true, nil
+			}
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Failed waiting for updated CRD version to appear in discovery: %v", err)
+	}
+
 	ctx.startGC(5)
 	// make sure gc.Sync finds the new CRD and starts monitoring it
 	time.Sleep(ctx.syncPeriod + 1*time.Second)
