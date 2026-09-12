@@ -138,7 +138,7 @@ type Controller interface {
 	// Run does the same as RunWithContext with a stop channel instead of
 	// a context.
 	//
-	// Contextual logging: RunWithcontext should be used instead of Run in code which supports contextual logging.
+	// Contextual logging: RunWithContext should be used instead of Run in code which supports contextual logging.
 	Run(stopCh <-chan struct{})
 
 	// HasSynced delegates to the Config's Queue
