@@ -1043,12 +1043,6 @@ const (
 	// Enables PreQueueingHint extension point to narrow pod evaluation on events.
 	SchedulerPreQueueingHints featuregate.Feature = "SchedulerPreQueueingHints"
 
-	// owner: @atosatto @yuanchen8911
-	// kep: http://kep.k8s.io/3902
-	//
-	// Decouples Taint Eviction Controller, performing taint-based Pod eviction, from Node Lifecycle Controller.
-	SeparateTaintEvictionController featuregate.Feature = "SeparateTaintEvictionController"
-
 	// owner: @aramase
 	// kep: https://kep.k8s.io/4412
 	//
@@ -2030,11 +2024,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	SeparateTaintEvictionController: {
-		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37 (locked to default in 1.34)
-	},
-
 	ServiceAccountNodeAudienceRestriction: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
@@ -2721,8 +2710,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	SchedulerPopFromBackoffQ:  {},
 	SchedulerPreQueueingHints: {},
-
-	SeparateTaintEvictionController: {},
 
 	ServiceAccountNodeAudienceRestriction: {},
 
