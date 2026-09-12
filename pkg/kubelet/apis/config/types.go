@@ -152,6 +152,14 @@ type KubeletConfiguration struct {
 	// certificate signing requests. The RotateKubeletServerCertificate feature
 	// must be enabled.
 	ServerTLSBootstrap bool
+	// clientCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// client certificate signing requests during certificate rotation.
+	// Valid values are: "" (default, ECDSA P-256), "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+	ClientCertificateKeyAlgorithm string
+	// serverCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// server certificate signing requests during certificate rotation.
+	// Valid values are: "" (default, ECDSA P-256), "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+	ServerCertificateKeyAlgorithm string
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized

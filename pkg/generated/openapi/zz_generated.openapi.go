@@ -76455,6 +76455,20 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"clientCertificateKeyAlgorithm": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clientCertificateKeyAlgorithm specifies the key algorithm to use when generating client certificate signing requests during certificate rotation. Valid values are: \"\" (default, ECDSA P-256), \"ML-DSA-44\", \"ML-DSA-65\", \"ML-DSA-87\". Default: \"\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"serverCertificateKeyAlgorithm": {
+						SchemaProps: spec.SchemaProps{
+							Description: "serverCertificateKeyAlgorithm specifies the key algorithm to use when generating server certificate signing requests during certificate rotation. Valid values are: \"\" (default, ECDSA P-256), \"ML-DSA-44\", \"ML-DSA-65\", \"ML-DSA-87\". Default: \"\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"authentication": {
 						SchemaProps: spec.SchemaProps{
 							Description: "authentication specifies how requests to the Kubelet's server are authenticated. Defaults:\n  anonymous:\n    enabled: false\n  webhook:\n    enabled: true\n    cacheTTL: \"2m\"",

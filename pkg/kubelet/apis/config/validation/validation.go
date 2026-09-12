@@ -181,6 +181,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
+	switch kc.ClientCertificateKeyAlgorithm {
+	case "", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87":
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: clientCertificateKeyAlgorithm %q must be one of: \"\", \"ML-DSA-44\", \"ML-DSA-65\", \"ML-DSA-87\"", kc.ClientCertificateKeyAlgorithm))
+	}
+	switch kc.ServerCertificateKeyAlgorithm {
+	case "", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87":
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverCertificateKeyAlgorithm %q must be one of: \"\", \"ML-DSA-44\", \"ML-DSA-65\", \"ML-DSA-87\"", kc.ServerCertificateKeyAlgorithm))
+	}
 	if kc.RunOnce {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: runOnce (--runOnce) %v, Runonce mode has been deprecated and should not be set", kc.RunOnce))
 	}
