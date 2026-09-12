@@ -109,12 +109,24 @@ func TestRollbackFiles(t *testing.T) {
 }
 
 func TestWriteKubeletConfigFiles(t *testing.T) {
-	tempDir := t.TempDir()
+	// Stands in for an instance configuration written by an earlier run. The contents only
+	// have to come back unchanged, so any valid KubeletConfiguration will do.
+	const existingInstanceConfig = `apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+containerRuntimeEndpoint: unix:///var/run/existing.sock
+`
+
+	instanceConfigPath := func(kubeletDir string) string {
+		return filepath.Join(kubeletDir, constants.KubeletInstanceConfigurationFileName)
+	}
+
 	testCases := []struct {
 		name          string
 		patchesDir    string
 		expectedError bool
 		cfg           *kubeadmapi.InitConfiguration
+		setup         func(t *testing.T, kubeletDir string)
+		verify        func(t *testing.T, kubeletDir string)
 	}{
 		{
 			name: "write kubelet config file successfully",
@@ -144,7 +156,9 @@ func TestWriteKubeletConfigFiles(t *testing.T) {
 			},
 		},
 		{
-			name: "missing instance config file",
+			// A missing instance configuration is not an error. WriteKubeletConfigFiles
+			// writes one with defaults so the upgraded kubelet has something to start with.
+			name: "missing instance config file is created with defaults",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					ComponentConfigs: kubeadmapi.ComponentConfigMap{
@@ -152,14 +166,55 @@ func TestWriteKubeletConfigFiles(t *testing.T) {
 					},
 				},
 			},
-			expectedError: true,
+			verify: func(t *testing.T, kubeletDir string) {
+				if _, err := os.Stat(instanceConfigPath(kubeletDir)); err != nil {
+					t.Fatalf("expected %s to be created, got: %v",
+						constants.KubeletInstanceConfigurationFileName, err)
+				}
+			},
+		},
+		{
+			name: "existing instance config file is left alone",
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ComponentConfigs: kubeadmapi.ComponentConfigMap{
+						componentconfigs.KubeletGroup: &componentConfig{},
+					},
+				},
+			},
+			setup: func(t *testing.T, kubeletDir string) {
+				if err := os.WriteFile(instanceConfigPath(kubeletDir), []byte(existingInstanceConfig), 0644); err != nil {
+					t.Fatalf("failed to write %s: %v",
+						constants.KubeletInstanceConfigurationFileName, err)
+				}
+			},
+			verify: func(t *testing.T, kubeletDir string) {
+				got, err := os.ReadFile(instanceConfigPath(kubeletDir))
+				if err != nil {
+					t.Fatalf("failed to read %s: %v",
+						constants.KubeletInstanceConfigurationFileName, err)
+				}
+				if string(got) != existingInstanceConfig {
+					t.Fatalf("expected %s to be left alone, got:\n%s",
+						constants.KubeletInstanceConfigurationFileName, got)
+				}
+			},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := WriteKubeletConfigFiles(tc.cfg, tempDir, tempDir, tc.patchesDir, true, os.Stdout)
+			// Each subtest gets its own directory. Sharing one lets the files written by an
+			// earlier subtest decide the outcome of a later one.
+			kubeletDir := t.TempDir()
+			if tc.setup != nil {
+				tc.setup(t, kubeletDir)
+			}
+			err := WriteKubeletConfigFiles(tc.cfg, kubeletDir, kubeletDir, tc.patchesDir, true, os.Stdout)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, err != nil, err)
+			}
+			if tc.verify != nil {
+				tc.verify(t, kubeletDir)
 			}
 		})
 	}
