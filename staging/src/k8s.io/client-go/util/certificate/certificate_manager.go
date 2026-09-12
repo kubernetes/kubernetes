@@ -204,10 +204,11 @@ type Config struct {
 	CertificateRenewFailure Counter
 	// GenerateKey is an optional function to generate the private key for a new
 	// certificate signing request. If not set, an ECDSA P-256 key is generated.
-	// Currently only *ecdsa.PrivateKey and *rsa.PrivateKey are supported.
+	// Currently *ecdsa.PrivateKey, *rsa.PrivateKey and *mldsa.PrivateKey are supported.
 	// The custom key must be strong enough or an error will be returned
 	// when attempting to generate a CSR. For RSA the minimum bits must be 2048,
-	// for ECDSA the minimum curve size must be 256 bits.
+	// for ECDSA the minimum curve size must be 256 bits. ML-DSA keys have no
+	// minimum requirement as all ML-DSA parameter sets are considered strong enough.
 	GenerateKey func() (crypto.Signer, error)
 	// Name is an optional string that will be used when writing log output
 	// via logger.WithName or returning errors from manager methods.
@@ -829,6 +830,7 @@ func hasKeyUsage(usages []certificates.KeyUsage, usage certificates.KeyUsage) bo
 
 // validateKeyStrength checks that the key is strong enough to be used for a certificate.
 // For RSA the minimum bits must be 2048, for ECDSA the minimum curve size must be 256 bits.
+// ML-DSA keys are always considered strong enough as all ML-DSA parameter sets are secure.
 func validateKeyStrength(key crypto.Signer) error {
 	const (
 		minRSAKeyBits   = 2048
