@@ -17,6 +17,11 @@ limitations under the License.
 package conversion
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -26,7 +31,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/validation"
+	restclient "k8s.io/client-go/rest"
+	restfake "k8s.io/client-go/rest/fake"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -553,4 +562,138 @@ func TestGetConvertedObjectsFromResponse(t *testing.T) {
 
 		})
 	}
+}
+
+func TestWebhookConverterConvertListWithSparseConvertedObjects(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := v1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add apiextensions/v1 to scheme: %v", err)
+	}
+	if err := v1beta1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add apiextensions/v1beta1 to scheme: %v", err)
+	}
+	codecs := serializer.NewCodecFactory(scheme)
+	targetGV := schema.GroupVersion{Group: "stable.example.com", Version: "v1"}
+
+	input := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{
+			"apiVersion": "stable.example.com/v2",
+			"kind":       "WidgetList",
+		},
+		Items: []unstructured.Unstructured{
+			*newWidget("stable.example.com/v1", "first", "original", "kept"),
+			*newWidget("stable.example.com/v2", "second", "original", "converted"),
+			*newWidget("stable.example.com/v1", "third", "original", "kept"),
+			*newWidget("stable.example.com/v2", "fourth", "original", "converted"),
+		},
+	}
+
+	restClient, err := restclient.NewRESTClient(
+		&url.URL{Scheme: "https", Host: "localhost"},
+		"",
+		restclient.ClientContentConfig{
+			ContentType:  runtime.ContentTypeJSON,
+			GroupVersion: v1beta1.SchemeGroupVersion,
+			Negotiator:   runtime.NewClientNegotiator(codecs.WithoutConversion(), v1beta1.SchemeGroupVersion),
+		},
+		nil,
+		restfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			data, err := io.ReadAll(req.Body)
+			if err != nil {
+				t.Fatalf("failed to read request body: %v", err)
+			}
+			obj, _, err := codecs.UniversalDeserializer().Decode(data, nil, &v1beta1.ConversionReview{})
+			if err != nil {
+				t.Fatalf("failed to decode conversion review request: %v", err)
+			}
+			review := obj.(*v1beta1.ConversionReview)
+			if review.Request == nil {
+				t.Fatalf("expected conversion review request, got nil")
+			}
+			if review.Request.DesiredAPIVersion != targetGV.String() {
+				t.Fatalf("expected desired apiVersion %q, got %q", targetGV.String(), review.Request.DesiredAPIVersion)
+			}
+			if len(review.Request.Objects) != 2 {
+				t.Fatalf("expected 2 sparse objects in request, got %d", len(review.Request.Objects))
+			}
+			for i, name := range []string{"second", "fourth"} {
+				obj, err := getRawExtensionObject(review.Request.Objects[i])
+				if err != nil {
+					t.Fatalf("failed to read sparse request object %d: %v", i, err)
+				}
+				if got := obj.(*unstructured.Unstructured).GetName(); got != name {
+					t.Fatalf("expected sparse request object %d to be %q, got %q", i, name, got)
+				}
+			}
+
+			response := &v1beta1.ConversionReview{
+				TypeMeta: metav1.TypeMeta{APIVersion: v1beta1.SchemeGroupVersion.String(), Kind: "ConversionReview"},
+				Response: &v1beta1.ConversionResponse{
+					UID:    review.Request.UID,
+					Result: metav1.Status{Status: metav1.StatusSuccess},
+					ConvertedObjects: []runtime.RawExtension{
+						{Object: newWidget("stable.example.com/v1", "second", "converted", "converted")},
+						{Object: newWidget("stable.example.com/v1", "fourth", "converted", "converted")},
+					},
+				},
+			}
+			responseData, err := json.Marshal(response)
+			if err != nil {
+				t.Fatalf("failed to encode conversion review response: %v", err)
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{runtime.ContentTypeJSON}},
+				Body:       io.NopCloser(bytes.NewReader(responseData)),
+			}, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("failed to create REST client: %v", err)
+	}
+
+	converter := &webhookConverter{
+		restClient:               restClient,
+		name:                     "widgets.stable.example.com",
+		conversionReviewVersions: []string{v1beta1.SchemeGroupVersion.Version},
+	}
+
+	converted, err := converter.Convert(input, targetGV)
+	if err != nil {
+		t.Fatalf("unexpected conversion error: %v", err)
+	}
+
+	expected := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{
+			"apiVersion": "stable.example.com/v1",
+			"kind":       "WidgetList",
+		},
+		Items: []unstructured.Unstructured{
+			*newWidget("stable.example.com/v1", "first", "original", "kept"),
+			*newWidget("stable.example.com/v1", "second", "converted", "converted"),
+			*newWidget("stable.example.com/v1", "third", "original", "kept"),
+			*newWidget("stable.example.com/v1", "fourth", "converted", "converted"),
+		},
+	}
+	if !reflect.DeepEqual(expected, converted) {
+		t.Errorf("unexpected converted list: %s", cmp.Diff(expected, converted))
+	}
+}
+
+func newWidget(apiVersion, name, phase, label string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": apiVersion,
+		"kind":       "Widget",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": "default",
+			"uid":       name + "-uid",
+			"labels": map[string]interface{}{
+				"phase": label,
+			},
+		},
+		"spec": map[string]interface{}{
+			"phase": phase,
+		},
+	}}
 }
