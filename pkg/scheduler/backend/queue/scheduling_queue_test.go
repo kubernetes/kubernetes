@@ -10786,8 +10786,8 @@ func TestPreQueueingHint_CompositePodGroupLookup(t *testing.T) {
 		WithQueueingHintMapPerProfile(m))
 
 	// Register the hierarchy (root CPG + leaf PodGroup) and its member pods.
-	q.AddGenericPodGroup(logger, framework.NewGenericCompositePodGroup(cpg))
-	q.AddGenericPodGroup(logger, framework.NewGenericPodGroup(pg))
+	q.AddGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(cpg))
+	q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg))
 	for _, pod := range []*v1.Pod{pod1, pod2} {
 		q.Add(ctx, pod)
 	}
@@ -10843,8 +10843,8 @@ func newCPGQueueInUnschedulable(t *testing.T, ctx context.Context, hint fwk.PreQ
 	}
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod1, pod2},
 		WithQueueingHintMapPerProfile(m))
-	q.AddGenericPodGroup(logger, framework.NewGenericCompositePodGroup(cpg))
-	q.AddGenericPodGroup(logger, framework.NewGenericPodGroup(pg))
+	q.AddGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(cpg))
+	q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg))
 	for _, pod := range []*v1.Pod{pod1, pod2} {
 		q.Add(ctx, pod)
 	}
