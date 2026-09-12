@@ -31,13 +31,10 @@ import (
 )
 
 func TestWatchCacheStorageMarkConsistent(t *testing.T) {
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	assert.True(t, s.snapshottingEnabled.Load())
 
@@ -70,13 +67,10 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 }
 
 func TestLatestSnapshotLocked(t *testing.T) {
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	_, ok := s.LatestSnapshotLocked()
 	assert.False(t, ok, "expected no snapshot before any writes")
@@ -86,20 +80,16 @@ func TestLatestSnapshotLocked(t *testing.T) {
 
 	snap, ok := s.LatestSnapshotLocked()
 	require.True(t, ok, "expected snapshot after write")
-	items, err := snap.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	items := allElements(t, snap)
 	assert.Len(t, items, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "100"}, items[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "100"}, items[0].Object)
 }
 
 func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	t.Log("Initially no snapshots exist, should return ResourceExpired error")
 	_, err := s.GetExactSnapshotLocked(20)
@@ -118,11 +108,8 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	val, ok, err := snap.GetByKey("foo")
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if !ok || val.(*Element).Object.(*mockObject).val != "20" {
+	val, ok := snap.GetByKey("foo")
+	if !ok || val.Object.(*mockObject).val != "20" {
 		t.Fatalf("Unexpected element in snapshot")
 	}
 
@@ -147,11 +134,8 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	val, ok, err = snap30.GetByKey("foo")
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if !ok || val.(*Element).Object.(*mockObject).val != "30" {
+	val, ok = snap30.GetByKey("foo")
+	if !ok || val.Object.(*mockObject).val != "30" {
 		t.Fatalf("Unexpected element in snapshot at RV 30")
 	}
 }
@@ -169,12 +153,8 @@ func (m *mockObject) DeepCopyObject() runtime.Object {
 func TestWatchCacheStorageSnapshots(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
-
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	assert.True(t, s.snapshottingEnabled.Load(), "Expected snapshotting to be enabled when feature gate is active")
 
@@ -197,10 +177,9 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap100, err := s.GetExactSnapshotLocked(100)
 	require.NoError(t, err)
-	elements, err := snap100.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements := allElements(t, snap100)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "100"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "100"}, elements[0].Object)
 
 	t.Log("Compact snapshots to remove rev 100")
 	s.CompactSnapshotsLocked(200)
@@ -210,16 +189,14 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 200")
 	snap200, err := s.GetExactSnapshotLocked(200)
 	require.NoError(t, err)
-	elements, err = snap200.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap200)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "200"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "200"}, elements[0].Object)
 
 	t.Log("Test cache on rev 300")
 	snap300, err := s.GetExactSnapshotLocked(300)
 	require.NoError(t, err)
-	elements, err = snap300.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap300)
 	assert.Empty(t, elements)
 
 	t.Log("Test cache on rev 400")
@@ -228,10 +205,9 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap400, err := s.GetExactSnapshotLocked(400)
 	require.NoError(t, err)
-	elements, err = snap400.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap400)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "400"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "400"}, elements[0].Object)
 
 	t.Log("Compact snapshots to simulate cache capacity downsize")
 	s.CompactSnapshotsLocked(500)
@@ -244,10 +220,9 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap500, err := s.GetExactSnapshotLocked(500)
 	require.NoError(t, err)
-	elements, err = snap500.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap500)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "500"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "500"}, elements[0].Object)
 
 	t.Log("Test cache on rev 600")
 	elem6 := &Element{Key: "foo", Object: &mockObject{key: "foo", val: "600"}}
@@ -255,18 +230,17 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap600, err := s.GetExactSnapshotLocked(600)
 	require.NoError(t, err)
-	elements, err = snap600.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap600)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].Object)
 
 	t.Log("Replace cache to remove history")
 	_, err = s.GetExactSnapshotLocked(500)
 	require.NoError(t, err, "Confirm that cache stores history before replace")
 
-	err = s.ReplaceLocked([]interface{}{
-		&Element{Key: "foo", Object: &mockObject{key: "foo", val: "600"}},
-	}, "700", 700)
+	err = s.ReplaceLocked([]*Element{
+		{Key: "foo", Object: &mockObject{key: "foo", val: "600"}},
+	}, 700)
 	require.NoError(t, err)
 
 	_, err = s.GetExactSnapshotLocked(500)
@@ -277,8 +251,16 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 700")
 	snap700, err := s.GetExactSnapshotLocked(700)
 	require.NoError(t, err)
-	elements, err = snap700.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap700)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].Object)
+}
+
+func allElements(t *testing.T, snapshot Snapshot) []*Element {
+	t.Helper()
+	var elems []*Element
+	for elem := range snapshot.RangePrefix("", "").All() {
+		elems = append(elems, elem)
+	}
+	return elems
 }

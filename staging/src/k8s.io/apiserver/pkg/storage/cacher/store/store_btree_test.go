@@ -28,52 +28,11 @@ func TestStoreListOrdered(t *testing.T) {
 	require.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
 	require.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
 	require.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo1", "bar2", 2),
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
 	}, store.List())
-}
-
-func TestStoreListPrefix(t *testing.T) {
-	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
-	require.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
-	require.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
-	require.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
-	require.NoError(t, store.Add(testStorageElement("bar", "baz", 4)))
-
-	items, err := store.OrderedListPrefix("foo", "")
-	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
-		testStorageElement("foo1", "bar2", 2),
-		testStorageElement("foo2", "bar1", 3),
-		testStorageElement("foo3", "bar3", 1),
-	}, items)
-
-	items, err = store.OrderedListPrefix("foo2", "")
-	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
-		testStorageElement("foo2", "bar1", 3),
-	}, items)
-
-	items, err = store.OrderedListPrefix("foo", "foo1\x00")
-	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
-		testStorageElement("foo2", "bar1", 3),
-		testStorageElement("foo3", "bar3", 1),
-	}, items)
-
-	items, err = store.OrderedListPrefix("foo", "foo2\x00")
-	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
-		testStorageElement("foo3", "bar3", 1),
-	}, items)
-
-	items, err = store.OrderedListPrefix("bar", "")
-	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
-		testStorageElement("bar", "baz", 4),
-	}, items)
 }
 
 func TestStoreSnapshotter(t *testing.T) {
@@ -135,26 +94,19 @@ type fakeIndexer struct {
 	rv int
 }
 
-func (f fakeIndexer) Add(obj interface{}) error    { return nil }
-func (f fakeIndexer) Update(obj interface{}) error { return nil }
-func (f fakeIndexer) Delete(obj interface{}) error { return nil }
-func (f fakeIndexer) Clone() Snapshot              { return f }
-func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
-	return nil, nil
-}
-func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]interface{}, error) {
+func (f fakeIndexer) Add(*Element) error    { return nil }
+func (f fakeIndexer) Update(*Element) error { return nil }
+func (f fakeIndexer) Delete(*Element) error { return nil }
+func (f fakeIndexer) Clone() Snapshot       { return f }
+func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]*Element, error) {
 	return nil, nil
 }
 
-func (f fakeIndexer) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	return nil, false, nil
+func (f fakeIndexer) GetByKey(key string) (*Element, bool) {
+	return nil, false
 }
 
-func (f fakeIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
-	return nil, false, nil
-}
-
-func (f fakeIndexer) List() []interface{} {
+func (f fakeIndexer) List() []*Element {
 	return nil
 }
 
@@ -162,10 +114,10 @@ func (f fakeIndexer) ListKeys() []string {
 	return nil
 }
 
-func (f fakeIndexer) Replace([]interface{}, string) error {
+func (f fakeIndexer) Replace([]*Element) error {
 	return nil
 }
-func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) Range { return nil }
+func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) Range { return EmptyRange() }
 
 type fakeSnapshotter struct {
 	getLessOrEqual func(rv uint64) (Snapshot, bool)

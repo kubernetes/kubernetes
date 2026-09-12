@@ -51,52 +51,31 @@ func (si *threadedStoreIndexer) Clone() Snapshot {
 	return si.store.Clone()
 }
 
-func (si *threadedStoreIndexer) Add(obj interface{}) error {
-	return si.addOrUpdate(obj)
+func (si *threadedStoreIndexer) Add(elem *Element) error {
+	return si.Update(elem)
 }
 
-func (si *threadedStoreIndexer) Update(obj interface{}) error {
-	return si.addOrUpdate(obj)
-}
-
-func (si *threadedStoreIndexer) addOrUpdate(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	newElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
+func (si *threadedStoreIndexer) Update(elem *Element) error {
 	si.lock.Lock()
 	defer si.lock.Unlock()
-	oldElem := si.store.addOrUpdateElem(newElem)
-	return si.indexer.updateElem(newElem.Key, oldElem, newElem)
+	old, _ := si.store.put(elem)
+	return si.indexer.updateElem(elem.Key, old, elem)
 }
 
-func (si *threadedStoreIndexer) Delete(obj interface{}) error {
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
+func (si *threadedStoreIndexer) Delete(elem *Element) error {
 	si.lock.Lock()
 	defer si.lock.Unlock()
-	oldObj, existed := si.store.deleteElem(storeElem)
+	old, existed := si.store.delete(elem)
 	if !existed {
 		return nil
 	}
-	return si.indexer.updateElem(storeElem.Key, oldObj, nil)
+	return si.indexer.updateElem(elem.Key, old, nil)
 }
 
-func (si *threadedStoreIndexer) List() []interface{} {
+func (si *threadedStoreIndexer) List() []*Element {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.List()
-}
-
-func (si *threadedStoreIndexer) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	si.lock.RLock()
-	defer si.lock.RUnlock()
-	return si.store.OrderedListPrefix(prefix, continueKey)
 }
 
 func (si *threadedStoreIndexer) ListKeys() []string {
@@ -105,29 +84,20 @@ func (si *threadedStoreIndexer) ListKeys() []string {
 	return si.store.ListKeys()
 }
 
-func (si *threadedStoreIndexer) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	si.lock.RLock()
-	defer si.lock.RUnlock()
-	return si.store.Get(obj)
-}
-
-func (si *threadedStoreIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
+func (si *threadedStoreIndexer) GetByKey(key string) (*Element, bool) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.GetByKey(key)
 }
 
-func (si *threadedStoreIndexer) Replace(objs []interface{}, resourceVersion string) error {
+func (si *threadedStoreIndexer) Replace(elems []*Element) error {
 	si.lock.Lock()
 	defer si.lock.Unlock()
-	err := si.store.Replace(objs, resourceVersion)
-	if err != nil {
-		return err
-	}
-	return si.indexer.Replace(objs, resourceVersion)
+	si.store.Replace(elems)
+	return si.indexer.Replace(elems)
 }
 
-func (si *threadedStoreIndexer) ByIndex(indexName, indexValue string) ([]interface{}, error) {
+func (si *threadedStoreIndexer) ByIndex(indexName, indexValue string) ([]*Element, error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.indexer.ByIndex(indexName, indexValue)
@@ -153,48 +123,16 @@ func (s *btreeStore) Clone() Snapshot {
 	}
 }
 
-func (s *btreeStore) Add(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
-	s.addOrUpdateElem(storeElem)
-	return nil
+func (s *btreeStore) put(elem *Element) (old *Element, replaced bool) {
+	return s.tree.ReplaceOrInsert(elem)
 }
 
-func (s *btreeStore) Update(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
-	s.addOrUpdateElem(storeElem)
-	return nil
+func (s *btreeStore) delete(elem *Element) (old *Element, existed bool) {
+	return s.tree.Delete(elem)
 }
 
-func (s *btreeStore) Delete(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
-	s.deleteElem(storeElem)
-	return nil
-}
-
-func (s *btreeStore) deleteElem(storeElem *Element) (*Element, bool) {
-	return s.tree.Delete(storeElem)
-}
-
-func (s *btreeStore) List() []interface{} {
-	items := make([]interface{}, 0, s.tree.Len())
+func (s *btreeStore) List() []*Element {
+	items := make([]*Element, 0, s.tree.Len())
 	s.tree.Ascend(func(item *Element) bool {
 		items = append(items, item)
 		return true
@@ -211,88 +149,38 @@ func (s *btreeStore) ListKeys() []string {
 	return items
 }
 
-func (s *btreeStore) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return nil, false, fmt.Errorf("obj is not a storeElement")
-	}
-	item, exists = s.tree.Get(storeElem)
-	return item, exists, nil
+func (s *btreeStore) GetByKey(key string) (*Element, bool) {
+	return s.tree.Get(&Element{Key: key})
 }
 
-func (s *btreeStore) GetByKey(key string) (item interface{}, exists bool, err error) {
-	return s.getByKey(key)
-}
-
-func (s *btreeStore) Replace(objs []interface{}, _ string) error {
+func (s *btreeStore) Replace(elems []*Element) {
 	s.tree.Clear(false)
-	for _, obj := range objs {
-		storeElem, ok := obj.(*Element)
-		if !ok {
-			return fmt.Errorf("obj not a storeElement: %#v", obj)
-		}
-		s.addOrUpdateElem(storeElem)
+	for _, elem := range elems {
+		s.tree.ReplaceOrInsert(elem)
 	}
-	return nil
-}
-
-// addOrUpdateLocked assumes a lock is held and is used for Add
-// and Update operations.
-func (s *btreeStore) addOrUpdateElem(storeElem *Element) *Element {
-	oldObj, _ := s.tree.ReplaceOrInsert(storeElem)
-	return oldObj
-}
-
-func (s *btreeStore) getByKey(key string) (item interface{}, exists bool, err error) {
-	keyElement := &Element{Key: key}
-	item, exists = s.tree.Get(keyElement)
-	return item, exists, nil
-}
-
-func (s *btreeStore) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	if continueKey == "" {
-		continueKey = prefix
-	}
-	var result []interface{}
-	s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
-		if !strings.HasPrefix(item.Key, prefix) {
-			return false
-		}
-		result = append(result, item)
-		return true
-	})
-	return result, nil
 }
 
 func (s *btreeStore) RangePrefix(prefix, continueKey string) Range {
-	return prefixRange{s, prefix, continueKey}
+	return btreeRange{tree: s.tree, prefix: prefix, startKey: max(prefix, continueKey)}
 }
 
-func (s *btreeStore) rangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
-	if continueKey == "" {
-		continueKey = prefix
-	}
-	return func(yield func(*Element, error) bool) {
-		s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
-			if !strings.HasPrefix(item.Key, prefix) {
-				return false
-			}
-			return yield(item, nil)
+type btreeRange struct {
+	tree             *btree.BTree[*Element]
+	prefix, startKey string
+}
+
+func (r btreeRange) All() iter.Seq[*Element] {
+	return func(yield func(*Element) bool) {
+		r.tree.AscendGreaterOrEqual(&Element{Key: r.startKey}, func(item *Element) bool {
+			return strings.HasPrefix(item.Key, r.prefix) && yield(item)
 		})
 	}
 }
 
-func (s *btreeStore) countPrefix(prefix, continueKey string) (count int) {
-	if continueKey == "" {
-		continueKey = prefix
-	}
-	s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
-		if !strings.HasPrefix(item.Key, prefix) {
-			return false
-		}
+func (r btreeRange) Count() (count int) {
+	for range r.All() {
 		count++
-		return true
-	})
+	}
 	return count
 }
 
@@ -316,29 +204,24 @@ type indexer struct {
 	indexers cache.Indexers
 }
 
-func (i *indexer) ByIndex(indexName, indexValue string) ([]interface{}, error) {
+func (i *indexer) ByIndex(indexName, indexValue string) ([]*Element, error) {
 	indexFunc := i.indexers[indexName]
 	if indexFunc == nil {
 		return nil, fmt.Errorf("index with name %s does not exist", indexName)
 	}
 	index := i.indices[indexName]
 	set := index[indexValue]
-	list := make([]interface{}, 0, len(set))
+	list := make([]*Element, 0, len(set))
 	for _, obj := range set {
 		list = append(list, obj)
 	}
 	return list, nil
 }
 
-func (i *indexer) Replace(objs []interface{}, resourceVersion string) error {
+func (i *indexer) Replace(elems []*Element) error {
 	i.indices = map[string]map[string]map[string]*Element{}
-	for _, obj := range objs {
-		storeElem, ok := obj.(*Element)
-		if !ok {
-			return fmt.Errorf("obj not a storeElement: %#v", obj)
-		}
-		err := i.updateElem(storeElem.Key, nil, storeElem)
-		if err != nil {
+	for _, elem := range elems {
+		if err := i.updateElem(elem.Key, nil, elem); err != nil {
 			return err
 		}
 	}

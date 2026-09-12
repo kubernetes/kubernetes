@@ -155,7 +155,7 @@ func newWatchCache(
 		resourceVersion: 0,
 		config:          config,
 		history:         newWatchCacheHistory(config, eventFreshDuration),
-		storage:         store.NewWatchCacheStorage(config.keyFunc, indexers),
+		storage:         store.NewWatchCacheStorage(indexers),
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.config.indexValidator = wc.history.isIndexValidLocked
@@ -242,20 +242,15 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 	wcEvent.timeline.MarkAt(metrics.PointStorageDecoded, recordTime)
 	wcEvent.timeline.MarkAt(metrics.PointCacheReceived, cacheReceived)
 
-	// We can call w.storage.Get() outside of a critical section,
+	// We can call w.storage.GetByKey() outside of a critical section,
 	// because the w.storage itself is thread-safe and the only
 	// place where it is modified is below (via UpdateStoreLocked)
 	// and these calls are serialized because reflector is processing
 	// events one-by-one.
-	previous, exists, err := w.storage.Get(event.Object)
-	if err != nil {
-		return err
-	}
-	if exists {
-		previousElem := previous.(*store.Element)
-		wcEvent.PrevObject = previousElem.Object
-		wcEvent.PrevObjLabels = previousElem.Labels
-		wcEvent.PrevObjFields = previousElem.Fields
+	if previous, exists := w.storage.GetByKey(key); exists {
+		wcEvent.PrevObject = previous.Object
+		wcEvent.PrevObjLabels = previous.Labels
+		wcEvent.PrevObjFields = previous.Fields
 	}
 
 	if err := func() error {
@@ -386,16 +381,12 @@ func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, o
 			return listResp{}, "", err
 		}
 	}
-	obj, exists, readResourceVersion, err := c.WaitUntilFreshAndGet(ctx, listRV, key)
+	elem, exists, readResourceVersion, err := c.WaitUntilFreshAndGet(ctx, listRV, key)
 	if err != nil {
 		return listResp{}, "", err
 	}
 	if !exists {
 		return listResp{ResourceVersion: readResourceVersion, Range: store.EmptyRange()}, "", nil
-	}
-	elem, ok := obj.(*store.Element)
-	if !ok {
-		return listResp{}, "", fmt.Errorf("non *store.Element returned from storage: %v", obj)
 	}
 	return listResp{ResourceVersion: readResourceVersion, Range: store.SingleElementRange(elem)}, "", nil
 }
@@ -494,14 +485,14 @@ func (w *watchCache) waitAndListConsistent(ctx context.Context, key, continueKey
 }
 
 func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
-	snap, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, minResourceVersion, key, continueKey, matchValues)
+	snap, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, minResourceVersion, matchValues)
 	if err != nil {
 		return listResp{}, "", err
 	}
 	return listResp{ResourceVersion: resourceVersion, Range: snap.RangePrefix(key, continueKey)}, index, nil
 }
 
-func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
+func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVersion uint64, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
 	consistentReadSupported := delegator.ConsistentReadSupported()
 	span := tracing.SpanFromContext(ctx)
 	w.RLock()
@@ -524,11 +515,7 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 		}
 		span.AddEvent("GetByIndexSnapshot fail", attribute.String("index", matchValue.IndexName), attribute.String("error", err.Error()))
 	}
-	snap, err = w.storage.GetLatestSnapshotOrBuildLocked(key, continueKey)
-	if err != nil {
-		span.AddEvent("GetLatestSnapshotOrBuildLocked failed", attribute.String("error", err.Error()))
-		return nil, 0, "", err
-	}
+	snap = w.storage.LatestSnapshotOrCloneLocked()
 	span.AddEvent("GetLatestSnapshotOrBuildLocked success")
 	return snap, w.resourceVersion, "", nil
 }
@@ -540,7 +527,7 @@ func (w *watchCache) notFresh(resourceVersion uint64) bool {
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
-func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (interface{}, bool, uint64, error) {
+func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (*store.Element, bool, uint64, error) {
 	span := tracing.SpanFromContext(ctx)
 	consistentReadSupported := delegator.ConsistentReadSupported()
 	w.RLock()
@@ -551,13 +538,9 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion u
 		return nil, false, 0, err
 	}
 	span.AddEvent("watchCache fresh enough")
-	value, exists, err := w.storage.GetByKey(key)
-	if err != nil {
-		span.AddEvent("GetByKey failed", attribute.String("error", err.Error()))
-		return nil, false, 0, err
-	}
+	elem, exists := w.storage.GetByKey(key)
 	span.AddEvent("GetByKey success")
-	return value, exists, w.resourceVersion, err
+	return elem, exists, w.resourceVersion, nil
 }
 
 // Replace takes slice of runtime.Object as a parameter.
@@ -567,7 +550,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		return err
 	}
 
-	toReplace := make([]interface{}, 0, len(objs))
+	toReplace := make([]*store.Element, 0, len(objs))
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
@@ -600,7 +583,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	// Empty the cyclic buffer, ensuring startIndex doesn't decrease.
 	w.history.ResetLocked()
 
-	if err := w.storage.ReplaceLocked(toReplace, resourceVersion, version); err != nil {
+	if err := w.storage.ReplaceLocked(toReplace, version); err != nil {
 		return err
 	}
 	w.resourceVersion = version
@@ -670,12 +653,11 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
 func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) (*watchCacheInterval, error) {
-	// When not matching a single key, an immutable snapshot lets us
-	// defer the O(N) interval build off the watchCache lock.
 	if !matchesSingle {
-		if snapshot, ok := w.storage.LatestSnapshotLocked(); ok {
-			return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot), nil
-		}
+		return newCacheIntervalFromSnapshot(w.resourceVersion, w.storage.LatestSnapshotOrCloneLocked()), nil
 	}
-	return newCacheIntervalFromStore(w.resourceVersion, w.storage.StoreLocked(), key, matchesSingle)
+	if elem, exists := w.storage.GetByKey(key); exists {
+		return newCacheIntervalFromElements(w.resourceVersion, elem), nil
+	}
+	return newCacheIntervalFromElements(w.resourceVersion), nil
 }
