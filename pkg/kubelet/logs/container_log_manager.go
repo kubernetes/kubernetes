@@ -167,7 +167,14 @@ func (c *containerLogManager) Clean(ctx context.Context, containerID string) err
 	if resp.GetStatus() == nil {
 		return fmt.Errorf("container status is nil for %q", containerID)
 	}
-	pattern := fmt.Sprintf("%s*", resp.GetStatus().GetLogPath())
+	logPath := resp.GetStatus().GetLogPath()
+	if logPath == "" {
+		// An empty log path would yield a pattern of "*", causing Glob to
+		// match every file in the kubelet's working directory and Remove
+		// to delete each one. Refuse to operate on an empty path.
+		return fmt.Errorf("container %q has an empty log path", containerID)
+	}
+	pattern := fmt.Sprintf("%s*", logPath)
 	logs, err := c.osInterface.Glob(pattern)
 	if err != nil {
 		return fmt.Errorf("failed to list all log files with pattern %q: %w", pattern, err)
