@@ -50,9 +50,8 @@ var (
 
 	// This Regex is optional -> (....)?
 	// (?P<istls>tls) -> Verify if the argument after "," is 'tls'
-	// Optional Separator from tls to the secret name -> "=?"
-	// (?P<secretname>[\w\-]+)? -> Optional secret name after the separator -> 1-N characters
-	regexTLS = `(,(?P<istls>tls)=?(?P<secretname>[\w\-]+)?)?`
+	// Optional secret name must be separated from tls by "="
+	regexTLS = `(,(?P<istls>tls)(=(?P<secretname>[\w\-]+)?)?)?`
 
 	// The validation Regex is the concatenation of hostPathSvc validation regex
 	// and the TLS validation regex
