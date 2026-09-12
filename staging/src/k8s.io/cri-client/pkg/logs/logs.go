@@ -289,7 +289,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	// so we explicitly resolve symlinks before reading the logs.
 	// There shouldn't be security issue because the container log
 	// path is owned by kubelet and the container runtime.
-	evaluated, err := filepath.EvalSymlinks(path)
+	evaluated, err := evalSymlinks(path)
 	if err != nil {
 		return fmt.Errorf("failed to try resolving symlinks in path %q: %v", path, err)
 	}

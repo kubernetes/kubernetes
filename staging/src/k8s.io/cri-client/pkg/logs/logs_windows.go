@@ -20,8 +20,20 @@ package logs
 
 import (
 	"os"
+	"path/filepath"
 	"syscall"
 )
+
+func evalSymlinks(path string) (string, error) {
+	evaluated, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return evaluated, nil
+	}
+	if _, statErr := os.Stat(path); statErr == nil {
+		return path, nil
+	}
+	return "", err
+}
 
 // Based on Windows implementation of Windows' syscall.Open
 // https://cs.opensource.google/go/go/+/refs/tags/go1.22.2:src/syscall/syscall_windows.go;l=342
