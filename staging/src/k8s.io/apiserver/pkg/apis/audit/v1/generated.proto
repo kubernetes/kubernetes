@@ -135,7 +135,9 @@ message EventList {
 message GroupResources {
   // Group is the name of the API group that contains the resources.
   // The empty string represents the core API group.
-  // `*` matches all groups
+  // `*` matches all groups.
+  // A leading `*.` matches all subgroups, e.g. `*.example.com` matches
+  // `foo.example.com` and `bar.foo.example.com`, but not `example.com` itself.
   // +optional
   optional string group = 1;
 

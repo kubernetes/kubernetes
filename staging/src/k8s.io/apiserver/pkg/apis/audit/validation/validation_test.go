@@ -43,6 +43,9 @@ func TestValidatePolicy(t *testing.T) {
 				"/metrics",
 				"*",
 			},
+		}, { // Wildcard in API group
+			Level:     audit.LevelRequestResponse,
+			Resources: []audit.GroupResources{{Group: "*.example.com"}},
 		}, { // Omit RequestReceived stage
 			Level: audit.LevelMetadata,
 			OmitStages: []audit.Stage{
@@ -120,6 +123,18 @@ func TestValidatePolicy(t *testing.T) {
 			OmitStages: []audit.Stage{
 				audit.Stage("foo"),
 			},
+		},
+		{ // leading wildcard without delimiter
+			Level:     audit.LevelMetadata,
+			Resources: []audit.GroupResources{{Group: "*example.com"}},
+		},
+		{ // wildcard in the middle of group name
+			Level:     audit.LevelMetadata,
+			Resources: []audit.GroupResources{{Group: "foo.*.example.com"}},
+		},
+		{ // trailing wildcard in group name
+			Level:     audit.LevelMetadata,
+			Resources: []audit.GroupResources{{Group: "example.*"}},
 		},
 	}
 	errorCases := []audit.Policy{}
