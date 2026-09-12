@@ -2442,10 +2442,8 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	// NOTE: resources must be unprepared AFTER all containers have stopped
 	// and BEFORE the pod status is changed on the API server
 	// to avoid race conditions with the resource deallocation code in kubernetes core.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		if err := kl.UnprepareDynamicResources(ctx, pod); err != nil {
-			return err
-		}
+	if err := kl.UnprepareDynamicResources(ctx, pod); err != nil {
+		return err
 	}
 
 	// Compute and update the status in cache once the pods are no longer running.

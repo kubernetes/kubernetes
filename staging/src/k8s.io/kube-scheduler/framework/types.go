@@ -76,7 +76,6 @@ const (
 	// UpdatePodSchedulingGatesEliminated is an update for pod's scheduling gates, which eliminates all scheduling gates in the Pod.
 	UpdatePodSchedulingGatesEliminated
 	// UpdatePodGeneratedResourceClaim is an update of the list of ResourceClaims generated for the pod.
-	// Depends on the DynamicResourceAllocation feature gate.
 	UpdatePodGeneratedResourceClaim
 
 	All ActionType = 1<<iota - 1

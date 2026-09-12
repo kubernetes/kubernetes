@@ -636,24 +636,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
-- name: DynamicResourceAllocation
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.26"
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.32"
-  - default: true
-    lockToDefault: false
-    preRelease: GA
-    version: "1.34"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.35"
 - name: EmptyDirVolumeMode
   versionedSpecs:
   - default: false

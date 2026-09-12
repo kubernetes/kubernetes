@@ -5017,17 +5017,12 @@ message PodSpec {
   // and reserved before the Pod is allowed to start. The resources
   // will be made available to those containers which consume them
   // by name.
-  //
-  // This is a stable field but requires that the
-  // DynamicResourceAllocation feature gate is enabled.
-  //
   // This field is immutable.
   //
   // +patchMergeKey=name
   // +patchStrategy=merge,retainKeys
   // +listType=map
   // +listMapKey=name
-  // +featureGate=DynamicResourceAllocation
   // +optional
   repeated PodResourceClaim resourceClaims = 39;
 
@@ -5258,7 +5253,6 @@ message PodStatus {
   // +patchStrategy=merge,retainKeys
   // +listType=map
   // +listMapKey=name
-  // +featureGate=DynamicResourceAllocation
   // +optional
   repeated PodResourceClaimStatus resourceClaimStatuses = 15;
 
@@ -5972,14 +5966,10 @@ message ResourceRequirements {
   // Claims lists the names of resources, defined in spec.resourceClaims,
   // that are used by this container.
   //
-  // This field depends on the
-  // DynamicResourceAllocation feature gate.
-  //
   // This field is immutable. It can only be set for containers.
   //
   // +listType=map
   // +listMapKey=name
-  // +featureGate=DynamicResourceAllocation
   // +optional
   repeated ResourceClaim claims = 3;
 }

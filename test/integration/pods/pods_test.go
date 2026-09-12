@@ -2603,8 +2603,6 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 // ResourceClaimStatuses when a DRA-unaware client overwrites the status of a
 // running pod and omits fields that it does not know about.
 func TestDRAStatusPreservedOnStatusUpdate(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
-
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 

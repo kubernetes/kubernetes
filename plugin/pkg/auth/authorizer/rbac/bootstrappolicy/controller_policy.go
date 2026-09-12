@@ -200,77 +200,75 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		},
 	})
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	rules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+		rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "list", "watch", "create", "delete").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+		rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourceclaims", "resourceclaims/status").RuleOrDie(),
+		rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+		eventsRule(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+		rules = append(rules,
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(schedulingGroup).Resources("podgroups").RuleOrDie(),
+			rbacv1helpers.NewRule("update", "patch").Groups(schedulingGroup).Resources("podgroups/status").RuleOrDie(),
+		)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimGranularStatusAuthorization) {
+		rules = append(rules,
+			rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourceclaims/binding").RuleOrDie(),
+		)
+	}
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resource-claim-controller"},
+		Rules:      rules,
+	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
 		rules := []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list", "watch", "create", "delete").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
-			rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourceclaims", "resourceclaims/status").RuleOrDie(),
+			// Deletes pods to evict them.
+			rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			// Sets pod conditions.
 			rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+			// The rest is read-only.
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("deviceclasses").RuleOrDie(),
 			eventsRule(),
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 			rules = append(rules,
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(schedulingGroup).Resources("podgroups").RuleOrDie(),
-				rbacv1helpers.NewRule("update", "patch").Groups(schedulingGroup).Resources("podgroups/status").RuleOrDie(),
+				// Sets DeviceTaintRule conditions.
+				rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("devicetaintrules/status").RuleOrDie(),
+				// Read-only for spec.
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie(),
 			)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimGranularStatusAuthorization) {
-			rules = append(rules,
-				rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourceclaims/binding").RuleOrDie(),
-			)
-		}
+
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resource-claim-controller"},
+			// Same name as in k8s.io/kubernetes/cmd/kube-controller-manager/names.
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "device-taint-eviction-controller"},
 			Rules:      rules,
 		})
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
-			rules := []rbacv1.PolicyRule{
-				// Deletes pods to evict them.
-				rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-				// Sets pod conditions.
-				rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
-				// The rest is read-only.
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourcePoolStatus) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			// Same name as in k8s.io/kubernetes/cmd/kube-controller-manager/names.
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resourcepoolstatusrequest-controller"},
+			Rules: []rbacv1.PolicyRule{
+				// Read and delete ResourcePoolStatusRequests (delete needed for TTL cleanup)
+				rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(resourceGroup).Resources("resourcepoolstatusrequests").RuleOrDie(),
+				// Update status after processing
+				rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourcepoolstatusrequests/status").RuleOrDie(),
+				// Read ResourceSlices to calculate pool status
 				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("deviceclasses").RuleOrDie(),
+				// Read ResourceClaims to calculate allocation counts
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+				// Read DeviceTaintRules to count tainted devices as unavailable
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie(),
 				eventsRule(),
-			}
-
-			if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
-				rules = append(rules,
-					// Sets DeviceTaintRule conditions.
-					rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("devicetaintrules/status").RuleOrDie(),
-					// Read-only for spec.
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie(),
-				)
-			}
-
-			addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-				// Same name as in k8s.io/kubernetes/cmd/kube-controller-manager/names.
-				ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "device-taint-eviction-controller"},
-				Rules:      rules,
-			})
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourcePoolStatus) {
-			addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-				// Same name as in k8s.io/kubernetes/cmd/kube-controller-manager/names.
-				ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resourcepoolstatusrequest-controller"},
-				Rules: []rbacv1.PolicyRule{
-					// Read and delete ResourcePoolStatusRequests (delete needed for TTL cleanup)
-					rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(resourceGroup).Resources("resourcepoolstatusrequests").RuleOrDie(),
-					// Update status after processing
-					rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourcepoolstatusrequests/status").RuleOrDie(),
-					// Read ResourceSlices to calculate pool status
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
-					// Read ResourceClaims to calculate allocation counts
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
-					// Read DeviceTaintRules to count tainted devices as unavailable
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie(),
-					eventsRule(),
-				},
-			})
-		}
+			},
+		})
 	}
 
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{

@@ -157,11 +157,6 @@ func TestFeatureGatedControllersShouldNotDefineAliases(t *testing.T) {
 			continue
 		}
 
-		// DO NOT ADD any new controllers here. one controller is an exception, because it was added before this test was introduced
-		if name == names.ResourceClaimController {
-			continue
-		}
-
 		areAllRequiredFeaturesAlpha := true
 		for _, feature := range requiredFeatureGates {
 			if !alphaFeatures.Has(string(feature)) {

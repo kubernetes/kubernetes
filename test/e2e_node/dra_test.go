@@ -19,7 +19,7 @@ E2E Node test for DRA (Dynamic Resource Allocation)
 This test covers node-specific aspects of DRA
 The test can be run locally on Linux this way:
     make test-e2e-node FOCUS='\[Feature:DynamicResourceAllocation\]' SKIP='\[Flaky\]' PARALLELISM=1 \
-       TEST_ARGS='--feature-gates="DynamicResourceAllocation=true,ResourceHealthStatus=true,DRAConsumableCapacity=true" --service-feature-gates="DynamicResourceAllocation=true,ResourceHealthStatus=true,DRAConsumableCapacity=true" --runtime-config=api/all=true'
+       TEST_ARGS='--feature-gates="ResourceHealthStatus=true,DRAConsumableCapacity=true" --service-feature-gates="ResourceHealthStatus=true,DRAConsumableCapacity=true" --runtime-config=api/all=true'
 */
 
 package e2enode
@@ -94,7 +94,7 @@ const (
 
 // Tests depend on container runtime support for CDI and the DRA feature gate.
 // The "DRA" label is used to select tests related to DRA in a Ginkgo label filter.
-var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DynamicResourceAllocation), func() {
+var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.DynamicResourceAllocation, func() {
 	f := framework.NewDefaultFramework("dra-node")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
