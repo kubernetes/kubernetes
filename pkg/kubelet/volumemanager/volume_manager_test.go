@@ -112,7 +112,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 			tCtx := ktesting.Init(t)
 			defer tCtx.Cancel("test has completed")
-			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }, func(_ kubetypes.UID) bool { return true })
 			go manager.Run(tCtx, sourcesReady)
 
 			podManager.SetPods([]*v1.Pod{pod})
@@ -239,7 +239,7 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 
 	tCtx := ktesting.Init(t)
 	defer tCtx.Cancel("test has completed")
-	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }, func(_ kubetypes.UID) bool { return true })
 	go manager.Run(tCtx, sourcesReady)
 
 	podManager.SetPods([]*v1.Pod{pod})
@@ -330,7 +330,7 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 
 	tCtx := ktesting.Init(t)
 	t.Cleanup(func() { tCtx.Cancel("test has completed") })
-	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }, func(_ kubetypes.UID) bool { return true })
 	go manager.Run(tCtx, sourcesReady)
 	podManager.SetPods([]*v1.Pod{pod})
 
@@ -367,7 +367,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
 	defer tCtx.Cancel("test has completed")
-	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }, func(_ kubetypes.UID) bool { return true })
 	go manager.Run(tCtx, sourcesReady)
 
 	podManager.SetPods([]*v1.Pod{pod})
@@ -458,7 +458,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 
 		tCtx := ktesting.Init(t)
 		defer tCtx.Cancel("test has completed")
-		sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+		sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }, func(_ kubetypes.UID) bool { return true })
 		go manager.Run(tCtx, sourcesReady)
 
 		podManager.SetPods([]*v1.Pod{pod})
@@ -723,7 +723,7 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
-			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }, func(_ kubetypes.UID) bool { return true })
 			go manager.Run(ctx, sourcesReady)
 
 			podManager.SetPods(pods)

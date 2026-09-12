@@ -493,7 +493,7 @@ func (kl *Kubelet) GetAllocatedPodByName(namespace, name string) (*v1.Pod, error
 	if !found {
 		return nil, nil
 	}
-	activePods := kl.filterOutInactivePods([]*v1.Pod{pod})
+	activePods := kl.filterOutInactivePods([]*v1.Pod{pod}, kl.sourcesReady.SourceForPodReady)
 	if len(activePods) == 0 {
 		return nil, nil
 	}
