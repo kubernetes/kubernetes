@@ -19,7 +19,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.13.0
 	github.com/coredns/corefile-migration v1.0.35
-	github.com/coreos/go-oidc v2.5.0+incompatible
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.6
 	github.com/cyphar/filepath-securejoin v0.7.0
@@ -27,6 +27,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/emicklei/go-restful/v3 v3.13.0
 	github.com/fsnotify/fsnotify v1.9.0
+	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/jsonreference v1.0.0
 	github.com/godbus/dbus/v5 v5.2.2
@@ -81,7 +82,6 @@ require (
 	google.golang.org/grpc v1.82.2
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/evanphx/json-patch.v4 v4.13.0
-	gopkg.in/go-jose/go-jose.v2 v2.6.3
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.0.0
 	k8s.io/apiextensions-apiserver v0.0.0
@@ -191,7 +191,6 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runtime-spec v1.3.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-	github.com/pquerna/cachecontrol v0.1.0 // indirect
 	github.com/prometheus/client_golang v1.24.0 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect

@@ -43,12 +43,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc/v3/oidc"
+	jose "github.com/go-jose/go-jose/v4"
 	celgo "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-	jose "gopkg.in/go-jose/go-jose.v2"
+	"golang.org/x/time/rate"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -68,11 +69,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var (
-	// synchronizeTokenIDVerifierForTest should be set to true to force a
-	// wait until the token ID verifiers are ready.
-	synchronizeTokenIDVerifierForTest = false
-)
+// synchronizeTokenIDVerifierForTest should be set to true to force a
+// wait until the token ID verifiers are ready.
+var synchronizeTokenIDVerifierForTest = false
 
 const (
 	wellKnownEndpointPath = "/.well-known/openid-configuration"
@@ -214,6 +213,17 @@ type jwtAuthenticator struct {
 	requiredClaims map[string]string
 
 	healthCheck atomic.Pointer[errorHolder]
+
+	// lifecycleCtx is used to determine whether or not the authenticator
+	// should continue to be used.
+	// This is mainly used to replace the fact that cancelled contexts
+	// used to cause verification errors through coreos/go-oidc but that
+	// was dropped in coreos/go-oidc v3 so that cancelled contexts no longer
+	// cause outgoing requests to fail (i.e for fetching remote keys).
+	// When lifecycleCtx is cancelled, this authenticator will return
+	// an error on token authentication requests and will report as being
+	// unhealthy.
+	lifecycleCtx context.Context
 }
 
 // idTokenVerifier is a wrapper around oidc.IDTokenVerifier. It uses the oidc.IDTokenVerifier
@@ -407,6 +417,7 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 		resolver:         resolver,
 		celMapper:        celMapper,
 		requiredClaims:   requiredClaims,
+		lifecycleCtx:     lifecycleCtx,
 	}
 	authn.healthCheck.Store(&errorHolder{
 		err: fmt.Errorf("oidc: authenticator for issuer %q is not initialized", authn.jwtAuthenticator.Issuer.URL),
@@ -454,6 +465,14 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 					clientWithJWKSMetrics := *client
 					clientWithJWKSMetrics.Transport = withMetricsRoundTripper(client.Transport, providerJSON.JWKSURL, issuerURL, opts.APIServerID, lifecycleCtx)
 					client = &clientWithJWKSMetrics
+
+					clientWithJWKSRateLimiting := *client
+					clientWithJWKSRateLimiting.Transport = &rateLimitedRoundTripper{
+						base:       client.Transport,
+						limiter:    rate.NewLimiter(rate.Limit(0.1), 3), // 6 requests per minute with a burst of 3.
+						urlToLimit: providerJSON.JWKSURL,
+					}
+					client = &clientWithJWKSRateLimiting
 
 					remoteKeySet := oidc.NewRemoteKeySet(oidc.ClientContext(lifecycleCtx, client), providerJSON.JWKSURL)
 					authn.setVerifier(&idTokenVerifier{oidc.NewVerifier(issuerURL, remoteKeySet, verifierConfig), audiences})
@@ -601,6 +620,31 @@ func (t *discoveryURLRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 		clone.URL = t.discoveryURL
 		return t.base.RoundTrip(clone)
 	}
+	return t.base.RoundTrip(req)
+}
+
+// rateLimitedRoundTripper is a http.RoundTripper that
+// enforces a rate limit on particular request URLs.
+type rateLimitedRoundTripper struct {
+	base       http.RoundTripper
+	limiter    *rate.Limiter
+	urlToLimit string
+}
+
+func (t *rateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Method == http.MethodGet && req.URL.String() == t.urlToLimit {
+		tokenReservation := t.limiter.Reserve()
+		if !tokenReservation.OK() {
+			return nil, fmt.Errorf("too many requests to %q", t.urlToLimit)
+		}
+
+		resp, err := t.base.RoundTrip(req)
+		if err != nil || resp == nil || resp.StatusCode != http.StatusOK {
+			tokenReservation.Cancel()
+		}
+		return resp, err
+	}
+
 	return t.base.RoundTrip(req)
 }
 
@@ -858,6 +902,10 @@ func (v *idTokenVerifier) verifyAudience(t *oidc.IDToken) error {
 }
 
 func (a *jwtAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	if err := a.lifecycleCtx.Err(); err != nil {
+		return nil, false, err
+	}
+
 	if !hasCorrectIssuer(a.jwtAuthenticator.Issuer.URL, token) {
 		return nil, false, nil
 	}
@@ -972,6 +1020,10 @@ func (a *jwtAuthenticator) AuthenticateToken(ctx context.Context, token string) 
 }
 
 func (a *jwtAuthenticator) HealthCheck() error {
+	if err := a.lifecycleCtx.Err(); err != nil {
+		return fmt.Errorf("oidc: authenticator for issuer %q is not healthy due to lifecycle context cancellation: %w", a.jwtAuthenticator.Issuer.URL, err)
+	}
+
 	if holder := *a.healthCheck.Load(); holder.err != nil {
 		return fmt.Errorf("oidc: authenticator for issuer %q is not healthy: %w", a.jwtAuthenticator.Issuer.URL, holder.err)
 	}
