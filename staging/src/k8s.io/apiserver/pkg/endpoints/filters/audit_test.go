@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -50,6 +51,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 type fakeAuditSink struct {
@@ -1032,5 +1035,33 @@ func TestAuditBackendRaceCondition(t *testing.T) {
 				<-serveFinished
 			}
 		})
+	}
+}
+
+func TestAuditPolicyLevelMetric(t *testing.T) {
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	ctx := t.Context()
+	sink := &fakeAuditSink{}
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelMetadata, nil)
+	handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
+	handler = WithAuditInit(handler)
+
+	req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
+	req.RemoteAddr = "127.0.0.1"
+	req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	const expected = `
+# HELP apiserver_audit_level_total [BETA] Counter of policy levels for audit events (1 per request).
+# TYPE apiserver_audit_level_total counter
+apiserver_audit_level_total{level="Metadata"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_audit_level_total"); err != nil {
+		t.Fatal(err)
 	}
 }

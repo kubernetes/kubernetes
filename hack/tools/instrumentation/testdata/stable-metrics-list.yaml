@@ -1,3 +1,23 @@
+- name: error_total
+  subsystem: apiserver_audit
+  help: Counter of audit events that failed to be audited properly. Plugin identifies
+    the plugin affected by the error.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - plugin
+- name: event_total
+  subsystem: apiserver_audit
+  help: Counter of audit events generated and sent to the audit backend.
+  type: Counter
+  stabilityLevel: BETA
+- name: level_total
+  subsystem: apiserver_audit
+  help: Counter of policy levels for audit events (1 per request).
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - level
 - name: automatic_reload_last_timestamp_seconds
   subsystem: authentication_config_controller
   namespace: apiserver
