@@ -148,34 +148,62 @@ func setEquivalent(set1, set2 []string) bool {
 }
 
 func TestGetDeviceNameFromMount(t *testing.T) {
-	fm := NewFakeMounter(
-		[]MountPoint{
-			{
-				Device: "/dev/disk/by-path/prefix-lun-1",
-				Path:   "/mnt/111",
-			},
-			{
-				Device: "/dev/disk/by-path/prefix-lun-1",
-				Path:   "/mnt/222",
-			},
-		})
-
 	tests := []struct {
+		name           string
+		mounter        *FakeMounter
 		mountPath      string
 		expectedDevice string
 		expectedRefs   int
+		expectedErr    string
 	}{
 		{
-			"/mnt/222",
-			"/dev/disk/by-path/prefix-lun-1",
-			2,
+			name: "single device",
+			mounter: NewFakeMounter(
+				[]MountPoint{
+					{
+						Device: "/dev/disk/by-path/prefix-lun-1",
+						Path:   "/mnt/111",
+					},
+					{
+						Device: "/dev/disk/by-path/prefix-lun-1",
+						Path:   "/mnt/222",
+					},
+				}),
+			mountPath:      "/mnt/222",
+			expectedDevice: "/dev/disk/by-path/prefix-lun-1",
+			expectedRefs:   2,
+		},
+		{
+			name: "multiple devices on same mount path",
+			mounter: NewFakeMounter(
+				[]MountPoint{
+					{
+						Device: "/dev/disk/by-path/prefix-lun-1",
+						Path:   "/mnt/shared",
+					},
+					{
+						Device: "/dev/disk/by-path/prefix-lun-2",
+						Path:   "/mnt/shared",
+					},
+				}),
+			mountPath:   "/mnt/shared",
+			expectedErr: "multiple devices mounted on",
 		},
 	}
 
-	for i, test := range tests {
-		if device, refs, err := GetDeviceNameFromMount(fm, test.mountPath); err != nil || test.expectedRefs != refs || test.expectedDevice != device {
-			t.Errorf("%d. GetDeviceNameFromMount(%s) = (%s, %d), %v; expected (%s,%d), nil", i, test.mountPath, device, refs, err, test.expectedDevice, test.expectedRefs)
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			device, refs, err := GetDeviceNameFromMount(test.mounter, test.mountPath)
+			if test.expectedErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.expectedErr) {
+					t.Fatalf("GetDeviceNameFromMount(%s) error = %v, want error containing %q", test.mountPath, err, test.expectedErr)
+				}
+				return
+			}
+			if err != nil || test.expectedRefs != refs || test.expectedDevice != device {
+				t.Fatalf("GetDeviceNameFromMount(%s) = (%s, %d), %v; expected (%s, %d), nil", test.mountPath, device, refs, err, test.expectedDevice, test.expectedRefs)
+			}
+		})
 	}
 }
 
