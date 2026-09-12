@@ -348,8 +348,15 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	// Note, exec probe does NOT have access to pod environment variables or downward API
 	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
 	if err != nil {
-		// Prober error, throw away the result.
-		return true
+		// The prober already maps execution errors (e.g. command not found, permission denied)
+		// to results.Failure before returning them here. When ProbeErrorAsFailure is enabled,
+		// let those mapped Failure results fall through to the normal threshold/hold logic so
+		// the container gets restarted as intended. Without the gate we preserve the historical
+		// behavior of discarding all errored probe results silently.
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ProbeErrorAsFailure) || result != results.Failure {
+			// Prober error, throw away the result.
+			return true
+		}
 	}
 
 	switch result {
