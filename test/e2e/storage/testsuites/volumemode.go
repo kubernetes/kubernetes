@@ -352,7 +352,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodPending), "Pod phase isn't pending")
 	}
 	if reason := checkIfBlockNotSupported(driver); reason == "" {
-		f.It("should fail to use a volume in a pod with mismatched mode", f.WithSlow(), failMismatched)
+		f.It("should fail to use a volume in a pod with mismatched mode", failMismatched)
 	}
 
 	notMapUnused := func(ctx context.Context) {
