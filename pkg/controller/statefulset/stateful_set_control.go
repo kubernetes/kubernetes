@@ -499,6 +499,20 @@ func (ssc *defaultStatefulSetControl) processReplica(ctx context.Context, set *a
 		return false, nil
 	}
 
+	// A pod with stale VCT-backed volumes (volumes whose template was removed
+	// from set.Spec.VolumeClaimTemplates) cannot be healed via an Update: the
+	// API server rejects changes to pod.Spec.Volumes once a pod is created.
+	// Delete the pod so it gets recreated against the current template set,
+	// which breaks the otherwise-endless FailedUpdate retry loop.
+	if hasStaleVolumes(set, replicas[i]) && !isTerminating(replicas[i]) {
+		logger.V(2).Info("StatefulSet pod has stale VCT volumes and will be deleted for recreation",
+			"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]))
+		if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
+			return true, err
+		}
+		return true, nil
+	}
+
 	// Make a deep copy so we don't mutate the shared cache
 	replica := replicas[i].DeepCopy()
 	if err := ssc.podControl.UpdateStatefulPod(ctx, updateSet, replica); err != nil {

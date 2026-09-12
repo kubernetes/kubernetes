@@ -313,6 +313,58 @@ func TestUpdateStorage(t *testing.T) {
 	}
 }
 
+func TestHasStaleVolumes(t *testing.T) {
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 1)
+
+	// Freshly created pod — all volumes match current VCTs, nothing stale.
+	if hasStaleVolumes(set, pod) {
+		t.Error("newly created pod should not have stale volumes")
+	}
+
+	// Pod with no volumes at all — nothing to be stale.
+	podNoVols := newStatefulSetPod(set, 1)
+	podNoVols.Spec.Volumes = nil
+	if hasStaleVolumes(set, podNoVols) {
+		t.Error("pod with no volumes should not have stale volumes")
+	}
+
+	// Simulate an adopted pod that carries a PVC-backed volume whose template
+	// has been removed from the StatefulSet (e.g. the set previously had a
+	// "datadir" template, now it has none).
+	podStale := newStatefulSetPod(set, 1)
+	// Strip the current VCTs so the pod's "datadir" volume is now stale.
+	setNoVCT := set.DeepCopy()
+	setNoVCT.Spec.VolumeClaimTemplates = nil
+	if !hasStaleVolumes(setNoVCT, podStale) {
+		t.Error("pod should be detected as having stale volumes when its VCT was removed from the set")
+	}
+
+	// Pod with a PVC-backed volume whose name looks like a set-generated PVC
+	// but belongs to a *different* set — the ClaimName pattern won't match, so
+	// it is not flagged.
+	podForeign := newStatefulSetPod(set, 1)
+	for i := range podForeign.Spec.Volumes {
+		if podForeign.Spec.Volumes[i].PersistentVolumeClaim != nil {
+			// ClaimName from a different set ("other-set-1") doesn't match
+			// getPersistentVolumeClaimName(set, ...) which would be "datadir-foo-1".
+			podForeign.Spec.Volumes[i].PersistentVolumeClaim.ClaimName = "datadir-other-set-1"
+		}
+	}
+	setNoVCT2 := set.DeepCopy()
+	setNoVCT2.Spec.VolumeClaimTemplates = nil
+	if hasStaleVolumes(setNoVCT2, podForeign) {
+		t.Error("volume whose PVC name does not match this set's naming pattern should not be flagged as stale")
+	}
+
+	// Pod whose ordinal cannot be parsed — hasStaleVolumes must return false.
+	podBadName := newStatefulSetPod(set, 1)
+	podBadName.Name = "not-a-statefulset-pod"
+	if hasStaleVolumes(set, podBadName) {
+		t.Error("pod with unparseable ordinal should not be flagged as stale")
+	}
+}
+
 func TestGetPersistentVolumeClaimRetentionPolicy(t *testing.T) {
 	retainPolicy := apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 		WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
