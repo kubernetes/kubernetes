@@ -40,7 +40,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
-	"k8s.io/utils/integer"
 )
 
 const (
@@ -523,7 +522,7 @@ func getReplicaSetFraction(logger klog.Logger, rs apps.ReplicaSet, d apps.Deploy
 	scaleBase := *(rs.Spec.Replicas)
 	// deploymentMaxReplicasBeforeScale should normally be a positive value, and we have made sure that it is not a zero.
 	newRSsize := (float64(scaleBase * deploymentMaxReplicas)) / float64(deploymentMaxReplicasBeforeScale)
-	return integer.RoundToInt32(newRSsize) - *(rs.Spec.Replicas)
+	return int32(math.Round(newRSsize)) - *(rs.Spec.Replicas)
 }
 
 // RsListFromClient returns an rsListFunc that wraps the given client.
