@@ -17,6 +17,7 @@ limitations under the License.
 package responsewriters
 
 import (
+	"bufio"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -24,6 +25,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -149,25 +151,38 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 var gzipPool = NewGzipWriterPoolOrDie()
 
 const (
-	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
-	// (usually the entire object), and if the size is smaller no gzipping will be performed
-	// if the client requests it.
+	// defaultGzipThresholdBytes is the response size above which the response
+	// is gzipped, if the client accepts gzip.
 	defaultGzipThresholdBytes = 128 * 1024
-	// Use the length of the first write to recognize streaming implementations.
-	// When streaming JSON first write is "{", while Kubernetes protobuf starts unique 4 byte header.
-	firstWriteStreamingThresholdBytes = 4
+	// responseBufferBytes is the size of the buffer every response is written
+	// through, which batches the per-item writes of streamed list responses
+	// into writes of this size. It equals defaultGzipThresholdBytes so that
+	// the buffer also makes the gzip decision: a response that overflows it
+	// exceeds the threshold, and one that fits is flushed once, at Close,
+	// uncompressed.
+	responseBufferBytes = defaultGzipThresholdBytes
 )
+
+// responseBufferPool holds the buffers responses are written through.
+// TODO: engage lazily so small responses don't hold a pooled buffer.
+var responseBufferPool = &sync.Pool{
+	New: func() interface{} {
+		return bufio.NewWriterSize(nil, responseBufferBytes)
+	},
+}
 
 type deferredResponseWriter struct {
 	mediaType       string
 	statusCode      int
 	contentEncoding string
 
-	hasBuffered bool
-	buffer      []byte
-	hasWritten  bool
-	hw          http.ResponseWriter
-	w           io.Writer
+	// buf takes every write; its first flush commits the response (see
+	// commit) and from then on it batches writes on their way to w.
+	buf        *bufio.Writer
+	final      bool // set by Close before it flushes buf: no writes follow
+	hasWritten bool // the response is committed
+	hw         http.ResponseWriter
+	w          io.Writer // below buf once committed: hw, or a gzip writer over hw
 	// totalBytes is the number of bytes written to `w` and does not include buffered bytes
 	totalBytes int
 	// lastWriteErr holds the error result (if any) of the last write attempt to `w`
@@ -177,51 +192,31 @@ type deferredResponseWriter struct {
 }
 
 func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
-	switch {
-	case w.hasWritten:
-		// already written, cannot buffer
-		return w.unbufferedWrite(p)
-
-	case w.contentEncoding != "gzip":
-		// non-gzip, no need to buffer
-		return w.unbufferedWrite(p)
-
-	case !w.hasBuffered && len(p) > defaultGzipThresholdBytes:
-		// not yet buffered, first write is long enough to trigger gzip, no need to buffer
-		return w.unbufferedWrite(p)
-
-	case !w.hasBuffered && len(p) > firstWriteStreamingThresholdBytes:
-		// not yet buffered, first write is longer than expected for streaming scenarios that would require buffering, no need to buffer
-		return w.unbufferedWrite(p)
-
-	default:
-		if !w.hasBuffered {
-			w.hasBuffered = true
-			// Start at 80 bytes to avoid rapid reallocation of the buffer.
-			// The minimum size of a 0-item serialized list object is 80 bytes:
-			// {"kind":"List","apiVersion":"v1","metadata":{"resourceVersion":"1"},"items":[]}\n
-			w.buffer = make([]byte, 0, max(80, len(p)))
-		}
-		w.buffer = append(w.buffer, p...)
-		var err error
-		if len(w.buffer) > defaultGzipThresholdBytes {
-			// we've accumulated enough to trigger gzip, write and clear buffer
-			_, err = w.unbufferedWrite(w.buffer)
-			w.buffer = nil
-		}
-		return len(p), err
+	if w.buf == nil {
+		w.buf = responseBufferPool.Get().(*bufio.Writer)
+		w.buf.Reset(committer{w})
 	}
+	return w.buf.Write(p)
 }
 
+// discardBufferedResponse drops what has been written so far, if the response
+// is not committed yet, so that an error response can be written instead.
 func (w *deferredResponseWriter) discardBufferedResponse() {
-	if w.hasWritten {
+	if w.hasWritten || w.buf == nil {
 		return
 	}
-	w.hasBuffered = false
-	w.buffer = nil
+	w.buf.Reset(committer{w})
 }
 
-func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
+// committer is the writer below buf: it receives buf's flushes.
+type committer struct{ w *deferredResponseWriter }
+
+func (c committer) Write(p []byte) (int, error) { return c.w.commit(p) }
+
+// commit receives buf's flushes. The first one commits the response (decides
+// gzip, writes status and headers); p and every later flush go to the chosen
+// writer.
+func (w *deferredResponseWriter) commit(p []byte) (n int, err error) {
 	defer func() {
 		w.totalBytes += n
 		w.lastWriteErr = err
@@ -232,10 +227,15 @@ func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 	}
 	w.hasWritten = true
 
+	// buf holds exactly defaultGzipThresholdBytes, so it flushes before Close
+	// only if the response exceeds the gzip threshold; if the first flush is
+	// Close's, the whole response fit under it.
+	exceedsGzipThreshold := !w.final
+
 	hw := w.hw
 	header := hw.Header()
 	switch {
-	case w.contentEncoding == "gzip" && len(p) > defaultGzipThresholdBytes:
+	case w.contentEncoding == "gzip" && exceedsGzipThreshold:
 		header.Set("Content-Encoding", "gzip")
 		header.Add("Vary", "Accept-Encoding")
 
@@ -276,21 +276,27 @@ func (w *deferredResponseWriter) Close() (err error) {
 		}
 	}()
 
-	if !w.hasWritten {
-		if !w.hasBuffered {
-			return nil
-		}
-		// never reached defaultGzipThresholdBytes, no need to do the gzip writer cleanup
-		_, err := w.unbufferedWrite(w.buffer)
-		w.buffer = nil
-		return err
+	if w.buf == nil {
+		return nil // nothing was written
 	}
-
-	switch t := w.w.(type) {
-	case *gzip.Writer:
-		err = t.Close()
-		t.Reset(nil)
-		gzipPool.Put(t)
+	w.final = true
+	err = w.buf.Flush() // commits the response, if it fit in buf
+	if err == nil && !w.hasWritten {
+		_, err = w.commit(nil) // an empty body still gets its status and headers
+	}
+	w.buf.Reset(nil)
+	responseBufferPool.Put(w.buf)
+	w.buf = nil
+	if gw, ok := w.w.(*gzip.Writer); ok {
+		if cerr := gw.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+		gw.Reset(nil)
+		gzipPool.Put(gw)
+	}
+	w.w = nil
+	if err != nil && w.lastWriteErr == nil {
+		w.lastWriteErr = err
 	}
 	return err
 }

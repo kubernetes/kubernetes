@@ -442,9 +442,11 @@ func TestDeferredResponseWriter_Write(t *testing.T) {
 		{
 			name:       "two small chunk writes",
 			chunks:     [][]byte{smallChunk, smallChunk},
-			expectGzip: false,
+			expectGzip: true,
 			expectHeaders: http.Header{
-				"Content-Type": []string{"text/plain"},
+				"Content-Type":     []string{"text/plain"},
+				"Content-Encoding": []string{"gzip"},
+				"Vary":             []string{"Accept-Encoding"},
 			},
 		},
 		{
@@ -488,9 +490,11 @@ func TestDeferredResponseWriter_Write(t *testing.T) {
 		{
 			name:       "one small chunk and one large chunk write",
 			chunks:     [][]byte{smallChunk, largeChunk},
-			expectGzip: false,
+			expectGzip: true,
 			expectHeaders: http.Header{
-				"Content-Type": []string{"text/plain"},
+				"Content-Type":     []string{"text/plain"},
+				"Content-Encoding": []string{"gzip"},
+				"Vary":             []string{"Accept-Encoding"},
 			},
 		},
 	}
