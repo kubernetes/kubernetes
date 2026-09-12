@@ -343,6 +343,17 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	pluginCommandGroup := plugin.GetPluginCommandGroup(cmds)
 	groups = append(groups, pluginCommandGroup)
 
+	// Prepare prefs to generate Aliases Command Group
+	prefs, err := pref.Read(o.Arguments, o.IOStreams.ErrOut)
+	if err != nil {
+		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
+		os.Exit(1)
+	}
+
+	// Add alias command group to the list of command groups.
+	aliasCommandGroup := kuberc.GetAliasesCommandGroup(cmds, prefs)
+	groups = append(groups, aliasCommandGroup)
+
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
 	utilcomp.SetFactoryForCompletion(f)
