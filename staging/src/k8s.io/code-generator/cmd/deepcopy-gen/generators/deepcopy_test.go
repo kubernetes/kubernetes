@@ -17,9 +17,12 @@ limitations under the License.
 package generators
 
 import (
+	"bytes"
 	"reflect"
+	"strings"
 	"testing"
 
+	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -306,6 +309,34 @@ func Test_deepCopyMethod(t *testing.T) {
 		} else if !tc.error && (r != nil) != tc.expect {
 			t.Errorf("case[%d]: expected result %v, got: %v", i, tc.expect, r)
 		}
+	}
+}
+
+func TestDoStructIgnoresBlankIdentifierMembers(t *testing.T) {
+	g := &genDeepCopy{}
+	tpe := &types.Type{
+		Name: types.Name{Package: "pkgname", Name: "WithBlank"},
+		Kind: types.Struct,
+		Members: []types.Member{
+			{
+				Name: "_",
+				Type: &types.Type{
+					Kind: types.Struct,
+				},
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	sw := generator.NewSnippetWriter(&out, &generator.Context{Namers: NameSystems()}, "$", "$")
+	g.doStruct(tpe, sw)
+	if err := sw.Error(); err != nil {
+		t.Fatalf("unexpected snippet writer error: %v", err)
+	}
+
+	generated := out.String()
+	if strings.Contains(generated, "out._") || strings.Contains(generated, "in._") {
+		t.Fatalf("generated deepcopy code references blank identifier field: %q", generated)
 	}
 }
 

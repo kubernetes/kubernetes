@@ -826,6 +826,10 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 
 	// Now fix-up fields as needed.
 	for _, m := range ut.Members {
+		if m.Name == "_" {
+			continue
+		}
+
 		ft := m.Type
 		uft := underlyingType(ft)
 
