@@ -886,6 +886,168 @@ func TestMemoryPressure(t *testing.T) {
 	}
 }
 
+func TestSoftEvictionNegativeMaxPodGracePeriod(t *testing.T) {
+	tests := map[string]struct {
+		terminationGracePeriodSeconds *int64
+	}{
+		"pod termination grace period set": {terminationGracePeriodSeconds: ptr.To(int64(120))},
+		"pod termination grace period nil": {},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			podsToMake := []podToMake{
+				{name: "guaranteed-low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "900Mi"},
+				{name: "burstable-below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi", ""), limits: newResourceList("200m", "1Gi", ""), memoryWorkingSet: "50Mi"},
+				{name: "burstable-above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi", ""), limits: newResourceList("200m", "1Gi", ""), memoryWorkingSet: "400Mi"},
+				{name: "best-effort-high-priority-high-usage", priority: highPriority, requests: newResourceList("", "", ""), limits: newResourceList("", "", ""), memoryWorkingSet: "400Mi"},
+				{name: "best-effort-low-priority-low-usage", priority: lowPriority, requests: newResourceList("", "", ""), limits: newResourceList("", "", ""), memoryWorkingSet: "100Mi"},
+			}
+			pods := []*v1.Pod{}
+			podStats := map[*v1.Pod]statsapi.PodStats{}
+			for _, podToMake := range podsToMake {
+				pod, podStat := makePodWithMemoryStats(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+				pods = append(pods, pod)
+				podStats[pod] = podStat
+			}
+			pods[4].Spec.TerminationGracePeriodSeconds = tc.terminationGracePeriodSeconds
+			podToEvict := pods[4]
+			activePodsFunc := func() []*v1.Pod {
+				return pods
+			}
+
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			podKiller := &mockPodKiller{}
+			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+			diskGC := &mockDiskGC{err: nil}
+			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+			config := Config{
+				MaxPodGracePeriodSeconds: -1,
+				PressureTransitionPeriod: time.Minute * 5,
+				Thresholds: []evictionapi.Threshold{
+					{
+						Signal:   evictionapi.SignalMemoryAvailable,
+						Operator: evictionapi.OpLessThan,
+						Value: evictionapi.ThresholdValue{
+							Quantity: quantityMustParse("1Gi"),
+						},
+						GracePeriod: time.Minute * 2,
+					},
+				},
+			}
+			summaryProvider := &fakeSummaryProvider{result: makeMemoryStats("2Gi", podStats)}
+			manager := &managerImpl{
+				clock:                        fakeClock,
+				killPodFunc:                  podKiller.killPodNow,
+				imageGC:                      diskGC,
+				containerGC:                  diskGC,
+				config:                       config,
+				recorder:                     &record.FakeRecorder{},
+				summaryProvider:              summaryProvider,
+				nodeRef:                      nodeRef,
+				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+			}
+
+			_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
+			if err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			fakeClock.Step(1 * time.Minute)
+			summaryProvider.result = makeMemoryStats("500Mi", podStats)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
+			if err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			fakeClock.Step(3 * time.Minute)
+			summaryProvider.result = makeMemoryStats("500Mi", podStats)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
+			if err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			if podKiller.pod != podToEvict {
+				t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+			}
+			if podKiller.gracePeriodOverride != nil {
+				t.Errorf("Manager should defer to the pod spec when MaxPodGracePeriodSeconds is negative, but used grace period override: %d", *podKiller.gracePeriodOverride)
+			}
+		})
+	}
+}
+
+func TestHardEvictionWithNegativeMaxPodGracePeriod(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	podsToMake := []podToMake{
+		{name: "guaranteed-low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "900Mi"},
+		{name: "burstable-below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi", ""), limits: newResourceList("200m", "1Gi", ""), memoryWorkingSet: "50Mi"},
+		{name: "burstable-above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi", ""), limits: newResourceList("200m", "1Gi", ""), memoryWorkingSet: "400Mi"},
+		{name: "best-effort-high-priority-high-usage", priority: highPriority, requests: newResourceList("", "", ""), limits: newResourceList("", "", ""), memoryWorkingSet: "400Mi"},
+		{name: "best-effort-low-priority-low-usage", priority: lowPriority, requests: newResourceList("", "", ""), limits: newResourceList("", "", ""), memoryWorkingSet: "100Mi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := makePodWithMemoryStats(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	podToEvict := pods[4]
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: -1,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1500Mi"),
+				},
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: makeMemoryStats("500Mi", podStats)}
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+	}
+
+	_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	if podKiller.pod != podToEvict {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+	}
+	if podKiller.gracePeriodOverride == nil {
+		t.Errorf("Manager chose to kill pod but should have had a grace period override.")
+	} else if *podKiller.gracePeriodOverride != int64(1) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, *podKiller.gracePeriodOverride)
+	}
+}
+
 func makeContainersByQOS(class v1.PodQOSClass) []v1.Container {
 	resource := newResourceList("100m", "1Gi", "")
 	switch class {
