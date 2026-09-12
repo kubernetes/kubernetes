@@ -648,49 +648,27 @@ func TestRejectPodAdmissionBasedOnOSSelector(t *testing.T) {
 	tests := []struct {
 		name            string
 		pod             *v1.Pod
-		node            *v1.Node
 		expectRejection bool
 	}{
 		{
-			name:            "OS label match",
+			name:            "pod selects the OS the kubelet runs on, should be admitted",
 			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS}}},
-			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS}}},
 			expectRejection: false,
 		},
 		{
-			name:            "dummyOS label, but the underlying OS matches",
-			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS}}},
-			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
-			expectRejection: false,
-		},
-		{
-			name:            "dummyOS label, but the underlying OS doesn't match",
+			name:            "pod selects a different OS, should be rejected",
 			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
-			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
-			expectRejection: true,
-		},
-		{
-			name:            "dummyOS label, but the underlying OS doesn't match",
-			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
-			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
-			expectRejection: true,
-		},
-		{
-			name:            "OS field mismatch, OS label on node object would be reset to correct value",
-			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
-			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
 			expectRejection: true,
 		},
 		{
 			name:            "No label selector on the pod, should be admitted",
 			pod:             &v1.Pod{},
-			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
 			expectRejection: false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actualResult := rejectPodAdmissionBasedOnOSSelector(test.pod, test.node)
+			actualResult := rejectPodAdmissionBasedOnOSSelector(test.pod)
 			if test.expectRejection != actualResult {
 				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
 			}
