@@ -156,7 +156,8 @@ func (s *sourceFile) listConfig(logger klog.Logger) error {
 
 // Get as many pod manifests as we can from a directory. Return an error if and only if something
 // prevented us from reading anything at all. Do not return an error if only some files
-// were problematic.
+// were problematic. If multiple manifests define the same pod, use the first one found
+// and ignore the duplicates.
 func (s *sourceFile) extractFromDir(logger klog.Logger, name string) ([]*v1.Pod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
@@ -169,6 +170,9 @@ func (s *sourceFile) extractFromDir(logger klog.Logger, name string) ([]*v1.Pod,
 	}
 
 	sort.Strings(dirents)
+
+	seenPods := make(map[string]string)
+
 	for _, path := range dirents {
 		statInfo, err := os.Stat(path)
 		if err != nil {
@@ -185,16 +189,34 @@ func (s *sourceFile) extractFromDir(logger klog.Logger, name string) ([]*v1.Pod,
 				if !os.IsNotExist(err) {
 					logger.Error(err, "Could not process manifest file", "path", path)
 				}
-			} else {
-				pods = append(pods, pod)
+				continue
 			}
+
+			podKey, err := cache.MetaNamespaceKeyFunc(pod)
+			if err != nil {
+				logger.Error(err, "Could not get pod key", "path", path)
+				continue
+			}
+
+			if previousPath, exists := seenPods[podKey]; exists {
+				klog.Warningf(
+					"Static pod %q already defined by %s, ignoring duplicate from %s",
+					podKey,
+					previousPath,
+					path,
+				)
+				continue
+			}
+
+			seenPods[podKey] = path
+			pods = append(pods, pod)
 		default:
 			logger.Error(nil, "Manifest path is not a directory or file", "path", path, "mode", statInfo.Mode())
 		}
 	}
+
 	return pods, nil
 }
-
 // extractFromFile parses a file for Pod configuration information.
 func (s *sourceFile) extractFromFile(logger klog.Logger, filename string) (pod *v1.Pod, err error) {
 	logger.V(3).Info("Reading config file", "path", filename)
