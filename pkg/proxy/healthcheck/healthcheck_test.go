@@ -388,44 +388,48 @@ func testHandlerWithHealth(hcs *server, nsn types.NamespacedName, status int, en
 	tHandler(hcs, nsn, status, endpoints, kubeProxyHealthy, t)
 }
 
+func assertHandlerResponse(handler http.Handler, nsn types.NamespacedName, status int, endpoints int, kubeProxyHealthy bool, t *testing.T) {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodGet, "/healthz", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp := httptest.NewRecorder()
+
+	handler.ServeHTTP(resp, req)
+
+	if resp.Code != status {
+		t.Errorf("expected status code %v, got %v", status, resp.Code)
+	}
+	var payload hcPayload
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Service.Name != nsn.Name || payload.Service.Namespace != nsn.Namespace {
+		t.Errorf("expected payload name %q, got %v", nsn.String(), payload.Service)
+	}
+	if payload.LocalEndpoints != endpoints {
+		t.Errorf("expected %d endpoints, got %d", endpoints, payload.LocalEndpoints)
+	}
+	if payload.ServiceProxyHealthy != kubeProxyHealthy {
+		t.Errorf("expected %v kubeProxyHealthy, got %v", kubeProxyHealthy, payload.ServiceProxyHealthy)
+	}
+	if !cmp.Equal(resp.Header()["Content-Type"], []string{"application/json"}) {
+		t.Errorf("expected 'Content-Type: application/json' response header, got: %v", resp.Header()["Content-Type"])
+	}
+	if !cmp.Equal(resp.Header()["X-Content-Type-Options"], []string{"nosniff"}) {
+		t.Errorf("expected 'X-Content-Type-Options: nosniff' response header, got: %v", resp.Header()["X-Content-Type-Options"])
+	}
+	if !cmp.Equal(resp.Header()["X-Load-Balancing-Endpoint-Weight"], []string{strconv.Itoa(endpoints)}) {
+		t.Errorf("expected 'X-Load-Balancing-Endpoint-Weight: %d' response header, got: %v", endpoints, resp.Header()["X-Load-Balancing-Endpoint-Weight"])
+	}
+}
+
 func tHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, kubeProxyHealthy bool, t *testing.T) {
 	instance := hcs.services[nsn]
 	for _, h := range instance.httpServers {
-		handler := h.(*fakeHTTPServer).handler
-
-		req, err := http.NewRequest("GET", "/healthz", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		resp := httptest.NewRecorder()
-
-		handler.ServeHTTP(resp, req)
-
-		if resp.Code != status {
-			t.Errorf("expected status code %v, got %v", status, resp.Code)
-		}
-		var payload hcPayload
-		if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
-			t.Fatal(err)
-		}
-		if payload.Service.Name != nsn.Name || payload.Service.Namespace != nsn.Namespace {
-			t.Errorf("expected payload name %q, got %v", nsn.String(), payload.Service)
-		}
-		if payload.LocalEndpoints != endpoints {
-			t.Errorf("expected %d endpoints, got %d", endpoints, payload.LocalEndpoints)
-		}
-		if payload.ServiceProxyHealthy != kubeProxyHealthy {
-			t.Errorf("expected %v kubeProxyHealthy, got %v", kubeProxyHealthy, payload.ServiceProxyHealthy)
-		}
-		if !cmp.Equal(resp.Header()["Content-Type"], []string{"application/json"}) {
-			t.Errorf("expected 'Content-Type: application/json' respose header, got: %v", resp.Header()["Content-Type"])
-		}
-		if !cmp.Equal(resp.Header()["X-Content-Type-Options"], []string{"nosniff"}) {
-			t.Errorf("expected 'X-Content-Type-Options: nosniff' respose header, got: %v", resp.Header()["X-Content-Type-Options"])
-		}
-		if !cmp.Equal(resp.Header()["X-Load-Balancing-Endpoint-Weight"], []string{strconv.Itoa(endpoints)}) {
-			t.Errorf("expected 'X-Load-Balancing-Endpoint-Weight: %d' respose header, got: %v", endpoints, resp.Header()["X-Load-Balancing-Endpoint-Weight"])
-		}
+		assertHandlerResponse(h.(*fakeHTTPServer).handler, nsn, status, endpoints, kubeProxyHealthy, t)
 	}
 }
 
@@ -1011,4 +1015,41 @@ func TestServerWithSelectiveListeningAddress(t *testing.T) {
 	}
 	// test the handler
 	testHandler(hcs, nsn, http.StatusServiceUnavailable, 0, t)
+}
+
+func TestHealthcheckDeletedServiceResponse(t *testing.T) {
+	listener := newFakeListener()
+	httpFactory := newFakeHTTPServerFactory()
+	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{})
+	proxyChecker := &fakeProxyHealthChecker{true}
+
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker, v1.IPv4Protocol)
+	hcs := hcsi.(*server)
+
+	nsn := mknsn("ns1", "svc")
+	if err := hcs.SyncServices(map[types.NamespacedName]uint16{nsn: 9376}); err != nil {
+		t.Fatal(err)
+	}
+	if err := hcs.SyncEndpoints(map[types.NamespacedName]int{nsn: 3}); err != nil {
+		t.Fatal(err)
+	}
+	testHandler(hcs, nsn, http.StatusOK, 3, t)
+
+	// An in-flight handler outlives the services map entry; a deleted service
+	// must return 503, not Go's implicit 200 OK.
+	var orphanedHandler http.Handler
+	for _, h := range hcs.services[nsn].httpServers {
+		orphanedHandler = h.(*fakeHTTPServer).handler
+	}
+	if orphanedHandler == nil {
+		t.Fatal("expected non-nil handler before deletion")
+	}
+
+	if err := hcs.SyncServices(nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(hcs.services) != 0 {
+		t.Errorf("expected 0 services after deletion, got %d", len(hcs.services))
+	}
+	assertHandlerResponse(orphanedHandler, nsn, http.StatusServiceUnavailable, 0, true, t)
 }
