@@ -17,6 +17,7 @@ limitations under the License.
 package watch
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -613,7 +614,7 @@ func TestRetryWatcher(t *testing.T) {
 			var counter uint32
 			// We always count with the last watch reestablishing which is imminent but still a race.
 			// We will wait for the last watch to reestablish to avoid it.
-			err = wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+			err = wait.PollUntilContextCancel(ctx, 10*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
 				counter = atomic.LoadUint32(atomicCounter)
 				return counter == tc.watchCount, nil
 			})
