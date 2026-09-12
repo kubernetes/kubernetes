@@ -2530,26 +2530,6 @@ func TestThrottledLogger(t *testing.T) {
 }
 
 func TestRequestMaxRetries(t *testing.T) {
-	successAtNthCalls := 1
-	actualCalls := 0
-	retryOneTimeHandler := func(w http.ResponseWriter, req *http.Request) {
-		defer func() { actualCalls++ }()
-		if actualCalls >= successAtNthCalls {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		w.Header().Set("Retry-After", "1")
-		w.WriteHeader(http.StatusTooManyRequests)
-		actualCalls++
-	}
-	testServer := httptest.NewServer(http.HandlerFunc(retryOneTimeHandler))
-	defer testServer.Close()
-
-	u, err := url.Parse(testServer.URL)
-	if err != nil {
-		t.Error(err)
-	}
-
 	testCases := []struct {
 		name        string
 		maxRetries  int
@@ -2574,8 +2554,26 @@ func TestRequestMaxRetries(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer func() { actualCalls = 0 }()
-			_, err := NewRequestWithClient(u, "", defaultContentConfig(), testServer.Client()).
+			const successAtNthCall = 1
+			var actualCalls atomic.Int64
+
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if actualCalls.Load() >= successAtNthCall {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				w.Header().Set("Retry-After", "1")
+				w.WriteHeader(http.StatusTooManyRequests)
+				actualCalls.Add(1)
+			}))
+			defer testServer.Close()
+
+			u, err := url.Parse(testServer.URL)
+			if err != nil {
+				t.Error(err)
+			}
+
+			_, err = NewRequestWithClient(u, "", defaultContentConfig(), testServer.Client()).
 				Verb("get").
 				MaxRetries(testCase.maxRetries).
 				AbsPath("/foo").
