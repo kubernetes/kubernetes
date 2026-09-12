@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -87,7 +88,9 @@ type GCERunner struct {
 }
 
 const (
-	defaultGCEMachine = "e2-standard-2"
+	defaultGCEMachine            = "e2-standard-2"
+	gceInstanceReadyPollInterval = 20 * time.Second
+	gceInstanceReadyTimeout      = 10 * time.Minute
 )
 
 func NewGCERunner(cfg remote.Config) remote.Runner {
@@ -592,44 +595,30 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 		}
 	}
 
-	instanceRunning := false
-	var instance *gceInstance
-	for i := 0; i < 30 && !instanceRunning; i++ {
-		if i > 0 {
-			time.Sleep(time.Second * 20)
-		}
-
-		instance, err := getGCEInstance(name)
-		if err != nil {
-			continue
-		}
-		if !strings.EqualFold(instance.Status, "RUNNING") {
-			_ = fmt.Errorf("instance %s not in state RUNNING, was %s", name, instance.Status)
-			continue
-		}
-		externalIP := g.getExternalIP(instance)
-		if len(externalIP) > 0 {
-			remote.AddHostnameIP(name, externalIP)
-		}
-
-		var output string
-		output, err = remote.SSH(name, "sh", "-c",
-			"'systemctl list-units  --type=service  --state=running | grep -e containerd -e crio'")
-		if err != nil {
-			_ = fmt.Errorf("instance %s not running containerd/crio daemon - Command failed: %s", name, output)
-			continue
-		}
-		if !strings.Contains(output, "containerd.service") &&
-			!strings.Contains(output, "crio.service") {
-			_ = fmt.Errorf("instance %s not running containerd/crio daemon: %s", name, output)
-			continue
-		}
-		instanceRunning = true
+	waitForReady := func() (*gceInstance, error) {
+		return waitForGCEInstanceReady(
+			context.Background(),
+			name,
+			gceInstanceReadyPollInterval,
+			gceInstanceReadyTimeout,
+			getGCEInstanceContext,
+			func(ctx context.Context, instance *gceInstance) error {
+				externalIP := g.getExternalIP(instance)
+				if len(externalIP) > 0 {
+					remote.AddHostnameIP(name, externalIP)
+				}
+				return probeGCEInstanceRuntime(ctx, instance, remote.SSHContext)
+			},
+		)
 	}
-	// If instance didn't reach running state in time, return with error now.
+
+	// Post-readiness setup can restart services or the instance, so verify the
+	// runtime again after it completes.
+	instance, err := waitForReady()
 	if err != nil {
 		return name, err
 	}
+	needsReadinessRecheck := false
 	// Instance reached running state in time, make sure that cloud-init is complete
 	if g.isCloudInitUsed(imageConfig.metadata) {
 		cloudInitFinished := false
@@ -645,6 +634,10 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 			}
 			cloudInitFinished = true
 		}
+		if err != nil {
+			return name, err
+		}
+		needsReadinessRecheck = true
 	}
 
 	// apply additional kernel arguments to the instance
@@ -653,9 +646,89 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 		if err := g.updateKernelArguments(instance, imageConfig.image, imageConfig.kernelArguments); err != nil {
 			return name, err
 		}
+		needsReadinessRecheck = true
+	}
+	if needsReadinessRecheck {
+		if _, err := waitForReady(); err != nil {
+			return name, err
+		}
 	}
 
-	return name, err
+	return name, nil
+}
+
+func waitForGCEInstanceReady(
+	ctx context.Context,
+	name string,
+	pollInterval, pollTimeout time.Duration,
+	describe func(context.Context, string) (*gceInstance, error),
+	probeRuntime func(context.Context, *gceInstance) error,
+) (*gceInstance, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("wait for instance %q readiness: %w", name, err)
+	}
+
+	var lastErr error
+	var readyInstance *gceInstance
+	pollErr := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
+		// Describe and probe failures can be transient during boot. Keep the last
+		// observation so the terminal error identifies the stage that stalled.
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		// A new attempt supersedes failures from earlier attempts.
+		lastErr = nil
+		instance, err := describe(ctx, name)
+		if err != nil {
+			lastErr = fmt.Errorf("describe instance %q: %w", name, err)
+			return false, nil
+		}
+		if !strings.EqualFold(instance.Status, "RUNNING") {
+			lastErr = fmt.Errorf("instance %q not RUNNING, status=%q", name, instance.Status)
+			return false, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		if err := probeRuntime(ctx, instance); err != nil {
+			lastErr = fmt.Errorf("probe runtime on instance %q: %w", name, err)
+			return false, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+
+		readyInstance = instance
+		return true, nil
+	})
+	if pollErr != nil {
+		if lastErr == nil {
+			return nil, fmt.Errorf("instance %q did not become ready: %w", name, pollErr)
+		}
+		return nil, fmt.Errorf("instance %q did not become ready: %w; last observation: %w", name, pollErr, lastErr)
+	}
+	return readyInstance, nil
+}
+
+func probeGCEInstanceRuntime(ctx context.Context, instance *gceInstance, ssh func(context.Context, string, ...string) (string, error)) error {
+	output, err := ssh(ctx, instance.Name, "systemctl", "list-units", "--type=service", "--state=running", "--no-legend", "--plain", "containerd.service", "crio.service")
+	if err != nil {
+		return fmt.Errorf("runtime service probe on instance %q failed: %w; output: %q", instance.Name, err, output)
+	}
+	for line := range strings.SplitSeq(output, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		unit := fields[0]
+		if unit == "●" && len(fields) > 1 {
+			unit = fields[1]
+		}
+		if unit == "containerd.service" || unit == "crio.service" {
+			return nil
+		}
+	}
+	return fmt.Errorf("instance %q is not running containerd or CRI-O; output: %q", instance.Name, output)
 }
 
 func (g *GCERunner) isCloudInitUsed(metadata *gceMetadata) bool {

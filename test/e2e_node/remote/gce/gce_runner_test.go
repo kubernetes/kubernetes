@@ -17,10 +17,322 @@ limitations under the License.
 package gce
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
+
+	"k8s.io/kubernetes/test/e2e_node/remote"
 )
+
+func TestWaitForGCEInstanceReady(t *testing.T) {
+	const instanceName = "test-instance"
+	ready := &gceInstance{Name: instanceName, Status: "RUNNING"}
+	describeErr := errors.New("last describe failure")
+	probeErr := errors.New("last runtime failure")
+
+	type observation struct {
+		instance            *gceInstance
+		describeErr         error
+		probeErr            error
+		cancelAfterDescribe bool
+		cancelAfterProbe    bool
+	}
+	tests := []struct {
+		name               string
+		observations       []observation
+		cancelBefore       bool
+		timeout            bool
+		wantInstance       *gceInstance
+		wantErr            error
+		wantLastErr        error
+		wantErrContains    string
+		wantErrNotContains string
+	}{
+		{
+			name:         "describe failures are retried",
+			observations: []observation{{describeErr: errors.New("attempt 1")}, {describeErr: errors.New("attempt 2")}, {instance: ready}},
+			wantInstance: ready,
+		},
+		{
+			name:         "canceled context stops before polling",
+			cancelBefore: true,
+			wantErr:      context.Canceled,
+		},
+		{
+			name:         "cancellation after describe skips the runtime probe",
+			observations: []observation{{instance: ready, cancelAfterDescribe: true}},
+			wantErr:      context.Canceled,
+		},
+		{
+			name:               "a newer successful observation clears an older failure",
+			observations:       []observation{{instance: ready, probeErr: errors.New("stale runtime failure")}, {instance: ready, cancelAfterProbe: true}},
+			wantErr:            context.Canceled,
+			wantErrNotContains: "stale runtime failure",
+		},
+		{
+			name:            "non-running observations preserve the last status",
+			observations:    []observation{{instance: &gceInstance{Name: instanceName, Status: "PROVISIONING"}}, {instance: &gceInstance{Name: instanceName, Status: "STAGING"}}, {instance: &gceInstance{Name: instanceName, Status: "STOPPING"}, cancelAfterDescribe: true}},
+			wantErr:         context.Canceled,
+			wantErrContains: `last observation: instance "test-instance" not RUNNING, status="STOPPING"`,
+		},
+		{
+			name:            "timeout preserves the last describe error",
+			observations:    []observation{{describeErr: describeErr}},
+			timeout:         true,
+			wantErr:         context.DeadlineExceeded,
+			wantLastErr:     describeErr,
+			wantErrContains: `last observation: describe instance "test-instance": last describe failure`,
+		},
+		{
+			name:            "runtime failures preserve the last probe error",
+			observations:    []observation{{instance: ready, probeErr: errors.New("attempt 1")}, {instance: ready, probeErr: errors.New("attempt 2")}, {instance: ready, probeErr: probeErr, cancelAfterProbe: true}},
+			wantErr:         context.Canceled,
+			wantLastErr:     probeErr,
+			wantErrContains: `last observation: probe runtime on instance "test-instance": last runtime failure`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if tc.cancelBefore {
+				cancel()
+			}
+
+			pollTimeout := time.Second
+			pollInterval := time.Millisecond
+			if tc.timeout {
+				pollInterval = time.Second
+				pollTimeout = 10 * time.Millisecond
+			}
+			describeCalls := 0
+			got, err := waitForGCEInstanceReady(
+				ctx,
+				instanceName,
+				pollInterval,
+				pollTimeout,
+				func(_ context.Context, _ string) (*gceInstance, error) {
+					if describeCalls >= len(tc.observations) {
+						t.Fatalf("unexpected describe call %d", describeCalls+1)
+					}
+					current := tc.observations[describeCalls]
+					describeCalls++
+					if current.cancelAfterDescribe {
+						cancel()
+					}
+					return current.instance, current.describeErr
+				},
+				func(_ context.Context, _ *gceInstance) error {
+					current := tc.observations[describeCalls-1]
+					if current.cancelAfterProbe {
+						cancel()
+					}
+					return current.probeErr
+				},
+			)
+			if got != tc.wantInstance {
+				t.Errorf("waitForGCEInstanceReady() instance = %p, want %p", got, tc.wantInstance)
+			}
+			if tc.wantErr == nil && err != nil {
+				t.Fatalf("waitForGCEInstanceReady() unexpected error: %v", err)
+			}
+			if tc.wantErr != nil && !errors.Is(err, tc.wantErr) {
+				t.Errorf("waitForGCEInstanceReady() error = %v, want it to wrap %v", err, tc.wantErr)
+			}
+			if tc.wantLastErr != nil && !errors.Is(err, tc.wantLastErr) {
+				t.Errorf("waitForGCEInstanceReady() error = %v, want it to wrap %v", err, tc.wantLastErr)
+			}
+			if tc.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErrContains)) {
+				t.Errorf("waitForGCEInstanceReady() error = %q, want it to contain %q", err, tc.wantErrContains)
+			}
+			if tc.wantErrNotContains != "" && err != nil && strings.Contains(err.Error(), tc.wantErrNotContains) {
+				t.Errorf("waitForGCEInstanceReady() error = %q, must not contain %q", err, tc.wantErrNotContains)
+			}
+		})
+	}
+}
+
+func TestWaitForGCEInstanceReadyBoundsOperations(t *testing.T) {
+	t.Run("before first observation", func(t *testing.T) {
+		instance, err := waitForGCEInstanceReady(
+			t.Context(), "test-instance", time.Second, 0,
+			func(context.Context, string) (*gceInstance, error) {
+				t.Fatal("describe called after the deadline")
+				return nil, nil
+			},
+			func(context.Context, *gceInstance) error {
+				t.Fatal("runtime probe called after the deadline")
+				return nil
+			},
+		)
+		if instance != nil || !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("waitForGCEInstanceReady() = (%v, %v), want (nil, context deadline exceeded)", instance, err)
+		}
+	})
+
+	for _, stage := range []string{"describe", "runtime probe"} {
+		t.Run(stage, func(t *testing.T) {
+			instance, err := waitForGCEInstanceReady(
+				t.Context(),
+				"test-instance",
+				time.Millisecond,
+				10*time.Millisecond,
+				func(ctx context.Context, _ string) (*gceInstance, error) {
+					if stage == "describe" {
+						<-ctx.Done()
+						return nil, ctx.Err()
+					}
+					return &gceInstance{Name: "test-instance", Status: "RUNNING"}, nil
+				},
+				func(ctx context.Context, _ *gceInstance) error {
+					if stage == "runtime probe" {
+						<-ctx.Done()
+						return ctx.Err()
+					}
+					return nil
+				},
+			)
+			if instance != nil || !errors.Is(err, context.DeadlineExceeded) {
+				t.Errorf("waitForGCEInstanceReady() = (%v, %v), want (nil, context deadline exceeded)", instance, err)
+			}
+		})
+	}
+}
+
+func TestProbeGCEInstanceRuntime(t *testing.T) {
+	sshErr := errors.New("ssh failed")
+	tests := []struct {
+		name        string
+		output      string
+		sshErr      error
+		wantErr     string
+		wantWrapped error
+	}{
+		{
+			name:    "substring matches are not accepted",
+			output:  "\nfoo-containerd.service loaded active running helper for containerd.service",
+			wantErr: "is not running containerd or CRI-O",
+		},
+		{name: "systemd status marker before CRI-O is accepted", output: "● crio.service loaded active running Container Runtime Interface for OCI"},
+		{
+			name:        "SSH failure preserves command error and output",
+			output:      "connection reset",
+			sshErr:      sshErr,
+			wantErr:     `output: "connection reset"`,
+			wantWrapped: sshErr,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			instance := &gceInstance{Name: "test-instance", Status: "RUNNING"}
+			var gotCommand []string
+			err := probeGCEInstanceRuntime(t.Context(), instance, func(_ context.Context, _ string, command ...string) (string, error) {
+				gotCommand = command
+				return tc.output, tc.sshErr
+			})
+			if wantCommand := []string{"systemctl", "list-units", "--type=service", "--state=running", "--no-legend", "--plain", "containerd.service", "crio.service"}; !reflect.DeepEqual(gotCommand, wantCommand) {
+				t.Errorf("SSH command = %q, want %q", gotCommand, wantCommand)
+			}
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("probeGCEInstanceRuntime() unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("probeGCEInstanceRuntime() error = %v, want it to contain %q", err, tc.wantErr)
+			}
+			if tc.wantWrapped != nil && !errors.Is(err, tc.wantWrapped) {
+				t.Errorf("probeGCEInstanceRuntime() error = %v, want it to wrap %v", err, tc.wantWrapped)
+			}
+		})
+	}
+}
+
+func TestCreateGCEInstanceRechecksReadinessAfterPostSetup(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires executable shell scripts")
+	}
+
+	tests := []struct {
+		name        string
+		imageConfig internalGCEImage
+		wantSSHCall string
+	}{
+		{
+			name:        "kernel update",
+			imageConfig: internalGCEImage{image: "ubuntu-image", project: "image-project", kernelArguments: []string{"test-argument=1"}},
+			wantSSHCall: "update-grub",
+		},
+		{
+			name: "cloud-init",
+			imageConfig: internalGCEImage{
+				image: "cloud-image", project: "image-project",
+				metadata: &gceMetadata{Items: []gceMetadataItems{{Key: "user-data", Value: "#cloud-config\n"}}},
+			},
+			wantSSHCall: "/var/lib/cloud/instance/boot-finished",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			instanceName := "test-prefix-" + tc.imageConfig.image
+			instanceJSON := fmt.Sprintf(`{"name":%q,"status":"RUNNING"}`, instanceName)
+			binDir := t.TempDir()
+			sshLog := filepath.Join(binDir, "ssh.log")
+			gcloudScript := fmt.Sprintf(`#!/bin/sh
+case "$*" in
+  *"project-info describe"*) printf '%%s\n' '{"defaultServiceAccount":"test@example.invalid"}' ;;
+  *"instances describe"*) printf '%%s\n' '%s' ;;
+  *) exit 99 ;;
+esac
+`, instanceJSON)
+			sshScript := fmt.Sprintf(`#!/bin/sh
+printf '%%s\n' "$*" >> %q
+case "$*" in
+  *"systemctl list-units"*) printf '%%s\n' 'containerd.service loaded active running containerd container runtime' ;;
+  *" reboot") exit 1 ;;
+  *) exit 0 ;;
+esac
+`, sshLog)
+			for name, content := range map[string]string{"gcloud": gcloudScript, "ssh": sshScript} {
+				if err := os.WriteFile(filepath.Join(binDir, name), []byte(content), 0o755); err != nil {
+					t.Fatalf("write fake %s: %v", name, err)
+				}
+			}
+			t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+			oldProject, oldZone := *project, *zone
+			t.Cleanup(func() { *project, *zone = oldProject, oldZone })
+			*project, *zone = "test-project", ""
+
+			runner := &GCERunner{cfg: remote.Config{InstanceNamePrefix: "test-prefix"}}
+			name, err := runner.createGCEInstance(&tc.imageConfig)
+			if err != nil {
+				t.Fatalf("createGCEInstance() unexpected error: %v", err)
+			}
+			if name != instanceName {
+				t.Errorf("createGCEInstance() name = %q, want %q", name, instanceName)
+			}
+			sshCalls, err := os.ReadFile(sshLog)
+			if err != nil {
+				t.Fatalf("read SSH log: %v", err)
+			}
+			if got := strings.Count(string(sshCalls), "systemctl list-units"); got != 2 {
+				t.Errorf("runtime probe calls = %d, want 2; log:\n%s", got, sshCalls)
+			}
+			if !strings.Contains(string(sshCalls), tc.wantSSHCall) {
+				t.Errorf("SSH call %q not found; log:\n%s", tc.wantSSHCall, sshCalls)
+			}
+		})
+	}
+}
 
 func TestPickNewestImage(t *testing.T) {
 	img := func(name, family, ts string) gceImage {

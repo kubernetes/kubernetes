@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -82,10 +83,14 @@ type projectInfo struct {
 }
 
 func runGCPCommandWithZone(args ...string) ([]byte, error) {
+	return runGCPCommandWithZoneContext(context.Background(), args...)
+}
+
+func runGCPCommandWithZoneContext(ctx context.Context, args ...string) ([]byte, error) {
 	if zone != nil && len(*zone) > 0 {
 		args = append(args, "--zone="+*zone)
 	}
-	return runGCPCommand(args...)
+	return runGCPCommandContext(ctx, args...)
 }
 
 func runGCPCommandWithZones(args ...string) ([]byte, error) {
@@ -96,14 +101,22 @@ func runGCPCommandWithZones(args ...string) ([]byte, error) {
 }
 
 func runGCPCommand(args ...string) ([]byte, error) {
+	return runGCPCommandContext(context.Background(), args...)
+}
+
+func runGCPCommandContext(ctx context.Context, args ...string) ([]byte, error) {
 	if project != nil && len(*project) > 0 {
 		args = append(args, "--project="+*project)
 	}
-	return runGCPCommandNoProject(args...)
+	return runGCPCommandNoProjectContext(ctx, args...)
 }
 
 func runGCPCommandNoProject(args ...string) ([]byte, error) {
-	bytes, err := exec.Command("gcloud", args...).Output()
+	return runGCPCommandNoProjectContext(context.Background(), args...)
+}
+
+func runGCPCommandNoProjectContext(ctx context.Context, args ...string) ([]byte, error) {
+	bytes, err := exec.CommandContext(ctx, "gcloud", args...).Output()
 	if err != nil {
 		var message string
 		if ee, ok := err.(*exec.ExitError); ok {
@@ -117,7 +130,11 @@ func runGCPCommandNoProject(args ...string) ([]byte, error) {
 }
 
 func getGCEInstance(host string) (*gceInstance, error) {
-	data, err := runGCPCommandWithZone("compute", "instances", "describe", host, "--format=json")
+	return getGCEInstanceContext(context.Background(), host)
+}
+
+func getGCEInstanceContext(ctx context.Context, host string) (*gceInstance, error) {
+	data, err := runGCPCommandWithZoneContext(ctx, "compute", "instances", "describe", host, "--format=json")
 	if err != nil {
 		return nil, fmt.Errorf("failed to describe instance in project %q: %w", *project, err)
 	}

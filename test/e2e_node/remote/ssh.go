@@ -17,6 +17,7 @@ limitations under the License.
 package remote
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -117,7 +118,12 @@ func getSSHCommand(sep string, args ...string) string {
 // SSH executes ssh command with runSSHCommand as root. The `sudo` makes sure that all commands
 // are executed by root, so that there won't be permission mismatch between different commands.
 func SSH(host string, cmd ...string) (string, error) {
-	return runSSHCommand(host, "ssh", append([]string{GetHostnameOrIP(host), "--", "sudo"}, cmd...)...)
+	return SSHContext(context.Background(), host, cmd...)
+}
+
+// SSHContext lets provisioning deadlines stop an SSH process that no longer responds.
+func SSHContext(ctx context.Context, host string, cmd ...string) (string, error) {
+	return runSSHCommandContext(ctx, host, "ssh", append([]string{GetHostnameOrIP(host), "--", "sudo"}, cmd...)...)
 }
 
 // SSHNoSudo executes ssh command with runSSHCommand as normal user. Sometimes we need this,
@@ -128,6 +134,10 @@ func SSHNoSudo(host string, cmd ...string) (string, error) {
 
 // runSSHCommand executes the ssh or scp command, adding the flag provided --ssh-options
 func runSSHCommand(host, cmd string, args ...string) (string, error) {
+	return runSSHCommandContext(context.Background(), host, cmd, args...)
+}
+
+func runSSHCommandContext(ctx context.Context, host, cmd string, args ...string) (string, error) {
 	if key, err := getPrivateSSHKey(host); len(key) != 0 {
 		if err != nil {
 			klog.Errorf("private SSH key (%s) not found. Check if the SSH key is configured properly:, err: %v", key, err)
@@ -143,7 +153,7 @@ func runSSHCommand(host, cmd string, args ...string) (string, error) {
 		args = append(strings.Split(*sshOptions, " "), args...)
 	}
 	klog.Infof("Running the command %s, with args: %v", cmd, args)
-	output, err := exec.Command(cmd, args...).CombinedOutput()
+	output, err := exec.CommandContext(ctx, cmd, args...).CombinedOutput()
 	if err != nil {
 		klog.Errorf("failed to run SSH command: out: %s, err: %v", output, err)
 		return string(output), fmt.Errorf("command [%s %s] failed with error: %w", cmd, strings.Join(args, " "), err)
