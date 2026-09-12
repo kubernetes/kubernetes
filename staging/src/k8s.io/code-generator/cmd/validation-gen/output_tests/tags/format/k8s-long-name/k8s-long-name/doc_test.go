@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -28,19 +27,19 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		LongNameField:        "foo.bar",
-		LongNamePtrField:     ptr.To("foo.bar"),
+		LongNamePtrField:     new("foo.bar"),
 		LongNameTypedefField: "foo.bar",
 	}).ExpectValid()
 
 	st.Value(&Struct{
 		LongNameField:        "1.2.3.4",
-		LongNamePtrField:     ptr.To("1.2.3.4"),
+		LongNamePtrField:     new("1.2.3.4"),
 		LongNameTypedefField: "1.2.3.4",
 	}).ExpectValid()
 
 	invalidStruct := &Struct{
 		LongNameField:        "",
-		LongNamePtrField:     ptr.To(""),
+		LongNamePtrField:     new(""),
 		LongNameTypedefField: "",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
@@ -53,7 +52,7 @@ func Test(t *testing.T) {
 
 	invalidStruct = &Struct{
 		LongNameField:        "Not a LongName",
-		LongNamePtrField:     ptr.To("Not a LongName"),
+		LongNamePtrField:     new("Not a LongName"),
 		LongNameTypedefField: "Not a LongName",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{

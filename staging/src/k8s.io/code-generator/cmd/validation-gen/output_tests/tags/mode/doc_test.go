@@ -20,27 +20,26 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestStrictUnion(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	// Mode A: FieldA required, FieldB implicitly forbidden
-	st.Value(&StrictUnion{D1: "A", FieldA: ptr.To("val")}).ExpectValid()
+	st.Value(&StrictUnion{D1: "A", FieldA: new("val")}).ExpectValid()
 	st.Value(&StrictUnion{D1: "A"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Required(field.NewPath("fieldA"), ""),
 	})
-	st.Value(&StrictUnion{D1: "A", FieldA: ptr.To("val"), FieldB: ptr.To("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	st.Value(&StrictUnion{D1: "A", FieldA: new("val"), FieldB: new("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Forbidden(field.NewPath("fieldB"), ""),
 	})
 
 	// Mode B: FieldA implicitly forbidden, FieldB required
-	st.Value(&StrictUnion{D1: "B", FieldB: ptr.To("val")}).ExpectValid()
+	st.Value(&StrictUnion{D1: "B", FieldB: new("val")}).ExpectValid()
 	st.Value(&StrictUnion{D1: "B"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Required(field.NewPath("fieldB"), ""),
 	})
-	st.Value(&StrictUnion{D1: "B", FieldA: ptr.To("val"), FieldB: ptr.To("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	st.Value(&StrictUnion{D1: "B", FieldA: new("val"), FieldB: new("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Forbidden(field.NewPath("fieldA"), ""),
 	})
 }
@@ -50,12 +49,12 @@ func TestSharedField(t *testing.T) {
 
 	// Valid (optional) in A and B
 	st.Value(&SharedField{D1: "A"}).ExpectValid()
-	st.Value(&SharedField{D1: "A", FieldA: ptr.To("val")}).ExpectValid()
+	st.Value(&SharedField{D1: "A", FieldA: new("val")}).ExpectValid()
 	st.Value(&SharedField{D1: "B"}).ExpectValid()
-	st.Value(&SharedField{D1: "B", FieldA: ptr.To("val")}).ExpectValid()
+	st.Value(&SharedField{D1: "B", FieldA: new("val")}).ExpectValid()
 
 	// Forbidden in C
-	st.Value(&SharedField{D1: "C", FieldA: ptr.To("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	st.Value(&SharedField{D1: "C", FieldA: new("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Forbidden(field.NewPath("fieldA"), ""),
 	})
 }
@@ -64,16 +63,16 @@ func TestChainedValidation(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	// Mode A: Required AND maxLength 5
-	st.Value(&ChainedValidation{D1: "A", FieldA: ptr.To("abc")}).ExpectValid()
+	st.Value(&ChainedValidation{D1: "A", FieldA: new("abc")}).ExpectValid()
 	st.Value(&ChainedValidation{D1: "A"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Required(field.NewPath("fieldA"), ""),
 	})
-	st.Value(&ChainedValidation{D1: "A", FieldA: ptr.To("too-long")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	st.Value(&ChainedValidation{D1: "A", FieldA: new("too-long")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.TooLong(field.NewPath("fieldA"), "too-long", 5),
 	})
 
 	// Mode B: Unlisted, so implicitly forbidden
-	st.Value(&ChainedValidation{D1: "B", FieldA: ptr.To("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	st.Value(&ChainedValidation{D1: "B", FieldA: new("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Forbidden(field.NewPath("fieldA"), ""),
 	})
 }
@@ -83,10 +82,10 @@ func TestImplicitForbidden(t *testing.T) {
 
 	// Mode A: Optional
 	st.Value(&ImplicitForbidden{D1: "A"}).ExpectValid()
-	st.Value(&ImplicitForbidden{D1: "A", FieldA: ptr.To("val")}).ExpectValid()
+	st.Value(&ImplicitForbidden{D1: "A", FieldA: new("val")}).ExpectValid()
 
 	// Mode B: Not listed, so implicitly Forbidden
-	st.Value(&ImplicitForbidden{D1: "B", FieldA: ptr.To("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	st.Value(&ImplicitForbidden{D1: "B", FieldA: new("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Forbidden(field.NewPath("fieldA"), ""),
 	})
 }
@@ -95,11 +94,11 @@ func TestNonStringDiscriminator(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	// Bool mode
-	st.Value(&NonStringDiscriminator{D1: true, FieldA: ptr.To("val")}).ExpectValid()
+	st.Value(&NonStringDiscriminator{D1: true, FieldA: new("val")}).ExpectValid()
 	st.Value(&NonStringDiscriminator{D1: true}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Required(field.NewPath("fieldA"), ""),
 	})
-	st.Value(&NonStringDiscriminator{D1: false, FieldA: ptr.To("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	st.Value(&NonStringDiscriminator{D1: false, FieldA: new("val")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Forbidden(field.NewPath("fieldA"), ""),
 	})
 }
@@ -110,8 +109,8 @@ func TestMultipleDiscriminators(t *testing.T) {
 	st.Value(&MultipleDiscriminators{
 		D1:     "A",
 		D2:     "B",
-		FieldA: ptr.To("valA"),
-		FieldB: ptr.To("valB"),
+		FieldA: new("valA"),
+		FieldB: new("valB"),
 	}).ExpectValid()
 
 	st.Value(&MultipleDiscriminators{
@@ -157,7 +156,7 @@ func TestRatcheting(t *testing.T) {
 	mkTest := func() *ChainedValidation {
 		return &ChainedValidation{
 			D1:     "A",
-			FieldA: ptr.To("too-long-string"),
+			FieldA: new("too-long-string"),
 		}
 	}
 
@@ -175,7 +174,7 @@ func TestRatcheting(t *testing.T) {
 	mkDifferent := func() *ChainedValidation {
 		return &ChainedValidation{
 			D1:     "A",
-			FieldA: ptr.To("also-too-long"),
+			FieldA: new("also-too-long"),
 		}
 	}
 	st.Value(mkTest()).OldValue(mkDifferent()).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
@@ -186,7 +185,7 @@ func TestRatcheting(t *testing.T) {
 	mkDifferentDisc := func() *ChainedValidation {
 		return &ChainedValidation{
 			D1:     "B", // Discriminator changed from B -> A
-			FieldA: ptr.To("too-long-string"),
+			FieldA: new("too-long-string"),
 		}
 	}
 	st.Value(mkTest()).OldValue(mkDifferentDisc()).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{

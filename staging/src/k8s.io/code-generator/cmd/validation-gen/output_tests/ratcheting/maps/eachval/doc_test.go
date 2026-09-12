@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test_StructWithMaps(t *testing.T) {
@@ -36,7 +35,7 @@ func Test_StructWithMaps(t *testing.T) {
 				"x": {IntField: 1},
 			},
 			MapNonComparableStructField: map[string]NonComparableStruct{
-				"x": {IntPtrField: ptr.To(1)},
+				"x": {IntPtrField: new(1)},
 			},
 		}
 	}

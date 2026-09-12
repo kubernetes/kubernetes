@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -28,11 +27,11 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		StringField:              "allowed-string",
-		StringPtrField:           ptr.To("allowed-pointer"),
+		StringPtrField:           new("allowed-pointer"),
 		StringTypedefField:       "allowed-typedef",
-		StringTypedefPtrField:    ptr.To(StringType("allowed-typedef-pointer")),
+		StringTypedefPtrField:    new(StringType("allowed-typedef-pointer")),
 		ValidatedTypedefField:    "allowed-on-type",
-		ValidatedTypedefPtrField: ptr.To(ValidatedStringType("allowed-on-type-ptr")),
+		ValidatedTypedefPtrField: new(ValidatedStringType("allowed-on-type-ptr")),
 	}).ExpectValid()
 
 	st.Value(&Struct{
@@ -46,11 +45,11 @@ func Test(t *testing.T) {
 
 	invalid := &Struct{
 		StringField:              "disallowed-string",
-		StringPtrField:           ptr.To("disallowed-pointer"),
+		StringPtrField:           new("disallowed-pointer"),
 		StringTypedefField:       "disallowed-typedef",
-		StringTypedefPtrField:    ptr.To(StringType("disallowed-typedef-pointer")),
+		StringTypedefPtrField:    new(StringType("disallowed-typedef-pointer")),
 		ValidatedTypedefField:    "disallowed-on-type",
-		ValidatedTypedefPtrField: ptr.To(ValidatedStringType("disallowed-on-type")),
+		ValidatedTypedefPtrField: new(ValidatedStringType("disallowed-on-type")),
 	}
 
 	st.Value(invalid).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{

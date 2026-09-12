@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -29,7 +28,7 @@ func Test(t *testing.T) {
 	st.Value(&Struct{
 		// invalid values (greater than maximum=1)
 		IntField:        2,
-		IntPtrField:     ptr.To(2),
+		IntPtrField:     new(2),
 		Int16Field:      2,
 		Int32Field:      2,
 		Int64Field:      2,
@@ -37,9 +36,9 @@ func Test(t *testing.T) {
 		Uint16Field:     2,
 		Uint32Field:     2,
 		Uint64Field:     2,
-		UintPtrField:    ptr.To(uint(2)),
+		UintPtrField:    new(uint(2)),
 		TypedefField:    IntType(2),
-		TypedefPtrField: ptr.To(IntType(2)),
+		TypedefPtrField: new(IntType(2)),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring(), field.ErrorList{
 		field.Invalid(field.NewPath("intField"), nil, ""),
 		field.Invalid(field.NewPath("intPtrField"), nil, ""),
@@ -57,7 +56,7 @@ func Test(t *testing.T) {
 	// Test validation ratcheting
 	st.Value(&Struct{
 		IntField:        2,
-		IntPtrField:     ptr.To(2),
+		IntPtrField:     new(2),
 		Int16Field:      2,
 		Int32Field:      2,
 		Int64Field:      2,
@@ -65,12 +64,12 @@ func Test(t *testing.T) {
 		Uint16Field:     2,
 		Uint32Field:     2,
 		Uint64Field:     2,
-		UintPtrField:    ptr.To(uint(2)),
+		UintPtrField:    new(uint(2)),
 		TypedefField:    IntType(2),
-		TypedefPtrField: ptr.To(IntType(2)),
+		TypedefPtrField: new(IntType(2)),
 	}).OldValue(&Struct{
 		IntField:        2,
-		IntPtrField:     ptr.To(2),
+		IntPtrField:     new(2),
 		Int16Field:      2,
 		Int32Field:      2,
 		Int64Field:      2,
@@ -78,14 +77,14 @@ func Test(t *testing.T) {
 		Uint16Field:     2,
 		Uint32Field:     2,
 		Uint64Field:     2,
-		UintPtrField:    ptr.To(uint(2)),
+		UintPtrField:    new(uint(2)),
 		TypedefField:    IntType(2),
-		TypedefPtrField: ptr.To(IntType(2)),
+		TypedefPtrField: new(IntType(2)),
 	}).ExpectValid()
 
 	st.Value(&Struct{
 		IntField:        1,
-		IntPtrField:     ptr.To(1),
+		IntPtrField:     new(1),
 		Int16Field:      1,
 		Int32Field:      1,
 		Int64Field:      1,
@@ -93,8 +92,8 @@ func Test(t *testing.T) {
 		Uint16Field:     1,
 		Uint32Field:     1,
 		Uint64Field:     1,
-		UintPtrField:    ptr.To(uint(1)),
+		UintPtrField:    new(uint(1)),
 		TypedefField:    IntType(1),
-		TypedefPtrField: ptr.To(IntType(1)),
+		TypedefPtrField: new(IntType(1)),
 	}).ExpectValid()
 }

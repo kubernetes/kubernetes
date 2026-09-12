@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestAlpha(t *testing.T) {
@@ -114,8 +113,8 @@ func TestSpecialValidationStruct(t *testing.T) {
 	st.Value(&SpecialValidationStruct{
 		NEQField:           5,
 		NEQFieldBeta:       5,
-		ForbiddenField:     ptr.To("val"),
-		ForbiddenFieldBeta: ptr.To("val"),
+		ForbiddenField:     new("val"),
+		ForbiddenFieldBeta: new("val"),
 		UpdateField:        "new",
 		UpdateFieldBeta:    "new",
 	}).OldValue(&SpecialValidationStruct{
@@ -131,8 +130,8 @@ func TestSpecialValidationStruct(t *testing.T) {
 	})
 
 	st.Value(&StructWithValidateFalse{
-		ValidateFalse:     ptr.To("val"),
-		ValidateFalseBeta: ptr.To("val"),
+		ValidateFalse:     new("val"),
+		ValidateFalseBeta: new("val"),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByValidationStabilityLevel(), field.ErrorList{
 		field.Invalid(field.NewPath("validateFalse"), "val", "always fails").MarkAlpha(),
 		field.Invalid(field.NewPath("validateFalseBeta"), "val", "always fails").MarkBeta(),

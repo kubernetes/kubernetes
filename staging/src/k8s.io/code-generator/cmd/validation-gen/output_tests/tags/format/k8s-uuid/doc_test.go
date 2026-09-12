@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestK8sUUID(t *testing.T) {
@@ -28,13 +27,13 @@ func TestK8sUUID(t *testing.T) {
 
 	st.Value(&MyType{
 		UUIDField:        "123e4567-e89b-12d3-a456-426614174000",
-		UUIDPtrField:     ptr.To("123e4567-e89b-12d3-a456-426614174000"),
+		UUIDPtrField:     new("123e4567-e89b-12d3-a456-426614174000"),
 		UUIDTypedefField: "123e4567-e89b-12d3-a456-426614174000",
 	}).ExpectValid()
 
 	invalidStruct := &MyType{
 		UUIDField:        "123E4567-E89B-12D3-A456-426614174000",
-		UUIDPtrField:     ptr.To("123E4567-E89B-12D3-A456-426614174000"),
+		UUIDPtrField:     new("123E4567-E89B-12D3-A456-426614174000"),
 		UUIDTypedefField: "123E4567-E89B-12D3-A456-426614174000",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
@@ -47,7 +46,7 @@ func TestK8sUUID(t *testing.T) {
 
 	invalidStruct = &MyType{
 		UUIDField:        "not-a-uuid",
-		UUIDPtrField:     ptr.To("not-a-uuid"),
+		UUIDPtrField:     new("not-a-uuid"),
 		UUIDTypedefField: "not-a-uuid",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
