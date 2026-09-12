@@ -196,6 +196,7 @@ const (
 
 	// Metric keys for in-place pod resize operations.
 	ContainerRequestedResizesKey        = "container_requested_resizes_total"
+	VolumeRequestedResizesKey           = "volume_requested_resizes_total"
 	PodResizeDurationMillisecondsKey    = "pod_resize_duration_milliseconds"
 	PodPendingResizesKey                = "pod_pending_resizes"
 	PodInfeasibleResizesKey             = "pod_infeasible_resizes_total"
@@ -1262,6 +1263,17 @@ var (
 		[]string{"resource", "requirement", "operation"},
 	)
 
+	// VolumeRequestedResizes tracks the cumulative number of requested resizes at the volume level.
+	VolumeRequestedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           VolumeRequestedResizesKey,
+			Help:           "Number of requested resizes, counted at the volume level. The 'medium' label refers to the volume storage medium (e.g. 'Memory'); the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"medium", "operation"},
+	)
+
 	// PodResizeDurationMilliseconds tracks the duration (in milliseconds) it takes to resize a pod.
 	PodResizeDurationMilliseconds = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -1564,6 +1576,10 @@ func Register() {
 			legacyregistry.MustRegister(PodInProgressResizes)
 			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
 			legacyregistry.MustRegister(PodDeferredResizeDurationSeconds)
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+			legacyregistry.MustRegister(VolumeRequestedResizes)
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {

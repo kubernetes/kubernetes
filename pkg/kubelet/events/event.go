@@ -40,6 +40,7 @@ const (
 	ResizeStarted                   = "ResizeStarted"
 	ResizeError                     = "ResizeError"
 	FailedNodeDeclaredFeaturesCheck = "FailedNodeDeclaredFeaturesCheck"
+	VolumeSizeExceedsPodMemoryLimit = "VolumeSizeExceedsPodMemoryLimit"
 )
 
 // Image event reason list

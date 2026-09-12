@@ -4997,11 +4997,10 @@ type mockVolumeResizeRuntimeHelper struct {
 
 type mockResizeCall struct {
 	volumeName string
-	newSize    *resource.Quantity
 }
 
-func (f *mockVolumeResizeRuntimeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeName string, newSize *resource.Quantity) error {
-	f.resizeCalls = append(f.resizeCalls, mockResizeCall{volumeName: volumeName, newSize: newSize})
+func (f *mockVolumeResizeRuntimeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeName string) error {
+	f.resizeCalls = append(f.resizeCalls, mockResizeCall{volumeName: volumeName})
 	return f.resizeErr
 }
 
@@ -5011,6 +5010,7 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 	for _, tc := range []struct {
 		testName       string
 		enableGate     bool
+		noCheckpoint   bool
 		actuatedLimit  *resource.Quantity
 		newLimit       *resource.Quantity
 		volMedium      v1.StorageMedium
@@ -5029,8 +5029,8 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 		{
 			testName:       "Non-memory emptyDir volume ignored",
 			enableGate:     true,
-			actuatedLimit:  nil,
-			newLimit:       resource.NewQuantity(100, resource.BinarySI),
+			actuatedLimit:  resource.NewQuantity(100, resource.BinarySI),
+			newLimit:       resource.NewQuantity(200, resource.BinarySI),
 			volMedium:      v1.StorageMediumDefault,
 			expectUpsize:   false,
 			expectDownsize: false,
@@ -5054,17 +5054,27 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 			expectDownsize: true,
 		},
 		{
-			testName:       "No action: limit removed (new limit nil)",
+			testName:       "Upsize: limit removed (new limit nil)",
 			enableGate:     true,
 			actuatedLimit:  resource.NewQuantity(100, resource.BinarySI),
 			newLimit:       nil,
 			volMedium:      v1.StorageMediumMemory,
-			expectUpsize:   false,
+			expectUpsize:   true,
 			expectDownsize: false,
 		},
 		{
-			testName:       "Force sync: new limit specified, no actuated limit",
+			testName:       "Downsize: limit added to uncapped volume (actuated limit nil)",
 			enableGate:     true,
+			actuatedLimit:  nil,
+			newLimit:       resource.NewQuantity(100, resource.BinarySI),
+			volMedium:      v1.StorageMediumMemory,
+			expectUpsize:   false,
+			expectDownsize: true,
+		},
+		{
+			testName:       "Force sync: new limit specified, no actuation checkpoint",
+			enableGate:     true,
+			noCheckpoint:   true,
 			actuatedLimit:  nil,
 			newLimit:       resource.NewQuantity(100, resource.BinarySI),
 			volMedium:      v1.StorageMediumMemory,
@@ -5115,7 +5125,7 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 				},
 			}
 
-			if tc.actuatedLimit != nil {
+			if !tc.noCheckpoint {
 				err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "mem-vol", tc.actuatedLimit)
 				require.NoError(t, err)
 			}
@@ -5174,8 +5184,8 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			volumesToDownsize: []string{"down-vol"},
 			volumesToUpsize:   []string{"up-vol"},
 			expectedCalls: []mockResizeCall{
-				{volumeName: "down-vol", newSize: resource.NewQuantity(100, resource.BinarySI)},
-				{volumeName: "up-vol", newSize: resource.NewQuantity(200, resource.BinarySI)},
+				{volumeName: "down-vol"},
+				{volumeName: "up-vol"},
 			},
 			expectedActuated: map[string]*resource.Quantity{
 				"down-vol": resource.NewQuantity(100, resource.BinarySI),
@@ -5188,7 +5198,7 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			volumesToUpsize:   []string{"up-vol"},
 			injectResizeError: fmt.Errorf("resize failed"),
 			expectedCalls: []mockResizeCall{
-				{volumeName: "down-vol", newSize: resource.NewQuantity(100, resource.BinarySI)},
+				{volumeName: "down-vol"},
 			},
 			expectedActuated:  map[string]*resource.Quantity{},
 			expectedResultErr: true,
@@ -5286,12 +5296,6 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			for idx, expectedCall := range tc.expectedCalls {
 				actualCall := helper.resizeCalls[idx]
 				assert.Equal(t, expectedCall.volumeName, actualCall.volumeName)
-				if expectedCall.newSize == nil {
-					assert.Nil(t, actualCall.newSize)
-				} else {
-					require.NotNil(t, actualCall.newSize)
-					assert.Equal(t, expectedCall.newSize.Value(), actualCall.newSize.Value())
-				}
 			}
 
 			// Check final actuated state
@@ -5316,6 +5320,7 @@ func TestIsPodResizeInProgress_Volumes(t *testing.T) {
 	for _, tc := range []struct {
 		testName        string
 		enableGate      bool
+		noCheckpoint    bool
 		specLimit       *resource.Quantity
 		statusLimit     *resource.Quantity
 		expectHasResize bool
@@ -5330,6 +5335,7 @@ func TestIsPodResizeInProgress_Volumes(t *testing.T) {
 		{
 			testName:        "Spec set, status not set (initial startup safety)",
 			enableGate:      true,
+			noCheckpoint:    true,
 			specLimit:       resource.NewQuantity(100, resource.BinarySI),
 			statusLimit:     nil,
 			expectHasResize: false,
@@ -5349,10 +5355,24 @@ func TestIsPodResizeInProgress_Volumes(t *testing.T) {
 			expectHasResize: true,
 		},
 		{
-			testName:        "Spec nil (removed), status set",
+			testName:        "Spec nil (removed), status set (resize in progress)",
 			enableGate:      true,
 			specLimit:       nil,
 			statusLimit:     resource.NewQuantity(200, resource.BinarySI),
+			expectHasResize: true,
+		},
+		{
+			testName:        "Spec set (added), status nil (uncapped, resize in progress)",
+			enableGate:      true,
+			specLimit:       resource.NewQuantity(100, resource.BinarySI),
+			statusLimit:     nil,
+			expectHasResize: true,
+		},
+		{
+			testName:        "Both spec and status nil (uncapped, no resize in progress)",
+			enableGate:      true,
+			specLimit:       nil,
+			statusLimit:     nil,
 			expectHasResize: false,
 		},
 	} {
@@ -5381,7 +5401,7 @@ func TestIsPodResizeInProgress_Volumes(t *testing.T) {
 				},
 			}
 
-			if tc.statusLimit != nil {
+			if !tc.noCheckpoint {
 				err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "mem-vol", tc.statusLimit)
 				require.NoError(t, err)
 			}

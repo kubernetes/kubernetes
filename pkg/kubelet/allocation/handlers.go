@@ -180,11 +180,17 @@ func IsMemoryBackedVolumeResizeRequested(desiredPod, allocatedPod *v1.Pod) bool 
 		return false
 	}
 	for i, allocatedVol := range allocatedPod.Spec.Volumes {
-		if !VolHasMemoryBackedEmptyDirSizeLimit(&allocatedVol) {
+		if !VolHasMemoryBackedEmptyDir(&allocatedVol) {
 			continue
 		}
 		desiredVol := desiredPod.Spec.Volumes[i]
-		if !apiequality.Semantic.DeepEqual(allocatedVol.EmptyDir.SizeLimit, desiredVol.EmptyDir.SizeLimit) {
+		hasAllocatedLimit := allocatedVol.EmptyDir.SizeLimit != nil && !allocatedVol.EmptyDir.SizeLimit.IsZero()
+		hasDesiredLimit := desiredVol.EmptyDir.SizeLimit != nil && !desiredVol.EmptyDir.SizeLimit.IsZero()
+		if !hasAllocatedLimit && !hasDesiredLimit {
+			// nil and 0 are considered equivalent for size limit.
+			continue
+		}
+		if hasAllocatedLimit != hasDesiredLimit || !allocatedVol.EmptyDir.SizeLimit.Equal(*desiredVol.EmptyDir.SizeLimit) {
 			return true
 		}
 	}
