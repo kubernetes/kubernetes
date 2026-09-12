@@ -61,23 +61,12 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 
 // ValidateStorageClassUpdate tests if an update to StorageClass is valid.
 func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageClass) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&storageClass.ObjectMeta, &oldStorageClass.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(storageClass.Parameters, oldStorageClass.Parameters, field.NewPath("parameters")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.Provisioner, oldStorageClass.Provisioner, field.NewPath("provisioner")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.ReclaimPolicy, oldStorageClass.ReclaimPolicy, field.NewPath("reclaimPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-	return allErrs
+	return apivalidation.ValidateObjectMetaUpdate(&storageClass.ObjectMeta, &oldStorageClass.ObjectMeta, field.NewPath("metadata"))
 }
 
 // validateProvisioner tests if provisioner is a valid qualified name.
 func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(provisioner) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, provisioner).MarkCoveredByDeclarative())
-	}
 	if len(provisioner) > 0 {
 		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(strings.ToLower(provisioner), fldPath)...)
 	}
@@ -672,6 +661,9 @@ func ValidateCSIStorageCapacityUpdate(capacity, oldCapacity *storage.CSIStorageC
 // ValidateVolumeAttributesClass validates a VolumeAttributesClass.
 func ValidateVolumeAttributesClass(volumeAttributesClass *storage.VolumeAttributesClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&volumeAttributesClass.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
+	if len(volumeAttributesClass.DriverName) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("driverName"), volumeAttributesClass.DriverName))
+	}
 	allErrs = append(allErrs, validateProvisioner(volumeAttributesClass.DriverName, field.NewPath("driverName"))...)
 	allErrs = append(allErrs, validateParameters(volumeAttributesClass.Parameters, false, field.NewPath("parameters"))...)
 	return allErrs
