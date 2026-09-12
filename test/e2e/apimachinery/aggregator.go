@@ -107,16 +107,16 @@ var _ = SIGDescribe("Aggregator", func() {
 
 func cleanupSampleAPIServer(ctx context.Context, client clientset.Interface, aggrclient *aggregatorclient.Clientset, n sampleAPIServerObjectNames, apiServiceName string) {
 	// delete the APIService first to avoid causing discovery errors
-	_ = aggrclient.ApiregistrationV1().APIServices().Delete(ctx, apiServiceName, metav1.DeleteOptions{})
+	framework.ExpectNoError(aggrclient.ApiregistrationV1().APIServices().Delete(ctx, apiServiceName, metav1.DeleteOptions{}), "deleting APIService %s", apiServiceName)
 
-	_ = client.AppsV1().Deployments(n.namespace).Delete(ctx, "sample-apiserver-deployment", metav1.DeleteOptions{})
-	_ = client.CoreV1().Secrets(n.namespace).Delete(ctx, "sample-apiserver-secret", metav1.DeleteOptions{})
-	_ = client.CoreV1().Services(n.namespace).Delete(ctx, "sample-api", metav1.DeleteOptions{})
-	_ = client.CoreV1().ServiceAccounts(n.namespace).Delete(ctx, "sample-apiserver", metav1.DeleteOptions{})
-	_ = client.RbacV1().RoleBindings("kube-system").Delete(ctx, n.roleBinding, metav1.DeleteOptions{})
-	_ = client.RbacV1().ClusterRoleBindings().Delete(ctx, "wardler:"+n.namespace+":auth-delegator", metav1.DeleteOptions{})
-	_ = client.RbacV1().ClusterRoles().Delete(ctx, n.clusterRole, metav1.DeleteOptions{})
-	_ = client.RbacV1().ClusterRoleBindings().Delete(ctx, n.clusterRoleBinding, metav1.DeleteOptions{})
+	framework.ExpectNoError(client.AppsV1().Deployments(n.namespace).Delete(ctx, "sample-apiserver-deployment", metav1.DeleteOptions{}), "deleting deployment sample-apiserver-deployment")
+	framework.ExpectNoError(client.CoreV1().Secrets(n.namespace).Delete(ctx, "sample-apiserver-secret", metav1.DeleteOptions{}), "deleting secret sample-apiserver-secret")
+	framework.ExpectNoError(client.CoreV1().Services(n.namespace).Delete(ctx, "sample-api", metav1.DeleteOptions{}), "deleting service sample-api")
+	framework.ExpectNoError(client.CoreV1().ServiceAccounts(n.namespace).Delete(ctx, "sample-apiserver", metav1.DeleteOptions{}), "deleting service account sample-apiserver")
+	framework.ExpectNoError(client.RbacV1().RoleBindings("kube-system").Delete(ctx, n.roleBinding, metav1.DeleteOptions{}), "deleting role binding %s", n.roleBinding)
+	framework.ExpectNoError(client.RbacV1().ClusterRoleBindings().Delete(ctx, "wardler:"+n.namespace+":auth-delegator", metav1.DeleteOptions{}), "deleting cluster role binding wardler:"+n.namespace+":auth-delegator")
+	framework.ExpectNoError(client.RbacV1().ClusterRoles().Delete(ctx, n.clusterRole, metav1.DeleteOptions{}), "deleting cluster role %s", n.clusterRole)
+	framework.ExpectNoError(client.RbacV1().ClusterRoleBindings().Delete(ctx, n.clusterRoleBinding, metav1.DeleteOptions{}), "deleting cluster role binding %s", n.clusterRoleBinding)
 }
 
 type sampleAPIServerObjectNames struct {

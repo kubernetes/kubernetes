@@ -1661,7 +1661,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 			defer func() {
 				// Will be cleaned up with the namespace if this fails.
-				_ = c.CoreV1().ConfigMaps(ns).Delete(ctx, dummyConfigMap.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(c.CoreV1().ConfigMaps(ns).Delete(ctx, dummyConfigMap.Name, metav1.DeleteOptions{}), "deleting config map %s", dummyConfigMap.Name)
 			}()
 
 			ginkgo.By("Update PVC 1 owner ref")
@@ -1810,7 +1810,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 			defer func() {
 				// Will be cleaned up by the namespace delete if this fails
-				_ = c.CoreV1().ConfigMaps(ns).Delete(ctx, randomConfigMap.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(c.CoreV1().ConfigMaps(ns).Delete(ctx, randomConfigMap.Name, metav1.DeleteOptions{}), "deleting config map %s", randomConfigMap.Name)
 			}()
 
 			ginkgo.By("Add external owner to PVC 1")
