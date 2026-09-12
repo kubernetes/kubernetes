@@ -752,7 +752,6 @@ func dropDisabledFields(
 	dropDisabledPodLevelResources(podSpec, oldPodSpec)
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
-	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysFieldInTopologySpread(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysFieldInPodAffinity(podSpec, oldPodSpec)
 	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
@@ -1271,23 +1270,6 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 	}
 }
 
-// dropDisabledNodeInclusionPolicyFields removes disabled fields from PodSpec related
-// to NodeInclusionPolicy only if it is not used by the old spec.
-func dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread) && podSpec != nil {
-		if !nodeTaintsPolicyInUse(oldPodSpec) {
-			for i := range podSpec.TopologySpreadConstraints {
-				podSpec.TopologySpreadConstraints[i].NodeTaintsPolicy = nil
-			}
-		}
-		if !nodeAffinityPolicyInUse(oldPodSpec) {
-			for i := range podSpec.TopologySpreadConstraints {
-				podSpec.TopologySpreadConstraints[i].NodeAffinityPolicy = nil
-			}
-		}
-	}
-}
-
 // dropDisabledMatchLabelKeysFieldInPodAffinity removes disabled fields from PodSpec related
 // to MatchLabelKeys in required/preferred PodAffinity/PodAntiAffinity only if it is not already used by the old spec.
 func dropDisabledMatchLabelKeysFieldInPodAffinity(podSpec, oldPodSpec *api.PodSpec) {
@@ -1391,34 +1373,6 @@ func matchLabelKeysInTopologySpreadInUse(podSpec *api.PodSpec) bool {
 
 	for _, c := range podSpec.TopologySpreadConstraints {
 		if len(c.MatchLabelKeys) > 0 {
-			return true
-		}
-	}
-	return false
-}
-
-// nodeAffinityPolicyInUse returns true if the pod spec is non-nil and has NodeAffinityPolicy field set
-// in TopologySpreadConstraints
-func nodeAffinityPolicyInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	for _, c := range podSpec.TopologySpreadConstraints {
-		if c.NodeAffinityPolicy != nil {
-			return true
-		}
-	}
-	return false
-}
-
-// nodeTaintsPolicyInUse returns true if the pod spec is non-nil and has NodeTaintsPolicy field set
-// in TopologySpreadConstraints
-func nodeTaintsPolicyInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	for _, c := range podSpec.TopologySpreadConstraints {
-		if c.NodeTaintsPolicy != nil {
 			return true
 		}
 	}

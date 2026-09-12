@@ -66,7 +66,6 @@ type PodTopologySpread struct {
 	replicationCtrls                                   corelisters.ReplicationControllerLister
 	replicaSets                                        appslisters.ReplicaSetLister
 	statefulSets                                       appslisters.StatefulSetLister
-	enableNodeInclusionPolicyInPodTopologySpread       bool
 	enableMatchLabelKeysInPodTopologySpread            bool
 	enableTaintTolerationComparisonOperators           bool
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
@@ -115,10 +114,9 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		return nil, err
 	}
 	pl := &PodTopologySpread{
-		parallelizer:       h.Parallelizer(),
-		sharedLister:       h.SnapshotSharedLister(),
-		defaultConstraints: args.DefaultConstraints,
-		enableNodeInclusionPolicyInPodTopologySpread:       fts.EnableNodeInclusionPolicyInPodTopologySpread,
+		parallelizer:                                       h.Parallelizer(),
+		sharedLister:                                       h.SnapshotSharedLister(),
+		defaultConstraints:                                 args.DefaultConstraints,
 		enableMatchLabelKeysInPodTopologySpread:            fts.EnableMatchLabelKeysInPodTopologySpread,
 		enableTaintTolerationComparisonOperators:           fts.EnableTaintTolerationComparisonOperators,
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,

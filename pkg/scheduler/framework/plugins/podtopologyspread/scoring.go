@@ -156,22 +156,14 @@ func (pl *PodTopologySpread) PreScore(
 		nodeInfo := allNodes[n]
 		node := nodeInfo.Node()
 
-		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
-			// `node` should satisfy incoming pod's NodeSelector/NodeAffinity
-			if match, _ := requiredNodeAffinity.Match(node); !match {
-				return
-			}
-		}
-
 		// All topologyKeys need to be present in `node`
 		if requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints) {
 			return
 		}
 
 		for i, c := range state.Constraints {
-			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-				!c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity,
-					pl.enableTaintTolerationComparisonOperators) {
+			if !c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity,
+				pl.enableTaintTolerationComparisonOperators) {
 				continue
 			}
 
