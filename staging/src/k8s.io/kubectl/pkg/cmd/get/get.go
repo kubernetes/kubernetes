@@ -57,7 +57,10 @@ type GetOptions struct {
 	ToPrinter              func(*meta.RESTMapping, *bool, bool, bool) (printers.ResourcePrinterFunc, error)
 	IsHumanReadablePrinter bool
 
-	CmdParent string
+	CmdParent   string
+	BuilderArgs []string
+	Builder     func() *resource.Builder
+	restClient  func() (*rest.RESTClient, error)
 
 	resource.FilenameOptions
 
@@ -171,7 +174,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run(f, args))
+			cmdutil.CheckErr(o.Run())
 		},
 		SuggestFor: []string{"list", "ls"},
 	}
@@ -195,6 +198,10 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 
 // Complete takes the command arguments and factory and infers any remaining options.
 func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	o.Builder = f.NewBuilder
+	o.restClient = f.RESTClient
+	o.BuilderArgs = args
+
 	if len(o.Raw) > 0 {
 		if len(args) > 0 {
 			return fmt.Errorf("arguments may not be passed when --raw is specified")
@@ -445,17 +452,16 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 }
 
 // Run performs the get operation.
-// TODO: remove the need to pass these arguments, like other commands.
-func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
+func (o *GetOptions) Run() error {
 	if len(o.Raw) > 0 {
-		restClient, err := f.RESTClient()
+		restClient, err := o.restClient()
 		if err != nil {
 			return err
 		}
 		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
 	if o.Watch || o.WatchOnly {
-		return o.watch(f, args)
+		return o.watch()
 	}
 
 	chunkSize := o.ChunkSize
@@ -465,7 +471,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		chunkSize = 0
 	}
 
-	r := f.NewBuilder().
+	r := o.Builder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
@@ -473,7 +479,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		FieldSelectorParam(o.FieldSelector).
 		Subresource(o.Subresource).
 		RequestChunksOf(chunkSize).
-		ResourceTypeOrNameArgs(true, args...).
+		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		ContinueOnError().
 		Latest().
 		Flatten().
@@ -610,16 +616,15 @@ func (s *separatorWriterWrapper) SetReady(state bool) {
 }
 
 // watch starts a client-side watch of one or more resources.
-// TODO: remove the need for arguments here.
-func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
-	r := f.NewBuilder().
+func (o *GetOptions) watch() error {
+	r := o.Builder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
 		RequestChunksOf(o.ChunkSize).
-		ResourceTypeOrNameArgs(true, args...).
+		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		SingleResourceType().
 		Latest().
 		TransformRequests(o.transformRequests).
