@@ -20,8 +20,32 @@ package logs
 
 import (
 	"os"
+	"path/filepath"
 	"syscall"
 )
+
+// evalSymlinks resolves symbolic links in the log path so that fsnotify
+// (which is used when following logs) can watch the real file. On Windows,
+// fsnotify does not follow symlinks, so we resolve them up front.
+//
+// Windows path resolution is best-effort: filepath.EvalSymlinks cannot
+// traverse Windows volume-mount points and reparse points (for example
+// when the container log root C:\var is mounted from a secondary disk),
+// even though the log file is otherwise fully accessible. In that case we
+// fall back to the original path, which is still readable through normal
+// file operations.
+func evalSymlinks(path string) (string, error) {
+	evaluated, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return evaluated, nil
+	}
+	// The path is accessible even though it cannot be resolved through
+	// reparse points, so keep it as-is rather than failing to read logs.
+	if _, statErr := os.Stat(path); statErr == nil {
+		return path, nil
+	}
+	return "", err
+}
 
 // Based on Windows implementation of Windows' syscall.Open
 // https://cs.opensource.google/go/go/+/refs/tags/go1.22.2:src/syscall/syscall_windows.go;l=342
