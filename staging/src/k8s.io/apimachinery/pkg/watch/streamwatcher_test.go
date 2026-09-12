@@ -17,6 +17,8 @@ limitations under the License.
 package watch_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -102,6 +104,28 @@ func TestStreamWatcherError(t *testing.T) {
 		t.Fatalf("unexpected open channel")
 	}
 
+	sw.Stop()
+	_, ok = <-sw.ResultChan()
+	if ok {
+		t.Fatalf("unexpected open channel")
+	}
+}
+
+func TestStreamWatcherErrorUnwrap(t *testing.T) {
+	fd := fakeDecoder{err: fmt.Errorf("decoding failed: %w", context.Canceled)}
+	fr := &fakeReporter{}
+	//nolint:logcheck // Intentionally uses the old API.
+	sw := NewStreamWatcher(fd, fr)
+	evt, ok := <-sw.ResultChan()
+	if !ok {
+		t.Fatalf("unexpected close")
+	}
+	if evt.Type != Error {
+		t.Fatalf("expected error event, got %#v", evt)
+	}
+	if !errors.Is(fr.err, context.Canceled) {
+		t.Errorf("expected reported error to wrap %v, got: %v", context.Canceled, fr.err)
+	}
 	sw.Stop()
 	_, ok = <-sw.ResultChan()
 	if ok {

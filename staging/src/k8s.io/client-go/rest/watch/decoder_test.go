@@ -18,6 +18,7 @@ package watch
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -27,6 +28,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimejson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -103,6 +105,49 @@ func TestDecoder(t *testing.T) {
 
 		decoder.Close()
 	}
+}
+
+// errorDecoder implements runtime.Decoder and always fails with the given error.
+type errorDecoder struct {
+	err error
+}
+
+func (d *errorDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	return nil, nil, d.err
+}
+
+func TestDecoder_EmbeddedDecodeErrorUnwrap(t *testing.T) {
+	out, in := io.Pipe()
+	embeddedErr := errors.New("embedded decode failure")
+	decoder := NewDecoder(streaming.NewDecoder(out, getDecoder()), &errorDecoder{err: embeddedErr})
+
+	go func() {
+		expect := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+		data, err := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expect)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+			return
+		}
+		event := metav1.WatchEvent{
+			Type:   string(watch.Added),
+			Object: runtime.RawExtension{Raw: json.RawMessage(data)},
+		}
+		if err := json.NewEncoder(in).Encode(&event); err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		if err := in.Close(); err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+	}()
+
+	_, _, err := decoder.Decode()
+	if err == nil {
+		t.Fatal("Expected decode error")
+	}
+	if !errors.Is(err, embeddedErr) {
+		t.Errorf("Expected error to wrap %v, got: %v", embeddedErr, err)
+	}
+	decoder.Close()
 }
 
 func TestDecoder_SourceClose(t *testing.T) {
