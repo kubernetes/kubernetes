@@ -223,6 +223,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newServiceCIDRsControllerDescriptor())
 	register(newStorageVersionMigratorControllerDescriptor())
 	register(newSELinuxWarningControllerDescriptor())
+	register(newImperativeEvictionResponderControllerDescriptor())
 
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {
