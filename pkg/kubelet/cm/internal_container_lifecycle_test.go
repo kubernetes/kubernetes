@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"testing"
 
 	"k8s.io/klog/v2"
@@ -47,12 +48,19 @@ func (memoryManager *mockMemoryManager) AddContainer(klog.Logger, *v1.Pod, *v1.C
 }
 
 type mockTopologyManager struct {
-	called bool
+	called             bool
+	removedContainerID string
+	removeErr          error
 	topologymanager.Manager
 }
 
 func (topologyManager *mockTopologyManager) AddContainer(klog.Logger, *v1.Pod, *v1.Container, string) {
 	topologyManager.called = true
+}
+
+func (topologyManager *mockTopologyManager) RemoveContainer(_ klog.Logger, containerID string) error {
+	topologyManager.removedContainerID = containerID
+	return topologyManager.removeErr
 }
 
 func TestPreStartContainer(t *testing.T) {
@@ -105,5 +113,37 @@ func TestPreStartContainer(t *testing.T) {
 		if !tManager.(*mockTopologyManager).called {
 			t.Errorf("TopologyManager's AddContainer method must be called during container startup")
 		}
+	}
+}
+
+func TestPostStopContainer(t *testing.T) {
+	testErr := errors.New("remove container")
+	tests := []struct {
+		name    string
+		wantErr error
+	}{
+		{
+			name: "remove succeeds",
+		},
+		{
+			name:    "remove fails",
+			wantErr: testErr,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			topologyManager := &mockTopologyManager{removeErr: test.wantErr}
+			lifecycle := internalContainerLifecycleImpl{topologyManager: topologyManager}
+
+			err := lifecycle.PostStopContainer(logger, "container-id")
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("PostStopContainer() error = %v, want %v", err, test.wantErr)
+			}
+			if topologyManager.removedContainerID != "container-id" {
+				t.Errorf("RemoveContainer() container ID = %q, want %q", topologyManager.removedContainerID, "container-id")
+			}
+		})
 	}
 }
