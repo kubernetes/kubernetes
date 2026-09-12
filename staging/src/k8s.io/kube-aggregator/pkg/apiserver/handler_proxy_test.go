@@ -459,7 +459,9 @@ func TestProxyHandler(t *testing.T) {
 				t.Errorf("expected %v, got %v", e, a)
 				return
 			}
-			// this varies every test
+			if e, a := []string{server.Listener.Addr().String()}, target.headers["X-Forwarded-Host"]; tc.expectedCalled && !reflect.DeepEqual(e, a) {
+				t.Errorf("expected %v, got %v", e, a)
+			}
 			delete(target.headers, "X-Forwarded-Host")
 			if e, a := tc.expectedHeaders, target.headers; !reflect.DeepEqual(e, a) {
 				t.Errorf("expected != got %v", cmp.Diff(e, a))

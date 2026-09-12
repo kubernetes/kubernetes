@@ -77,6 +77,12 @@ type UpgradeAwareHandler struct {
 	// specifies the Host header value to send in the HTTP request. If this is false, the incoming req.Host header will
 	// just be forwarded to the backend server.
 	UseLocationHost bool
+	// OriginalHost, if set, is used as the value of the X-Forwarded-Host header
+	// sent to the backend when WrapTransport is true. It should be the host as
+	// received by the proxy from the client (i.e. req.Host before the request
+	// URL is rewritten to the backend address). When empty, the backend URL host
+	// is used, which is the legacy behavior.
+	OriginalHost string
 	// FlushInterval controls how often the standard HTTP proxy will flush content from the upstream.
 	FlushInterval time.Duration
 	// MaxBytesPerSec controls the maximum rate for an upstream connection. No rate is imposed if the value is zero.
@@ -511,6 +517,9 @@ func dial(req *http.Request, transport http.RoundTripper) (net.Conn, error) {
 func (h *UpgradeAwareHandler) defaultProxyTransport(url *url.URL, internalTransport http.RoundTripper) http.RoundTripper {
 	scheme := url.Scheme
 	host := url.Host
+	if h.OriginalHost != "" {
+		host = h.OriginalHost
+	}
 	suffix := h.Location.Path
 	if strings.HasSuffix(url.Path, "/") && !strings.HasSuffix(suffix, "/") {
 		suffix += "/"
