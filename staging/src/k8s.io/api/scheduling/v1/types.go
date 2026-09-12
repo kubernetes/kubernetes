@@ -38,7 +38,7 @@ type PriorityClass struct {
 	// value represents the integer value of this priority class. This is the actual priority that pods
 	// receive when they have the name of this class in their pod spec.
 	// +optional
-	Value int32 `json:"value" protobuf:"bytes,2,opt,name=value"`
+	Value int32 `json:"value" protobuf:"varint,2,opt,name=value"`
 
 	// globalDefault specifies whether this PriorityClass should be considered as
 	// the default priority for pods that do not have any priority class.
@@ -46,7 +46,7 @@ type PriorityClass struct {
 	// one PriorityClasses exists with their `globalDefault` field set to true,
 	// the smallest value of such global default PriorityClasses will be used as the default priority.
 	// +optional
-	GlobalDefault bool `json:"globalDefault,omitempty" protobuf:"bytes,3,opt,name=globalDefault"`
+	GlobalDefault bool `json:"globalDefault,omitempty" protobuf:"varint,3,opt,name=globalDefault"`
 
 	// description is an arbitrary string that usually provides guidelines on
 	// when this priority class should be used.
