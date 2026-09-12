@@ -3338,6 +3338,79 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 			},
 		},
 		{
+			// Victim deletion events that arrive while the preemptor is gated are consumed
+			// without activating it. Completing preemption then produces no new deletion event
+			// (victims are already gone), so the executor must activate the preemptor itself.
+			// Two victims are required: with a single victim, lastVictimsPendingPreemption is
+			// populated before PreemptPod blocks, so deleting that victim would ungate the
+			// preemptor via PreEnqueue and the test would pass even without Activate.
+			Name: "preemptor is activated when async preemption produces no deletion event",
+			Steps: []asyncframework.Step{
+				{
+					Name:       "create Node",
+					CreateNode: "node",
+				},
+				{
+					Name: "create first victim",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("victim-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					},
+				},
+				{
+					Name: "create second victim",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("victim-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					},
+				},
+				{
+					Name: "create pod group for preemptor",
+					CreatePodGroup: &asyncframework.CreatePodGroup{
+						PodGroup: st.MakePodGroup().Name("pg-preemptor").MinCount(1).Priority(100).Obj(),
+					},
+				},
+				{
+					Name: "create a preemptor Pod",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
+					},
+				},
+				{
+					Name: "schedule the preemptor Pod",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
+						ExpectUnschedulable: true,
+					},
+				},
+				{
+					Name:            "check the preemptor Pod is gated",
+					PodGatedInQueue: "preemptor",
+				},
+				{
+					Name:                 "check the preemptor Pod making the preemption API calls",
+					PodRunningPreemption: new(2),
+				},
+				{
+					Name:      "delete first victim while preemption is in flight",
+					DeletePod: "victim-1",
+				},
+				{
+					Name:      "delete second victim while preemption is in flight",
+					DeletePod: "victim-2",
+				},
+				{
+					Name:               "complete the preemption; executor must activate the preemptor",
+					CompletePreemption: "pg-preemptor",
+				},
+				{
+					Name: "schedule the preemptor Pod after victims were deleted externally",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
+						ExpectSuccess: true,
+					},
+				},
+			},
+		},
+		{
 			Name: "gated preemptor is eventually scheduled even if victim deletion doesn't raise queue hints",
 			Steps: []asyncframework.Step{
 				{
