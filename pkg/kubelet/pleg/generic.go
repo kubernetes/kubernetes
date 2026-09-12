@@ -483,12 +483,12 @@ func computeEvents(logger klog.Logger, oldPod, newPod *kubecontainer.Pod, cid *k
 
 // getPodIP preserves an older cached status' pod IP if the new status has no pod IPs
 // and its sandboxes have exited
-func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) []string {
+func (g *GenericPLEG) getPodIPs(ctx context.Context, pid types.UID, status *kubecontainer.PodStatus) []string {
 	if len(status.IPs) != 0 {
 		return status.IPs
 	}
 
-	oldStatus, err := g.cache.Get(pid)
+	oldStatus, err := g.cache.Get(ctx, pid)
 	if err != nil || len(oldStatus.IPs) == 0 {
 		return nil
 	}
@@ -537,7 +537,7 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 		// When a pod is torn down, kubelet may race with PLEG and retrieve
 		// a pod status after network teardown, but the kubernetes API expects
 		// the completed pod's IP to be available after the pod is dead.
-		status.IPs = g.getPodIPs(pid, status)
+		status.IPs = g.getPodIPs(ctx, pid, status)
 	}
 
 	g.cache.Set(pod.ID, status, err, timestamp)

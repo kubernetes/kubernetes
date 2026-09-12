@@ -79,7 +79,7 @@ func (f *fakePodWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions
 	default:
 		return
 	}
-	status, err := f.cache.Get(uid)
+	status, err := f.cache.Get(ctx, uid)
 	if err != nil {
 		f.t.Errorf("Unexpected error: %v", err)
 	}
