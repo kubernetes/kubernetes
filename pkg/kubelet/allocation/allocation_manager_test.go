@@ -943,7 +943,7 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 					Type:    v1.PodResizePending,
 					Status:  "True",
 					Reason:  "Infeasible",
-					Message: "Resize is infeasible for Guaranteed Pods alongside CPU Manager policy \"static\"",
+					Message: "Resize is infeasible for Guaranteed Pods with integer CPU requests alongside CPU Manager policy \"static\"",
 				},
 			},
 		},
@@ -983,7 +983,65 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 					Type:    v1.PodResizePending,
 					Status:  "True",
 					Reason:  "Infeasible",
-					Message: "Resize is infeasible for Guaranteed Pods alongside CPU Manager policy \"static\"",
+					Message: "Resize is infeasible for Guaranteed Pods with integer CPU requests alongside CPU Manager policy \"static\"",
+				},
+			},
+		},
+		{
+			name:                           "Guaranteed QOS pod with fractional CPU - CPU resize should succeed with static CPU policy",
+			originalRequests:               v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			originalLimits:                 v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			podsToTest:                     []*v1.Pod{createTestPod("5555", "pod5", "ns5", v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}, v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}, false)},
+			ipprExclusiveCPUsFeatureGate:   false,
+			ipprExclusiveMemoryFeatureGate: true,
+			newRequests:                    v1.ResourceList{v1.ResourceCPU: resource.MustParse("800m"), v1.ResourceMemory: mem500M},
+			newLimits:                      v1.ResourceList{v1.ResourceCPU: resource.MustParse("800m"), v1.ResourceMemory: mem500M},
+			expectedAllocatedReqs:          v1.ResourceList{v1.ResourceCPU: resource.MustParse("800m"), v1.ResourceMemory: mem500M},
+			expectedAllocatedLims:          v1.ResourceList{v1.ResourceCPU: resource.MustParse("800m"), v1.ResourceMemory: mem500M},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: "True",
+				},
+			},
+		},
+		{
+			name:                           "Guaranteed QOS pod with fractional CPU - resize to integer CPU should be blocked with static CPU policy",
+			originalRequests:               v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			originalLimits:                 v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			podsToTest:                     []*v1.Pod{createTestPod("6666", "pod6", "ns6", v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}, v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}, false)},
+			ipprExclusiveCPUsFeatureGate:   false,
+			ipprExclusiveMemoryFeatureGate: true,
+			newRequests:                    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M},
+			newLimits:                      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M},
+			expectedAllocatedReqs:          v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			expectedAllocatedLims:          v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Infeasible",
+					Message: "Resize is infeasible for Guaranteed Pods with integer CPU requests alongside CPU Manager policy \"static\"",
+				},
+			},
+		},
+		{
+			name:                           "Guaranteed QOS pod with integer CPU - resize to fractional CPU should be blocked with static CPU policy",
+			originalRequests:               v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M},
+			originalLimits:                 v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M},
+			podsToTest:                     []*v1.Pod{createTestPod("7777", "pod7", "ns7", v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M}, v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M}, false)},
+			ipprExclusiveCPUsFeatureGate:   false,
+			ipprExclusiveMemoryFeatureGate: true,
+			newRequests:                    v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			newLimits:                      v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			expectedAllocatedReqs:          v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M},
+			expectedAllocatedLims:          v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Infeasible",
+					Message: "Resize is infeasible for Guaranteed Pods with integer CPU requests alongside CPU Manager policy \"static\"",
 				},
 			},
 		},
@@ -1299,6 +1357,138 @@ func TestRetryPendingResizesMemoryBackedVolumes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGuaranteedPodIntegerCPUResizeScopedToContainer(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	nodeConfig := cm.NodeConfig{}
+	nodeConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+
+	cpu500m := resource.MustParse("500m")
+	cpu800m := resource.MustParse("800m")
+	cpu1000m := resource.MustParse("1")
+	mem500M := resource.MustParse("500Mi")
+
+	t.Run("multi-container: fractional CPU resize allowed when other container has integer CPU", func(t *testing.T) {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.InPlacePodVerticalScalingExclusiveCPUs:   false,
+			features.InPlacePodVerticalScalingExclusiveMemory: true,
+		})
+		// Pod with two containers: c1 has integer CPU (not resized), c2 has fractional CPU (resized 500m→800m).
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: "mc-1", Name: "mc-pod1", Namespace: "ns"},
+			Status:     v1.PodStatus{Phase: v1.PodRunning},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:      "c1",
+						Image:     "test-image",
+						Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M}, Limits: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M}},
+					},
+					{
+						Name:      "c2",
+						Image:     "test-image",
+						Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}, Limits: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
+					},
+				},
+			},
+		}
+		pod.Status.ContainerStatuses = []v1.ContainerStatus{
+			{Name: "c1", AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem500M}},
+			{Name: "c2", AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
+		}
+
+		newPod := pod.DeepCopy()
+		newPod.Spec.Containers[1].Resources.Requests[v1.ResourceCPU] = cpu800m
+		newPod.Spec.Containers[1].Resources.Limits[v1.ResourceCPU] = cpu800m
+
+		podStatus := &kubecontainer.PodStatus{
+			ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace,
+			ContainerStatuses: []*kubecontainer.Status{
+				{Name: "c1", State: kubecontainer.ContainerStateRunning, Resources: &kubecontainer.ContainerResources{CPURequest: pod.Spec.Containers[0].Resources.Requests.Cpu(), CPULimit: pod.Spec.Containers[0].Resources.Limits.Cpu(), MemoryLimit: pod.Spec.Containers[0].Resources.Limits.Memory()}},
+				{Name: "c2", State: kubecontainer.ContainerStateRunning, Resources: &kubecontainer.ContainerResources{CPURequest: pod.Spec.Containers[1].Resources.Requests.Cpu(), CPULimit: pod.Spec.Containers[1].Resources.Limits.Cpu(), MemoryLimit: pod.Spec.Containers[1].Resources.Limits.Memory()}},
+			},
+		}
+
+		allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{pod}, &nodeConfig)
+		require.NoError(t, allocationManager.SetAllocatedResources(logger, pod))
+		t.Cleanup(func() { allocationManager.RemovePod(logger, pod.UID) })
+
+		allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+			return newPod, true
+		}
+		allocationManager.PushPendingResize(logger, pod.UID)
+		allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+		assert.False(t, allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID), "fractional-to-fractional resize should not be infeasible")
+
+		alloc, found := allocationManager.GetContainerResourceAllocation(newPod.UID, "c2")
+		require.True(t, found)
+		assert.Equal(t, cpu800m, alloc.Requests[v1.ResourceCPU], "c2 should be resized to 800m")
+	})
+
+	t.Run("multi-container: fractional to integer CPU resize blocked even when other container is fractional", func(t *testing.T) {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.InPlacePodVerticalScalingExclusiveCPUs:   false,
+			features.InPlacePodVerticalScalingExclusiveMemory: true,
+		})
+		// Pod with two containers: c1 has fractional CPU (not resized), c2 has fractional CPU resized to integer (500m→1).
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: "mc-2", Name: "mc-pod2", Namespace: "ns"},
+			Status:     v1.PodStatus{Phase: v1.PodRunning},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:      "c1",
+						Image:     "test-image",
+						Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}, Limits: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
+					},
+					{
+						Name:      "c2",
+						Image:     "test-image",
+						Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}, Limits: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
+					},
+				},
+			},
+		}
+		pod.Status.ContainerStatuses = []v1.ContainerStatus{
+			{Name: "c1", AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
+			{Name: "c2", AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
+		}
+
+		newPod := pod.DeepCopy()
+		newPod.Spec.Containers[1].Resources.Requests[v1.ResourceCPU] = cpu1000m
+		newPod.Spec.Containers[1].Resources.Limits[v1.ResourceCPU] = cpu1000m
+
+		podStatus := &kubecontainer.PodStatus{
+			ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace,
+			ContainerStatuses: []*kubecontainer.Status{
+				{Name: "c1", State: kubecontainer.ContainerStateRunning, Resources: &kubecontainer.ContainerResources{CPURequest: pod.Spec.Containers[0].Resources.Requests.Cpu(), CPULimit: pod.Spec.Containers[0].Resources.Limits.Cpu(), MemoryLimit: pod.Spec.Containers[0].Resources.Limits.Memory()}},
+				{Name: "c2", State: kubecontainer.ContainerStateRunning, Resources: &kubecontainer.ContainerResources{CPURequest: pod.Spec.Containers[1].Resources.Requests.Cpu(), CPULimit: pod.Spec.Containers[1].Resources.Limits.Cpu(), MemoryLimit: pod.Spec.Containers[1].Resources.Limits.Memory()}},
+			},
+		}
+
+		allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{pod}, &nodeConfig)
+		require.NoError(t, allocationManager.SetAllocatedResources(logger, pod))
+		t.Cleanup(func() { allocationManager.RemovePod(logger, pod.UID) })
+
+		allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+			return newPod, true
+		}
+		allocationManager.PushPendingResize(logger, pod.UID)
+		allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+		assert.True(t, allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID), "fractional-to-integer resize should be infeasible")
+
+		alloc, found := allocationManager.GetContainerResourceAllocation(newPod.UID, "c2")
+		require.True(t, found)
+		assert.Equal(t, cpu500m, alloc.Requests[v1.ResourceCPU], "c2 should remain at 500m")
+	})
 }
 
 func TestRetryPendingResizesWithSwap(t *testing.T) {
