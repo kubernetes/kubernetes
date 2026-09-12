@@ -80,15 +80,8 @@ var (
 		},
 		[]string{"resource"},
 	)
-	resourceSizeEstimate = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_resource_size_estimate_bytes",
-			Help:           "Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
-	newObjectCounts = compbasemetrics.NewGaugeVec(
+	resourceSizeEstimate = newResourceSizeEstimateCollector()
+	newObjectCounts      = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_resource_objects",
 			Help:           "Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.",
@@ -165,7 +158,7 @@ func Register() {
 		legacyregistry.MustRegister(etcdRequestCounts)
 		legacyregistry.MustRegister(etcdRequestErrorCounts)
 		legacyregistry.MustRegister(objectCounts)
-		legacyregistry.MustRegister(resourceSizeEstimate)
+		legacyregistry.CustomMustRegister(resourceSizeEstimate)
 		legacyregistry.MustRegister(newObjectCounts)
 		legacyregistry.CustomMustRegister(storageMonitor)
 		legacyregistry.MustRegister(etcdEventsReceivedCounts)
@@ -183,18 +176,14 @@ func UpdateStoreStats(groupResource schema.GroupResource, stats storage.Stats, e
 		objectCounts.WithLabelValues(groupResource.String()).Set(-1)
 		newObjectCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
 		if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
+			resourceSizeEstimate.updateStoreStats(groupResource, stats, err)
 		}
 		return
 	}
 	objectCounts.WithLabelValues(groupResource.String()).Set(float64(stats.ObjectCount))
 	newObjectCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(stats.ObjectCount))
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		if stats.ObjectCount > 0 && stats.EstimatedAverageObjectSizeBytes == 0 {
-			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
-		} else {
-			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(stats.EstimatedAverageObjectSizeBytes * stats.ObjectCount))
-		}
+		resourceSizeEstimate.updateStoreStats(groupResource, stats, nil)
 	}
 }
 
@@ -203,7 +192,7 @@ func DeleteStoreStats(groupResource schema.GroupResource) {
 	objectCounts.Delete(map[string]string{"resource": groupResource.String()})
 	newObjectCounts.Delete(map[string]string{"group": groupResource.Group, "resource": groupResource.Resource})
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		resourceSizeEstimate.DeleteLabelValues(groupResource.Group, groupResource.Resource)
+		resourceSizeEstimate.deleteStoreStats(groupResource)
 	}
 }
 
@@ -245,6 +234,7 @@ func RecordDecodeError(groupResource schema.GroupResource) {
 // Reset resets the etcd_request_duration_seconds metric.
 func Reset() {
 	etcdRequestLatency.Reset()
+	resourceSizeEstimate.Reset()
 }
 
 // sinceInSeconds gets the time since the specified start in seconds.
@@ -253,6 +243,11 @@ func Reset() {
 var sinceInSeconds = func(start time.Time) float64 {
 	return time.Since(start).Seconds()
 }
+
+// now returns the current time.
+//
+// This is a variable to facilitate testing.
+var now = time.Now
 
 // SetStorageMonitorGetter sets monitor getter to allow monitoring etcd stats.
 func SetStorageMonitorGetter(getter func() ([]Monitor, error)) {
