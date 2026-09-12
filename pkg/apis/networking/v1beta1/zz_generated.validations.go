@@ -358,7 +358,35 @@ func Validate_IngressClassParametersReference(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	// field networkingv1beta1.IngressClassParametersReference.Scope has no validation
+	{ // field networkingv1beta1.IngressClassParametersReference.Scope
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *networkingv1beta1.IngressClassParametersReference) *string {
+				return oldObj.Scope
+			})
+		errs = append(errs, fn(fldPath.Child("scope"), obj.Scope, oldVal, oldObj != nil)...)
+	}
+
 	// field networkingv1beta1.IngressClassParametersReference.Namespace has no validation
 	return errs
 }
