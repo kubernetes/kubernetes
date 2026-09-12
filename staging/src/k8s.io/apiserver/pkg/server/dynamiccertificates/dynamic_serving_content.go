@@ -138,6 +138,11 @@ func (c *DynamicCertKeyPairContent) Run(ctx context.Context, workers int) {
 	// doesn't matter what workers say, only start one.
 	go wait.Until(c.runWorker, time.Second, ctx.Done())
 
+	// Periodic reload in case fsnotify misses the write. See DynamicFileCAContent.Run.
+	go wait.Until(func() {
+		c.queue.Add(workItemKey)
+	}, FileRefreshDuration, ctx.Done())
+
 	// start the loop that watches the cert and key files until stopCh is closed.
 	go wait.Until(func() {
 		if err := c.watchCertKeyFile(ctx.Done()); err != nil {
