@@ -72,7 +72,11 @@ func ExtractInto(object runtime.Object, objectType typed.ParseableType, fieldMan
 	u := typedObj.ExtractItems(fieldset.Leaves()).AsValue().Unstructured()
 	m, ok := u.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("unable to convert managed fields for %s to unstructured, expected map, got %T", fieldManager, u)
+		if u == nil {
+			m = map[string]interface{}{}
+		} else {
+			return fmt.Errorf("unable to convert managed fields for %s to unstructured, expected map, got %T", fieldManager, u)
+		}
 	}
 
 	// set the type meta manually if it doesn't exist to avoid missing kind errors
