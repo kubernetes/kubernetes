@@ -99,13 +99,13 @@ type csiClient interface {
 		volID string,
 		stagingTargetPath string,
 		volumePublishPath string,
-	) ([]api.VolumeHealthCondition, error)
+	) (VolumeHealthResult, error)
 	// NodeGetStorageHealth returns adverse health conditions for the driver's
 	// storage backend on this node. An empty slice means the backend is healthy.
 	NodeGetStorageHealth(
 		ctx context.Context,
 		secrets map[string]string,
-	) ([]storagev1.StorageHealthCondition, error)
+	) (StorageHealthResult, error)
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
@@ -150,6 +150,24 @@ type nodeV1ClientCreator func(addr csiAddr, metricsManager *MetricsManager) (
 )
 
 type nodeV1AccessModeMapper func(am api.PersistentVolumeAccessMode) csipbv1.VolumeCapability_AccessMode_Mode
+
+type VolumeHealthResult struct {
+	Conditions []api.VolumeHealthCondition
+	Unknown    []UnknownCondition
+}
+
+type StorageHealthResult struct {
+	Conditions []storagev1.StorageHealthCondition
+	Unknown    []UnknownCondition
+}
+
+// UnknownCondition is kept as raw strings because it deliberately never
+// becomes a v1.VolumeHealthCondition.
+type UnknownCondition struct {
+	Status  string
+	Reason  string
+	Message string
+}
 
 // newV1NodeClient creates a new NodeClient with the internally used gRPC
 // connection set up. It also returns a closer which must be called to close
@@ -677,18 +695,18 @@ func (c *csiDriverClient) NodeSupportsStorageHealth(ctx context.Context) (bool, 
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_GET_STORAGE_HEALTH)
 }
 
-func (c *csiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) ([]api.VolumeHealthCondition, error) {
+func (c *csiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) (VolumeHealthResult, error) {
 	klog.V(4).InfoS(log("calling NodeGetVolumeHealth rpc"), "volID", volID, "stagingTargetPath", stagingTargetPath, "volumePublishPath", volumePublishPath)
 	if volID == "" {
-		return nil, errors.New("missing volume id")
+		return VolumeHealthResult{}, errors.New("missing volume id")
 	}
 	if c.nodeV1ClientCreator == nil {
-		return nil, errors.New("nodeV1ClientCreate is nil")
+		return VolumeHealthResult{}, errors.New("nodeV1ClientCreate is nil")
 	}
 
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
-		return nil, err
+		return VolumeHealthResult{}, err
 	}
 	defer func() {
 		err := closer.Close()
@@ -704,20 +722,21 @@ func (c *csiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagin
 	}
 	resp, err := nodeClient.NodeGetVolumeHealth(ctx, req)
 	if err != nil {
-		return nil, err
+		return VolumeHealthResult{}, err
 	}
+
 	return mapVolumeHealthConditions(resp.GetVolumeHealth()), nil
 }
 
-func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
+func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) (StorageHealthResult, error) {
 	klog.V(4).InfoS(log("calling NodeGetStorageHealth rpc"))
 	if c.nodeV1ClientCreator == nil {
-		return nil, errors.New("nodeV1ClientCreate is nil")
+		return StorageHealthResult{}, errors.New("nodeV1ClientCreate is nil")
 	}
 
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
-		return nil, err
+		return StorageHealthResult{}, err
 	}
 	defer func() {
 		err := closer.Close()
@@ -731,29 +750,43 @@ func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[
 	}
 	resp, err := nodeClient.NodeGetStorageHealth(ctx, req)
 	if err != nil {
-		return nil, err
+		return StorageHealthResult{}, err
 	}
-	return mapStorageBackendHealth(resp.GetBackendHealth())
+	res, err := mapStorageBackendHealth(resp.GetBackendHealth())
+	if err != nil {
+		return StorageHealthResult{}, err
+	}
+	return res, nil
+
 }
 
-func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondition {
+func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) VolumeHealthResult {
 	if vh == nil {
-		return nil
+		return VolumeHealthResult{}
 	}
 	entries := vh.GetHealthStatuses()
 	if len(entries) == 0 {
-		return nil
+		return VolumeHealthResult{}
 	}
-	out := make([]api.VolumeHealthCondition, 0, len(entries))
+	out := VolumeHealthResult{
+		Conditions: []api.VolumeHealthCondition{},
+		Unknown:    []UnknownCondition{},
+	}
 	for _, entry := range entries {
 		if entry == nil {
 			continue
 		}
 		status, ok := mapVolumeHealthStatus(entry.GetStatus())
 		if !ok {
+			out.Unknown = append(out.Unknown, UnknownCondition{
+				Status:  entry.GetStatus().String(),
+				Reason:  entry.GetReason(),
+				Message: entry.GetMessage(),
+			})
 			continue
 		}
-		out = append(out, api.VolumeHealthCondition{
+
+		out.Conditions = append(out.Conditions, api.VolumeHealthCondition{
 			Status:  status,
 			Reason:  entry.GetReason(),
 			Message: entry.GetMessage(),
@@ -777,20 +810,28 @@ func mapVolumeHealthStatus(status csipbv1.VolumeHealthErrorType) (api.VolumeHeal
 
 const maxStorageHealthConditions = 16
 
-func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth) ([]storagev1.StorageHealthCondition, error) {
+func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth) (StorageHealthResult, error) {
 	if len(entries) == 0 {
-		return nil, nil
+		return StorageHealthResult{}, nil
 	}
 	if len(entries) > maxStorageHealthConditions {
-		return nil, fmt.Errorf("NodeGetStorageHealth returned %d conditions, maximum is %d", len(entries), maxStorageHealthConditions)
+		return StorageHealthResult{}, fmt.Errorf("NodeGetStorageHealth returned %d conditions, maximum is %d", len(entries), maxStorageHealthConditions)
 	}
-	out := make([]storagev1.StorageHealthCondition, 0, len(entries))
+	out := StorageHealthResult{
+		Conditions: []storagev1.StorageHealthCondition{},
+		Unknown:    []UnknownCondition{},
+	}
 	for i, entry := range entries {
 		if entry == nil {
 			continue
 		}
 		status, ok := mapStorageHealthStatus(entry.GetStatus())
 		if !ok {
+			out.Unknown = append(out.Unknown, UnknownCondition{
+				Status:  entry.GetStatus().String(),
+				Reason:  entry.GetReason(),
+				Message: entry.GetMessage(),
+			})
 			continue
 		}
 		condition := storagev1.StorageHealthCondition{
@@ -801,12 +842,12 @@ func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_Sto
 		if capability := entry.GetVolumeCapability(); capability != nil {
 			accessMode, volumeMode, err := mapStorageHealthVolumeCapability(capability)
 			if err != nil {
-				return nil, fmt.Errorf("NodeGetStorageHealth condition %d has invalid volume capability: %w", i, err)
+				return StorageHealthResult{}, fmt.Errorf("NodeGetStorageHealth condition %d has invalid volume capability: %w", i, err)
 			}
 			condition.AccessMode = &accessMode
 			condition.VolumeMode = &volumeMode
 		}
-		out = append(out, condition)
+		out.Conditions = append(out.Conditions, condition)
 	}
 	return out, nil
 }

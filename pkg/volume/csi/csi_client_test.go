@@ -343,7 +343,7 @@ func (c *fakeCsiDriverClient) NodeSupportsStorageHealth(ctx context.Context) (bo
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_GET_STORAGE_HEALTH)
 }
 
-func (c *fakeCsiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) ([]api.VolumeHealthCondition, error) {
+func (c *fakeCsiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) (VolumeHealthResult, error) {
 	c.t.Log("calling fake.NodeGetVolumeHealth...")
 	req := &csipbv1.NodeGetVolumeHealthRequest{
 		VolumeId:          volID,
@@ -352,19 +352,19 @@ func (c *fakeCsiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, st
 	}
 	resp, err := c.nodeClient.NodeGetVolumeHealth(ctx, req)
 	if err != nil {
-		return nil, err
+		return VolumeHealthResult{}, err
 	}
 	return mapVolumeHealthConditions(resp.GetVolumeHealth()), nil
 }
 
-func (c *fakeCsiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
+func (c *fakeCsiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) (StorageHealthResult, error) {
 	c.t.Log("calling fake.NodeGetStorageHealth...")
 	req := &csipbv1.NodeGetStorageHealthRequest{
 		Secrets: secrets,
 	}
 	resp, err := c.nodeClient.NodeGetStorageHealth(ctx, req)
 	if err != nil {
-		return nil, err
+		return StorageHealthResult{}, err
 	}
 	return mapStorageBackendHealth(resp.GetBackendHealth())
 }
@@ -1212,11 +1212,11 @@ func TestNodeGetVolumeHealth(t *testing.T) {
 				return
 			}
 			fakeCloser.Check()
-			if len(conditions) != tc.wantConditions {
-				t.Fatalf("expected %d conditions, got %d", tc.wantConditions, len(conditions))
+			if len(conditions.Conditions) != tc.wantConditions {
+				t.Fatalf("expected %d conditions, got %d", tc.wantConditions, len(conditions.Conditions))
 			}
-			if tc.wantConditions > 0 && conditions[0].Status != tc.wantStatus {
-				t.Fatalf("expected status %q, got %q", tc.wantStatus, conditions[0].Status)
+			if tc.wantConditions > 0 && conditions.Conditions[0].Status != tc.wantStatus {
+				t.Fatalf("expected status %q, got %q", tc.wantStatus, conditions.Conditions[0].Status)
 			}
 			supported, err := client.NodeSupportsVolumeHealth(context.Background())
 			if err != nil {
@@ -1272,11 +1272,11 @@ func TestNodeGetStorageHealth(t *testing.T) {
 				t.Fatal(err)
 			}
 			fakeCloser.Check()
-			if len(conditions) != tc.wantConditions {
-				t.Fatalf("expected %d conditions, got %d", tc.wantConditions, len(conditions))
+			if len(conditions.Conditions) != tc.wantConditions {
+				t.Fatalf("expected %d conditions, got %d", tc.wantConditions, len(conditions.Conditions))
 			}
-			if tc.wantConditions > 0 && conditions[0].Status != tc.wantStatus {
-				t.Fatalf("expected status %q, got %q", tc.wantStatus, conditions[0].Status)
+			if tc.wantConditions > 0 && conditions.Conditions[0].Status != tc.wantStatus {
+				t.Fatalf("expected status %q, got %q", tc.wantStatus, conditions.Conditions[0].Status)
 			}
 			supported, err := client.NodeSupportsStorageHealth(context.Background())
 			if err != nil {

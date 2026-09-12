@@ -70,26 +70,26 @@ func (t *testStatusUpdater) callCount() int {
 type fakeHealthClient struct {
 	supportsVolumeHealth  bool
 	supportsStorageHealth bool
-	volumeConditions      []v1.VolumeHealthCondition
-	storageConditions     []storagev1.StorageHealthCondition
+	volumeConditions      csi.VolumeHealthResult
+	storageConditions     csi.StorageHealthResult
 	volumeErr             error
 	storageErr            error
 	volumeCalls           int
 	storageCalls          int
 }
 
-func (f *fakeHealthClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) ([]v1.VolumeHealthCondition, error) {
+func (f *fakeHealthClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) (csi.VolumeHealthResult, error) {
 	f.volumeCalls++
 	if f.volumeErr != nil {
-		return nil, f.volumeErr
+		return csi.VolumeHealthResult{}, f.volumeErr
 	}
 	return f.volumeConditions, nil
 }
 
-func (f *fakeHealthClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
+func (f *fakeHealthClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) (csi.StorageHealthResult, error) {
 	f.storageCalls++
 	if f.storageErr != nil {
-		return nil, f.storageErr
+		return csi.StorageHealthResult{}, f.storageErr
 	}
 	return f.storageConditions, nil
 }
@@ -241,7 +241,7 @@ func TestProbeVolumeHealth(t *testing.T) {
 
 			prevCalls := 0
 			for i, s := range tc.steps {
-				client.volumeConditions = s.volumeConditions
+				client.volumeConditions = csi.VolumeHealthResult{Conditions: s.volumeConditions}
 				client.volumeErr = s.volumeErr
 				m.probeVolumeHealth(context.Background())
 
@@ -339,7 +339,7 @@ func TestProbeStorageHealth(t *testing.T) {
 
 			prevCalls := 0
 			for i, s := range tc.steps {
-				client.storageConditions = s.storageConditions
+				client.storageConditions = csi.StorageHealthResult{Conditions: s.storageConditions}
 				client.storageErr = s.storageErr
 				m.probeStorageHealth(context.Background())
 

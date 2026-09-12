@@ -19,15 +19,13 @@ package csi
 import (
 	"context"
 
-	api "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
 )
 
 // HealthClient is the subset of CSI node RPCs used for volume and storage health probing.
 type HealthClient interface {
-	NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) ([]api.VolumeHealthCondition, error)
-	NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error)
+	NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) (VolumeHealthResult, error)
+	NodeGetStorageHealth(ctx context.Context, secrets map[string]string) (StorageHealthResult, error)
 	NodeSupportsVolumeHealth(ctx context.Context) (bool, error)
 	NodeSupportsStorageHealth(ctx context.Context) (bool, error)
 }
@@ -77,20 +75,20 @@ func (c *CSIHealthClient) NodeSupportsStorageHealth(ctx context.Context) (bool, 
 	return client.NodeSupportsStorageHealth(ctx)
 }
 
-func (c *CSIHealthClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) ([]api.VolumeHealthCondition, error) {
+func (c *CSIHealthClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) (VolumeHealthResult, error) {
 	client, err := c.csiClientGetter.Get()
 	if err != nil {
-		return nil, err
+		return VolumeHealthResult{}, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, csiTimeout)
 	defer cancel()
 	return client.NodeGetVolumeHealth(ctx, volID, stagingTargetPath, volumePublishPath)
 }
 
-func (c *CSIHealthClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
+func (c *CSIHealthClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) (StorageHealthResult, error) {
 	client, err := c.csiClientGetter.Get()
 	if err != nil {
-		return nil, err
+		return StorageHealthResult{}, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, csiTimeout)
 	defer cancel()
