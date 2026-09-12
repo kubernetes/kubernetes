@@ -1113,6 +1113,14 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 		if device.NodeSelector != nil {
 			setFields = append(setFields, "`nodeSelector`")
 			allErrs = append(allErrs, corevalidation.ValidateNodeSelector(device.NodeSelector, false, fldPath.Child("nodeSelector"))...)
+			// The allocator combines only a single term, so a per-device selector must have
+			// exactly one, matching the slice-level check. Ratcheted like Capacity and Taints
+			// above so an existing multi-term slice can still be updated.
+			if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.NodeSelector, device.NodeSelector) {
+				if len(device.NodeSelector.NodeSelectorTerms) != 1 {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeSelector", "nodeSelectorTerms"), device.NodeSelector.NodeSelectorTerms, "must have exactly one node selector term"))
+				}
+			}
 		}
 		if device.AllNodes != nil {
 			if *device.AllNodes {
