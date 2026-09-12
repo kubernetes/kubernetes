@@ -60,7 +60,7 @@ func (obj *LocationStreamer) DeepCopyObject() runtime.Object {
 
 // InputStream returns a stream with the contents of the URL location. If no location is provided,
 // a null stream is returned.
-func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, contentType string, err error) {
+func (s *LocationStreamer) InputStream(ctx context.Context, acceptHeader string) (stream io.ReadCloser, flush bool, contentType string, err error) {
 	if s.Location == nil {
 		// If no location was provided, return a null stream
 		return nil, false, "", nil

@@ -395,7 +395,6 @@ func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainterna
 }
 
 type SimpleStream struct {
-	version     string
 	accept      string
 	contentType string
 	err         error
@@ -414,8 +413,7 @@ func (s *SimpleStream) DeepCopyObject() runtime.Object {
 	panic("SimpleStream does not support DeepCopy")
 }
 
-func (s *SimpleStream) InputStream(_ context.Context, version, accept string) (io.ReadCloser, bool, string, error) {
-	s.version = version
+func (s *SimpleStream) InputStream(_ context.Context, accept string) (io.ReadCloser, bool, string, error) {
 	s.accept = accept
 	return s, false, s.contentType, s.err
 }
@@ -2356,7 +2354,7 @@ func TestGetBinary(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !stream.closed || stream.version != testGroupVersion.String() || stream.accept != "text/other, */*" ||
+	if !stream.closed || stream.accept != "text/other, */*" ||
 		resp.Header.Get("Content-Type") != stream.contentType || string(body) != "response data" {
 		t.Errorf("unexpected stream: %#v", stream)
 	}
