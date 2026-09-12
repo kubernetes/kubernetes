@@ -1986,7 +1986,8 @@
                 "name": "nameValue",
                 "priority": 2
               }
-            ]
+            ],
+            "hermetic": true
           }
         },
         "ttlSecondsAfterFinished": 8,

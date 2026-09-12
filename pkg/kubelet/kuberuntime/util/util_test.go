@@ -31,6 +31,7 @@ import (
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodSandboxChanged(t *testing.T) {
@@ -154,6 +155,29 @@ func TestPodSandboxChanged(t *testing.T) {
 						Id: "sandboxID1",
 						Network: &runtimeapi.PodSandboxNetworkStatus{
 							Ip: "10.0.0.10",
+						},
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+					},
+				},
+			},
+			expectedChanged:   false,
+			expectedAttempt:   0,
+			expectedSandboxID: "sandboxID1",
+			expectedReason:    "",
+		},
+		"Hermetic pod with ready sandbox status and no IP": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Hermetic: ptr.To(true),
+				},
+			},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Id: "sandboxID1",
+						Network: &runtimeapi.PodSandboxNetworkStatus{
+							Ip: "",
 						},
 						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
 						State:    runtimeapi.PodSandboxState_SANDBOX_READY,

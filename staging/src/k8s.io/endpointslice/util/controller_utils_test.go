@@ -189,6 +189,19 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "Hermetic pod running with IP",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Hermetic: ptr.To(true),
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					PodIP: "1.2.3.4",
+				},
+			},
+			expected: false,
+		},
 		// Pod should be in endpoints:
 		{
 			name: "Pending pod with Never RestartPolicy",

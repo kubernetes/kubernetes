@@ -341,6 +341,12 @@ func IsHostNetworkPod(pod *v1.Pod) bool {
 	return pod.Spec.HostNetwork
 }
 
+// IsHermeticPod returns whether hermetic isolation is requested for the given Pod.
+// Pod must not be nil.
+func IsHermeticPod(pod *v1.Pod) bool {
+	return pod.Spec.Hermetic != nil && *pod.Spec.Hermetic
+}
+
 // ConvertPodStatusToRunningPod returns Pod given PodStatus and container runtime string.
 // TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
 func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod {

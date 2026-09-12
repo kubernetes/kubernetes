@@ -4804,6 +4804,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Hermetic != nil {
+		in, out := &in.Hermetic, &out.Hermetic
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

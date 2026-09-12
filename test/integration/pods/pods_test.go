@@ -26,6 +26,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -47,6 +50,7 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodTopologyLabels(t *testing.T) {
@@ -2673,3 +2677,246 @@ func TestDRAStatusPreservedOnStatusUpdate(t *testing.T) {
 		t.Errorf("ResourceClaimStatuses not cleared: %v", cleared.Status.ResourceClaimStatuses)
 	}
 }
+
+func TestHermeticPodValidation(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "hermetic-pod-validation", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	ctx := context.Background()
+
+	testCases := []struct {
+		name        string
+		pod         *v1.Pod
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "hermetic true valid pod with exec probe",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hermetic-valid", Namespace: ns.Name},
+				Spec: v1.PodSpec{
+					Hermetic: ptr.To(true),
+					Containers: []v1.Container{{
+						Name:  "c",
+						Image: "pause",
+						LivenessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{Command: []string{"echo", "ok"}},
+							},
+						},
+					}},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "hermetic true with hostNetwork rejected",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hermetic-hostnetwork", Namespace: ns.Name},
+				Spec: v1.PodSpec{
+					Hermetic:    ptr.To(true),
+					HostNetwork: true,
+					Containers: []v1.Container{{
+						Name:  "c",
+						Image: "pause",
+					}},
+				},
+			},
+			expectError: true,
+			errorMsg:    "must be false if hostNetwork is true",
+		},
+		{
+			name: "hermetic true with HTTP probe rejected",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hermetic-http-probe", Namespace: ns.Name},
+				Spec: v1.PodSpec{
+					Hermetic: ptr.To(true),
+					Containers: []v1.Container{{
+						Name:  "c",
+						Image: "pause",
+						LivenessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								HTTPGet: &v1.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt32(8080)},
+							},
+						},
+					}},
+				},
+			},
+			expectError: true,
+			errorMsg:    "may not be set when hermetic is true",
+		},
+		{
+			name: "hermetic true with DNSPolicy ClusterFirst rejected",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hermetic-dns-clusterfirst", Namespace: ns.Name},
+				Spec: v1.PodSpec{
+					Hermetic:  ptr.To(true),
+					DNSPolicy: v1.DNSClusterFirst,
+					Containers: []v1.Container{{
+						Name:  "c",
+						Image: "pause",
+					}},
+				},
+			},
+			expectError: true,
+			errorMsg:    "must be 'None' when hermetic is true",
+		},
+		{
+			name: "hermetic true with EnableServiceLinks true rejected",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hermetic-service-links", Namespace: ns.Name},
+				Spec: v1.PodSpec{
+					Hermetic:           ptr.To(true),
+					EnableServiceLinks: ptr.To(true),
+					Containers: []v1.Container{{
+						Name:  "c",
+						Image: "pause",
+					}},
+				},
+			},
+			expectError: true,
+			errorMsg:    "must be false when hermetic is true",
+		},
+		{
+			name: "hermetic false with hostNetwork allowed",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "non-hermetic-hostnetwork", Namespace: ns.Name},
+				Spec: v1.PodSpec{
+					Hermetic:    ptr.To(false),
+					HostNetwork: true,
+					Containers: []v1.Container{{
+						Name:  "c",
+						Image: "pause",
+						Ports: []v1.ContainerPort{{
+							ContainerPort: 8080,
+							HostPort:      8080,
+						}},
+					}},
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			created, err := client.CoreV1().Pods(ns.Name).Create(ctx, tc.pod, metav1.CreateOptions{})
+			if tc.expectError {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tc.errorMsg)
+				}
+				if !strings.Contains(err.Error(), tc.errorMsg) {
+					t.Fatalf("expected error containing %q, got: %v", tc.errorMsg, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if tc.pod.Spec.Hermetic != nil {
+					if created.Spec.Hermetic == nil || *created.Spec.Hermetic != *tc.pod.Spec.Hermetic {
+						t.Errorf("expected spec.hermetic=%v, got %v", *tc.pod.Spec.Hermetic, created.Spec.Hermetic)
+					}
+					if *tc.pod.Spec.Hermetic {
+						if created.Spec.DNSPolicy != v1.DNSNone {
+							t.Errorf("expected spec.dnsPolicy=%q, got %q", v1.DNSNone, created.Spec.DNSPolicy)
+						}
+						if created.Spec.EnableServiceLinks == nil || *created.Spec.EnableServiceLinks != false {
+							t.Errorf("expected spec.enableServiceLinks=false, got %v", created.Spec.EnableServiceLinks)
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestHermeticWorkloadsTemplateValidation(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "hermetic-workloads", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	ctx := context.Background()
+
+	// 1. Deployment with spec.template.spec.hermetic: true
+	deploy := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "hermetic-deploy", Namespace: ns.Name},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "hermetic-deploy"}},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "hermetic-deploy"}},
+				Spec: v1.PodSpec{
+					Hermetic:   ptr.To(true),
+					Containers: []v1.Container{{Name: "c", Image: "pause"}},
+				},
+			},
+		},
+	}
+	createdDeploy, err := client.AppsV1().Deployments(ns.Name).Create(ctx, deploy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create deployment with hermetic pod template: %v", err)
+	}
+	if createdDeploy.Spec.Template.Spec.DNSPolicy != v1.DNSNone {
+		t.Errorf("expected deployment template DNSPolicy to be %q, got %q", v1.DNSNone, createdDeploy.Spec.Template.Spec.DNSPolicy)
+	}
+	if createdDeploy.Spec.Template.Spec.EnableServiceLinks == nil || *createdDeploy.Spec.Template.Spec.EnableServiceLinks != false {
+		t.Errorf("expected deployment template enableServiceLinks to be false, got: %+v", createdDeploy.Spec.Template.Spec.EnableServiceLinks)
+	}
+
+	// 2. StatefulSet with spec.template.spec.hermetic: true
+	sts := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "hermetic-sts", Namespace: ns.Name},
+		Spec: appsv1.StatefulSetSpec{
+			Selector:    &metav1.LabelSelector{MatchLabels: map[string]string{"app": "hermetic-sts"}},
+			ServiceName: "headless",
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "hermetic-sts"}},
+				Spec: v1.PodSpec{
+					Hermetic:   ptr.To(true),
+					Containers: []v1.Container{{Name: "c", Image: "pause"}},
+				},
+			},
+		},
+	}
+	createdSts, err := client.AppsV1().StatefulSets(ns.Name).Create(ctx, sts, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create statefulset with hermetic pod template: %v", err)
+	}
+	if createdSts.Spec.Template.Spec.DNSPolicy != v1.DNSNone {
+		t.Errorf("expected statefulset template DNSPolicy to be %q, got %q", v1.DNSNone, createdSts.Spec.Template.Spec.DNSPolicy)
+	}
+	if createdSts.Spec.Template.Spec.EnableServiceLinks == nil || *createdSts.Spec.Template.Spec.EnableServiceLinks != false {
+		t.Errorf("expected statefulset template enableServiceLinks to be false, got: %+v", createdSts.Spec.Template.Spec.EnableServiceLinks)
+	}
+
+	// 3. Job with spec.template.spec.hermetic: true
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "hermetic-job", Namespace: ns.Name},
+		Spec: batchv1.JobSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Hermetic:      ptr.To(true),
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers:    []v1.Container{{Name: "c", Image: "pause"}},
+				},
+			},
+		},
+	}
+	createdJob, err := client.BatchV1().Jobs(ns.Name).Create(ctx, job, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create job with hermetic pod template: %v", err)
+	}
+	if createdJob.Spec.Template.Spec.DNSPolicy != v1.DNSNone {
+		t.Errorf("expected job template DNSPolicy to be %q, got %q", v1.DNSNone, createdJob.Spec.Template.Spec.DNSPolicy)
+	}
+	if createdJob.Spec.Template.Spec.EnableServiceLinks == nil || *createdJob.Spec.Template.Spec.EnableServiceLinks != false {
+		t.Errorf("expected job template enableServiceLinks to be false, got: %+v", createdJob.Spec.Template.Spec.EnableServiceLinks)
+	}
+}
+

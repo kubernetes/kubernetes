@@ -4142,6 +4142,77 @@ func validatePodHostName(spec *core.PodSpec, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
+// validateHermeticPod validates the Hermetic field on PodSpec and its constraints.
+func validateHermeticPod(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if spec.Hermetic == nil || !*spec.Hermetic {
+		return allErrs
+	}
+
+	if spec.HostNetwork {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("hermetic"), *spec.Hermetic, "must be false if hostNetwork is true"))
+	}
+
+	if spec.DNSPolicy != core.DNSNone {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("dnsPolicy"), spec.DNSPolicy, "must be 'None' when hermetic is true"))
+	}
+
+	if spec.EnableServiceLinks == nil || *spec.EnableServiceLinks {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("enableServiceLinks"), spec.EnableServiceLinks, "must be false when hermetic is true"))
+	}
+
+	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
+		// Network probes (HTTPGet, TCPSocket, GRPC) are forbidden because CNI is not invoked and external network interfaces are not attached.
+		checkProbe := func(probe *core.Probe, probePath *field.Path) {
+			if probe == nil {
+				return
+			}
+			if probe.HTTPGet != nil {
+				allErrs = append(allErrs, field.Forbidden(probePath.Child("httpGet"), "may not be set when hermetic is true"))
+			}
+			if probe.TCPSocket != nil {
+				allErrs = append(allErrs, field.Forbidden(probePath.Child("tcpSocket"), "may not be set when hermetic is true"))
+			}
+			if probe.GRPC != nil {
+				allErrs = append(allErrs, field.Forbidden(probePath.Child("grpc"), "may not be set when hermetic is true"))
+			}
+		}
+
+		checkProbe(c.LivenessProbe, cFldPath.Child("livenessProbe"))
+		checkProbe(c.ReadinessProbe, cFldPath.Child("readinessProbe"))
+		checkProbe(c.StartupProbe, cFldPath.Child("startupProbe"))
+
+		// Network lifecycle handlers are forbidden for the same reason.
+		if c.Lifecycle != nil {
+			checkLifecycleHandler := func(handler *core.LifecycleHandler, handlerPath *field.Path) {
+				if handler == nil {
+					return
+				}
+				if handler.HTTPGet != nil {
+					allErrs = append(allErrs, field.Forbidden(handlerPath.Child("httpGet"), "may not be set when hermetic is true"))
+				}
+				if handler.TCPSocket != nil {
+					allErrs = append(allErrs, field.Forbidden(handlerPath.Child("tcpSocket"), "may not be set when hermetic is true"))
+				}
+			}
+			checkLifecycleHandler(c.Lifecycle.PostStart, cFldPath.Child("lifecycle", "postStart"))
+			checkLifecycleHandler(c.Lifecycle.PreStop, cFldPath.Child("lifecycle", "preStop"))
+		}
+
+		// HostPort cannot be mapped without CNI / external network interface.
+		portsPath := cFldPath.Child("ports")
+		for i, port := range c.Ports {
+			if port.HostPort > 0 {
+				allErrs = append(allErrs, field.Forbidden(portsPath.Index(i).Child("hostPort"), "may not be set when hermetic is true"))
+			}
+		}
+
+		return true
+	})
+
+	return allErrs
+}
+
 // validateContainers is called by pod spec and template validation to validate the list of regular containers.
 func validateContainers(containers []core.Container, os *core.PodOS, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -4274,11 +4345,11 @@ func validateSchedulingGates(schedulingGates []core.PodSchedulingGate, fldPath *
 	return allErrs
 }
 
-func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolicy, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolicy, hermetic *bool, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// Validate DNSNone case. Must provide at least one DNS name server.
-	if dnsPolicy != nil && *dnsPolicy == core.DNSNone {
+	// Validate DNSNone case. Must provide at least one DNS name server unless hermetic is true.
+	if (hermetic == nil || !*hermetic) && dnsPolicy != nil && *dnsPolicy == core.DNSNone {
 		if dnsConfig == nil {
 			return append(allErrs, field.Required(fldPath, fmt.Sprintf("must provide `dnsConfig` when `dnsPolicy` is %s", core.DNSNone)))
 		}
@@ -4807,13 +4878,14 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validateShareProcessNamespace(spec, fldPath)...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, opts, fldPath.Child("affinity"))...)
-	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"), opts)...)
+	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, spec.Hermetic, fldPath.Child("dnsConfig"), opts)...)
 	allErrs = append(allErrs, validateReadinessGates(spec.ReadinessGates, fldPath.Child("readinessGates"))...)
 	allErrs = append(allErrs, validateSchedulingGates(spec.SchedulingGates, fldPath.Child("schedulingGates"))...)
 	allErrs = append(allErrs, validateTopologySpreadConstraints(spec.TopologySpreadConstraints, fldPath.Child("topologySpreadConstraints"), opts)...)
 	allErrs = append(allErrs, validateWindowsHostProcessPod(spec, fldPath)...)
 	allErrs = append(allErrs, validateHostUsers(spec, fldPath, opts)...)
 	allErrs = append(allErrs, validatePodHostName(spec, fldPath)...)
+	allErrs = append(allErrs, validateHermeticPod(spec, fldPath)...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))

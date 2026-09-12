@@ -11081,7 +11081,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 				tc.dnsPolicy = &testDNSClusterFirst
 			}
 
-			errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), tc.opts)
+			errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, nil, field.NewPath("dnsConfig"), tc.opts)
 			if len(errs) != 0 && !tc.expectedError {
 				t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
 			} else if len(errs) == 0 && tc.expectedError {
@@ -11327,6 +11327,20 @@ func TestValidatePodSpec(t *testing.T) {
 			podtest.SetContainers(podtest.MakeContainer("container")),
 			podtest.SetOS(core.Linux),
 		),
+		"populate Hermetic": podtest.MakePod("",
+			podtest.SetHermetic(ptr.To(true)),
+		),
+		"populate Hermetic with Exec probe": podtest.MakePod("",
+			podtest.SetHermetic(ptr.To(true)),
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerLivenessProbe(&core.Probe{
+					SuccessThreshold: 1,
+					ProbeHandler: core.ProbeHandler{
+						Exec: &core.ExecAction{Command: []string{"echo", "ok"}},
+					},
+				}),
+			)),
+		),
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
@@ -11494,6 +11508,133 @@ func TestValidatePodSpec(t *testing.T) {
 				field.Forbidden(field.NewPath("field.resources"), "may not be set for a windows pod"),
 			},
 		},
+		"Hermetic true with hostNetwork true": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetHostNetwork(true),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.hermetic"), true, "must be false if hostNetwork is true"),
+			},
+		},
+		"Hermetic true with container HTTP liveness probe": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerLivenessProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							HTTPGet: &core.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt32(8080), Scheme: core.URISchemeHTTP},
+						},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("field.containers[0].livenessProbe.httpGet"), "may not be set when hermetic is true"),
+			},
+		},
+		"Hermetic true with container TCP readiness probe": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerReadinessProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(8080)},
+						},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("field.containers[0].readinessProbe.tcpSocket"), "may not be set when hermetic is true"),
+			},
+		},
+		"Hermetic true with container gRPC startup probe": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerStartupProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							GRPC: &core.GRPCAction{Port: 8080},
+						},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("field.containers[0].startupProbe.grpc"), "may not be set when hermetic is true"),
+			},
+		},
+		"Hermetic true with initContainer HTTP probe": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetInitContainers(podtest.MakeContainer("ictr",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerLivenessProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							HTTPGet: &core.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt32(8080), Scheme: core.URISchemeHTTP},
+						},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("field.initContainers[0].livenessProbe.httpGet"), "may not be set when hermetic is true"),
+			},
+		},
+		"Hermetic true with container lifecycle postStart HTTP probe": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerLifecycle(core.Lifecycle{
+						PostStart: &core.LifecycleHandler{
+							HTTPGet: &core.HTTPGetAction{Path: "/init", Port: intstr.FromInt32(8080), Scheme: core.URISchemeHTTP},
+						},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("field.containers[0].lifecycle.postStart.httpGet"), "may not be set when hermetic is true"),
+			},
+		},
+		"Hermetic true with container hostPort": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("field.containers[0].ports[0].hostPort"), "may not be set when hermetic is true"),
+			},
+		},
+		"Hermetic true with dnsPolicy ClusterFirst": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetDNSPolicy(core.DNSClusterFirst),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.dnsPolicy"), core.DNSClusterFirst, "must be 'None' when hermetic is true"),
+			},
+		},
+		"Hermetic true with enableServiceLinks true": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetEnableServiceLinks(ptr.To(true)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.enableServiceLinks"), true, "must be false when hermetic is true"),
+			},
+		},
+		"Hermetic true with enableServiceLinks nil": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetEnableServiceLinks(nil),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.enableServiceLinks"), nil, "must be false when hermetic is true"),
+			},
+		},
 	}
 	for k, tc := range failureCases {
 		t.Run(k, func(t *testing.T) {
@@ -11506,6 +11647,192 @@ func TestValidatePodSpec(t *testing.T) {
 			if len(tc.expectedErrors) != 0 {
 				matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
 				matcher.Test(t, tc.expectedErrors, errs)
+			}
+		})
+	}
+}
+
+func TestValidateHermeticPod(t *testing.T) {
+	testCases := map[string]struct {
+		pod            core.Pod
+		expectedErrors field.ErrorList
+	}{
+		"hermetic nil with hostNetwork": {
+			pod: *podtest.MakePod("",
+				podtest.SetHostNetwork(true),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 80, ContainerPort: 80, Protocol: "TCP"}),
+					podtest.SetContainerLivenessProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							HTTPGet: &core.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt32(80), Scheme: core.URISchemeHTTP},
+						},
+					}),
+				)),
+			),
+		},
+		"hermetic false with hostNetwork": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(false)),
+				podtest.SetHostNetwork(true),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 80, ContainerPort: 80, Protocol: "TCP"}),
+					podtest.SetContainerLivenessProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							HTTPGet: &core.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt32(80), Scheme: core.URISchemeHTTP},
+						},
+					}),
+				)),
+			),
+		},
+		"hermetic true valid with exec probe and sleep lifecycle": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerLivenessProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							Exec: &core.ExecAction{Command: []string{"echo", "ok"}},
+						},
+					}),
+					podtest.SetContainerLifecycle(core.Lifecycle{
+						PreStop: &core.LifecycleHandler{
+							Sleep: &core.SleepAction{Seconds: 5},
+						},
+					}),
+				)),
+			),
+		},
+		"hermetic true with hostNetwork true": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetHostNetwork(true),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec.hermetic"), true, "must be false if hostNetwork is true"),
+			},
+		},
+		"hermetic true with dnsPolicy Default": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetDNSPolicy(core.DNSDefault),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec.dnsPolicy"), core.DNSDefault, "must be 'None' when hermetic is true"),
+			},
+		},
+		"hermetic true with enableServiceLinks true": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetEnableServiceLinks(ptr.To(true)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec.enableServiceLinks"), true, "must be false when hermetic is true"),
+			},
+		},
+		"hermetic true with liveness HTTP probe": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerLivenessProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							HTTPGet: &core.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt32(80), Scheme: core.URISchemeHTTP},
+						},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.containers[0].livenessProbe.httpGet"), "may not be set when hermetic is true"),
+			},
+		},
+		"hermetic true with readiness TCP probe": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerReadinessProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)},
+						},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.containers[0].readinessProbe.tcpSocket"), "may not be set when hermetic is true"),
+			},
+		},
+		"hermetic true with startup gRPC probe": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerStartupProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							GRPC: &core.GRPCAction{Port: 80},
+						},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.containers[0].startupProbe.grpc"), "may not be set when hermetic is true"),
+			},
+		},
+		"hermetic true with initContainer HTTP probe": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetInitContainers(podtest.MakeContainer("ic",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerLivenessProbe(&core.Probe{
+						SuccessThreshold: 1,
+						ProbeHandler: core.ProbeHandler{
+							HTTPGet: &core.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt32(80), Scheme: core.URISchemeHTTP},
+						},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.initContainers[0].livenessProbe.httpGet"), "may not be set when hermetic is true"),
+			},
+		},
+		"hermetic true with lifecycle postStart HTTP probe": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerLifecycle(core.Lifecycle{
+						PostStart: &core.LifecycleHandler{
+							HTTPGet: &core.HTTPGetAction{Path: "/init", Port: intstr.FromInt32(80), Scheme: core.URISchemeHTTP},
+						},
+					}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.containers[0].lifecycle.postStart.httpGet"), "may not be set when hermetic is true"),
+			},
+		},
+		"hermetic true with hostPort": {
+			pod: *podtest.MakePod("",
+				podtest.SetHermetic(ptr.To(true)),
+				podtest.SetContainers(podtest.MakeContainer("c",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}),
+				)),
+			),
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.containers[0].ports[0].hostPort"), "may not be set when hermetic is true"),
+			},
+		},
+	}
+
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			opts := PodValidationOptions{ResourceIsPod: true}
+			errs := ValidatePodSpec(&tc.pod.Spec, nil, field.NewPath("spec"), opts)
+			if len(tc.expectedErrors) != 0 {
+				matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+				matcher.Test(t, tc.expectedErrors, errs)
+			} else if len(errs) != 0 {
+				t.Errorf("expected success but got errors: %v", errs)
 			}
 		})
 	}
@@ -24583,6 +24910,7 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.VolumeMounts[*]",
 		"EvictionResponders[*].Name",
 		"EvictionResponders[*].Priority",
+		"Hermetic",
 		"HostAliases",
 		"Hostname",
 		"HostnameOverride",
@@ -28998,7 +29326,7 @@ func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, PodValidationOptions{})
+			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, nil, PodValidationOptions{})
 			if testCase.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}

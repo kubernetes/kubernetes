@@ -178,6 +178,11 @@ func deepHashObjectToString(objectToWrite interface{}) string {
 // Endpoints or EndpointSlice resource. Terminating pods are only included if
 // includeTerminating is true.
 func ShouldPodBeInEndpoints(pod *v1.Pod, includeTerminating bool) bool {
+	// Hermetic pods must never be added to endpoints since they have no routable network interface or IP.
+	if pod.Spec.Hermetic != nil && *pod.Spec.Hermetic {
+		return false
+	}
+
 	// "Terminal" describes when a Pod is complete (in a succeeded or failed phase).
 	// This is distinct from the "Terminating" condition which represents when a Pod
 	// is being terminated (metadata.deletionTimestamp is non nil).

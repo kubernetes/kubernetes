@@ -97,8 +97,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.SchedulerName = v1.DefaultSchedulerName
 			}
 			if s.EnableServiceLinks == nil {
-				enableServiceLinks := v1.DefaultEnableServiceLinks
-				s.EnableServiceLinks = &enableServiceLinks
+				if s.Hermetic != nil && *s.Hermetic {
+					s.EnableServiceLinks = ptr.To(false)
+				} else {
+					enableServiceLinks := v1.DefaultEnableServiceLinks
+					s.EnableServiceLinks = &enableServiceLinks
+				}
+			}
+			if s.Hermetic != nil && *s.Hermetic {
+				s.DNSPolicy = core.DNSNone
+				s.HostNetwork = false
 			}
 		},
 		func(s *core.PodStatus, c randfill.Continue) {
