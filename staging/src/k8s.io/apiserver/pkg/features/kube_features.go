@@ -56,13 +56,6 @@ const (
 	// Enables serving watch requests in separate goroutines.
 	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
 
-	// owner: @jefftree
-	//
-	// Remove the v2beta1 apidiscovery.k8s.io/v2beta1 group version. Aggregated
-	// discovery implements its own handlers and follows a different lifecycle than
-	// traditional k8s resources.
-	AggregatedDiscoveryRemoveBetaType featuregate.Feature = "AggregatedDiscoveryRemoveBetaType"
-
 	// owner: @modulitos
 	//
 	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
@@ -334,12 +327,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	APIServingWithRoutine: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	AggregatedDiscoveryRemoveBetaType: {
-		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true},
 	},
 
 	AllowParsingUserUIDFromCertAuth: {

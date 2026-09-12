@@ -978,7 +978,7 @@ func fetchPath(handler http.Handler, etag string) (*http.Response, []byte, *apid
 	req := httptest.NewRequest("GET", "/apis", nil)
 
 	// Ask for JSON response
-	req.Header.Set("Accept", runtime.ContentTypeJSON+";g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList,"+runtime.ContentTypeJSON+";g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList")
+	req.Header.Set("Accept", runtime.ContentTypeJSON+";g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList")
 
 	if etag != "" {
 		// Quote provided etag if unquoted
