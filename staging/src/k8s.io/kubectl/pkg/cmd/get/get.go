@@ -59,6 +59,8 @@ type GetOptions struct {
 
 	CmdParent   string
 	BuilderArgs []string
+	Builder     func() *resource.Builder
+	restClient  func() (*rest.RESTClient, error)
 
 	resource.FilenameOptions
 
@@ -172,7 +174,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run(f))
+			cmdutil.CheckErr(o.Run())
 		},
 		SuggestFor: []string{"list", "ls"},
 	}
@@ -196,13 +198,16 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 
 // Complete takes the command arguments and factory and infers any remaining options.
 func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	o.Builder = f.NewBuilder
+	o.restClient = f.RESTClient
+	o.BuilderArgs = args
+
 	if len(o.Raw) > 0 {
 		if len(args) > 0 {
 			return fmt.Errorf("arguments may not be passed when --raw is specified")
 		}
 		return nil
 	}
-	o.BuilderArgs = args
 
 	var err error
 	o.Namespace, o.ExplicitNamespace, err = f.ToRawKubeConfigLoader().Namespace()
@@ -447,17 +452,16 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 }
 
 // Run performs the get operation.
-// TODO: remove the need to pass the factory, like other commands.
-func (o *GetOptions) Run(f cmdutil.Factory) error {
+func (o *GetOptions) Run() error {
 	if len(o.Raw) > 0 {
-		restClient, err := f.RESTClient()
+		restClient, err := o.restClient()
 		if err != nil {
 			return err
 		}
 		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
 	if o.Watch || o.WatchOnly {
-		return o.watch(f)
+		return o.watch()
 	}
 
 	chunkSize := o.ChunkSize
@@ -467,7 +471,7 @@ func (o *GetOptions) Run(f cmdutil.Factory) error {
 		chunkSize = 0
 	}
 
-	r := f.NewBuilder().
+	r := o.Builder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
@@ -612,8 +616,8 @@ func (s *separatorWriterWrapper) SetReady(state bool) {
 }
 
 // watch starts a client-side watch of one or more resources.
-func (o *GetOptions) watch(f cmdutil.Factory) error {
-	r := f.NewBuilder().
+func (o *GetOptions) watch() error {
+	r := o.Builder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
