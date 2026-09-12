@@ -256,7 +256,8 @@ func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, 
 		return printer.PrintObj, nil
 	}
 
-	o.Run(f, args)
+	o.BuilderArgs = args
+	o.Run(f)
 
 	var comps []string
 	resources := strings.Split(buf.String(), " ")

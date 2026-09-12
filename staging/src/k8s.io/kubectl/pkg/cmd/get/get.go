@@ -57,7 +57,8 @@ type GetOptions struct {
 	ToPrinter              func(*meta.RESTMapping, *bool, bool, bool) (printers.ResourcePrinterFunc, error)
 	IsHumanReadablePrinter bool
 
-	CmdParent string
+	CmdParent   string
+	BuilderArgs []string
 
 	resource.FilenameOptions
 
@@ -171,7 +172,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run(f, args))
+			cmdutil.CheckErr(o.Run(f))
 		},
 		SuggestFor: []string{"list", "ls"},
 	}
@@ -201,6 +202,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		}
 		return nil
 	}
+	o.BuilderArgs = args
 
 	var err error
 	o.Namespace, o.ExplicitNamespace, err = f.ToRawKubeConfigLoader().Namespace()
@@ -445,8 +447,8 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 }
 
 // Run performs the get operation.
-// TODO: remove the need to pass these arguments, like other commands.
-func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
+// TODO: remove the need to pass the factory, like other commands.
+func (o *GetOptions) Run(f cmdutil.Factory) error {
 	if len(o.Raw) > 0 {
 		restClient, err := f.RESTClient()
 		if err != nil {
@@ -455,7 +457,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
 	if o.Watch || o.WatchOnly {
-		return o.watch(f, args)
+		return o.watch(f)
 	}
 
 	chunkSize := o.ChunkSize
@@ -473,7 +475,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		FieldSelectorParam(o.FieldSelector).
 		Subresource(o.Subresource).
 		RequestChunksOf(chunkSize).
-		ResourceTypeOrNameArgs(true, args...).
+		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		ContinueOnError().
 		Latest().
 		Flatten().
@@ -610,8 +612,7 @@ func (s *separatorWriterWrapper) SetReady(state bool) {
 }
 
 // watch starts a client-side watch of one or more resources.
-// TODO: remove the need for arguments here.
-func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
+func (o *GetOptions) watch(f cmdutil.Factory) error {
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
@@ -619,7 +620,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
 		RequestChunksOf(o.ChunkSize).
-		ResourceTypeOrNameArgs(true, args...).
+		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		SingleResourceType().
 		Latest().
 		TransformRequests(o.transformRequests).
