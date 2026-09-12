@@ -59,8 +59,7 @@ func runDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess, cmd *c
 
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
-		cmd.Help()
-		return nil
+		return cmdutil.UsageErrorf(cmd, "cluster to delete is required")
 	}
 
 	configFile := configAccess.GetDefaultFilename()
