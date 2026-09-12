@@ -33,7 +33,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	}
 	defer removeAll(dirName, t)
 
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	fileName := filepath.Join(dirName, "test_pod_config")
 	err = os.WriteFile(fileName, []byte{1, 2, 3}, 0555)
 	if err != nil {
@@ -41,7 +41,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	}
 
 	ch := make(chan sourceUpdate, 1)
-	lw := newSourceFile(fileName, "localhost", time.Millisecond, ch)
+	lw := newSourceFile(ctx, fileName, "localhost", time.Millisecond, ch)
 	err = lw.listConfig(logger)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
@@ -56,9 +56,9 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	}
 	defer removeAll(dirName, t)
 
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	ch := make(chan sourceUpdate, 1)
-	lw := newSourceFile(dirName, "localhost", time.Millisecond, ch)
+	lw := newSourceFile(ctx, dirName, "localhost", time.Millisecond, ch)
 	err = lw.listConfig(logger)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

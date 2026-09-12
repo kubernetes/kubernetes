@@ -19,12 +19,14 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
 )
 
-func (s *sourceFile) startWatch(logger klog.Logger) {
+func (s *sourceFile) startWatch(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	logger.Error(nil, "Watching source file is unsupported in this build")
 }
 
