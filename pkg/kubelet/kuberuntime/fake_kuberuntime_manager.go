@@ -104,6 +104,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		cpuCFSQuotaPeriod:  metav1.Duration{Duration: time.Millisecond * 100},
 		livenessManager:    proberesults.NewManager(),
 		startupManager:     proberesults.NewManager(),
+		probeLifecycle:     kubecontainer.NoopContainerProbeLifecycle{},
 		machineInfo:        machineInfo,
 		osInterface:        osInterface,
 		containerManager:   cm.NewFakeContainerManager(logger),

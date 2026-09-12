@@ -258,6 +258,10 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax not enabled, CrashLoopBackOff.MaxContainerRestartPeriod must not be set"))
 	}
 
+	if localFeatureGate.Enabled(features.ContainerScopedProbes) && localFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: feature gates ContainerScopedProbes and ChangeContainerStatusOnKubeletRestart cannot both be enabled; ChangeContainerStatusOnKubeletRestart is deprecated and ContainerScopedProbes implements its disabled semantics, preserving the last reported Ready and Started state across a kubelet restart"))
+	}
+
 	// Check for mutually exclusive keys before the main validation loop
 	reservedKeys := map[string]bool{
 		kubetypes.SystemReservedEnforcementKey:             false,

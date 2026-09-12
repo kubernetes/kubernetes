@@ -521,6 +521,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		kubelet.livenessManager,
 		kubelet.readinessManager,
 		kubelet.startupManager,
+		kubelet.probeManager,
 		kubelet.rootDirectory,
 		kubelet.podLogsDirectory,
 		kubelet.machineInfo,
