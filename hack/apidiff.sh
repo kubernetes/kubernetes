@@ -25,7 +25,7 @@
 
 usage () {
   cat <<EOF >&2
-Usage: $0 [-r <revision>] [directory ...]"
+Usage: $0 [-r <revision>] [directory ...]
    -t <revision>: Report changes in code up to and including this revision.
                   Default is the current working tree instead of a revision.
    -r <revision>: Report change in code added since this revision. Default is
