@@ -358,7 +358,10 @@ var _ = common.SIGDescribe("Networking", func() {
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
 		f.It("should update nodePort: http", f.WithSlow(), func(ctx context.Context) {
-			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.UseHostNetwork)
+			// UseStaticNodePorts keeps the nodePort reserved after the Service is deleted
+			// below, so a Service from a test running in parallel can not get it and
+			// answer the probe.
+			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.UseHostNetwork, e2enetwork.UseStaticNodePorts)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (ctx, nodeIP) and getting ALL host endpoints", config.NodeIP, config.NodeIP, config.NodeHTTPPort))
 			err := config.DialFromNode(ctx, "http", config.NodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
@@ -389,7 +392,10 @@ var _ = common.SIGDescribe("Networking", func() {
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
 		f.It("should update nodePort: udp", f.WithSlow(), func(ctx context.Context) {
-			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.UseHostNetwork)
+			// UseStaticNodePorts keeps the nodePort reserved after the Service is deleted
+			// below, so a Service from a test running in parallel can not get it and
+			// answer the probe.
+			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.UseHostNetwork, e2enetwork.UseStaticNodePorts)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP) and getting ALL host endpoints", config.NodeIP, config.NodeIP, config.NodeUDPPort))
 			err := config.DialFromNode(ctx, "udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {

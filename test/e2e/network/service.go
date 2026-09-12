@@ -1653,14 +1653,14 @@ var _ = common.SIGDescribe("Services", func() {
 		if port.NodePort == 0 {
 			framework.Failf("got unexpected Spec.Ports[0].nodePort for new service: %v", service)
 		}
-		if !e2eservice.NodePortRange.Contains(int(port.NodePort)) {
+		if !e2enetwork.NodePortRange.Contains(int(port.NodePort)) {
 			framework.Failf("got unexpected (out-of-range) port for new service: %v", service)
 		}
 
 		outOfRangeNodePort := 0
 		for {
 			outOfRangeNodePort = 1 + rand.Intn(65535)
-			if !e2eservice.NodePortRange.Contains(outOfRangeNodePort) {
+			if !e2enetwork.NodePortRange.Contains(outOfRangeNodePort) {
 				break
 			}
 		}
@@ -1754,7 +1754,7 @@ var _ = common.SIGDescribe("Services", func() {
 		if port.NodePort == 0 {
 			framework.Failf("got unexpected Spec.Ports[0].nodePort for new service: %v", service)
 		}
-		if !e2eservice.NodePortRange.Contains(int(port.NodePort)) {
+		if !e2enetwork.NodePortRange.Contains(int(port.NodePort)) {
 			framework.Failf("got unexpected (out-of-range) port for new service: %v", service)
 		}
 
