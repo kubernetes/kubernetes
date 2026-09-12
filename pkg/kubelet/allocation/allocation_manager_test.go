@@ -19,6 +19,7 @@ package allocation
 import (
 	"context"
 	"fmt"
+	"os"
 	goruntime "runtime"
 	"strings"
 	"testing"
@@ -3691,4 +3692,91 @@ func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klo
 	})
 
 	return allocationManager, runningPod, pendingPod, logger
+}
+
+
+// TestAddPodCheckpointFailure verifies that AddPod fails admission and rolls back
+// the in-memory allocation when the checkpoint write fails, preventing state desynchronization.
+func TestAddPodCheckpointFailure(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	logger, _ := ktesting.NewTestContext(t)
+
+	checkpointDir, err := os.MkdirTemp("", "allocation_manager_checkpoint_test")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(checkpointDir)
+	})
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "test-pod-uid",
+			Name:      "test-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+					},
+				},
+			},
+		},
+	}
+	activePods := []*v1.Pod{pod}
+
+	// Build a manager with a real checkpoint state so we can trigger a checkpoint failure.
+	allocatedState, err := state.NewStateCheckpoint(logger, checkpointDir, "test_checkpoint")
+	require.NoError(t, err)
+
+	// Inject failing checkpoint manager into the underlying state.
+	// Since state.State hides internal fields, we test stateCheckpoint failure via state interface.
+	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
+	m := &manager{
+		allocated:      allocatedState,
+		admitHandlers:  lifecycle.PodAdmitHandlers{},
+		sourcesReady:   config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
+		ticker:         time.NewTicker(initialRetryDelay),
+		triggerPodSync: func(_ context.Context, _ *v1.Pod) {},
+		getActivePods:  func() []*v1.Pod { return activePods },
+		getPodByUID: func(uid types.UID) (*v1.Pod, bool) {
+			for _, p := range activePods {
+				if p.UID == uid {
+					return p, true
+				}
+			}
+			return nil, false
+		},
+		statusManager: statusManager,
+		recorder:      record.NewFakeRecorder(10),
+	}
+
+	// Create a failing state wrapper
+	m.allocated = &failingState{
+		State: allocatedState,
+	}
+
+	ok, reason, message := m.AddPod(context.Background(), activePods, pod)
+
+	// Admission must fail: a checkpoint write failure must not silently allow the pod.
+	assert.False(t, ok, "AddPod must return false when checkpoint write fails")
+	assert.NotEmpty(t, reason, "AddPod must return a non-empty reason on checkpoint failure")
+	assert.NotEmpty(t, message, "AddPod must return a non-empty message on checkpoint failure")
+
+	// The in-memory allocation must have been rolled back.
+	_, found := m.allocated.GetPodResourceInfo(pod.UID)
+	assert.False(t, found, "pod allocation must not remain in cache after checkpoint write failure")
+}
+
+type failingState struct {
+	state.State
+}
+
+func (f *failingState) SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo state.PodResourceInfo) error {
+	_ = f.State.SetPodResourceInfo(logger, podUID, resourceInfo)
+	return fmt.Errorf("injected checkpoint write failure")
 }

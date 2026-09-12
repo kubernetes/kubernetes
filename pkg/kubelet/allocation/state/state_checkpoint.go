@@ -141,26 +141,73 @@ func (sc *stateCheckpoint) GetPodResourceInfo(podUID types.UID) (PodResourceInfo
 	return sc.cache.GetPodResourceInfo(podUID)
 }
 
-// SetContainerResoruces sets resources information for a pod's container
+
+func (sc *stateCheckpoint) getPodResourceInfoCopy(podUID types.UID) (PodResourceInfo, bool) {
+	oldInfo, oldFound := sc.cache.GetPodResourceInfo(podUID)
+	if !oldFound {
+		return PodResourceInfo{}, false
+	}
+	newInfo := PodResourceInfo{
+		ContainerResources: make(map[string]v1.ResourceRequirements, len(oldInfo.ContainerResources)),
+		PodLevelResources:  oldInfo.PodLevelResources.DeepCopy(),
+	}
+	for k, v := range oldInfo.ContainerResources {
+		newInfo.ContainerResources[k] = *v.DeepCopy()
+	}
+	if oldInfo.EmptyDirVolumeLimits != nil {
+		newInfo.EmptyDirVolumeLimits = make(map[string]*resource.Quantity, len(oldInfo.EmptyDirVolumeLimits))
+		for k, v := range oldInfo.EmptyDirVolumeLimits {
+			if v != nil {
+				q := v.DeepCopy()
+				newInfo.EmptyDirVolumeLimits[k] = &q
+			} else {
+				newInfo.EmptyDirVolumeLimits[k] = nil
+			}
+		}
+	}
+	return newInfo, true
+}
+
+// revertPodResourceInfo restores the in-memory cache to the previous state for a pod
+// when a checkpoint write fails, preventing a split-brain between memory and disk.
+func (sc *stateCheckpoint) revertPodResourceInfo(logger klog.Logger, podUID types.UID, oldInfo PodResourceInfo, oldFound bool) {
+	if oldFound {
+		_ = sc.cache.SetPodResourceInfo(logger, podUID, oldInfo)
+	} else {
+		_ = sc.cache.RemovePod(logger, podUID)
+	}
+}
+
+// SetContainerResources sets resources information for a pod's container
 func (sc *stateCheckpoint) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
+	oldInfo, oldFound := sc.getPodResourceInfoCopy(podUID)
 	err := sc.cache.SetContainerResources(logger, podUID, containerName, resources)
 	if err != nil {
 		return err
 	}
-	return sc.storeState(logger)
+	if err := sc.storeState(logger); err != nil {
+		sc.revertPodResourceInfo(logger, podUID, oldInfo, oldFound)
+		return err
+	}
+	return nil
 }
 
 // SetPodLevelResources sets resources information for a pod's resources at pod-level.
 func (sc *stateCheckpoint) SetPodLevelResources(logger klog.Logger, podUID types.UID, resInfo *v1.ResourceRequirements) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
+	oldInfo, oldFound := sc.getPodResourceInfoCopy(podUID)
 	err := sc.cache.SetPodLevelResources(logger, podUID, resInfo)
 	if err != nil {
 		return err
 	}
-	return sc.storeState(logger)
+	if err := sc.storeState(logger); err != nil {
+		sc.revertPodResourceInfo(logger, podUID, oldInfo, oldFound)
+		return err
+	}
+	return nil
 }
 
 // SetEmptyDirVolumeLimit sets the size limit for a pod's emptyDir volume.
@@ -168,22 +215,32 @@ func (sc *stateCheckpoint) SetEmptyDirVolumeLimit(podUID types.UID, volumeName s
 	logger := klog.TODO()
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
+	oldInfo, oldFound := sc.getPodResourceInfoCopy(podUID)
 	err := sc.cache.SetEmptyDirVolumeLimit(podUID, volumeName, limit)
 	if err != nil {
 		return err
 	}
-	return sc.storeState(logger)
+	if err := sc.storeState(logger); err != nil {
+		sc.revertPodResourceInfo(logger, podUID, oldInfo, oldFound)
+		return err
+	}
+	return nil
 }
 
 // SetPodResourceInfo sets pod resource information
 func (sc *stateCheckpoint) SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
+	oldInfo, oldFound := sc.getPodResourceInfoCopy(podUID)
 	err := sc.cache.SetPodResourceInfo(logger, podUID, resourceInfo)
 	if err != nil {
 		return err
 	}
-	return sc.storeState(logger)
+	if err := sc.storeState(logger); err != nil {
+		sc.revertPodResourceInfo(logger, podUID, oldInfo, oldFound)
+		return err
+	}
+	return nil
 }
 
 // Delete deletes resource information for specified pod
