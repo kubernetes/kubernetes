@@ -810,6 +810,161 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 	}
 }
 
+// Tests function "ServerResourcesForGroupVersion" when the "unaggregated" discovery is returned.
+func TestMemCacheServerResourcesForGroupVersion(t *testing.T) {
+	tests := []struct {
+		name              string
+		groupVersion      string
+		apiGroup          *metav1.APIGroup
+		resourcesMap      map[string]*metav1.APIResourceList
+		expectedResources []string
+	}{
+		{
+			name:         "Legacy discovery format: 0 resource",
+			groupVersion: "apps/v1",
+			apiGroup: &metav1.APIGroup{
+				Name: "apps",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{
+						GroupVersion: "apps/v1",
+						Version:      "v1",
+					},
+				},
+			},
+			resourcesMap: map[string]*metav1.APIResourceList{
+				"apps/v1": &metav1.APIResourceList{
+					APIResources: []metav1.APIResource{},
+				},
+			},
+			expectedResources: []string{},
+		},
+		{
+			name:         "Legacy discovery format: 2 resources",
+			groupVersion: "batch/v1",
+			apiGroup: &metav1.APIGroup{
+				Name: "batch",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{
+						GroupVersion: "batch/v1",
+						Version:      "v1",
+					},
+				},
+			},
+			resourcesMap: map[string]*metav1.APIResourceList{
+				"batch/v1": &metav1.APIResourceList{
+					APIResources: []metav1.APIResource{
+						{Name: "cronjobs"},
+						{Name: "jobs"},
+					},
+				},
+			},
+			expectedResources: []string{
+				"cronjobs",
+				"jobs",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		mux := http.NewServeMux()
+
+		mux.HandleFunc("/apis", func(w http.ResponseWriter, r *http.Request) {
+			apis := &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{*test.apiGroup},
+			}
+			output, err := json.Marshal(apis)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+			// Content-type is "unaggregated" discovery format -- no resources returned.
+			w.Header().Set("Content-Type", discovery.AcceptV1)
+			w.WriteHeader(http.StatusOK)
+			_, err = w.Write(output)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+		})
+
+		mux.HandleFunc("/apis/{group}", func(w http.ResponseWriter, r *http.Request) {
+			group := r.PathValue("group")
+			if group != test.apiGroup.Name {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			output, err := json.Marshal(test.apiGroup)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+			// Content-type is "unaggregated" discovery format -- no resources returned.
+			w.Header().Set("Content-Type", discovery.AcceptV1)
+			w.WriteHeader(http.StatusOK)
+			_, err = w.Write(output)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+		})
+
+		mux.HandleFunc("/apis/{group}/{version}", func(w http.ResponseWriter, r *http.Request) {
+			group := r.PathValue("group")
+			if group != test.apiGroup.Name {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			version := r.PathValue("version")
+			gv := fmt.Sprintf("%s/%s", group, version)
+			output, err := json.Marshal(test.resourcesMap[gv])
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+			// Content-type is "unaggregated" discovery format -- no resources returned.
+			w.Header().Set("Content-Type", discovery.AcceptV1)
+			w.WriteHeader(http.StatusOK)
+			_, err = w.Write(output)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+		})
+
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		})
+		server := httptest.NewServer(mux)
+		defer server.Close()
+		client := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+		memClient := memCacheClient{
+			delegate:               client,
+			groupToServerResources: map[string]*cacheEntry{},
+		}
+		assert.False(t, memClient.Fresh())
+		apiResourceList, err := memClient.ServerResourcesForGroupVersion(test.groupVersion)
+		require.NoError(t, err)
+		assert.False(t, memClient.receivedAggregatedDiscovery)
+		assert.True(t, memClient.Fresh())
+		// Test the expected resources are returned for the aggregated format.
+		expectedResourceNames := sets.NewString(test.expectedResources...)
+		actualResourceNames := sets.NewString(resourceNamesFromResourceLists([]*metav1.APIResourceList{apiResourceList})...)
+		assert.True(t, expectedResourceNames.Equal(actualResourceNames),
+			"%s: Expected after invalidation resources (%s), got (%s)", test.name, expectedResourceNames.List(), actualResourceNames.List())
+		// Invalidate the cache and retrieve the server groups and resources again.
+		memClient.Invalidate()
+		assert.False(t, memClient.Fresh())
+		apiResourceList, err = memClient.ServerResourcesForGroupVersion(test.groupVersion)
+		require.NoError(t, err)
+		assert.False(t, memClient.receivedAggregatedDiscovery)
+		// Test the expected resources are returned for the aggregated format.
+		actualResourceNames = sets.NewString(resourceNamesFromResourceLists([]*metav1.APIResourceList{apiResourceList})...)
+		assert.True(t, expectedResourceNames.Equal(actualResourceNames),
+			"%s: Expected after invalidation resources (%s), got (%s)", test.name, expectedResourceNames.List(), actualResourceNames.List())
+	}
+}
+
 // Tests function "GroupsAndMaybeResources" when the "aggregated" discovery is returned.
 func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 	tests := []struct {
@@ -1637,6 +1792,16 @@ func TestMemCacheAggregatedServerGroups(t *testing.T) {
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
 			"%s: Expected after invalidation groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
 	}
+}
+
+func resourceNamesFromResourceLists(resourceLists []*metav1.APIResourceList) []string {
+	result := []string{}
+	for _, resourceList := range resourceLists {
+		for _, resource := range resourceList.APIResources {
+			result = append(result, resource.Name)
+		}
+	}
+	return result
 }
 
 func groupNamesFromList(groups *metav1.APIGroupList) []string {
