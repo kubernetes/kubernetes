@@ -310,7 +310,7 @@ func TestUpdateStoreStats(t *testing.T) {
 			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_resource_objects gauge
 apiserver_resource_objects{group="foo",resource="bar"} 10
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
+# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} -1
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
@@ -325,7 +325,7 @@ apiserver_storage_objects{resource="bar.foo"} 10
 			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_resource_objects gauge
 apiserver_resource_objects{group="foo",resource="bar"} 10
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
+# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 100
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
@@ -340,7 +340,7 @@ apiserver_storage_objects{resource="bar.foo"} 10
 			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_resource_objects gauge
 apiserver_resource_objects{group="foo",resource="bar"} 0
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
+# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 0
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
@@ -358,7 +358,7 @@ apiserver_resource_objects{group="foo",resource="bar"} -1
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_storage_objects gauge
 apiserver_storage_objects{resource="bar.foo"} -1
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
+# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} -1
 `,
@@ -385,7 +385,7 @@ func TestDeleteStoreStats(t *testing.T) {
 	UpdateStoreStats(schema.GroupResource{Group: "foo1", Resource: "bar1"}, storage.Stats{ObjectCount: 10}, nil)
 	UpdateStoreStats(schema.GroupResource{Group: "foo2", Resource: "bar2"}, storage.Stats{ObjectCount: 20, EstimatedAverageObjectSizeBytes: 10}, nil)
 
-	expectedMetrics := `# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
+	expectedMetrics := `# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 apiserver_resource_size_estimate_bytes{group="foo1",resource="bar1"} -1
 apiserver_resource_size_estimate_bytes{group="foo2",resource="bar2"} 200
@@ -404,7 +404,7 @@ apiserver_storage_objects{resource="bar2.foo2"} 20
 
 	DeleteStoreStats(schema.GroupResource{Group: "foo1", Resource: "bar1"})
 
-	expectedMetrics = `# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
+	expectedMetrics = `# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 apiserver_resource_size_estimate_bytes{group="foo2",resource="bar2"} 200
 # HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
@@ -421,7 +421,7 @@ apiserver_storage_objects{resource="bar2.foo2"} 20
 	DeleteStoreStats(schema.GroupResource{Group: "foo2", Resource: "bar2"})
 	expectedMetrics = `# HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_storage_objects gauge
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
+# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 `
 	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), "apiserver_storage_objects", "apiserver_resource_objects", "apiserver_resource_size_estimate_bytes"); err != nil {
