@@ -19,6 +19,7 @@ package operationexecutor
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -43,6 +44,7 @@ import (
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/mount-utils"
 )
 
 // this method just tests the volume plugin name that's used in CompleteFunc, the same plugin is also used inside the
@@ -860,4 +862,140 @@ func initTestPlugins(t *testing.T, plugs []volume.VolumePlugin, pluginName strin
 	}
 
 	return pluginMgr, tmpDir
+}
+
+// TestGenerateUnmountVolumeFunc_UnmountsLeakedSubmounts verifies that mounts
+// which leaked into the pod's volume directory (for example a
+// terminationMessagePath bind mount propagated back to the host through a
+// Bidirectional volumeMount) are unmounted before the plugin's TearDown runs,
+// and that TearDown is skipped when they cannot be unmounted.
+func TestGenerateUnmountVolumeFunc_UnmountsLeakedSubmounts(t *testing.T) {
+	const (
+		volumeName = "cache-volume"
+		podUID     = types.UID("pod-uid")
+	)
+
+	tests := []struct {
+		name            string
+		unmountErr      error
+		usePodsDir      bool
+		expectUnmount   bool
+		expectTearDown  bool
+		expectOpErr     bool
+		expectDirExists bool
+	}{
+		{
+			name:           "leaked submount is unmounted before TearDown",
+			usePodsDir:     true,
+			expectUnmount:  true,
+			expectTearDown: true,
+		},
+		{
+			name:            "TearDown is skipped when the submount cannot be unmounted",
+			usePodsDir:      true,
+			unmountErr:      fmt.Errorf("device or resource busy"),
+			expectUnmount:   true,
+			expectOpErr:     true,
+			expectDirExists: true,
+		},
+		{
+			name:           "volume paths outside the pod directory are not touched",
+			usePodsDir:     false,
+			expectTearDown: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Set up a kubelet-style volume host with a fake plugin and a
+			// fake mounter, both rooted in a temp dir.
+			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+			og := getTestOperationGenerator(volumePluginMgr)
+			host := volumePluginMgr.Host
+
+			// Create the pod's volume directory, as SetUp would have.
+			if err := os.MkdirAll(host.GetPodVolumeDir(podUID, fakePlugin.GetPluginName(), volumeName), 0755); err != nil {
+				t.Fatalf("failed to create volume dir: %v", err)
+			}
+			// The mount table always lists canonical paths.
+			volumePath, err := filepath.EvalSymlinks(host.GetPodVolumeDir(podUID, fakePlugin.GetPluginName(), volumeName))
+			if err != nil {
+				t.Fatalf("failed to resolve volume dir: %v", err)
+			}
+			// Simulate the leak: a file inside the volume dir that the mount
+			// table reports as a mount point (a terminationMessagePath bind
+			// mount propagated back from a Bidirectional container mount).
+			leakedMount := filepath.Join(volumePath, "log.txt")
+			if err := os.WriteFile(leakedMount, []byte("termination message"), 0644); err != nil {
+				t.Fatalf("failed to create leaked mount point file: %v", err)
+			}
+
+			// The fake mounter is the mount table; UnmountFunc decides whether
+			// unmounting the leaked mount succeeds in this case.
+			fakeMounter := host.GetMounter().(*mount.FakeMounter)
+			fakeMounter.MountPoints = []mount.MountPoint{{Path: leakedMount, Device: "/dev/leaked"}}
+			fakeMounter.UnmountFunc = func(string) error { return test.unmountErr }
+
+			// The pods dir is how the operation decides whether the volume path
+			// is kubelet-owned. Passing "" makes the volume look like it lives
+			// outside the pod directory (the hostPath situation).
+			podsDir := ""
+			if test.usePodsDir {
+				podsDir = host.GetPodsDir()
+			}
+			volumeToUnmount := MountedVolume{
+				PodName:             volumetypes.UniquePodName(podUID),
+				VolumeName:          v1.UniqueVolumeName(volumeName),
+				InnerVolumeSpecName: volumeName,
+				PluginName:          fakePlugin.GetPluginName(),
+				PodUID:              podUID,
+			}
+
+			// Run the unmount operation exactly as the volume manager would.
+			ops, err := og.GenerateUnmountVolumeFunc(volumeToUnmount, &attemptTrackingTestASW{}, podsDir)
+			if err != nil {
+				t.Fatalf("GenerateUnmountVolumeFunc returned unexpected error: %v", err)
+			}
+			eventErr, detailedErr := ops.Run()
+			if gotErr := eventErr != nil || detailedErr != nil; gotErr != test.expectOpErr {
+				t.Fatalf("operation error = %v / %v, want error: %v", eventErr, detailedErr, test.expectOpErr)
+			}
+
+			// Was the leaked mount unmounted? (Only recorded on success.)
+			unmounted := false
+			for _, action := range fakeMounter.GetLog() {
+				if action.Action == mount.FakeActionUnmount && action.Target == leakedMount {
+					unmounted = true
+				}
+			}
+			if test.expectUnmount && test.unmountErr == nil && !unmounted {
+				t.Errorf("expected %s to be unmounted, fake mounter log: %+v", leakedMount, fakeMounter.GetLog())
+			}
+			if !test.expectUnmount && unmounted {
+				t.Errorf("expected %s not to be unmounted", leakedMount)
+			}
+
+			// Did the plugin's TearDown run? It must be skipped when the leaked
+			// mount is still there, otherwise RemoveAll would descend into it.
+			tearDownCalls := 0
+			for _, unmounter := range fakePlugin.GetUnmounters() {
+				tearDownCalls += unmounter.GetTearDownCallCount()
+			}
+			if test.expectTearDown && tearDownCalls == 0 {
+				t.Errorf("expected TearDown to be called")
+			}
+			if !test.expectTearDown && tearDownCalls != 0 {
+				t.Errorf("expected TearDown not to be called, got %d calls", tearDownCalls)
+			}
+
+			// The volume dir is gone only if TearDown ran.
+			_, statErr := os.Stat(volumePath)
+			if test.expectDirExists && statErr != nil {
+				t.Errorf("expected volume dir to still exist, got: %v", statErr)
+			}
+			if !test.expectDirExists && !os.IsNotExist(statErr) {
+				t.Errorf("expected volume dir to be removed, stat error: %v", statErr)
+			}
+		})
+	}
 }
