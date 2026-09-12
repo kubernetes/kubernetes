@@ -315,10 +315,16 @@ func (r *RuntimeSort) Less(i, j int) bool {
 		klog.Fatalf("Failed to get j values for %#v using %s (%v)", jObj, r.field, err)
 	}
 
-	if len(iValues) == 0 || len(iValues[0]) == 0 {
+	iMissing := len(iValues) == 0 || len(iValues[0]) == 0
+	jMissing := len(jValues) == 0 || len(jValues[0]) == 0
+	// Two missing values are equal; returning true would violate sort.Interface.
+	if iMissing && jMissing {
+		return false
+	}
+	if iMissing {
 		return true
 	}
-	if len(jValues) == 0 || len(jValues[0]) == 0 {
+	if jMissing {
 		return false
 	}
 	iField := iValues[0][0]
@@ -360,10 +366,16 @@ func (t *TableSorter) Less(i, j int) bool {
 	iValues := t.parsedRows[i]
 	jValues := t.parsedRows[j]
 
-	if len(iValues) == 0 || len(iValues[0]) == 0 {
+	iMissing := len(iValues) == 0 || len(iValues[0]) == 0
+	jMissing := len(jValues) == 0 || len(jValues[0]) == 0
+	// Two missing values are equal; returning true would violate sort.Interface.
+	if iMissing && jMissing {
+		return false
+	}
+	if iMissing {
 		return true
 	}
-	if len(jValues) == 0 || len(jValues[0]) == 0 {
+	if jMissing {
 		return false
 	}
 
