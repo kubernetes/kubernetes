@@ -44,6 +44,11 @@ import (
 
 // Config contains all the settings for one of these low-level controllers.
 type Config struct {
+	// Name is the name of this controller's reflector. If unset, the reflector
+	// defaults to the closest source_file.go:line in the call stack that is
+	// outside this package.
+	Name string
+
 	// The queue for your objects - has to be a DeltaFIFO due to
 	// assumptions in the implementation. Your Process() function
 	// should accept the output of this Queue's Pop() method.
@@ -181,6 +186,7 @@ func (c *controller) RunWithContext(ctx context.Context) {
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
+			Name:            c.config.Name,
 			Logger:          &logger,
 			ResyncPeriod:    c.config.FullResyncPeriod,
 			MinWatchTimeout: c.config.MinWatchTimeout,
@@ -664,8 +670,8 @@ type InformerOptions struct {
 	// Optional - if unset no additional transforming is happening.
 	Transform TransformFunc
 
-	// Identifier is used to identify the FIFO for metrics and logging purposes.
-	// If not set, metrics will not be published.
+	// Identifier is used to identify the informer for metrics and logging purposes.
+	// If not set, metrics will not be published and the reflector uses its default name.
 	Identifier InformerNameAndResource
 
 	// InformerMetricsProvider is the metrics provider for the informer.
@@ -1033,6 +1039,7 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 	logger, fifo := newQueueFIFO(logger, options.ObjectType, clientState, options.Transform, options.Identifier, options.InformerMetricsProvider)
 
 	cfg := &Config{
+		Name:             options.Identifier.Name(),
 		Queue:            fifo,
 		ListerWatcher:    options.ListerWatcher,
 		ObjectType:       options.ObjectType,
