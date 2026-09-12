@@ -38,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/features"
+	featurestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -125,6 +127,7 @@ type execPluginClientTestData struct {
 	wantGetCertificateErrorPrefix string
 	wantClientErrorPrefix         string
 	wantMetrics                   *wantMetrics
+	disableStatusErr              bool
 }
 
 func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byte, clientAuthorizedToken, clientCertFileName, clientKeyFileName string) []execPluginClientTestData {
@@ -458,6 +461,63 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 		},
 		{
+			name: "binary fails with status",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
+					{
+						Name:  exitCodeEnvVar,
+						Value: "10",
+					},
+					{
+						Name: outputEnvVar,
+						Value: `{
+							"kind": "Status",
+							"apiVersion": "v1",
+							"status": "Failure",
+							"message": "plugin failed with status",
+							"reason": "Forbidden",
+							"code": 403
+						}`,
+					},
+				}
+			},
+			wantGetCertificateErrorPrefix: "plugin failed with status",
+			wantClientErrorPrefix:         `Get "https`,
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 10, callStatus: "plugin_execution_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
+		},
+		{
+			name: "binary fails with status feature disabled",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
+					{
+						Name:  exitCodeEnvVar,
+						Value: "10",
+					},
+					{
+						Name: outputEnvVar,
+						Value: `{
+							"kind": "Status",
+							"apiVersion": "v1",
+							"status": "Failure",
+							"message": "plugin failed with status",
+							"reason": "Forbidden",
+							"code": 403
+						}`,
+					},
+				}
+			},
+			disableStatusErr:              true,
+			wantGetCertificateErrorPrefix: "exec: executable testdata/exec-plugin.sh failed with exit code 10",
+			wantClientErrorPrefix:         `Get "https`,
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 10, callStatus: "plugin_execution_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
+		},
+		{
 			name: "binary denied by denyall policy",
 			clientConfigFunc: func(c *rest.Config) {
 				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyDenyAll
@@ -573,6 +633,9 @@ func TestExecPluginViaClient(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if test.disableStatusErr {
+				featurestesting.SetFeatureDuringTest(t, features.ExecPluginStatusError, false)
+			}
 			actualMetrics := captureMetrics(t)
 
 			var authorizationHeaderValues syncedHeaderValues
