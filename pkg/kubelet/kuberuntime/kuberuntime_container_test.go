@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -48,6 +49,19 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 )
+
+type blockingLifecycleRunner struct {
+	started chan struct{}
+	release chan struct{}
+	done    chan struct{}
+}
+
+func (r *blockingLifecycleRunner) Run(_ context.Context, _ kubecontainer.ContainerID, _ *v1.Pod, _ *v1.Container, _ *v1.LifecycleHandler) (string, error) {
+	close(r.started)
+	defer close(r.done)
+	<-r.release
+	return "", nil
+}
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
 func TestRemoveContainer(t *testing.T) {
@@ -282,6 +296,29 @@ func TestToKubeContainerStatus(t *testing.T) {
 				ExitCode:   121,
 				Reason:     "GotKilled",
 				Message:    "The container was killed",
+			},
+		},
+		"container whose start was cancelled": {
+			input: &runtimeapi.ContainerStatus{
+				Id:         cid.ID,
+				Metadata:   meta,
+				Image:      imageSpec,
+				State:      runtimeapi.ContainerState_CONTAINER_EXITED,
+				CreatedAt:  createdAt,
+				FinishedAt: finishedAt,
+				ExitCode:   int32(128),
+				Reason:     "StartError",
+				Message:    "context canceled",
+			},
+			expected: &kubecontainer.Status{
+				ID:         *cid,
+				Image:      imageSpec.Image,
+				State:      kubecontainer.ContainerStateExited,
+				CreatedAt:  time.Unix(0, createdAt),
+				FinishedAt: time.Unix(0, finishedAt),
+				ExitCode:   128,
+				Reason:     "StartError",
+				Message:    "context canceled",
 			},
 		},
 		"unknown container": {
@@ -587,6 +624,59 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 			actual := m.toKubeContainerStatus(tCtx, podUID, cStatus, cid.Type)
 			assert.EqualValues(t, test.expected, actual.User, desc)
 		})
+	}
+}
+
+func TestExecutePreStopHookCancellation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	runner := &blockingLifecycleRunner{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		done:    make(chan struct{}),
+	}
+	m.runner = runner
+	defer func() {
+		select {
+		case <-runner.done:
+		default:
+			close(runner.release)
+			<-runner.done
+		}
+	}()
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod", Name: "pod", Namespace: "test"}}
+	container := &v1.Container{
+		Name:      "container",
+		Lifecycle: &v1.Lifecycle{PreStop: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"block"}}}},
+	}
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "container"}
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+	hookDone := make(chan struct{})
+	go func() {
+		defer close(hookDone)
+		m.executePreStopHook(ctx, pod, containerID, container, 60)
+	}()
+
+	select {
+	case <-runner.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("PreStop hook did not start")
+	}
+	cancel()
+	select {
+	case <-hookDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("executePreStopHook did not return after its context was cancelled")
+	}
+
+	close(runner.release)
+	select {
+	case <-runner.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("blocking lifecycle runner did not exit after release")
 	}
 }
 

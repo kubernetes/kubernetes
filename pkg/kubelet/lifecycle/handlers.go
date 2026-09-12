@@ -144,6 +144,9 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 	if err != nil {
 		return err
 	}
+	// A shortened pod deletion grace period must interrupt an in-flight HTTP
+	// lifecycle hook instead of leaving the pod worker on the original timeout.
+	req = req.Clone(ctx)
 	resp, err := hr.httpDoer.Do(req)
 	discardHTTPRespBody(resp)
 
