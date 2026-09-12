@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
+	// See https://github.com/kubernetes/kubernetes/issues/115489 for tracking.
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/server/healthz"
 	internalapi "k8s.io/cri-api/pkg/apis"

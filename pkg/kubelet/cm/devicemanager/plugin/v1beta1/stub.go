@@ -344,6 +344,7 @@ func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartConta
 func (m *Stub) ListAndWatch(_ *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	// Use klog.TODO() because this method must match the generated device
 	// plugin gRPC signature in api_grpc.pb.go, which does not accept a logger.
+	// See https://github.com/kubernetes/kubernetes/issues/115484 for tracking.
 	klog.TODO().Info("ListAndWatch")
 
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: m.devs})

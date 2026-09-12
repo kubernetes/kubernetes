@@ -909,6 +909,7 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		// in real use as the result of this. Should also consider to parallelize device
 		// plugin Allocate grpc calls if it becomes common that a container may require
 		// resources from multiple device plugins.
+		// See https://github.com/kubernetes/kubernetes/issues/115474 for tracking.
 		m.mutex.Lock()
 		eI, ok := m.endpoints[resource]
 		m.mutex.Unlock()
