@@ -42771,6 +42771,7 @@ func schema_k8sio_api_networking_v1_IngressClass(ref common.ReferenceCallback) c
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -42900,6 +42901,7 @@ func schema_k8sio_api_networking_v1_IngressClassSpec(ref common.ReferenceCallbac
 						},
 					},
 				},
+				Required: []string{"controller"},
 			},
 		},
 		Dependencies: []string{
@@ -43069,7 +43071,6 @@ func schema_k8sio_api_networking_v1_IngressPortStatus(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"port", "protocol"},
 			},
 		},
 	}
@@ -44173,6 +44174,7 @@ func schema_k8sio_api_networking_v1beta1_IngressClass(ref common.ReferenceCallba
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -44262,7 +44264,7 @@ func schema_k8sio_api_networking_v1beta1_IngressClassParametersReference(ref com
 					},
 					"scope": {
 						SchemaProps: spec.SchemaProps{
-							Description: "scope represents if this refers to a cluster or namespace scoped resource. This may be set to \"Cluster\" (default) or \"Namespace\".",
+							Description: "scope represents if this refers to a cluster or namespace scoped resource. This may be set to \"Cluster\" (default) or \"Namespace\". Note: unlike networking.k8s.io/v1, this API version has no defaulting for this field, so it must be set explicitly.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -44302,6 +44304,7 @@ func schema_k8sio_api_networking_v1beta1_IngressClassSpec(ref common.ReferenceCa
 						},
 					},
 				},
+				Required: []string{"controller"},
 			},
 		},
 		Dependencies: []string{
@@ -44471,7 +44474,6 @@ func schema_k8sio_api_networking_v1beta1_IngressPortStatus(ref common.ReferenceC
 						},
 					},
 				},
-				Required: []string{"port", "protocol"},
 			},
 		},
 	}
