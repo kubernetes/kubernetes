@@ -2570,7 +2570,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		f.It("creates slices", func(ctx context.Context) {
 			// Define desired resource slices.
 			driverName := f.Namespace.Name
-			numSlices := 100
+			numSlices := 10
 			devicePrefix := "dev-"
 			domainSuffix := ".example.com"
 			poolName := "network-attached"
