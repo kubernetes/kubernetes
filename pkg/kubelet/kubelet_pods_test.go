@@ -8715,6 +8715,7 @@ func TestGetentUserExists(t *testing.T) {
 	}
 	tests := []struct {
 		name       string
+		user       string // account to look up; "kubelet" when empty
 		getentExit string // shell script body for a fake "getent"; empty means no getent on PATH
 		wantFound  bool
 		wantErr    bool
@@ -8735,8 +8736,22 @@ func TestGetentUserExists(t *testing.T) {
 			wantErr:    true,
 		},
 		{
-			name:      "getent not installed",
+			// root is in /etc/passwd on any Linux host, so os/user sees it without getent
+			name:      "getent not installed, account is in passwd",
+			user:      "root",
+			wantFound: true,
+		},
+		{
+			name:      "getent not installed, no such account",
+			user:      "kubelet-test-no-such-account",
 			wantFound: false,
+		},
+		{
+			// once getent runs, its answer stands, even for an account os/user can see
+			name:       "getent reports not found for a local account",
+			user:       "root",
+			getentExit: "exit 2",
+			wantFound:  false,
 		},
 	}
 	for _, tc := range tests {
@@ -8750,7 +8765,12 @@ func TestGetentUserExists(t *testing.T) {
 			}
 			t.Setenv("PATH", binDir)
 
-			found, err := getentUserExists("kubelet")
+			logger, _ := ktesting.NewTestContext(t)
+			name := tc.user
+			if name == "" {
+				name = "kubelet"
+			}
+			found, err := getentUserExists(logger, name)
 			if tc.wantErr {
 				if err == nil {
 					t.Errorf("%s: expected error, got nil", tc.name)
@@ -8764,6 +8784,38 @@ func TestGetentUserExists(t *testing.T) {
 				t.Errorf("%s: got found=%v, want %v", tc.name, found, tc.wantFound)
 			}
 		})
+	}
+}
+func TestGetentUserExistsRelativePath(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("getent is a Linux tool")
+	}
+	dir := t.TempDir()
+	ran := filepath.Join(dir, "ran")
+	t.Setenv("KUBELET_TEST_MARKER", ran)
+	// exits 2, so a getent that did run would also report root as missing
+	script := "#!/bin/sh\n: > \"$KUBELET_TEST_MARKER\"\nexit 2\n"
+	if err := os.WriteFile(filepath.Join(dir, "getent"), []byte(script), 0o755); err != nil {
+		t.Fatalf("writing fake getent: %v", err)
+	}
+	// an inherited execerrdot=0 would let LookPath hand back the relative path
+	godebug := "execerrdot=1"
+	if v := os.Getenv("GODEBUG"); v != "" {
+		godebug = v + "," + godebug
+	}
+	t.Setenv("GODEBUG", godebug)
+	t.Chdir(dir)
+	t.Setenv("PATH", ".")
+
+	logger, _ := ktesting.NewTestContext(t)
+	found, err := getentUserExists(logger, "root")
+	if err != nil || !found {
+		t.Errorf("got found=%v err=%v, want the os/user fallback to report root", found, err)
+	}
+	if _, err := os.Stat(ran); err == nil {
+		t.Errorf("getent was executed from the working directory")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("checking the marker: %v", err)
 	}
 }
 
