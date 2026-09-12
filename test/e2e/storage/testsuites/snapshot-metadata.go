@@ -307,11 +307,6 @@ func (s *snapshotMetadataTestSuite) DefineTests(driver storageframework.TestDriv
 
 		config = smDriver.PrepareTest(ctx, f)
 
-		// Create snapshot metadata resources (CRD is already created by test runner script)
-		ginkgo.By("Creating snapshot metadata resources")
-		err = storageutils.CreateSnapshotMetadataResources(ctx, f, config.Driver.GetDriverInfo().Name, config.DriverNamespace.Name)
-		framework.ExpectNoError(err, "Failed to create snapshot metadata resources")
-
 		pattern.VolMode = v1.PersistentVolumeBlock
 		volume = storageframework.CreateVolumeResource(ctx, smDriver, config, pattern, s.GetTestSuiteInfo().SupportedSizeRange)
 		testPVC = volume.Pvc
@@ -359,14 +354,6 @@ func (s *snapshotMetadataTestSuite) DefineTests(driver storageframework.TestDriv
 			backupClientPod = nil
 		}
 
-		// Cleanup snapshot metadata resources
-		if config != nil {
-			ginkgo.By("Cleaning up snapshot metadata resources")
-			err := storageutils.CleanupSnapshotMetadataResources(ctx, f, config.Driver.GetDriverInfo().Name, config.DriverNamespace.Name)
-			if err != nil {
-				framework.Logf("Warning: failed to cleanup snapshot metadata resources: %v", err)
-			}
-		}
 	})
 
 	ginkgo.It("should verify GetMetadataDelta", func(ctx context.Context) {
