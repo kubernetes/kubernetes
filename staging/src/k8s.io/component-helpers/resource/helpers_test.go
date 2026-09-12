@@ -26,6 +26,35 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+func TestResourceNameHelpers(t *testing.T) {
+	tests := []struct {
+		name     string
+		helper   func(v1.ResourceName) bool
+		resource v1.ResourceName
+		want     bool
+	}{
+		{name: "extended", helper: IsExtendedResourceName, resource: "example.com/gpu", want: true},
+		{name: "native is not extended", helper: IsExtendedResourceName, resource: v1.ResourceCPU, want: false},
+		{name: "prefixed native is not extended", helper: IsExtendedResourceName, resource: "kubernetes.io/gpu", want: false},
+		{name: "quota request is not extended", helper: IsExtendedResourceName, resource: "requests.example.com/gpu", want: false},
+		{name: "invalid is not extended", helper: IsExtendedResourceName, resource: "example.com/gpu!", want: false},
+		{name: "prefixed native", helper: IsPrefixedNativeResource, resource: "example.kubernetes.io/gpu", want: true},
+		{name: "not prefixed native", helper: IsPrefixedNativeResource, resource: "example.com/gpu", want: false},
+		{name: "huge page", helper: IsHugePageResourceName, resource: "hugepages-2Mi", want: true},
+		{name: "not huge page", helper: IsHugePageResourceName, resource: v1.ResourceMemory, want: false},
+		{name: "attachable volume", helper: IsAttachableVolumeResourceName, resource: "attachable-volumes-csi-driver", want: true},
+		{name: "not attachable volume", helper: IsAttachableVolumeResourceName, resource: v1.ResourceStorage, want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.helper(test.resource); got != test.want {
+				t.Errorf("helper(%q) = %t, want %t", test.resource, got, test.want)
+			}
+		})
+	}
+}
+
 func TestPodRequestsAndLimits(t *testing.T) {
 	cases := []struct {
 		pod              *v1.Pod

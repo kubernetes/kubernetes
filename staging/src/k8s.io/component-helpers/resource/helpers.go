@@ -17,13 +17,49 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
+
+// IsExtendedResourceName returns true if the resource name is not native, does
+// not use the quota requests prefix, and is valid when converted to a quota
+// resource name.
+func IsExtendedResourceName(name v1.ResourceName) bool {
+	if isNativeResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
+		return false
+	}
+
+	nameForQuota := fmt.Sprintf("%s%s", v1.DefaultResourceRequestsPrefix, name)
+	return len(validation.IsQualifiedName(nameForQuota)) == 0
+}
+
+// IsPrefixedNativeResource returns true if the resource name is in the
+// *kubernetes.io/ namespace.
+func IsPrefixedNativeResource(name v1.ResourceName) bool {
+	return strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
+}
+
+func isNativeResource(name v1.ResourceName) bool {
+	return !strings.Contains(string(name), "/") || IsPrefixedNativeResource(name)
+}
+
+// IsHugePageResourceName returns true if the resource name has the huge page
+// resource prefix.
+func IsHugePageResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+}
+
+// IsAttachableVolumeResourceName returns true if the resource name has the
+// attachable volume resource prefix.
+func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
+}
 
 // ContainerType signifies container type
 type ContainerType int

@@ -33,7 +33,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -442,7 +441,7 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 		// Pod level hugepage limits must be always equal or greater than the aggregated
 		// container level hugepage limits + DRA limits
 		for resourceName, ctrLims := range limitsWithoutPodLevel {
-			if !v1helper.IsHugePageResourceName(resourceName) {
+			if !resourcehelper.IsHugePageResourceName(resourceName) {
 				continue
 			}
 
@@ -464,7 +463,7 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 
 		for _, ctr := range pod.Spec.Containers {
 			for resourceName, ctrLimit := range ctr.Resources.Limits {
-				if v1helper.IsHugePageResourceName(resourceName) {
+				if resourcehelper.IsHugePageResourceName(resourceName) {
 					continue
 				}
 
@@ -592,7 +591,7 @@ func (pl *DynamicResources) nodeFitsResources(nodeInfo fwk.NodeInfo, podRequest 
 	}
 
 	for resName, reqQuant := range podRequest.ScalarResources {
-		if v1helper.IsHugePageResourceName(resName) {
+		if resourcehelper.IsHugePageResourceName(resName) {
 			nodeCapacity := nodeInfo.GetAllocatable().GetScalarResources()[resName]
 			nodeRequested := nodeInfo.GetRequested().GetScalarResources()[resName]
 			available := nodeCapacity - nodeRequested

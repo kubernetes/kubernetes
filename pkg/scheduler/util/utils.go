@@ -35,10 +35,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 var maxPodStartTime = metav1.NewTime(time.Unix(0, math.MaxInt64).UTC())
@@ -203,14 +203,14 @@ func DeletePod(ctx context.Context, cs kubernetes.Interface, pod *v1.Pod) error 
 
 // IsScalarResourceName validates the resource for Extended, Hugepages, Native and AttachableVolume resources
 func IsScalarResourceName(name v1.ResourceName) bool {
-	return v1helper.IsExtendedResourceName(name) || v1helper.IsHugePageResourceName(name) ||
-		v1helper.IsPrefixedNativeResource(name) || v1helper.IsAttachableVolumeResourceName(name)
+	return resourcehelper.IsExtendedResourceName(name) || resourcehelper.IsHugePageResourceName(name) ||
+		resourcehelper.IsPrefixedNativeResource(name) || resourcehelper.IsAttachableVolumeResourceName(name)
 }
 
 // IsDRAExtendedResourceName returns true when name is an extended resource name, or an implicit extended resource name
 // derived from device class name with the format of deviceclass.resource.kubernetes.io/<device class name>
 func IsDRAExtendedResourceName(name v1.ResourceName) bool {
-	return v1helper.IsExtendedResourceName(name) || strings.HasPrefix(string(name), resourceapi.ResourceDeviceClassPrefix)
+	return resourcehelper.IsExtendedResourceName(name) || strings.HasPrefix(string(name), resourceapi.ResourceDeviceClassPrefix)
 }
 
 // As converts two objects to the given type.
