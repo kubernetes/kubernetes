@@ -21,9 +21,11 @@ import (
 	"testing"
 
 	. "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestFilter(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	table := []Event{
 		{Type: Added, Object: testType("foo")},
 		{Type: Added, Object: testType("bar")},
@@ -32,7 +34,7 @@ func TestFilter(t *testing.T) {
 		{Type: Added, Object: testType("zoo")},
 	}
 
-	source := NewFake()
+	source := NewFakeWithOptions(FakeOptions{Logger: &logger})
 	filtered := Filter(source, func(e Event) (Event, bool) {
 		return e, e.Object.(testType)[0] != 'b'
 	})
@@ -59,7 +61,8 @@ func TestFilter(t *testing.T) {
 }
 
 func TestFilterStop(t *testing.T) {
-	source := NewFake()
+	logger, _ := ktesting.NewTestContext(t)
+	source := NewFakeWithOptions(FakeOptions{Logger: &logger})
 	filtered := Filter(source, func(e Event) (Event, bool) {
 		return e, e.Object.(testType)[0] != 'b'
 	})
@@ -84,6 +87,7 @@ func TestFilterStop(t *testing.T) {
 }
 
 func TestRecorder(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	events := []Event{
 		{Type: Added, Object: testType("foo")},
 		{Type: Added, Object: testType("bar")},
@@ -92,7 +96,7 @@ func TestRecorder(t *testing.T) {
 		{Type: Added, Object: testType("zoo")},
 	}
 
-	source := NewFake()
+	source := NewFakeWithOptions(FakeOptions{Logger: &logger})
 	go func() {
 		for _, item := range events {
 			source.Action(item.Type, item.Object)
