@@ -511,6 +511,35 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			expectedRawValue:    numContainersPerPod * 600,
 		},
 		{
+			name: "scale up: replica count overflow saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				resource: &cpuResource{
+					requests: cpuRequests(3, "1.0"),
+					levels:   makePodMetricLevels(15_000_000_000, 15_000_000_000, 15_000_000_000),
+				},
+			},
+			targetUtilization:   1,
+			expectedReplicas:    math.MaxInt32,
+			expectedUtilization: 1_500_000_000,
+			expectedRawValue:    numContainersPerPod * 15_000_000_000,
+		},
+		{
+			name: "scale up: replica count overflow with unready pod saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				podReadiness:    []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
+				resource: &cpuResource{
+					requests: cpuRequests(3, "1.0"),
+					levels:   makePodMetricLevels(15_000_000_000, 15_000_000_000, 15_000_000_000),
+				},
+			},
+			targetUtilization:   1,
+			expectedReplicas:    math.MaxInt32,
+			expectedUtilization: 1_500_000_000,
+			expectedRawValue:    numContainersPerPod * 15_000_000_000,
+		},
+		{
 			name: "scale up: hot-CPU container scales less",
 			fixture: calcScenario{
 				currentReplicas: 3,
@@ -1062,6 +1091,37 @@ func TestReplicaCalcPodMetric(t *testing.T) {
 			expectedUsage:    20000,
 		},
 		{
+			name: "scale up: replica count overflow saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 2,
+				metric:          podMetric(1_500_000_000, 1_500_000_000),
+			},
+			targetUsage:      1,
+			expectedReplicas: math.MaxInt32,
+			expectedUsage:    1_500_000_000,
+		},
+		{
+			name: "scale up: replica count overflow with missing metric saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				metric:          podMetric(1_500_000_000, 1_500_000_000),
+			},
+			targetUsage:      1,
+			expectedReplicas: math.MaxInt32,
+			expectedUsage:    1_500_000_000,
+		},
+		{
+			name: "scale up: replica count overflow with unready pod saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				podPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodPending},
+				metric:          podMetric(1_500_000_000, 1_500_000_000, 1_500_000_000),
+			},
+			targetUsage:      1,
+			expectedReplicas: math.MaxInt32,
+			expectedUsage:    1_500_000_000,
+		},
+		{
 			name: "scale up: unready hot-CPU pod scales less",
 			fixture: calcScenario{
 				currentReplicas: 3,
@@ -1185,6 +1245,16 @@ func TestReplicaCalcObjectMetric(t *testing.T) {
 			expectedUsage:    math.MaxInt64,
 		},
 		{
+			name: "scale up from zero: replica count overflow saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 0,
+				metric:          objectMetric(math.MaxInt32 + 1),
+			},
+			targetUsage:      1,
+			expectedReplicas: math.MaxInt32,
+			expectedUsage:    math.MaxInt32 + 1,
+		},
+		{
 			name: "scale up: ignores unready pods",
 			fixture: calcScenario{
 				currentReplicas: 3,
@@ -1272,6 +1342,16 @@ func TestReplicaCalcObjectPerPodMetric(t *testing.T) {
 			perPodTargetUsage: 5000,
 			expectedReplicas:  4,
 			expectedUsage:     6667,
+		},
+		{
+			name: "scale up: replica count overflow saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				metric:          perPodMetric(math.MaxInt32 + 1),
+			},
+			perPodTargetUsage: 1,
+			expectedReplicas:  math.MaxInt32,
+			expectedUsage:     715827883, // ceil((MaxInt32 + 1) / 3)
 		},
 		{
 			name: "scale down",
@@ -1566,6 +1646,20 @@ func TestReplicaCalcResourceMissingMetrics(t *testing.T) {
 			expectedReplicas:    3,
 			expectedUtilization: 24,
 			expectedRawValue:    495, // numContainersPerPod * 247, for sufficiently large values of 247.
+		},
+		{
+			name: "some pods missing metrics: replica count overflow saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				resource: &cpuResource{
+					requests: cpuRequests(3, "1.0"),
+					levels:   makePodMetricLevels(15_000_000_000, 15_000_000_000),
+				},
+			},
+			targetUtilization:   1,
+			expectedReplicas:    math.MaxInt32,
+			expectedUtilization: 1_500_000_000,
+			expectedRawValue:    numContainersPerPod * 15_000_000_000,
 		},
 		{
 			name: "no change: metric equal to target",
