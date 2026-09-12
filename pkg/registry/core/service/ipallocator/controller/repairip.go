@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -416,12 +417,9 @@ func (r *RepairIPAddress) syncService(key string) error {
 				continue
 			}
 			// the IPAddress is duplicate but current Service is not the referenced, it has to be recreated
-			for _, clusterIP := range refService.Spec.ClusterIPs {
-				if ipAddress.Name == clusterIP {
-					r.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPAlreadyAllocated", "ClusterIPAllocation", "Cluster IP [%v]:%s was assigned to multiple services; please recreate service", family, ip)
-					runtime.HandleError(fmt.Errorf("the cluster IP [%v]:%s for service %s/%s was assigned to other services %s/%s; please recreate", family, ip, svc.Namespace, svc.Name, refService.Namespace, refService.Name))
-					break
-				}
+			if slices.Contains(refService.Spec.ClusterIPs, ipAddress.Name) {
+				r.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPAlreadyAllocated", "ClusterIPAllocation", "Cluster IP [%v]:%s was assigned to multiple services; please recreate service", family, ip)
+				runtime.HandleError(fmt.Errorf("the cluster IP [%v]:%s for service %s/%s was assigned to other services %s/%s; please recreate", family, ip, svc.Namespace, svc.Name, refService.Namespace, refService.Name))
 			}
 		}
 
@@ -540,10 +538,8 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 	}
 	// The service exists, we have checked in previous loop that all Service to IPAddress are correct
 	// but we also have to check the reverse, that the IPAddress to Service relation is correct
-	for _, clusterIP := range svc.Spec.ClusterIPs {
-		if ipAddress.Name == clusterIP {
-			return nil
-		}
+	if slices.Contains(svc.Spec.ClusterIPs, ipAddress.Name) {
+		return nil
 	}
 
 	// There is a special case when we "break the immutability" of the Service ClusterIPs,
