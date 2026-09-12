@@ -435,6 +435,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
 			},
 		},
+		"invalid update of gang minCount to 0": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1")),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setPodGroupMinCount(0)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "schedulingPolicy", "gang", "minCount"), ""),
+			},
+		},
 		"invalid update of gang minCount": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
 			updateObj: mkValidPodGroup(setResourceVersion("1"), setPodGroupMinCount(-1)),
@@ -447,6 +454,30 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidPodGroup(setResourceVersion("1"), setBasicPolicy()),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
+			},
+		},
+		"invalid update from basic to gang policy": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1"), setBasicPolicy()),
+			updateObj: mkValidPodGroup(setResourceVersion("1")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
+			},
+		},
+		"invalid update from basic policy with neither basic nor gang": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1"), setBasicPolicy()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), clearPodGroupPolicy()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+			},
+		},
+		"invalid update from basic policy with both basic and gang": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1"), setBasicPolicy()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setBothPolicies()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
 				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
 			},
 		},
