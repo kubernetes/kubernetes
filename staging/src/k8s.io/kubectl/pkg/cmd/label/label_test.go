@@ -28,15 +28,95 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 )
+
+// testFactory is a minimal cmdutil.Factory implementation for exercising the
+// label command. Only the methods the command uses are implemented; any other
+// method panics via the embedded nil Factory.
+type testFactory struct {
+	cmdutil.Factory
+
+	namespace          string
+	unstructuredClient resource.RESTClient
+}
+
+func (f *testFactory) ToRawKubeConfigLoader() clientcmd.ClientConfig {
+	return &fakeClientConfig{namespace: f.namespace}
+}
+
+func (f *testFactory) NewBuilder() *resource.Builder {
+	return resource.NewFakeBuilder(
+		func(version schema.GroupVersion) (resource.RESTClient, error) {
+			return f.unstructuredClient, nil
+		},
+		func() (meta.RESTMapper, error) {
+			return testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme), nil
+		},
+		func() (restmapper.CategoryExpander, error) {
+			return resource.FakeCategoryExpander, nil
+		},
+	)
+}
+
+func (f *testFactory) UnstructuredClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+	return f.unstructuredClient, nil
+}
+
+// fakeClientConfig implements clientcmd.ClientConfig, resolving the namespace
+// the label command runs against.
+type fakeClientConfig struct {
+	namespace string
+}
+
+func (c *fakeClientConfig) RawConfig() (clientcmdapi.Config, error) {
+	return clientcmdapi.Config{}, nil
+}
+
+func (c *fakeClientConfig) ClientConfig() (*restclient.Config, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (c *fakeClientConfig) Namespace() (string, bool, error) {
+	return c.namespace, len(c.namespace) > 0, nil
+}
+
+func (c *fakeClientConfig) ConfigAccess() clientcmd.ConfigAccess {
+	return nil
+}
+
+func defaultHeader() http.Header {
+	header := http.Header{}
+	header.Set("Content-Type", runtime.ContentTypeJSON)
+	return header
+}
+
+func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
+	return io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
+}
+
+func testPodList() *v1.PodList {
+	return &v1.PodList{
+		ListMeta: metav1.ListMeta{ResourceVersion: "15"},
+		Items: []v1.Pod{
+			{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"}},
+		},
+	}
+}
 
 func TestValidateLabels(t *testing.T) {
 	tests := []struct {
@@ -357,10 +437,7 @@ func TestLabelErrors(t *testing.T) {
 
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
-			defer tf.Cleanup()
-
-			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			tf := &testFactory{namespace: "test"}
 
 			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 			buf := bytes.NewBuffer([]byte{})
@@ -368,9 +445,9 @@ func TestLabelErrors(t *testing.T) {
 			cmd.SetOut(buf)
 			cmd.SetErr(buf)
 
-			opts := NewLabelOptions(ioStreams)
-			opts.list = testCase.list
-			err := opts.Complete(tf, cmd, testCase.args)
+			flags := NewLabelFlags(ioStreams)
+			flags.List = testCase.list
+			opts, err := flags.ToOptions(tf, cmd, testCase.args)
 			if err == nil {
 				err = opts.Validate()
 			}
@@ -389,20 +466,18 @@ func TestLabelErrors(t *testing.T) {
 }
 
 func TestLabelForResourceFromFile(t *testing.T) {
-	pods, _, _ := cmdtesting.TestData()
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
+	pods := testPodList()
 
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	tf.UnstructuredClient = &fake.RESTClient{
+	unstructuredClient := &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
 				case "/namespaces/test/replicationcontrollers/cassandra":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -410,7 +485,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/replicationcontrollers/cassandra":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -421,13 +496,13 @@ func TestLabelForResourceFromFile(t *testing.T) {
 			}
 		}),
 	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	tf := &testFactory{namespace: "test", unstructuredClient: unstructuredClient}
 
 	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, ioStreams)
-	opts := NewLabelOptions(ioStreams)
-	opts.Filenames = []string{"../../../testdata/controller.yaml"}
-	err := opts.Complete(tf, cmd, []string{"a=b"})
+	flags := NewLabelFlags(ioStreams)
+	flags.Filenames = []string{"../../../testdata/controller.yaml"}
+	opts, err := flags.ToOptions(tf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -443,24 +518,21 @@ func TestLabelForResourceFromFile(t *testing.T) {
 }
 
 func TestLabelLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	tf.UnstructuredClient = &fake.RESTClient{
+	unstructuredClient := &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
 		}),
 	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	tf := &testFactory{namespace: "test", unstructuredClient: unstructuredClient}
 
 	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, ioStreams)
-	opts := NewLabelOptions(ioStreams)
-	opts.Filenames = []string{"../../../testdata/controller.yaml"}
-	opts.local = true
-	err := opts.Complete(tf, cmd, []string{"a=b"})
+	flags := NewLabelFlags(ioStreams)
+	flags.Filenames = []string{"../../../testdata/controller.yaml"}
+	flags.Local = true
+	opts, err := flags.ToOptions(tf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -476,20 +548,18 @@ func TestLabelLocal(t *testing.T) {
 }
 
 func TestLabelMultipleObjects(t *testing.T) {
-	pods, _, _ := cmdtesting.TestData()
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
+	pods := testPodList()
 
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	tf.UnstructuredClient = &fake.RESTClient{
+	unstructuredClient := &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
 				case "/namespaces/test/pods":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -497,9 +567,9 @@ func TestLabelMultipleObjects(t *testing.T) {
 			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
 				case "/namespaces/test/pods/bar":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[1])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &pods.Items[1])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -510,13 +580,13 @@ func TestLabelMultipleObjects(t *testing.T) {
 			}
 		}),
 	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	tf := &testFactory{namespace: "test", unstructuredClient: unstructuredClient}
 
 	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
-	opts := NewLabelOptions(ioStreams)
-	opts.all = true
+	flags := NewLabelFlags(ioStreams)
+	flags.All = true
 	cmd := NewCmdLabel(tf, ioStreams)
-	err := opts.Complete(tf, cmd, []string{"pods", "a=b"})
+	opts, err := flags.ToOptions(tf, cmd, []string{"pods", "a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -532,10 +602,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 }
 
 func TestLabelResourceVersion(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	tf.UnstructuredClient = &fake.RESTClient{
+	unstructuredClient := &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -545,7 +612,7 @@ func TestLabelResourceVersion(t *testing.T) {
 				case "/namespaces/test/pods/foo":
 					return &http.Response{
 						StatusCode: http.StatusOK,
-						Header:     cmdtesting.DefaultHeader(),
+						Header:     defaultHeader(),
 						Body: io.NopCloser(bytes.NewBufferString(
 							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"10"}}`,
 						))}, nil
@@ -565,7 +632,7 @@ func TestLabelResourceVersion(t *testing.T) {
 					}
 					return &http.Response{
 						StatusCode: http.StatusOK,
-						Header:     cmdtesting.DefaultHeader(),
+						Header:     defaultHeader(),
 						Body: io.NopCloser(bytes.NewBufferString(
 							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"11"}}`,
 						))}, nil
@@ -579,16 +646,17 @@ func TestLabelResourceVersion(t *testing.T) {
 			}
 		}),
 	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	tf := &testFactory{namespace: "test", unstructuredClient: unstructuredClient}
 
 	iostreams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
-	options := NewLabelOptions(iostreams)
-	options.resourceVersion = "10"
+	flags := NewLabelFlags(iostreams)
+	flags.ResourceVersion = "10"
 	args := []string{"pods/foo", "a=b"}
-	if err := options.Complete(tf, cmd, args); err != nil {
+	options, err := flags.ToOptions(tf, cmd, args)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(); err != nil {
@@ -600,10 +668,7 @@ func TestLabelResourceVersion(t *testing.T) {
 }
 
 func TestRunLabelMsg(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	tf.UnstructuredClient = &fake.RESTClient{
+	unstructuredClient := &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -613,7 +678,7 @@ func TestRunLabelMsg(t *testing.T) {
 				case "/namespaces/test/pods/foo":
 					return &http.Response{
 						StatusCode: http.StatusOK,
-						Header:     cmdtesting.DefaultHeader(),
+						Header:     defaultHeader(),
 						Body: io.NopCloser(bytes.NewBufferString(
 							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","labels":{"existing":"abc"}}}`,
 						))}, nil
@@ -626,7 +691,7 @@ func TestRunLabelMsg(t *testing.T) {
 				case "/namespaces/test/pods/foo":
 					return &http.Response{
 						StatusCode: http.StatusOK,
-						Header:     cmdtesting.DefaultHeader(),
+						Header:     defaultHeader(),
 						Body: io.NopCloser(bytes.NewBufferString(
 							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","labels":{"existing":"abc"}}}`,
 						))}, nil
@@ -640,7 +705,7 @@ func TestRunLabelMsg(t *testing.T) {
 			}
 		}),
 	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	tf := &testFactory{namespace: "test", unstructuredClient: unstructuredClient}
 
 	testCases := []struct {
 		name          string
@@ -713,18 +778,19 @@ pod/foo not labeled
 			if tc.dryRun != "" {
 				cmd.Flags().Set("dry-run", tc.dryRun)
 			}
-			options := NewLabelOptions(iostreams)
+			flags := NewLabelFlags(iostreams)
 			if tc.overwrite {
-				options.overwrite = true
+				flags.Overwrite = true
 			}
-			if err := options.Complete(tf, cmd, tc.args); err != nil {
+			options, err := flags.ToOptions(tf, cmd, tc.args)
+			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if err := options.Validate(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			err := options.RunLabel()
+			err = options.RunLabel()
 			if tc.expectedError == nil {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
