@@ -28,6 +28,7 @@ import (
 	cadvisorfs "github.com/google/cadvisor/lib/fs"
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -149,6 +150,11 @@ func TestCRIListPodStats(t *testing.T) {
 		container7      = makeFakeContainer(sandbox5, cName7, 0, true)
 		containerStats7 = makeFakeContainerStats(container7, imageFsMountpoint)
 
+		// Running pod that is unknown to the PodManager (e.g. already deleted)
+		sandbox6        = makeFakePodSandbox("sandbox6-name", "sandbox6-uid", "sandbox6-ns", false)
+		container9      = makeFakeContainer(sandbox6, cName0, 0, false)
+		containerStats9 = makeFakeContainerStats(container9, imageFsMountpoint)
+
 		podLogName0  = "pod-log-0"
 		podLogName1  = "pod-log-1"
 		podLogStats0 = makeFakeLogStats(5000)
@@ -162,6 +168,10 @@ func TestCRIListPodStats(t *testing.T) {
 		fakeRuntimeService = critest.NewFakeRuntimeService()
 		fakeImageService   = critest.NewFakeImageService()
 	)
+	// All sandboxes except sandbox6 are known to the PodManager
+	unknownPodUID := types.UID("sandbox6-uid")
+	mockPodManager.EXPECT().GetPodByUID(unknownPodUID).Return(nil, false)
+	mockPodManager.EXPECT().GetPodByUID(mock.MatchedBy(func(uid types.UID) bool { return uid != unknownPodUID })).Return(&v1.Pod{}, true)
 
 	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":                           getTestContainerInfo(seedRoot, "", "", ""),
@@ -192,13 +202,13 @@ func TestCRIListPodStats(t *testing.T) {
 	mockCadvisor.EXPECT().GetDirFsInfo(unknownMountpoint).Return(cadvisorapi.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
 
 	fakeRuntimeService.SetFakeSandboxes([]*critest.FakePodSandbox{
-		sandbox0, sandbox1, sandbox2, sandbox3, sandbox4, sandbox5,
+		sandbox0, sandbox1, sandbox2, sandbox3, sandbox4, sandbox5, sandbox6,
 	})
 	fakeRuntimeService.SetFakeContainers([]*critest.FakeContainer{
-		container0, container1, container2, container3, container4, container5, container6, container7, container8,
+		container0, container1, container2, container3, container4, container5, container6, container7, container8, container9,
 	})
 	fakeRuntimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{
-		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7, containerStats8,
+		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7, containerStats8, containerStats9,
 	})
 
 	ephemeralVolumes := makeFakeVolumeStats([]string{"ephVolume1, ephVolumes2"})
@@ -348,6 +358,10 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRIPodCPUAndMemoryStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
 	checkCRIPodSwapStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
 	checkCRIPodIOStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
+
+	// sandbox6 is unknown to the PodManager and so should be filtered out
+	_, found := podStatsMap[statsapi.PodReference{Name: "sandbox6-name", UID: "sandbox6-uid", Namespace: "sandbox6-ns"}]
+	assert.False(found)
 }
 
 func TestListPodStatsStrictlyFromCRI(t *testing.T) {
@@ -396,6 +410,8 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		fakeRuntimeService = critest.NewFakeRuntimeService()
 		fakeImageService   = critest.NewFakeImageService()
 	)
+	mockPodManager.EXPECT().GetPodByUID(mock.Anything).Return(&v1.Pod{}, true).Maybe()
+
 	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":                           getTestContainerInfo(seedRoot, "", "", ""),
 		"/kubelet":                    getTestContainerInfo(seedKubelet, "", "", ""),
@@ -608,6 +624,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
 		fakeRuntimeService = critest.NewFakeRuntimeService()
 	)
+	mockPodManager.EXPECT().GetPodByUID(mock.Anything).Return(&v1.Pod{}, true).Maybe()
 
 	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":                           getTestContainerInfo(seedRoot, "", "", ""),
