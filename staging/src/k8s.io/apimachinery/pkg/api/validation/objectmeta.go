@@ -344,7 +344,7 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 
 	// Reject updates that don't specify a resource version
 	if len(newMeta.GetResourceVersion()) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newMeta.GetResourceVersion(), "must be specified for an update"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newMeta.GetResourceVersion(), "must be specified for an update").WithOrigin("update").MarkCoveredByDeclarative())
 	}
 
 	// Generation shouldn't be decremented
