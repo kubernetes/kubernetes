@@ -95,6 +95,16 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 			e2eskipper.Skipf("No Windows nodes with hard memory-pressure eviction found")
 		}
 
+		// Skip this test on Hyper-V nodes. Hyper-V containers run inside
+		// lightweight VMs with dynamic memory, so testlimit.exe inside a pod
+		// cannot create real host memory pressure — the balloon driver reclaims
+		// pages and the host pages out VM memory to its pagefile.
+		for _, rh := range node.Status.RuntimeHandlers {
+			if rh.Name == "runhcs-wcow-hypervisor" {
+				e2eskipper.Skipf("Eviction test is not supported on Hyper-V nodes (memory pressure cannot be created from inside a VM)")
+			}
+		}
+
 		framework.Logf("Node %q capacity: %v Mi", node.Name, nodeMem.capacity.Value()/(1024*1024))
 		framework.Logf("Node %q hard eviction threshold: %v Mi", node.Name, nodeMem.hardEviction.Value()/(1024*1024))
 		framework.Logf("Available memory before eviction: %v Mi", (nodeMem.capacity.Value()-nodeMem.hardEviction.Value())/(1024*1024))
