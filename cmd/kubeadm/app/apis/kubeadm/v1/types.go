@@ -606,6 +606,12 @@ const (
 	EncryptionAlgorithmRSA3072 EncryptionAlgorithmType = "RSA-3072"
 	// EncryptionAlgorithmRSA4096 defines the RSA encryption algorithm type with key size 4096 bits.
 	EncryptionAlgorithmRSA4096 EncryptionAlgorithmType = "RSA-4096"
+	// EncryptionAlgorithmMLDSA44 defines the ML-DSA-44 encryption algorithm variant.
+	EncryptionAlgorithmMLDSA44 EncryptionAlgorithmType = "ML-DSA-44"
+	// EncryptionAlgorithmMLDSA65 defines the ML-DSA-65 encryption algorithm variant.
+	EncryptionAlgorithmMLDSA65 EncryptionAlgorithmType = "ML-DSA-65"
+	// EncryptionAlgorithmMLDSA87 defines the ML-DSA-87 encryption algorithm variant.
+	EncryptionAlgorithmMLDSA87 EncryptionAlgorithmType = "ML-DSA-87"
 )
 
 // Timeouts holds various timeouts that apply to kubeadm commands.

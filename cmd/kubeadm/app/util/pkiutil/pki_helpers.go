@@ -21,6 +21,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -33,6 +34,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -307,15 +309,17 @@ func TryLoadKeyFromDisk(pkiPath, name string) (crypto.Signer, error) {
 		return nil, errors.Wrapf(err, "couldn't load the private key file %s", privateKeyPath)
 	}
 
-	// Allow RSA and ECDSA formats only
+	// Allow RSA, ECDSA and ML-DSA formats only
 	var key crypto.Signer
 	switch k := privKey.(type) {
 	case *rsa.PrivateKey:
 		key = k
 	case *ecdsa.PrivateKey:
 		key = k
+	case *mldsa.PrivateKey:
+		key = k
 	default:
-		return nil, errors.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
+		return nil, errors.Errorf("the private key file %s is neither in RSA, ECDSA nor ML-DSA format", privateKeyPath)
 	}
 
 	return key, nil
@@ -339,7 +343,7 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, c
 		return nil, nil, errors.Wrapf(err, "couldn't load the public key file %s", publicKeyPath)
 	}
 
-	// Allow RSA and ECDSA formats only
+	// Allow RSA, ECDSA and ML-DSA formats only
 	mismatchErrFmt := "the private key file %[2]s is in %[1]s format but the public key file %[3]s is not in %[1]s format"
 	switch k := privKey.(type) {
 	case *rsa.PrivateKey:
@@ -354,8 +358,14 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, c
 			return nil, nil, errors.Errorf(mismatchErrFmt, "ECDSA", privateKeyPath, publicKeyPath)
 		}
 		return k, pubKey, nil
+	case *mldsa.PrivateKey:
+		pubKey, ok := pubKeys[0].(*mldsa.PublicKey)
+		if !ok {
+			return nil, nil, errors.Errorf(mismatchErrFmt, "ML-DSA", privateKeyPath, publicKeyPath)
+		}
+		return k, pubKey, nil
 	default:
-		return nil, nil, errors.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
+		return nil, nil, errors.Errorf("the private key file %s is neither in RSA, ECDSA nor ML-DSA format", privateKeyPath)
 	}
 }
 
@@ -597,6 +607,12 @@ func GeneratePrivateKey(keyType kubeadmapi.EncryptionAlgorithmType) (crypto.Sign
 		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	case kubeadmapi.EncryptionAlgorithmECDSAP384:
 		return ecdsa.GenerateKey(elliptic.P384(), cryptorand.Reader)
+	case kubeadmapi.EncryptionAlgorithmMLDSA44:
+		return mldsa.GenerateKey(mldsa.MLDSA44())
+	case kubeadmapi.EncryptionAlgorithmMLDSA65:
+		return mldsa.GenerateKey(mldsa.MLDSA65())
+	case kubeadmapi.EncryptionAlgorithmMLDSA87:
+		return mldsa.GenerateKey(mldsa.MLDSA87())
 	}
 
 	rsaKeySize := rsaKeySizeFromAlgorithmType(keyType)
@@ -618,9 +634,12 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		return nil, errors.New("must specify a CommonName")
 	}
 
-	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+	keyUsage := x509.KeyUsageDigitalSignature
 	if isCA {
 		keyUsage |= x509.KeyUsageCertSign
+	}
+	if canAlgorithmDoKeyEncipherment(cfg.EncryptionAlgorithm) {
+		keyUsage |= x509.KeyUsageKeyEncipherment
 	}
 
 	RemoveDuplicateAltNames(&cfg.AltNames)
@@ -666,7 +685,10 @@ func NewSelfSignedCACert(cfg *CertConfig, key crypto.Signer) (*x509.Certificate,
 	}
 	serial = new(big.Int).Add(serial, big.NewInt(1))
 
-	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign
+	keyUsage := x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign
+	if canAlgorithmDoKeyEncipherment(cfg.EncryptionAlgorithm) {
+		keyUsage |= x509.KeyUsageKeyEncipherment
+	}
 
 	notBefore := time.Now().UTC()
 	if !cfg.NotBefore.IsZero() {
@@ -758,4 +780,10 @@ func VerifyCertChain(cert *x509.Certificate, intermediates []*x509.Certificate, 
 	}
 
 	return nil
+}
+
+// canAlgorithmDoKeyEncipherment checks if the given algorithm type can be used for key encipherment.
+// Currently only RSA can do it from the list of supported algorithms.
+func canAlgorithmDoKeyEncipherment(alg kubeadmapi.EncryptionAlgorithmType) bool {
+	return strings.HasPrefix(string(alg), "RSA-")
 }

@@ -20,6 +20,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/x509"
 	"fmt"
@@ -45,6 +46,8 @@ var (
 
 	ecdsaP256Key *ecdsa.PrivateKey
 	ecdsaP384Key *ecdsa.PrivateKey
+
+	mldsa44Key, mldsa65Key, mldsa87Key *mldsa.PrivateKey
 )
 
 func TestMain(m *testing.M) {
@@ -83,6 +86,19 @@ func TestMain(m *testing.M) {
 		panic("Could not generate ECDSA P384 key")
 	}
 
+	mldsa44Key, err = mldsa.GenerateKey(mldsa.MLDSA44())
+	if err != nil {
+		panic("Could not generate ML-DSA-44 key")
+	}
+	mldsa65Key, err = mldsa.GenerateKey(mldsa.MLDSA65())
+	if err != nil {
+		panic("Could not generate ML-DSA-65 key")
+	}
+	mldsa87Key, err = mldsa.GenerateKey(mldsa.MLDSA87())
+	if err != nil {
+		panic("Could not generate ML-DSA-87 key")
+	}
+
 	os.Exit(m.Run())
 }
 
@@ -98,6 +114,18 @@ func TestNewCertAndKey(t *testing.T) {
 		{
 			name: "ECDSA P384 should succeed",
 			key:  ecdsaP384Key,
+		},
+		{
+			name: "ML-DSA-44 should succeed",
+			key:  mldsa44Key,
+		},
+		{
+			name: "ML-DSA-65 should succeed",
+			key:  mldsa65Key,
+		},
+		{
+			name: "ML-DSA-87 should succeed",
+			key:  mldsa87Key,
 		},
 	}
 
@@ -538,6 +566,27 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 			caKey:      ecdsaP384Key,
 			expected:   true,
 		},
+		{
+			desc:       "ML-DSA-44 valid path and name",
+			pathSuffix: "",
+			name:       "foo",
+			caKey:      mldsa44Key,
+			expected:   true,
+		},
+		{
+			desc:       "ML-DSA-65 valid path and name",
+			pathSuffix: "",
+			name:       "foo",
+			caKey:      mldsa65Key,
+			expected:   true,
+		},
+		{
+			desc:       "ML-DSA-87 valid path and name",
+			pathSuffix: "",
+			name:       "foo",
+			caKey:      mldsa87Key,
+			expected:   true,
+		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.desc, func(t *testing.T) {
@@ -585,6 +634,13 @@ func TestTryLoadPrivatePublicKeyFromDisk(t *testing.T) {
 			desc:       "ECDSA private key and ECDSA public key",
 			privateKey: ecdsaP256Key,
 			publicKey:  ecdsaP256Key.Public(),
+			writePub:   true,
+			wantErr:    false,
+		},
+		{
+			desc:       "ML-DSA private key and ML-DSA public key",
+			privateKey: mldsa44Key,
+			publicKey:  mldsa44Key.Public(),
 			writePub:   true,
 			wantErr:    false,
 		},
@@ -1041,5 +1097,16 @@ func TestRSAKeySizeFromAlgorithmType(t *testing.T) {
 				t.Errorf("expected size: %d, got: %d", rt.expectedSize, size)
 			}
 		})
+	}
+}
+
+func TestCanAlgorithmDoKeyEncipherment(t *testing.T) {
+	alg := kubeadmapi.EncryptionAlgorithmRSA2048
+	if !canAlgorithmDoKeyEncipherment(alg) {
+		t.Errorf("expected algorithm %q to be able to do encipherment", alg)
+	}
+	alg = kubeadmapi.EncryptionAlgorithmECDSAP256
+	if canAlgorithmDoKeyEncipherment(alg) {
+		t.Errorf("expected algorithm %q to not be able to do encipherment", alg)
 	}
 }
