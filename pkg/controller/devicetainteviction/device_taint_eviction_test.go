@@ -2385,11 +2385,10 @@ func testEviction(tCtx ktesting.TContext) {
 			controller := newTestController(tCtx)
 
 			var wg sync.WaitGroup
-			defer func() {
+			tCtx.Cleanup(func() {
 				tCtx.Log("Waiting for goroutine termination...")
-				tCtx.Cancel("time to stop")
 				wg.Wait()
-			}()
+			})
 			wg.Go(func() {
 				tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 			})
@@ -2483,11 +2482,10 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, toleration, slowDelete bool
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		// Run with 1 worker to ensure sequential execution. Concurrent workers cause
 		// non-deterministic ordering of status updates, leading to flakes in Status assertions.
@@ -2687,11 +2685,10 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	})
@@ -2784,11 +2781,10 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	})
@@ -2851,11 +2847,10 @@ func synctestRetry(tCtx ktesting.TContext) {
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	})
