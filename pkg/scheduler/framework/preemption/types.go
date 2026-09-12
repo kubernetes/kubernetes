@@ -135,33 +135,6 @@ func (p *podGroupPreemptor) PreemptionPolicy() schedulingv1beta1.PreemptionPolic
 	return p.preemptionPolicy
 }
 
-// domain represents the boundary or scope within which the preemption logic is evaluated.
-// It abstracts the scheduling domain, which can range from a single Node (for standard Pod preemption)
-// to a group of Nodes or the entire Cluster (for PodGroup preemption).
-type domain struct {
-	nodes              map[string]fwk.NodeInfo
-	name               string
-	allPossibleVictims []*DomainVictim
-}
-
-// Nodes returns a map of NodeInfo objects by node name that belong to this domain.
-// The preemption logic uses this to check feasibility and resource availability
-// within the specific scope.
-func (d *domain) Nodes() map[string]fwk.NodeInfo {
-	return d.nodes
-}
-
-// GetAllPossibleVictims returns all potential victims running within this domain (individual Pods or PodGroups).
-func (d *domain) GetAllPossibleVictims() []*DomainVictim {
-	return d.allPossibleVictims
-}
-
-// GetName returns a unique identifier for the domain.
-// This is primarily used for logging and debugging purposes.
-func (d *domain) GetName() string {
-	return d.name
-}
-
 // getHighestAllAncestor returns the key of the highest ancestor in the hierarchy that has disruption mode All.
 // It returns (key, true) if found, or (empty, false) if not found.
 // TODO: log/return an error if there is a gap in the hierarchy.
@@ -217,35 +190,17 @@ func createDomainVictims(snapshot fwk.SharedLister, victims []Victim) ([]*Domain
 	return allPossibleVictims, nil
 }
 
-// newDomainForWorkloadPreemption creates a new domain for workload preemption.
-// The domain is the whole cluster and it contains victims that are computed based
-// on the pods and their scheduling groups.
+// getWorkloadPreemptionVictims discovers all candidate victims across the cluster snapshot for workload preemption.
 // Pods that are part of a pod group or composite pod group with disruption mode All are grouped
 // together into a single victim. Otherwise, they are treated as individual victims.
 // In both cases, the priority of the victim is determined by the pod group or composite pod group priority.
-func newDomainForWorkloadPreemption(logger klog.Logger, snapshot fwk.SharedLister, podGroupSnapshot fwk.PodGroupLister, compositePodGroupSnapshot fwk.CompositePodGroupLister, name string) (*domain, error) {
+func getWorkloadPreemptionVictims(logger klog.Logger, snapshot fwk.SharedLister, podGroupSnapshot fwk.PodGroupLister, compositePodGroupSnapshot fwk.CompositePodGroupLister) ([]*DomainVictim, error) {
 	nodes, err := snapshot.NodeInfos().List()
 	if err != nil {
 		return nil, err
 	}
 
-	allPossibleVictims, err := getCrossNodesVictims(logger, snapshot, podGroupSnapshot, compositePodGroupSnapshot, nodes)
-	if err != nil {
-		return nil, err
-	}
-
-	nodesMap := make(map[string]fwk.NodeInfo, len(nodes))
-	for _, nodeInfo := range nodes {
-		if nodeInfo != nil && nodeInfo.Node() != nil {
-			nodesMap[nodeInfo.Node().Name] = nodeInfo
-		}
-	}
-
-	return &domain{
-		nodes:              nodesMap,
-		allPossibleVictims: allPossibleVictims,
-		name:               name,
-	}, nil
+	return getCrossNodesVictims(logger, snapshot, podGroupSnapshot, compositePodGroupSnapshot, nodes)
 }
 
 // getCrossNodesVictims aggregates pods across the provided nodes into cluster-wide preemption candidates.
@@ -487,23 +442,19 @@ func newDomainVictim(snapshot fwk.SharedLister, pods []fwk.PodInfo, priority int
 	}, nil
 }
 
-// Candidate represents a nominated node on which the preemptor can be scheduled,
+// candidate represents a nominated node on which the preemptor can be scheduled,
 // along with the list of victims that should be evicted for the preemptor to fit the node.
-type Candidate interface {
-	// Victims wraps a list of to-be-preempted Pods and the number of PDB violation.
-	Victims() *extenderv1.Victims
-	// Name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
-	Name() string
-	// NumPodGroupDisruptions returns the number of preemption units that affect pod groups.
+type candidate struct {
+	// victims wraps a list of to-be-preempted Pods and the number of PDB violation.
+	victims *extenderv1.Victims
+	// name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
+	name string
+	// numPodGroupDisruptions returns the number of preemption units that affect pod groups.
 	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
-	NumPodGroupDisruptions() int
+	numPodGroupDisruptions int
 }
 
-type candidate struct {
-	victims                *extenderv1.Victims
-	numPodGroupDisruptions int
-	name                   string
-}
+var _ fwk.Candidate = &candidate{}
 
 // Victims returns s.victims.
 func (s *candidate) Victims() *extenderv1.Victims {
@@ -522,18 +473,18 @@ func (s *candidate) NumPodGroupDisruptions() int {
 
 type candidateList struct {
 	idx   int32
-	items []Candidate
+	items []fwk.Candidate
 }
 
 // newCandidateList creates a new candidate list with the given capacity.
 func newCandidateList(capacity int32) *candidateList {
-	return &candidateList{idx: -1, items: make([]Candidate, capacity)}
+	return &candidateList{idx: -1, items: make([]fwk.Candidate, capacity)}
 }
 
 // add adds a new candidate to the internal array atomically.
 // Note: in case the list has reached its capacity, the candidate is disregarded
 // and not added to the internal array.
-func (cl *candidateList) add(c *candidate) {
+func (cl *candidateList) add(c fwk.Candidate) {
 	if idx := atomic.AddInt32(&cl.idx, 1); idx < int32(len(cl.items)) {
 		cl.items[idx] = c
 	}
@@ -549,7 +500,7 @@ func (cl *candidateList) size() int32 {
 
 // get returns the internal candidate array. This function is NOT atomic and
 // assumes that all add() operations have been completed.
-func (cl *candidateList) get() []Candidate {
+func (cl *candidateList) get() []fwk.Candidate {
 	return cl.items[:cl.size()]
 }
 

@@ -89,8 +89,10 @@ type Executor struct {
 	// PreemptPod is a function that actually preempts a specific Pod. It returns true
 	// when the victim was preempted only in scheduler memory, without a delete call.
 	// This is exposed to be replaced during tests.
-	PreemptPod func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error)
+	PreemptPod func(ctx context.Context, c fwk.Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error)
 }
+
+var _ fwk.PreemptionExecutor = &Executor{}
 
 // NewExecutor creates a new preemption executor.
 func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
@@ -102,7 +104,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 		fts:                          fts,
 	}
 
-	e.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
+	e.PreemptPod = func(ctx context.Context, c fwk.Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 		logger := klog.FromContext(ctx)
 
 		preemptedInMemory := false
@@ -164,9 +166,9 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 	return e
 }
 
-// actuatePodPreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of
+// ActuatePodPreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of
 // victims to be evicted.
-func (e *Executor) actuatePodPreemption(ctx context.Context, candidate Candidate, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
+func (e *Executor) ActuatePodPreemption(ctx context.Context, candidate fwk.Candidate, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
 	podPreemptor := &podExecutorPreemptor{Pod: preemptorPod}
 	if e.fts.EnableAsyncPreemption {
 		e.prepareCandidateAsync(candidate, podPreemptor, pluginName)
@@ -175,8 +177,8 @@ func (e *Executor) actuatePodPreemption(ctx context.Context, candidate Candidate
 	return e.prepareCandidate(ctx, candidate, podPreemptor, pluginName)
 }
 
-// actuatePodGroupPreemption actuates the preemption given preemptor pods, pod group and a list of victims to be evicted.
-func (e *Executor) actuatePodGroupPreemption(ctx context.Context, candidate Candidate, pgInfo fwk.PodGroupInfo, pluginName string) *fwk.Status {
+// ActuatePodGroupPreemption actuates the preemption given preemptor pods, pod group and a list of victims to be evicted.
+func (e *Executor) ActuatePodGroupPreemption(ctx context.Context, candidate fwk.Candidate, pgInfo fwk.PodGroupInfo, pluginName string) *fwk.Status {
 	var podGroupPreemptor ExecutorPreemptor
 	if pgInfo.GetCompositePodGroup() != nil {
 		podGroupPreemptor = &compositePodGroupExecutorPreemptor{cpg: pgInfo.GetCompositePodGroup(), pods: pgInfo.GetUnscheduledPods()}
@@ -197,7 +199,7 @@ func (e *Executor) actuatePodGroupPreemption(ctx context.Context, candidate Cand
 // The Pod won't be retried until the goroutine triggered here completes.
 //
 // See http://kep.k8s.io/4832 for how the async preemption works.
-func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreemptor, pluginName string) {
+func (e *Executor) prepareCandidateAsync(c fwk.Candidate, preemptor ExecutorPreemptor, pluginName string) {
 	observeVictims(preemptor, c)
 	// Intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
 	// because this process could continue even after this scheduling cycle finishes.
@@ -316,7 +318,7 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 // - Evict the victim pods
 // - Reject the victim pods if they are in waitingPod map
 // - Clear the low-priority pods' nominatedNodeName status if needed
-func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, pluginName string) *fwk.Status {
+func (e *Executor) prepareCandidate(ctx context.Context, c fwk.Candidate, preemptor ExecutorPreemptor, pluginName string) *fwk.Status {
 	observeVictims(preemptor, c)
 	startTime := time.Now()
 	metricsResult := metrics.GoroutineResultSuccess
@@ -360,7 +362,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 	return nil
 }
 
-func observeVictims(preemptor ExecutorPreemptor, candidate Candidate) {
+func observeVictims(preemptor ExecutorPreemptor, candidate fwk.Candidate) {
 	numVictims := float64(len(candidate.Victims().Pods))
 	if preemptor.Type() == string(fwk.PodGroupKeyType) || preemptor.Type() == string(fwk.CompositePodGroupKeyType) {
 		metrics.WorkloadPreemptionVictims.Observe(numVictims)

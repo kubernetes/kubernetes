@@ -37,7 +37,9 @@ import (
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
+	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -176,7 +178,16 @@ func (c *FrameworkComponents) GetCache() internalcache.Cache {
 // snapshot is injected into every framework profile as its SharedLister;
 // Scheduler passes the scheduler's internal cache snapshot, while library
 // consumers may inject custom snapshots for testing or simulation.
-func NewFrameworkMap(ctx context.Context, c *FrameworkComponents, recorderFactory profile.RecorderFactory, snapshot *internalcache.Snapshot) (profile.Map, error) {
+//
+// opts allows callers to pass additional framework options (such as custom
+// PreemptionManager or other runtime options) to customize the framework.
+func NewFrameworkMap(
+	ctx context.Context,
+	c *FrameworkComponents,
+	recorderFactory profile.RecorderFactory,
+	snapshot *internalcache.Snapshot,
+	opts ...frameworkruntime.Option,
+) (profile.Map, error) {
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(c.options.frameworkOutOfTreeRegistry); err != nil {
 		return nil, err
@@ -184,7 +195,7 @@ func NewFrameworkMap(ctx context.Context, c *FrameworkComponents, recorderFactor
 	csiManager := nodevolumelimits.NewCSIManager(
 		c.informerFactory.Storage().V1().CSINodes().Lister())
 
-	profiles, err := profile.NewMap(ctx, c.options.profiles, registry, recorderFactory,
+	baseOpts := []frameworkruntime.Option{
 		frameworkruntime.WithComponentConfigVersion(c.options.componentConfigVersion),
 		frameworkruntime.WithClientSet(c.client),
 		frameworkruntime.WithKubeConfig(c.options.kubeConfig),
@@ -202,7 +213,13 @@ func NewFrameworkMap(ctx context.Context, c *FrameworkComponents, recorderFactor
 		frameworkruntime.WithSharedCSIManager(csiManager),
 		frameworkruntime.WithPodGroupManager(c.cache),
 		frameworkruntime.WithMaxBatchAge(c.options.maxBatchAge),
-	)
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return preemption.NewDefaultPreemptionManager(fh, plfeature.NewSchedulerFeaturesFromGates(feature.DefaultFeatureGate))
+		}),
+	}
+	opts = append(baseOpts, opts...)
+
+	profiles, err := profile.NewMap(ctx, c.options.profiles, registry, recorderFactory, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %w", err)
 	}
