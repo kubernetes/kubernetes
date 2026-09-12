@@ -45,6 +45,7 @@ type PodDevicesEntry struct {
 // checkpointData struct is used to store pod to device allocation information
 // in a checkpoint file.
 // TODO: add version control when we need to change checkpoint format.
+// See https://github.com/kubernetes/kubernetes/issues/115483 for tracking.
 type checkpointData struct {
 	PodDeviceEntries  []PodDevicesEntry
 	RegisteredDevices map[string][]string

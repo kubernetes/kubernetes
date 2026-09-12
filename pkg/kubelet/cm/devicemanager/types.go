@@ -114,6 +114,7 @@ type DeviceRunContainerOptions struct {
 }
 
 // TODO: evaluate whether we need this error definition.
+// See https://github.com/kubernetes/kubernetes/issues/115480 for tracking.
 const (
 	errEndpointStopped = "endpoint %v has been stopped"
 )
