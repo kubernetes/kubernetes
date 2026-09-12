@@ -192,6 +192,13 @@ type Proxier struct {
 	// staleChains contains information about chains to be deleted later
 	staleChains map[string]time.Time
 
+	// committedChains and committedAffinitySets are the service-related chains
+	// and affinity sets that kube-proxy believes are committed in nftables after
+	// the last successful sync. Incremental syncs use these instead of calling
+	// ListAll to discover existing objects for cleanup.
+	committedChains       sets.Set[string]
+	committedAffinitySets sets.Set[string]
+
 	// serviceCIDRs is a comma separated list of ServiceCIDRs belonging to the IPFamily
 	// which proxier is operating on, can be directly consumed by knftables.
 	serviceCIDRs string
@@ -1266,23 +1273,34 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	}
 
 	var existingChains sets.Set[string]
-	existingChainsList, err := proxier.nftables.List(context.TODO(), "chain")
-	if err == nil {
-		existingChains = sets.New(existingChainsList...)
-	} else {
-		proxier.logger.Error(err, "Failed to list existing chains")
-	}
 	var existingAffinitySets sets.Set[string]
-	existingSets, err := proxier.nftables.List(context.TODO(), "sets")
-	if err == nil {
-		existingAffinitySets = sets.New[string]()
-		for _, set := range existingSets {
-			if isAffinitySetName(set) {
-				existingAffinitySets.Insert(set)
+	if doFullSync {
+		// On a full sync, discover the actual table contents so we can clean up
+		// any stale chains/sets left over from a previous kube-proxy run.
+		existingChainsList, err := proxier.nftables.List(context.TODO(), "chain")
+		if err == nil {
+			existingChains = sets.New(existingChainsList...)
+		} else {
+			proxier.logger.Error(err, "Failed to list existing chains")
+		}
+		existingSets, err := proxier.nftables.List(context.TODO(), "sets")
+		if err == nil {
+			existingAffinitySets = sets.New[string]()
+			for _, set := range existingSets {
+				if isAffinitySetName(set) {
+					existingAffinitySets.Insert(set)
+				}
 			}
+		} else {
+			proxier.logger.Error(err, "Failed to list existing sets")
 		}
 	} else {
-		proxier.logger.Error(err, "Failed to list existing sets")
+		// On incremental syncs use the committed in-memory state, avoiding the
+		// expensive table-wide nft list that grows O(n) with Service count.
+		// Include stale chains so the loop below can un-stale them if their
+		// endpoints come back before the grace period expires.
+		existingChains = proxier.committedChains.Union(sets.KeySet(proxier.staleChains))
+		existingAffinitySets = proxier.committedAffinitySets
 	}
 
 	// Accumulate service/endpoint chains and affinity sets to keep.
@@ -1838,7 +1856,6 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			}
 		}
 	}
-
 	// OTOH, we can immediately delete any stale affinity sets
 	for set := range existingAffinitySets {
 		if !activeAffinitySets.Has(set) {
@@ -1869,7 +1886,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		klogV9.InfoS("Running nftables transaction", "transaction", tx.String())
 	}
 
-	err = proxier.nftables.Run(context.TODO(), tx)
+	err := proxier.nftables.Run(context.TODO(), tx)
 	if err != nil {
 		proxier.logger.Error(err, "nftables sync failed")
 		metrics.NFTablesSyncFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
@@ -1883,6 +1900,8 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	}
 	success = true
 	proxier.needFullSync = false
+	proxier.committedChains = activeChains
+	proxier.committedAffinitySets = activeAffinitySets
 
 	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
 		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
