@@ -356,3 +356,56 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		})
 	}
 }
+
+// TestDeviceTaintRuleEmptySelectorWarning covers
+// https://github.com/kubernetes/kubernetes/issues/141422: an empty but
+// non-nil deviceSelector matches every device from every driver, which is
+// easy to trigger by mistake and has no other signal at apply time.
+func TestDeviceTaintRuleEmptySelectorWarning(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	driver := "example.com"
+
+	testcases := map[string]struct {
+		selector      *resource.DeviceTaintSelector
+		expectWarning bool
+	}{
+		"nil-selector-matches-nothing": {
+			selector:      nil,
+			expectWarning: false,
+		},
+		"empty-selector-matches-everything": {
+			selector:      &resource.DeviceTaintSelector{},
+			expectWarning: true,
+		},
+		"selector-with-driver-is-scoped": {
+			selector:      &resource.DeviceTaintSelector{Driver: &driver},
+			expectWarning: false,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			ruleObj := obj.DeepCopy()
+			ruleObj.Spec.DeviceSelector = tc.selector
+
+			createWarnings := Strategy.WarningsOnCreate(ctx, ruleObj)
+			updateWarnings := Strategy.WarningsOnUpdate(ctx, ruleObj, ruleObj)
+
+			if tc.expectWarning {
+				if len(createWarnings) == 0 {
+					t.Error("expected a warning from WarningsOnCreate, got none")
+				}
+				if len(updateWarnings) == 0 {
+					t.Error("expected a warning from WarningsOnUpdate, got none")
+				}
+			} else {
+				if len(createWarnings) != 0 {
+					t.Errorf("unexpected warnings from WarningsOnCreate: %q", createWarnings)
+				}
+				if len(updateWarnings) != 0 {
+					t.Errorf("unexpected warnings from WarningsOnUpdate: %q", updateWarnings)
+				}
+			}
+		})
+	}
+}
