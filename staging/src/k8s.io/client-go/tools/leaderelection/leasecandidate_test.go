@@ -122,6 +122,55 @@ func TestLeaseCandidateAck(t *testing.T) {
 	}
 }
 
+func TestLeaseCandidateReleasedOnShutdown(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	tc := testcase{
+		candidateName:      "foo",
+		candidateNamespace: "default",
+		leaseName:          "lease",
+		binaryVersion:      "1.35.0",
+		emulationVersion:   "1.35.0",
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+
+	client := fake.NewSimpleClientset()
+	candidate, _, err := NewCandidate(
+		client,
+		tc.candidateNamespace,
+		tc.candidateName,
+		tc.leaseName,
+		tc.binaryVersion,
+		tc.emulationVersion,
+		v1.OldestEmulationVersion,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		candidate.Run(ctx)
+		close(done)
+	}()
+
+	// Wait for the LeaseCandidate to be created
+	if err := pollForLease(ctx, tc, client, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Cancel context to trigger shutdown
+	cancel()
+	<-done
+
+	// Verify the LeaseCandidate was deleted
+	_, err = client.CoordinationV1beta1().LeaseCandidates(tc.candidateNamespace).Get(
+		context.Background(), tc.candidateName, metav1.GetOptions{})
+	if !errors.IsNotFound(err) {
+		t.Errorf("expected NotFound after shutdown, got: %v", err)
+	}
+}
+
 func pollForLease(ctx context.Context, tc testcase, client *fake.Clientset, t *metav1.MicroTime) error {
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		lc, err := client.CoordinationV1beta1().LeaseCandidates(tc.candidateNamespace).Get(ctx, tc.candidateName, metav1.GetOptions{})
