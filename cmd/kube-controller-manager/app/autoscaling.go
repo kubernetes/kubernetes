@@ -27,7 +27,8 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+	metricsv1client "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1"
+	metricsv1beta1client "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
 	"k8s.io/metrics/pkg/client/external_metrics"
 )
@@ -61,10 +62,20 @@ func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext
 
 	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(hpaClient.Discovery())
 
-	resourceClient, err := resourceclient.NewForConfig(clientConfig)
+	resourceClientV1, err := metricsv1client.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init the resource client for %s: %w", controllerName, err)
+		return nil, fmt.Errorf("failed to init the v1 resource client for %s: %w", controllerName, err)
 	}
+
+	resourceClientV1beta1, err := metricsv1beta1client.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init the v1beta1 resource client for %s: %w", controllerName, err)
+	}
+
+	// the pod metrics getter negotiates the resource metrics API version via
+	// discovery, preferring v1 and falling back to v1beta1 for metrics
+	// servers that don't serve v1 yet.
+	podMetricsGetter := metrics.NewVersionedPodMetricsGetter(resourceClientV1, resourceClientV1beta1, hpaClient.Discovery())
 
 	externalMetricsClient, err := external_metrics.NewForConfig(clientConfig)
 	if err != nil {
@@ -72,7 +83,7 @@ func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext
 	}
 
 	metricsClient := metrics.NewRESTMetricsClient(
-		resourceClient,
+		podMetricsGetter,
 		custom_metrics.NewForConfig(clientConfig, controllerContext.RESTMapper, apiVersionsGetter),
 		externalMetricsClient,
 	)
@@ -98,6 +109,12 @@ func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext
 				apiVersionsGetter,
 				controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
 				ctx.Done())
+		},
+		func(ctx context.Context) {
+			metrics.PeriodicallyInvalidate(
+				ctx,
+				podMetricsGetter,
+				controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration)
 		},
 		func(ctx context.Context) {
 			pas.Run(ctx, int(controllerContext.ComponentConfig.HPAController.ConcurrentHorizontalPodAutoscalerSyncs))
