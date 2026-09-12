@@ -779,37 +779,19 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		// the result invalid.
 		var allocatedState *structured.AllocatedState
 		err = wait.PollUntilContextTimeout(ctx, time.Microsecond, 5*time.Second, true /* immediate */, func(context.Context) (bool, error) {
-			if pl.fts.EnableDRAConsumableCapacity {
-				allocatedState, err = pl.draManager.ResourceClaims().GatherAllocatedState()
-				if err != nil {
-					if errors.Is(err, errClaimTrackerConcurrentModification) {
-						logger.V(6).Info("Conflicting modification during GatherAllocatedState, trying again")
-						return false, nil
-					}
-					return false, err
+			allocatedState, err = pl.draManager.ResourceClaims().GatherAllocatedState()
+			if err != nil {
+				if errors.Is(err, errClaimTrackerConcurrentModification) {
+					logger.V(6).Info("Conflicting modification during GatherAllocatedState, trying again")
+					return false, nil
 				}
-				if allocatedState == nil {
-					return false, errors.New("nil allocated state")
-				}
-				// Done.
-				return true, nil
-			} else {
-				allocatedDevices, err := pl.draManager.ResourceClaims().ListAllAllocatedDevices()
-				if err != nil {
-					if errors.Is(err, errClaimTrackerConcurrentModification) {
-						logger.V(6).Info("Conflicting modification during ListAllAllocatedDevices, trying again")
-						return false, nil
-					}
-					return false, err
-				}
-				allocatedState = &structured.AllocatedState{
-					AllocatedDevices:         allocatedDevices,
-					AllocatedSharedDeviceIDs: sets.New[structured.SharedDeviceID](),
-					AggregatedCapacity:       structured.NewConsumedCapacityCollection(),
-				}
-				// Done.
-				return true, nil
+				return false, err
 			}
+			if allocatedState == nil {
+				return false, errors.New("nil allocated state")
+			}
+			// Done.
+			return true, nil
 		})
 		if err != nil {
 			return nil, statusError(logger, fmt.Errorf("gather allocation state: %w", err))
