@@ -115,7 +115,7 @@ func NewRuntimeClassInformerWithOptions(client kubernetes.Interface, options int
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedRuntimeClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) RuntimeClassIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "node.k8s.io", Version: "v1alpha1", Resource: "runtimeclasss"}
+	gvr := schema.GroupVersionResource{Group: "node.k8s.io", Version: "v1alpha1", Resource: "runtimeclasses"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apinodev1alpha1.RuntimeClass](cache.NewSharedIndexInformerWithOptions(

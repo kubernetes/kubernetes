@@ -116,7 +116,7 @@ func NewNetworkPolicyInformerWithOptions(client kubernetes.Interface, namespace 
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedNetworkPolicyInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) NetworkPolicyIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "networkpolicys"}
+	gvr := schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "networkpolicies"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apiextensionsv1beta1.NetworkPolicy](cache.NewSharedIndexInformerWithOptions(
