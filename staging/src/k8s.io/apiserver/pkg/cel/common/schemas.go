@@ -162,6 +162,10 @@ func SchemaDeclType(s Schema, isResourceRoot bool) *apiservercel.DeclType {
 			timestampWithMaxLength := apiservercel.NewSimpleTypeWithMinSize("timestamp", cel.TimestampType, types.Timestamp{Time: time.Time{}}, int64(apiservercel.MinDatetimeSizeJSON))
 			timestampWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
 			return timestampWithMaxLength
+		case "quantity":
+			quantityWithMaxLength := apiservercel.QuantityDeclType
+			quantityWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
+			return quantityWithMaxLength
 		}
 
 		strWithMaxLength := apiservercel.NewSimpleTypeWithMinSize("string", cel.StringType, types.String(""), apiservercel.MinStringSize)
