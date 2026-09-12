@@ -1930,7 +1930,7 @@ func TestValidateIngressClass(t *testing.T) {
 		},
 		"valid name, empty controller": {
 			ingressClass: makeValidIngressClass("test123", ""),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.controller"), "")},
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.controller"), "at least one controller is required")},
 		},
 		"valid name, controller max length": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/"+strings.Repeat("a", 243)),

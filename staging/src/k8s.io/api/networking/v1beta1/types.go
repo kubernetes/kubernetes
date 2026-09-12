@@ -369,6 +369,8 @@ type IngressClassSpec struct {
 	// domain-prefixed path no more than 250 characters in length, e.g.
 	// "acme.io/ingress-controller". This field is immutable.
 	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:required
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	Controller string `json:"controller,omitempty" protobuf:"bytes,1,opt,name=controller"`
 
 	// parameters is a link to a custom resource containing additional
