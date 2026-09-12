@@ -2672,6 +2672,60 @@ func TestApplyAlias(t *testing.T) {
 	}
 }
 
+// TestApplyAliasSuggestsOnTypo aims to cover issues/1795:
+func TestApplyAliasSuggestsOnTypo(t *testing.T) {
+	rootCmd := &cobra.Command{
+		Use: "root",
+	}
+	prefHandler := NewPreferences()
+	prefHandler.AddFlags(rootCmd.PersistentFlags())
+	pref, ok := prefHandler.(*Preferences)
+	if !ok {
+		t.Fatal("unexpected type. Expected *Preferences")
+	}
+	// Runnable is required so cobra's suggestion engine considers it.
+	rootCmd.AddCommand(&cobra.Command{
+		Use: "run",
+		Run: func(cmd *cobra.Command, args []string) {},
+	})
+	pref.getPreferencesFunc = func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+		return &config.Preference{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Preference",
+				APIVersion: "kubectl.config.k8s.io/v1alpha1",
+			},
+			Aliases: []config.AliasOverride{
+				{
+					Name:    "runx",
+					Command: "run",
+				},
+			},
+		}, nil
+	}
+
+	errWriter := &bytes.Buffer{}
+	opts := genericclioptions.NewConfigFlags(false)
+	// "runc" is a typo of the "runx" alias
+	_, err := pref.Apply(rootCmd, opts, []string{"root", "runc"}, errWriter)
+	require.NoError(t, err)
+
+	if _, _, err := rootCmd.Find([]string{"runx"}); err != nil {
+		t.Fatalf("expected alias %q to be registered on root command, got error: %v", "runx", err)
+	}
+
+	suggestions := rootCmd.SuggestionsFor("runc")
+	found := false
+	for _, s := range suggestions {
+		if s == "runx" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected suggestions for %q to include alias %q, got %v", "runc", "runx", suggestions)
+	}
+}
+
 func TestGetExplicitKuberc(t *testing.T) {
 	tests := []struct {
 		args        []string
