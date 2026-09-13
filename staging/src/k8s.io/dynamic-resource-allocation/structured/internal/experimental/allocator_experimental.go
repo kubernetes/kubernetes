@@ -150,7 +150,6 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
 	}()
 
-	alloc.logger.V(5).Info("Gathering pools", "slices", alloc.slices)
 	// First determine all eligible pools.
 	pools, err := GatherPools(ctx, alloc.slices, node, a.features)
 	if err != nil {
