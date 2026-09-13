@@ -870,7 +870,7 @@ func (s *trackingMockStorage) GetList(ctx context.Context, key string, opts stor
 
 func (s *trackingMockStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	s.record("Watch")
-	return watch.NewEmptyWatch(), nil
+	return cachertesting.NewMockWatch(), nil
 }
 
 func (s *trackingMockStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
@@ -941,6 +941,9 @@ func TestWatchCacheByteBudgetBypassDelegator(t *testing.T) {
 	if count := backingStorage.getCallCount("DisableResourceSizeEstimation"); count != 1 {
 		t.Errorf("expected 1 call to DisableResourceSizeEstimation, got %d", count)
 	}
+
+	// Wait briefly for reflector goroutine to fully stop before resetting calls
+	time.Sleep(50 * time.Millisecond)
 
 	// Reset calls so we only assert calls made by delegator methods below
 	backingStorage.resetCalls()
