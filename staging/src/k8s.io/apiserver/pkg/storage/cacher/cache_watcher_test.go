@@ -718,6 +718,66 @@ func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 	}
 }
 
+// TestCacheWatcherStuckOnInitEvents verifies that a client which stops reading
+// the events it asked for does not keep the processInterval goroutine (and the
+// snapshot of initial events it holds) alive forever.
+func TestCacheWatcherStuckOnInitEvents(t *testing.T) {
+	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
+	forgotten := make(chan bool, 10)
+	forget := func(drainWatcher bool) { forgotten <- drainWatcher }
+
+	initEvents := []*watchCacheEvent{
+		{Object: makeTestPod("pod1", 1), ResourceVersion: 1},
+		{Object: makeTestPod("pod2", 2), ResourceVersion: 2},
+		{Object: makeTestPod("pod3", 3), ResourceVersion: 3},
+		{Object: makeTestPod("pod4", 4), ResourceVersion: 4},
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	// A chanSize of 1 gives us a result channel that a client which never
+	// reads will fill immediately.
+	w := newCacheWatcher(1, filter, forget, storage.APIObjectVersioner{}, time.Now().Add(time.Hour), true,
+		schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), fakeClock, "")
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		w.processInterval(context.Background(), intervalFromEvents(initEvents), 0)
+	}()
+
+	// Wait until the result channel is full and the timer is armed, i.e. the
+	// sender is parked on an event the client will never read. Waiting on
+	// HasWaiters() alone would not be enough, as the timer is already armed
+	// before the first event is sent.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, wait.ForeverTestTimeout, true,
+		func(context.Context) (bool, error) {
+			return len(w.ResultChan()) == 1 && fakeClock.HasWaiters(), nil
+		}); err != nil {
+		t.Fatalf("processInterval didn't block sending initial events: %v", err)
+	}
+	select {
+	case <-done:
+		t.Fatalf("processInterval returned before the timeout elapsed")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	fakeClock.Step(initEventsTimeout + time.Second)
+
+	select {
+	case <-done:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("processInterval is still blocked after the %v timeout elapsed", initEventsTimeout)
+	}
+	select {
+	case drainWatcher := <-forgotten:
+		if drainWatcher {
+			t.Errorf("expected forget(false), the client is not reading so there is nothing to drain")
+		}
+	default:
+		t.Errorf("expected forget() to be called when the send timed out")
+	}
+}
+
 func gatherWithoutBuckets(gatherer compbasemetrics.Gatherer) testutil.GathererFunc {
 	return func() ([]*testutil.MetricFamily, error) {
 		got, err := gatherer.Gather()
