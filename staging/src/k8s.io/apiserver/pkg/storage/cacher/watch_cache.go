@@ -346,6 +346,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		wcEvent.PrevObjFields = previousElem.Fields
 	}
 
+	var callOnBypassed func()
 	if err := func() error {
 		w.Lock()
 		defer w.Unlock()
@@ -386,9 +387,9 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 				w.history.ResetLocked()
 				w.storage.ReplaceLocked(nil, "", resourceVersion)
 				w.keyToSize = nil
-				if w.onBypassed != nil {
-					w.onBypassed()
-				}
+				// Capture onBypassed to call outside the lock to avoid deadlock
+				// with DisableResourceSizeEstimation which acquires collectorMux.
+				callOnBypassed = w.onBypassed
 				return nil
 			}
 		}
@@ -403,6 +404,13 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		return nil
 	}(); err != nil {
 		return err
+	}
+
+	// Call onBypassed outside the lock to avoid deadlock with
+	// DisableResourceSizeEstimation (which acquires collectorMux while
+	// getKeys may be waiting on watchCache.RLock under collectorMux.RLock).
+	if callOnBypassed != nil {
+		callOnBypassed()
 	}
 
 	if w.Bypassed() {
@@ -733,56 +741,65 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		})
 	}
 
-	w.Lock()
-	defer w.Unlock()
+	var callOnBypassed func()
+	func() {
+		w.Lock()
+		defer w.Unlock()
 
-	if w.Bypassed() {
-		return nil
-	}
-
-	// Ensure startIndex never decreases, so that existing watchCacheInterval
-	// instances get "invalid" errors if the try to download from the buffer
-	// using their own start/end indexes calculated from previous buffer
-	// content.
-
-	// Empty the cyclic buffer, ensuring startIndex doesn't decrease.
-	w.history.ResetLocked()
-
-	if w.maxBytes > 0 {
-		w.totalBytes = totalBytes
-		w.keyToSize = keyToSize
-		metrics.WatchCacheEstimatedBytes.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(float64(totalBytes))
-
-		if totalBytes > w.maxBytes {
-			w.bypassed.Store(true)
-			metrics.WatchCacheBypassed.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(1)
-			klog.Warningf("Watch cache for %v exceeded byte budget (estimated %d bytes > %d bytes max). Bypassing watch cache and falling back to storage.", w.config.groupResource, totalBytes, w.maxBytes)
-			if err := w.storage.ReplaceLocked(nil, resourceVersion, version); err != nil {
-				return err
-			}
-			w.keyToSize = nil
-			w.resourceVersion = version
-			if w.onBypassed != nil {
-				w.onBypassed()
-			}
-			w.cond.Broadcast()
-			metrics.RecordResourceVersion(w.config.groupResource, version)
-			return nil
+		if w.Bypassed() {
+			return
 		}
+
+		// Ensure startIndex never decreases, so that existing watchCacheInterval
+		// instances get "invalid" errors if the try to download from the buffer
+		// using their own start/end indexes calculated from previous buffer
+		// content.
+
+		// Empty the cyclic buffer, ensuring startIndex doesn't decrease.
+		w.history.ResetLocked()
+
+		if w.maxBytes > 0 {
+			w.totalBytes = totalBytes
+			w.keyToSize = keyToSize
+			metrics.WatchCacheEstimatedBytes.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(float64(totalBytes))
+
+			if totalBytes > w.maxBytes {
+				w.bypassed.Store(true)
+				metrics.WatchCacheBypassed.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(1)
+				klog.Warningf("Watch cache for %v exceeded byte budget (estimated %d bytes > %d bytes max). Bypassing watch cache and falling back to storage.", w.config.groupResource, totalBytes, w.maxBytes)
+				w.storage.ReplaceLocked(nil, resourceVersion, version)
+				w.keyToSize = nil
+				w.resourceVersion = version
+				// Capture onBypassed to call outside the lock to avoid deadlock
+				// with DisableResourceSizeEstimation which acquires collectorMux.
+				callOnBypassed = w.onBypassed
+				w.cond.Broadcast()
+				metrics.RecordResourceVersion(w.config.groupResource, version)
+				return
+			}
+		}
+
+		if err = w.storage.ReplaceLocked(toReplace, resourceVersion, version); err != nil {
+			return
+		}
+		w.resourceVersion = version
+		if w.onReplace != nil {
+			w.onReplace()
+		}
+		w.cond.Broadcast()
+
+		metrics.RecordResourceVersion(w.config.groupResource, version)
+		klog.V(3).Infof("Replaced watchCache (rev: %v) ", resourceVersion)
+	}()
+
+	// Call onBypassed outside the lock to avoid deadlock with
+	// DisableResourceSizeEstimation (which acquires collectorMux while
+	// getKeys may be waiting on watchCache.RLock under collectorMux.RLock).
+	if callOnBypassed != nil {
+		callOnBypassed()
 	}
 
-	if err := w.storage.ReplaceLocked(toReplace, resourceVersion, version); err != nil {
-		return err
-	}
-	w.resourceVersion = version
-	if w.onReplace != nil {
-		w.onReplace()
-	}
-	w.cond.Broadcast()
-
-	metrics.RecordResourceVersion(w.config.groupResource, version)
-	klog.V(3).Infof("Replaced watchCache (rev: %v) ", resourceVersion)
-	return nil
+	return err
 }
 
 func (w *watchCache) SetOnReplace(onReplace func()) {
