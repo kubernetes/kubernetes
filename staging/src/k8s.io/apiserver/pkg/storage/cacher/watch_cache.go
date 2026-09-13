@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,10 +94,56 @@ type watchCache struct {
 	// This handler is run at the end of every successful Replace() method.
 	onReplace func()
 
+	// This handler is run when the watch cache exceeds its byte budget and is bypassed.
+	onBypassed func()
+
 	history *watchCacheHistory
 	storage *store.WatchCacheStorage
 
 	config *ImmutableWatchCacheConfig
+
+	// totalBytes tracks the estimated total size of objects held in the watch cache.
+	totalBytes int64
+
+	// maxBytes defines the maximum byte budget for this watch cache. 0 means unlimited.
+	maxBytes int64
+
+	// bypassed indicates whether caching was disabled due to exceeding byte budget.
+	bypassed bool
+}
+
+// EstimateObjectSize estimates the serialized byte size of a runtime.Object.
+func EstimateObjectSize(obj runtime.Object) int64 {
+	if obj == nil {
+		return 0
+	}
+	if u, ok := obj.(*unstructured.Unstructured); ok {
+		if data, err := json.Marshal(u.Object); err == nil {
+			return int64(len(data))
+		}
+	}
+	if data, err := json.Marshal(obj); err == nil {
+		return int64(len(data))
+	}
+	return 1024
+}
+
+func (w *watchCache) TotalBytes() int64 {
+	w.RLock()
+	defer w.RUnlock()
+	return w.totalBytes
+}
+
+func (w *watchCache) Bypassed() bool {
+	w.RLock()
+	defer w.RUnlock()
+	return w.bypassed
+}
+
+func (w *watchCache) SetOnBypassed(onBypassed func()) {
+	w.Lock()
+	defer w.Unlock()
+	w.onBypassed = onBypassed
 }
 
 type ImmutableWatchCacheConfig struct {
@@ -126,6 +174,10 @@ type ImmutableWatchCacheConfig struct {
 	waitingUntilFresh *progress.ConditionalProgressRequester
 
 	getCurrentRV func(context.Context) (uint64, error)
+
+	// maxBytes defines maximum total estimated bytes of objects that can be stored in the cache.
+	// 0 means unlimited.
+	maxBytes int64
 }
 
 func newWatchCache(
@@ -139,6 +191,7 @@ func newWatchCache(
 	groupResource schema.GroupResource,
 	progressRequester *progress.ConditionalProgressRequester,
 	getCurrentRV func(context.Context) (uint64, error),
+	maxBytes int64,
 ) *watchCache {
 	config := &ImmutableWatchCacheConfig{
 		keyFunc:           keyFunc,
@@ -149,11 +202,13 @@ func newWatchCache(
 		groupResource:     groupResource,
 		waitingUntilFresh: progressRequester,
 		getCurrentRV:      getCurrentRV,
+		maxBytes:          maxBytes,
 	}
 
 	wc := &watchCache{
 		resourceVersion: 0,
 		config:          config,
+		maxBytes:        maxBytes,
 		history:         newWatchCacheHistory(config, eventFreshDuration),
 		storage:         store.NewWatchCacheStorage(config.keyFunc, indexers),
 	}
@@ -224,6 +279,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 	if err != nil {
 		return fmt.Errorf("couldn't compute key: %v", err)
 	}
+	elemSize := EstimateObjectSize(event.Object)
 	elem := &store.Element{Key: key, Object: event.Object}
 	elem.Labels, elem.Fields, err = w.config.getAttrsFunc(event.Object)
 	if err != nil {
@@ -262,9 +318,51 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		w.Lock()
 		defer w.Unlock()
 
+		if w.bypassed {
+			w.resourceVersion = resourceVersion
+			defer w.cond.Broadcast()
+			return nil
+		}
+
 		w.history.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()
+
+		// Update totalBytes:
+		switch event.Type {
+		case watch.Added:
+			w.totalBytes += elemSize
+		case watch.Modified:
+			if exists && wcEvent.PrevObject != nil {
+				prevSize := EstimateObjectSize(wcEvent.PrevObject)
+				w.totalBytes += (elemSize - prevSize)
+			} else {
+				w.totalBytes += elemSize
+			}
+		case watch.Deleted:
+			if exists && wcEvent.PrevObject != nil {
+				prevSize := EstimateObjectSize(wcEvent.PrevObject)
+				w.totalBytes -= prevSize
+			} else {
+				w.totalBytes -= elemSize
+			}
+			if w.totalBytes < 0 {
+				w.totalBytes = 0
+			}
+		}
+		metrics.WatchCacheEstimatedBytes.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(float64(w.totalBytes))
+
+		if w.maxBytes > 0 && w.totalBytes > w.maxBytes {
+			w.bypassed = true
+			metrics.WatchCacheBypassed.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(1)
+			klog.Warningf("Watch cache for %v exceeded byte budget (estimated %d bytes > %d bytes max). Bypassing watch cache and falling back to storage.", w.config.groupResource, w.totalBytes, w.maxBytes)
+			w.history.ResetLocked()
+			w.storage.ReplaceLocked(nil, "", resourceVersion)
+			if w.onBypassed != nil {
+				w.onBypassed()
+			}
+			return nil
+		}
 
 		if w.history.isCacheFullLocked() {
 			oldestRV := w.history.OldestResourceVersionLocked()
@@ -276,6 +374,10 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		return nil
 	}(); err != nil {
 		return err
+	}
+
+	if w.Bypassed() {
+		return nil
 	}
 
 	// Avoid calling event handler under lock.
@@ -568,6 +670,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	}
 
 	toReplace := make([]interface{}, 0, len(objs))
+	var totalBytes int64
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
@@ -581,6 +684,8 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		if err != nil {
 			return err
 		}
+		elemSize := EstimateObjectSize(object)
+		totalBytes += elemSize
 		toReplace = append(toReplace, &store.Element{
 			Key:    key,
 			Object: object,
@@ -599,6 +704,25 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 
 	// Empty the cyclic buffer, ensuring startIndex doesn't decrease.
 	w.history.ResetLocked()
+
+	w.totalBytes = totalBytes
+	metrics.WatchCacheEstimatedBytes.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(float64(totalBytes))
+
+	if w.maxBytes > 0 && totalBytes > w.maxBytes {
+		w.bypassed = true
+		metrics.WatchCacheBypassed.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(1)
+		klog.Warningf("Watch cache for %v exceeded byte budget (estimated %d bytes > %d bytes max). Bypassing watch cache and falling back to storage.", w.config.groupResource, totalBytes, w.maxBytes)
+		if err := w.storage.ReplaceLocked(nil, resourceVersion, version); err != nil {
+			return err
+		}
+		w.resourceVersion = version
+		if w.onBypassed != nil {
+			w.onBypassed()
+		}
+		w.cond.Broadcast()
+		metrics.RecordResourceVersion(w.config.groupResource, version)
+		return nil
+	}
 
 	if err := w.storage.ReplaceLocked(toReplace, resourceVersion, version); err != nil {
 		return err

@@ -834,6 +834,41 @@ func TestWatchCacheBypass(t *testing.T) {
 	}
 }
 
+func TestWatchCacheByteBudgetBypassDelegator(t *testing.T) {
+	backingStorage := &cachertesting.MockStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
+
+	// Mark watchCache as bypassed (as happens when exceeding byte budget)
+	cacher.watchCache.bypassed = true
+
+	if !cacher.Bypassed() {
+		t.Errorf("expected cacher to report bypassed")
+	}
+
+	// 1. Get should delegate directly to storage
+	pod := &example.Pod{}
+	_ = delegator.Get(context.TODO(), "/pods/ns/foo", storage.GetOptions{ResourceVersion: "1"}, pod)
+
+	// 2. GetList should delegate directly to storage
+	list := &example.PodList{}
+	_ = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{}, list)
+
+	// 3. Watch should delegate directly to storage
+	_, err = delegator.Watch(context.TODO(), "/pods/ns", storage.ListOptions{})
+	if err != nil {
+		t.Errorf("expected Watch to delegate to storage: %v", err)
+	}
+
+	// 4. Delete should delegate directly to storage
+	_ = delegator.Delete(context.TODO(), "/pods/ns/foo", pod, nil, nil, nil, storage.DeleteOptions{})
+}
+
 func TestEmptyWatchEventCache(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)

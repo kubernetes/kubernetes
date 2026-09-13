@@ -28,6 +28,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -64,6 +65,8 @@ type EtcdOptions struct {
 	EnableWatchCache bool
 	// WatchCacheSizes represents override to a given resource
 	WatchCacheSizes []string
+	// WatchCacheMaxBytesPerResource represents the maximum in-memory byte budget per resource
+	WatchCacheMaxBytesPerResource []string
 
 	// SkipHealthEndpoints, when true, causes the Apply methods to not set up health endpoints.
 	// This allows multiple invocations of the Apply methods without duplication of said endpoints.
@@ -163,6 +166,15 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"watch-cache is enabled. The only meaningful size setting to supply here is zero, which means to "+
 		"disable watch caching for the associated resource; all non-zero values are equivalent and mean "+
 		"to not disable watch caching for that resource")
+
+	fs.StringSliceVar(&s.WatchCacheMaxBytesPerResource, "watch-cache-max-bytes-per-resource", s.WatchCacheMaxBytesPerResource, ""+
+		"Watch cache maximum in-memory byte budget per resource, comma separated. "+
+		"The individual setting format: [resource[.group]#]size, where resource is lowercase plural (no version), "+
+		"group is omitted for resources of apiVersion v1 and included for others, "+
+		"and size is a quantity (e.g. 50Mi, 100M) or number of bytes. "+
+		"If no resource is specified (or resource is 'default'), the limit applies as the default for all resources. "+
+		"If the watch cache for a resource exceeds this limit, caching is bypassed and requests fall back directly to storage. "+
+		"Setting size to 0 disables watch caching for the associated resource.")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
@@ -517,12 +529,72 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 			klog.V(3).InfoS("Not using watch cache", "resource", resource)
 			ret.Decorator = generic.UndecoratedStorage
 		} else {
+			defaultMaxBytes, resourceMaxBytes, err := ParseWatchCacheMaxBytesPerResource(f.Options.WatchCacheMaxBytesPerResource)
+			if err != nil {
+				return generic.RESTOptions{}, err
+			}
+			maxBytes := defaultMaxBytes
+			if mb, hasOverride := resourceMaxBytes[resource]; hasOverride {
+				maxBytes = mb
+			}
+			if mb, hasOverride := resourceMaxBytes[resource]; hasOverride && mb == 0 {
+				klog.V(3).InfoS("Not using watch cache (byte budget is 0)", "resource", resource)
+				ret.Decorator = generic.UndecoratedStorage
+				return ret, nil
+			}
+			if storageConfig != nil {
+				storageConfig.MaxBytes = maxBytes
+			}
 			klog.V(3).InfoS("Using watch cache", "resource", resource)
 			ret.Decorator = genericregistry.StorageWithCacher()
 		}
 	}
 
 	return ret, nil
+}
+
+// ParseWatchCacheMaxBytesPerResource turns a list of max-bytes specifications into a default
+// byte limit and a map of group resources to requested byte limits.
+func ParseWatchCacheMaxBytesPerResource(specs []string) (int64, map[schema.GroupResource]int64, error) {
+	var defaultBytes int64
+	resourceBytes := make(map[schema.GroupResource]int64)
+	for _, c := range specs {
+		c = strings.TrimSpace(c)
+		if len(c) == 0 {
+			continue
+		}
+		tokens := strings.Split(c, "#")
+		if len(tokens) == 1 {
+			q, err := resource.ParseQuantity(tokens[0])
+			if err != nil {
+				return 0, nil, fmt.Errorf("invalid byte size %q in watch-cache-max-bytes-per-resource: %w", c, err)
+			}
+			val := q.Value()
+			if val < 0 {
+				return 0, nil, fmt.Errorf("watch-cache-max-bytes-per-resource cannot be negative: %s", c)
+			}
+			defaultBytes = val
+		} else if len(tokens) == 2 {
+			target := strings.TrimSpace(tokens[0])
+			sizeStr := strings.TrimSpace(tokens[1])
+			q, err := resource.ParseQuantity(sizeStr)
+			if err != nil {
+				return 0, nil, fmt.Errorf("invalid byte size %q in watch-cache-max-bytes-per-resource: %w", c, err)
+			}
+			val := q.Value()
+			if val < 0 {
+				return 0, nil, fmt.Errorf("watch-cache-max-bytes-per-resource cannot be negative: %s", c)
+			}
+			if strings.EqualFold(target, "default") {
+				defaultBytes = val
+			} else {
+				resourceBytes[schema.ParseGroupResource(target)] = val
+			}
+		} else {
+			return 0, nil, fmt.Errorf("invalid value of watch cache max bytes: %s", c)
+		}
+	}
+	return defaultBytes, resourceBytes, nil
 }
 
 // ParseWatchCacheSizes turns a list of cache size values into a map of group resources

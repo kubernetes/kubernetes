@@ -30,6 +30,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -136,7 +137,7 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 		defer wc.RUnlock()
 		return wc.resourceVersion, nil
 	}
-	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
+	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV, 0)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.history.capacity = capacity
@@ -1427,4 +1428,102 @@ func getMaxItemRV(t *testing.T, versioner storage.Versioner, items []interface{}
 		maxRV = max(maxRV, itemRV)
 	}
 	return maxRV
+}
+
+func TestWatchCacheByteBudget(t *testing.T) {
+	// Test 1: EstimateObjectSize
+	pod := makeTestPod("pod1", 1)
+	podSize := EstimateObjectSize(pod)
+	if podSize <= 0 {
+		t.Fatalf("expected positive pod size, got %d", podSize)
+	}
+
+	u := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name": "my-map",
+			},
+			"data": map[string]interface{}{
+				"key": "value",
+			},
+		},
+	}
+	uSize := EstimateObjectSize(u)
+	if uSize <= 0 {
+		t.Fatalf("expected positive unstructured size, got %d", uSize)
+	}
+
+	// Test 2: TotalBytes on Add, Modify, Delete
+	c := newTestWatchCache(10, DefaultEventFreshDuration, &cache.Indexers{})
+	defer c.Stop()
+
+	require.NoError(t, c.Add(makeTestPod("pod1", 1)))
+	firstSize := c.TotalBytes()
+	if firstSize != podSize {
+		t.Errorf("expected TotalBytes %d, got %d", podSize, firstSize)
+	}
+
+	pod2 := makeTestPod("pod2", 2)
+	pod2Size := EstimateObjectSize(pod2)
+	require.NoError(t, c.Add(pod2))
+	if c.TotalBytes() != firstSize+pod2Size {
+		t.Errorf("expected TotalBytes %d, got %d", firstSize+pod2Size, c.TotalBytes())
+	}
+
+	// Update pod1 with larger labels
+	largerPod := makeTestPodDetails("pod1", 3, "node1", map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"})
+	largerPodSize := EstimateObjectSize(largerPod)
+	require.NoError(t, c.Update(largerPod))
+	expectedAfterUpdate := firstSize + pod2Size + (largerPodSize - podSize)
+	if c.TotalBytes() != expectedAfterUpdate {
+		t.Errorf("expected TotalBytes %d after update, got %d", expectedAfterUpdate, c.TotalBytes())
+	}
+
+	// Delete pod2
+	require.NoError(t, c.Delete(pod2))
+	expectedAfterDelete := expectedAfterUpdate - pod2Size
+	if c.TotalBytes() != expectedAfterDelete {
+		t.Errorf("expected TotalBytes %d after delete, got %d", expectedAfterDelete, c.TotalBytes())
+	}
+
+	// Test 3: Replace respects byte budget
+	bypassedCalled := false
+	limitedCache := newWatchCache(
+		func(obj runtime.Object) (string, error) {
+			p := obj.(*v1.Pod)
+			return "/prefix/ns/" + p.Name, nil
+		},
+		func(event *watchCacheEvent) {},
+		func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			p := obj.(*v1.Pod)
+			return labels.Set(p.Labels), fields.Set{"spec.nodeName": p.Spec.NodeName}, nil
+		},
+		storage.APIObjectVersioner{},
+		&cache.Indexers{},
+		testingclock.NewFakeClock(time.Now()),
+		DefaultEventFreshDuration,
+		schema.GroupResource{Resource: "pods"},
+		nil,
+		func(context.Context) (uint64, error) { return 0, nil },
+		podSize, // MaxBytes equal to 1 pod
+	)
+	limitedCache.SetOnBypassed(func() {
+		bypassedCalled = true
+	})
+
+	// Replace with 2 pods -> should exceed budget and bypass
+	err := limitedCache.Replace([]interface{}{makeTestPod("pod1", 1), makeTestPod("pod2", 2)}, "2")
+	require.NoError(t, err)
+	if !limitedCache.Bypassed() {
+		t.Errorf("expected limitedCache to be bypassed after Replace exceeding budget")
+	}
+	if !bypassedCalled {
+		t.Errorf("expected OnBypassed callback to be invoked")
+	}
+	// Storage should be cleared to free memory
+	if len(limitedCache.storage.List()) != 0 {
+		t.Errorf("expected storage to be cleared after bypass, got %d items", len(limitedCache.storage.List()))
+	}
 }
