@@ -122,6 +122,11 @@ type Config struct {
 	Codec runtime.Codec
 
 	Clock clock.WithTicker
+
+	// MaxBytes defines maximum total estimated bytes of objects that can be stored in the cache.
+	// If the total bytes exceed this limit, the cacher will bypass caching and delegate directly to underlying storage.
+	// 0 means unlimited.
+	MaxBytes int64
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -343,6 +348,7 @@ type Cacher struct {
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
 	watcherMetrics          *metrics.WatcherMetricsObservers
+	maxBytes                int64
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -440,7 +446,8 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	progressRequester := progress.NewConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
-		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
+		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion,
+		config.MaxBytes)
 	listerWatcher := NewListerWatcher(config.Storage, resourcePrefix, config.NewListFunc, contextMetadata)
 	reflectorName := "storage/cacher.go:" + resourcePrefix
 
@@ -453,8 +460,12 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	// In most of the cases, leader is reelected within few cycles.
 	reflector.MaxInternalErrorRetryDuration = time.Second * 30
 
+	cacher.maxBytes = config.MaxBytes
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
+	watchCache.SetOnBypassed(func() {
+		cacher.terminateAllWatchers()
+	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
 		err := config.Storage.EnableResourceSizeEstimation(cacher.getKeys)
@@ -477,7 +488,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		defer cacher.terminateAllWatchers()
 		wait.Until(
 			func() {
-				if !cacher.isStopped() {
+				if !cacher.isStopped() && !cacher.Bypassed() {
 					cacher.startCaching(stopCh)
 				}
 			}, time.Second, stopCh,
@@ -486,7 +497,24 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	return cacher, nil
 }
 
+func (c *Cacher) Bypassed() bool {
+	if c.watchCache == nil {
+		return false
+	}
+	return c.watchCache.Bypassed()
+}
+
+func (c *Cacher) TotalBytes() int64 {
+	if c.watchCache == nil {
+		return 0
+	}
+	return c.watchCache.TotalBytes()
+}
+
 func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
+	if c.Bypassed() {
+		return
+	}
 	startTime := time.Now()
 	c.watchCache.SetOnReplace(func() {
 		c.ready.setReady()
@@ -514,6 +542,9 @@ type namespacedName struct {
 }
 
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	if c.Bypassed() {
+		return c.storage.Watch(ctx, key, opts)
+	}
 	ctx, span := tracing.Start(ctx, "cacher.Watch",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.Stringer("type", c.groupResource))
@@ -690,6 +721,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 }
 
 func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	if c.Bypassed() {
+		return c.storage.Get(ctx, key, opts, objPtr)
+	}
 	ctx, span := tracing.Start(ctx, "cacher.Get",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("key", key),
@@ -751,6 +785,9 @@ type listResp struct {
 
 // GetList implements storage.Interface
 func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	if c.Bypassed() {
+		return c.storage.GetList(ctx, key, opts, listObj)
+	}
 	preparedKey, err := c.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return err

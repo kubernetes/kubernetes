@@ -79,6 +79,9 @@ func (c *CacheDelegator) EnableResourceSizeEstimation(keys storage.KeysFunc) err
 }
 
 func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+	if c.cacher.Bypassed() {
+		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil, opts)
+	}
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
 	if elem, exists, err := c.cacher.watchCache.storage.GetByKey(key); err != nil {
@@ -94,6 +97,9 @@ func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Obj
 }
 
 func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	if c.cacher.Bypassed() {
+		return c.storage.Watch(ctx, key, opts)
+	}
 	// if the watch-list feature wasn't set and the resourceVersion is unset
 	// ensure that the rv from which the watch is being served, is the latest
 	// one. "latest" is ensured by serving the watch from
@@ -108,6 +114,9 @@ func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.Lis
 }
 
 func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	if c.cacher.Bypassed() {
+		return c.storage.Get(ctx, key, opts, objPtr)
+	}
 	if opts.ResourceVersion == "" {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility).
@@ -129,6 +138,9 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 }
 
 func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	if c.cacher.Bypassed() {
+		return c.storage.GetList(ctx, key, opts, listObj)
+	}
 	_, _, err := storage.ValidateListOptions(c.cacher.resourcePrefix, c.cacher.versioner, opts)
 	if err != nil {
 		return err

@@ -18,6 +18,7 @@ package options
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -261,6 +262,76 @@ func TestParseWatchCacheSizes(t *testing.T) {
 	}
 }
 
+func TestParseWatchCacheMaxBytesPerResource(t *testing.T) {
+	testCases := []struct {
+		name                string
+		specs               []string
+		expectDefaultBytes  int64
+		expectResourceBytes map[schema.GroupResource]int64
+		expectErr           string
+	}{
+		{
+			name:      "test invalid format with too many tokens",
+			specs:     []string{"deployments.apps#65536#extra"},
+			expectErr: "invalid value of watch cache max bytes",
+		},
+		{
+			name:      "test invalid byte size",
+			specs:     []string{"deployments.apps#invalid-size"},
+			expectErr: "invalid byte size",
+		},
+		{
+			name:      "test negative byte size",
+			specs:     []string{"deployments.apps#-10Mi"},
+			expectErr: "watch-cache-max-bytes-per-resource cannot be negative",
+		},
+		{
+			name:                "test global default only",
+			specs:               []string{"100Mi"},
+			expectDefaultBytes:  100 * 1024 * 1024,
+			expectResourceBytes: map[schema.GroupResource]int64{},
+		},
+		{
+			name:               "test global default with keyword and overrides",
+			specs:              []string{"default#100Mi", "deployments.apps#50Mi", "sbomreports.aquasecurity.github.io#0"},
+			expectDefaultBytes: 100 * 1024 * 1024,
+			expectResourceBytes: map[schema.GroupResource]int64{
+				{Group: "apps", Resource: "deployments"}:                   50 * 1024 * 1024,
+				{Group: "aquasecurity.github.io", Resource: "sbomreports"}: 0,
+			},
+		},
+		{
+			name:               "test plain numbers in bytes",
+			specs:              []string{"1048576", "secrets#2097152"},
+			expectDefaultBytes: 1048576,
+			expectResourceBytes: map[schema.GroupResource]int64{
+				{Group: "", Resource: "secrets"}: 2097152,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defaultBytes, resourceBytes, err := ParseWatchCacheMaxBytesPerResource(tc.specs)
+			if len(tc.expectErr) != 0 {
+				if err == nil || !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected err containing %q, got %v", tc.expectErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if defaultBytes != tc.expectDefaultBytes {
+				t.Errorf("expected defaultBytes %d, got %d", tc.expectDefaultBytes, defaultBytes)
+			}
+			if !reflect.DeepEqual(resourceBytes, tc.expectResourceBytes) {
+				t.Errorf("expected resourceBytes %v, got %v", tc.expectResourceBytes, resourceBytes)
+			}
+		})
+	}
+}
+
 func TestKMSHealthzEndpoint(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
@@ -474,6 +545,48 @@ func TestRestOptionsStorageObjectCountTracker(t *testing.T) {
 	}
 	if restOptions.StorageConfig.StorageObjectCountTracker != serverConfig.StorageObjectCountTracker {
 		t.Errorf("There are different StorageObjectCountTracker in restOptions and serverConfig")
+	}
+}
+
+func TestRestOptionsWatchCacheMaxBytes(t *testing.T) {
+	serverConfig := server.NewConfig(codecs)
+	etcdOptions := &EtcdOptions{
+		EnableWatchCache: true,
+		WatchCacheMaxBytesPerResource: []string{
+			"default#100Mi",
+			"deployments.apps#50Mi",
+			"sbomreports.aquasecurity.github.io#0",
+		},
+	}
+	if err := etcdOptions.ApplyTo(serverConfig); err != nil {
+		t.Fatalf("Failed to apply etcd options: %v", err)
+	}
+
+	// 1. deployments.apps should have MaxBytes = 50Mi and use StorageWithCacher
+	deployOptions, err := serverConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "apps", Resource: "deployments"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deployOptions.StorageConfig.MaxBytes != 50*1024*1024 {
+		t.Errorf("expected MaxBytes %d for deployments, got %d", 50*1024*1024, deployOptions.StorageConfig.MaxBytes)
+	}
+
+	// 2. sbomreports.aquasecurity.github.io should have budget 0 and fall back to UndecoratedStorage
+	sbomOptions, err := serverConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "aquasecurity.github.io", Resource: "sbomreports"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sbomOptions.Decorator == nil {
+		t.Errorf("expected decorator to be non-nil")
+	}
+
+	// 3. pods should use default 100Mi
+	podOptions, err := serverConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: "pods"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if podOptions.StorageConfig.MaxBytes != 100*1024*1024 {
+		t.Errorf("expected MaxBytes %d for pods, got %d", 100*1024*1024, podOptions.StorageConfig.MaxBytes)
 	}
 }
 
