@@ -370,6 +370,7 @@ message CSINodeSpec {
 message CSINodeStatus {
   // storageHealth contains backend health reports for CSI drivers registered on the node.
   // +optional
+  // +k8s:optional
   // +listType=map
   // +listMapKey=name
   // +patchMergeKey=name
@@ -545,6 +546,7 @@ message StorageClassList {
 message StorageHealth {
   // name is the CSI driver name, matching CSINodeDriver.name.
   // +required
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional string name = 1;
 
   // healthConditions are the adverse storage backend conditions reported by the CSI driver.
