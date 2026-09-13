@@ -534,6 +534,7 @@ func (c *Cacher) probeOverBudget(ctx context.Context) (bool, error) {
 	}
 	listObj := c.newListFunc()
 	opts := storage.ListOptions{
+		Recursive: true,
 		Predicate: storage.SelectionPredicate{
 			Limit: 50,
 		},
