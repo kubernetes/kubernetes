@@ -78,7 +78,24 @@ func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbacv1.PolicyRule,
 func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
 
-	r.authorizationRuleResolver.VisitRulesFor(ctx, requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
+	// Determine the namespace to use for rule resolution.
+	// When the request targets the "namespaces" resource itself (e.g., DELETE /api/v1/namespaces/tenant),
+	// the request info parser sets Namespace to the namespace name. However, namespaces are cluster-scoped
+	// resources, so namespace-scoped RoleBindings should NOT grant write/mutating permissions on namespace
+	// operations (e.g. edit, patch, delete).
+	// Read access (get/list/watch) at the namespace scope is preserved to allow namespace discovery
+	// (see bootstrappolicy viewRules: read access to namespaces at the namespace scope means you can read *this* namespace).
+	// For write operations (!IsReadOnly()), we clear the namespace so that only ClusterRoleBindings are consulted.
+	// See https://github.com/kubernetes/kubernetes/issues/142024
+	namespace := requestAttributes.GetNamespace()
+	if requestAttributes.IsResourceRequest() &&
+		requestAttributes.GetResource() == "namespaces" &&
+		requestAttributes.GetAPIGroup() == "" &&
+		!requestAttributes.IsReadOnly() {
+		namespace = ""
+	}
+
+	r.authorizationRuleResolver.VisitRulesFor(ctx, requestAttributes.GetUser(), namespace, ruleCheckingVisitor.visit)
 	if ruleCheckingVisitor.allowed {
 		return authorizer.DecisionAllow, ruleCheckingVisitor.reason, nil
 	}

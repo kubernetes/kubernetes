@@ -534,3 +534,188 @@ func BenchmarkAuthorize(b *testing.B) {
 		})
 	}
 }
+
+func TestNamespaceWritePermissionsNotGrantedByRoleBinding(t *testing.T) {
+	// Tests issue https://github.com/kubernetes/kubernetes/issues/142024
+	// Namespace-scoped RoleBinding must not grant write/mutating permissions on the namespace resource itself.
+	clusterRoles := []*rbacv1.ClusterRole{
+		newClusterRole("cluster-admin", newRule("*", "*", "*", "*")),
+	}
+	roles := []*rbacv1.Role{
+		newRole("ns-admin", "tenant", newRule("*", "*", "*", "*")),
+	}
+	roleBindings := []*rbacv1.RoleBinding{
+		newRoleBinding("tenant", "cluster-admin", bindToClusterRole, "User:tenant"),
+		newRoleBinding("tenant", "ns-admin", bindToRole, "User:tenant-with-role"),
+	}
+	clusterRoleBindings := []*rbacv1.ClusterRoleBinding{
+		newClusterRoleBinding("cluster-admin", "User:cluster-admin"),
+	}
+
+	ruleResolver, _ := rbacregistryvalidation.NewTestRuleResolver(roles, roleBindings, clusterRoles, clusterRoleBindings)
+	a := RBACAuthorizer{ruleResolver}
+
+	tenantUser := &user.DefaultInfo{Name: "tenant"}
+	tenantWithRoleUser := &user.DefaultInfo{Name: "tenant-with-role"}
+	clusterAdminUser := &user.DefaultInfo{Name: "cluster-admin"}
+
+	tests := []struct {
+		name          string
+		attrs         authorizer.Attributes
+		expectAllowed bool
+	}{
+		// Tenant with RoleBinding to cluster-admin in "tenant" namespace:
+		// Read permissions on the namespace should be ALLOWED (for namespace discovery)
+		{
+			name: "tenant can get its own namespace",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            tenantUser,
+				Verb:            "get",
+				Resource:        "namespaces",
+				Name:            "tenant",
+				Namespace:       "tenant",
+			},
+			expectAllowed: true,
+		},
+		// Mutating permissions on the namespace should be FORBIDDEN via RoleBinding
+		{
+			name: "tenant cannot delete its own namespace via RoleBinding",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            tenantUser,
+				Verb:            "delete",
+				Resource:        "namespaces",
+				Name:            "tenant",
+				Namespace:       "tenant",
+			},
+			expectAllowed: false,
+		},
+		{
+			name: "tenant cannot update its own namespace via RoleBinding",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            tenantUser,
+				Verb:            "update",
+				Resource:        "namespaces",
+				Name:            "tenant",
+				Namespace:       "tenant",
+			},
+			expectAllowed: false,
+		},
+		{
+			name: "tenant cannot patch its own namespace via RoleBinding",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            tenantUser,
+				Verb:            "patch",
+				Resource:        "namespaces",
+				Name:            "tenant",
+				Namespace:       "tenant",
+			},
+			expectAllowed: false,
+		},
+		{
+			name: "tenant cannot update finalize subresource on its own namespace via RoleBinding",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            tenantUser,
+				Verb:            "update",
+				Resource:        "namespaces",
+				Subresource:     "finalize",
+				Name:            "tenant",
+				Namespace:       "tenant",
+			},
+			expectAllowed: false,
+		},
+		// Tenant binding to a namespace-scoped Role with wildcard rules (* on *)
+		{
+			name: "tenant with Role cannot delete its own namespace via RoleBinding",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            tenantWithRoleUser,
+				Verb:            "delete",
+				Resource:        "namespaces",
+				Name:            "tenant",
+				Namespace:       "tenant",
+			},
+			expectAllowed: false,
+		},
+		{
+			name: "tenant with Role cannot patch its own namespace via RoleBinding",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            tenantWithRoleUser,
+				Verb:            "patch",
+				Resource:        "namespaces",
+				Name:            "tenant",
+				Namespace:       "tenant",
+			},
+			expectAllowed: false,
+		},
+		// Tenant cannot delete other namespaces
+		{
+			name: "tenant cannot delete other namespace",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            tenantUser,
+				Verb:            "delete",
+				Resource:        "namespaces",
+				Name:            "other",
+				Namespace:       "other",
+			},
+			expectAllowed: false,
+		},
+		// Tenant CAN still manage resources inside its namespace
+		{
+			name: "tenant can delete pods in its own namespace",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            tenantUser,
+				Verb:            "delete",
+				Resource:        "pods",
+				Name:            "mypod",
+				Namespace:       "tenant",
+			},
+			expectAllowed: true,
+		},
+		// Cluster admin with ClusterRoleBinding CAN manage namespaces
+		{
+			name: "cluster-admin can delete namespace",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            clusterAdminUser,
+				Verb:            "delete",
+				Resource:        "namespaces",
+				Name:            "tenant",
+				Namespace:       "tenant",
+			},
+			expectAllowed: true,
+		},
+		{
+			name: "cluster-admin can update namespace",
+			attrs: authorizer.AttributesRecord{
+				ResourceRequest: true,
+				User:            clusterAdminUser,
+				Verb:            "update",
+				Resource:        "namespaces",
+				Name:            "tenant",
+				Namespace:       "tenant",
+			},
+			expectAllowed: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			decision, reason, err := a.Authorize(context.Background(), tc.attrs)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			isAllowed := (decision == authorizer.DecisionAllow)
+			if isAllowed != tc.expectAllowed {
+				t.Errorf("expected allowed=%v, got allowed=%v (decision=%v, reason=%s)", tc.expectAllowed, isAllowed, decision, reason)
+			}
+		})
+	}
+}
