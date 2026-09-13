@@ -412,11 +412,11 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 }
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
-func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sentAt time.Time) {
+func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sentAt time.Time, stopped bool) {
 	watchEvent := c.convertToWatchEvent(event)
 	if watchEvent == nil {
 		// Watcher is not interested in that object.
-		return time.Time{}, time.Time{}
+		return time.Time{}, time.Time{}, false
 	}
 	builtAt = c.clock.Now()
 
@@ -434,7 +434,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	// events.
 	select {
 	case <-c.done:
-		return time.Time{}, time.Time{}
+		return time.Time{}, time.Time{}, true
 	default:
 	}
 
@@ -443,8 +443,9 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 		c.markBookmarkAfterRvSent(event)
 		sentAt = c.clock.Now()
 	case <-c.done:
+		stopped = true
 	}
-	return builtAt, sentAt
+	return builtAt, sentAt, stopped
 }
 
 func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
@@ -499,8 +500,13 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		if event == nil {
 			break
 		}
-		c.sendWatchCacheEvent(event)
-
+		_, sentAt, stopped := c.sendWatchCacheEvent(event)
+		if stopped {
+			if initEventCount > 0 {
+				metrics.InitCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Add(float64(initEventCount))
+			}
+			return
+		}
 		// With some events already sent, update resourceVersion so that
 		// events that were buffered and not yet processed won't be delivered
 		// to this watcher second time causing going back in time.
@@ -513,12 +519,11 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		if event.ResourceVersion > resourceVersion {
 			resourceVersion = event.ResourceVersion
 		}
-		initEventCount++
+		if !sentAt.IsZero() {
+			initEventCount++
+		}
 	}
 
-	if initEventCount > 0 {
-		metrics.InitCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Add(float64(initEventCount))
-	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
@@ -526,7 +531,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 
 	// send bookmark after sending all events in cacheInterval for watchlist request
 	if cacheInterval.initialEventsEndBookmark != nil {
-		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+		_, _, _ = c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
 	}
 	c.process(ctx, resourceVersion)
 }
@@ -551,7 +556,7 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 			// or a bookmark event with an RV equal to resourceVersion
 			// if we haven't sent one to the client
 			if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
-				builtAt, sentAt := c.sendWatchCacheEvent(event)
+				builtAt, sentAt, _ := c.sendWatchCacheEvent(event)
 				c.observeDispatchMetrics(event, dequeuedAt, builtAt, sentAt)
 			}
 		case <-ctx.Done():
