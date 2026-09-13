@@ -122,6 +122,11 @@ type Config struct {
 	Codec runtime.Codec
 
 	Clock clock.WithTicker
+
+	// MaxBytes defines maximum total estimated bytes of objects that can be stored in the cache.
+	// If the total bytes exceed this limit, the cacher will bypass caching and delegate directly to underlying storage.
+	// 0 means unlimited.
+	MaxBytes int64
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -343,6 +348,10 @@ type Cacher struct {
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
 	watcherMetrics          *metrics.WatcherMetricsObservers
+	maxBytes                int64
+	codec                   runtime.Codec
+	reflectorStopCh         chan struct{}
+	reflectorStopOnce       sync.Once
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -440,7 +449,8 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	progressRequester := progress.NewConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
-		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
+		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion,
+		config.MaxBytes, config.Codec)
 	listerWatcher := NewListerWatcher(config.Storage, resourcePrefix, config.NewListFunc, contextMetadata)
 	reflectorName := "storage/cacher.go:" + resourcePrefix
 
@@ -453,8 +463,14 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	// In most of the cases, leader is reelected within few cycles.
 	reflector.MaxInternalErrorRetryDuration = time.Second * 30
 
+	cacher.maxBytes = config.MaxBytes
+	cacher.codec = config.Codec
+	cacher.reflectorStopCh = make(chan struct{})
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
+	watchCache.SetOnBypassed(func() {
+		cacher.stopCachingOnBypass()
+	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
 		err := config.Storage.EnableResourceSizeEstimation(cacher.getKeys)
@@ -477,7 +493,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		defer cacher.terminateAllWatchers()
 		wait.Until(
 			func() {
-				if !cacher.isStopped() {
+				if !cacher.isStopped() && !cacher.Bypassed() {
 					cacher.startCaching(stopCh)
 				}
 			}, time.Second, stopCh,
@@ -486,7 +502,109 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	return cacher, nil
 }
 
+func (c *Cacher) Bypassed() bool {
+	if c.watchCache == nil {
+		return false
+	}
+	return c.watchCache.Bypassed()
+}
+
+func (c *Cacher) TotalBytes() int64 {
+	if c.watchCache == nil {
+		return 0
+	}
+	return c.watchCache.TotalBytes()
+}
+
+func (c *Cacher) stopCachingOnBypass() {
+	c.reflectorStopOnce.Do(func() {
+		close(c.reflectorStopCh)
+	})
+	if c.watchCache != nil {
+		c.watchCache.bypassed.Store(true)
+	}
+	c.ready.setReady()
+	c.storage.DisableResourceSizeEstimation()
+	c.terminateAllWatchers()
+}
+
+func (c *Cacher) probeOverBudget(ctx context.Context) (bool, error) {
+	if c.maxBytes <= 0 {
+		return false, nil
+	}
+	listObj := c.newListFunc()
+	opts := storage.ListOptions{
+		Predicate: storage.SelectionPredicate{
+			Limit: 50,
+		},
+	}
+	err := c.storage.GetList(ctx, c.resourcePrefix, opts, listObj)
+	if err != nil {
+		return false, err
+	}
+	items, err := meta.ExtractList(listObj)
+	if err != nil {
+		return false, nil
+	}
+	if len(items) == 0 {
+		return false, nil
+	}
+
+	var sampleBytes int64
+	for _, item := range items {
+		sampleBytes += EstimateObjectSize(item.(runtime.Object), c.codec)
+	}
+
+	if sampleBytes > c.maxBytes {
+		return true, nil
+	}
+
+	stats, err := c.storage.Stats(ctx)
+	if err == nil && stats.ObjectCount > int64(len(items)) {
+		avgSize := sampleBytes / int64(len(items))
+		if avgSize > 0 && stats.ObjectCount*avgSize > c.maxBytes {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
+	if c.Bypassed() {
+		return
+	}
+
+	if c.maxBytes > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		overBudget, err := c.probeOverBudget(ctx)
+		cancel()
+		if err == nil && overBudget {
+			klog.Warningf("Watch cache for %v pre-populate probe exceeded byte budget (%d bytes max). Bypassing watch cache and falling back to storage.", c.groupResource, c.maxBytes)
+			metrics.WatchCacheBypassed.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Set(1)
+			c.stopCachingOnBypass()
+			return
+		}
+	}
+
+	reflectorStop := make(chan struct{})
+	reflectorStopOnce := sync.Once{}
+	stopReflector := func() {
+		reflectorStopOnce.Do(func() {
+			close(reflectorStop)
+		})
+	}
+	defer stopReflector()
+	go func() {
+		select {
+		case <-stopChannel:
+			stopReflector()
+		case <-c.reflectorStopCh:
+			stopReflector()
+		case <-reflectorStop:
+		}
+	}()
+
 	startTime := time.Now()
 	c.watchCache.SetOnReplace(func() {
 		c.ready.setReady()
@@ -497,12 +615,14 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	})
 	var err error
 	defer func() {
-		c.ready.setError(err)
+		if !c.Bypassed() {
+			c.ready.setError(err)
+		}
 	}()
 
 	c.terminateAllWatchers()
-	err = c.reflector.ListAndWatch(stopChannel)
-	if err != nil {
+	err = c.reflector.ListAndWatch(reflectorStop)
+	if err != nil && !c.Bypassed() && !c.isStopped() {
 		klog.Errorf("cacher (%v): unexpected ListAndWatch error: %v; reinitializing...", c.groupResource.String(), err)
 		metrics.WatchCacheInitializationErrors.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 	}
@@ -514,6 +634,9 @@ type namespacedName struct {
 }
 
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	if c.Bypassed() {
+		return c.storage.Watch(ctx, key, opts)
+	}
 	ctx, span := tracing.Start(ctx, "cacher.Watch",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.Stringer("type", c.groupResource))
@@ -690,6 +813,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 }
 
 func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	if c.Bypassed() {
+		return c.storage.Get(ctx, key, opts, objPtr)
+	}
 	ctx, span := tracing.Start(ctx, "cacher.Get",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("key", key),
@@ -751,6 +877,9 @@ type listResp struct {
 
 // GetList implements storage.Interface
 func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	if c.Bypassed() {
+		return c.storage.GetList(ctx, key, opts, listObj)
+	}
 	preparedKey, err := c.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return err
@@ -901,11 +1030,18 @@ func (c *Cacher) triggerValuesThreadUnsafe(event *watchCacheEvent) ([]string, bo
 }
 
 func (c *Cacher) processEvent(event *watchCacheEvent) {
+	if c.Bypassed() {
+		return
+	}
 	if curLen := int64(len(c.incoming)); c.incomingHWM.Update(curLen) {
 		// Monitor if this gets backed up, and how much.
 		klog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.groupResource.String(), curLen)
 	}
-	c.incoming <- *event
+	select {
+	case c.incoming <- *event:
+	case <-c.stopCh:
+	case <-c.reflectorStopCh:
+	}
 }
 
 func (c *Cacher) dispatchEvents() {
@@ -920,6 +1056,9 @@ func (c *Cacher) dispatchEvents() {
 	// we poll aggressively for the first list RV before entering the dispatch loop.
 	lastProcessedResourceVersion := uint64(0)
 	if err := wait.PollUntilContextCancel(wait.ContextForChannel(c.stopCh), 10*time.Millisecond, true, func(_ context.Context) (bool, error) {
+		if c.Bypassed() {
+			return true, nil
+		}
 		if rv := c.watchCache.getListResourceVersion(); rv != 0 {
 			lastProcessedResourceVersion = rv
 			return true, nil
@@ -930,11 +1069,17 @@ func (c *Cacher) dispatchEvents() {
 		// the non-empty error means that the stopCh was closed
 		return
 	}
+	if c.Bypassed() {
+		return
+	}
 	for {
 		select {
 		case event, ok := <-c.incoming:
 			if !ok {
 				return
+			}
+			if c.Bypassed() {
+				continue
 			}
 			// Don't dispatch bookmarks coming from the storage layer.
 			// They can be very frequent (even to the level of subseconds)
@@ -965,6 +1110,8 @@ func (c *Cacher) dispatchEvents() {
 			}
 			c.dispatchEvent(bookmarkEvent)
 		case <-c.stopCh:
+			return
+		case <-c.reflectorStopCh:
 			return
 		}
 	}
@@ -1228,6 +1375,9 @@ func (c *Cacher) Stop() {
 	c.stopped = true
 	c.ready.stop()
 	c.stopLock.Unlock()
+	c.reflectorStopOnce.Do(func() {
+		close(c.reflectorStopCh)
+	})
 	close(c.stopCh)
 	c.stopWg.Wait()
 }
@@ -1385,6 +1535,9 @@ func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCach
 }
 
 func (c *Cacher) getKeys(ctx context.Context) ([]string, error) {
+	if c.Bypassed() {
+		return nil, fmt.Errorf("cacher for %v is bypassed", c.groupResource)
+	}
 	ctx, span := tracing.Start(ctx, "cacher.getKeys",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)))
 	defer span.End(500 * time.Millisecond)
@@ -1397,6 +1550,9 @@ func (c *Cacher) getKeys(ctx context.Context) ([]string, error) {
 }
 
 func (c *Cacher) Ready() bool {
+	if c.Bypassed() {
+		return true
+	}
 	_, err := c.ready.check()
 	return err == nil
 }

@@ -18,13 +18,16 @@ package cacher
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,10 +95,71 @@ type watchCache struct {
 	// This handler is run at the end of every successful Replace() method.
 	onReplace func()
 
+	// This handler is run when the watch cache exceeds its byte budget and is bypassed.
+	onBypassed func()
+
 	history *watchCacheHistory
 	storage *store.WatchCacheStorage
 
 	config *ImmutableWatchCacheConfig
+
+	// totalBytes tracks the estimated total size of objects held in the watch cache.
+	totalBytes int64
+
+	// maxBytes defines the maximum byte budget for this watch cache. 0 means unlimited.
+	maxBytes int64
+
+	// keyToSize caches object sizes by key to avoid re-serializing on update/delete.
+	keyToSize map[string]int64
+
+	// codec is the storage codec used for estimating serialized object sizes.
+	codec runtime.Codec
+
+	// bypassed indicates whether caching was disabled due to exceeding byte budget.
+	bypassed atomic.Bool
+}
+
+// EstimateObjectSize estimates the serialized byte size of a runtime.Object.
+// If codec is provided, it encodes the object using the codec to determine wire size.
+// Otherwise, it falls back to json.Marshal.
+func EstimateObjectSize(obj runtime.Object, codec runtime.Codec) int64 {
+	if obj == nil {
+		return 0
+	}
+	if codec != nil {
+		if data, err := runtime.Encode(codec, obj); err == nil {
+			return int64(len(data))
+		}
+	}
+	if u, ok := obj.(*unstructured.Unstructured); ok {
+		if data, err := json.Marshal(u.Object); err == nil {
+			return int64(len(data))
+		}
+	}
+	if data, err := json.Marshal(obj); err == nil {
+		return int64(len(data))
+	}
+	return 0
+}
+
+func (w *watchCache) TotalBytes() int64 {
+	w.RLock()
+	defer w.RUnlock()
+	return w.totalBytes
+}
+
+func (w *watchCache) Bypassed() bool {
+	return w.bypassed.Load()
+}
+
+func (w *watchCache) SetBypassed(bypassed bool) {
+	w.bypassed.Store(bypassed)
+}
+
+func (w *watchCache) SetOnBypassed(onBypassed func()) {
+	w.Lock()
+	defer w.Unlock()
+	w.onBypassed = onBypassed
 }
 
 type ImmutableWatchCacheConfig struct {
@@ -126,6 +190,13 @@ type ImmutableWatchCacheConfig struct {
 	waitingUntilFresh *progress.ConditionalProgressRequester
 
 	getCurrentRV func(context.Context) (uint64, error)
+
+	// maxBytes defines maximum total estimated bytes of objects that can be stored in the cache.
+	// 0 means unlimited.
+	maxBytes int64
+
+	// codec is used for serializing objects when measuring byte budget.
+	codec runtime.Codec
 }
 
 func newWatchCache(
@@ -139,6 +210,8 @@ func newWatchCache(
 	groupResource schema.GroupResource,
 	progressRequester *progress.ConditionalProgressRequester,
 	getCurrentRV func(context.Context) (uint64, error),
+	maxBytes int64,
+	codec runtime.Codec,
 ) *watchCache {
 	config := &ImmutableWatchCacheConfig{
 		keyFunc:           keyFunc,
@@ -149,13 +222,20 @@ func newWatchCache(
 		groupResource:     groupResource,
 		waitingUntilFresh: progressRequester,
 		getCurrentRV:      getCurrentRV,
+		maxBytes:          maxBytes,
+		codec:             codec,
 	}
 
 	wc := &watchCache{
 		resourceVersion: 0,
 		config:          config,
+		maxBytes:        maxBytes,
+		codec:           codec,
 		history:         newWatchCacheHistory(config, eventFreshDuration),
 		storage:         store.NewWatchCacheStorage(config.keyFunc, indexers),
+	}
+	if maxBytes > 0 {
+		wc.keyToSize = make(map[string]int64)
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.config.indexValidator = wc.history.isIndexValidLocked
@@ -208,9 +288,11 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 	return object, resourceVersion, nil
 }
 
-// processEvent is safe as long as there is at most one call to it in flight
-// at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) error {
+	if w.Bypassed() {
+		return nil
+	}
+
 	cacheReceived := w.config.clock.Now()
 	recordTime := cacheReceived
 	if withRecordTime, ok := event.Object.(storage.WatchEventWithRecordTime); ok {
@@ -224,6 +306,12 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 	if err != nil {
 		return fmt.Errorf("couldn't compute key: %v", err)
 	}
+
+	var elemSize int64
+	if w.maxBytes > 0 && (event.Type == watch.Added || event.Type == watch.Modified) {
+		elemSize = EstimateObjectSize(event.Object, w.codec)
+	}
+
 	elem := &store.Element{Key: key, Object: event.Object}
 	elem.Labels, elem.Fields, err = w.config.getAttrsFunc(event.Object)
 	if err != nil {
@@ -246,6 +334,12 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		w.Lock()
 		defer w.Unlock()
 
+		if w.Bypassed() {
+			w.resourceVersion = resourceVersion
+			defer w.cond.Broadcast()
+			return nil
+		}
+
 		previous, err := w.storage.UpdateStoreLocked(event.Type, elem, resourceVersion)
 		if err != nil {
 			return err
@@ -260,6 +354,39 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()
 
+		if w.maxBytes > 0 {
+			switch event.Type {
+			case watch.Added:
+				w.totalBytes += elemSize
+				w.keyToSize[key] = elemSize
+			case watch.Modified:
+				prevSize := w.keyToSize[key]
+				w.totalBytes += (elemSize - prevSize)
+				w.keyToSize[key] = elemSize
+			case watch.Deleted:
+				prevSize := w.keyToSize[key]
+				delete(w.keyToSize, key)
+				w.totalBytes -= prevSize
+				if w.totalBytes < 0 {
+					w.totalBytes = 0
+				}
+			}
+			metrics.WatchCacheEstimatedBytes.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(float64(w.totalBytes))
+
+			if w.totalBytes > w.maxBytes {
+				w.bypassed.Store(true)
+				metrics.WatchCacheBypassed.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(1)
+				klog.Warningf("Watch cache for %v exceeded byte budget (estimated %d bytes > %d bytes max). Bypassing watch cache and falling back to storage.", w.config.groupResource, w.totalBytes, w.maxBytes)
+				w.history.ResetLocked()
+				w.storage.Replace(nil, "", resourceVersion)
+				w.keyToSize = nil
+				if w.onBypassed != nil {
+					w.onBypassed()
+				}
+				return nil
+			}
+		}
+
 		if w.history.isCacheFullLocked() {
 			oldestRV := w.history.OldestResourceVersionLocked()
 			w.storage.CompactSnapshotsLocked(oldestRV)
@@ -267,6 +394,10 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		return nil
 	}(); err != nil {
 		return err
+	}
+
+	if w.Bypassed() {
+		return nil
 	}
 
 	// Avoid calling event handler under lock.
@@ -566,12 +697,20 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion u
 
 // Replace takes slice of runtime.Object as a parameter.
 func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
+	if w.Bypassed() {
+		return nil
+	}
 	version, err := w.config.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
 		return err
 	}
 
 	toReplace := make([]interface{}, 0, len(objs))
+	var totalBytes int64
+	var keyToSize map[string]int64
+	if w.maxBytes > 0 {
+		keyToSize = make(map[string]int64, len(objs))
+	}
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
@@ -585,6 +724,11 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		if err != nil {
 			return err
 		}
+		if w.maxBytes > 0 {
+			elemSize := EstimateObjectSize(object, w.codec)
+			totalBytes += elemSize
+			keyToSize[key] = elemSize
+		}
 		toReplace = append(toReplace, &store.Element{
 			Key:    key,
 			Object: object,
@@ -596,6 +740,10 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	w.Lock()
 	defer w.Unlock()
 
+	if w.Bypassed() {
+		return nil
+	}
+
 	// Ensure startIndex never decreases, so that existing watchCacheInterval
 	// instances get "invalid" errors if the try to download from the buffer
 	// using their own start/end indexes calculated from previous buffer
@@ -603,6 +751,29 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 
 	// Empty the cyclic buffer, ensuring startIndex doesn't decrease.
 	w.history.ResetLocked()
+
+	if w.maxBytes > 0 {
+		w.totalBytes = totalBytes
+		w.keyToSize = keyToSize
+		metrics.WatchCacheEstimatedBytes.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(float64(totalBytes))
+
+		if totalBytes > w.maxBytes {
+			w.bypassed.Store(true)
+			metrics.WatchCacheBypassed.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Set(1)
+			klog.Warningf("Watch cache for %v exceeded byte budget (estimated %d bytes > %d bytes max). Bypassing watch cache and falling back to storage.", w.config.groupResource, totalBytes, w.maxBytes)
+			if err := w.storage.Replace(nil, resourceVersion, version); err != nil {
+				return err
+			}
+			w.keyToSize = nil
+			w.resourceVersion = version
+			if w.onBypassed != nil {
+				w.onBypassed()
+			}
+			w.cond.Broadcast()
+			metrics.RecordResourceVersion(w.config.groupResource, version)
+			return nil
+		}
+	}
 
 	if err := w.storage.Replace(toReplace, resourceVersion, version); err != nil {
 		return err

@@ -30,6 +30,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -136,7 +137,7 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 		defer wc.RUnlock()
 		return wc.resourceVersion, nil
 	}
-	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
+	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV, 0, nil)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.history.capacity = capacity
@@ -1427,4 +1428,136 @@ func getMaxItemRV(t *testing.T, versioner storage.Versioner, items []interface{}
 		maxRV = max(maxRV, itemRV)
 	}
 	return maxRV
+}
+
+func TestWatchCacheByteBudget(t *testing.T) {
+	// Test 1: EstimateObjectSize
+	if size := EstimateObjectSize(nil, nil); size != 0 {
+		t.Fatalf("expected 0 for nil object, got %d", size)
+	}
+
+	pod := makeTestPod("pod1", 1)
+	podSize := EstimateObjectSize(pod, nil)
+	if podSize <= 0 {
+		t.Fatalf("expected positive pod size, got %d", podSize)
+	}
+
+	u := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name": "my-map",
+			},
+			"data": map[string]interface{}{
+				"key": "value",
+			},
+		},
+	}
+	uSize := EstimateObjectSize(u, nil)
+	if uSize <= 0 {
+		t.Fatalf("expected positive unstructured size, got %d", uSize)
+	}
+
+	// Test 2: Zero overhead when maxBytes == 0 (unset flag)
+	unlimitedCache := newTestWatchCache(10, DefaultEventFreshDuration, &cache.Indexers{})
+	defer unlimitedCache.Stop()
+	require.NoError(t, unlimitedCache.Add(makeTestPod("pod1", 1)))
+	if unlimitedCache.TotalBytes() != 0 {
+		t.Errorf("expected 0 TotalBytes when maxBytes is 0 (zero overhead), got %d", unlimitedCache.TotalBytes())
+	}
+	if unlimitedCache.watchCache.keyToSize != nil {
+		t.Errorf("expected nil keyToSize when maxBytes is 0, got %v", unlimitedCache.watchCache.keyToSize)
+	}
+
+	// Test 3: TotalBytes tracking when maxBytes > 0
+	budgetedCache := newWatchCache(
+		func(obj runtime.Object) (string, error) {
+			p := obj.(*v1.Pod)
+			return "/prefix/ns/" + p.Name, nil
+		},
+		func(event *watchCacheEvent) {},
+		func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			p := obj.(*v1.Pod)
+			return labels.Set(p.Labels), fields.Set{"spec.nodeName": p.Spec.NodeName}, nil
+		},
+		storage.APIObjectVersioner{},
+		&cache.Indexers{},
+		testingclock.NewFakeClock(time.Now()),
+		DefaultEventFreshDuration,
+		schema.GroupResource{Resource: "pods"},
+		nil,
+		func(context.Context) (uint64, error) { return 0, nil },
+		1000000, // Large MaxBytes so it doesn't bypass yet
+		nil,
+	)
+
+	require.NoError(t, budgetedCache.Add(makeTestPod("pod1", 1)))
+	firstSize := budgetedCache.TotalBytes()
+	if firstSize != podSize {
+		t.Errorf("expected TotalBytes %d, got %d", podSize, firstSize)
+	}
+
+	pod2 := makeTestPod("pod2", 2)
+	pod2Size := EstimateObjectSize(pod2, nil)
+	require.NoError(t, budgetedCache.Add(pod2))
+	if budgetedCache.TotalBytes() != firstSize+pod2Size {
+		t.Errorf("expected TotalBytes %d, got %d", firstSize+pod2Size, budgetedCache.TotalBytes())
+	}
+
+	// Update pod1 with larger labels
+	largerPod := makeTestPodDetails("pod1", 3, "node1", map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"})
+	largerPodSize := EstimateObjectSize(largerPod, nil)
+	require.NoError(t, budgetedCache.Update(largerPod))
+	expectedAfterUpdate := firstSize + pod2Size + (largerPodSize - podSize)
+	if budgetedCache.TotalBytes() != expectedAfterUpdate {
+		t.Errorf("expected TotalBytes %d after update, got %d", expectedAfterUpdate, budgetedCache.TotalBytes())
+	}
+
+	// Delete pod2
+	require.NoError(t, budgetedCache.Delete(pod2))
+	expectedAfterDelete := expectedAfterUpdate - pod2Size
+	if budgetedCache.TotalBytes() != expectedAfterDelete {
+		t.Errorf("expected TotalBytes %d after delete, got %d", expectedAfterDelete, budgetedCache.TotalBytes())
+	}
+
+	// Test 4: Replace respects byte budget and clears memory on bypass
+	bypassedCalled := false
+	limitedCache := newWatchCache(
+		func(obj runtime.Object) (string, error) {
+			p := obj.(*v1.Pod)
+			return "/prefix/ns/" + p.Name, nil
+		},
+		func(event *watchCacheEvent) {},
+		func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			p := obj.(*v1.Pod)
+			return labels.Set(p.Labels), fields.Set{"spec.nodeName": p.Spec.NodeName}, nil
+		},
+		storage.APIObjectVersioner{},
+		&cache.Indexers{},
+		testingclock.NewFakeClock(time.Now()),
+		DefaultEventFreshDuration,
+		schema.GroupResource{Resource: "pods"},
+		nil,
+		func(context.Context) (uint64, error) { return 0, nil },
+		podSize, // MaxBytes equal to 1 pod
+		nil,
+	)
+	limitedCache.SetOnBypassed(func() {
+		bypassedCalled = true
+	})
+
+	// Replace with 2 pods -> should exceed budget and bypass
+	err := limitedCache.Replace([]interface{}{makeTestPod("pod1", 1), makeTestPod("pod2", 2)}, "2")
+	require.NoError(t, err)
+	if !limitedCache.Bypassed() {
+		t.Errorf("expected limitedCache to be bypassed after Replace exceeding budget")
+	}
+	if !bypassedCalled {
+		t.Errorf("expected OnBypassed callback to be invoked")
+	}
+	// Storage should be cleared to free memory
+	if len(limitedCache.storage.List()) != 0 {
+		t.Errorf("expected storage to be cleared after bypass, got %d items", len(limitedCache.storage.List()))
+	}
 }
