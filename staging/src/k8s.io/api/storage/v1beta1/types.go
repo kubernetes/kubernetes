@@ -731,6 +731,7 @@ type StorageHealthCondition struct {
 type StorageHealth struct {
 	// name is the CSI driver name, matching CSINodeDriver.name.
 	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// healthConditions are the adverse storage backend conditions reported by the CSI driver.
 	// At most 16 conditions may be reported.
@@ -743,6 +744,7 @@ type StorageHealth struct {
 type CSINodeStatus struct {
 	// storageHealth contains backend health reports for CSI drivers registered on the node.
 	// +optional
+	// +k8s:optional
 	// +listType=map
 	// +listMapKey=name
 	// +patchMergeKey=name
