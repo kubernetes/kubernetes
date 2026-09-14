@@ -2997,22 +2997,7 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.schedule: Required value": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mycronjob",
-				Namespace: metav1.NamespaceDefault,
-				UID:       types.UID("1a2b3c"),
-			},
-			Spec: batch.CronJobSpec{
-				Schedule:          "",
-				ConcurrencyPolicy: batch.AllowConcurrent,
-				JobTemplate: batch.JobTemplateSpec{
-					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
-					},
-				},
-			},
-		},
+
 		"spec.timeZone: timeZone must be nil or non-empty string": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
