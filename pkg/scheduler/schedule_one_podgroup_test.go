@@ -9932,7 +9932,6 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 	testRegistry.MustRegister(
 		metrics.PodGroupScheduleAttempts,
 		metrics.PodGroupSchedulingLatency,
-		metrics.PodGroupSchedulingAlgorithmLatency,
 	)
 
 	tests := []struct {
@@ -10038,7 +10037,6 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 
 					metrics.PodGroupScheduleAttempts.Reset()
 					metrics.PodGroupSchedulingLatency.Reset()
-					metrics.PodGroupSchedulingAlgorithmLatency.Reset()
 
 					logger, ctx := ktesting.NewTestContext(t)
 					testNode := st.MakeNode().Name("node1").Obj()
@@ -10064,8 +10062,23 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 						)
 					}
 
+					var lock sync.Mutex
+					boundPods := sets.New[string]()
+					failedPods := sets.New[string]()
+
 					client := clientsetfake.NewSimpleClientset(testNode, p1)
 					queue := internalqueue.NewTestQueue(ctx, nil)
+					client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+						if action.GetSubresource() != "binding" {
+							return false, nil, nil
+						}
+						lock.Lock()
+						binding := action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
+						boundPods.Insert(binding.Name)
+						lock.Unlock()
+						return true, binding, nil
+					})
+
 					schedFwk, err := tf.NewFramework(ctx, []tf.RegisterPluginFunc{
 						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 						tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -10080,7 +10093,7 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 						t.Fatalf("Failed to create framework: %v", err)
 					}
 
-					cache := internalcache.New(ctx, nil, true, true)
+					cache := internalcache.New(ctx, nil, true, setup.cpgEnabled)
 					cache.AddNode(logger, testNode)
 
 					sched := &Scheduler{
@@ -10090,6 +10103,9 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 						client:           client,
 						nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
 						FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+							lock.Lock()
+							failedPods.Insert(p.Pod.Name)
+							lock.Unlock()
 						},
 					}
 					if err := sched.initAlgorithm(); err != nil {
@@ -10098,31 +10114,65 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 
 					// submitPodGroupAlgorithmResult finishes the cycle and records attempt and latency metrics
 					podGroupCycleState := framework.NewCycleState()
-					pgResult := &podGroupAlgorithmResult{
-						status:              tt.status,
-						podGroupInfo:        qpgi.PodGroupInfo,
-						waitingOnPreemption: tt.waitingOnPreemption,
-					}
-					if !tt.isCPG {
-						placementCycleState := framework.NewCycleState()
-						placementCycleState.SetPodGroupCycleState(podGroupCycleState)
-						podCtx := initPodSchedulingContext(ctx, p1, placementCycleState)
-						pgResult.podResults = []algorithmResult{
-							{
-								status:         tt.status,
-								podCtx:         podCtx,
-								podInfo:        qpgi.PodInfosForGroup(qpgi.PodGroupInfo.GetKey())[0],
-								scheduleResult: ScheduleResult{SuggestedHost: testNode.Name},
+					placementCycleState := framework.NewCycleState()
+					placementCycleState.SetPodGroupCycleState(podGroupCycleState)
+					podCtx := initPodSchedulingContext(ctx, p1, placementCycleState)
+
+					resultsMap := make(map[fwk.EntityKey]*podGroupAlgorithmResult)
+					if tt.isCPG {
+						resultsMap[qpgi.PodGroupInfo.GetKey()] = &podGroupAlgorithmResult{
+							status:              tt.status,
+							podGroupInfo:        qpgi.PodGroupInfo,
+							waitingOnPreemption: tt.waitingOnPreemption,
+						}
+						childPGInfo := qpgi.PodGroupInfo.Children()[0]
+						resultsMap[childPGInfo.GetKey()] = &podGroupAlgorithmResult{
+							status:              tt.status,
+							podGroupInfo:        childPGInfo,
+							waitingOnPreemption: tt.waitingOnPreemption,
+							podResults: []algorithmResult{
+								{
+									status:         tt.status,
+									podCtx:         podCtx,
+									podInfo:        qpgi.PodInfosForGroup(childPGInfo.GetKey())[0],
+									scheduleResult: ScheduleResult{SuggestedHost: testNode.Name},
+								},
+							},
+						}
+					} else {
+						resultsMap[qpgi.PodGroupInfo.GetKey()] = &podGroupAlgorithmResult{
+							status:              tt.status,
+							podGroupInfo:        qpgi.PodGroupInfo,
+							waitingOnPreemption: tt.waitingOnPreemption,
+							podResults: []algorithmResult{
+								{
+									status:         tt.status,
+									podCtx:         podCtx,
+									podInfo:        qpgi.PodInfosForGroup(qpgi.PodGroupInfo.GetKey())[0],
+									scheduleResult: ScheduleResult{SuggestedHost: testNode.Name},
+								},
 							},
 						}
 					}
-					resultsMap := map[fwk.EntityKey]*podGroupAlgorithmResult{
-						qpgi.PodGroupInfo.GetKey(): pgResult,
-					}
 					sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, qpgi, resultsMap, time.Now(), tt.status)
 
-					// Also test algorithm latency metric helper directly with profile and type
-					metrics.PodGroupAlgorithmLatency(schedFwk.ProfileName(), string(qpgi.Type()), 0.1)
+					if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+						lock.Lock()
+						defer lock.Unlock()
+						return len(boundPods)+len(failedPods) == qpgi.Size(), nil
+					}); err != nil {
+						t.Errorf("Failed waiting for all pods to be either bound or failed")
+					}
+
+					lock.Lock()
+					wantBound, wantFailed := sets.New[string](), sets.New("p1")
+					if tt.status.IsSuccess() {
+						wantBound, wantFailed = sets.New("p1"), sets.New[string]()
+					}
+					if !boundPods.Equal(wantBound) || !failedPods.Equal(wantFailed) {
+						t.Errorf("Unexpected pod outcome: bound=%v failed=%v, want bound=%v failed=%v", sets.List(boundPods), sets.List(failedPods), sets.List(wantBound), sets.List(wantFailed))
+					}
+					lock.Unlock()
 
 					// Verify podgroup_schedule_attempts_total
 					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", nil, "type", tt.wantType, 1)
@@ -10136,12 +10186,13 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 					}
 					assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_podgroup_scheduling_attempt_duration_seconds", labels, 1)
 
-					// Verify podgroup_scheduling_algorithm_duration_seconds sample count
-					algoLabels := map[string]string{
-						"profile": "test-scheduler",
-						"type":    tt.wantType,
+					// Only the root's type is recorded; a CPG child must not be reported on its own.
+					otherType := metrics.CompositePodGroup
+					if tt.wantType == metrics.CompositePodGroup {
+						otherType = metrics.PodGroup
 					}
-					assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_podgroup_scheduling_algorithm_duration_seconds", algoLabels, 1)
+					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", "type", otherType, 0)
+					assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_podgroup_scheduling_attempt_duration_seconds", map[string]string{"type": otherType}, 0)
 				})
 			}
 		})

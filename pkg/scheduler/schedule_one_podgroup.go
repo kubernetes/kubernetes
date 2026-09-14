@@ -421,7 +421,7 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 		completePGResults = map[fwk.EntityKey]*podGroupAlgorithmResult{rootPodGroupInfo.PodGroupInfo.GetKey(): result}
 	}
 
-	metrics.PodGroupAlgorithmLatency(schedFwk.ProfileName(), string(rootPodGroupInfo.Type()), metrics.SinceInSeconds(start))
+	metrics.PodGroupAlgorithmLatency(schedFwk.ProfileName(), metrics.EntityTypeToLabel(rootPodGroupInfo.Type()), metrics.SinceInSeconds(start))
 
 	// Run pod group post filter plugins if scheduling failed. If any of the plugins is successful,
 	// we need to put the pods from pod group back into the scheduling queue.
@@ -794,7 +794,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 		sched.submitPodGroupResult(ctx, schedFwk, podGroupState, queuedPodInfos, podGroupResult)
 	}
 
-	entityType := string(rootPodGroupInfo.Type())
+	entityType := metrics.EntityTypeToLabel(rootPodGroupInfo.Type())
 	rootResult := podGroupResults[rootPodGroupInfo.PodGroupInfo.GetKey()]
 	switch {
 	case rootResult.status.IsSuccess():
