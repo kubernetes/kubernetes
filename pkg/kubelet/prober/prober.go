@@ -69,17 +69,6 @@ func newProber(
 	}
 }
 
-// recordContainerEvent should be used by the prober for all container related events.
-func (pb *prober) recordContainerEvent(ctx context.Context, pod *v1.Pod, container *v1.Container, eventType, reason, message string, args ...interface{}) {
-	logger := klog.FromContext(ctx)
-	ref, err := kubecontainer.GenerateContainerRef(pod, container)
-	if err != nil {
-		logger.Error(err, "Can't make a ref to pod and container", "pod", klog.KObj(pod), "containerName", container.Name)
-		return
-	}
-	pb.recorder.WithLogger(logger).Eventf(ref, eventType, reason, message, args...)
-}
-
 // probe probes the container and emits values on the container for probe failure or errors
 // returns a results.Result which gives the underlying result of the probe, a string containing the output from the probe
 // and an error. An error is only returned if the probe itself errors (not every results.Failure leads to an error).
