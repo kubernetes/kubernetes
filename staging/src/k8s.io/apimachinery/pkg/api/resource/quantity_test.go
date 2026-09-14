@@ -400,6 +400,7 @@ func TestQuantityParse(t *testing.T) {
 				t.Errorf("%v: unexpected error: %v", item.input, err)
 				continue
 			}
+			beforeValue, beforeOK := got.AsInt64()
 			if asDec {
 				got.AsDec()
 			}
@@ -412,8 +413,8 @@ func TestQuantityParse(t *testing.T) {
 			}
 
 			if asDec {
-				if i, ok := got.AsInt64(); i != 0 || ok {
-					t.Errorf("%v: expected inf.Dec to return false for AsInt64: %d", item.input, i)
+				if i, ok := got.AsInt64(); i != beforeValue || ok != beforeOK {
+					t.Errorf("%v: expected inf.Dec to return the same AsInt64 as the int64 form: (%d, %t), got (%d, %t)", item.input, beforeValue, beforeOK, i, ok)
 				}
 				continue
 			}
@@ -1345,9 +1346,8 @@ func TestNegAndSubAtMostNegative(t *testing.T) {
 
 	check := func(name string, got Quantity) {
 		t.Helper()
-		// AsInt64 must run before Cmp: Cmp promotes got to the Dec backend in place
-		// (via AsDec), after which AsInt64 always returns ok=false and can no longer
-		// catch a result the fix should have moved off the int64 backend.
+		// ok=false distinguishes the decimal fallback from a wrap back to
+		// mostNegative, which would fit an int64 and report ok=true.
 		if v, ok := got.AsInt64(); ok {
 			t.Errorf("%s: AsInt64() = (%d, true), want ok=false because 2^63 does not fit int64", name, v)
 		}
@@ -1416,8 +1416,8 @@ func TestNegAndSubAtMostNegative(t *testing.T) {
 
 	// A plain zero receiver takes the 0 - y == -y shortcut, so the scale comes from
 	// the subtrahend. AsInt64 is not asserted here: it returns ok=false on both the
-	// old code (negative scale) and the fixed code (Dec backend), so it can't tell
-	// them apart. String and Sign can.
+	// old code (negative scale) and the fixed code (fractional digits), so it can't
+	// tell them apart. String and Sign can.
 	zeroScaledSub := Quantity{Format: DecimalSI}
 	zeroScaledSub.Sub(*NewScaledQuantity(mostNegative, Milli))
 	if got := zeroScaledSub.String(); got != "9223372036854775808m" {
