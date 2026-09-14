@@ -930,22 +930,12 @@ func TestGetPodPriority(t *testing.T) {
 			pod:  st.MakePod().Name("p7").Priority(10).PodGroupName("pg1").Obj(),
 			podGroupLister: &mockPodGroupLister{
 				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": {
-						ObjectMeta: metav1.ObjectMeta{Name: "pg1"},
-						Spec: schedulingv1beta1.PodGroupSpec{
-							ParentCompositePodGroupName: new("cpg1"),
-						},
-					},
+					"pg1": st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
 				},
 			},
 			compositePodGroupLister: &mockCompositePodGroupLister{
 				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							Priority: new(int32(150)),
-						},
-					},
+					"cpg1": st.MakeCompositePodGroup().Name("cpg1").Priority(150).Obj(),
 				},
 			},
 			expectedPriority: 150,
@@ -955,28 +945,13 @@ func TestGetPodPriority(t *testing.T) {
 			pod:  st.MakePod().Name("p8").Priority(10).PodGroupName("pg1").Obj(),
 			podGroupLister: &mockPodGroupLister{
 				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": {
-						ObjectMeta: metav1.ObjectMeta{Name: "pg1"},
-						Spec: schedulingv1beta1.PodGroupSpec{
-							ParentCompositePodGroupName: new("cpg1"),
-						},
-					},
+					"pg1": st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
 				},
 			},
 			compositePodGroupLister: &mockCompositePodGroupLister{
 				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Name: "cpg2"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							Priority: new(int32(250)),
-						},
-					},
+					"cpg1": st.MakeCompositePodGroup().Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+					"cpg2": st.MakeCompositePodGroup().Name("cpg2").Priority(250).Obj(),
 				},
 			},
 			expectedPriority: 250,
@@ -1015,13 +990,7 @@ func TestGetPodPriority(t *testing.T) {
 			},
 			compositePodGroupLister: &mockCompositePodGroupLister{
 				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							Priority:                    new(int32(150)),
-							ParentCompositePodGroupName: new("missing-cpg2"),
-						},
-					},
+					"cpg1": st.MakeCompositePodGroup().Name("cpg1").Priority(150).ParentCompositePodGroup("missing-cpg2").Obj(),
 				},
 			},
 			expectedPriority: 150,
@@ -1116,15 +1085,8 @@ func TestTraverseHierarchyUp(t *testing.T) {
 			},
 			compositePodGroupLister: &mockCompositePodGroupLister{
 				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-					},
+					"cpg1": st.MakeCompositePodGroup().Namespace(namespace).Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+					"cpg2": st.MakeCompositePodGroup().Namespace(namespace).Name("cpg2").Obj(),
 				},
 			},
 			expectedVisitedKeys: []fwk.EntityKey{
@@ -1139,15 +1101,8 @@ func TestTraverseHierarchyUp(t *testing.T) {
 			podGroupLister: &mockPodGroupLister{podGroups: map[string]*schedulingv1beta1.PodGroup{}},
 			compositePodGroupLister: &mockCompositePodGroupLister{
 				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-					},
+					"cpg1": st.MakeCompositePodGroup().Namespace(namespace).Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+					"cpg2": st.MakeCompositePodGroup().Namespace(namespace).Name("cpg2").Obj(),
 				},
 			},
 			expectedVisitedKeys: []fwk.EntityKey{
@@ -1165,15 +1120,8 @@ func TestTraverseHierarchyUp(t *testing.T) {
 			},
 			compositePodGroupLister: &mockCompositePodGroupLister{
 				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-					},
+					"cpg1": st.MakeCompositePodGroup().Namespace(namespace).Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+					"cpg2": st.MakeCompositePodGroup().Namespace(namespace).Name("cpg2").Obj(),
 				},
 			},
 			stopAt: "cpg1",
@@ -1192,18 +1140,8 @@ func TestTraverseHierarchyUp(t *testing.T) {
 			},
 			compositePodGroupLister: &mockCompositePodGroupLister{
 				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg1"),
-						},
-					},
+					"cpg1": st.MakeCompositePodGroup().Namespace(namespace).Name("cpg1").ParentCompositePodGroup("cpg2").Obj(),
+					"cpg2": st.MakeCompositePodGroup().Namespace(namespace).Name("cpg2").ParentCompositePodGroup("cpg1").Obj(),
 				},
 			},
 			expectedVisitedKeys: []fwk.EntityKey{
