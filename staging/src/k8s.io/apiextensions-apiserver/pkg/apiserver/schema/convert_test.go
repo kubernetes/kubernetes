@@ -70,10 +70,6 @@ func TestStructuralRoundtripOrError(t *testing.T) {
 		origSchema := &apiextensions.JSONSchemaProps{}
 		x := reflect.ValueOf(origSchema).Elem()
 		n := rand.Intn(x.NumField())
-		if name := x.Type().Field(n).Name; name == "Example" || name == "ExternalDocs" {
-			// we drop these intentionally
-			continue
-		}
 		f.Fill(x.Field(n).Addr().Interface())
 
 		// it roundtrips or NewStructural errors out. We should never drop anything

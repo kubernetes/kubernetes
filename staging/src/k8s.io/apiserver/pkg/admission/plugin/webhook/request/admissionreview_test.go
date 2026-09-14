@@ -502,8 +502,8 @@ func TestCreateAdmissionObjects(t *testing.T) {
 		{
 			name: "v1",
 			attrs: &admission.VersionedAttributes{
-				VersionedObject:    versionedObj.DeepCopyObject(),
-				VersionedOldObject: versionedObjOld.DeepCopyObject(),
+				VersionedObject:    admission.NewLazyObject(versionedObj.DeepCopyObject()),
+				VersionedOldObject: admission.NewLazyObject(versionedObjOld.DeepCopyObject()),
 				Attributes:         attrs,
 			},
 			invocation: &generic.WebhookInvocation{
@@ -545,8 +545,8 @@ func TestCreateAdmissionObjects(t *testing.T) {
 		{
 			name: "v1beta1",
 			attrs: &admission.VersionedAttributes{
-				VersionedObject:    versionedObj.DeepCopyObject(),
-				VersionedOldObject: versionedObjOld.DeepCopyObject(),
+				VersionedObject:    admission.NewLazyObject(versionedObj.DeepCopyObject()),
+				VersionedOldObject: admission.NewLazyObject(versionedObjOld.DeepCopyObject()),
 				Attributes:         attrs,
 			},
 			invocation: &generic.WebhookInvocation{

@@ -32,7 +32,7 @@ import (
 // by listing EndpointSlices in the service's namespace whose `kubernetes.io/service-name`
 // label contains the service's name.
 type EndpointSlice struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata.
 	// +optional
@@ -48,11 +48,16 @@ type EndpointSlice struct {
 	// The EndpointSlice controller only generates, and kube-proxy only processes,
 	// slices of addressType "IPv4" and "IPv6". No semantics are defined for
 	// the "FQDN" type.
+	// +required
+	// +k8s:required
+	// +k8s:immutable
 	AddressType AddressType `json:"addressType" protobuf:"bytes,4,rep,name=addressType"`
 
 	// endpoints is a list of unique endpoints in this slice. Each slice may
 	// include a maximum of 1000 endpoints.
+	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	Endpoints []Endpoint `json:"endpoints" protobuf:"bytes,2,rep,name=endpoints"`
 
 	// ports specifies the list of network ports exposed by each endpoint in
@@ -68,6 +73,7 @@ type EndpointSlice struct {
 
 // AddressType represents the type of address referred to by an endpoint.
 // +enum
+// +k8s:enum
 type AddressType string
 
 const (
@@ -90,9 +96,13 @@ type Endpoint struct {
 	// controller will always have exactly 1 address. No semantics are defined for
 	// additional addresses beyond the first, and kube-proxy does not look at them.
 	// +listType=set
+	// +required
+	// +k8s:required
+	// +k8s:maxItems=100
 	Addresses []string `json:"addresses" protobuf:"bytes,1,rep,name=addresses"`
 
 	// conditions contains information about the current status of the endpoint.
+	// +optional
 	Conditions EndpointConditions `json:"conditions,omitempty" protobuf:"bytes,2,opt,name=conditions"`
 
 	// hostname of this endpoint. This field may be used by consumers of
@@ -161,11 +171,13 @@ type EndpointConditions struct {
 type EndpointHints struct {
 	// forZones indicates the zone(s) this endpoint should be consumed by when
 	// using topology aware routing. May contain a maximum of 8 entries.
+	// +optional
 	// +listType=atomic
 	ForZones []ForZone `json:"forZones,omitempty" protobuf:"bytes,1,name=forZones"`
 
 	// forNodes indicates the node(s) this endpoint should be consumed by when
 	// using topology aware routing. May contain a maximum of 8 entries.
+	// +optional
 	// +listType=atomic
 	ForNodes []ForNode `json:"forNodes,omitempty" protobuf:"bytes,2,name=forNodes"`
 }
@@ -173,12 +185,14 @@ type EndpointHints struct {
 // ForZone provides information about which zones should consume this endpoint.
 type ForZone struct {
 	// name represents the name of the zone.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 }
 
 // ForNode provides information about which nodes should consume this endpoint.
 type ForNode struct {
 	// name represents the name of the node.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 }
 
@@ -192,17 +206,20 @@ type EndpointPort struct {
 	// * must consist of lower case alphanumeric characters or '-'.
 	// * must start and end with an alphanumeric character.
 	// Default is empty string.
+	// +optional
 	Name *string `json:"name,omitempty" protobuf:"bytes,1,name=name"`
 
 	// protocol represents the IP protocol for this port.
 	// Must be UDP, TCP, or SCTP.
 	// Default is TCP.
+	// +optional
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,2,name=protocol"`
 
 	// port represents the port number of the endpoint.
 	// If the EndpointSlice is derived from a Kubernetes service, this must be set
 	// to the service's target port. EndpointSlices used for other purposes may have
 	// a nil port.
+	// +optional
 	Port *int32 `json:"port,omitempty" protobuf:"bytes,3,opt,name=port"`
 
 	// The application protocol for this port.
@@ -229,7 +246,7 @@ type EndpointPort struct {
 
 // EndpointSliceList represents a list of endpoint slices
 type EndpointSliceList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata.
 	// +optional

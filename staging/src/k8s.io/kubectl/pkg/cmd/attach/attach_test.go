@@ -137,7 +137,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			options:         &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "wrong"}, GetPodTimeout: 10},
 			args:            []string{"foo"},
 			expectedPodName: "foo",
-			expectError:     "container wrong not found in pod foo",
+			expectError:     "container wrong is not valid for pod foo out of: bar, debugger (ephem), initfoo (init)",
 			obj:             attachPod(),
 		},
 		{
@@ -276,7 +276,7 @@ func TestAttach(t *testing.T) {
 			attachPath:   "/api/" + version + "/namespaces/test/pods/foo/attach",
 			pod:          attachPod(),
 			container:    "foo",
-			expectedErr:  "cannot attach to the container: container foo not found in pod foo",
+			expectedErr:  "cannot attach to the container: container foo is not valid for pod foo out of: bar, debugger (ephem), initfoo (init)",
 		},
 	}
 	for _, test := range tests {
@@ -510,7 +510,7 @@ func TestReattachMessage(t *testing.T) {
 			container: "bar",
 			rawTTY:    true,
 			stdin:     true,
-			expected:  "Session ended, resume using",
+			expected:  "Session ended, resume using 'kubectl foo -c bar -n test -i -t' command",
 		},
 		{
 			name:      "no stdin",
@@ -541,7 +541,7 @@ func TestReattachMessage(t *testing.T) {
 			container: "bar",
 			rawTTY:    true,
 			stdin:     true,
-			expected:  "",
+			expected:  "Session ended, resume using 'kubectl foo -c bar -n test -i -t' command",
 		},
 		{
 			name:      "ephemeral container",
@@ -549,7 +549,7 @@ func TestReattachMessage(t *testing.T) {
 			container: "debugger",
 			rawTTY:    true,
 			stdin:     true,
-			expected:  "Session ended, the ephemeral container will not be restarted",
+			expected:  "Session ended, the ephemeral container will not be restarted but may be reattached using 'kubectl foo -c debugger -n test -i -t' if it is still running",
 		},
 	}
 	for _, test := range tests {
@@ -558,7 +558,8 @@ func TestReattachMessage(t *testing.T) {
 				StreamOptions: exec.StreamOptions{
 					Stdin: test.stdin,
 				},
-				Pod: test.pod,
+				CommandName: "kubectl",
+				Pod:         test.pod,
 			}
 			if msg := options.reattachMessage(test.container, test.rawTTY); test.expected == "" && msg != "" {
 				t.Errorf("reattachMessage(%v, %v) = %q, want empty string", test.container, test.rawTTY, msg)

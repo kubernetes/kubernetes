@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0
 /*
  * libpathrs: safe path resolution on Linux
- * Copyright (C) 2019-2025 Aleksa Sarai <cyphar@cyphar.com>
  * Copyright (C) 2019-2025 SUSE LLC
+ * Copyright (C) 2026 Aleksa Sarai <cyphar@cyphar.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -16,6 +16,8 @@ package pathrs
 import (
 	"fmt"
 	"os"
+
+	"golang.org/x/sys/unix"
 
 	"cyphar.com/go-pathrs/internal/fdutils"
 	"cyphar.com/go-pathrs/internal/libpathrs"
@@ -30,11 +32,9 @@ import (
 // you can try to use [Root.Open] or [Root.OpenFile].
 //
 // It is critical that perform all relevant operations through this [Handle]
-// (rather than fetching the file descriptor yourself with [Handle.IntoRaw]),
+// (rather than fetching the underlying [os.File] yourself with [Handle.IntoFile]),
 // because the security properties of libpathrs depend on users doing all
 // relevant filesystem operations through libpathrs.
-//
-// [os.File]: https://pkg.go.dev/os#File
 type Handle struct {
 	inner *os.File
 }
@@ -43,7 +43,7 @@ type Handle struct {
 // handle will be copied by this method, so the original handle should still be
 // freed by the caller.
 //
-// This is effectively the inverse operation of [Handle.IntoRaw], and is used
+// This is effectively the inverse operation of [Handle.IntoFile], and is used
 // for "deserialising" pathrs root handles.
 func HandleFromFile(file *os.File) (*Handle, error) {
 	newFile, err := fdutils.DupFile(file)
@@ -58,11 +58,11 @@ func HandleFromFile(file *os.File) (*Handle, error) {
 // and can be opened multiple times.
 //
 // The handle returned is only usable for reading, and this is method is
-// shorthand for [Handle.OpenFile] with os.O_RDONLY.
+// shorthand for [Handle.OpenFile] with [unix.O_RDONLY].
 //
 // TODO: Rename these to "Reopen" or something.
 func (h *Handle) Open() (*os.File, error) {
-	return h.OpenFile(os.O_RDONLY)
+	return h.OpenFile(unix.O_RDONLY)
 }
 
 // OpenFile creates an "upgraded" file handle to the file referenced by the
@@ -73,7 +73,7 @@ func (h *Handle) Open() (*os.File, error) {
 // handle.
 //
 // TODO: Rename these to "Reopen" or something.
-func (h *Handle) OpenFile(flags int) (*os.File, error) {
+func (h *Handle) OpenFile(flags uint64) (*os.File, error) {
 	return fdutils.WithFileFd(h.inner, func(fd uintptr) (*os.File, error) {
 		newFd, err := libpathrs.Reopen(fd, flags)
 		if err != nil {
@@ -92,8 +92,6 @@ func (h *Handle) OpenFile(flags int) (*os.File, error) {
 // calling [Handle.Close] will also close any copies of the returned [os.File].
 // If you want to get an independent copy, use [Handle.Clone] followed by
 // [Handle.IntoFile] on the cloned [Handle].
-//
-// [os.File]: https://pkg.go.dev/os#File
 func (h *Handle) IntoFile() *os.File {
 	// TODO: Figure out if we really don't want to make a copy.
 	// TODO: We almost certainly want to clear r.inner here, but we can't do

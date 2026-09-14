@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
@@ -216,22 +217,22 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, p
 
 func (im *realImageGCManager) Start(ctx context.Context) {
 	logger := klog.FromContext(ctx)
-	go wait.Until(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		_, err := im.detectImages(ctx, time.Now())
 		if err != nil {
 			logger.Info("Failed to monitor images", "err", err)
 		}
-	}, 5*time.Minute, wait.NeverStop)
+	}, 5*time.Minute)
 
 	// Start a goroutine periodically updates image cache.
-	go wait.Until(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		images, err := im.runtime.ListImages(ctx)
 		if err != nil {
 			logger.Info("Failed to update image list", "err", err)
 		} else {
 			im.imageCache.set(images)
 		}
-	}, 30*time.Second, wait.NeverStop)
+	}, 30*time.Second)
 
 }
 
@@ -383,7 +384,7 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 	// Check valid capacity.
 	if capacity == 0 {
 		err := goerrors.New("invalid capacity 0 on image filesystem")
-		im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.InvalidDiskCapacity, err.Error())
+		im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.InvalidDiskCapacity, "%s", err.Error())
 		return err
 	}
 
@@ -578,7 +579,7 @@ func (im *realImageGCManager) imagesInEvictionOrder(ctx context.Context, freeTim
 			imageID := getImageIDFromTuple(image)
 			// Ensure imageID is valid or else continue
 			if imageID == "" {
-				im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, "ImageID is not valid, skipping, ImageID: %v", imageID)
+				im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.InvalidImageID, "ImageID is not valid, skipping, image: %v", image)
 				continue
 			}
 			images = append(images, evictionInfo{

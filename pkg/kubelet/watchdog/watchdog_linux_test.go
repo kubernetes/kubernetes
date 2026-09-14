@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -26,9 +25,15 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
+
+// Some of these tests capture log output. Don't reduce the verbosity or they will fail!
+func init() {
+	ktesting.SetDefaultVerbosity(5)
+}
 
 // Mock syncLoopHealthChecker
 type mockSyncLoopHealthChecker struct {
@@ -92,6 +97,8 @@ func TestNewHealthChecker(t *testing.T) {
 
 // TestHealthCheckerStart tests the Start method of the healthChecker.
 func TestHealthCheckerStart(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	// Test cases
 	tests := []struct {
 		name           string
@@ -146,8 +153,8 @@ func TestHealthCheckerStart(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+		tCtx.SyncTest(tt.name, func(tCtx ktesting.TContext) {
+			tCtx = ktesting.Init(tCtx, initoption.BufferLogs(true))
 			logger := tCtx.Logger()
 			defer func() {
 				tCtx.Cancel("test has completed")
@@ -166,7 +173,11 @@ func TestHealthCheckerStart(t *testing.T) {
 				t.Fatalf("NewHealthChecker() failed: %v", err)
 			}
 			if !tt.noCheckers {
-				hc.SetHealthCheckers(&mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}, nil)
+				// Bypass SetHealthCheckers because it adds LogHealthz, which leaks a background
+				// goroutine that doesn't play well with SyncTest.
+				hc.(*healthChecker).checkers.Store([]healthz.HealthChecker{
+					healthz.NamedCheck("syncloop", (&mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}).SyncLoopHealthCheck),
+				})
 			}
 
 			// Start the health checker

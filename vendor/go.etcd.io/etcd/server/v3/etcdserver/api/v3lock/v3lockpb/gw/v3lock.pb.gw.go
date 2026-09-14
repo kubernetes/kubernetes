@@ -9,8 +9,6 @@ It translates gRPC into RESTful JSON APIs.
 package gw
 
 import (
-	protov1 "github.com/golang/protobuf/proto"
-
 	"context"
 	"errors"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v3lock/v3lockpb"
@@ -43,11 +41,14 @@ func request_Lock_Lock_0(ctx context.Context, marshaler runtime.Marshaler, clien
 		protoReq v3lockpb.LockRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
 	msg, err := client.Lock(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 func local_request_Lock_Lock_0(ctx context.Context, marshaler runtime.Marshaler, server v3lockpb.LockServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -55,11 +56,11 @@ func local_request_Lock_Lock_0(ctx context.Context, marshaler runtime.Marshaler,
 		protoReq v3lockpb.LockRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.Lock(ctx, &protoReq)
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 func request_Lock_Unlock_0(ctx context.Context, marshaler runtime.Marshaler, client v3lockpb.LockClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -67,11 +68,14 @@ func request_Lock_Unlock_0(ctx context.Context, marshaler runtime.Marshaler, cli
 		protoReq v3lockpb.UnlockRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
 	msg, err := client.Unlock(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 func local_request_Lock_Unlock_0(ctx context.Context, marshaler runtime.Marshaler, server v3lockpb.LockServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -79,11 +83,11 @@ func local_request_Lock_Unlock_0(ctx context.Context, marshaler runtime.Marshale
 		protoReq v3lockpb.UnlockRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.Unlock(ctx, &protoReq)
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 // v3lockpb.RegisterLockHandlerServer registers the http handlers for service Lock to "mux".

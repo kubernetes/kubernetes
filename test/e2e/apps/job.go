@@ -27,6 +27,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,6 +101,156 @@ var _ = SIGDescribe("Job", func() {
 			}
 		}
 		gomega.Expect(successes).To(gomega.Equal(completions), "expected %d successful job pods, but got  %d", completions, successes)
+	})
+
+	f.It("should compile a Workload and PodGroup for a gang-scheduled Job and wire its pods to the PodGroup", framework.WithFeatureGate(features.WorkloadWithJob), func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(2)
+		backoffLimit := int32(6)
+
+		ginkgo.By("Creating a gang-scheduled job")
+		job := e2ejob.NewTestJob("notTerminate", "gang", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.Scheduling = &batchv1.JobSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(parallelism)},
+			},
+		}
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Waiting for a gang Workload owned by the Job")
+		var workload *schedulingv1beta1.Workload
+		gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1beta1.Workload, error) {
+			list, err := f.ClientSet.SchedulingV1beta1().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return nil, err
+			}
+			for i := range list.Items {
+				if ref := list.Items[i].Spec.ControllerRef; ref != nil && ref.Kind == "Job" && ref.Name == job.Name {
+					workload = &list.Items[i]
+					return workload, nil
+				}
+			}
+			return nil, nil
+		}).WithTimeout(f.Timeouts.PodStart).ShouldNot(gomega.BeNil(), "expected a Workload owned by the Job")
+
+		gomega.Expect(workload.Spec.PodGroupTemplates).To(gomega.HaveLen(1), "expected a single PodGroupTemplate")
+		gomega.Expect(workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang).NotTo(gomega.BeNil(), "expected a gang PodGroupTemplate")
+		gomega.Expect(workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount).To(gomega.Equal(parallelism), "unexpected gang minCount")
+
+		ginkgo.By("Waiting for the runtime PodGroup referencing the Workload")
+		var podGroup *schedulingv1beta1.PodGroup
+		gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1beta1.PodGroup, error) {
+			list, err := f.ClientSet.SchedulingV1beta1().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return nil, err
+			}
+			for i := range list.Items {
+				if ref := list.Items[i].Spec.WorkloadRef; ref != nil && ref.WorkloadName == workload.Name {
+					podGroup = &list.Items[i]
+					return podGroup, nil
+				}
+			}
+			return nil, nil
+		}).WithTimeout(f.Timeouts.PodStart).ShouldNot(gomega.BeNil(), "expected a PodGroup referencing the Workload")
+
+		ginkgo.By("Ensuring the Job's pods reference the PodGroup via schedulingGroup")
+		gomega.Eventually(ctx, func(ctx context.Context) (int, error) {
+			pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+			if err != nil {
+				return 0, err
+			}
+			return len(pods.Items), nil
+		}).WithTimeout(f.Timeouts.PodStart).Should(gomega.Equal(int(parallelism)), "expected %d job pods", parallelism)
+
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job")
+		for _, pod := range pods.Items {
+			gomega.Expect(pod.Spec.SchedulingGroup).NotTo(gomega.BeNil(), "pod %s missing schedulingGroup", pod.Name)
+			gomega.Expect(pod.Spec.SchedulingGroup.PodGroupName).To(gomega.HaveValue(gomega.Equal(podGroup.Name)), "pod %s schedulingGroup does not reference the PodGroup", pod.Name)
+		}
+	})
+
+	f.It("should propagate an elastic gang minCount change to the Workload and PodGroup", framework.WithFeatureGate(features.WorkloadWithJob), func(ctx context.Context) {
+		parallelism := int32(3)
+		completions := int32(3)
+		backoffLimit := int32(6)
+		initialMinCount := int32(3)
+		updatedMinCount := int32(2)
+
+		ginkgo.By("Creating a gang-scheduled job")
+		job := e2ejob.NewTestJob("notTerminate", "gang-resize", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.Scheduling = &batchv1.JobSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(initialMinCount)},
+			},
+		}
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Waiting for a gang Workload owned by the Job with the initial minCount")
+		var workloadName string
+		gomega.Eventually(ctx, func(ctx context.Context) (*int32, error) {
+			list, err := f.ClientSet.SchedulingV1beta1().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return nil, err
+			}
+			for i := range list.Items {
+				ref := list.Items[i].Spec.ControllerRef
+				if ref == nil || ref.Kind != "Job" || ref.Name != job.Name {
+					continue
+				}
+				if len(list.Items[i].Spec.PodGroupTemplates) == 0 || list.Items[i].Spec.PodGroupTemplates[0].SchedulingPolicy.Gang == nil {
+					return nil, nil
+				}
+				workloadName = list.Items[i].Name
+				return new(list.Items[i].Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount), nil
+			}
+			return nil, nil
+		}).WithTimeout(f.Timeouts.PodStart).Should(gomega.HaveValue(gomega.Equal(initialMinCount)), "expected the Workload gang minCount to match the initial value")
+
+		ginkgo.By("Reducing the Job's gang minCount")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			cur, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Get(ctx, job.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			cur.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = new(updatedMinCount)
+			_, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Update(ctx, cur, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update job gang minCount")
+
+		ginkgo.By("Waiting for the new minCount to propagate to the Workload template")
+		gomega.Eventually(ctx, func(ctx context.Context) (*int32, error) {
+			wl, err := f.ClientSet.SchedulingV1beta1().Workloads(f.Namespace.Name).Get(ctx, workloadName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			if len(wl.Spec.PodGroupTemplates) == 0 || wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang == nil {
+				return nil, nil
+			}
+			return new(wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount), nil
+		}).WithTimeout(f.Timeouts.PodStart).Should(gomega.HaveValue(gomega.Equal(updatedMinCount)), "expected the Workload gang minCount to be updated")
+
+		ginkgo.By("Waiting for the new minCount to propagate to the runtime PodGroup")
+		gomega.Eventually(ctx, func(ctx context.Context) (*int32, error) {
+			list, err := f.ClientSet.SchedulingV1beta1().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return nil, err
+			}
+			for i := range list.Items {
+				ref := list.Items[i].Spec.WorkloadRef
+				if ref == nil || ref.WorkloadName != workloadName {
+					continue
+				}
+				if list.Items[i].Spec.SchedulingPolicy.Gang == nil {
+					return nil, nil
+				}
+				return new(list.Items[i].Spec.SchedulingPolicy.Gang.MinCount), nil
+			}
+			return nil, nil
+		}).WithTimeout(f.Timeouts.PodStart).Should(gomega.HaveValue(gomega.Equal(updatedMinCount)), "expected the PodGroup gang minCount to be updated")
 	})
 
 	/*
@@ -252,7 +404,8 @@ var _ = SIGDescribe("Job", func() {
 					Namespace: pod.Namespace,
 				},
 			}
-			err = f.ClientSet.CoreV1().Pods(pod.Namespace).EvictV1(ctx, evictTarget)
+			// use new variable explicitly here, to ensure it doesn't escape the scope of goroutines
+			err := f.ClientSet.CoreV1().Pods(pod.Namespace).EvictV1(ctx, evictTarget)
 			framework.ExpectNoError(err, "failed to evict the pod: %s/%s", pod.Name, pod.Namespace)
 
 			ginkgo.By(fmt.Sprintf("Awaiting for the pod: %s/%s to be deleted", pod.Name, pod.Namespace))
@@ -1332,7 +1485,7 @@ done`}
 			Should(gomega.HaveField("Status", gomega.BeEquivalentTo(batchv1.JobStatus{})))
 	})
 
-	framework.It("containers restarted by container restart policy should not trigger PodFailurePolicy", framework.WithFeature("ContainerRestartRules"), framework.WithFeatureGate(features.ContainerRestartRules), func(ctx context.Context) {
+	framework.It("containers restarted by container restart policy should not trigger PodFailurePolicy", framework.WithNodeConformance(), framework.WithFeatureGate(features.ContainerRestartRules), func(ctx context.Context) {
 		parallelism := int32(1)
 		completions := int32(1)
 		backoffLimit := int32(1)
@@ -1375,6 +1528,300 @@ done`}
 		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
 		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+	})
+
+	framework.It("should create Workload and PodGroup for gang-eligible Job",
+		framework.WithFeatureGate(features.GenericWorkload),
+		framework.WithFeatureGate(features.WorkloadWithJob),
+		func(ctx context.Context) {
+			parallelism := int32(4)
+			completions := int32(4)
+			backoffLimit := int32(6)
+
+			ginkgo.By("Creating an indexed job with parallelism=completions")
+			job := e2ejob.NewTestJob("succeed", "gang-create", v1.RestartPolicyNever,
+				parallelism, completions, nil, backoffLimit)
+			job.Spec.CompletionMode = ptr.To(batchv1.IndexedCompletion)
+			job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			framework.ExpectNoError(err, "failed to create job in namespace: %s/%s", job.Namespace, job.Name)
+
+			ginkgo.By("Waiting for Workload to be created")
+			var workload *schedulingv1beta1.Workload
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				workloads, listErr := f.ClientSet.SchedulingV1beta1().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				if listErr != nil {
+					return listErr
+				}
+				for i := range workloads.Items {
+					for _, ref := range workloads.Items[i].OwnerReferences {
+						if ref.UID == job.UID && ref.Kind == "Job" {
+							workload = &workloads.Items[i]
+							return nil
+						}
+					}
+				}
+				return fmt.Errorf("workload not found for job %s", job.Name)
+			}).WithTimeout(30 * time.Second).WithPolling(time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Waiting for PodGroup to be created")
+			var podGroup *schedulingv1beta1.PodGroup
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				podGroups, listErr := f.ClientSet.SchedulingV1beta1().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				if listErr != nil {
+					return listErr
+				}
+				for i := range podGroups.Items {
+					for _, ref := range podGroups.Items[i].OwnerReferences {
+						if ref.UID == job.UID && ref.Kind == "Job" {
+							podGroup = &podGroups.Items[i]
+							return nil
+						}
+					}
+				}
+				return fmt.Errorf("podgroup not found for job %s", job.Name)
+			}).WithTimeout(30 * time.Second).WithPolling(time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Verifying PodGroup ownerReferences")
+			gomega.Expect(podGroup.OwnerReferences).To(gomega.HaveLen(2))
+			var hasJobOwner, hasWorkloadOwner bool
+			for _, ref := range podGroup.OwnerReferences {
+				if ref.UID == job.UID && ref.Kind == "Job" {
+					hasJobOwner = true
+				}
+				if ref.UID == workload.UID && ref.Kind == "Workload" {
+					hasWorkloadOwner = true
+				}
+			}
+			gomega.Expect(hasJobOwner).To(gomega.BeTrueBecause("PodGroup should have Job ownerReference with UID %s", job.UID))
+			gomega.Expect(hasWorkloadOwner).To(gomega.BeTrueBecause("PodGroup should have Workload ownerReference with UID %s", workload.UID))
+
+			ginkgo.By("Verifying pods have schedulingGroup set")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				pods, listErr := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+				if listErr != nil {
+					return listErr
+				}
+				if len(pods.Items) < int(parallelism) {
+					return fmt.Errorf("expected %d pods, got %d", parallelism, len(pods.Items))
+				}
+				for _, pod := range pods.Items {
+					if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
+						return fmt.Errorf("pod %s missing schedulingGroup", pod.Name)
+					}
+					if *pod.Spec.SchedulingGroup.PodGroupName != podGroup.Name {
+						return fmt.Errorf("pod %s schedulingGroup = %q, want %q", pod.Name, *pod.Spec.SchedulingGroup.PodGroupName, podGroup.Name)
+					}
+				}
+				return nil
+			}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Waiting for job to complete")
+			err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
+			framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+			ginkgo.By("Ensuring job has no active pods")
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+			framework.ExpectNoError(err, "failed to get job")
+			gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
+			gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
+			gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		})
+
+	/*
+		Testname: Allow updating pod resources for suspended Jobs
+		Description: Create a suspended Job with initial container resources.
+		Update the container resources while the job is suspended.
+		Unsuspend the job and verify that pods are created with the updated resources.
+		This verifies KEP-5440: Mutable Job Pod Resource Updates.
+	*/
+	framework.It("should allow updating pod resources for a suspended job", framework.WithFeatureGate(features.MutablePodResourcesForSuspendedJobs), func(ctx context.Context) {
+		jobName := "e2e-mutable-resources" + utilrand.String(5)
+
+		parallelism := int32(1)
+		completions := int32(1)
+		backoffLimit := int32(6)
+
+		initialCPU := resource.MustParse("100m")
+		initialMemory := resource.MustParse("128Mi")
+		updatedCPU := resource.MustParse("200m")
+		updatedMemory := resource.MustParse("256Mi")
+
+		ginkgo.By("Creating a suspended job with initial resources")
+		job := e2ejob.NewTestJob("succeed", jobName, v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.Suspend = ptr.To(true)
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    initialCPU,
+					v1.ResourceMemory: initialMemory,
+				},
+			}
+		}
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Verifying job is suspended and no pods are created")
+		err = e2ejob.WaitForJobSuspend(ctx, f.ClientSet, f.Namespace.Name, jobName)
+		framework.ExpectNoError(err, "failed to verify job is suspended")
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, jobName)
+		framework.ExpectNoError(err, "failed to get pods for job")
+		gomega.Expect(pods.Items).To(gomega.BeEmpty(), "expected no pods while job is suspended")
+
+		ginkgo.By("Updating container resources while job is suspended")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, jobName)
+			if err != nil {
+				return err
+			}
+			for i := range job.Spec.Template.Spec.Containers {
+				job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    updatedCPU,
+						v1.ResourceMemory: updatedMemory,
+					},
+				}
+			}
+			job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update job resources")
+
+		ginkgo.By("Unsuspending the job")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, jobName)
+			if err != nil {
+				return err
+			}
+			job.Spec.Suspend = ptr.To(false)
+			job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			return err
+		})
+		framework.ExpectNoError(err, "failed to unsuspend job")
+
+		ginkgo.By("Waiting for job to complete")
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, jobName, batchv1.JobReasonCompletionsReached, completions)
+		framework.ExpectNoError(err, "failed to wait for job completion")
+
+		ginkgo.By("Verifying pods were created with updated resources")
+		pods, err = e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, jobName)
+		framework.ExpectNoError(err, "failed to get pods for job")
+		gomega.Expect(pods.Items).NotTo(gomega.BeEmpty(), "expected at least one pod")
+
+		for _, pod := range pods.Items {
+			for _, container := range pod.Spec.Containers {
+				cpuRequest := container.Resources.Requests[v1.ResourceCPU]
+				memoryRequest := container.Resources.Requests[v1.ResourceMemory]
+				gomega.Expect(cpuRequest.Equal(updatedCPU)).To(gomega.BeTrueBecause(
+					"expected CPU request %v, got %v", updatedCPU.String(), cpuRequest.String()))
+				gomega.Expect(memoryRequest.Equal(updatedMemory)).To(gomega.BeTrueBecause(
+					"expected memory request %v, got %v", updatedMemory.String(), memoryRequest.String()))
+			}
+		}
+	})
+
+	/*
+		Testname: Allow updating pod resources for a job that started and was suspended
+		Description: Create a job that starts running, suspend it, update the
+		container resources while suspended, then unsuspend and verify that newly
+		created pods have the updated resources. This verifies that resource updates
+		are allowed even for jobs that have previously started.
+	*/
+	framework.It("should allow updating pod resources for a job that started and then was suspended", framework.WithFeatureGate(features.MutablePodResourcesForSuspendedJobs), func(ctx context.Context) {
+		jobName := "e2e-start-suspend" + utilrand.String(5)
+
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6)
+
+		initialCPU := resource.MustParse("100m")
+		initialMemory := resource.MustParse("128Mi")
+		updatedCPU := resource.MustParse("200m")
+		updatedMemory := resource.MustParse("256Mi")
+
+		ginkgo.By("Creating a running job with initial resources")
+		job := e2ejob.NewTestJob("notTerminate", jobName, v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.Suspend = ptr.To(false)
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    initialCPU,
+					v1.ResourceMemory: initialMemory,
+				},
+			}
+		}
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Waiting for pods to be running")
+		err = e2ejob.WaitForJobPodsRunning(ctx, f.ClientSet, f.Namespace.Name, jobName, parallelism)
+		framework.ExpectNoError(err, "failed to wait for job pods to be running")
+
+		ginkgo.By("Suspending the running job")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, jobName)
+			if err != nil {
+				return err
+			}
+			job.Spec.Suspend = ptr.To(true)
+			job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			return err
+		})
+		framework.ExpectNoError(err, "failed to suspend job")
+
+		ginkgo.By("Waiting for all pods to be deleted after suspension")
+		err = e2ejob.WaitForAllJobPodsGone(ctx, f.ClientSet, f.Namespace.Name, jobName)
+		framework.ExpectNoError(err, "failed to wait for pods to be deleted after suspension")
+
+		ginkgo.By("Updating container resources while job is suspended")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, jobName)
+			if err != nil {
+				return err
+			}
+			for i := range job.Spec.Template.Spec.Containers {
+				job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    updatedCPU,
+						v1.ResourceMemory: updatedMemory,
+					},
+				}
+			}
+			job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update job resources")
+
+		ginkgo.By("Unsuspending the job")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, jobName)
+			if err != nil {
+				return err
+			}
+			job.Spec.Suspend = ptr.To(false)
+			job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			return err
+		})
+		framework.ExpectNoError(err, "failed to unsuspend job")
+
+		ginkgo.By("Waiting for new pods to be running with updated resources")
+		err = e2ejob.WaitForJobPodsRunning(ctx, f.ClientSet, f.Namespace.Name, jobName, parallelism)
+		framework.ExpectNoError(err, "failed to wait for job pods to be running after unsuspending")
+
+		ginkgo.By("Verifying newly created pods have updated resources")
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, jobName)
+		framework.ExpectNoError(err, "failed to get pods for job")
+		gomega.Expect(pods.Items).NotTo(gomega.BeEmpty(), "expected at least one pod")
+
+		for _, pod := range pods.Items {
+			for _, container := range pod.Spec.Containers {
+				cpuRequest := container.Resources.Requests[v1.ResourceCPU]
+				memoryRequest := container.Resources.Requests[v1.ResourceMemory]
+				gomega.Expect(cpuRequest.Equal(updatedCPU)).To(gomega.BeTrueBecause(
+					"expected CPU request %v, got %v", updatedCPU.String(), cpuRequest.String()))
+				gomega.Expect(memoryRequest.Equal(updatedMemory)).To(gomega.BeTrueBecause(
+					"expected memory request %v, got %v", updatedMemory.String(), memoryRequest.String()))
+			}
+		}
 	})
 })
 

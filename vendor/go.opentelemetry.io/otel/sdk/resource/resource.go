@@ -112,7 +112,7 @@ func (r *Resource) String() string {
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Resource.
-func (r *Resource) MarshalLog() interface{} {
+func (r *Resource) MarshalLog() any {
 	return struct {
 		Attributes attribute.Set
 		SchemaURL  string
@@ -148,7 +148,7 @@ func (r *Resource) Iter() attribute.Iterator {
 	return r.attrs.Iter()
 }
 
-// Equal returns whether r and o represent the same resource. Two resources can
+// Equal reports whether r and o represent the same resource. Two resources can
 // be equal even if they have different schema URLs.
 //
 // See the documentation on the [Resource] type for the pitfalls of using ==
@@ -232,6 +232,15 @@ func Empty() *Resource {
 // Default returns an instance of Resource with a default
 // "service.name" and OpenTelemetrySDK attributes.
 func Default() *Resource {
+	return DefaultWithContext(context.Background())
+}
+
+// DefaultWithContext returns an instance of Resource with a default
+// "service.name" and OpenTelemetrySDK attributes.
+//
+// If the default resource has already been initialized, the provided ctx
+// is ignored and the cached resource is returned.
+func DefaultWithContext(ctx context.Context) *Resource {
 	defaultResourceOnce.Do(func() {
 		var err error
 		defaultDetectors := []Detector{
@@ -243,7 +252,7 @@ func Default() *Resource {
 			defaultDetectors = append([]Detector{defaultServiceInstanceIDDetector{}}, defaultDetectors...)
 		}
 		defaultResource, err = Detect(
-			context.Background(),
+			ctx,
 			defaultDetectors...,
 		)
 		if err != nil {
@@ -260,8 +269,14 @@ func Default() *Resource {
 // Environment returns an instance of Resource with attributes
 // extracted from the OTEL_RESOURCE_ATTRIBUTES environment variable.
 func Environment() *Resource {
+	return EnvironmentWithContext(context.Background())
+}
+
+// EnvironmentWithContext returns an instance of Resource with attributes
+// extracted from the OTEL_RESOURCE_ATTRIBUTES environment variable.
+func EnvironmentWithContext(ctx context.Context) *Resource {
 	detector := &fromEnv{}
-	resource, err := detector.Detect(context.Background())
+	resource, err := detector.Detect(ctx)
 	if err != nil {
 		otel.Handle(err)
 	}

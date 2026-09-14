@@ -107,7 +107,7 @@ func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Con
 	}
 
 	cpusPerNUMA := make(map[int][]int)
-	for numaNode := 0; numaNode < numaNodes; numaNode++ {
+	for numaNode := range numaNodes {
 		nodeCPUList := e2epod.ExecCommandInContainer(f, pod.Name, cnt.Name,
 			"/bin/cat", fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", numaNode))
 

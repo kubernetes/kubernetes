@@ -137,7 +137,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			// Update each node to advertise 3 available extended resources
 			e2enode.AddExtendedResource(ctx, cs, node.Name, testExtendedResource, resource.MustParse("5"))
 
-			for j := 0; j < 2; j++ {
+			for j := range 2 {
 				// Request 2 of the available resources for the victim pods
 				podRes = v1.ResourceList{}
 				podRes[testExtendedResource] = resource.MustParse("2")
@@ -224,7 +224,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			// Update each node to advertise 3 available extended resources
 			e2enode.AddExtendedResource(ctx, cs, node.Name, testExtendedResource, resource.MustParse("5"))
 
-			for j := 0; j < 2; j++ {
+			for j := range 2 {
 				// Request 2 of the available resources for the victim pods
 				podRes = v1.ResourceList{}
 				podRes[testExtendedResource] = resource.MustParse("2")
@@ -328,7 +328,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			e2enode.AddExtendedResource(ctx, cs, node.Name, testExtendedResource, resource.MustParse("10"))
 
 			// Create 10 low priority pods on each node, which will use up 10/10 of the node's resources.
-			for j := 0; j < 10; j++ {
+			for j := range 10 {
 				// Request 1 of the available resources for the victim pods
 				podRes = v1.ResourceList{}
 				podRes[testExtendedResource] = resource.MustParse("1")
@@ -375,11 +375,11 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 		highPriorityPods := make([]*v1.Pod, 0, 5*nodeListLen)
 		mediumPriorityPods := make([]*v1.Pod, 0, 10*nodeListLen)
 
-		ginkgo.By("Run high/medium priority pods that have same requirements as that of lower priority pod")
+		ginkgo.By("Run medium priority pods that have same requirements as that of lower priority pod")
 		for i := range nodeList.Items {
 			// Create medium priority pods first
 			// to confirm the scheduler finally prioritize the high priority pods, ignoring the medium priority pods.
-			for j := 0; j < 10; j++ {
+			for j := range 10 {
 				// 5 pods per node will be unschedulable
 				// because the node only has 10 resource, and high priority pods will use 5 resource.
 				p := createPausePod(ctx, f, pausePodConfig{
@@ -392,19 +392,6 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 					},
 				})
 				mediumPriorityPods = append(mediumPriorityPods, p)
-			}
-
-			for j := 0; j < 5; j++ {
-				p := createPausePod(ctx, f, pausePodConfig{
-					Name:              fmt.Sprintf("pod%d-%d-%v", i, j, highPriorityClassName),
-					PriorityClassName: highPriorityClassName,
-					Resources: &v1.ResourceRequirements{
-						// Set the pod request to the low priority pod's resources
-						Requests: lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
-						Limits:   lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
-					},
-				})
-				highPriorityPods = append(highPriorityPods, p)
 			}
 		}
 
@@ -419,6 +406,22 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				}
 				return preemptedPod.DeletionTimestamp != nil, nil
 			}))
+		}
+
+		ginkgo.By("Run high priority pods that have same requirements as that of lower priority pod")
+		for i := range nodeList.Items {
+			for j := range 5 {
+				p := createPausePod(ctx, f, pausePodConfig{
+					Name:              fmt.Sprintf("pod%d-%d-%v", i, j, highPriorityClassName),
+					PriorityClassName: highPriorityClassName,
+					Resources: &v1.ResourceRequirements{
+						// Set the pod request to the low priority pod's resources
+						Requests: lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
+						Limits:   lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
+					},
+				})
+				highPriorityPods = append(highPriorityPods, p)
+			}
 		}
 
 		// All high priority Pods should be schedulable by removing the low priority Pods.
@@ -754,9 +757,8 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			Description: Four levels of Pods in ReplicaSets with different levels of Priority, restricted by given CPU limits MUST launch. Priority 1 - 3 Pods MUST spawn first followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected number of Replicas.
 		*/
 		framework.ConformanceIt("runs ReplicaSets to verify preemption running path", func(ctx context.Context) {
-			podNamesSeen := []int32{0, 0, 0}
+			var podNamesSeen [3]atomic.Int32
 
-			// create a pod controller to list/watch pod events from the test framework namespace
 			_, podController := cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -772,17 +774,19 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				cache.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
 						if pod, ok := obj.(*v1.Pod); ok {
-							if strings.HasPrefix(pod.Name, "rs-pod1") {
-								atomic.AddInt32(&podNamesSeen[0], 1)
-							} else if strings.HasPrefix(pod.Name, "rs-pod2") {
-								atomic.AddInt32(&podNamesSeen[1], 1)
-							} else if strings.HasPrefix(pod.Name, "rs-pod3") {
-								atomic.AddInt32(&podNamesSeen[2], 1)
+							switch {
+							case strings.HasPrefix(pod.Name, "rs-pod1"):
+								podNamesSeen[0].Add(1)
+							case strings.HasPrefix(pod.Name, "rs-pod2"):
+								podNamesSeen[1].Add(1)
+							case strings.HasPrefix(pod.Name, "rs-pod3"):
+								podNamesSeen[2].Add(1)
 							}
 						}
 					},
 				},
 			)
+
 			go podController.Run(ctx.Done())
 
 			// prepare three ReplicaSet
@@ -835,7 +839,12 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				runPauseRS(ctx, f, rsConfs[i])
 			}
 
-			framework.Logf("pods created so far: %v", podNamesSeen)
+			framework.Logf(
+				"pods created so far: [%d %d %d]",
+				podNamesSeen[0].Load(),
+				podNamesSeen[1].Load(),
+				podNamesSeen[2].Load(),
+			)
 			framework.Logf("length of pods created so far: %v", len(podNamesSeen))
 
 			// create a Preemptor Pod
@@ -853,7 +862,12 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			preemptorPod := createPod(ctx, f, preemptorPodConf)
 			waitForPreemptingWithTimeout(ctx, f, preemptorPod, framework.PodGetTimeout)
 
-			framework.Logf("pods created so far: %v", podNamesSeen)
+			framework.Logf(
+				"pods created so far: [%d %d %d]",
+				podNamesSeen[0].Load(),
+				podNamesSeen[1].Load(),
+				podNamesSeen[2].Load(),
+			)
 
 			// count pods number of ReplicaSet{1,2,3}:
 			// - if it's more than expected replicas, it denotes its pods have been over-preempted
@@ -861,8 +875,8 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			// "*2" means pods of ReplicaSet{1,2} are expected to be only preempted once.
 			expectedRSPods := []int32{1 * 2, 1 * 2, 1}
 			err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PollShortTimeout, false, func(ctx context.Context) (bool, error) {
-				for i := 0; i < len(podNamesSeen); i++ {
-					got := atomic.LoadInt32(&podNamesSeen[i])
+				for i := range len(podNamesSeen) {
+					got := podNamesSeen[i].Load()
 					if got < expectedRSPods[i] {
 						framework.Logf("waiting for rs%d to observe %d pod creations, got %d", i+1, expectedRSPods[i], got)
 						return false, nil
@@ -873,15 +887,20 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				return true, nil
 			})
 			if err != nil {
-				framework.Logf("pods created so far: %v", podNamesSeen)
+				framework.Logf(
+					"pods created so far: [%d %d %d]",
+					podNamesSeen[0].Load(),
+					podNamesSeen[1].Load(),
+					podNamesSeen[2].Load(),
+				)
 				framework.Failf("failed pod observation expectations: %v", err)
 			}
 
 			// If logic continues to here, we should do a final check to ensure within a time period,
 			// the state is stable; otherwise, pods may be over-preempted.
 			time.Sleep(5 * time.Second)
-			for i := 0; i < len(podNamesSeen); i++ {
-				got := atomic.LoadInt32(&podNamesSeen[i])
+			for i := range len(podNamesSeen) {
+				got := podNamesSeen[i].Load()
 				if got < expectedRSPods[i] {
 					framework.Failf("pods of ReplicaSet%d have been under-preempted: expect %v pod names, but got %d", i+1, expectedRSPods[i], got)
 				} else if got > expectedRSPods[i] {

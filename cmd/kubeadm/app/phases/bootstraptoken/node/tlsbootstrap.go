@@ -130,3 +130,25 @@ func AutoApproveNodeCertificateRotation(client clientset.Interface) error {
 		},
 	})
 }
+
+// AllowAPIServerToAccessKubeletAPI creates RBAC rules that allow the API server kubelet client to access the kubelet API
+func AllowAPIServerToAccessKubeletAPI(client clientset.Interface) error {
+	fmt.Println("[bootstrap-token] Configured RBAC rules to allow the API server kubelet client certificate to access the kubelet API")
+
+	return apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), &rbac.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constants.KubeletAPIAdminClusterRoleBindingName,
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "ClusterRole",
+			Name:     constants.KubeletAPIAdminClusterRoleName,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind: rbac.UserKind,
+				Name: constants.APIServerKubeletClientCertCommonName,
+			},
+		},
+	})
+}

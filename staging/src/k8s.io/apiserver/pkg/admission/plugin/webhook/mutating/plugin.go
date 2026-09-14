@@ -22,7 +22,9 @@ import (
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/manifest/source"
 )
 
 const (
@@ -48,6 +50,22 @@ type Plugin struct {
 }
 
 var _ admission.MutationInterface = &Plugin{}
+var _ initializer.WantsManifestLoaders = &Plugin{}
+
+// SetManifestLoaders provides the manifest load functions for scheme-based defaulting and validation.
+func (a *Plugin) SetManifestLoaders(loaders *initializer.ManifestLoaders) {
+	if loaders == nil || loaders.LoadMutatingWebhookManifests == nil {
+		return
+	}
+	loadFunc := loaders.LoadMutatingWebhookManifests
+	a.Webhook.SetStaticSourceFactory(func(manifestsDir string) (generic.ReloadableSource, error) {
+		src := source.NewMutatingSource(manifestsDir, a.Webhook.GetAPIServerID(), source.MutatingWebhookLoadFunc(loadFunc))
+		if err := src.LoadInitial(); err != nil {
+			return nil, err
+		}
+		return src, nil
+	})
+}
 
 // NewMutatingWebhook returns a generic admission webhook plugin.
 func NewMutatingWebhook(configFile io.Reader) (*Plugin, error) {
@@ -58,7 +76,6 @@ func NewMutatingWebhook(configFile io.Reader) (*Plugin, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return p, nil
 }
 

@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/pkg/v3/traceutil"
@@ -80,23 +81,39 @@ func (tr *storeTxnCommon) rangeKeys(ctx context.Context, key, end []byte, curRev
 	if rev < tr.s.compactMainRev {
 		return &RangeResult{KVs: nil, Count: -1, Rev: 0}, ErrCompacted
 	}
-	if ro.Count {
+	if ro.CountOnly {
 		total := tr.s.kvindex.CountRevisions(key, end, rev)
 		tr.trace.Step("count revisions from in-memory index tree")
 		return &RangeResult{KVs: nil, Count: total, Rev: curRev}, nil
 	}
-	revpairs, total := tr.s.kvindex.Revisions(key, end, rev, int(ro.Limit))
+
+	if ro.FastKeysOnly {
+		keys, modifies, creates, versions, total := tr.s.kvindex.Range(key, end, rev, int(ro.Limit), ro.WithTotalCount)
+		tr.trace.Step("keys only range from in-memory index tree")
+		if len(keys) == 0 {
+			return &RangeResult{KVs: nil, Count: 0, Rev: curRev}, nil
+		}
+		kvs := make([]*mvccpb.KeyValue, len(keys))
+		for i := range len(kvs) {
+			kvs[i] = &mvccpb.KeyValue{
+				Key:            keys[i],
+				ModRevision:    modifies[i].Main,
+				CreateRevision: creates[i].Main,
+				Version:        versions[i],
+			}
+		}
+		return &RangeResult{KVs: kvs, Count: total, Rev: curRev}, nil
+	}
+
+	revpairs, total := tr.s.kvindex.Revisions(key, end, rev, int(ro.Limit), ro.WithTotalCount)
 	tr.trace.Step("range keys from in-memory index tree")
 	if len(revpairs) == 0 {
 		return &RangeResult{KVs: nil, Count: total, Rev: curRev}, nil
 	}
 
-	limit := int(ro.Limit)
-	if limit <= 0 || limit > len(revpairs) {
-		limit = len(revpairs)
-	}
+	cappedEntriesCount := sliceCapWithLimit(int(ro.Limit), revpairs)
 
-	kvs := make([]mvccpb.KeyValue, limit)
+	kvs := make([]*mvccpb.KeyValue, cappedEntriesCount)
 	revBytes := NewRevBytes()
 	for i, revpair := range revpairs[:len(kvs)] {
 		select {
@@ -104,6 +121,7 @@ func (tr *storeTxnCommon) rangeKeys(ctx context.Context, key, end []byte, curRev
 			return nil, fmt.Errorf("rangeKeys: context cancelled: %w", ctx.Err())
 		default:
 		}
+
 		revBytes = RevToBytes(revpair, revBytes)
 		_, vs := tr.tx.UnsafeRange(schema.Key, revBytes, nil, 0)
 		if len(vs) != 1 {
@@ -120,15 +138,24 @@ func (tr *storeTxnCommon) rangeKeys(ctx context.Context, key, end []byte, curRev
 				zap.Int("len-values", len(vs)),
 			)
 		}
-		if err := kvs[i].Unmarshal(vs[0]); err != nil {
+		kv := &mvccpb.KeyValue{}
+		if err := proto.Unmarshal(vs[0], kv); err != nil {
 			tr.s.lg.Fatal(
 				"failed to unmarshal mvccpb.KeyValue",
 				zap.Error(err),
 			)
 		}
+		kvs[i] = kv
 	}
 	tr.trace.Step("range keys from bolt db")
 	return &RangeResult{KVs: kvs, Count: total, Rev: curRev}, nil
+}
+
+func sliceCapWithLimit[S any](limit int, s []S) int {
+	if limit <= 0 || limit > len(s) {
+		return len(s)
+	}
+	return limit
 }
 
 func (tr *storeTxnRead) End() {
@@ -141,7 +168,7 @@ type storeTxnWrite struct {
 	tx backend.BatchTx
 	// beginRev is the revision where the txn begins; it will write to the next revision.
 	beginRev int64
-	changes  []mvccpb.KeyValue
+	changes  []*mvccpb.KeyValue
 }
 
 func (s *store) Write(trace *traceutil.Trace) TxnWrite {
@@ -152,7 +179,7 @@ func (s *store) Write(trace *traceutil.Trace) TxnWrite {
 		storeTxnCommon: storeTxnCommon{s, tx, 0, 0, trace},
 		tx:             tx,
 		beginRev:       s.currentRev,
-		changes:        make([]mvccpb.KeyValue, 0, 4),
+		changes:        make([]*mvccpb.KeyValue, 0, 4),
 	}
 	return newMetricsTxnWrite(tw)
 }
@@ -211,7 +238,7 @@ func (tw *storeTxnWrite) put(key, value []byte, leaseID lease.LeaseID) {
 	ibytes = RevToBytes(idxRev, ibytes)
 
 	ver = ver + 1
-	kv := mvccpb.KeyValue{
+	kv := &mvccpb.KeyValue{
 		Key:            key,
 		Value:          value,
 		CreateRevision: c,
@@ -220,7 +247,7 @@ func (tw *storeTxnWrite) put(key, value []byte, leaseID lease.LeaseID) {
 		Lease:          int64(leaseID),
 	}
 
-	d, err := kv.Marshal()
+	d, err := proto.Marshal(kv)
 	if err != nil {
 		tw.storeTxnCommon.s.lg.Fatal(
 			"failed to marshal mvccpb.KeyValue",
@@ -268,7 +295,7 @@ func (tw *storeTxnWrite) deleteRange(key, end []byte) int64 {
 	if len(tw.changes) > 0 {
 		rrev++
 	}
-	keys, _ := tw.s.kvindex.Range(key, end, rrev)
+	keys, _, _, _, _ := tw.s.kvindex.Range(key, end, rrev, 0, false)
 	if len(keys) == 0 {
 		return 0
 	}
@@ -283,9 +310,9 @@ func (tw *storeTxnWrite) delete(key []byte) {
 	idxRev := newBucketKey(tw.beginRev+1, int64(len(tw.changes)), true)
 	ibytes = BucketKeyToBytes(idxRev, ibytes)
 
-	kv := mvccpb.KeyValue{Key: key}
+	kv := &mvccpb.KeyValue{Key: key}
 
-	d, err := kv.Marshal()
+	d, err := proto.Marshal(kv)
 	if err != nil {
 		tw.storeTxnCommon.s.lg.Fatal(
 			"failed to marshal mvccpb.KeyValue",
@@ -318,4 +345,4 @@ func (tw *storeTxnWrite) delete(key []byte) {
 	}
 }
 
-func (tw *storeTxnWrite) Changes() []mvccpb.KeyValue { return tw.changes }
+func (tw *storeTxnWrite) Changes() []*mvccpb.KeyValue { return tw.changes }

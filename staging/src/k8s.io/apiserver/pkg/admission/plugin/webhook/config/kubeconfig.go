@@ -25,46 +25,49 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
+	v1 "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
 )
 
 var (
 	scheme = runtime.NewScheme()
-	codecs = serializer.NewCodecFactory(scheme)
+	codecs = serializer.NewCodecFactory(scheme, serializer.EnableStrict)
 )
 
 func init() {
 	utilruntime.Must(webhookadmission.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 }
 
-// LoadConfig extract the KubeConfigFile from configFile
-func LoadConfig(configFile io.Reader) (string, error) {
-	var kubeconfigFile string
-	if configFile != nil {
-		// we have a config so parse it.
-		data, err := io.ReadAll(configFile)
-		if err != nil {
-			return "", err
-		}
-		decoder := codecs.UniversalDecoder()
-		decodedObj, err := runtime.Decode(decoder, data)
-		if err != nil {
-			return "", err
-		}
-		config, ok := decodedObj.(*webhookadmission.WebhookAdmission)
-		if !ok {
-			return "", fmt.Errorf("unexpected type: %T", decodedObj)
-		}
-
-		if !path.IsAbs(config.KubeConfigFile) {
-			return "", field.Invalid(field.NewPath("kubeConfigFile"), config.KubeConfigFile, "must be an absolute file path")
-		}
-
-		kubeconfigFile = config.KubeConfigFile
+// LoadConfig extracts the webhook admission configuration from configFile.
+func LoadConfig(configFile io.Reader) (*webhookadmission.WebhookAdmission, error) {
+	if configFile == nil {
+		return &webhookadmission.WebhookAdmission{}, nil
 	}
-	return kubeconfigFile, nil
+	// we have a config so parse it.
+	data, err := io.ReadAll(configFile)
+	if err != nil {
+		return nil, err
+	}
+	decoder := codecs.UniversalDecoder()
+	decodedObj, err := runtime.Decode(decoder, data)
+	if err != nil {
+		return nil, err
+	}
+	config, ok := decodedObj.(*webhookadmission.WebhookAdmission)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type: %T", decodedObj)
+	}
+
+	// KubeConfigFile may be empty when only staticManifestsDir is configured.
+	if len(config.KubeConfigFile) > 0 && !path.IsAbs(config.KubeConfigFile) {
+		return nil, field.Invalid(field.NewPath("kubeConfigFile"), config.KubeConfigFile, "must be an absolute file path")
+	}
+
+	if err := manifest.ValidateStaticManifestsDir(config.StaticManifestsDir); err != nil {
+		return nil, err
+	}
+
+	return config, nil
 }

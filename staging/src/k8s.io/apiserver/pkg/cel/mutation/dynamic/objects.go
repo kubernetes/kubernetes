@@ -120,17 +120,20 @@ func (v *ObjectVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		}
 		result[k] = converted
 	}
-	if typeDesc == reflect.TypeOf(result) {
+	switch typeDesc {
+	case reflect.TypeFor[map[string]any]():
 		return result, nil
-	}
 	// CEL's builtin data literal values all support conversion to structpb.Value, which
 	// can then be serialized to JSON. This is convenient for CEL expressions that return
 	// an arbitrary JSON value, such as our MutatingAdmissionPolicy JSON Patch valueExpression
 	// field, so we support the conversion here, for Object data literals, as well.
-	if typeDesc == reflect.TypeOf(&structpb.Value{}) {
+	case reflect.TypeFor[*structpb.Struct]():
 		return structpb.NewStruct(result)
+	case reflect.TypeFor[*structpb.Value]():
+		return structpb.NewValue(result)
+	default:
+		return nil, fmt.Errorf("unable to convert to %v", typeDesc)
 	}
-	return nil, fmt.Errorf("unable to convert to %v", typeDesc)
 }
 
 // ConvertToType supports type conversions between CEL value types supported by the expression language.
@@ -242,6 +245,46 @@ func convertField(value ref.Val) (any, error) {
 				return nil, fmt.Errorf("map key %q is of type %T, not string", k, k)
 			}
 			result[stringKey] = v.Value()
+		}
+		return result, nil
+	}
+	if lister, ok := value.(traits.Lister); ok {
+		var result []any
+		it := lister.Iterator()
+		for it.HasNext() == types.True {
+			val := it.Next()
+			conv, err := convertField(val)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, conv)
+		}
+		return result, nil
+	}
+	if mapper, ok := value.(traits.Mapper); ok {
+		// ObjectVal handles its own fast path and returns map[string]any directly via ConvertToNative
+		if objVal, isObj := value.(*ObjectVal); isObj {
+			native, err := objVal.ConvertToNative(reflect.TypeFor[map[string]any]())
+			if err != nil {
+				return nil, err
+			}
+			return native, nil
+		}
+
+		result := make(map[string]any)
+		it := mapper.Iterator()
+		for it.HasNext() == types.True {
+			k := it.Next()
+			stringKey, ok := k.Value().(string)
+			if !ok {
+				return nil, fmt.Errorf("map key %q is of type %T, not string", k, k)
+			}
+			v := mapper.Get(k)
+			conv, err := convertField(v)
+			if err != nil {
+				return nil, err
+			}
+			result[stringKey] = conv
 		}
 		return result, nil
 	}

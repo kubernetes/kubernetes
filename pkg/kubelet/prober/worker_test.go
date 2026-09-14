@@ -605,14 +605,18 @@ func TestStartupProbeFailureThreshold(t *testing.T) {
 }
 
 func TestCleanUp(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	ktesting.Init(t).SyncTest("", testCleanUp)
+}
+
+func testCleanUp(tCtx ktesting.TContext) {
+	t := tCtx.TB()
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		key := probeKey{testPodUID, testContainerName, probeType}
 		w := newTestWorker(m, probeType, v1.Probe{})
-		m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(probeType != startup))
-		go w.run(ctx)
+		m.statusManager.SetPodStatus(tCtx.Logger(), w.pod, getTestRunningStatusWithStarted(probeType != startup))
+		go w.run(tCtx)
 		m.workers[key] = w
 
 		// Wait for worker to run.
@@ -910,6 +914,8 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 		probeType      probeType
 		initialValue   results.Result
 		expectSet      bool
+		isSidecar      bool
+		expectedResult results.Result // only checked if expectSet is true
 	}{
 		{
 			name:           "feature enabled, is restart, readiness",
@@ -918,6 +924,8 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			probeType:      readiness,
 			initialValue:   results.Failure,
 			expectSet:      true,
+			isSidecar:      false,
+			expectedResult: results.Failure,
 		},
 		{
 			name:           "feature enabled, is restart, liveness",
@@ -926,6 +934,8 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			probeType:      liveness,
 			initialValue:   results.Success,
 			expectSet:      true,
+			isSidecar:      false,
+			expectedResult: results.Success,
 		},
 		{
 			name:           "feature enabled, is restart, startup",
@@ -934,6 +944,8 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			probeType:      startup,
 			initialValue:   results.Unknown,
 			expectSet:      true,
+			isSidecar:      false,
+			expectedResult: results.Unknown,
 		},
 		{
 			name:           "feature enabled, not restart, readiness",
@@ -942,6 +954,8 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			probeType:      readiness,
 			initialValue:   results.Failure,
 			expectSet:      true,
+			isSidecar:      false,
+			expectedResult: results.Failure,
 		},
 		{
 			name:           "feature enabled, not restart, liveness",
@@ -950,6 +964,8 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			probeType:      liveness,
 			initialValue:   results.Success,
 			expectSet:      true,
+			isSidecar:      false,
+			expectedResult: results.Success,
 		},
 		{
 			name:           "feature enabled, not restart, startup",
@@ -958,6 +974,8 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			probeType:      startup,
 			initialValue:   results.Unknown,
 			expectSet:      true,
+			isSidecar:      false,
+			expectedResult: results.Unknown,
 		},
 		{
 			name:           "feature disabled, is restart, readiness",
@@ -965,6 +983,7 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			isRestart:      true,
 			probeType:      readiness,
 			expectSet:      false,
+			isSidecar:      false,
 		},
 		{
 			name:           "feature disabled, is restart, liveness",
@@ -972,6 +991,7 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			isRestart:      true,
 			probeType:      liveness,
 			expectSet:      false,
+			isSidecar:      false,
 		},
 		{
 			name:           "feature disabled, is restart, startup",
@@ -979,6 +999,7 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			isRestart:      true,
 			probeType:      startup,
 			expectSet:      false,
+			isSidecar:      false,
 		},
 		{
 			name:           "feature disabled, not restart, readiness",
@@ -987,6 +1008,8 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			probeType:      readiness,
 			initialValue:   results.Failure,
 			expectSet:      true,
+			isSidecar:      false,
+			expectedResult: results.Failure,
 		},
 		{
 			name:           "feature disabled, not restart, liveness",
@@ -995,6 +1018,8 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			probeType:      liveness,
 			initialValue:   results.Success,
 			expectSet:      true,
+			isSidecar:      false,
+			expectedResult: results.Success,
 		},
 		{
 			name:           "feature disabled, not restart, startup",
@@ -1003,6 +1028,37 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			probeType:      startup,
 			initialValue:   results.Unknown,
 			expectSet:      true,
+			isSidecar:      false,
+			expectedResult: results.Unknown,
+		},
+		// Sidecar tests - regression for https://github.com/kubernetes/kubernetes/issues/136910
+		{
+			name:           "feature disabled, is restart, startup, sidecar",
+			featureEnabled: false,
+			isRestart:      true,
+			probeType:      startup,
+			initialValue:   results.Unknown,
+			expectSet:      true,
+			isSidecar:      true,
+			expectedResult: results.Success, // Sidecars get Success, not initialValue
+		},
+		{
+			name:           "feature disabled, is restart, liveness, sidecar",
+			featureEnabled: false,
+			isRestart:      true,
+			probeType:      liveness,
+			initialValue:   results.Success,
+			expectSet:      false, // Readiness/liveness probes not set for sidecars on restart
+			isSidecar:      true,
+		},
+		{
+			name:           "feature disabled, is restart, readiness, sidecar",
+			featureEnabled: false,
+			isRestart:      true,
+			probeType:      readiness,
+			initialValue:   results.Failure,
+			expectSet:      false, // Readiness/liveness probes not set for sidecars on restart
+			isSidecar:      true,
 		},
 	}
 
@@ -1011,27 +1067,48 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
 
 			m := newTestManager()
-			podStatus := getTestRunningStatus()
-			podStatus.ContainerStatuses[0].ContainerID = "test://container-id"
-			if tc.isRestart {
-				podStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(-5 * time.Minute)}
-			} else {
-				podStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(5 * time.Minute)}
-			}
 
-			w := newTestWorker(m, tc.probeType, v1.Probe{InitialDelaySeconds: 1000})
-			m.statusManager.SetPodStatus(logger, w.pod, podStatus)
+			var w *worker
+			var containerID kubecontainer.ContainerID
+
+			if tc.isSidecar {
+				w = newTestWorkerWithRestartableInitContainer(m, tc.probeType)
+				w.spec = &v1.Probe{InitialDelaySeconds: 1000}
+				// For sidecar, we need init container status
+				podStatus := getTestRunningStatus()
+				// Move container from regular to init containers (it's a sidecar)
+				podStatus.InitContainerStatuses = []v1.ContainerStatus{podStatus.ContainerStatuses[0]}
+				podStatus.ContainerStatuses = nil
+				podStatus.InitContainerStatuses[0].ContainerID = "test://container-id"
+				if tc.isRestart {
+					podStatus.InitContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(-5 * time.Minute)}
+				} else {
+					podStatus.InitContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(5 * time.Minute)}
+				}
+				m.statusManager.SetPodStatus(logger, w.pod, podStatus)
+				containerID = kubecontainer.ParseContainerID(logger, podStatus.InitContainerStatuses[0].ContainerID)
+			} else {
+				podStatus := getTestRunningStatus()
+				podStatus.ContainerStatuses[0].ContainerID = "test://container-id"
+				if tc.isRestart {
+					podStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(-5 * time.Minute)}
+				} else {
+					podStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(5 * time.Minute)}
+				}
+				w = newTestWorker(m, tc.probeType, v1.Probe{InitialDelaySeconds: 1000})
+				m.statusManager.SetPodStatus(logger, w.pod, podStatus)
+				containerID = kubecontainer.ParseContainerID(logger, podStatus.ContainerStatuses[0].ContainerID)
+			}
 
 			w.doProbe(ctx)
 
-			containerID := kubecontainer.ParseContainerID(podStatus.ContainerStatuses[0].ContainerID)
 			result, ok := resultsManager(m, tc.probeType).Get(containerID)
 
 			if ok != tc.expectSet {
 				t.Errorf("Expected result to be set: %v, but got: %v", tc.expectSet, ok)
 			}
-			if tc.expectSet && result != tc.initialValue {
-				t.Errorf("Expected result %v, but got: %v", tc.initialValue, result)
+			if tc.expectSet && result != tc.expectedResult {
+				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
 			}
 		})
 	}

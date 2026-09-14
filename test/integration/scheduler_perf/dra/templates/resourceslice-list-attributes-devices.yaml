@@ -1,0 +1,33 @@
+{{$numDevices := or .numDevices 64}}
+{{$numListValues := or .numListValues 32}}
+{{$sharedValue := or .sharedValue "shared-value"}}
+{{$numNonMatchingDevices := or .numNonMatchingDevices 32}}
+
+kind: ResourceSlice
+apiVersion: resource.k8s.io/v1
+metadata:
+  name: resourceslice-{{.Index}}
+spec:
+  pool:
+    name: resourceslice-{{.Index}}
+    generation: 1
+    resourceSliceCount: 1
+  driver: test-driver.cdi.k8s.io
+  nodeName: scheduler-perf-dra-{{.Index}}
+  devices:{{range $deviceIndex := ($numDevices | Int)}}
+  - name: device-{{$deviceIndex}}
+    attributes:
+      dra.example.com/match:
+        strings:
+        # Keep a contiguous block of non-matching devices before the matching
+        # suffix so claim requests must work through that block before they
+        # reach enough compatible devices. This is meant to stress the
+        # MatchAttribute search path with repeated incompatible checks before
+        # the allocator reaches the exact-fit matching suffix.
+        {{if ge $deviceIndex ($numNonMatchingDevices | Int)}}
+        - {{$sharedValue}}
+        {{end}}
+        {{range $valueIndex := ($numListValues | Int)}}
+        - device-{{$deviceIndex}}-value-{{$valueIndex}}
+        {{end}}
+{{end}}

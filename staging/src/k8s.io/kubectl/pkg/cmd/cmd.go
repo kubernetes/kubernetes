@@ -25,7 +25,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -53,6 +55,8 @@ import (
 	"k8s.io/kubectl/pkg/cmd/explain"
 	"k8s.io/kubectl/pkg/cmd/expose"
 	"k8s.io/kubectl/pkg/cmd/get"
+	kuberccmd "k8s.io/kubectl/pkg/cmd/kuberc"
+	"k8s.io/kubectl/pkg/cmd/kustomize"
 	"k8s.io/kubectl/pkg/cmd/label"
 	"k8s.io/kubectl/pkg/cmd/logs"
 	"k8s.io/kubectl/pkg/cmd/options"
@@ -74,10 +78,6 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubectl/pkg/util/term"
-
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/kustomize"
 )
 
 type KubectlOptions struct {
@@ -163,7 +163,7 @@ func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
 func NewKubectlCommand(o KubectlOptions) *cobra.Command {
-	warningHandler := rest.NewWarningWriter(o.IOStreams.ErrOut, rest.WarningWriterOptions{Deduplicate: true, Color: term.AllowsColorOutput(o.IOStreams.ErrOut)})
+	warningHandler := rest.NewWarningWriter(o.IOStreams.ErrOut, rest.WarningWriterOptions{Deduplicate: true, Color: printers.AllowsColorOutput(o.IOStreams.ErrOut)})
 	warningsAsErrors := false
 	var finishProfiling func() error
 	// Parent command to which all subcommands are added.
@@ -275,7 +275,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 		{
 			Message: "Deploy Commands:",
 			Commands: []*cobra.Command{
-				rollout.NewCmdRollout(f, o.IOStreams),
+				rollout.NewCmdRollout("kubectl", f, o.IOStreams),
 				scale.NewCmdScale(f, o.IOStreams),
 				autoscale.NewCmdAutoscale(f, o.IOStreams),
 			},
@@ -355,6 +355,9 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	cmds.AddCommand(apiresources.NewCmdAPIVersions(f, o.IOStreams))
 	cmds.AddCommand(apiresources.NewCmdAPIResources(f, o.IOStreams))
 	cmds.AddCommand(options.NewCmdOptions(o.IOStreams.Out))
+	if !cmdutil.KubeRC.IsDisabled() {
+		cmds.AddCommand(kuberccmd.NewCmdKubeRC(o.IOStreams))
+	}
 
 	// Stop warning about normalization of flags. That makes it possible to
 	// add the klog flags later.

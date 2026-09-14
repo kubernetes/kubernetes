@@ -26,6 +26,7 @@ import (
 	"time"
 
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -127,7 +128,7 @@ func TestAllocateIPAllocator(t *testing.T) {
 			if f := r.Used(); f != 0 {
 				t.Errorf("[%s]: wrong used: expected %d, got %d", tc.name, 0, f)
 			}
-			found := sets.NewString()
+			found := sets.New[string]()
 			count := 0
 			for r.Free() > 0 {
 				ip, err := r.AllocateNext()
@@ -336,7 +337,7 @@ func TestAllocateSmallIPAllocator(t *testing.T) {
 	if f := r.Free(); f != 2 {
 		t.Errorf("expected free equal to 2 got: %d", f)
 	}
-	found := sets.NewString()
+	found := sets.New[string]()
 	for i := 0; i < 2; i++ {
 		ip, err := r.AllocateNext()
 		if err != nil {
@@ -372,11 +373,11 @@ func TestForEachIPAllocator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testCases := []sets.String{
-		sets.NewString(),
-		sets.NewString("192.168.1.1"),
-		sets.NewString("192.168.1.1", "192.168.1.254"),
-		sets.NewString("192.168.1.1", "192.168.1.128", "192.168.1.254"),
+	testCases := []sets.Set[string]{
+		sets.New[string](),
+		sets.New[string]("192.168.1.1"),
+		sets.New[string]("192.168.1.1", "192.168.1.254"),
+		sets.New[string]("192.168.1.1", "192.168.1.128", "192.168.1.254"),
 	}
 
 	for i, tc := range testCases {
@@ -395,7 +396,7 @@ func TestForEachIPAllocator(t *testing.T) {
 				t.Errorf("[%d] expected IP %v allocated", i, ip)
 			}
 		}
-		calls := sets.NewString()
+		calls := sets.New[string]()
 		r.ForEach(func(ip net.IP) {
 			calls.Insert(ip.String())
 		})
@@ -403,7 +404,7 @@ func TestForEachIPAllocator(t *testing.T) {
 			t.Errorf("[%d] expected %d calls, got %d", i, len(tc), len(calls))
 		}
 		if !calls.Equal(tc) {
-			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, calls.List(), tc.List())
+			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, sets.List(calls), sets.List(tc))
 		}
 	}
 }
@@ -444,7 +445,7 @@ func TestIPAllocatorClusterIPMetrics(t *testing.T) {
 	expectMetrics(t, cidrIPv6, em)
 
 	// allocate 2 IPv4 addresses
-	found := sets.NewString()
+	found := sets.New[string]()
 	for i := 0; i < 2; i++ {
 		ip, err := a.AllocateNext()
 		if err != nil {
@@ -540,7 +541,7 @@ func TestIPAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 	expectMetrics(t, cidrIPv4, em)
 
 	// allocate 2 dynamic IPv4 addresses
-	found := sets.NewString()
+	found := sets.New[string]()
 	for i := 0; i < 2; i++ {
 		ip, err := a.AllocateNext()
 		if err != nil {
@@ -1226,5 +1227,94 @@ func TestUsedWithInvalidIPs(t *testing.T) {
 	used := r.Used()
 	if used != 1 {
 		t.Errorf("Expected Used() to return 1 (only valid IPs), got %d", used)
+	}
+}
+
+func TestAllocateNextStopOnError(t *testing.T) {
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
+
+	calls := 0
+	client.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
+		calls++
+		return true, nil, fmt.Errorf("server error")
+	}))
+
+	c, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ipAddressSynced = func() bool { return true }
+	defer c.Destroy()
+
+	_, err = c.AllocateNext()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != "server error" {
+		t.Fatalf("expected 'server error', got %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 call, got %d", calls)
+	}
+}
+
+func TestAllocateNext_Collision(t *testing.T) {
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
+	ipStore := ipInformer.Informer().GetIndexer()
+
+	// Inject collision reactor FIRST
+	// We want to simulate that the first IP tried is already allocated in the underlying storage
+	// but NOT in the cache (so it passes the cache check in allocateFromRange).
+	// The allocator picks a random IP. To make it deterministic or easier to hit,
+	collisionCount := 0
+	client.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if collisionCount == 0 {
+			collisionCount++
+			// Simulate ErrAllocated (AlreadyExists)
+			return true, nil, apierrors.NewAlreadyExists(networkingv1.Resource("ipaddresses"), action.(k8stesting.CreateAction).GetObject().(*networkingv1.IPAddress).Name)
+		}
+		ip := action.(k8stesting.CreateAction).GetObject().(*networkingv1.IPAddress)
+		_, exists, err := ipStore.GetByKey(ip.Name)
+		if err != nil {
+			return false, nil, fmt.Errorf("failed to get ip %s from cache: %w", ip.Name, err)
+		}
+		if exists {
+			return false, nil, fmt.Errorf("ip already exist")
+		}
+		ip.Generation = 1
+		err = ipStore.Add(ip)
+		return false, ip, err
+	}))
+
+	a, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.ipAddressSynced = func() bool { return true }
+	defer a.Destroy()
+
+	// AllocateNext should succeed even if the first attempt hits a collision
+	ip, err := a.AllocateNext()
+	if err != nil {
+		t.Fatalf("AllocateNext failed: %v", err)
+	}
+	if collisionCount != 1 {
+		t.Errorf("Expected 1 collision, got %d", collisionCount)
+	}
+	if !cidr.Contains(ip) {
+		t.Errorf("Allocated IP %s not in CIDR %s", ip, cidr)
 	}
 }

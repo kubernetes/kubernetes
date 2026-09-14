@@ -1,5 +1,31 @@
 {
   "*elidenovalidations.T1": {
+    "deepValidatedMap[%ɜ¤0ȻG炕炎鷖Ʊ]": [
+      "type OtherStruct"
+    ],
+    "deepValidatedMap[tƓ晲銩靨能鷸ȳ琍殪]": [
+      "type OtherStruct"
+    ],
+    "deepValidatedSlice[0]": [
+      "type DeepTypedefSlice",
+      "type OtherStruct"
+    ],
+    "deepValidatedSlice[1]": [
+      "type DeepTypedefSlice",
+      "type OtherStruct"
+    ],
+    "doubleDeepValidatedMap[滧ǖvq]": [
+      "type OtherStruct"
+    ],
+    "doubleDeepValidatedMap[黰¢ơđ?ȵɓf*Z迖瓼轊]": [
+      "type OtherStruct"
+    ],
+    "doubleDeepValidatedSlice           [0]": [
+      "type OtherStruct"
+    ],
+    "doubleDeepValidatedSlice           [1]": [
+      "type OtherStruct"
+    ],
     "hasFieldVal.s": [
       "field HasFieldVal.S"
     ],
@@ -8,6 +34,22 @@
     ],
     "hasTypeVal": [
       "type HasTypeVal"
+    ],
+    "validatedMapKey": [
+      "type ValidatedKeyType",
+      "type ValidatedKeyType"
+    ],
+    "validatedMap[ʅȀʙĄĥ腲ʤaǇ趴]": [
+      "type OtherStruct"
+    ],
+    "validatedMap[赖{³*Ę鄏þƿ髈儱Ŀ蒫÷K]": [
+      "type OtherStruct"
+    ],
+    "validatedSlice[0]": [
+      "type OtherStruct"
+    ],
+    "validatedSlice[1]": [
+      "type OtherStruct"
     ]
   }
 }

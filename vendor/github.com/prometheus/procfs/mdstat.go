@@ -1,4 +1,4 @@
-// Copyright 2018 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -27,13 +27,34 @@ var (
 	recoveryLinePctRE    = regexp.MustCompile(`= (.+)%`)
 	recoveryLineFinishRE = regexp.MustCompile(`finish=(.+)min`)
 	recoveryLineSpeedRE  = regexp.MustCompile(`speed=(.+)[A-Z]`)
-	componentDeviceRE    = regexp.MustCompile(`(.*)\[\d+\]`)
+	componentDeviceRE    = regexp.MustCompile(`(.*)\[(\d+)\](\([SF]+\))?`)
+	personalitiesPrefix  = "Personalities : "
 )
+
+type MDStatComponent struct {
+	// Name of the component device.
+	Name string
+	// DescriptorIndex number of component device, e.g. the order in the superblock.
+	DescriptorIndex int32
+	// Flags per Linux drivers/md/md.[ch] as of v6.12-rc1
+	// Subset that are exposed in mdstat
+	WriteMostly bool
+	Journal     bool
+	Faulty      bool // "Faulty" is what kernel source uses for "(F)"
+	Spare       bool
+	Replacement bool
+	// Some additional flags that are NOT exposed in procfs today; they may
+	// be available via sysfs.
+	// In_sync, Bitmap_sync, Blocked, WriteErrorSeen, FaultRecorded,
+	// BlockedBadBlocks, WantReplacement, Candidate, ...
+}
 
 // MDStat holds info parsed from /proc/mdstat.
 type MDStat struct {
 	// Name of the device.
 	Name string
+	// raid type of the device.
+	Type string
 	// activity-state of the device.
 	ActivityState string
 	// Number of active disks.
@@ -58,8 +79,8 @@ type MDStat struct {
 	BlocksSyncedFinishTime float64
 	// current sync speed (in Kilobytes/sec)
 	BlocksSyncedSpeed float64
-	// Name of md component devices
-	Devices []string
+	// component devices
+	Devices []MDStatComponent
 }
 
 // MDStat parses an mdstat-file (/proc/mdstat) and returns a slice of
@@ -80,13 +101,24 @@ func (fs FS) MDStat() ([]MDStat, error) {
 // parseMDStat parses data from mdstat file (/proc/mdstat) and returns a slice of
 // structs containing the relevant info.
 func parseMDStat(mdStatData []byte) ([]MDStat, error) {
+	// TODO:
+	// - parse global hotspares from the "unused devices" line.
 	mdStats := []MDStat{}
 	lines := strings.Split(string(mdStatData), "\n")
+	knownRaidTypes := make(map[string]bool)
 
 	for i, line := range lines {
 		if strings.TrimSpace(line) == "" || line[0] == ' ' ||
-			strings.HasPrefix(line, "Personalities") ||
 			strings.HasPrefix(line, "unused") {
+			continue
+		}
+		// Personalities : [linear] [multipath] [raid0] [raid1] [raid6] [raid5] [raid4] [raid10]
+		if len(knownRaidTypes) == 0 && strings.HasPrefix(line, personalitiesPrefix) {
+			personalities := strings.Fields(line[len(personalitiesPrefix):])
+			for _, word := range personalities {
+				word := word[1 : len(word)-1]
+				knownRaidTypes[word] = true
+			}
 			continue
 		}
 
@@ -95,13 +127,26 @@ func parseMDStat(mdStatData []byte) ([]MDStat, error) {
 			return nil, fmt.Errorf("%w: Expected 3+ lines, got %q", ErrFileParse, line)
 		}
 		mdName := deviceFields[0] // mdx
-		state := deviceFields[2]  // active or inactive
+		state := deviceFields[2]  // active, inactive, broken
+
+		mdType := "unknown" // raid1, raid5, etc.
+		var deviceStartIndex int
+		if len(deviceFields) > 3 { // mdType may be in the 3rd or 4th field
+			if isRaidType(deviceFields[3], knownRaidTypes) {
+				mdType = deviceFields[3]
+				deviceStartIndex = 4
+			} else if len(deviceFields) > 4 && isRaidType(deviceFields[4], knownRaidTypes) {
+				// if the 3rd field is (...), the 4th field is the mdType
+				mdType = deviceFields[4]
+				deviceStartIndex = 5
+			}
+		}
 
 		if len(lines) <= i+3 {
 			return nil, fmt.Errorf("%w: Too few lines for md device: %q", ErrFileParse, mdName)
 		}
 
-		// Failed disks have the suffix (F) & Spare disks have the suffix (S).
+		// Failed (Faulty) disks have the suffix (F) & Spare disks have the suffix (S).
 		fail := int64(strings.Count(line, "(F)"))
 		spare := int64(strings.Count(line, "(S)"))
 		active, total, down, size, err := evalStatusLine(lines[i], lines[i+1])
@@ -123,16 +168,20 @@ func parseMDStat(mdStatData []byte) ([]MDStat, error) {
 		finish := float64(0)
 		pct := float64(0)
 		recovering := strings.Contains(lines[syncLineIdx], "recovery")
+		reshaping := strings.Contains(lines[syncLineIdx], "reshape")
 		resyncing := strings.Contains(lines[syncLineIdx], "resync")
 		checking := strings.Contains(lines[syncLineIdx], "check")
 
 		// Append recovery and resyncing state info.
-		if recovering || resyncing || checking {
-			if recovering {
+		if recovering || resyncing || checking || reshaping {
+			switch {
+			case recovering:
 				state = "recovering"
-			} else if checking {
+			case reshaping:
+				state = "reshaping"
+			case checking:
 				state = "checking"
-			} else {
+			default:
 				state = "resyncing"
 			}
 
@@ -148,8 +197,14 @@ func parseMDStat(mdStatData []byte) ([]MDStat, error) {
 			}
 		}
 
+		devices, err := evalComponentDevices(deviceFields[deviceStartIndex:])
+		if err != nil {
+			return nil, fmt.Errorf("error parsing components in md device %q: %w", mdName, err)
+		}
+
 		mdStats = append(mdStats, MDStat{
 			Name:                   mdName,
+			Type:                   mdType,
 			ActivityState:          state,
 			DisksActive:            active,
 			DisksFailed:            fail,
@@ -162,14 +217,24 @@ func parseMDStat(mdStatData []byte) ([]MDStat, error) {
 			BlocksSyncedPct:        pct,
 			BlocksSyncedFinishTime: finish,
 			BlocksSyncedSpeed:      speed,
-			Devices:                evalComponentDevices(deviceFields),
+			Devices:                devices,
 		})
 	}
 
 	return mdStats, nil
 }
 
+// check if a string's format is like the mdType
+// Rule 1: mdType should not be like (...)
+// Rule 2: mdType should not be like sda[0]
+// .
+func isRaidType(mdType string, knownRaidTypes map[string]bool) bool {
+	_, ok := knownRaidTypes[mdType]
+	return !strings.ContainsAny(mdType, "([") && ok
+}
+
 func evalStatusLine(deviceLine, statusLine string) (active, total, down, size int64, err error) {
+	// e.g. 523968 blocks super 1.2 [4/4] [UUUU]
 	statusFields := strings.Fields(statusLine)
 	if len(statusFields) < 1 {
 		return 0, 0, 0, 0, fmt.Errorf("%w: Unexpected statusline %q: %w", ErrFileParse, statusLine, err)
@@ -260,17 +325,29 @@ func evalRecoveryLine(recoveryLine string) (blocksSynced int64, blocksToBeSynced
 	return blocksSynced, blocksToBeSynced, pct, finish, speed, nil
 }
 
-func evalComponentDevices(deviceFields []string) []string {
-	mdComponentDevices := make([]string, 0)
-	if len(deviceFields) > 3 {
-		for _, field := range deviceFields[4:] {
-			match := componentDeviceRE.FindStringSubmatch(field)
-			if match == nil {
-				continue
-			}
-			mdComponentDevices = append(mdComponentDevices, match[1])
+func evalComponentDevices(deviceFields []string) ([]MDStatComponent, error) {
+	mdComponentDevices := make([]MDStatComponent, 0)
+	for _, field := range deviceFields {
+		match := componentDeviceRE.FindStringSubmatch(field)
+		if match == nil {
+			continue
 		}
+		descriptorIndex, err := strconv.ParseInt(match[2], 10, 32)
+		if err != nil {
+			return mdComponentDevices, fmt.Errorf("error parsing int from device %q: %w", match[2], err)
+		}
+		mdComponentDevices = append(mdComponentDevices, MDStatComponent{
+			Name:            match[1],
+			DescriptorIndex: int32(descriptorIndex),
+			// match may contain one or more of these
+			// https://github.com/torvalds/linux/blob/7ec462100ef9142344ddbf86f2c3008b97acddbe/drivers/md/md.c#L8376-L8392
+			Faulty:      strings.Contains(match[3], "(F)"),
+			Spare:       strings.Contains(match[3], "(S)"),
+			Journal:     strings.Contains(match[3], "(J)"),
+			Replacement: strings.Contains(match[3], "(R)"),
+			WriteMostly: strings.Contains(match[3], "(W)"),
+		})
 	}
 
-	return mdComponentDevices
+	return mdComponentDevices, nil
 }

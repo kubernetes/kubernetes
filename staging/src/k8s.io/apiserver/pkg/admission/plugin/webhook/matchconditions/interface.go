@@ -33,5 +33,5 @@ type MatchResult struct {
 // Matcher contains logic for converting Evaluations to bool of matches or does not match
 type Matcher interface {
 	// Match is used to take cel evaluations and convert into decisions
-	Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.Authorizer) MatchResult
+	Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.UnconditionalAuthorizer) MatchResult
 }

@@ -18,8 +18,6 @@ package probe
 
 import (
 	"fmt"
-	"strconv"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -32,10 +30,7 @@ func ResolveContainerPort(param intstr.IntOrString, container *v1.Container) (in
 		port = param.IntValue()
 	case intstr.String:
 		if port, err = findPortByName(container, param.StrVal); err != nil {
-			// Last ditch effort - maybe it was an int stored as string?
-			if port, err = strconv.Atoi(param.StrVal); err != nil {
-				return port, err
-			}
+			return port, err
 		}
 	default:
 		return port, fmt.Errorf("intOrString had no kind: %+v", param)
@@ -53,5 +48,5 @@ func findPortByName(container *v1.Container, portName string) (int, error) {
 			return int(port.ContainerPort), nil
 		}
 	}
-	return 0, fmt.Errorf("port %s not found", portName)
+	return 0, fmt.Errorf("port %q not found", portName)
 }

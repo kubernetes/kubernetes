@@ -26,6 +26,7 @@ var (
 	// A sync pool to reduce allocation.
 	intPool  sync.Pool
 	maxInt64 = big.NewInt(math.MaxInt64)
+	minInt64 = big.NewInt(math.MinInt64)
 )
 
 func init() {
@@ -34,62 +35,105 @@ func init() {
 	}
 }
 
-// scaledValue scales given unscaled value from scale to new Scale and returns
-// an int64. It ALWAYS rounds up the result when scale down. The final result might
-// overflow.
+// scaledValue scales unscaled from scale to newScale and returns it as an int64.
+// Scaling down rounds away from zero (1.5 to 2, -1.5 to -2), matching
+// negativeScaleInt64. ok is false when the true value overflows int64, and then
+// the result saturates to mostNegative or mostPositive.
 //
-// scale, newScale represents the scale of the unscaled decimal.
+// scale, newScale represent the scale of the unscaled decimal.
 // The mathematical value of the decimal is unscaled * 10**(-scale).
-func scaledValue(unscaled *big.Int, scale, newScale int) int64 {
+func scaledValue(unscaled *big.Int, scale, newScale int64) (int64, bool) {
 	dif := scale - newScale
 	if dif == 0 {
-		return unscaled.Int64()
+		return bigToInt64Saturated(unscaled)
 	}
 
-	// Handle scale up
-	// This is an easy case, we do not need to care about rounding and overflow.
-	// If any intermediate operation causes overflow, the result will overflow.
+	// Scale up: multiply by 10^(-dif). No case here needs a big.Int.
 	if dif < 0 {
-		return unscaled.Int64() * int64(math.Pow10(-dif))
-	}
-
-	// Handle scale down
-	// We have to be careful about the intermediate operations.
-
-	// fast path when unscaled < max.Int64 and exp(10,dif) < max.Int64
-	const log10MaxInt64 = 19
-	if unscaled.Cmp(maxInt64) < 0 && dif < log10MaxInt64 {
-		divide := int64(math.Pow10(dif))
-		result := unscaled.Int64() / divide
-		mod := unscaled.Int64() % divide
-		if mod != 0 {
-			return result + 1
+		if unscaled.Sign() == 0 {
+			return 0, true
 		}
-		return result
+		// Bound dif before Scale(-dif) narrows it: 2^32 would come back as 0.
+		if dif <= -log10MaxInt64 {
+			if unscaled.Sign() < 0 {
+				return mostNegative, false
+			}
+			return mostPositive, false
+		}
+		// A coefficient already outside int64 only grows here.
+		if !unscaled.IsInt64() {
+			if unscaled.Sign() < 0 {
+				return mostNegative, false
+			}
+			return mostPositive, false
+		}
+		return positiveScaleInt64(unscaled.Int64(), Scale(-dif))
 	}
 
-	// We should only convert back to int64 when getting the result.
+	// Scale down: divide by 10^dif, rounding the quotient away from zero.
+
+	// Fast path when unscaled fits int64 and the divisor stays below it. The
+	// quotient is then strictly smaller in magnitude, so it cannot overflow.
+	if unscaled.IsInt64() && dif < log10MaxInt64 {
+		u := unscaled.Int64()
+		divide := int64(math.Pow10(int(dif)))
+		q := u / divide
+		if u%divide != 0 {
+			if u < 0 {
+				q--
+			} else {
+				q++
+			}
+		}
+		return q, true
+	}
+
+	// Only the rounding sign survives, and no divisor has to be built:
+	// dif >= BitLen implies 10^dif > 2^dif >= 2^BitLen > |unscaled|.
+	if dif >= int64(unscaled.BitLen()) {
+		switch unscaled.Sign() {
+		case 0:
+			return 0, true
+		case -1:
+			return -1, true
+		default:
+			return 1, true
+		}
+	}
+
 	divisor := intPool.Get().(*big.Int)
 	exp := intPool.Get().(*big.Int)
-	result := intPool.Get().(*big.Int)
+	quotient := intPool.Get().(*big.Int)
+	remainder := intPool.Get().(*big.Int)
 	defer func() {
 		intPool.Put(divisor)
 		intPool.Put(exp)
-		intPool.Put(result)
+		intPool.Put(quotient)
+		intPool.Put(remainder)
 	}()
 
 	// divisor = 10^(dif)
-	// TODO: create loop up table if exp costs too much.
-	divisor.Exp(bigTen, exp.SetInt64(int64(dif)), nil)
-	// reuse exp
-	remainder := exp
-
-	// result = unscaled / divisor
-	// remainder = unscaled % divisor
-	result.DivMod(unscaled, divisor, remainder)
+	divisor.Exp(bigTen, exp.SetInt64(dif), nil)
+	// QuoRem truncates toward zero, so the step below rounds away from it.
+	quotient.QuoRem(unscaled, divisor, remainder)
 	if remainder.Sign() != 0 {
-		return result.Int64() + 1
+		if unscaled.Sign() < 0 {
+			quotient.Sub(quotient, bigOne)
+		} else {
+			quotient.Add(quotient, bigOne)
+		}
 	}
+	return bigToInt64Saturated(quotient)
+}
 
-	return result.Int64()
+// bigToInt64Saturated returns v as an int64, saturating to mostNegative or
+// mostPositive when v does not fit. ok is false when saturation occurred.
+func bigToInt64Saturated(v *big.Int) (int64, bool) {
+	if v.IsInt64() {
+		return v.Int64(), true
+	}
+	if v.Sign() < 0 {
+		return mostNegative, false
+	}
+	return mostPositive, false
 }

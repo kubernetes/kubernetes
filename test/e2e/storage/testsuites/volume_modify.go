@@ -86,16 +86,17 @@ func (v *volumeModifyTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInf
 	return v.tsInfo
 }
 
-func (v *volumeModifyTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (v *volumeModifyTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	_, ok := driver.(storageframework.VolumeAttributesClassTestDriver)
 	if !ok {
-		e2eskipper.Skipf("Driver %q does not support VolumeAttributesClass tests - skipping", driver.GetDriverInfo().Name)
+		return fmt.Sprintf("Driver %q does not support VolumeAttributesClass tests - skipping", driver.GetDriverInfo().Name)
 	}
 	// Skip block storage tests if the driver we are testing against does not support block volumes
 	// TODO: This should be made generic so that it doesn't have to be re-written for every test that uses the 	BlockVolModeDynamicPV testcase
 	if !driver.GetDriverInfo().Capabilities[storageframework.CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
-		e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", driver.GetDriverInfo().Name)
+		return fmt.Sprintf("Driver %q does not support block volume mode - skipping", driver.GetDriverInfo().Name)
 	}
+	return ""
 }
 
 func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
@@ -232,8 +233,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		framework.ExpectNoError(err, "While waiting for PVC to have expected VAC")
 	})
 
-	// Marked as flaky until https://github.com/kubernetes-csi/external-resizer/issues/483 is solved.
-	framework.It("should recover from invalid target VAC by updating PVC to new valid VAC", framework.WithFlaky(), func(ctx context.Context) {
+	ginkgo.It("should recover from invalid target VAC by updating PVC to new valid VAC", func(ctx context.Context) {
 		init(ctx, false /* volume created without VAC */)
 		ginkgo.DeferCleanup(cleanup)
 

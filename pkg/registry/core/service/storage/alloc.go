@@ -17,18 +17,17 @@ limitations under the License.
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"net"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	netutils "k8s.io/utils/net"
@@ -152,7 +151,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 	// Do some loose pre-validation of the input.  This makes it easier in the
 	// rest of allocation code to not have to consider corner cases.
 	if el := validation.ValidateServiceClusterIPsRelatedFields(service, oldService); len(el) != 0 {
-		return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+		return apierrors.NewInvalid(api.Kind("Service"), service.Name, el)
 	}
 
 	//TODO(thockin): Move this logic to validation?
@@ -225,7 +224,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 
 	// If we have validation errors, bail out now so we don't make them worse.
 	if len(el) > 0 {
-		return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+		return apierrors.NewInvalid(api.Kind("Service"), service.Name, el)
 	}
 
 	// Special-case: headless + selectorless.  This has to happen before other
@@ -277,7 +276,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 
 	// If we have validation errors, don't bother with the rest.
 	if len(el) > 0 {
-		return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+		return apierrors.NewInvalid(api.Kind("Service"), service.Name, el)
 	}
 
 	// nil families, gets cluster default
@@ -402,41 +401,39 @@ func (al *Allocators) allocIPs(service *api.Service, toAlloc map[api.IPFamily]st
 		if ip == "" {
 			var allocatedIP net.IP
 			var err error
-			if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-				// TODO: simplify this and avoid all this duplicate code
-				svcAllocator, ok := allocator.(*ipallocator.MetaAllocator)
-				if ok {
-					allocatedIP, err = svcAllocator.AllocateNextService(service)
-				} else {
-					allocatedIP, err = allocator.AllocateNext()
-				}
+
+			// TODO: simplify this and avoid all this duplicate code
+			svcAllocator, ok := allocator.(*ipallocator.MetaAllocator)
+			if ok {
+				allocatedIP, err = svcAllocator.AllocateNextService(service)
 			} else {
 				allocatedIP, err = allocator.AllocateNext()
 			}
 			if err != nil {
-				return allocated, errors.NewInternalError(fmt.Errorf("failed to allocate a serviceIP: %v", err))
+				if !errors.Is(err, ipallocator.ErrFull) {
+					el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocate IP: %v", err))}
+					return allocated, apierrors.NewInvalid(api.Kind("Service"), service.Name, el)
+				}
+				return allocated, apierrors.NewInternalError(fmt.Errorf("failed to allocate a serviceIP for Service %q: %w", service.Name, err))
 			}
 			allocated[family] = allocatedIP.String()
 		} else {
 			parsedIP := netutils.ParseIPSloppy(ip)
 			if parsedIP == nil {
-				return allocated, errors.NewInternalError(fmt.Errorf("failed to parse service IP %q", ip))
+				return allocated, apierrors.NewInternalError(fmt.Errorf("failed to parse service IP %q", ip))
 			}
 			var err error
-			if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-				// TODO: simplify this and avoid all this duplicate code
-				svcAllocator, ok := allocator.(*ipallocator.MetaAllocator)
-				if ok {
-					err = svcAllocator.AllocateService(service, parsedIP)
-				} else {
-					err = allocator.Allocate(parsedIP)
-				}
+
+			// TODO: simplify this and avoid all this duplicate code
+			svcAllocator, ok := allocator.(*ipallocator.MetaAllocator)
+			if ok {
+				err = svcAllocator.AllocateService(service, parsedIP)
 			} else {
 				err = allocator.Allocate(parsedIP)
 			}
 			if err != nil {
 				el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocate IP %v: %v", ip, err))}
-				return allocated, errors.NewInvalid(api.Kind("Service"), service.Name, el)
+				return allocated, apierrors.NewInvalid(api.Kind("Service"), service.Name, el)
 			}
 			allocated[family] = ip
 		}
@@ -462,7 +459,7 @@ func (al *Allocators) releaseIPs(toRelease map[api.IPFamily]string) (map[api.IPF
 
 		parsedIP := netutils.ParseIPSloppy(ip)
 		if parsedIP == nil {
-			return released, errors.NewInternalError(fmt.Errorf("failed to parse service IP %q", ip))
+			return released, apierrors.NewInternalError(fmt.Errorf("failed to parse service IP %q", ip))
 		}
 		if err := allocator.Release(parsedIP); err != nil {
 			return released, err
@@ -502,7 +499,7 @@ func (al *Allocators) txnAllocNodePorts(service *api.Service, dryRun bool) (tran
 	if apiservice.NeedsHealthCheck(service) {
 		if err := al.allocHealthCheckNodePort(service, nodePortOp); err != nil {
 			txn.Revert()
-			return nil, errors.NewInternalError(err)
+			return nil, apierrors.NewInternalError(err)
 		}
 	}
 
@@ -528,7 +525,7 @@ func initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocatio
 				if err != nil {
 					// TODO: when validation becomes versioned, this gets more complicated.
 					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), np, err.Error())}
-					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+					return apierrors.NewInvalid(api.Kind("Service"), service.Name, el)
 				}
 				servicePort.NodePort = int32(np)
 				svcPortToNodePort[int(servicePort.Port)] = np
@@ -538,7 +535,7 @@ func initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocatio
 					// TODO: what error should be returned here?  It's not a
 					// field-level validation failure (the field is valid), and it's
 					// not really an internal error.
-					return errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+					return apierrors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %w", err))
 				}
 				servicePort.NodePort = int32(nodePort)
 				svcPortToNodePort[int(servicePort.Port)] = nodePort
@@ -553,7 +550,7 @@ func initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocatio
 				if err != nil {
 					// TODO: when validation becomes versioned, this gets more complicated.
 					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
-					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+					return apierrors.NewInvalid(api.Kind("Service"), service.Name, el)
 				}
 			}
 		}
@@ -816,7 +813,7 @@ func (al *Allocators) updateNodePorts(after After, before Before, nodePortOp *po
 				err := nodePortOp.Allocate(int(nodePort.NodePort))
 				if err != nil {
 					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort.NodePort, err.Error())}
-					return errors.NewInvalid(api.Kind("Service"), newService.Name, el)
+					return apierrors.NewInvalid(api.Kind("Service"), newService.Name, el)
 				}
 				portAllocated[int(nodePort.NodePort)] = true
 			}
@@ -826,7 +823,7 @@ func (al *Allocators) updateNodePorts(after After, before Before, nodePortOp *po
 				// TODO: what error should be returned here?  It's not a
 				// field-level validation failure (the field is valid), and it's
 				// not really an internal error.
-				return errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+				return apierrors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %w", err))
 			}
 			servicePort.NodePort = int32(nodePortNumber)
 			nodePort.NodePort = servicePort.NodePort
@@ -867,7 +864,7 @@ func (al *Allocators) updateHealthCheckNodePort(after After, before Before, node
 	// Insert health check node port into the service's HealthCheckNodePort field if needed.
 	case !neededHealthCheckNodePort && needsHealthCheckNodePort:
 		if err := al.allocHealthCheckNodePort(service, nodePortOp); err != nil {
-			return false, errors.NewInternalError(err)
+			return false, apierrors.NewInternalError(err)
 		}
 
 	// Case 2: Transition from needs HealthCheckNodePort to don't need HealthCheckNodePort.

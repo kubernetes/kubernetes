@@ -22,8 +22,12 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -37,7 +41,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
@@ -74,7 +78,7 @@ const defaultWipingDelay = 30 * time.Second
 type ActivePodsFunc func() []*v1.Pod
 
 // GetNodeFunc is a function that returns the node object using the kubelet's node lister.
-type GetNodeFunc func() (*v1.Node, error)
+type GetNodeFunc func(context.Context) (*v1.Node, error)
 
 // Manager is responsible for managing ResourceClaims.
 // It ensures that they are prepared before starting pods
@@ -118,12 +122,12 @@ type Manager struct {
 // - Avoid repeated "failed to ...: failed to ..." when wrapping errors.
 // - Avoid wrapping when it does not provide relevant additional information to keep the user-visible error short.
 func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDirectory string) (*Manager, error) {
-	claimInfoCache, err := newClaimInfoCache(logger, stateFileDirectory, draManagerStateFileName)
+	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
 	if err != nil {
 		return nil, fmt.Errorf("create ResourceClaim cache: %w", err)
 	}
 
-	healthInfoCache, err := newHealthInfoCache(filepath.Join(stateFileDirectory, "dra_health_state"))
+	healthInfoCache, err := newHealthInfoCache(logger, filepath.Join(stateFileDirectory, "dra_health_state"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create healthInfo cache: %w", err)
 	}
@@ -155,6 +159,15 @@ func (m *Manager) GetWatcherHandler() cache.PluginHandler {
 	return m.draPlugins
 }
 
+// Stop shuts down the DRA plugin manager and waits for all background
+// goroutines to finish. It should be called when the manager is no longer
+// needed to avoid leaking goroutines and racing on state file cleanup.
+func (m *Manager) Stop() {
+	if m.draPlugins != nil {
+		m.draPlugins.Stop()
+	}
+}
+
 // Start starts the reconcile loop of the manager.
 func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady) error {
 	m.initDRAPluginManager(ctx, getNode, defaultWipingDelay)
@@ -172,7 +185,7 @@ func (m *Manager) initDRAPluginManager(ctx context.Context, getNode GetNodeFunc,
 
 // reconcileLoop ensures that any stale state in the manager's claimInfoCache gets periodically reconciled.
 func (m *Manager) reconcileLoop(ctx context.Context) {
-	logger := klog.FromContext(ctx)
+	logger := klog.FromContext(ctx).WithName("dra-manager")
 	// Only once all sources are ready do we attempt to reconcile.
 	// This ensures that the call to m.activePods() below will succeed with
 	// the actual active pods list.
@@ -226,7 +239,8 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 func (m *Manager) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.prepareResources(ctx, pod)
-	kubeletmetrics.DRAOperationsDuration.WithLabelValues("PrepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
+	isError := (err != nil)
+	kubeletmetrics.DRAOperationsDuration.WithLabelValues("PrepareResources", strconv.FormatBool(isError)).Observe(time.Since(startTime).Seconds())
 	if err != nil {
 		return fmt.Errorf("prepare dynamic resources: %w", err)
 	}
@@ -235,7 +249,8 @@ func (m *Manager) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 
 func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	var err error
-	logger := klog.FromContext(ctx)
+	logger := klog.FromContext(ctx).WithName("dra-manager")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 	batches := make(map[*draplugin.DRAPlugin][]*drapb.Claim)
 	resourceClaims := make(map[types.UID]*resourceapi.ResourceClaim)
 
@@ -268,7 +283,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	for i := range podResourceClaims {
 		podClaim := &podResourceClaims[i]
 		infos[i].podClaim = podClaim
-		logger.V(3).Info("Processing resource", "pod", klog.KObj(pod), "podClaim", podClaim.Name)
+		logger.V(3).Info("Processing resource", "podClaim", podClaim.Name)
 		claimName, mustCheckOwner, err := resourceclaim.Name(pod, podClaim)
 		if err != nil {
 			return err
@@ -288,14 +303,14 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		}
 
 		if mustCheckOwner {
-			if err = resourceclaim.IsForPod(pod, resourceClaim); err != nil {
+			if err = resourceclaim.IsForPod(pod, resourceClaim, m.podGroupResourceClaimsEnabled()); err != nil {
 				// No wrapping, error is already informative.
 				return err
 			}
 		}
 
 		// Check if pod is in the ReservedFor for the claim
-		if !resourceclaim.IsReservedForPod(pod, resourceClaim) {
+		if !resourceclaim.IsReservedForPod(pod, resourceClaim, m.podGroupResourceClaimsEnabled()) {
 			return fmt.Errorf("pod %s (%s) is not allowed to use ResourceClaim %s (%s)",
 				pod.Name, pod.UID, *claimName, resourceClaim.UID)
 		}
@@ -311,7 +326,10 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		}
 		infos[i].claimInfo = claimInfo
 		infos[i].plugins = make(map[string]*draplugin.DRAPlugin, len(claimInfo.DriverState))
-		for driverName := range claimInfo.DriverState {
+		for driverName, driverState := range claimInfo.DriverState {
+			if driverState.Skips(resourceapi.SkipNodeOperationNodePrepareResources) {
+				continue
+			}
 			if plugin := infos[i].plugins[driverName]; plugin != nil {
 				continue
 			}
@@ -326,12 +344,12 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 
 	// Now that we have everything that we need, we can update the claim info cache.
 	// Almost nothing can go wrong anymore at this point.
-	err = m.cache.withLock(func() error {
+	err = m.cache.withLock(logger, func() error {
 		for i := range podResourceClaims {
 			resourceClaim := infos[i].resourceClaim
 			podClaim := infos[i].podClaim
 			if resourceClaim == nil {
-				logger.V(5).Info("No need to prepare resources, no claim generated", "pod", klog.KObj(pod), "podClaim", podClaim.Name)
+				logger.V(5).Info("No need to prepare resources, no claim generated", "podClaim", podClaim.Name)
 				continue
 			}
 			// Get a reference to the claim info for this claim from the cache.
@@ -340,12 +358,18 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			if !exists {
 				claimInfo = infos[i].claimInfo
 				m.cache.add(claimInfo)
-				logger.V(6).Info("Created new claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
+				logger.V(6).Info("Created new claim info cache entry", "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			} else {
 				if claimInfo.ClaimUID != resourceClaim.UID {
 					return fmt.Errorf("old ResourceClaim with same name %s and different UID %s still exists (previous pod force-deleted?!)", resourceClaim.Name, claimInfo.ClaimUID)
 				}
-				logger.V(6).Info("Found existing claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
+				// Reject attaching a new pod to a claim if unprepareResources
+				// has already started as cache entry will be deleted when resources
+				// are fully unprepared.
+				if claimInfo.isUnpreparing() {
+					return fmt.Errorf("ResourceClaim %s is being unprepared", resourceClaim.Name)
+				}
+				logger.V(6).Info("Found existing claim info cache entry", "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			}
 
 			// Add a reference to the current pod in the claim info.
@@ -359,10 +383,10 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				return fmt.Errorf("checkpoint ResourceClaim cache: %w", err)
 			}
 
-			// If this claim is already prepared, there is no need to prepare it again.
+			// If this claim is already prepared, continue preparing for any remaining claims.
 			if claimInfo.isPrepared() {
-				logger.V(5).Info("Resources already prepared", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim))
-				return nil
+				logger.V(5).Info("Resources already prepared", "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim))
+				continue
 			}
 
 			// This saved claim will be used to update ClaimInfo cache
@@ -375,7 +399,11 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				Uid:       string(claimInfo.ClaimUID),
 				Name:      claimInfo.ClaimName,
 			}
-			for driverName := range claimInfo.DriverState {
+			for driverName, driverState := range claimInfo.DriverState {
+				if driverState.Skips(resourceapi.SkipNodeOperationNodePrepareResources) {
+					kubeletmetrics.DRANodePrepareSkipsTotal.WithLabelValues(driverName).Inc()
+					continue
+				}
 				plugin := infos[i].plugins[driverName]
 				batches[plugin] = append(batches[plugin], claim)
 			}
@@ -410,12 +438,19 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 
 			claim := resourceClaims[types.UID(claimUID)]
 
-			// Add the prepared CDI devices to the claim info
-			err := m.cache.withLock(func() error {
+			// Add the prepared CDI devices to the claim info. The
+			// driver's response is authoritative for this (claim, driver)
+			// pair, so drop any previously appended devices before
+			// rebuilding the list. Otherwise a retry of a prepare that
+			// had partially succeeded (this driver appended devices,
+			// another driver in the batch failed, setPrepared was
+			// skipped) would end up with the devices duplicated.
+			err := m.cache.withLock(logger, func() error {
 				info, exists := m.cache.get(claim.Name, claim.Namespace)
 				if !exists {
-					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s", claim.Name)
+					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s in namespace %s", claim.Name, claim.Namespace)
 				}
+				info.resetDevices(plugin.DriverName())
 				for _, device := range result.GetDevices() {
 					info.addDevice(plugin.DriverName(), state.Device{PoolName: device.PoolName,
 						DeviceName: device.DeviceName, ShareID: (*types.UID)(device.ShareId),
@@ -436,12 +471,12 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	}
 
 	// Atomically perform some operations on the claimInfo cache.
-	err = m.cache.withLock(func() error {
+	err = m.cache.withLock(logger, func() error {
 		// Mark all pod claims as prepared.
 		for _, claim := range resourceClaims {
 			info, exists := m.cache.get(claim.Name, claim.Namespace)
 			if !exists {
-				return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s", claim.Name)
+				return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s in namespace %s", claim.Name, claim.Namespace)
 			}
 			info.setPrepared()
 		}
@@ -471,13 +506,40 @@ func lookupClaimRequest(claims []*drapb.Claim, claimUID string) *drapb.Claim {
 	return nil
 }
 
+// truncateHealthMessage truncates a health message to the maximum allowed length.
+// If the message exceeds v1.ResourceHealthMessageMaxLength, it is truncated to
+// (maxLength - 3) characters and "..." is appended.
+func truncateHealthMessage(message string) string {
+	if len(message) <= v1.ResourceHealthMessageMaxLength {
+		return message
+	}
+	return message[:v1.ResourceHealthMessageMaxLength-3] + "..."
+}
+
 // GetResources gets a ContainerInfo object from the claimInfo cache.
 // This information is used by the caller to update a container config.
 func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
 	cdiDevices := []kubecontainer.CDIDevice{}
 
+	// claimRequests maps claimName -> []requestNames for this container
+	claimRequests := make(map[string][]string)
+
+	// Collect regular ResourceClaims
+	containerClaimsMap := make(map[string][]string, len(container.Resources.Claims))
+	for _, claim := range container.Resources.Claims {
+		if _, ok := containerClaimsMap[claim.Name]; !ok {
+			containerClaimsMap[claim.Name] = []string{}
+		}
+		containerClaimsMap[claim.Name] = append(containerClaimsMap[claim.Name], claim.Request)
+	}
+
 	for i := range pod.Spec.ResourceClaims {
 		podClaim := &pod.Spec.ResourceClaims[i]
+		requests, ok := containerClaimsMap[podClaim.Name]
+		if !ok {
+			continue
+		}
+
 		claimName, _, err := resourceclaim.Name(pod, podClaim)
 		if err != nil {
 			// No wrapping, error is already informative.
@@ -489,61 +551,54 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 		if claimName == nil {
 			continue
 		}
-		for _, claim := range container.Resources.Claims {
-			if podClaim.Name != claim.Name {
-				continue
-			}
 
-			err := m.cache.withRLock(func() error {
-				claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
-				if !exists {
-					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s", *claimName)
-				}
-
-				// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
-				cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(claim.Request)...)
-
-				return nil
-			})
-			if err != nil {
-				// No wrapping, this is the error above.
-				return nil, err
-			}
-		}
+		claimRequests[*claimName] = append(claimRequests[*claimName], requests...)
 	}
 
+	// Collect extended resource claims if feature is enabled
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) && pod.Status.ExtendedResourceClaimStatus != nil {
 		claimName := pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
 		// if the container has requests for extended resources backed by DRA,
 		// they must have been allocated via the extendedResourceClaim created
 		// by the kube-scheduler.
+
+		// Build map of this container's extended resource requests
+		extendedResourceRequests := make(map[string]bool)
+		for rName, rValue := range container.Resources.Requests {
+			if !rValue.IsZero() && schedutil.IsDRAExtendedResourceName(rName) {
+				extendedResourceRequests[rName.String()] = true
+			}
+		}
+
+		// Collect request names matching this container's extended resources
+		for _, rm := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
+			// allow multiple device requests per container per resource.
+			if rm.ContainerName == container.Name && extendedResourceRequests[rm.ResourceName] {
+				claimRequests[claimName] = append(claimRequests[claimName], rm.RequestName)
+			}
+		}
+	}
+
+	// Process all collected claims
+	for claimName, requestNames := range claimRequests {
 		err := m.cache.withRLock(func() error {
 			claimInfo, exists := m.cache.get(claimName, pod.Namespace)
 			if !exists {
-				return fmt.Errorf("unable to get claim info for claim %s in namespace %s", claimName, pod.Namespace)
+				return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s in namespace %s", claimName, pod.Namespace)
 			}
 
-			for rName, rValue := range container.Resources.Requests {
-				if rValue.IsZero() {
-					// We only care about the resources requested by the pod
-					continue
-				}
-				if schedutil.IsDRAExtendedResourceName(rName) {
-					for _, rm := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
-						// allow multiple device requests per container per resource.
-						if rm.ContainerName == container.Name && rm.ResourceName == rName.String() {
-							// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
-							cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(rm.RequestName)...)
-						}
-					}
-				}
+			for _, requestName := range requestNames {
+				// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
+				cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(requestName)...)
 			}
 			return nil
 		})
 		if err != nil {
+			// No wrapping, this is the error above.
 			return nil, err
 		}
 	}
+
 	return &ContainerInfo{CDIDevices: cdiDevices}, nil
 }
 
@@ -554,7 +609,8 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.unprepareResourcesForPod(ctx, pod)
-	kubeletmetrics.DRAOperationsDuration.WithLabelValues("UnprepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
+	isError := (err != nil)
+	kubeletmetrics.DRAOperationsDuration.WithLabelValues("UnprepareResources", strconv.FormatBool(isError)).Observe(time.Since(startTime).Seconds())
 	if err != nil {
 		return fmt.Errorf("unprepare dynamic resources: %w", err)
 	}
@@ -562,24 +618,36 @@ func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 }
 
 func (m *Manager) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod) error {
+	// Try to get claim names from the cache first.
 	var claimNames []string
-	for i := range pod.Spec.ResourceClaims {
-		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
-		if err != nil {
-			// No wrapping, the error is already informative.
-			return err
+	_ = m.cache.withRLock(func() error {
+		claimNames = m.cache.claimNamesForPod(pod.UID)
+		return nil
+	})
+
+	// If the cache doesn't have any claim names for this pod, it may be because Kubelet was
+	// restarted and claiminfo checkpoint was removed.
+	// We should try to get claim names from the pod spec and status to ensure that we
+	// unprepare all relevant claims.
+	if len(claimNames) == 0 {
+		for i := range pod.Spec.ResourceClaims {
+			claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+			if err != nil {
+				// No wrapping, the error is already informative.
+				return err
+			}
+			if claimName == nil {
+				// The claim name might be nil if no underlying resource claim
+				// was generated for the referenced claim. There are valid use
+				// cases when this might happen, so we simply skip it.
+				continue
+			}
+			claimNames = append(claimNames, *claimName)
 		}
-		// The claim name might be nil if no underlying resource claim
-		// was generated for the referenced claim. There are valid use
-		// cases when this might happen, so we simply skip it.
-		if claimName == nil {
-			continue
-		}
-		claimNames = append(claimNames, *claimName)
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) {
-		if pod.Status.ExtendedResourceClaimStatus != nil {
-			claimNames = append(claimNames, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) {
+			if pod.Status.ExtendedResourceClaimStatus != nil {
+				claimNames = append(claimNames, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
+			}
 		}
 	}
 
@@ -587,17 +655,27 @@ func (m *Manager) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod) err
 }
 
 func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, namespace string, claimNames []string) error {
-	logger := klog.FromContext(ctx)
+	logger := klog.FromContext(ctx).WithName("dra-manager")
 	batches := make(map[string][]*drapb.Claim)
 	claimNamesMap := make(map[types.UID]string)
 	for _, claimName := range claimNames {
 		// Atomically perform some operations on the claimInfo cache.
-		err := m.cache.withLock(func() error {
+		err := m.cache.withLock(logger, func() error {
 			// Get the claim info from the cache
 			claimInfo, exists := m.cache.get(claimName, namespace)
 
 			// Skip calling NodeUnprepareResource if claim info is not cached
 			if !exists {
+				return nil
+			}
+
+			// Do nothing if the claimInfo doesn't reference this pod.
+			// PrepareResources adds the pod to PodUIDs before any driver work,
+			// so a missing reference means PrepareResources never got that far
+			// for this pod (e.g. the validation pass errored out) and there is
+			// nothing for us to unprepare. Without this check we could
+			// tear down a claim that is still in use by another pod.
+			if !claimInfo.hasPodReference(podUID) {
 				return nil
 			}
 
@@ -617,13 +695,25 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 			// after NodeUnprepareResources GRPC succeeds
 			claimNamesMap[claimInfo.ClaimUID] = claimInfo.ClaimName
 
+			// Mark the claim as being unprepared while we hold the cache
+			// lock. NodeUnprepareResources runs below without the lock
+			// held; any concurrent prepareResources for a different pod
+			// that finds this entry must refuse to attach itself, since
+			// the resources are being unprepared and the cache entry
+			// will be deleted on completion.
+			claimInfo.setUnpreparing()
+
 			// Loop through all drivers and prepare for calling NodeUnprepareResources.
 			claim := &drapb.Claim{
 				Namespace: claimInfo.Namespace,
 				Uid:       string(claimInfo.ClaimUID),
 				Name:      claimInfo.ClaimName,
 			}
-			for driverName := range claimInfo.DriverState {
+			for driverName, driverState := range claimInfo.DriverState {
+				if driverState.Skips(resourceapi.SkipNodeOperationNodeUnprepareResources) {
+					kubeletmetrics.DRANodeUnprepareSkipsTotal.WithLabelValues(driverName).Inc()
+					continue
+				}
 				batches[driverName] = append(batches[driverName], claim)
 			}
 
@@ -641,7 +731,7 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 	for driverName, claims := range batches {
 		// Call NodeUnprepareResources RPC for all resource handles.
 		plugin, err := m.draPlugins.GetPlugin(driverName)
-		if plugin == nil {
+		if err != nil {
 			// No wrapping, error includes driver name already.
 			return err
 		}
@@ -668,7 +758,7 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 	}
 
 	// Atomically perform some operations on the claimInfo cache.
-	err := m.cache.withLock(func() error {
+	err := m.cache.withLock(logger, func() error {
 		// TODO(#132978): Re-evaluate this logic to support post-mortem health updates.
 		// As of the initial implementation, we immediately delete the claim info upon
 		// unprepare. This means a late-arriving health update for a terminated pod
@@ -699,8 +789,8 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 // PodMightNeedToUnprepareResources returns true if the pod might need to
 // unprepare resources
 func (m *Manager) PodMightNeedToUnprepareResources(uid types.UID) bool {
-	m.cache.Lock()
-	defer m.cache.Unlock()
+	m.cache.RLock()
+	defer m.cache.RUnlock()
 	return m.cache.hasPodReference(uid)
 }
 
@@ -708,7 +798,18 @@ func (m *Manager) PodMightNeedToUnprepareResources(uid types.UID) bool {
 func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error) {
 	claimInfos := make([]*ClaimInfo, 0, len(pod.Spec.ResourceClaims))
 
+	// Build a map of container claims for O(1) lookup
+	containerClaimsMap := make(map[string]bool, len(container.Resources.Claims))
+	for _, claim := range container.Resources.Claims {
+		containerClaimsMap[claim.Name] = true
+	}
+
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {
+		// Only process claims that this container actually uses
+		if !containerClaimsMap[podResourceClaim.Name] {
+			continue
+		}
+
 		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
 		if err != nil {
 			// No wrapping, the error is already informative.
@@ -722,23 +823,17 @@ func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) (
 
 		// Ownership doesn't get checked here, this should have been done before.
 
-		for _, claim := range container.Resources.Claims {
-			if podResourceClaim.Name != claim.Name {
-				continue
+		err = m.cache.withRLock(func() error {
+			claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
+			if !exists {
+				return fmt.Errorf("unable to get information for ResourceClaim %s", *claimName)
 			}
-
-			err := m.cache.withRLock(func() error {
-				claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
-				if !exists {
-					return fmt.Errorf("unable to get information for ResourceClaim %s", *claimName)
-				}
-				claimInfos = append(claimInfos, claimInfo.DeepCopy())
-				return nil
-			})
-			if err != nil {
-				// No wrapping, this is the error above.
-				return nil, err
-			}
+			claimInfos = append(claimInfos, claimInfo.DeepCopy())
+			return nil
+		})
+		if err != nil {
+			// No wrapping, this is the error above.
+			return nil, err
 		}
 	}
 
@@ -774,8 +869,10 @@ func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) (
 }
 
 // UpdateAllocatedResourcesStatus updates the health status of allocated DRA resources in the pod's container statuses.
-func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
-	logger := klog.FromContext(context.Background())
+func (m *Manager) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, status *v1.PodStatus) {
+	logger = logger.WithName("dra-manager")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+	enableHealthMessage := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatusMessage)
 	for i := range status.ContainerStatuses {
 		containerStatus := &status.ContainerStatuses[i]
 
@@ -800,21 +897,37 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 			}
 		}
 
+		// Build a map of pod claim statuses for O(1) lookup
+		podClaimStatusMap := make(map[string]string, len(pod.Status.ResourceClaimStatuses))
+		for _, podClaimStatus := range pod.Status.ResourceClaimStatuses {
+			if podClaimStatus.ResourceClaimName != nil {
+				podClaimStatusMap[podClaimStatus.Name] = *podClaimStatus.ResourceClaimName
+			}
+		}
+
 		// Iterate through the claims requested by this specific container.
 		for _, claim := range containerSpec.Resources.Claims {
 			// Find the actual name of the ResourceClaim object.
-			var actualClaimName string
-			for _, podClaimStatus := range pod.Status.ResourceClaimStatuses {
-				if podClaimStatus.Name == claim.Name {
-					if podClaimStatus.ResourceClaimName != nil {
-						actualClaimName = *podClaimStatus.ResourceClaimName
+			// Try the O(1) map lookup first, then fall back to resolving
+			// from the pod spec. The fallback is needed because
+			// ResourceClaimStatuses may not be populated yet when a
+			// health update triggers an early status sync.
+			actualClaimName := podClaimStatusMap[claim.Name]
+
+			if actualClaimName == "" {
+				for i := range pod.Spec.ResourceClaims {
+					if pod.Spec.ResourceClaims[i].Name == claim.Name {
+						claimNamePtr, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+						if err == nil && claimNamePtr != nil {
+							actualClaimName = *claimNamePtr
+						}
+						break
 					}
-					break
 				}
 			}
 
 			if actualClaimName == "" {
-				logger.V(4).Info("Could not find generated name for resource claim in pod status", "pod", klog.KObj(pod), "container", containerSpec.Name, "claimName", claim.Name)
+				logger.V(4).Info("Could not find generated name for resource claim", "container", containerSpec.Name, "claimName", claim.Name)
 				continue
 			}
 
@@ -825,7 +938,7 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 				// Use the actual claim name to look up claim info.
 				claimInfo, exists := m.cache.get(actualClaimName, pod.Namespace)
 				if !exists {
-					logger.V(4).Info("Could not find claim info for resource claim", "pod", klog.KObj(pod), "container", containerSpec.Name, "claimName", actualClaimName)
+					logger.V(4).Info("Could not find claim info for resource claim", "container", containerSpec.Name, "claimName", actualClaimName)
 					return
 				}
 
@@ -852,26 +965,34 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 				// Clear previous health entries before adding current ones.
 				resStatus.Resources = []v1.ResourceHealth{}
 
+				// Use a map to track resourceIDs we've already added to avoid duplicates.
+				// Multiple devices in claimInfo.DriverState may have the same resourceID
+				// (e.g., when using the same CDI device ID), so we need to deduplicate.
+				seenResourceIDs := make(map[v1.ResourceID]bool)
+
 				for driverName, driverState := range claimInfo.DriverState {
 					for _, device := range driverState.Devices {
-						healthStr := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
-
-						var health v1.ResourceHealthStatus
-						switch healthStr {
-						case "Healthy":
-							health = v1.ResourceHealthStatusHealthy
-						case "Unhealthy":
-							health = v1.ResourceHealthStatusUnhealthy
-						default:
-							health = v1.ResourceHealthStatusUnknown
+						// Skip devices that don't match the request we're reporting for.
+						// Use BaseRequestRef to handle subrequests (e.g., "request/subrequest" -> "request")
+						// since device.RequestNames are stored with subrequest suffixes stripped.
+						if claim.Request != "" && len(device.RequestNames) > 0 && !slices.Contains(device.RequestNames, resourceclaim.BaseRequestRef(claim.Request)) {
+							continue
 						}
 
-						resourceHealth := v1.ResourceHealth{Health: health}
-						if len(device.CDIDeviceIDs) > 0 {
-							resourceHealth.ResourceID = v1.ResourceID(device.CDIDeviceIDs[0])
-						} else {
-							resourceHealth.ResourceID = v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, device.PoolName, device.DeviceName))
+						healthInfo := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
+						resourceHealth := buildResourceHealth(
+							driverName,
+							device,
+							healthInfo,
+							enableHealthMessage,
+						)
+
+						// Skip if we've already added this resourceID
+						if seenResourceIDs[resourceHealth.ResourceID] {
+							continue
 						}
+						seenResourceIDs[resourceHealth.ResourceID] = true
+
 						resStatus.Resources = append(resStatus.Resources, resourceHealth)
 					}
 				}
@@ -889,15 +1010,80 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 	}
 }
 
+func toResourceHealthStatus(health state.DeviceHealthStatus) v1.ResourceHealthStatus {
+	switch health {
+	case state.DeviceHealthStatusHealthy:
+		return v1.ResourceHealthStatusHealthy
+	case state.DeviceHealthStatusUnhealthy:
+		return v1.ResourceHealthStatusUnhealthy
+	default:
+		return v1.ResourceHealthStatusUnknown
+	}
+}
+
+func buildResourceHealth(driverName string, device state.Device, healthInfo state.DeviceHealth, enableMessage bool) v1.ResourceHealth {
+	// Create the ResourceHealth entry
+	resourceHealth := v1.ResourceHealth{
+		Health: toResourceHealthStatus(healthInfo.Health),
+	}
+	if enableMessage && len(healthInfo.Message) > 0 {
+		resourceHealth.Message = &healthInfo.Message
+	}
+	// Use first CDI device ID as ResourceID, with fallback
+	if len(device.CDIDeviceIDs) > 0 {
+		resourceHealth.ResourceID = v1.ResourceID(device.CDIDeviceIDs[0])
+	} else {
+		resourceHealth.ResourceID = v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, device.PoolName, device.DeviceName))
+	}
+	return resourceHealth
+}
+
+func toDeviceHealthStatus(health drahealthv1.HealthStatus) state.DeviceHealthStatus {
+	switch health {
+	case drahealthv1.HealthStatus_HEALTHY:
+		return state.DeviceHealthStatusHealthy
+	case drahealthv1.HealthStatus_UNHEALTHY:
+		return state.DeviceHealthStatusUnhealthy
+	default:
+		return state.DeviceHealthStatusUnknown
+	}
+}
+
+func buildDeviceHealth(logger klog.Logger, device *drahealthv1.DeviceHealth) state.DeviceHealth {
+	// Extract the health check timeout from the gRPC response
+	// If not specified, zero, or negative, use the default timeout
+	timeout := DefaultHealthTimeout
+	timeoutSeconds := device.GetHealthCheckTimeoutSeconds()
+	if timeoutSeconds > 0 {
+		timeout = time.Duration(timeoutSeconds) * time.Second
+	} else if timeoutSeconds < 0 {
+		// Log warning for negative timeout values and use default
+		logger.V(4).Info("Ignoring negative health check timeout, using default",
+			"poolName", device.GetDevice().GetPoolName(),
+			"deviceName", device.GetDevice().GetDeviceName(),
+			"providedTimeout", timeoutSeconds,
+			"defaultTimeout", DefaultHealthTimeout)
+	}
+	return state.DeviceHealth{
+		PoolName:           device.GetDevice().GetPoolName(),
+		DeviceName:         device.GetDevice().GetDeviceName(),
+		Health:             toDeviceHealthStatus(device.GetHealth()),
+		LastUpdated:        time.Unix(device.GetLastUpdatedTime(), 0),
+		HealthCheckTimeout: timeout,
+		Message:            truncateHealthMessage(device.GetMessage()),
+	}
+}
+
 // HandleWatchResourcesStream processes health updates from the DRA plugin.
-func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, pluginName string) error {
-	logger := klog.FromContext(ctx)
+func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, pluginName string) error {
+	logger := klog.FromContext(ctx).WithName("dra-manager")
+	logger = klog.LoggerWithValues(logger, "pluginName", pluginName)
 
 	defer func() {
-		logger.V(4).Info("Clearing health cache for driver upon stream exit", "pluginName", pluginName)
+		logger.V(4).Info("Clearing health cache for driver upon stream exit")
 		// Use a separate context for clearDriver if needed, though background should be fine.
-		if err := m.healthInfoCache.clearDriver(pluginName); err != nil {
-			logger.Error(err, "Failed to clear health info cache for driver", "pluginName", pluginName)
+		if err := m.healthInfoCache.clearDriver(logger, pluginName); err != nil {
+			logger.Error(err, "Failed to clear health info cache for driver")
 		}
 	}()
 
@@ -906,91 +1092,74 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 		if err != nil {
 			// Context canceled, normal shutdown.
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				logger.V(4).Info("Stopping health monitoring due to context cancellation", "pluginName", pluginName, "reason", err)
+				logger.V(4).Info("Stopping health monitoring due to context cancellation", "reason", err)
 				return err
 			}
 			// Stream closed cleanly by the server, get normal EOF.
 			if errors.Is(err, io.EOF) {
-				logger.V(4).Info("Stream ended with EOF", "pluginName", pluginName)
+				logger.V(4).Info("Stream ended with EOF")
 				return nil
 			}
+			// The driver advertises the health service but does not support
+			// health reporting. Not an error, the caller stops watching.
+			if status.Code(err) == codes.Unimplemented {
+				logger.V(4).Info("Driver does not support WatchResources", "reason", err)
+				return err
+			}
 			// Other errors are unexpected, log & return.
-			logger.Error(err, "Error receiving from WatchResources stream", "pluginName", pluginName)
+			logger.Error(err, "Error receiving from WatchResources stream")
 			return err
 		}
 
-		// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
+		// Convert drahealthv1.DeviceHealth to state.DeviceHealth
 		devices := make([]state.DeviceHealth, len(resp.GetDevices()))
 		for i, d := range resp.GetDevices() {
-			var health state.DeviceHealthStatus
-			switch d.GetHealth() {
-			case drahealthv1alpha1.HealthStatus_HEALTHY:
-				health = state.DeviceHealthStatusHealthy
-			case drahealthv1alpha1.HealthStatus_UNHEALTHY:
-				health = state.DeviceHealthStatusUnhealthy
-			default:
-				health = state.DeviceHealthStatusUnknown
-			}
-
-			// Extract the health check timeout from the gRPC response
-			// If not specified, zero, or negative, use the default timeout
-			timeout := DefaultHealthTimeout
-			timeoutSeconds := d.GetHealthCheckTimeoutSeconds()
-			if timeoutSeconds > 0 {
-				timeout = time.Duration(timeoutSeconds) * time.Second
-			} else if timeoutSeconds < 0 {
-				// Log warning for negative timeout values and use default
-				logger.V(4).Info("Ignoring negative health check timeout, using default",
-					"pluginName", pluginName,
-					"poolName", d.GetDevice().GetPoolName(),
-					"deviceName", d.GetDevice().GetDeviceName(),
-					"providedTimeout", timeoutSeconds,
-					"defaultTimeout", DefaultHealthTimeout)
-			}
-
-			devices[i] = state.DeviceHealth{
-				PoolName:           d.GetDevice().GetPoolName(),
-				DeviceName:         d.GetDevice().GetDeviceName(),
-				Health:             health,
-				LastUpdated:        time.Unix(d.GetLastUpdatedTime(), 0),
-				HealthCheckTimeout: timeout,
-			}
+			devices[i] = buildDeviceHealth(logger, d)
 		}
 
-		changedDevices, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
+		changedDevices, updateErr := m.healthInfoCache.updateHealthInfo(logger, pluginName, devices)
 		if updateErr != nil {
-			logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
+			logger.Error(updateErr, "Failed to update health info cache")
 		}
 		if len(changedDevices) > 0 {
-			logger.V(4).Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
+			logger.V(4).Info("Health info changed, checking affected pods", "changedDevicesCount", len(changedDevices))
 
-			podsToUpdate := sets.New[string]()
-
+			// Snapshot which pods use which of this plugin's devices. The
+			// claim info cache lock is then held once per report and only
+			// while building the index, independent of how many devices
+			// changed, so that a plugin sending large reports at a high
+			// rate cannot block DRA operations on the lock.
+			type deviceKey struct {
+				poolName   string
+				deviceName string
+			}
+			podsByDevice := make(map[deviceKey][]string)
 			m.cache.RLock()
-			for _, dev := range changedDevices {
-				for _, cInfo := range m.cache.claimInfo {
-					if driverState, ok := cInfo.DriverState[pluginName]; ok {
-						for _, allocatedDevice := range driverState.Devices {
-							if allocatedDevice.PoolName == dev.PoolName && allocatedDevice.DeviceName == dev.DeviceName {
-								podsToUpdate.Insert(cInfo.PodUIDs.UnsortedList()...)
-								break
-							}
-						}
+			for _, cInfo := range m.cache.claimInfo {
+				if driverState, ok := cInfo.DriverState[pluginName]; ok {
+					for _, allocatedDevice := range driverState.Devices {
+						key := deviceKey{poolName: allocatedDevice.PoolName, deviceName: allocatedDevice.DeviceName}
+						podsByDevice[key] = append(podsByDevice[key], cInfo.PodUIDs.UnsortedList()...)
 					}
 				}
 			}
 			m.cache.RUnlock()
 
+			podsToUpdate := sets.New[string]()
+			for _, dev := range changedDevices {
+				podsToUpdate.Insert(podsByDevice[deviceKey{poolName: dev.PoolName, deviceName: dev.DeviceName}]...)
+			}
+
 			if podsToUpdate.Len() > 0 {
 				podUIDs := podsToUpdate.UnsortedList()
-				logger.Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
+				logger.Info("Sending health update notification for pods", "pods", podUIDs)
 				select {
 				case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
 				default:
-					logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pluginName", pluginName, "pods", podUIDs)
+					logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pods", podUIDs)
 				}
 			} else {
-				logger.V(4).Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
+				logger.V(4).Info("Health info changed, but no active pods found using the affected devices")
 			}
 		}
 
@@ -1001,4 +1170,8 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 func (m *Manager) Updates() <-chan resourceupdates.Update {
 	// Return the internal channel that HandleWatchResourcesStream writes to.
 	return m.update
+}
+
+func (*Manager) podGroupResourceClaimsEnabled() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAWorkloadResourceClaims)
 }

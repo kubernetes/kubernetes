@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"slices"
 	"strings"
 	"testing"
 
@@ -176,19 +177,11 @@ func TestIsSuperset(t *testing.T) {
 		assert.False(t, isSuperset(tolerations[super], tolerations[sub]),
 			"%s should NOT be a superset of %s", super, sub)
 	}
-	contains := func(ss []string, s string) bool {
-		for _, str := range ss {
-			if str == s {
-				return true
-			}
-		}
-		return false
-	}
 
 	for _, test := range tests {
 		t.Run(test.toleration, func(t *testing.T) {
 			for name := range tolerations {
-				if name == test.toleration || contains(test.ss, name) {
+				if name == test.toleration || slices.Contains(test.ss, name) {
 					assertSuperset(t, test.toleration, name)
 				} else {
 					assertNotSuperset(t, test.toleration, name)

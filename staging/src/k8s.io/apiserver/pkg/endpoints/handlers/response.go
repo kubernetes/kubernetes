@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	"k8s.io/apiserver/pkg/endpoints/metrics"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/util/apihelpers"
@@ -193,7 +192,6 @@ func (e *watchEncoder) doEncode(obj runtime.Object, event watch.Event, w io.Writ
 		Type:   string(event.Type),
 		Object: runtime.RawExtension{Raw: e.buffer.Bytes()},
 	}
-	metrics.WatchEventsSizes.WithContext(e.ctx).WithLabelValues(e.groupVersionResource.Group, e.groupVersionResource.Version, e.groupVersionResource.Resource).Observe(float64(len(outEvent.Object.Raw)))
 
 	defer e.eventBuffer.Reset()
 	if err := e.encoder.Encode(outEvent, e.eventBuffer); err != nil {

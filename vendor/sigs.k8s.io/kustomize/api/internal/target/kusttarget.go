@@ -29,13 +29,14 @@ import (
 
 // KustTarget encapsulates the entirety of a kustomization build.
 type KustTarget struct {
-	kustomization *types.Kustomization
-	kustFileName  string
-	ldr           ifc.Loader
-	validator     ifc.Validator
-	rFactory      *resmap.Factory
-	pLdr          *loader.Loader
-	origin        *resource.Origin
+	kustomization     *types.Kustomization
+	kustFileName      string
+	ldr               ifc.Loader
+	validator         ifc.Validator
+	rFactory          *resmap.Factory
+	pLdr              *loader.Loader
+	origin            *resource.Origin
+	helmRootNamespace string // namespace inherited from parent kustomization for HelmCharts
 }
 
 // NewKustTarget returns a new instance of KustTarget.
@@ -496,6 +497,16 @@ func (kt *KustTarget) accumulateDirectory(
 	}
 	subKt.kustomization.BuildMetadata = kt.kustomization.BuildMetadata
 	subKt.origin = kt.origin
+	// Propagate namespace to child kustomization's helmRootNamespace for HelmCharts
+	// This ensures Helm charts in base kustomizations inherit namespace from overlays
+	// without affecting other transformers like patches
+	// Fixes https://github.com/kubernetes-sigs/kustomize/issues/6031
+	// Fixes https://github.com/kubernetes-sigs/kustomize/issues/6027
+	if kt.kustomization.Namespace != "" {
+		subKt.helmRootNamespace = kt.kustomization.Namespace
+	} else if kt.helmRootNamespace != "" {
+		subKt.helmRootNamespace = kt.helmRootNamespace
+	}
 	var bytes []byte
 	if openApiPath, exists := subKt.Kustomization().OpenAPI["path"]; exists {
 		bytes, err = ldr.Load(openApiPath)

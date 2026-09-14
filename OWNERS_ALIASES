@@ -168,10 +168,12 @@ aliases:
   # - verult
   sig-scheduling-maintainers:
     - ahg-g
+    - ania-borowiec
     - dom4ha
     - Huang-Wei
     - kerthcet
     - macsko
+    - mm4tt
     - sanposhiho
   # emeritus:
   # - alculquicondor
@@ -181,14 +183,19 @@ aliases:
   # - ravisantoshgudimetla
   # - wojtek-t
   sig-scheduling:
+    - ania-borowiec
     - AxeZhan
+    - brejman
     - damemi
     - denkensk
     - dom4ha
     - macsko
+    - mm4tt
     - sanposhiho
+    - tosi3k
     - utam0k
     - kerthcet
+    - Argh4k
   # emeritus:
   # - adtac
   # - liu-cong
@@ -280,6 +287,8 @@ aliases:
     - ffromani
     - tallclair
     - natasha41575
+    - ndixita
+    - harche
   sig-network-approvers:
     - aojea
     - bowei
@@ -322,49 +331,52 @@ aliases:
 
   sig-autoscaling-maintainers:
     - adrianmoisey
-    - gjtempleton
     - jackfrancis
+    - omerap12
     - towca
   # emeritus
   # - maciekpytel
   # - mwielgus
   # - raywainman
+  # - gjtempleton
   sig-instrumentation-approvers:
-    - logicalhan
     - dashpole
     - RainbowMango
     - serathius
     - dgrisonnet
     - rexagod
     - richabanker
+    - pohly
+  # sig-instrumentation-emeritus
+  # - brancz
+  # - DirectXMan12
+  # - ehashman
+  # - logicalhan
   sig-instrumentation-reviewers:
     - dashpole
     - s-urbaniak
     - coffeepac
-    - logicalhan
     - RainbowMango
     - serathius
     - dgrisonnet
     - pohly
     - mengjiao-liu
+    - nmn3m
     - rexagod
     - richabanker
-  # sig-instrumentation-emeritus
-  # - brancz
-  # - DirectXMan12
-  # - ehashman
-
   api-approvers:
     - deads2k
     - msau42
     - smarterclayton
     - thockin
     - liggitt
+    - jpbetz
   # subsets of api-approvers by sig area to help focus approval requests to those with domain knowledge
   sig-api-machinery-api-approvers:
     - deads2k
     - liggitt
     - smarterclayton
+    - jpbetz
   sig-apps-api-approvers:
     - deads2k
     - liggitt
@@ -380,6 +392,11 @@ aliases:
   sig-cloud-provider-api-approvers:
     - liggitt
     - thockin
+  sig-cloud-provider-leads:
+    - bridgetkromhout
+    - cheftako
+    - elmiko
+    - joelspeed
   sig-cluster-lifecycle-api-approvers:
     - deads2k
     - liggitt
@@ -430,6 +447,7 @@ aliases:
     - saad-ali
     - luxas
     - janetkuo
+    - jpbetz
     - justinsb
     - pwittrock
     - tallclair
@@ -536,12 +554,18 @@ aliases:
     - soltysh
     - liggitt
   dep-reviewers:
-    - logicalhan
+    - BenTheElder
+    - cblecker
+    - dims
+    - thockin
+    - sttts
+    - soltysh
+    - liggitt
   feature-approvers:
     - adrianmoisey # Autoscaling
-    - andrewsykim # Cloud Provider
     - ardaguclu # CLI
     - aojea # Network, Testing
+    - cheftako # Cloud Provider
     - danwinship # Network
     - dashpole # Instrumentation
     - dchen1107 # Node
@@ -551,24 +575,26 @@ aliases:
     - dims # Architecture
     - dom4ha # Scheduling
     - eddiezane # CLI
+    - elmiko # Cloud Provider
     - enj # Auth
-    - gjtempleton # Autoscaling
     - jackfrancis # Autoscaling
     - janetkuo # Apps
     - jayunit100 # Windows
+    - joelspeed # Cloud Provider
     - jpbetz # API Machinery
     - jsafrane # Storage
     - jsturtevant # Windows
     - justinsb # Cluster Lifecycle
     - kow3ns # Apps
     - liggitt # Auth
-    - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
     - macsko # Scheduling
     - marosset # Windows
     - mikezappa87 # Network
     - mrunalp # Node
     - msau42 # Storage
+    - omerap12 # Autoscaling
+    - pohly # Instrumentation
     - rexagod # Instrumentation
     - richabanker # Instrumentation
     - saad-ali # Storage
@@ -582,8 +608,11 @@ aliases:
     - towca # Autoscaling
     - xing-yang # Storage
     - wojtek-t # Scalability
+  # feature-approvers-emeritus:
+  # - logicalhan # Instrumentation
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
   conformance-behavior-approvers:
+    - BenTheElder
     - smarterclayton
     - johnbelamaric
     - dims

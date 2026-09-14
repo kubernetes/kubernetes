@@ -77,7 +77,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			var nodes []*v1.Node
-			for i := 0; i < nodeCount; i++ {
+			for i := range nodeCount {
 				node := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   fmt.Sprintf("testnode-%d", i),
@@ -390,7 +390,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			}
 
 			var nodes []*v1.Node
-			for i := 0; i < nodeCount; i++ {
+			for i := range nodeCount {
 				node := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("node-%d", i),

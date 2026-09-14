@@ -29,6 +29,19 @@ trap "cleanup" EXIT SIGINT
 
 cleanup
 
+# Ensure model-schema generator matches the version from
+# k8s.io/kubernetes/pkg/generated/openapi/cmd/models-schema/main.go
+echo "Ensuring models-schema is up-to-date"
+K8S_MODELS_SCHEMA="${SCRIPT_ROOT}/../../../../pkg/generated/openapi/cmd/models-schema/main.go"
+SAMPLE_APISERVER_MODELS_SCHEMA="${SCRIPT_ROOT}/pkg/generated/openapi/cmd/models-schema/main.go"
+# these two files will only differ in the imported lines for generated openapi
+if ! diff -I "k8s.io/kubernetes/pkg/generated/openapi" \
+  -I "k8s.io/sample-apiserver/pkg/generated/openapi" \
+  "${K8S_MODELS_SCHEMA}" "${SAMPLE_APISERVER_MODELS_SCHEMA}"; then
+  echo "${SAMPLE_APISERVER_MODELS_SCHEMA} is out of date. Compare changes with ${K8S_MODELS_SCHEMA}"
+  exit 1
+fi
+
 mkdir -p "${TMP_DIFFROOT}"
 cp -a "${DIFFROOT}"/* "${TMP_DIFFROOT}"
 

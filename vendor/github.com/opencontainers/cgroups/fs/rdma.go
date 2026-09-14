@@ -11,6 +11,11 @@ func (s *RdmaGroup) Name() string {
 	return "rdma"
 }
 
+// ID returns the controller ID for rdma subsystem.
+func (s *RdmaGroup) ID() cgroups.Controller {
+	return cgroups.RDMA
+}
+
 func (s *RdmaGroup) Apply(path string, _ *cgroups.Resources, pid int) error {
 	return apply(path, pid)
 }

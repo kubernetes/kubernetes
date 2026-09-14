@@ -60,7 +60,7 @@ const (
 
 type ActivePodsFunc func() []*v1.Pod
 
-type GetNodeFunc func() (*v1.Node, error)
+type GetNodeFunc func(context.Context) (*v1.Node, error)
 
 // Manages the containers running on a machine.
 type ContainerManager interface {
@@ -93,12 +93,12 @@ type ContainerManager interface {
 	GetNodeAllocatableReservation() v1.ResourceList
 
 	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
-	GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList
+	GetCapacity(logger klog.Logger, localStorageCapacityIsolation bool) v1.ResourceList
 
 	// GetDevicePluginResourceCapacity returns the node capacity (amount of total device plugin resources),
 	// node allocatable (amount of total healthy resources reported by device plugin),
 	// and inactive device plugin resources previously registered on the node.
-	GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string)
+	GetDevicePluginResourceCapacity(logger klog.Logger) (v1.ResourceList, v1.ResourceList, []string)
 
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
@@ -115,7 +115,7 @@ type ContainerManager interface {
 	// any registered device plugin resource
 	UpdatePluginResources(*schedulerframework.NodeInfo, *lifecycle.PodAdmitAttributes) error
 
-	InternalContainerLifecycle() InternalContainerLifecycle
+	InternalContainerLifecycle(logger klog.Logger) InternalContainerLifecycle
 
 	// GetPodCgroupRoot returns the cgroup which contains all pods.
 	GetPodCgroupRoot() string
@@ -134,7 +134,7 @@ type ContainerManager interface {
 	ShouldResetExtendedResourceCapacity() bool
 
 	// GetAllocateResourcesPodAdmitHandler returns an instance of a PodAdmitHandler responsible for allocating pod resources.
-	GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler
+	GetAllocateResourcesPodAdmitHandler(logger klog.Logger) lifecycle.PodAdmitHandler
 
 	// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
 	GetNodeAllocatableAbsolute() v1.ResourceList
@@ -150,17 +150,17 @@ type ContainerManager interface {
 	PodMightNeedToUnprepareResources(UID types.UID) bool
 
 	// UpdateAllocatedResourcesStatus updates the status of allocated resources for the pod.
-	UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus)
+	UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, status *v1.PodStatus)
 
 	// Updates returns a channel that receives an Update when the device changed its status.
 	Updates() <-chan resourceupdates.Update
 
 	// PodHasExclusiveCPUs returns true if the provided pod has containers with exclusive CPUs,
 	// This means that at least one sidecar container or one app container has exclusive CPUs allocated.
-	PodHasExclusiveCPUs(pod *v1.Pod) bool
+	PodHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod) bool
 
 	// ContainerHasExclusiveCPUs returns true if the provided container in the pod has exclusive cpu
-	ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool
+	ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool
 
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider
@@ -193,6 +193,8 @@ type NodeConfig struct {
 	CPUManagerReconcilePeriod    time.Duration
 	MemoryManagerPolicy          string
 	MemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
+	MemoryReservationPolicy      kubeletconfig.MemoryReservationPolicy
+	MemoryThrottlingFactor       *float64
 	PodPidsLimit                 int64
 	EnforceCPULimits             bool
 	CPUCFSQuotaPeriod            time.Duration
@@ -224,25 +226,25 @@ func int64Slice(in []int) []int64 {
 	return out
 }
 
-func podHasExclusiveCPUs(cr cpuAllocationReader, pod *v1.Pod) bool {
+func podHasExclusiveCPUs(logger klog.Logger, cr cpuAllocationReader, pod *v1.Pod) bool {
 	for _, container := range pod.Spec.InitContainers {
-		if containerHasExclusiveCPUs(cr, pod, &container) {
+		if containerHasExclusiveCPUs(logger, cr, pod, &container) {
 			return true
 		}
 	}
 	for _, container := range pod.Spec.Containers {
-		if containerHasExclusiveCPUs(cr, pod, &container) {
+		if containerHasExclusiveCPUs(logger, cr, pod, &container) {
 			return true
 		}
 	}
-	klog.V(4).InfoS("Pod contains no container with pinned cpus", "podName", pod.Name)
+	logger.V(4).Info("Pod contains no container with pinned cpus", "podName", pod.Name)
 	return false
 }
 
-func containerHasExclusiveCPUs(cr cpuAllocationReader, pod *v1.Pod, container *v1.Container) bool {
+func containerHasExclusiveCPUs(logger klog.Logger, cr cpuAllocationReader, pod *v1.Pod, container *v1.Container) bool {
 	exclusiveCPUs := cr.GetExclusiveCPUs(string(pod.UID), container.Name)
 	if !exclusiveCPUs.IsEmpty() {
-		klog.V(4).InfoS("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
+		logger.V(4).Info("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
 		return true
 	}
 	return false

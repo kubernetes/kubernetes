@@ -178,7 +178,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			}
 
 			// Two lists that are both empty and both non nil are equal
-			if v1.Len() == 0 || v2.Len() == 0 {
+			if v1.Len() == 0 && v2.Len() == 0 {
 				return true
 			}
 		}
@@ -199,7 +199,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			return v1.IsNil() == v2.IsNil()
 		}
 		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, equateNilAndEmpty, depth+1)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, equateNilAndEmpty, depth+1)
 	case reflect.Struct:
 		for i, n := 0, v1.NumField(); i < n; i++ {
@@ -229,7 +229,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			}
 
 			// Two maps that are both empty and both non nil are equal
-			if v1.Len() == 0 || v2.Len() == 0 {
+			if v1.Len() == 0 && v2.Len() == 0 {
 				return true
 			}
 		}

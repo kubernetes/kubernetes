@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -191,7 +190,7 @@ func (mfc *monitorFakeCmd) Stop() {
 
 func TestIPTablesMonitor(t *testing.T) {
 	mfe := newMonitorFakeExec()
-	ipt := newInternal(mfe, ProtocolIPv4, "", "")
+	ipt := newInternal(mfe, ProtocolIPv4)
 
 	var reloads uint32
 	stopCh := make(chan struct{})

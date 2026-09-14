@@ -35,7 +35,7 @@ var _ Scope = &noneScope{}
 func NewNoneScope() Scope {
 	return &noneScope{
 		scope{
-			name:             noneTopologyScope,
+			name:             NoneTopologyScope,
 			podTopologyHints: podTopologyHints{},
 			policy:           NewNonePolicy(),
 			podMap:           containermap.NewContainerMap(),
@@ -43,6 +43,6 @@ func NewNoneScope() Scope {
 	}
 }
 
-func (s *noneScope) Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult {
-	return s.admitPolicyNone(pod)
+func (s *noneScope) Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
+	return s.admitPolicyNone(ctx, pod, operation)
 }

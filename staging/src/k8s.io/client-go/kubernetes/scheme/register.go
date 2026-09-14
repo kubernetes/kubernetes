@@ -33,8 +33,6 @@ import (
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
-	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -53,6 +51,7 @@ import (
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -68,11 +67,12 @@ import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagemigrationv1 "k8s.io/api/storagemigration/v1"
 	storagemigrationv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -99,8 +99,6 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	authorizationv1beta1.AddToScheme,
 	autoscalingv1.AddToScheme,
 	autoscalingv2.AddToScheme,
-	autoscalingv2beta1.AddToScheme,
-	autoscalingv2beta2.AddToScheme,
 	batchv1.AddToScheme,
 	batchv1beta1.AddToScheme,
 	certificatesv1.AddToScheme,
@@ -119,6 +117,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	flowcontrolv1beta1.AddToScheme,
 	flowcontrolv1beta2.AddToScheme,
 	flowcontrolv1beta3.AddToScheme,
+	lifecyclev1alpha1.AddToScheme,
 	networkingv1.AddToScheme,
 	networkingv1beta1.AddToScheme,
 	nodev1.AddToScheme,
@@ -133,12 +132,13 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	resourcev1beta2.AddToScheme,
 	resourcev1beta1.AddToScheme,
 	resourcev1alpha3.AddToScheme,
-	schedulingv1alpha1.AddToScheme,
+	schedulingv1alpha3.AddToScheme,
 	schedulingv1beta1.AddToScheme,
 	schedulingv1.AddToScheme,
 	storagev1beta1.AddToScheme,
 	storagev1.AddToScheme,
 	storagev1alpha1.AddToScheme,
+	storagemigrationv1.AddToScheme,
 	storagemigrationv1beta1.AddToScheme,
 }
 

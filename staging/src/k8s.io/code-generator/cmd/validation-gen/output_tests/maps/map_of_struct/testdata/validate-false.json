@@ -14,6 +14,28 @@
       "field Struct.MapField[*]",
       "type OtherStruct"
     ],
+    "mapPtrField": [
+      "field Struct.MapPtrField"
+    ],
+    "mapPtrField[\u003eóǲ岋笨Gń條]": [
+      "field Struct.MapPtrField[*]",
+      "type OtherStruct"
+    ],
+    "mapPtrField[]": [
+      "field Struct.MapPtrField[*]",
+      "type OtherStruct"
+    ],
+    "mapPtrTypedefField": [
+      "field Struct.MapPtrTypedefField"
+    ],
+    "mapPtrTypedefField[v$蛷)讻IeYF墄[C_睿ȉǫ蹟t´]": [
+      "field Struct.MapPtrTypedefField[*]",
+      "type OtherTypedefStruct"
+    ],
+    "mapPtrTypedefField[ș$0đ\u003eƯ]ɹȽ東]": [
+      "field Struct.MapPtrTypedefField[*]",
+      "type OtherTypedefStruct"
+    ],
     "mapTypedefField": [
       "field Struct.MapTypedefField"
     ],

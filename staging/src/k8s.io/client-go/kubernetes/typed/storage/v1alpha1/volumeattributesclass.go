@@ -41,6 +41,7 @@ type VolumeAttributesClassInterface interface {
 	Create(ctx context.Context, volumeAttributesClass *storagev1alpha1.VolumeAttributesClass, opts v1.CreateOptions) (*storagev1alpha1.VolumeAttributesClass, error)
 	Update(ctx context.Context, volumeAttributesClass *storagev1alpha1.VolumeAttributesClass, opts v1.UpdateOptions) (*storagev1alpha1.VolumeAttributesClass, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*storagev1alpha1.VolumeAttributesClass, error)
 	List(ctx context.Context, opts v1.ListOptions) (*storagev1alpha1.VolumeAttributesClassList, error)

@@ -1,3 +1,86 @@
+## 2.32.0
+
+`-fd` generate RSpec-style documentation output.  Thank @woodie !
+--sleep-on-failure pauses a failed spec before teardown. Thanks @qinqon !
+
+## 2.31.0
+
+Add a bunch of Claude Skills via the marketplace:
+
+```
+/plugin marketplace add onsi/ginkgo
+/plugin install ginkgo@ginkgo
+```
+
+## 2.30.0
+
+### Features
+Ginkgo now allows `extentions/global.Reset` to support running multiple suites from within a single process.  This may take some massaging on your part (see [1672](https://github.com/onsi/ginkgo/issues/1672)) but can dramatically speed up codebases with O(hundreds) of test suites.
+
+Thanks @lawrencejones !
+
+### Fixes
+
+- Fix nested --github-output group for progress report nested inside timeline [4f62d7a]
+
+## 2.29.0
+
+`GinkgoHelperGo` makes it easier to write test helpers that need to run in goroutines.  Specifically, it makes managing the failure state and capturing failure panics correctly straightforward.
+
+`ginkgo outline` now includes entries defined in `DescribeTableSubtree`
+
+## 2.28.3
+
+### Maintenance
+Bump all dependencies
+
+## 2.28.2
+
+- Add ArtifactDir() to support Go 1.26 testing.TB interface [f3a36b6]
+- Implement shell completion [94151c8]
+- Add asan CLI option mirroring msan implementation [4d21dbb]
+- Bump uri from 1.0.3 to 1.0.4 in /docs (#1630) [c102161]
+- fix aspect ratio [9619647]
+- update logos [5779304]
+
+## 2.28.1
+
+Update all dependencies.  This auto-updated the required version of Go to 1.24, consistent with the fact that Go 1.23 has been out of support for almost six months.
+
+## 2.28.0
+
+Ginkgo's SemVer filter now supports filtering multiple components by SemVer version:
+
+```go
+It("should work in a specific version range (1.0.0, 2.0.0) and third-party dependency redis in [8.0.0, ~)", SemVerConstraint(">= 3.2.0"), ComponentSemVerConstraint("redis", ">= 8.0.0") func() {
+    // This test will only run when version is between 1.0.0 (exclusive) and 2.0.0 (exclusive) and redis version is >= 8.0.0
+})
+```
+
+can be filtered in or out with an invocation like:
+
+```bash
+ginkgo --sem-ver-filter="2.1.1, redis=8.2.0"
+```
+
+Huge thanks to @Icarus9913 for working on this!
+
+## 2.27.5
+
+### Fixes
+Don't make a new formatter for each GinkgoT(); that's just silly and uses precious memory
+
+## 2.27.4
+
+### Fixes
+- CurrentTreeConstructionNodeReport: fix for nested container nodes [59bc751]
+
+## 2.27.3
+
+### Fixes
+report exit result in case of failure [1c9f356]
+fix data race [ece19c8]
+
 ## 2.27.2
 
 ### Fixes

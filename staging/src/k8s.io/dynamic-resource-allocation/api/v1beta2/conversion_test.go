@@ -25,6 +25,8 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	apitest "k8s.io/dynamic-resource-allocation/api/internal/test"
 )
 
 func TestConversion(t *testing.T) {
@@ -334,4 +336,34 @@ func TestConversion(t *testing.T) {
 		})
 	}
 
+}
+
+// TestConversionRoundTrip verifies that the automatically generated and
+// hand-written conversion code for the DRA API correctly round-trips
+// between v1beta2 and v1. For each non-list type registered in v1beta2,
+// a fuzzed object is converted to v1 and back, and the result must be
+// equal to the original.
+//
+// Note that this only covers conversion code which is called
+// while converting the top-level API types. Types embedded
+// inside those have their own conversion functions, but those
+// are not necessarily called.
+func TestConversionRoundTrip(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := resourceapi.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := resourcev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	filler := apitest.NewFiller(t, scheme, nil)
+
+	apitest.ConversionRoundTrip(t, scheme, filler,
+		schema.GroupVersion{Group: resourcev1beta2.GroupName, Version: "v1beta2"},
+		schema.GroupVersion{Group: resourceapi.GroupName, Version: "v1"},
+	)
 }

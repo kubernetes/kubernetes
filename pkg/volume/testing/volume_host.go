@@ -173,11 +173,6 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 	return plug.NewUnmounter(spec.Name(), podUID)
 }
 
-// Returns the hostname of the host kubelet is running on
-func (f *fakeVolumeHost) GetHostName() string {
-	return "fakeHostName"
-}
-
 func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
@@ -406,8 +401,8 @@ func (f *fakeKubeletVolumeHost) GetHostUtil() hostutil.HostUtils {
 	return f.hostUtil
 }
 
-func (f *fakeKubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error) {
-	ctb, err := f.kubeClient.CertificatesV1beta1().ClusterTrustBundles().Get(context.Background(), name, metav1.GetOptions{})
+func (f *fakeKubeletVolumeHost) GetTrustAnchorsByName(ctx context.Context, name string, allowMissing bool) ([]byte, error) {
+	ctb, err := f.kubeClient.CertificatesV1().ClusterTrustBundles().Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("while getting ClusterTrustBundle %s: %w", name, err)
 	}
@@ -416,8 +411,8 @@ func (f *fakeKubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing 
 }
 
 // Note: we do none of the deduplication and sorting that the real deal should do.
-func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
-	ctbList, err := f.kubeClient.CertificatesV1beta1().ClusterTrustBundles().List(context.Background(), metav1.ListOptions{})
+func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(ctx context.Context, signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
+	ctbList, err := f.kubeClient.CertificatesV1().ClusterTrustBundles().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("while listing all ClusterTrustBundles: %w", err)
 	}

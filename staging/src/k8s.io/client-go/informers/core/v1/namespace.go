@@ -25,6 +25,7 @@ import (
 	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -33,11 +34,39 @@ import (
 )
 
 // NamespaceInformer provides access to a shared informer and lister for
-// Namespaces.
+// Namespaces. Prefer using the type-safe variant (see [TypedNamespaceInformer]).
 type NamespaceInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.NamespaceLister
 }
+
+// TypedNamespaceInformer provides access to a shared informer and lister for
+// Namespaces, including the type-safe TypedInformer variant.
+// It is a superset of NamespaceInformer.
+type TypedNamespaceInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() NamespaceIndexInformer
+	Lister() corev1.NamespaceLister
+}
+
+// NamespaceIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type NamespaceIndexInformer cache.TypedSharedIndexInformer[*apicorev1.Namespace]
+
+// NamespaceHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Namespace.
+type NamespaceHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apicorev1.Namespace]
+
+// NamespaceDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Namespace.
+type NamespaceDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apicorev1.Namespace]
+
+// NamespaceFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Namespace.
+type NamespaceFilteringHandler = cache.TypedFilteringResourceEventHandler[*apicorev1.Namespace]
+
+// NamespaceIndexers is a specialization of [cache.TypedIndexers] for Namespace.
+type NamespaceIndexers = cache.TypedIndexers[*apicorev1.Namespace]
+
+// DeletedNamespace is a specialization of [cache.DeletedObject] for Namespace.
+type DeletedNamespace = cache.DeletedObject[*apicorev1.Namespace]
 
 type namespaceInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -47,55 +76,132 @@ type namespaceInformer struct {
 // NewNamespaceInformer constructs a new informer for Namespace type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedNamespaceInformer]).
 func NewNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredNamespaceInformer(client, resyncPeriod, indexers, nil)
+	return NewNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedNamespaceInformer constructs a new informer for Namespace type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers NamespaceIndexers) NamespaceIndexInformer {
+	return NewTypedNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredNamespaceInformer constructs a new informer for Namespace type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredNamespaceInformer]).
 func NewFilteredNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewTypedNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredNamespaceInformer constructs a new informer for Namespace type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers NamespaceIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) NamespaceIndexInformer {
+	return NewTypedNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewNamespaceInformerWithOptions constructs a new informer for Namespace type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedNamespaceInformerWithOptions]).
+func NewNamespaceInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedNamespaceInformerWithOptions(client, options)
+}
+
+// NewTypedNamespaceInformerWithOptions constructs a new informer for Namespace type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedNamespaceInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) NamespaceIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Namespace](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CoreV1().Namespaces().List(context.Background(), options)
+				return client.CoreV1().Namespaces().List(context.Background(), opts)
 			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CoreV1().Namespaces().Watch(context.Background(), options)
+				return client.CoreV1().Namespaces().Watch(context.Background(), opts)
 			},
-			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+			ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CoreV1().Namespaces().List(ctx, options)
+				return client.CoreV1().Namespaces().List(ctx, opts)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CoreV1().Namespaces().Watch(ctx, options)
+				return client.CoreV1().Namespaces().Watch(ctx, opts)
 			},
 		}, client),
 		&apicorev1.Namespace{},
-		resyncPeriod,
-		indexers,
-	)
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
+		},
+	))
 }
 
 func (f *namespaceInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredNamespaceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.Namespace{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *namespaceInformer) TypedInformer() NamespaceIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Namespace](f.factory.InformerFor(&apicorev1.Namespace{}, f.defaultInformer))
 }
 
 func (f *namespaceInformer) Lister() corev1.NamespaceLister {
 	return corev1.NewNamespaceLister(f.Informer().GetIndexer())
+}
+
+// ToTypedNamespaceInformer converts an untyped informer into a TypedNamespaceInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Namespace. If that is not the case, calling type-safe methods of the returned
+// TypedNamespaceInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedNamespaceInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedNamespaceInformer(informer NamespaceInformer) TypedNamespaceInformer {
+	if informer, ok := informer.(TypedNamespaceInformer); ok {
+		return informer
+	}
+	return &namespaceTypedInformerAdapter{informer}
+}
+
+type namespaceTypedInformerAdapter struct {
+	NamespaceInformer
+}
+
+func (a *namespaceTypedInformerAdapter) TypedInformer() NamespaceIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Namespace](a.Informer())
+}
+
+// ToNamespaceIndexInformer converts an untyped informer into a NamespaceIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Namespace. If that is not the case, calling type-safe methods of the returned
+// NamespaceIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a NamespaceIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToNamespaceIndexInformer(informer cache.SharedIndexInformer) NamespaceIndexInformer {
+	if informer, ok := informer.(NamespaceIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Namespace](informer)
 }

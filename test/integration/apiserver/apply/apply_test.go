@@ -855,7 +855,7 @@ func TestApplyGroupsManySeparateUpdates(t *testing.T) {
 		t.Fatalf("Failed to create object using Apply patch: %v", err)
 	}
 
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		unique := fmt.Sprintf("updater%v", i)
 		object, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
 			AbsPath("/apis/admissionregistration.k8s.io/v1").
@@ -906,7 +906,7 @@ func TestCreateVeryLargeObject(t *testing.T) {
 		Data: map[string]string{},
 	}
 
-	for i := 0; i < 9999; i++ {
+	for i := range 9999 {
 		unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
 		cfg.Data[unique] = "A"
 	}
@@ -965,7 +965,7 @@ func TestUpdateVeryLargeObject(t *testing.T) {
 		}
 
 		// Apply the large update, then attempt to push it to the apiserver.
-		for i := 0; i < 9999; i++ {
+		for i := range 9999 {
 			unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
 			updateCfg.Data[unique] = "A"
 		}
@@ -1020,7 +1020,7 @@ func TestPatchVeryLargeObject(t *testing.T) {
 	}
 
 	patchString := `{"data":{"k":"v"`
-	for i := 0; i < 9999; i++ {
+	for i := range 9999 {
 		unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
 		patchString = fmt.Sprintf("%s,%q:%q", patchString, unique, "A")
 	}
@@ -1081,7 +1081,7 @@ func TestPatchVeryLargeObjectCBORApply(t *testing.T) {
 	}
 
 	patchString := `{"data":{"k":"v"`
-	for i := 0; i < 9999; i++ {
+	for i := range 9999 {
 		unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
 		patchString = fmt.Sprintf("%s,%q:%q", patchString, unique, "A")
 	}
@@ -1672,9 +1672,9 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		APIVersion: "apps/v1",
 		Time:       actual.Time,
 		FieldsType: "FieldsV1",
-		FieldsV1: &metav1.FieldsV1{
-			Raw: []byte(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{".":{},"f:image":{},"f:name":{}}}}}}}`),
-		},
+		FieldsV1: metav1.NewFieldsV1(
+			`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{".":{},"f:image":{},"f:name":{}}}}}}}`,
+		),
 	}
 
 	if !reflect.DeepEqual(actual, expected) {
@@ -3015,9 +3015,7 @@ func benchPostPod(client clientset.Interface, pod v1.Pod, parallel int) func(*te
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			c := make(chan error)
-			for j := 0; j < parallel; j++ {
-				j := j
-				i := i
+			for j := range parallel {
 				go func(pod v1.Pod) {
 					pod.Name = fmt.Sprintf("post%d-%d-%d-%d", parallel, b.N, j, i)
 					_, err := client.CoreV1().RESTClient().Post().
@@ -3028,7 +3026,7 @@ func benchPostPod(client clientset.Interface, pod v1.Pod, parallel int) func(*te
 					c <- err
 				}(pod)
 			}
-			for j := 0; j < parallel; j++ {
+			for range parallel {
 				err := <-c
 				if err != nil {
 					b.Fatal(err)
@@ -3062,7 +3060,7 @@ func benchListPod(client clientset.Interface, pod v1.Pod, num int) func(*testing
 			b.Fatal(err)
 		}
 		// Create pods
-		for i := 0; i < num; i++ {
+		for i := range num {
 			pod.Name = fmt.Sprintf("get-%d-%d", b.N, i)
 			pod.Namespace = namespace
 			_, err := client.CoreV1().RESTClient().Post().
@@ -3320,7 +3318,7 @@ func TestRenamingAppliedFieldManagers(t *testing.T) {
 		t.Fatalf("Expected object to have 1 managed fields entry, got: %d", len(managedFields))
 	}
 	entry := managedFields[0]
-	if entry.Manager != "multi_manager" || entry.Operation != "Apply" || string(entry.FieldsV1.Raw) != `{"f:metadata":{"f:labels":{"f:b":{}}}}` {
+	if entry.Manager != "multi_manager" || entry.Operation != "Apply" || entry.FieldsV1.GetRawString() != `{"f:metadata":{"f:labels":{"f:b":{}}}}` {
 		t.Fatalf(`Unexpected entry, got: %v`, entry)
 	}
 }
@@ -3420,7 +3418,7 @@ func TestRenamingUpdatedFieldManagers(t *testing.T) {
 		t.Fatalf("Expected object to have 2 managed fields entries, got: %d", len(managedFields))
 	}
 	entry := managedFields[1]
-	if entry.Manager != "multi_manager" || entry.Operation != "Update" || string(entry.FieldsV1.Raw) != `{"f:metadata":{"f:labels":{"f:b":{}}}}` {
+	if entry.Manager != "multi_manager" || entry.Operation != "Update" || entry.FieldsV1.GetRawString() != `{"f:metadata":{"f:labels":{"f:b":{}}}}` {
 		t.Fatalf(`Unexpected entry, got: %v`, entry)
 	}
 }
@@ -3531,7 +3529,7 @@ func TestDroppingSubresourceField(t *testing.T) {
 		t.Fatalf("Expected object to have 2 managed fields entries, got: %d", len(managedFields))
 	}
 	entry := managedFields[1]
-	if entry.Manager != "label_manager" || entry.Operation != "Apply" || string(entry.FieldsV1.Raw) != `{"f:metadata":{"f:labels":{"f:b":{}}}}` {
+	if entry.Manager != "label_manager" || entry.Operation != "Apply" || entry.FieldsV1.GetRawString() != `{"f:metadata":{"f:labels":{"f:b":{}}}}` {
 		t.Fatalf(`Unexpected entry, got: %v`, entry)
 	}
 }
@@ -3643,7 +3641,7 @@ func TestDroppingSubresourceFromSpecField(t *testing.T) {
 		t.Fatalf("Expected object to have 2 managed fields entries, got: %d", len(managedFields))
 	}
 	entry := managedFields[1]
-	if entry.Manager != "manager" || entry.Operation != "Update" || string(entry.FieldsV1.Raw) != `{"f:status":{"f:phase":{}}}` {
+	if entry.Manager != "manager" || entry.Operation != "Update" || entry.FieldsV1.GetRawString() != `{"f:status":{"f:phase":{}}}` {
 		t.Fatalf(`Unexpected entry, got: %v`, entry)
 	}
 }
@@ -3724,7 +3722,7 @@ func TestSubresourceField(t *testing.T) {
 	if managedFields[1].Manager != "manager" ||
 		managedFields[1].Operation != "Update" ||
 		managedFields[1].Subresource != "scale" ||
-		string(managedFields[1].FieldsV1.Raw) != `{"f:spec":{"f:replicas":{}}}` {
+		managedFields[1].FieldsV1.GetRawString() != `{"f:spec":{"f:replicas":{}}}` {
 		t.Fatalf(`Unexpected entry, got: %v`, managedFields[1])
 	}
 }
@@ -3985,6 +3983,159 @@ func TestApplyFormerlyAtomicFields(t *testing.T) {
 		managedFields[i].Time = nil
 	}
 
+	if !reflect.DeepEqual(expectedManagedFields, managedFields) {
+		t.Fatalf("unexpected managed fields: %v", cmp.Diff(expectedManagedFields, managedFields))
+	}
+}
+
+func TestApplyEventSeriesGranularToAtomic(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	event := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Event",
+		"metadata": {
+			"name": "test-event",
+			"namespace": "default"
+		},
+		"involvedObject": {
+			"kind": "Pod",
+			"name": "test-pod",
+			"namespace": "default"
+		},
+		"reason": "TestReason",
+		"message": "TestMessage",
+		"type": "Normal",
+		"series": {
+			"count": 2,
+			"lastObservedTime": "2023-01-01T00:00:00.000000Z"
+		}
+	}`)
+
+	managedFieldsUpdate := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Event",
+		"metadata": {
+			"name": "test-event",
+			"namespace": "default",
+			"managedFields": [
+				{
+					"apiVersion": "v1",
+					"fieldsType": "FieldsV1",
+					"fieldsV1": {
+						"f:involvedObject": {},
+						"f:message": {},
+						"f:reason": {},
+						"f:series": {
+							".": {},
+							"f:count": {},
+							"f:lastObservedTime": {}
+						},
+						"f:type": {}
+					},
+					"manager": "recorder",
+					"operation": "Update",
+					"time": "2023-01-01T00:00:00.000000Z"
+				}
+			]
+		}
+	}`)
+
+	applyEvent := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Event",
+		"metadata": {
+			"name": "test-event",
+			"namespace": "default"
+		},
+		"series": {
+			"count": 3,
+			"lastObservedTime": "2023-01-01T00:01:00.000000Z"
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().
+		Post().
+		Param("fieldManager", "recorder").
+		Resource("events").
+		Namespace("default").
+		Body(event).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	// Set managed fields to object
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.StrategicMergePatchType).
+		Name("test-event").
+		Namespace("default").
+		Param("fieldManager", "recorder").
+		Resource("events").
+		Body(managedFieldsUpdate).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to set managed fields: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Name("test-event").
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("events").
+		Body(applyEvent).
+		Do(context.TODO()).
+		Get()
+	if !apierrors.IsConflict(err) {
+		t.Fatalf("expected conflict on series, got: %v", err)
+	}
+	if cause, ok := apierrors.StatusCause(err, metav1.CauseTypeFieldManagerConflict); !ok || cause.Field != ".series" {
+		t.Fatalf("expected conflict on .series, got: %v", err)
+	}
+
+	newObj, err := client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Name("test-event").
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Param("force", "true").
+		Resource("events").
+		Body(applyEvent).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply object: %v", err)
+	}
+
+	var expectedManagedFields []metav1.ManagedFieldsEntry
+	expectedManagedFieldsString := []byte(`[
+		{
+			"apiVersion": "v1",
+			"fieldsType": "FieldsV1",
+			"fieldsV1": {"f:series":{}},
+			"manager": "apply_test",
+			"operation": "Apply"
+		},
+		{
+			"apiVersion": "v1",
+			"fieldsType": "FieldsV1",
+			"fieldsV1": {"f:involvedObject":{},"f:message":{},"f:reason":{},"f:type":{}},
+			"manager": "recorder",
+			"operation": "Update"
+		}
+	]`)
+	if err := json.Unmarshal(expectedManagedFieldsString, &expectedManagedFields); err != nil {
+		t.Fatalf("unexpectedly failed to decode expected managed fields: %v", err)
+	}
+
+	managedFields := newObj.(*v1.Event).ManagedFields
+	for i := range managedFields {
+		managedFields[i].Time = nil
+	}
 	if !reflect.DeepEqual(expectedManagedFields, managedFields) {
 		t.Fatalf("unexpected managed fields: %v", cmp.Diff(expectedManagedFields, managedFields))
 	}

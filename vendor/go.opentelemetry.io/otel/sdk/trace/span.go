@@ -20,7 +20,7 @@ import (
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
 )
@@ -61,6 +61,7 @@ type ReadOnlySpan interface {
 	InstrumentationScope() instrumentation.Scope
 	// InstrumentationLibrary returns information about the instrumentation
 	// library that created the span.
+	//
 	// Deprecated: please use InstrumentationScope instead.
 	InstrumentationLibrary() instrumentation.Library //nolint:staticcheck // This method needs to be define for backwards compatibility
 	// Resource returns information about the entity that produced the span.
@@ -150,12 +151,22 @@ type recordingSpan struct {
 
 	// tracer is the SDK tracer that created this span.
 	tracer *tracer
+
+	// origCtx is the context used when starting this span that has the
+	// recordingSpan instance set as the active span. If not nil, it is used
+	// when ending the span to ensure any metrics are recorded with a context
+	// containing this span without requiring an additional allocation.
+	origCtx context.Context
 }
 
 var (
 	_ ReadWriteSpan = (*recordingSpan)(nil)
 	_ runtimeTracer = (*recordingSpan)(nil)
 )
+
+func (s *recordingSpan) setOrigCtx(ctx context.Context) {
+	s.origCtx = ctx
+}
 
 // SpanContext returns the SpanContext of this span.
 func (s *recordingSpan) SpanContext() trace.SpanContext {
@@ -165,7 +176,7 @@ func (s *recordingSpan) SpanContext() trace.SpanContext {
 	return s.spanContext
 }
 
-// IsRecording returns if this span is being recorded. If this span has ended
+// IsRecording reports whether this span is being recorded. If this span has ended
 // this will return false.
 func (s *recordingSpan) IsRecording() bool {
 	if s == nil {
@@ -177,7 +188,7 @@ func (s *recordingSpan) IsRecording() bool {
 	return s.isRecording()
 }
 
-// isRecording returns if this span is being recorded. If this span has ended
+// isRecording reports whether this span is being recorded. If this span has ended
 // this will return false.
 //
 // This method assumes s.mu.Lock is held by the caller.
@@ -335,10 +346,12 @@ func (s *recordingSpan) addOverCapAttrs(limit int, attrs []attribute.KeyValue) {
 	}
 }
 
-// truncateAttr returns a truncated version of attr. Only string and string
-// slice attribute values are truncated. String values are truncated to at
-// most a length of limit. Each string slice value is truncated in this fashion
-// (the slice length itself is unaffected).
+// truncateAttr returns a truncated version of attr. Only string, string
+// slice, byte slice, and slice attribute values are truncated. String values are truncated
+// to at most a length of limit. Each string slice value is truncated in this
+// fashion (the slice length itself is unaffected), and byte slice values are truncated to at most
+// limit bytes. For slice attribute values, the limit is applied to each
+// element recursively.
 //
 // No truncation is performed for a negative limit.
 func truncateAttr(limit int, attr attribute.KeyValue) attribute.KeyValue {
@@ -355,8 +368,93 @@ func truncateAttr(limit int, attr attribute.KeyValue) attribute.KeyValue {
 			v[i] = truncate(limit, v[i])
 		}
 		return attr.Key.StringSlice(v)
+	case attribute.BYTESLICE:
+		v := attr.Value.AsString()
+		if len(v) > limit {
+			return attr.Key.ByteSlice([]byte(v[:limit]))
+		}
+		return attr
+	case attribute.SLICE:
+		v := attr.Value.AsSlice()
+		if !slices.ContainsFunc(v, func(e attribute.Value) bool { return needsTruncation(limit, e) }) {
+			return attr
+		}
+		newV := make([]attribute.Value, len(v))
+		for i, elem := range v {
+			newV[i] = truncateValue(limit, elem)
+		}
+		return attr.Key.Slice(newV...)
 	}
 	return attr
+}
+
+// truncateValue returns a truncated version of v. Only string, string slice,
+// byte slice, and (recursively) slice values are modified.
+//
+// No truncation is performed for a negative limit.
+func truncateValue(limit int, v attribute.Value) attribute.Value {
+	switch v.Type() {
+	case attribute.STRING:
+		return attribute.StringValue(truncate(limit, v.AsString()))
+	case attribute.STRINGSLICE:
+		ss := v.AsStringSlice()
+		for i := range ss {
+			ss[i] = truncate(limit, ss[i])
+		}
+		return attribute.StringSliceValue(ss)
+
+	case attribute.BYTESLICE:
+		// len(v.AsString()) is identical to len(v.AsByteSlice()) but
+		// avoids allocating the full slice before truncation.
+		s := v.AsString()
+		if limit >= 0 && len(s) > limit {
+			return attribute.ByteSliceValue([]byte(s[:limit]))
+		}
+	case attribute.SLICE:
+		sl := v.AsSlice()
+		if !slices.ContainsFunc(sl, func(e attribute.Value) bool { return needsTruncation(limit, e) }) {
+			return v
+		}
+		newSl := make([]attribute.Value, len(sl))
+		for i, elem := range sl {
+			newSl[i] = truncateValue(limit, elem)
+		}
+		return attribute.SliceValue(newSl...)
+	}
+	return v
+}
+
+// stringNeedsTruncation reports whether s would be modified by truncate for the
+// given limit.
+func stringNeedsTruncation(limit int, s string) bool {
+	if limit < 0 || len(s) <= limit {
+		return false
+	}
+	return utf8.RuneCountInString(s) > limit || !utf8.ValidString(s)
+}
+
+// needsTruncation reports whether v would be modified by truncateValue for the
+// given limit.
+func needsTruncation(limit int, v attribute.Value) bool {
+	switch v.Type() {
+	case attribute.STRING:
+		return stringNeedsTruncation(limit, v.AsString())
+	case attribute.BYTESLICE:
+		// len(v.AsString()) is identical to len(v.AsByteSlice()) but
+		// avoids memory allocation.
+		if limit >= 0 && len(v.AsString()) > limit {
+			return true
+		}
+	case attribute.STRINGSLICE:
+		for _, s := range v.AsStringSlice() {
+			if stringNeedsTruncation(limit, s) {
+				return true
+			}
+		}
+	case attribute.SLICE:
+		return slices.ContainsFunc(v.AsSlice(), func(e attribute.Value) bool { return needsTruncation(limit, e) })
+	}
+	return false
 }
 
 // truncate returns a truncated version of s such that it contains less than
@@ -495,6 +593,17 @@ func (s *recordingSpan) End(options ...trace.SpanEndOption) {
 	}
 	s.mu.Unlock()
 
+	if s.tracer.inst.Enabled() {
+		ctx := s.origCtx
+		if ctx == nil {
+			// This should not happen as the origCtx should be set, but
+			// ensure trace information is propagated in the case of an
+			// error.
+			ctx = trace.ContextWithSpan(context.Background(), s)
+		}
+		defer s.tracer.inst.SpanEnded(ctx, s)
+	}
+
 	sps := s.tracer.provider.getSpanProcessors()
 	if len(sps) == 0 {
 		return
@@ -545,7 +654,7 @@ func (s *recordingSpan) RecordError(err error, opts ...trace.EventOption) {
 	s.addEvent(semconv.ExceptionEventName, opts...)
 }
 
-func typeStr(i interface{}) string {
+func typeStr(i any) string {
 	t := reflect.TypeOf(i)
 	if t.PkgPath() == "" && t.Name() == "" {
 		// Likely a builtin type.

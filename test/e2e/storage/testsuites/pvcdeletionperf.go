@@ -62,7 +62,8 @@ func (t *pvcDeletionPerformanceTestSuite) GetTestSuiteInfo() storageframework.Te
 	return t.tsInfo
 }
 
-func (t *pvcDeletionPerformanceTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (t *pvcDeletionPerformanceTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (t *pvcDeletionPerformanceTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

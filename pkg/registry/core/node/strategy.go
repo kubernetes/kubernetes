@@ -23,6 +23,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -33,6 +35,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -41,18 +44,17 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // nodeStrategy implements behavior for nodes
 type nodeStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Nodes is the default logic that applies when creating and updating Node
 // objects.
-var Strategy = nodeStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = nodeStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped is false for nodes.
 func (nodeStrategy) NamespaceScoped() bool {
@@ -72,7 +74,7 @@ func (nodeStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 // AllowCreateOnUpdate is false for nodes.
-func (nodeStrategy) AllowCreateOnUpdate() bool {
+func (nodeStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -115,6 +117,10 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && !nodeDeclaredFeaturesInUse(oldNode) {
 		node.Status.DeclaredFeatures = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && !nodePodPreemptionPolicyInUse(oldNode) {
+		node.Spec.PodPreemptionPolicy = nil
+	}
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)
@@ -132,6 +138,14 @@ func nodeConfigSourceInUse(node *api.Node) bool {
 func (nodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	node := obj.(*api.Node)
 	return validation.ValidateNode(node)
+}
+
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (nodeStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.InPlacePodVerticalScalingSchedulerPreemption): utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
+	}}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -154,7 +168,7 @@ func (nodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Objec
 	return nodeWarnings(obj)
 }
 
-func (nodeStrategy) AllowUnconditionalUpdate() bool {
+func (nodeStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -183,6 +197,10 @@ func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 
 	if !nodeStatusConfigInUse(oldNode) {
 		newNode.Status.Config = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) && oldNode.Status.NodeInfo.RunningInUserNamespace == nil {
+		newNode.Status.NodeInfo.RunningInUserNamespace = nil
 	}
 }
 
@@ -324,4 +342,9 @@ func supplementalGroupsPolicyInUse(node *api.Node) bool {
 // nodeDeclaredFeaturesInUse returns true if the node.status has DeclaredFeatures
 func nodeDeclaredFeaturesInUse(node *api.Node) bool {
 	return node != nil && node.Status.DeclaredFeatures != nil
+}
+
+// nodePodPreemptionPolicyInUse returns true if the node.spec has PodPreemptionPolicy
+func nodePodPreemptionPolicyInUse(node *api.Node) bool {
+	return node != nil && node.Spec.PodPreemptionPolicy != nil
 }

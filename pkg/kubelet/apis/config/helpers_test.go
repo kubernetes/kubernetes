@@ -163,6 +163,7 @@ var (
 	kubeletConfigurationNonPathFieldPaths = sets.New[string](
 		"Address",
 		"AllowedUnsafeSysctls[*]",
+		"DefaultPodSysctls[*]",
 		"Authentication.Anonymous.Enabled",
 		"Authentication.Webhook.CacheTTL.Duration",
 		"Authentication.Webhook.Enabled",
@@ -236,6 +237,7 @@ var (
 		"SingleProcessOOMKill",
 		"Logging.Verbosity",
 		"TLSCipherSuites[*]",
+		"TLSCurvePreferences[*]",
 		"TLSMinVersion",
 		"IPTablesDropBit",
 		"IPTablesMasqueradeBit",
@@ -299,6 +301,7 @@ var (
 		"ShutdownGracePeriod.Duration",
 		"ShutdownGracePeriodCriticalPods.Duration",
 		"MemoryThrottlingFactor",
+		"MemoryReservationPolicy",
 		"ContainerRuntimeEndpoint",
 		"ImageServiceEndpoint",
 		"Tracing.Endpoint",

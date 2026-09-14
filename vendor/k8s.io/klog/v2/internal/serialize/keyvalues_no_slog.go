@@ -28,7 +28,7 @@ import (
 
 // KVFormat serializes one key/value pair into the provided buffer.
 // A space gets inserted before the pair.
-func (f Formatter) KVFormat(b *bytes.Buffer, k, v interface{}) {
+func (f Formatter) KVFormat(b *bytes.Buffer, k, v interface{}) string {
 	// This is the version without slog support. Must be kept in sync with
 	// the version in keyvalues_slog.go.
 
@@ -37,13 +37,15 @@ func (f Formatter) KVFormat(b *bytes.Buffer, k, v interface{}) {
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/migration-to-structured-logging.md#name-arguments
 	// for the sake of performance. Keys with spaces,
 	// special characters, etc. will break parsing.
+	var key string
 	if sK, ok := k.(string); ok {
 		// Avoid one allocation when the key is a string, which
 		// normally it should be.
-		b.WriteString(sK)
+		key = sK
 	} else {
-		b.WriteString(fmt.Sprintf("%s", k))
+		key = fmt.Sprintf("%s", k)
 	}
+	b.WriteString(key)
 
 	// The type checks are sorted so that more frequently used ones
 	// come first because that is then faster in the common
@@ -94,4 +96,6 @@ func (f Formatter) KVFormat(b *bytes.Buffer, k, v interface{}) {
 	default:
 		f.formatAny(b, v)
 	}
+
+	return key
 }

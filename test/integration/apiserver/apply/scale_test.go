@@ -417,7 +417,7 @@ func assertReplicasOwnership(t *testing.T, obj *unstructured.Unstructured, field
 
 	for _, managedField := range accessor.GetManagedFields() {
 		var entryJSON map[string]interface{}
-		if err := json.Unmarshal(managedField.FieldsV1.Raw, &entryJSON); err != nil {
+		if err := json.Unmarshal(managedField.FieldsV1.GetRawBytes(), &entryJSON); err != nil {
 			t.Fatalf("failed to read into json")
 		}
 

@@ -19,20 +19,31 @@ package memorymanager
 import (
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
 
 const (
@@ -47,11 +58,22 @@ var (
 
 	podLevelRequirementsGuaranteed = &v1.ResourceRequirements{
 		Limits: v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse("1000Mi"),
+			v1.ResourceCPU:    resource.MustParse("1000m"),
 			v1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 		Requests: v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse("1000Mi"),
+			v1.ResourceCPU:    resource.MustParse("1000m"),
+			v1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+	}
+
+	podLevelRequirementsBurstable = &v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1000m"),
+			v1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("500m"),
 			v1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 	}
@@ -133,26 +155,35 @@ func areContainerMemoryAssignmentsEqual(t *testing.T, cma1, cma2 state.Container
 }
 
 type testStaticPolicy struct {
-	description                  string
-	assignments                  state.ContainerMemoryAssignments
-	expectedAssignments          state.ContainerMemoryAssignments
-	machineState                 state.NUMANodeMap
-	expectedMachineState         state.NUMANodeMap
-	systemReserved               systemReservedMemory
-	expectedError                error
-	machineInfo                  *cadvisorapi.MachineInfo
-	pod                          *v1.Pod
-	topologyHint                 *topologymanager.TopologyHint
-	expectedTopologyHints        map[string][]topologymanager.TopologyHint
-	initContainersReusableMemory reusableMemory
-	podLevelResourcesEnabled     bool
+	description                     string
+	assignments                     state.ContainerMemoryAssignments
+	expectedAssignments             state.ContainerMemoryAssignments
+	machineState                    state.NUMANodeMap
+	expectedMachineState            state.NUMANodeMap
+	systemReserved                  systemReservedMemory
+	expectedError                   error
+	machineInfo                     *cadvisorapi.MachineInfo
+	pod                             *v1.Pod
+	topologyHint                    *topologymanager.TopologyHint
+	expectedTopologyHints           map[string][]topologymanager.TopologyHint
+	initContainersReusableMemory    reusableMemory
+	podLevelResourcesEnabled        bool
+	podLevelResourceManagersEnabled bool
+	requiredMetrics                 requiredMetrics
+}
+
+type requiredMetrics struct {
+	expTotalAllocs              int
+	expTotalErrors              int
+	expExclusiveAssignments     int
+	expPodSharedPoolAssignments int
 }
 
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
 	logger, _ := ktesting.NewTestContext(t)
-	manager := topologymanager.NewFakeManager()
+	manager := topologymanager.NewFakeManager(logger)
 	if hint != nil {
-		manager = topologymanager.NewFakeManagerWithHint(hint)
+		manager = topologymanager.NewFakeManagerWithHint(logger, hint)
 	}
 
 	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager)
@@ -1192,7 +1223,7 @@ func TestStaticPolicyStart(t *testing.T) {
 }
 
 func TestStaticPolicyAllocate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description:         "should do nothing for non-guaranteed pods",
@@ -2071,17 +2102,21 @@ func TestStaticPolicyAllocate(t *testing.T) {
 					v1.ResourceMemory: 512 * mb,
 				},
 			},
-			pod:                      getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
-			expectedTopologyHints:    nil,
-			topologyHint:             &topologymanager.TopologyHint{},
-			expectedError:            nil,
-			podLevelResourcesEnabled: true,
+			pod:                             getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
+			expectedTopologyHints:           nil,
+			topologyHint:                    &topologymanager.TopologyHint{},
+			expectedError:                   nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: false,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			if testCase.podLevelResourcesEnabled && !testCase.podLevelResourceManagersEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, false)
+			}
 
 			t.Logf("TestStaticPolicyAllocate %s", testCase.description)
 			p, s, err := initTests(t, &testCase, testCase.topologyHint, nil)
@@ -2089,7 +2124,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[0], lifecycle.AddOperation)
 			if (err == nil) != (testCase.expectedError == nil) || (err != nil && testCase.expectedError != nil && err.Error() != testCase.expectedError.Error()) {
 				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 			}
@@ -2112,7 +2147,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 }
 
 func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description: "should re-use init containers memory, init containers requests 1Gi and 2Gi, apps containers 3Gi and 4Gi",
@@ -2814,14 +2849,14 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.InitContainers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i], lifecycle.AddOperation)
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
 			}
 
 			for i := range testCase.pod.Spec.Containers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.Containers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[i], lifecycle.AddOperation)
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -2841,7 +2876,7 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 }
 
 func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description: "should do nothing once containers already exist under the state file",
@@ -3148,7 +3183,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.InitContainers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i], lifecycle.AddOperation)
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -3159,7 +3194,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.Containers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.Containers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[i], lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}
@@ -3816,18 +3851,138 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 			expectedTopologyHints:    nil,
 			podLevelResourcesEnabled: true,
 		},
+		{
+			description: "should provide pod topology hints for guaranteed pod with pod level resources when PodLevelResourceManagers is enabled",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{
+						Id:     0,
+						Memory: 3 * gb,
+						HugePages: []cadvisorapi.HugePagesInfo{
+							{
+								PageSize: pageSize1Gb,
+								NumPages: 1,
+							},
+						},
+					},
+					{
+						Id:     1,
+						Memory: 3 * gb,
+						HugePages: []cadvisorapi.HugePagesInfo{
+							{
+								PageSize: pageSize1Gb,
+								NumPages: 1,
+							},
+						},
+					},
+				},
+			},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+				string(hugepages1Gi): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+		}, {
+			description: "should not provide pod topology hints for burstable pod with pod level resources when PodLevelResourceManagers is enabled",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsBurstable, "container1", requirementsGuaranteed),
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			expectedTopologyHints:           nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
 			p, s, err := initTests(t, &testCase, nil, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			topologyHints := p.GetTopologyHints(logger, s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			topologyHints := p.GetTopologyHints(logger, s, testCase.pod, &testCase.pod.Spec.Containers[0], lifecycle.AddOperation)
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
 			}
@@ -3839,28 +3994,310 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
-			description: "should not provide pod topology hints for guaranteed pod with pod level resources",
+			description: "should provide pod topology hints for guaranteed pod without container level resources when PodLevelResources and PodLevelResourceManagers are disabled",
+			pod:         getPod("pod1", "container1", requirementsGuaranteed),
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{
+						Id:     0,
+						Memory: 3 * gb,
+						HugePages: []cadvisorapi.HugePagesInfo{
+							{
+								PageSize: pageSize1Gb,
+								NumPages: 1,
+							},
+						},
+					},
+					{
+						Id:     1,
+						Memory: 3 * gb,
+						HugePages: []cadvisorapi.HugePagesInfo{
+							{
+								PageSize: pageSize1Gb,
+								NumPages: 1,
+							},
+						},
+					},
+				},
+			},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+				string(hugepages1Gi): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+			podLevelResourcesEnabled:        false,
+			podLevelResourceManagersEnabled: false,
+		},
+		{
+			description: "should not provide pod topology hints for burstable pod with container level resources when PodLevelResources and PodLevelResourceManagers are disabled",
+			pod:         getPod("pod1", "container1", requirementsBurstable),
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			expectedTopologyHints:           nil,
+			podLevelResourcesEnabled:        false,
+			podLevelResourceManagersEnabled: false,
+		},
+		{
+			description: "should not provide pod topology hints for guaranteed pod with pod level resources when PodLevelResourceManagers is disabled",
 			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
 			systemReserved: systemReservedMemory{
 				0: map[v1.ResourceName]uint64{
 					v1.ResourceMemory: 1024 * mb,
 				},
 			},
-			expectedTopologyHints:    nil,
-			podLevelResourcesEnabled: true,
+			expectedTopologyHints:           nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: false,
+		},
+		{
+			description: "should provide pod topology hints for guaranteed pod with pod level resources when PodLevelResourceManagers is enabled",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{
+						Id:     0,
+						Memory: 3 * gb,
+					},
+					{
+						Id:     1,
+						Memory: 3 * gb,
+					},
+				},
+			},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+		},
+		{
+			description: "should provide pod topology hints for guaranteed pod with pod level resources that overrides container level resources",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsBurstable),
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{
+						Id:     0,
+						Memory: 3 * gb,
+					},
+					{
+						Id:     1,
+						Memory: 3 * gb,
+					},
+				},
+			},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+		},
+		{
+			description: "should not provide pod topology hints for burstable pod with pod level resources when PodLevelResourceManagers is enabled",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsBurstable, "container1", requirementsGuaranteed),
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			expectedTopologyHints:           nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+		},
+		{
+			description: "should not provide pod topology hints for burstable pod with pod level and container level burstable resources",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsBurstable, "container1", requirementsBurstable),
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			expectedTopologyHints:           nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
 			p, s, err := initTests(t, &testCase, nil, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			topologyHints := p.GetPodTopologyHints(logger, s, testCase.pod)
+			topologyHints := p.GetPodTopologyHints(logger, s, testCase.pod, lifecycle.AddOperation)
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
 			}
@@ -4130,7 +4567,9 @@ func Test_getPodRequestedResources(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			actual, err := getPodRequestedResources(tc.pod)
+			logger, _ := ktesting.NewTestContext(t)
+
+			actual, err := getPodRequestedResources(logger, tc.pod)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -4212,6 +4651,1391 @@ func Test_isAffinityViolatingNUMAAllocations(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			if isAffinityViolatingNUMAAllocations(tc.machineState, tc.topologyHint.NUMANodeAffinity) != tc.isViolationExpected {
 				t.Errorf("isAffinityViolatingNUMAAllocations with affinity %v expected to return %t, got %t", tc.topologyHint.NUMANodeAffinity.GetBits(), tc.isViolationExpected, !tc.isViolationExpected)
+			}
+		})
+	}
+}
+
+type containerOptions struct {
+	name          string
+	request       string
+	limit         string
+	restartPolicy *v1.ContainerRestartPolicy
+}
+
+type podOption func(*v1.Pod)
+
+func withPodResources(memRequest, memLimit string) podOption {
+	return func(pod *v1.Pod) {
+		pod.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse(memRequest),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse(memLimit),
+			},
+		}
+	}
+}
+
+func makeMultiContainerPodWithOptions(initContainers, appContainers []*containerOptions, podOptions ...podOption) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod",
+			UID:  "podUID",
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{},
+			Containers:     []v1.Container{},
+		},
+	}
+
+	for i, opts := range initContainers {
+		container := v1.Container{
+			Name: "initContainer-" + strconv.Itoa(i),
+		}
+		if opts.request != "" {
+			container.Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(opts.request),
+					v1.ResourceCPU:    resource.MustParse("1"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(opts.limit),
+					v1.ResourceCPU:    resource.MustParse("1"),
+				},
+			}
+		}
+		if opts.restartPolicy != nil {
+			container.RestartPolicy = opts.restartPolicy
+		}
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
+	}
+
+	for i, opts := range appContainers {
+		container := v1.Container{
+			Name: "appContainer-" + strconv.Itoa(i),
+		}
+		if opts.request != "" {
+			container.Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(opts.request),
+					v1.ResourceCPU:    resource.MustParse("1"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(opts.limit),
+					v1.ResourceCPU:    resource.MustParse("1"),
+				},
+			}
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, container)
+	}
+
+	for _, fn := range podOptions {
+		fn(pod)
+	}
+
+	return pod
+}
+
+func makeMultiContainerPodWithOptionsAndPodLevelResources(podLevelMemory string, initContainers, appContainers []*containerOptions) *v1.Pod {
+	return makeMultiContainerPodWithOptions(initContainers, appContainers, withPodResources(podLevelMemory, podLevelMemory))
+}
+
+func TestValidatePodScopeResources(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, true)
+	testCases := []struct {
+		name        string
+		pod         *v1.Pod
+		expectedErr error
+		scope       string
+		features    map[featuregate.Feature]bool
+	}{
+		{
+			name: "Valid: Pod-level != Guaranteed containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "1Gi", limit: "1Gi"},
+					{name: "c2"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Only Guaranteed containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "1Gi", limit: "1Gi"},
+					{name: "c2", request: "1Gi", limit: "1Gi"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Only podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1"},
+					{name: "c2"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Pod-level == Guaranteed containers, has podSharedPool containers with request, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"6Gi",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "3Gi", limit: "3Gi"},
+					{name: "c2", request: "2Gi", limit: "2Gi"},
+					{name: "c3", request: "500Gi", limit: "1Gi"},
+					{name: "c4"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Failure: Pod-level == Guaranteed containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"5Gi",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "2Gi", limit: "2Gi"},
+					{name: "c2", request: "3Gi", limit: "3Gi"},
+					{name: "c3"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: fmt.Errorf("pod rejected, sum of exclusive container memory requests equals pod budget, leaving no memory for shared containers"),
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Pod-level resources with standard and restartable init containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "init-c1", request: "1Gi", limit: "1Gi"},
+					{name: "restartable-init-c1", request: "1Gi", limit: "1Gi", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{
+					{name: "c1"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Pod-level resources equal init and standard container resources without non-guaranteed containers do not produce empty shared pool error, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "restartable-init-c1", request: "1Gi", limit: "1Gi", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{
+					{name: "c1", request: "1Gi", limit: "1Gi"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Failure: Pod-level resources when guaranteed sidecar that equals pod resources and then non-guaranteed init container produce empty shared pool error, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "restartable-init-c1", request: "2Gi", limit: "2Gi", restartPolicy: &containerRestartPolicyAlways},
+					{name: "init-c1"},
+				},
+				[]*containerOptions{},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: fmt.Errorf("pod rejected, pod has shared init containers but no memory available for them"),
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Pod-level resources when non-guaranteed standard init container first and then guaranteed sidecar container do not produce empty shared pool error, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "init-c1"},
+					{name: "restartable-init-c1", request: "2Gi", limit: "2Gi", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Pod-level resources when guaranteed standard init container first and then guaranteed sidecar container do not produce empty shared pool error, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "init-c1", request: "2Gi", limit: "2Gi"},
+					{name: "restartable-init-c1", request: "2Gi", limit: "2Gi", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Failure: Pod-level == Restartable guaranteed init containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "restartable-init-c1", request: "2Gi", limit: "2Gi", restartPolicy: &containerRestartPolicyAlways},
+					{name: "restartable-init-c2", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: fmt.Errorf("pod rejected, sum of exclusive container memory requests equals pod budget, leaving no memory for shared containers"),
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Pod-level resources with only restartable one init container and one standard container, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "restartable-init-c", request: "1Gi", limit: "1Gi", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{
+					{name: "c1", request: "1Gi", limit: "1Gi"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			for feature, enabled := range tc.features {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, enabled)
+			}
+
+			logger, _ := ktesting.NewTestContext(t)
+			machineInfo := &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{
+						Id:     0,
+						Memory: 8 * gb,
+					},
+				},
+			}
+			systemReserved := systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 256 * mb,
+				},
+			}
+			policy, err := NewPolicyStatic(logger, machineInfo, systemReserved, topologymanager.NewFakeManagerWithScope(tc.scope))
+			if err != nil {
+				t.Fatalf("NewPolicyStatic() failed: %v", err)
+			}
+
+			err = policy.(*staticPolicy).validatePodScopeResources(logger, tc.pod)
+			if tc.expectedErr != nil {
+				if err == nil {
+					t.Errorf("Expected error %q, got nil", tc.expectedErr.Error())
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error %q, got %q", tc.expectedErr.Error(), err.Error())
+				}
+			} else if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+type containerSpec struct {
+	name          string
+	memRequest    string
+	memLimit      string
+	restartPolicy *v1.ContainerRestartPolicy
+}
+
+func getPodWithContainersAndPodLevelResources(podName, podMemRequest, podMemLimit string, initContainers, appContainers []containerSpec) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+			UID:  "podUID", // Using a static UID for simplicity in tests, can be overridden.
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{},
+			Containers:     []v1.Container{},
+			RestartPolicy:  v1.RestartPolicyNever,
+		},
+	}
+	pod.ObjectMeta.UID = types.UID(podName)
+
+	for i, c := range initContainers {
+		container := v1.Container{
+			Name:  c.name,
+			Image: "image",
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("1"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("1"),
+				},
+			},
+		}
+		if c.name == "" {
+			container.Name = "init-container-" + strconv.Itoa(i)
+		}
+		if c.memRequest != "" {
+			container.Resources.Requests[v1.ResourceMemory] = resource.MustParse(c.memRequest)
+		}
+		if c.memLimit != "" {
+			container.Resources.Limits[v1.ResourceMemory] = resource.MustParse(c.memLimit)
+		}
+		if c.restartPolicy != nil {
+			container.RestartPolicy = c.restartPolicy
+		}
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
+	}
+
+	for i, c := range appContainers {
+		container := v1.Container{
+			Name:  c.name,
+			Image: "image",
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("1"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("1"),
+				},
+			},
+		}
+		if c.name == "" {
+			container.Name = "app-container-" + strconv.Itoa(i)
+		}
+		if c.memRequest != "" {
+			container.Resources.Requests[v1.ResourceMemory] = resource.MustParse(c.memRequest)
+		}
+		if c.memLimit != "" {
+			container.Resources.Limits[v1.ResourceMemory] = resource.MustParse(c.memLimit)
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, container)
+	}
+
+	if podMemRequest != "" || podMemLimit != "" {
+		pod.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("3"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("3"),
+			},
+		}
+		if podMemRequest != "" {
+			pod.Spec.Resources.Requests[v1.ResourceMemory] = resource.MustParse(podMemRequest)
+		}
+		if podMemLimit != "" {
+			pod.Spec.Resources.Limits[v1.ResourceMemory] = resource.MustParse(podMemLimit)
+		}
+	} else {
+		pod.Spec.Resources = nil
+	}
+	return pod
+}
+
+func TestStaticPolicyAllocatePod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	machineInfo := &cadvisorapi.MachineInfo{
+		Topology: []cadvisorapi.Node{
+			{Id: 0, Memory: 2 * gb},
+			{Id: 1, Memory: 2 * gb},
+		},
+	}
+
+	systemReserved := systemReservedMemory{
+		0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb},
+		1: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb},
+	}
+
+	machineState := state.NUMANodeMap{
+		0: &state.NUMANodeState{
+			MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+				v1.ResourceMemory: {
+					Allocatable:    1536 * mb,
+					Free:           1536 * mb,
+					Reserved:       0,
+					SystemReserved: 512 * mb,
+					TotalMemSize:   2 * gb,
+				},
+			},
+			NumberOfAssignments: 0,
+			Cells:               []int{0},
+		},
+		1: &state.NUMANodeState{
+			MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+				v1.ResourceMemory: {
+					Allocatable:    1536 * mb,
+					Free:           1536 * mb,
+					Reserved:       0,
+					SystemReserved: 512 * mb,
+					TotalMemSize:   2 * gb,
+				},
+			},
+			NumberOfAssignments: 0,
+			Cells:               []int{1},
+		},
+	}
+
+	testCases := []testStaticPolicy{
+		{
+			description:    "should successfully allocate memory for a guaranteed pod with pod-level resources",
+			machineInfo:    machineInfo,
+			systemReserved: systemReserved,
+			machineState:   machineState,
+			pod: getPodWithContainersAndPodLevelResources("pod1", "1Gi", "1Gi", nil, []containerSpec{
+				{name: "container1", memRequest: "512Mi", memLimit: "512Mi"},
+			}),
+			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expectedError: nil,
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": {
+					"container1": []state.Block{
+						{NUMAAffinity: []int{0}, Size: 512 * mb, Type: v1.ResourceMemory},
+					},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 0,
+					Cells:               []int{1},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              1,
+				expExclusiveAssignments:     1,
+				expPodSharedPoolAssignments: 0,
+			},
+		},
+		{
+			description:    "scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and guaranteed container, multi NUMA node, PodLevelResourceManagers enabled",
+			machineInfo:    machineInfo,
+			systemReserved: systemReserved,
+			machineState:   machineState,
+			pod: getPodWithContainersAndPodLevelResources("pod2", "2Gi", "2Gi", nil, []containerSpec{
+				{name: "container1", memRequest: "1Gi", memLimit: "1Gi"},
+			}),
+			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(1), Preferred: true},
+			expectedError: nil,
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod2": {
+					"container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1024 * mb,
+							Reserved:       512 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           0,
+							Reserved:       1536 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              1,
+				expExclusiveAssignments:     1,
+				expPodSharedPoolAssignments: 0,
+			},
+		},
+		{
+			description:    "scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and non-guaranteed container, multi NUMA node, PodLevelResourceManagers enabled",
+			machineInfo:    machineInfo,
+			systemReserved: systemReserved,
+			machineState:   machineState,
+			pod: getPodWithContainersAndPodLevelResources("pod3", "2Gi", "2Gi", nil, []containerSpec{
+				{name: "container1"},
+				{name: "container2"},
+			}),
+			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedError: nil,
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod3": {
+					"container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 2 * gb, Type: v1.ResourceMemory},
+					},
+					"container2": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 2 * gb, Type: v1.ResourceMemory},
+					},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              2,
+				expExclusiveAssignments:     0,
+				expPodSharedPoolAssignments: 2,
+			},
+		},
+		{
+			description:    "scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed and non-guaranteed containers, multi NUMA node, PodLevelResourceManagers enabled",
+			machineInfo:    machineInfo,
+			systemReserved: systemReserved,
+			machineState:   machineState,
+			pod: getPodWithContainersAndPodLevelResources("pod3", "2Gi", "2Gi", nil, []containerSpec{
+				{name: "container1", memRequest: "1Gi", memLimit: "1Gi"},
+				{name: "container2"},
+				{name: "container3"},
+			}),
+			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedError: nil,
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod3": {
+					"container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+					"container2": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+					"container3": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              3,
+				expExclusiveAssignments:     1,
+				expPodSharedPoolAssignments: 2,
+			},
+		},
+		{
+			description:    "scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed standard and guaranteed init containers, multi NUMA node, PodLevelResourceManagers enabled",
+			machineInfo:    machineInfo,
+			systemReserved: systemReserved,
+			machineState:   machineState,
+			pod: getPodWithContainersAndPodLevelResources(
+				"pod4", "2Gi", "2Gi",
+				[]containerSpec{
+					{name: "init-container1", memRequest: "2Gi", memLimit: "2Gi"},
+				},
+				[]containerSpec{
+					{name: "container1", memRequest: "1Gi", memLimit: "1Gi"},
+					{name: "container2"},
+				},
+			),
+			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedError: nil,
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod4": {
+					"init-container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 2 * gb, Type: v1.ResourceMemory},
+					},
+					"container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+					"container2": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              3,
+				expExclusiveAssignments:     2,
+				expPodSharedPoolAssignments: 1,
+			},
+		},
+		{
+			description:    "scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed standard and guaranteed restartable and non-guaranteed standard init containers, multi NUMA node, PodLevelResourceManagers enabled",
+			machineInfo:    machineInfo,
+			systemReserved: systemReserved,
+			machineState:   machineState,
+			pod: getPodWithContainersAndPodLevelResources(
+				"pod4", "3Gi", "3Gi",
+				[]containerSpec{
+					{name: "init-container1"},
+					{name: "init-restartable-container2", memRequest: "1Gi", memLimit: "1Gi", restartPolicy: &containerRestartPolicyAlways},
+					{name: "init-container3"},
+				},
+				[]containerSpec{
+					{name: "container1", memRequest: "1Gi", memLimit: "1Gi"},
+					{name: "container2"},
+				},
+			),
+			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedError: nil,
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod4": {
+					"init-container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 3 * gb, Type: v1.ResourceMemory},
+					},
+					"init-restartable-container2": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+					"init-container3": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 2 * gb, Type: v1.ResourceMemory},
+					},
+					"container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+					"container2": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           0,
+							Reserved:       1536 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           0,
+							Reserved:       1536 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              5,
+				expExclusiveAssignments:     2,
+				expPodSharedPoolAssignments: 3,
+			},
+		},
+		{
+			description:    "scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed standard and non-guaranteed restartable and standard init containers, multi NUMA node, PodLevelResourceManagers enabled",
+			machineInfo:    machineInfo,
+			systemReserved: systemReserved,
+			machineState:   machineState,
+			pod: getPodWithContainersAndPodLevelResources(
+				"pod4", "3Gi", "3Gi",
+				[]containerSpec{
+					{name: "init-container1"},
+					{name: "init-restartable-container2", restartPolicy: &containerRestartPolicyAlways},
+					{name: "init-container3"},
+				},
+				[]containerSpec{
+					{name: "container1", memRequest: "1Gi", memLimit: "1Gi"},
+					{name: "container2"},
+				},
+			),
+			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedError: nil,
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod4": {
+					"init-container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 3 * gb, Type: v1.ResourceMemory},
+					},
+					"init-restartable-container2": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 2 * gb, Type: v1.ResourceMemory},
+					},
+					"init-container3": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 3 * gb, Type: v1.ResourceMemory},
+					},
+					"container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+					"container2": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 2 * gb, Type: v1.ResourceMemory},
+					},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           0,
+							Reserved:       1536 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           0,
+							Reserved:       1536 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              5,
+				expExclusiveAssignments:     1,
+				expPodSharedPoolAssignments: 4,
+			},
+		},
+		{
+			description:    "scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed standard and non-guaranteed init containers, multi NUMA node, PodLevelResourceManagers enabled",
+			machineInfo:    machineInfo,
+			systemReserved: systemReserved,
+			machineState:   machineState,
+			pod: getPodWithContainersAndPodLevelResources(
+				"pod4", "2Gi", "2Gi",
+				[]containerSpec{
+					{name: "init-container1"},
+				},
+				[]containerSpec{
+					{name: "container1", memRequest: "1Gi", memLimit: "1Gi"},
+					{name: "container2"},
+				},
+			),
+			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedError: nil,
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod4": {
+					"init-container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 2 * gb, Type: v1.ResourceMemory},
+					},
+					"container1": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+					"container2": []state.Block{
+						{NUMAAffinity: []int{0, 1}, Size: 1 * gb, Type: v1.ResourceMemory},
+					},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+					},
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              3,
+				expExclusiveAssignments:     1,
+				expPodSharedPoolAssignments: 2,
+			},
+		},
+		{
+			description:    "scope: pod, should reject a pod that would result in an empty pod shared pool",
+			machineInfo:    machineInfo,
+			systemReserved: systemReserved,
+			machineState:   machineState,
+			pod: getPodWithContainersAndPodLevelResources("pod3", "2Gi", "2Gi", nil, []containerSpec{
+				{name: "container1", memRequest: "1Gi", memLimit: "1Gi"},
+				{name: "container2", memRequest: "1Gi", memLimit: "1Gi"},
+				{name: "container3"},
+			}),
+			topologyHint:                    &topologymanager.TopologyHint{},
+			expectedError:                   admission.NewEmptyPodSharedPoolError(fmt.Errorf("pod rejected, sum of exclusive container memory requests equals pod budget, leaving no memory for shared containers")),
+			expectedAssignments:             state.ContainerMemoryAssignments{},
+			expectedMachineState:            machineState,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalErrors: 1,
+			},
+		},
+		{
+			description:    "scope: pod, should not allocate exclusive memory to a non-guaranteed pod with pod-level resources and guaranteed containers, PodLevelResourceManagers enabled",
+			machineInfo:    machineInfo,
+			systemReserved: systemReserved,
+			machineState:   machineState,
+			pod: getPodWithContainersAndPodLevelResources("pod3", "1Gi", "2Gi", nil, []containerSpec{
+				{name: "container1", memRequest: "1Gi", memLimit: "1Gi"},
+				{name: "container2"},
+				{name: "container3"},
+			}),
+			topologyHint:                    &topologymanager.TopologyHint{},
+			expectedError:                   nil,
+			expectedAssignments:             state.ContainerMemoryAssignments{},
+			expectedMachineState:            machineState,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalErrors: 0,
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
+
+			metrics.Register()
+			metrics.ResourceManagerAllocationsTotal.Reset()
+			metrics.ResourceManagerAllocationErrorsTotal.Reset()
+			metrics.ResourceManagerContainerAssignments.Reset()
+
+			p, s, err := initTests(t, &testCase, testCase.topologyHint, testCase.initContainersReusableMemory)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			err = p.AllocatePod(logger, s, testCase.pod, lifecycle.AddOperation)
+			if testCase.expectedError != nil {
+				require.Error(t, err)
+				require.Equal(t, testCase.expectedError.Error(), err.Error())
+
+				errors, err := testutil.GetCounterMetricValue(metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerPod))
+				require.NoError(t, err)
+				require.InDelta(t, float64(testCase.requiredMetrics.expTotalErrors), errors, 0.001, "expected allocation errors to be incremented")
+
+				return
+			}
+			require.NoError(t, err)
+
+			assignments := s.GetMemoryAssignments()
+			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
+				t.Fatalf("Actual assignments: %v is different from the expected one: %v", assignments, testCase.expectedAssignments)
+			}
+
+			machineState := s.GetMachineState()
+			if !areMachineStatesEqual(logger, machineState, testCase.expectedMachineState) {
+				t.Fatalf("The actual machine state: %v is different from the expected one: %v", machineState, testCase.expectedMachineState)
+			}
+
+			allocations, err := testutil.GetCounterMetricValue(metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerPod))
+			require.NoError(t, err)
+			require.InDelta(t, float64(testCase.requiredMetrics.expTotalAllocs), allocations, 0.001, "unexpected number of allocations")
+
+			exclusiveAssignments, err := testutil.GetCounterMetricValue(metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerExclusivePod))
+			require.NoError(t, err)
+			require.InDelta(t, float64(testCase.requiredMetrics.expExclusiveAssignments), exclusiveAssignments, 0.001, "unexpected number of assignments")
+
+			podSharedPoolAssignments, err := testutil.GetCounterMetricValue(metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerSharedPod))
+			require.NoError(t, err)
+			require.InDelta(t, float64(testCase.requiredMetrics.expPodSharedPoolAssignments), podSharedPoolAssignments, 0.001, "unexpected number of assignments")
+		})
+	}
+}
+
+// The following lifecycle tests verify that the static memory manager policy
+// processes or skips operations based on the given lifecycle.Operation.
+// Since Allocate* and GetTopologyHints* do not return an error when an
+// operation is unsupported (they silently return nil/empty hints to avoid
+// aborting the entire operation across all hint providers), the tests check
+// log output to confirm whether an operation was processed or skipped.
+//
+// The test values used (e.g. memory sizes, cpusets, pod resource requests)
+// are arbitrary but correct values that let the code run the happy path; the
+// exact values have no special meaning. These tests do not validate the
+// correctness of the allocation or hint results, only whether the operation
+// is processed or skipped for a given lifecycle operation.
+
+func TestStaticPolicyLifecycleAllocate(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			err = policy.Allocate(tCtx, st, pod, &pod.Spec.Containers[0], testCase.operation)
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "Container-level memory allocation skipped, Memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			err = policy.AllocatePod(logger, st, pod, testCase.operation)
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "Pod-level memory allocation skipped, memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			hints := policy.GetTopologyHints(logger, st, pod, &pod.Spec.Containers[0], testCase.operation)
+			if hints != nil {
+				t.Errorf("Unexpected hints: %v", hints)
+			}
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "GetTopologyHints skipped, memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			hints := policy.GetPodTopologyHints(logger, st, pod, testCase.operation)
+			if hints != nil {
+				t.Errorf("Unexpected hints: %v", hints)
+			}
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "GetPodTopologyHints skipped, memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
 			}
 		})
 	}

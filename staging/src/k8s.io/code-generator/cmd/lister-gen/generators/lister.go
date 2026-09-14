@@ -26,7 +26,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/code-generator/cmd/lister-gen/args"
-	genutil "k8s.io/code-generator/pkg/util"
+	"k8s.io/code-generator/pkg/apidefinitions"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -67,9 +67,22 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
+	var idOpts []apidefinitions.Option
+	if len(args.LintRules) > 0 {
+		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
+	}
+
 	var targetList []generator.Target
 	for _, inputPkg := range context.Inputs {
 		p := context.Universe.Package(inputPkg)
+
+		info, err := apidefinitions.Identify(p, apidefinitions.Lister, idOpts...)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		if !info.ShouldGenerate() {
+			continue
+		}
 
 		objectMeta, internal, err := objectMetaForPackage(p)
 		if err != nil {
@@ -102,12 +115,12 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 		// group when generating.
-		override, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupName"}, p.Comments)
+		override, ok, err := apidefinitions.GroupNameForPackage(p.Comments)
 		if err != nil {
-			klog.Fatalf("error extracting groupName tags: %v", err)
+			klog.Fatalf("error resolving group name: %v", err)
 		}
-		if override["groupName"] != nil {
-			gv.Group = clientgentypes.Group(strings.SplitN(override["groupName"][0], ".", 2)[0])
+		if ok {
+			gv.Group = clientgentypes.Group(strings.SplitN(override, ".", 2)[0])
 		}
 
 		var typesToGenerate []*types.Type

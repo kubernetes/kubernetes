@@ -24,13 +24,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -61,20 +62,22 @@ func (f *fakeContainerCommandRunner) RunInContainer(_ context.Context, id kubeco
 }
 
 func stubPodStatusProvider(podIP string) podStatusProvider {
-	return podStatusProviderFunc(func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
-		return &kubecontainer.PodStatus{
-			ID:        uid,
-			Name:      name,
-			Namespace: namespace,
-			IPs:       []string{podIP},
-		}, nil
-	})
+	return &fakePodStatusProvider{podIP: podIP}
 }
 
-type podStatusProviderFunc func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
+type fakePodStatusProvider struct {
+	podIP string
+}
 
-func (f podStatusProviderFunc) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
-	return f(uid, name, namespace)
+func (f *fakePodStatusProvider) GetPod(_ context.Context, uid types.UID) (*kubecontainer.Pod, error) {
+	return &kubecontainer.Pod{ID: uid}, nil
+}
+
+func (f *fakePodStatusProvider) GetPodStatus(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+	return &kubecontainer.PodStatus{
+		ID:  pod.ID,
+		IPs: []string{f.podIP},
+	}, nil
 }
 
 func TestRunHandlerExec(t *testing.T) {
@@ -228,7 +231,7 @@ func TestRunHandlerHttps(t *testing.T) {
 	pod.Spec.Containers = []v1.Container{container}
 
 	t.Run("consistent", func(t *testing.T) {
-		container.Lifecycle.PostStart.HTTPGet.Port = intstr.FromString("70")
+		container.Lifecycle.PostStart.HTTPGet.Port = intstr.FromInt32(70)
 		pod.Spec.Containers = []v1.Container{container}
 		_, err := handlerRunner.Run(tCtx, containerID, &pod, &container, container.Lifecycle.PostStart)
 
@@ -250,7 +253,7 @@ func TestRunHandlerHTTPPort(t *testing.T) {
 	}{
 		{
 			Name:     "consistent/with port",
-			Port:     intstr.FromString("70"),
+			Port:     intstr.FromInt32(70),
 			Expected: "https://foo:70/bar",
 		}, {
 			Name:        "consistent/without port",
@@ -322,7 +325,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo",
-				Port:        intstr.FromString("42"),
+				Port:        intstr.FromInt32(42),
 				Host:        "example.test",
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
@@ -341,7 +344,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo",
-				Port:        intstr.FromString("42"),
+				Port:        intstr.FromInt32(42),
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -359,7 +362,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "/foo",
-				Port:        intstr.FromString("42"),
+				Port:        intstr.FromInt32(42),
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -377,7 +380,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo",
-				Port:        intstr.FromString("42"),
+				Port:        intstr.FromInt32(42),
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -413,7 +416,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo",
-				Port:        intstr.FromString("4430"),
+				Port:        intstr.FromInt32(4430),
 				Scheme:      "https",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -431,7 +434,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo",
-				Port:        intstr.FromString("80"),
+				Port:        intstr.FromInt32(80),
 				Scheme:      "baz",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -449,7 +452,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo?k=v",
-				Port:        intstr.FromString("80"),
+				Port:        intstr.FromInt32(80),
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -467,7 +470,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo#frag",
-				Port:        intstr.FromString("80"),
+				Port:        intstr.FromInt32(80),
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -485,7 +488,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:   "foo",
-				Port:   intstr.FromString("80"),
+				Port:   intstr.FromInt32(80),
 				Scheme: "http",
 				HTTPHeaders: []v1.HTTPHeader{
 					{
@@ -510,7 +513,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			HTTPGet: &v1.HTTPGetAction{
 				Host:   "example.test",
 				Path:   "foo",
-				Port:   intstr.FromString("80"),
+				Port:   intstr.FromInt32(80),
 				Scheme: "http",
 				HTTPHeaders: []v1.HTTPHeader{
 					{
@@ -705,6 +708,10 @@ func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	portNumber, err := strconv.Atoi(port)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	recorder := &record.FakeRecorder{Events: make(chan string, 10)}
 
@@ -722,7 +729,7 @@ func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 					// set the scheme to https to ensure it falls back to HTTP.
 					Scheme: "https",
 					Host:   "127.0.0.1",
-					Port:   intstr.FromString(port),
+					Port:   intstr.FromInt32(int32(portNumber)),
 					Path:   "bar",
 					HTTPHeaders: []v1.HTTPHeader{
 						{
@@ -785,6 +792,7 @@ func TestIsHTTPResponseError(t *testing.T) {
 }
 
 func TestRunSleepHandler(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil, nil)
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -821,8 +829,8 @@ func TestRunSleepHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, tCtx := ktesting.NewTestContext(t)
+		tCtx.SyncTest(tt.name, func(tCtx ktesting.TContext) {
+			t := tCtx.TB()
 			pod.Spec.Containers[0].Lifecycle.PreStop.Sleep = &v1.SleepAction{Seconds: tt.sleepSeconds}
 			ctx, cancel := context.WithTimeout(tCtx, time.Duration(tt.terminationGracePeriodSeconds)*time.Second)
 			defer cancel()
@@ -840,6 +848,7 @@ func TestRunSleepHandler(t *testing.T) {
 }
 
 func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pod",
@@ -847,13 +856,12 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 	}
 	createMockFeature := func(t *testing.T, name string, inferForSched bool, maxVersionStr string) *ndftesting.MockFeature {
 		m := ndftesting.NewMockFeature(t)
-		m.EXPECT().Name().Return(name).Maybe()
-		m.EXPECT().InferForScheduling(mock.Anything).Return(inferForSched).Maybe()
+		m.SetName(name)
+		m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool { return inferForSched })
 		if maxVersionStr != "" {
-			maxVersionStr := version.MustParseSemantic(maxVersionStr)
-			m.EXPECT().MaxVersion().Return(maxVersionStr).Maybe()
+			m.SetMaxVersion(version.MustParseSemantic(maxVersionStr))
 		} else {
-			m.EXPECT().MaxVersion().Return(nil).Maybe()
+			m.SetMaxVersion(nil)
 		}
 		return m
 	}
@@ -908,12 +916,12 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			framework, err := ndf.New(tc.registeredFeatures)
-			require.NoError(t, err)
-			handler := NewDeclaredFeaturesAdmitHandler(framework, ndf.NewFeatureSet(tc.nodeDeclaredFeatures...), tc.version)
+			framework := ndf.New(tc.registeredFeatures)
+			fs := framework.MustMapSorted(tc.nodeDeclaredFeatures)
+			handler := NewDeclaredFeaturesAdmitHandler(framework, fs, tc.version)
 			attrs := &PodAdmitAttributes{Pod: pod}
 
-			result := handler.Admit(attrs)
+			result := handler.Admit(tCtx, attrs)
 
 			require.Equal(t, tc.expectedAdmit, result.Admit)
 			if !result.Admit {

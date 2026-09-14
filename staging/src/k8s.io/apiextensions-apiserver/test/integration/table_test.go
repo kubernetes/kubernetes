@@ -252,7 +252,7 @@ func TestTableGet(t *testing.T) {
 				// Validate extra column for v1
 				if i == 1 {
 					if got, expected := tbl.Rows[0].Cells[6], int64(5); got != expected {
-						t.Errorf("expected cell[6] to equal %q, got %q", expected, got)
+						t.Errorf("expected cell[6] to equal %v, got %v", expected, got)
 					}
 				}
 			}
@@ -350,7 +350,7 @@ func TestTableGet(t *testing.T) {
 				// Validate extra column for v1
 				if i == 1 {
 					if got, expected := tbl.Rows[0].Cells[6], int64(5); got != expected {
-						t.Errorf("expected cell[6] to equal %q, got %q", expected, got)
+						t.Errorf("expected cell[6] to equal %v, got %v", expected, got)
 					}
 				}
 			}

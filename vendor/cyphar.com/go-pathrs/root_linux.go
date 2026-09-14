@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0
 /*
  * libpathrs: safe path resolution on Linux
- * Copyright (C) 2019-2025 Aleksa Sarai <cyphar@cyphar.com>
  * Copyright (C) 2019-2025 SUSE LLC
+ * Copyright (C) 2026 Aleksa Sarai <cyphar@cyphar.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -19,6 +19,8 @@ import (
 	"os"
 	"syscall"
 
+	"golang.org/x/sys/unix"
+
 	"cyphar.com/go-pathrs/internal/fdutils"
 	"cyphar.com/go-pathrs/internal/libpathrs"
 )
@@ -27,7 +29,7 @@ import (
 // purpose of this "root handle" is to perform operations within the directory
 // tree, or to get a [Handle] to inodes within the directory tree.
 //
-// At time of writing, it is considered a *VERY BAD IDEA* to open a [Root]
+// At time of writing, it is considered a *VERY BAD IDEA* to open a Root
 // inside a possibly-attacker-controlled directory tree. While we do have
 // protections that should defend against it, it's far more dangerous than just
 // opening a directory tree which is not inside a potentially-untrusted
@@ -54,8 +56,6 @@ func OpenRoot(path string) (*Root, error) {
 // still be closed by the caller.
 //
 // This is effectively the inverse operation of [Root.IntoFile].
-//
-// [os.File]: https://pkg.go.dev/os#File
 func RootFromFile(file *os.File) (*Root, error) {
 	newFile, err := fdutils.DupFile(file)
 	if err != nil {
@@ -70,7 +70,7 @@ func RootFromFile(file *os.File) (*Root, error) {
 //
 // All symlinks (including trailing symlinks) are followed, but they are
 // resolved within the rootfs. If you wish to open a handle to the symlink
-// itself, use [ResolveNoFollow].
+// itself, use [Root.ResolveNoFollow].
 func (r *Root) Resolve(path string) (*Handle, error) {
 	return fdutils.WithFileFd(r.inner, func(rootFd uintptr) (*Handle, error) {
 		handleFd, err := libpathrs.InRootResolve(rootFd, path)
@@ -85,10 +85,10 @@ func (r *Root) Resolve(path string) (*Handle, error) {
 	})
 }
 
-// ResolveNoFollow is effectively an O_NOFOLLOW version of [Resolve]. Their
-// behaviour is identical, except that *trailing* symlinks will not be
-// followed. If the final component is a trailing symlink, an O_PATH|O_NOFOLLOW
-// handle to the symlink itself is returned.
+// ResolveNoFollow is effectively an [unix.O_NOFOLLOW] version of
+// [Root.Resolve]. Their behaviour is identical, except that *trailing*
+// symlinks will not be followed. If the final component is a trailing symlink,
+// an [unix.O_PATH]|[unix.O_NOFOLLOW] handle to the symlink itself is returned.
 func (r *Root) ResolveNoFollow(path string) (*Handle, error) {
 	return fdutils.WithFileFd(r.inner, func(rootFd uintptr) (*Handle, error) {
 		handleFd, err := libpathrs.InRootResolveNoFollow(rootFd, path)
@@ -103,33 +103,29 @@ func (r *Root) ResolveNoFollow(path string) (*Handle, error) {
 	})
 }
 
-// Open is effectively shorthand for [Resolve] followed by [Handle.Open], but
-// can be slightly more efficient (it reduces CGo overhead and the number of
-// syscalls used when using the openat2-based resolver) and is arguably more
+// Open is effectively shorthand for [Root.Resolve] followed by [Handle.Open],
+// but can be slightly more efficient (it reduces CGo overhead and the number
+// of syscalls used when using the openat2-based resolver) and is arguably more
 // ergonomic to use.
 //
 // This is effectively equivalent to [os.Open].
-//
-// [os.Open]: https://pkg.go.dev/os#Open
 func (r *Root) Open(path string) (*os.File, error) {
-	return r.OpenFile(path, os.O_RDONLY)
+	return r.OpenFile(path, unix.O_RDONLY)
 }
 
-// OpenFile is effectively shorthand for [Resolve] followed by
+// OpenFile is effectively shorthand for [Root.Resolve] followed by
 // [Handle.OpenFile], but can be slightly more efficient (it reduces CGo
 // overhead and the number of syscalls used when using the openat2-based
 // resolver) and is arguably more ergonomic to use.
 //
-// However, if flags contains os.O_NOFOLLOW and the path is a symlink, then
+// However, if flags contains [unix.O_NOFOLLOW] and the path is a symlink, then
 // OpenFile's behaviour will match that of openat2. In most cases an error will
-// be returned, but if os.O_PATH is provided along with os.O_NOFOLLOW then a
-// file equivalent to [ResolveNoFollow] will be returned instead.
+// be returned, but if [unix.O_PATH] is provided along with [unix.O_NOFOLLOW]
+// then a file equivalent to [Root.ResolveNoFollow] will be returned instead.
 //
-// This is effectively equivalent to [os.OpenFile], except that os.O_CREAT is
-// not supported.
-//
-// [os.OpenFile]: https://pkg.go.dev/os#OpenFile
-func (r *Root) OpenFile(path string, flags int) (*os.File, error) {
+// This is effectively equivalent to [os.OpenFile], except that [unix.O_CREAT]
+// is not supported.
+func (r *Root) OpenFile(path string, flags uint64) (*os.File, error) {
 	return fdutils.WithFileFd(r.inner, func(rootFd uintptr) (*os.File, error) {
 		fd, err := libpathrs.InRootOpen(rootFd, path, flags)
 		if err != nil {
@@ -145,9 +141,7 @@ func (r *Root) OpenFile(path string, flags int) (*os.File, error) {
 //
 // Unlike [os.Create], if the file already exists an error is created rather
 // than the file being opened and truncated.
-//
-// [os.Create]: https://pkg.go.dev/os#Create
-func (r *Root) Create(path string, flags int, mode os.FileMode) (*os.File, error) {
+func (r *Root) Create(path string, flags uint64, mode os.FileMode) (*os.File, error) {
 	unixMode, err := toUnixMode(mode, false)
 	if err != nil {
 		return nil, err
@@ -163,9 +157,9 @@ func (r *Root) Create(path string, flags int, mode os.FileMode) (*os.File, error
 
 // Rename two paths within a [Root]'s directory tree. The flags argument is
 // identical to the RENAME_* flags to the renameat2(2) system call.
-func (r *Root) Rename(src, dst string, flags uint) error {
+func (r *Root) Rename(src, dst string, flags uint64) error {
 	_, err := fdutils.WithFileFd(r.inner, func(rootFd uintptr) (struct{}, error) {
-		err := libpathrs.InRootRename(rootFd, src, dst, flags)
+		err := libpathrs.InRootRename(rootFd, src, rootFd, dst, flags)
 		return struct{}{}, err
 	})
 	return err
@@ -194,8 +188,6 @@ func (r *Root) RemoveFile(path string) error {
 // directory tree.
 //
 // This is effectively equivalent to [os.Remove].
-//
-// [os.Remove]: https://pkg.go.dev/os#Remove
 func (r *Root) Remove(path string) error {
 	// In order to match os.Remove's implementation we need to also do both
 	// syscalls unconditionally and adjust the error based on whether
@@ -219,8 +211,6 @@ func (r *Root) Remove(path string) error {
 // RemoveAll recursively deletes a path and all of its children.
 //
 // This is effectively equivalent to [os.RemoveAll].
-//
-// [os.RemoveAll]: https://pkg.go.dev/os#RemoveAll
 func (r *Root) RemoveAll(path string) error {
 	_, err := fdutils.WithFileFd(r.inner, func(rootFd uintptr) (struct{}, error) {
 		err := libpathrs.InRootRemoveAll(rootFd, path)
@@ -233,8 +223,6 @@ func (r *Root) RemoveAll(path string) error {
 // mode is used for the new directory (the process's umask applies).
 //
 // This is effectively equivalent to [os.Mkdir].
-//
-// [os.Mkdir]: https://pkg.go.dev/os#Mkdir
 func (r *Root) Mkdir(path string, mode os.FileMode) error {
 	unixMode, err := toUnixMode(mode, false)
 	if err != nil {
@@ -253,8 +241,6 @@ func (r *Root) Mkdir(path string, mode os.FileMode) error {
 // directories created by this function (the process's umask applies).
 //
 // This is effectively equivalent to [os.MkdirAll].
-//
-// [os.MkdirAll]: https://pkg.go.dev/os#MkdirAll
 func (r *Root) MkdirAll(path string, mode os.FileMode) (*Handle, error) {
 	unixMode, err := toUnixMode(mode, false)
 	if err != nil {
@@ -278,9 +264,7 @@ func (r *Root) MkdirAll(path string, mode os.FileMode) (*Handle, error) {
 // directory tree. The provided mode is used for the new directory (the
 // process's umask applies).
 //
-// This is effectively equivalent to [unix.Mknod].
-//
-// [unix.Mknod]: https://pkg.go.dev/golang.org/x/sys/unix#Mknod
+// This is effectively equivalent to [golang.org/x/sys/unix.Mknod].
 func (r *Root) Mknod(path string, mode os.FileMode, dev uint64) error {
 	unixMode, err := toUnixMode(mode, true)
 	if err != nil {
@@ -295,30 +279,26 @@ func (r *Root) Mknod(path string, mode os.FileMode, dev uint64) error {
 }
 
 // Symlink creates a symlink within a [Root]'s directory tree. The symlink is
-// created at path and is a link to target.
+// created at newname and is a link to oldname.
 //
 // This is effectively equivalent to [os.Symlink].
-//
-// [os.Symlink]: https://pkg.go.dev/os#Symlink
-func (r *Root) Symlink(path, target string) error {
+func (r *Root) Symlink(oldname, newname string) error {
 	_, err := fdutils.WithFileFd(r.inner, func(rootFd uintptr) (struct{}, error) {
-		err := libpathrs.InRootSymlink(rootFd, path, target)
+		err := libpathrs.InRootSymlink(oldname, rootFd, newname)
 		return struct{}{}, err
 	})
 	return err
 }
 
 // Hardlink creates a hardlink within a [Root]'s directory tree. The hardlink
-// is created at path and is a link to target. Both paths are within the
+// is created at newname and is a link to oldname. Both paths are within the
 // [Root]'s directory tree (you cannot hardlink to a different [Root] or the
 // host).
 //
 // This is effectively equivalent to [os.Link].
-//
-// [os.Link]: https://pkg.go.dev/os#Link
-func (r *Root) Hardlink(path, target string) error {
+func (r *Root) Hardlink(oldname, newname string) error {
 	_, err := fdutils.WithFileFd(r.inner, func(rootFd uintptr) (struct{}, error) {
-		err := libpathrs.InRootHardlink(rootFd, path, target)
+		err := libpathrs.InRootHardlink(rootFd, oldname, rootFd, newname, 0)
 		return struct{}{}, err
 	})
 	return err
@@ -327,8 +307,6 @@ func (r *Root) Hardlink(path, target string) error {
 // Readlink returns the target of a symlink with a [Root]'s directory tree.
 //
 // This is effectively equivalent to [os.Readlink].
-//
-// [os.Readlink]: https://pkg.go.dev/os#Readlink
 func (r *Root) Readlink(path string) (string, error) {
 	return fdutils.WithFileFd(r.inner, func(rootFd uintptr) (string, error) {
 		return libpathrs.InRootReadlink(rootFd, path)
@@ -345,8 +323,6 @@ func (r *Root) Readlink(path string) (string, error) {
 // calling [Root.Close] will also close any copies of the returned [os.File].
 // If you want to get an independent copy, use [Root.Clone] followed by
 // [Root.IntoFile] on the cloned [Root].
-//
-// [os.File]: https://pkg.go.dev/os#File
 func (r *Root) IntoFile() *os.File {
 	// TODO: Figure out if we really don't want to make a copy.
 	// TODO: We almost certainly want to clear r.inner here, but we can't do

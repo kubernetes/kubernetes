@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -104,6 +105,7 @@ func TestParseEvent(t *testing.T) {
 				assert.ErrorContains(t, err, tc.expectedErr)
 			} else {
 				require.NoError(t, err)
+				actualEvent.recordTime = time.Time{}
 				assert.Equal(t, tc.expectedEvent, actualEvent)
 			}
 		})

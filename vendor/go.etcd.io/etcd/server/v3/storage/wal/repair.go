@@ -49,15 +49,14 @@ func Repair(lg *zap.Logger, dirpath string) bool {
 		switch {
 		case err == nil:
 			// update crc of the decoder when necessary
-			switch rec.Type {
-			case CrcType:
+			if rec.GetType() == CrcType {
 				crc := decoder.LastCRC()
 				// current crc of decoder must match the crc of the record.
 				// do no need to match 0 crc, since the decoder is a new one at this case.
 				if crc != 0 && rec.Validate(crc) != nil {
 					return false
 				}
-				decoder.UpdateCRC(rec.Crc)
+				decoder.UpdateCRC(rec.GetCrc())
 			}
 			continue
 

@@ -23,15 +23,23 @@ import (
 type Set interface {
 	Add(string)
 	Remove(string)
-	Contains(string) bool
+	Contains(val ...string) bool
 	Equals(Set) bool
 	Length() int
 	Values() []string
 	Copy() Set
 	Sub(Set) Set
+
+	// ContainsAll returns whether the set contains all given values
+	// Deprecated: Use Contains instead.
+	ContainsAll(values []string) bool
 }
 
-func NewUnsafeSet(values ...string) *unsafeSet {
+type ThreadsafeSet interface {
+	Set
+}
+
+func NewUnsafeSet(values ...string) Set {
 	set := &unsafeSet{make(map[string]struct{})}
 	for _, v := range values {
 		set.Add(v)
@@ -39,10 +47,12 @@ func NewUnsafeSet(values ...string) *unsafeSet {
 	return set
 }
 
-func NewThreadsafeSet(values ...string) *tsafeSet {
+func NewThreadsafeSet(values ...string) ThreadsafeSet {
 	us := NewUnsafeSet(values...)
 	return &tsafeSet{us, sync.RWMutex{}}
 }
+
+var _ Set = (*unsafeSet)(nil)
 
 type unsafeSet struct {
 	d map[string]struct{}
@@ -59,12 +69,17 @@ func (us *unsafeSet) Remove(value string) {
 }
 
 // Contains returns whether the set contains the given value
-func (us *unsafeSet) Contains(value string) (exists bool) {
-	_, exists = us.d[value]
-	return exists
+func (us *unsafeSet) Contains(values ...string) (exists bool) {
+	for _, value := range values {
+		if _, exists := us.d[value]; !exists {
+			return false
+		}
+	}
+	return true
 }
 
 // ContainsAll returns whether the set contains all given values
+// Deprecated: Use Contains instead.
 func (us *unsafeSet) ContainsAll(values []string) bool {
 	for _, s := range values {
 		if !us.Contains(s) {
@@ -122,8 +137,10 @@ func (us *unsafeSet) Sub(other Set) Set {
 	return result
 }
 
+var _ ThreadsafeSet = (*tsafeSet)(nil)
+
 type tsafeSet struct {
-	us *unsafeSet
+	us Set
 	m  sync.RWMutex
 }
 
@@ -139,10 +156,18 @@ func (ts *tsafeSet) Remove(value string) {
 	ts.us.Remove(value)
 }
 
-func (ts *tsafeSet) Contains(value string) (exists bool) {
+func (ts *tsafeSet) Contains(values ...string) (exists bool) {
 	ts.m.RLock()
 	defer ts.m.RUnlock()
-	return ts.us.Contains(value)
+	return ts.us.Contains(values...)
+}
+
+// ContainsAll returns whether the set contains all given values
+// Deprecated: Use Contains instead.
+func (ts *tsafeSet) ContainsAll(values []string) bool {
+	ts.m.RLock()
+	defer ts.m.RUnlock()
+	return ts.us.ContainsAll(values)
 }
 
 func (ts *tsafeSet) Equals(other Set) bool {

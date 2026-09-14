@@ -327,6 +327,11 @@ func (in EventSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in EvictionResponder) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.EvictionResponder"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ExecAction) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.ExecAction"
 }
@@ -419,6 +424,11 @@ func (in ISCSIVolumeSource) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ImageVolumeSource) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.ImageVolumeSource"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImageVolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.ImageVolumeStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -537,6 +547,21 @@ func (in NodeAffinity) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodeAllocatableMappedResources) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.NodeAllocatableMappedResources"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodeAllocatableOverheadResources) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.NodeAllocatableOverheadResources"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodeAllocatableResourceClaimStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NodeCondition) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.NodeCondition"
 }
@@ -564,6 +589,11 @@ func (in NodeFeatures) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NodeList) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.NodeList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodePodPreemptionPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.NodePodPreemptionPolicy"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -797,6 +827,11 @@ func (in PodSchedulingGate) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodSchedulingGroup) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.PodSchedulingGroup"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodSecurityContext) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PodSecurityContext"
 }
@@ -817,11 +852,6 @@ func (in PodStatus) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PodStatusResult) OpenAPIModelName() string {
-	return "io.k8s.api.core.v1.PodStatusResult"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodTemplate) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PodTemplate"
 }
@@ -834,6 +864,11 @@ func (in PodTemplateList) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodTemplateSpec) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PodTemplateSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodVolumeHealth) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.PodVolumeHealth"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -1162,6 +1197,16 @@ func (in VolumeDevice) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in VolumeHealthCondition) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.VolumeHealthCondition"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in VolumeHealthStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.VolumeHealthStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in VolumeMount) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.VolumeMount"
 }
@@ -1192,6 +1237,11 @@ func (in VolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in VolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.VolumeStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in VsphereVirtualDiskVolumeSource) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource"
 }
@@ -1204,9 +1254,4 @@ func (in WeightedPodAffinityTerm) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in WindowsSecurityContextOptions) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.WindowsSecurityContextOptions"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in WorkloadReference) OpenAPIModelName() string {
-	return "io.k8s.api.core.v1.WorkloadReference"
 }

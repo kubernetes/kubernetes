@@ -33,5 +33,25 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.PreemptionPolicy = &preemptLowerPriority
 			}
 		},
+		func(s *scheduling.PodGroup, c randfill.Continue) {
+			c.FillNoCustom(s)
+			if s.Spec.DisruptionMode == nil {
+				s.Spec.DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
+			}
+			if s.Spec.PreemptionPolicy == nil {
+				preemptLowerPriority := scheduling.PreemptLowerPriority
+				s.Spec.PreemptionPolicy = &preemptLowerPriority
+			}
+		},
+		func(s *scheduling.CompositePodGroup, c randfill.Continue) {
+			c.FillNoCustom(s)
+			if s.Spec.DisruptionMode == nil {
+				s.Spec.DisruptionMode = &scheduling.CompositeDisruptionMode{Single: &scheduling.SingleCompositeDisruptionMode{}}
+			}
+			if s.Spec.PreemptionPolicy == nil {
+				preemptLowerPriority := scheduling.PreemptLowerPriority
+				s.Spec.PreemptionPolicy = &preemptLowerPriority
+			}
+		},
 	}
 }

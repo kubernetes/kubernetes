@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -48,6 +47,10 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 
 	if kc.UserNamespaces != nil {
 		return fmt.Errorf("invalid configuration: userNamespaces is not supported on Windows")
+	}
+
+	if len(kc.DefaultPodSysctls) > 0 {
+		return fmt.Errorf("invalid configuration: defaultPodSysctls is not supported on Windows")
 	}
 
 	return nil

@@ -32,7 +32,7 @@ var (
 			Subsystem:      kubeServiceAccountSubsystem,
 			Name:           "legacy_tokens_total",
 			Help:           "Cumulative legacy service account tokens used",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 
@@ -43,7 +43,7 @@ var (
 			Subsystem:      kubeServiceAccountSubsystem,
 			Name:           "stale_tokens_total",
 			Help:           "Cumulative stale projected service account tokens used",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 
@@ -83,7 +83,7 @@ var (
 			Subsystem:      kubeServiceAccountSubsystem,
 			Name:           "valid_tokens_total",
 			Help:           "Cumulative valid projected service account tokens used",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 )

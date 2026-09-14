@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -94,8 +95,9 @@ type GraphBuilder struct {
 	// This channel is also protected by monitorLock.
 	stopCh <-chan struct{}
 
-	// running tracks whether Run() has been called.
-	// it is protected by monitorLock.
+	// running is set to true when the Run() function has been called.
+	// It will revert to false when the Run() function receives a cancellation.
+	// It is protected by monitorLock.
 	running bool
 
 	eventRecorder    record.EventRecorder
@@ -131,7 +133,7 @@ type monitor struct {
 // Run is intended to be called in a goroutine. Multiple calls of this is an
 // error.
 func (m *monitor) Run() {
-	m.controller.Run(m.stopCh)
+	m.controller.RunWithContext(wait.ContextForChannel(m.stopCh))
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
@@ -149,13 +151,15 @@ func NewDependencyGraphBuilder(
 	attemptToDelete := workqueue.NewTypedRateLimitingQueueWithConfig(
 		workqueue.DefaultTypedControllerRateLimiter[*node](),
 		workqueue.TypedRateLimitingQueueConfig[*node]{
-			Name: "garbage_collector_attempt_to_delete",
+			Logger: new(klog.FromContext(ctx)),
+			Name:   "garbage_collector_attempt_to_delete",
 		},
 	)
 	attemptToOrphan := workqueue.NewTypedRateLimitingQueueWithConfig(
 		workqueue.DefaultTypedControllerRateLimiter[*node](),
 		workqueue.TypedRateLimitingQueueConfig[*node]{
-			Name: "garbage_collector_attempt_to_orphan",
+			Logger: new(klog.FromContext(ctx)),
+			Name:   "garbage_collector_attempt_to_orphan",
 		},
 	)
 	absentOwnerCache := NewReferenceCache(500)
@@ -168,7 +172,8 @@ func NewDependencyGraphBuilder(
 		graphChanges: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[*event](),
 			workqueue.TypedRateLimitingQueueConfig[*event]{
-				Name: "garbage_collector_graph_changes",
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "garbage_collector_graph_changes",
 			},
 		),
 		uidToNode: &concurrentUIDToNode{
@@ -222,12 +227,17 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 
 	shared, err := gb.sharedInformers.ForResource(resource)
 	if err != nil {
-		logger.V(4).Error(err, "unable to use a shared informer", "resource", resource, "kind", kind)
+		logger.V(4).Info("unable to use a shared informer", "resource", resource, "kind", kind, "err", err)
 		return nil, nil, err
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)
-	// need to clone because it's from a shared cache
-	shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
+	resyncPeriod := time.Duration(0)
+	if _, err := shared.Informer().AddEventHandlerWithOptions(handlers, cache.HandlerOptions{
+		Logger:       &logger,
+		ResyncPeriod: &resyncPeriod,
+	}); err != nil {
+		return nil, nil, err
+	}
 	return shared.Informer().GetController(), shared.Informer().GetStore(), nil
 }
 
@@ -620,12 +630,7 @@ func hasOrphanFinalizer(accessor metav1.Object) bool {
 
 func hasFinalizer(accessor metav1.Object, matchingFinalizer string) bool {
 	finalizers := accessor.GetFinalizers()
-	for _, finalizer := range finalizers {
-		if finalizer == matchingFinalizer {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(finalizers, matchingFinalizer)
 }
 
 // this function takes newAccessor directly because the caller already
@@ -783,7 +788,7 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 			// waiting for the deletion of their dependents.
 			gb.addUnblockedOwnersToDeleteQueue(logger, removed, changed)
 			// update the node itself
-			existingNode.owners = accessor.GetOwnerReferences()
+			existingNode.setOwners(accessor.GetOwnerReferences())
 			// Add the node to its new owners' dependent lists.
 			gb.addDependentToOwners(logger, existingNode, added)
 			// remove the node from the dependent list of node that are no longer in

@@ -25,6 +25,7 @@ import (
 	apistoragev1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -33,11 +34,39 @@ import (
 )
 
 // StorageClassInformer provides access to a shared informer and lister for
-// StorageClasses.
+// StorageClasses. Prefer using the type-safe variant (see [TypedStorageClassInformer]).
 type StorageClassInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() storagev1beta1.StorageClassLister
 }
+
+// TypedStorageClassInformer provides access to a shared informer and lister for
+// StorageClasses, including the type-safe TypedInformer variant.
+// It is a superset of StorageClassInformer.
+type TypedStorageClassInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() StorageClassIndexInformer
+	Lister() storagev1beta1.StorageClassLister
+}
+
+// StorageClassIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type StorageClassIndexInformer cache.TypedSharedIndexInformer[*apistoragev1beta1.StorageClass]
+
+// StorageClassHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for StorageClass.
+type StorageClassHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apistoragev1beta1.StorageClass]
+
+// StorageClassDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for StorageClass.
+type StorageClassDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apistoragev1beta1.StorageClass]
+
+// StorageClassFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for StorageClass.
+type StorageClassFilteringHandler = cache.TypedFilteringResourceEventHandler[*apistoragev1beta1.StorageClass]
+
+// StorageClassIndexers is a specialization of [cache.TypedIndexers] for StorageClass.
+type StorageClassIndexers = cache.TypedIndexers[*apistoragev1beta1.StorageClass]
+
+// DeletedStorageClass is a specialization of [cache.DeletedObject] for StorageClass.
+type DeletedStorageClass = cache.DeletedObject[*apistoragev1beta1.StorageClass]
 
 type storageClassInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -47,55 +76,132 @@ type storageClassInformer struct {
 // NewStorageClassInformer constructs a new informer for StorageClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedStorageClassInformer]).
 func NewStorageClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredStorageClassInformer(client, resyncPeriod, indexers, nil)
+	return NewStorageClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedStorageClassInformer constructs a new informer for StorageClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedStorageClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers StorageClassIndexers) StorageClassIndexInformer {
+	return NewTypedStorageClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredStorageClassInformer constructs a new informer for StorageClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredStorageClassInformer]).
 func NewFilteredStorageClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewTypedStorageClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredStorageClassInformer constructs a new informer for StorageClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredStorageClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers StorageClassIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) StorageClassIndexInformer {
+	return NewTypedStorageClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewStorageClassInformerWithOptions constructs a new informer for StorageClass type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedStorageClassInformerWithOptions]).
+func NewStorageClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedStorageClassInformerWithOptions(client, options)
+}
+
+// NewTypedStorageClassInformerWithOptions constructs a new informer for StorageClass type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedStorageClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) StorageClassIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "storageclasss"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apistoragev1beta1.StorageClass](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.StorageV1beta1().StorageClasses().List(context.Background(), options)
+				return client.StorageV1beta1().StorageClasses().List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.StorageV1beta1().StorageClasses().Watch(context.Background(), options)
+				return client.StorageV1beta1().StorageClasses().Watch(context.Background(), opts)
 			},
-			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.StorageV1beta1().StorageClasses().List(ctx, options)
+				return client.StorageV1beta1().StorageClasses().List(ctx, opts)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.StorageV1beta1().StorageClasses().Watch(ctx, options)
+				return client.StorageV1beta1().StorageClasses().Watch(ctx, opts)
 			},
 		}, client),
 		&apistoragev1beta1.StorageClass{},
-		resyncPeriod,
-		indexers,
-	)
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
+		},
+	))
 }
 
 func (f *storageClassInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredStorageClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedStorageClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *storageClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistoragev1beta1.StorageClass{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *storageClassInformer) TypedInformer() StorageClassIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistoragev1beta1.StorageClass](f.factory.InformerFor(&apistoragev1beta1.StorageClass{}, f.defaultInformer))
 }
 
 func (f *storageClassInformer) Lister() storagev1beta1.StorageClassLister {
 	return storagev1beta1.NewStorageClassLister(f.Informer().GetIndexer())
+}
+
+// ToTypedStorageClassInformer converts an untyped informer into a TypedStorageClassInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *StorageClass. If that is not the case, calling type-safe methods of the returned
+// TypedStorageClassInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedStorageClassInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedStorageClassInformer(informer StorageClassInformer) TypedStorageClassInformer {
+	if informer, ok := informer.(TypedStorageClassInformer); ok {
+		return informer
+	}
+	return &storageClassTypedInformerAdapter{informer}
+}
+
+type storageClassTypedInformerAdapter struct {
+	StorageClassInformer
+}
+
+func (a *storageClassTypedInformerAdapter) TypedInformer() StorageClassIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistoragev1beta1.StorageClass](a.Informer())
+}
+
+// ToStorageClassIndexInformer converts an untyped informer into a StorageClassIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *StorageClass. If that is not the case, calling type-safe methods of the returned
+// StorageClassIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a StorageClassIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToStorageClassIndexInformer(informer cache.SharedIndexInformer) StorageClassIndexInformer {
+	if informer, ok := informer.(StorageClassIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apistoragev1beta1.StorageClass](informer)
 }

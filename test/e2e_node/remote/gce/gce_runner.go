@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -69,17 +68,17 @@ func (e *envs) Set(value string) error {
 // nodeEnvs is the node envs from the flag `node-env`.
 var nodeEnvs = make(envs)
 
-var project = flag.String("project", "", "gce project the hosts live in (gce)")
-var zone = flag.String("zone", "", "gce zone that the hosts live in (gce)")
-var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2  (gce)")
-var imageProject = flag.String("image-project", "", "gce project the hosts live in  (gce)")
-var instanceType = flag.String("instance-type", "e2-medium", "GCP Machine type to use for test")
-var preemptibleInstances = flag.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible  (gce)")
-var network = flag.String("network", "", "Specifies the network that the VM instance are a part of")
-var subnet = flag.String("subnet", "", "Specifies the subnet that the VM instance are a part of")
+var project = remote.CommandLine.String("project", "", "gce project the hosts live in (gce)")
+var zone = remote.CommandLine.String("zone", "", "gce zone that the hosts live in (gce)")
+var instanceMetadata = remote.CommandLine.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2  (gce)")
+var imageProject = remote.CommandLine.String("image-project", "", "gce project the hosts live in  (gce)")
+var instanceType = remote.CommandLine.String("instance-type", "e2-medium", "GCP Machine type to use for test")
+var preemptibleInstances = remote.CommandLine.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible  (gce)")
+var network = remote.CommandLine.String("network", "", "Specifies the network that the VM instance are a part of")
+var subnet = remote.CommandLine.String("subnet", "", "Specifies the subnet that the VM instance are a part of")
 
 func init() {
-	flag.Var(&nodeEnvs, "node-env", "An environment variable passed to instance as metadata, e.g. when '--node-env=PATH=/usr/bin' is specified, there will be an extra instance metadata 'PATH=/usr/bin'.")
+	remote.CommandLine.Var(&nodeEnvs, "node-env", "An environment variable passed to instance as metadata, e.g. when '--node-env=PATH=/usr/bin' is specified, there will be an extra instance metadata 'PATH=/usr/bin'.")
 }
 
 type GCERunner struct {
@@ -186,10 +185,9 @@ type GCEImage struct {
 	Resources       Resources `json:"resources,omitempty"`
 }
 
-// Returns an image name based on regex and given GCE project.
+// getGCEImage returns the newest image matching imageRegex and imageFamily in project.
 func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) (string, error) {
-	data, err := runGCPCommandNoProject("compute", "images", "list",
-		"--format=json", "--project="+project)
+	data, err := runGCPCommandNoProject(gceImageListArgs(project, imageFamily)...)
 	if err != nil {
 		return "", fmt.Errorf("failed to list images in project %q: %w", project, err)
 	}
@@ -198,13 +196,35 @@ func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) 
 	if err != nil {
 		return "", fmt.Errorf("failed to parse images: %w", err)
 	}
+	return pickNewestImage(images, imageRegex, imageFamily, project)
+}
 
+// gceImageListArgs returns the gcloud arguments to list candidate images.
+func gceImageListArgs(project, imageFamily string) []string {
+	args := []string{"compute", "images", "list", "--format=json", "--project=" + project}
+	if imageFamily != "" {
+		// Narrow to the family so gcloud does not return the whole project.
+		// For large projects that can take a long time and consume significant
+		// amounts of RAM. It was the reason why the memory requirements of
+		// jobs using Ubuntu had to be raised (https://github.com/kubernetes/kubernetes/issues/141434).
+		args = append(args, "--filter=family="+imageFamily)
+	}
+	return args
+}
+
+// pickNewestImage returns the name of the newest image matching imageRegex and imageFamily.
+func pickNewestImage(images []gceImage, imageRegex, imageFamily, project string) (string, error) {
 	imageObjs := []imageObj{}
-	imageRe := regexp.MustCompile(imageRegex)
+	// Compile, not MustCompile: image_regex is user config and must not panic.
+	imageRe, err := regexp.Compile(imageRegex)
+	if err != nil {
+		return "", fmt.Errorf("failed to compile image_regex %q: %w", imageRegex, err)
+	}
 	for _, instance := range images {
 		if imageRegex != "" && !imageRe.MatchString(instance.Name) {
 			continue
 		}
+		// gcloud's --filter=family is not guaranteed exact, so match here too.
 		if imageFamily != "" && instance.Family != imageFamily {
 			continue
 		}

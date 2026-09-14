@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"net"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	netutils "k8s.io/utils/net"
 )
 
@@ -28,9 +28,10 @@ import (
 type NodePortAddresses struct {
 	cidrStrings []string
 
-	cidrs                []*net.IPNet
-	containsIPv4Loopback bool
-	matchAll             bool
+	cidrs                    []*net.IPNet
+	containsIPv4Loopback     bool
+	containsExplicitLoopback bool
+	matchAll                 bool
 }
 
 // RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
@@ -55,6 +56,13 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAdd
 			npa.cidrStrings = []string{IPv4ZeroCIDR}
 		} else {
 			npa.cidrStrings = []string{IPv6ZeroCIDR}
+		}
+	}
+
+	for _, str := range npa.cidrStrings {
+		if _, cidr, err := netutils.ParseCIDRSloppy(str); err == nil && cidr.IP.IsLoopback() {
+			npa.containsExplicitLoopback = true
+			break
 		}
 	}
 
@@ -131,4 +139,11 @@ func (npa *NodePortAddresses) GetNodeIPs(nw NetworkInterfacer) ([]net.IP, error)
 // ContainsIPv4Loopback returns true if npa's CIDRs contain an IPv4 loopback address.
 func (npa *NodePortAddresses) ContainsIPv4Loopback() bool {
 	return npa.containsIPv4Loopback
+}
+
+// ContainsExplicitLoopback returns true if npa's CIDRs include a CIDR that targets
+// loopback specifically (e.g. 127.0.0.0/8 or ::1/128), as opposed to a catch-all CIDR
+// that contains a loopback address.
+func (npa *NodePortAddresses) ContainsExplicitLoopback() bool {
+	return npa.containsExplicitLoopback
 }

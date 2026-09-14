@@ -91,6 +91,9 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetExternalKubeInformerFactory(i.externalInformers)
 	}
 
+	if wants, ok := plugin.(WantsUnconditionalAuthorizer); ok {
+		wants.SetUnconditionalAuthorizer(i.authorizer)
+	}
 	if wants, ok := plugin.(WantsAuthorizer); ok {
 		wants.SetAuthorizer(i.authorizer)
 	}

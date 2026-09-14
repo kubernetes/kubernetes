@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -25,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -36,6 +39,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
+type fakeAuthorizer struct {
+}
+
+func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	return authorizer.DecisionAllow, "ok", nil
+}
+
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, resource.GroupName)
 	restOptions := generic.RESTOptions{
@@ -46,7 +56,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 	}
 	fakeClient := fake.NewSimpleClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
-	resourceClaimStorage, statusStorage, err := NewREST(restOptions, mockNSClient)
+	resourceClaimStorage, statusStorage, err := NewREST(restOptions, mockNSClient, &fakeAuthorizer{})
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -159,6 +169,17 @@ func TestUpdateStatus(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
+	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "system:serviceaccount:kube-system:test"})
+	ctx = genericapirequest.WithRequestInfo(ctx, &genericapirequest.RequestInfo{
+		IsResourceRequest: true,
+		Verb:              "update",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        "v1",
+		Resource:          "resourceclaims",
+		Subresource:       "status",
+		Namespace:         metav1.NamespaceDefault,
+		Name:              "foo",
+	})
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	claimStart := validNewClaim("foo", metav1.NamespaceDefault)

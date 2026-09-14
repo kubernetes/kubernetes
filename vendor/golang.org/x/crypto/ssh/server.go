@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"strings"
 )
 
@@ -25,26 +26,43 @@ type Permissions struct {
 	// defines "force-command" (only allow the given command to
 	// execute) and "source-address" (only allow connections from
 	// the given address). The SSH package currently only enforces
-	// the "source-address" critical option. It is up to server
-	// implementations to enforce other critical options, such as
-	// "force-command", by checking them after the SSH handshake
-	// is successful. In general, SSH servers should reject
+	// the "source-address" critical option: it is validated against
+	// the client's remote address whenever it is present in the
+	// Permissions returned by any authentication callback. Its value
+	// is a comma-separated list of IP addresses and CIDR blocks;
+	// consistently with OpenSSH, a connection whose remote address is
+	// not an IP address, such as a Unix domain socket, never matches
+	// the list and is rejected when the option is present. It is up
+	// to server implementations to enforce other critical options,
+	// such as "force-command", by checking them after the SSH
+	// handshake is successful. In general, SSH servers should reject
 	// connections that specify critical options that are unknown
 	// or not supported.
 	CriticalOptions map[string]string
 
-	// Extensions are extra functionality that the server may
-	// offer on authenticated connections. Lack of support for an
-	// extension does not preclude authenticating a user. Common
-	// extensions are "permit-agent-forwarding",
-	// "permit-X11-forwarding". The Go SSH library currently does
-	// not act on any extension, and it is up to server
-	// implementations to honor them. Extensions can be used to
-	// pass data from the authentication callbacks to the server
-	// application layer.
+	// Extensions are extra functionality that the server may offer on
+	// authenticated connections. Lack of support for an extension does not
+	// preclude authenticating a user. Common extensions are
+	// "permit-agent-forwarding", "permit-X11-forwarding". In general the Go
+	// SSH library does not act on extensions and it is up to server
+	// implementations to honor them; extensions can also be used to pass data
+	// from the authentication callbacks to the server application layer.
+	//
+	// The one extension acted upon by this library is "no-touch-required",
+	// which applies only to security-key public keys
+	// (sk-ecdsa-sha2-nistp256@openssh.com and sk-ssh-ed25519@openssh.com).
+	// When present, it waives the default requirement that SK signatures
+	// assert user presence (i.e. a physical touch of the authenticator)
+	// during signature verification.
 	Extensions map[string]string
+
+	// ExtraData allows to store user defined data.
+	ExtraData map[any]any
 }
 
+// GSSAPIWithMICConfig includes the server callbacks for gssapi-with-mic
+// authentication. If either field is nil, gssapi-with-mic is considered not
+// configured.
 type GSSAPIWithMICConfig struct {
 	// AllowLogin, must be set, is called when gssapi-with-mic
 	// authentication is selected (RFC 4462 section 3). The srcName is from the
@@ -57,6 +75,10 @@ type GSSAPIWithMICConfig struct {
 	// Server must be set. It's the implementation
 	// of the GSSAPIServer interface. See GSSAPIServer interface for details.
 	Server GSSAPIServer
+}
+
+func gssapiWithMICConfigured(config *GSSAPIWithMICConfig) bool {
+	return config != nil && config.AllowLogin != nil && config.Server != nil
 }
 
 // SendAuthBanner implements [ServerPreAuthConn].
@@ -78,6 +100,79 @@ type ServerPreAuthConn interface {
 	// SendAuthBanner sends a banner message to the client.
 	// It returns an error once the authentication phase has ended.
 	SendAuthBanner(string) error
+}
+
+// noTouchRequiredExtension is the extension name used by OpenSSH in
+// authorized_keys options and certificate extensions to mark keys
+// whose signatures do not need to assert user presence (touch). See
+// ssh-keygen(1) and sshd(8).
+const noTouchRequiredExtension = "no-touch-required"
+
+// noTouchAllowed reports whether the user presence requirement on
+// SK signatures should be waived for this authentication attempt. The
+// requirement is waived when the "no-touch-required" extension is
+// present either in the Permissions returned by the auth callback
+// (authorized_keys-level opt-out) or in the certificate's own
+// Extensions (CA-level opt-out), matching OpenSSH behavior. OpenSSH
+// reads the per-key opt-out only from cert Extensions and
+// authorized_keys options (never from CriticalOptions); we follow the
+// same rule.
+func noTouchAllowed(pubKey PublicKey, perms *Permissions) bool {
+	if perms != nil {
+		if _, ok := perms.Extensions[noTouchRequiredExtension]; ok {
+			return true
+		}
+	}
+	if cert, ok := pubKey.(*Certificate); ok {
+		if _, ok := cert.Extensions[noTouchRequiredExtension]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// skKeyWithoutUP returns a PublicKey equivalent to pubKey but whose
+// Verify accepts SK signatures with the user-presence flag clear. If
+// pubKey is not (and does not wrap) an SK key, pubKey is returned
+// unchanged. The returned value never mutates pubKey: for SK keys a
+// shallow copy is made so that the noTouchRequired flag is set only on
+// the clone.
+//
+// The implementation is iterative rather than recursive. When pubKey
+// is a *Certificate we unwrap exactly one level to look at the inner
+// key. The SSH cert format forbids Certificate.Key from being another
+// Certificate (parseCert rejects it), but nothing stops callers from
+// constructing such a value directly in Go; a recursive descent could
+// otherwise be driven to unbounded depth by a hand-crafted or cyclic
+// Certificate. A malformed input of that shape simply returns
+// unchanged here.
+func skKeyWithoutUP(pubKey PublicKey) PublicKey {
+	cert, isCert := pubKey.(*Certificate)
+	target := pubKey
+	if isCert {
+		target = cert.Key
+	}
+	var cloned PublicKey
+	switch k := target.(type) {
+	case *skECDSAPublicKey:
+		c := *k
+		c.noTouchRequired = true
+		cloned = &c
+	case *skEd25519PublicKey:
+		c := *k
+		c.noTouchRequired = true
+		cloned = &c
+	default:
+		// Not an SK key (or a pathological *Certificate wrapping
+		// another *Certificate): pubKey is already usable for Verify.
+		return pubKey
+	}
+	if !isCert {
+		return cloned
+	}
+	c := *cert
+	c.Key = cloned
+	return &c
 }
 
 // ServerConfig holds server specific configuration data.
@@ -125,6 +220,23 @@ type ServerConfig struct {
 	// depending on the public key, store it inside a
 	// Permissions.Extensions entry.
 	PublicKeyCallback func(conn ConnMetadata, key PublicKey) (*Permissions, error)
+
+	// VerifiedPublicKeyCallback, if non-nil, is called after a client
+	// successfully confirms having control over a key that was previously
+	// approved by PublicKeyCallback. The permissions object passed to the
+	// callback is the one returned by PublicKeyCallback for the given public
+	// key and its ownership is transferred to the callback. The returned
+	// Permissions object can be the same object, optionally modified, or a
+	// completely new object. If VerifiedPublicKeyCallback is non-nil,
+	// PublicKeyCallback is not allowed to return a PartialSuccessError, which
+	// can instead be returned by VerifiedPublicKeyCallback. The
+	// signatureAlgorithm argument is the format of the signature that was
+	// successfully verified.
+	//
+	// VerifiedPublicKeyCallback does not affect which authentication methods
+	// are included in the list of methods that can be attempted by the client.
+	VerifiedPublicKeyCallback func(conn ConnMetadata, key PublicKey, permissions *Permissions,
+		signatureAlgorithm string) (*Permissions, error)
 
 	// KeyboardInteractiveCallback, if non-nil, is called when
 	// keyboard-interactive authentication is selected (RFC
@@ -223,8 +335,10 @@ func (c *pubKeyCache) add(candidate cachedPubKey) {
 type ServerConn struct {
 	Conn
 
-	// If the succeeding authentication callback returned a
-	// non-nil Permissions pointer, it is stored here.
+	// If the succeeding authentication callback returned a non-nil Permissions
+	// pointer, it is stored here. These are the permissions from the final,
+	// successful authentication method. Permissions returned by callbacks that
+	// return PartialSuccessError are not preserved and must be nil.
 	Permissions *Permissions
 }
 
@@ -246,7 +360,7 @@ func NewServerConn(c net.Conn, config *ServerConfig) (*ServerConn, <-chan NewCha
 		fullConf.PublicKeyAuthAlgorithms = defaultPubKeyAuthAlgos
 	} else {
 		for _, algo := range fullConf.PublicKeyAuthAlgorithms {
-			if !contains(SupportedAlgorithms().PublicKeyAuths, algo) && !contains(InsecureAlgorithms().PublicKeyAuths, algo) {
+			if !slices.Contains(SupportedAlgorithms().PublicKeyAuths, algo) && !slices.Contains(InsecureAlgorithms().PublicKeyAuths, algo) {
 				c.Close()
 				return nil, nil, nil, fmt.Errorf("ssh: unsupported public key authentication algorithm %s", algo)
 			}
@@ -283,8 +397,7 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 	}
 
 	if !config.NoClientAuth && config.PasswordCallback == nil && config.PublicKeyCallback == nil &&
-		config.KeyboardInteractiveCallback == nil && (config.GSSAPIWithMICConfig == nil ||
-		config.GSSAPIWithMICConfig.AllowLogin == nil || config.GSSAPIWithMICConfig.Server == nil) {
+		config.KeyboardInteractiveCallback == nil && !gssapiWithMICConfigured(config.GSSAPIWithMICConfig) {
 		return nil, errors.New("ssh: no authentication methods configured but NoClientAuth is also false")
 	}
 
@@ -337,6 +450,10 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 	return perms, err
 }
 
+// checkSourceAddress matches addr against sourceAddrs, a comma-separated list
+// of IP addresses and CIDR blocks. Consistently with OpenSSH, a remote address
+// that is not IP-based, such as a Unix domain socket, never matches the list
+// and is rejected.
 func checkSourceAddress(addr net.Addr, sourceAddrs string) error {
 	if addr == nil {
 		return errors.New("ssh: no address known for client, but source-address match required")
@@ -344,7 +461,7 @@ func checkSourceAddress(addr net.Addr, sourceAddrs string) error {
 
 	tcpAddr, ok := addr.(*net.TCPAddr)
 	if !ok {
-		return fmt.Errorf("ssh: remote address %v is not an TCP address when checking source-address match", addr)
+		return fmt.Errorf("ssh: remote address %v is not a TCP address when checking source-address match", addr)
 	}
 
 	for _, sourceAddr := range strings.Split(sourceAddrs, ",") {
@@ -365,6 +482,21 @@ func checkSourceAddress(addr net.Addr, sourceAddrs string) error {
 	}
 
 	return fmt.Errorf("ssh: remote address %v is not allowed because of source-address restriction", addr)
+}
+
+// checkSourceAddressCriticalOption enforces the source-address critical
+// option, if present in perms, as documented in Permissions.CriticalOptions.
+// A present but empty value matches no address, so it denies authentication,
+// consistently with OpenSSH, rather than being treated as absent.
+func checkSourceAddressCriticalOption(addr net.Addr, perms *Permissions) error {
+	if perms == nil {
+		return nil
+	}
+	saco, ok := perms.CriticalOptions[sourceAddressCriticalOption]
+	if !ok {
+		return nil
+	}
+	return checkSourceAddress(addr, saco)
 }
 
 func gssExchangeToken(gssapiConfig *GSSAPIWithMICConfig, token []byte, s *connection,
@@ -508,6 +640,15 @@ func (b *BannerError) Error() string {
 	return b.Err.Error()
 }
 
+// maxAuthServerAttempts caps the total number of SSH_MSG_USERAUTH_REQUEST
+// messages the server will process on a single connection, regardless of
+// outcome (failure, partial success, public key query, or none). It is a
+// backstop against clients that drive the authentication loop indefinitely
+// without ever incurring a real failure — for example by repeatedly
+// triggering PartialSuccessError or by spamming public key offer queries —
+// neither of which increment the MaxAuthTries failure counter.
+const maxAuthServerAttempts = 128
+
 func (s *connection) serverAuthenticate(config *ServerConfig) (*Permissions, error) {
 	if config.PreAuthConnCallback != nil {
 		config.PreAuthConnCallback(s)
@@ -518,6 +659,7 @@ func (s *connection) serverAuthenticate(config *ServerConfig) (*Permissions, err
 	var perms *Permissions
 
 	authFailures := 0
+	authAttempts := 0
 	noneAuthCount := 0
 	var authErrs []error
 	var calledBannerCallback bool
@@ -546,6 +688,19 @@ userAuthLoop:
 			return nil, &ServerAuthError{Errors: authErrs}
 		}
 
+		if authAttempts >= maxAuthServerAttempts {
+			discMsg := &disconnectMsg{
+				Reason:  2,
+				Message: "too many authentication attempts",
+			}
+			if err := s.transport.writePacket(Marshal(discMsg)); err != nil {
+				return nil, err
+			}
+			authErrs = append(authErrs, discMsg)
+			return nil, &ServerAuthError{Errors: authErrs}
+		}
+		authAttempts++
+
 		var userAuthReq userAuthRequestMsg
 		if packet, err := s.transport.readPacket(); err != nil {
 			if err == io.EOF {
@@ -557,7 +712,7 @@ userAuthLoop:
 		}
 
 		if userAuthReq.Service != serviceSSH {
-			return nil, errors.New("ssh: client attempted to negotiate for unknown service: " + userAuthReq.Service)
+			return nil, fmt.Errorf("ssh: client attempted to negotiate for unknown service: %q", userAuthReq.Service)
 		}
 
 		if s.user != userAuthReq.User && partialSuccessReturned {
@@ -631,7 +786,7 @@ userAuthLoop:
 				return nil, parseError(msgUserAuthRequest)
 			}
 			algo := string(algoBytes)
-			if !contains(config.PublicKeyAuthAlgorithms, underlyingAlgo(algo)) {
+			if !slices.Contains(config.PublicKeyAuthAlgorithms, underlyingAlgo(algo)) {
 				authErr = fmt.Errorf("ssh: algorithm %q not accepted", algo)
 				break
 			}
@@ -643,7 +798,8 @@ userAuthLoop:
 
 			pubKey, err := ParsePublicKey(pubKeyData)
 			if err != nil {
-				return nil, err
+				authErr = err
+				break
 			}
 
 			candidate, ok := cache.get(s.user, pubKeyData)
@@ -652,14 +808,18 @@ userAuthLoop:
 				candidate.pubKeyData = pubKeyData
 				candidate.perms, candidate.result = authConfig.PublicKeyCallback(s, pubKey)
 				_, isPartialSuccessError := candidate.result.(*PartialSuccessError)
+				if isPartialSuccessError && config.VerifiedPublicKeyCallback != nil {
+					return nil, errors.New("ssh: invalid library usage: PublicKeyCallback must not return partial success when VerifiedPublicKeyCallback is defined")
+				}
 
-				if (candidate.result == nil || isPartialSuccessError) &&
-					candidate.perms != nil &&
-					candidate.perms.CriticalOptions != nil &&
-					candidate.perms.CriticalOptions[sourceAddressCriticalOption] != "" {
-					if err := checkSourceAddress(
-						s.RemoteAddr(),
-						candidate.perms.CriticalOptions[sourceAddressCriticalOption]); err != nil {
+				// This check is authoritative for the Permissions returned by
+				// PublicKeyCallback: the check at the end of the auth loop sees
+				// the final Permissions, which VerifiedPublicKeyCallback may
+				// have replaced, and is skipped on partial success. It also
+				// makes public key queries fail before the client signs when
+				// PublicKeyCallback supplies the restriction.
+				if candidate.result == nil || isPartialSuccessError {
+					if err := checkSourceAddressCriticalOption(s.RemoteAddr(), candidate.perms); err != nil {
 						candidate.result = err
 					}
 				}
@@ -695,7 +855,7 @@ userAuthLoop:
 				// ssh-rsa-cert-v01@openssh.com algorithm with ssh-rsa public
 				// key type. The algorithm and public key type must be
 				// consistent: both must be certificate algorithms, or neither.
-				if !contains(algorithmsForKeyFormat(pubKey.Type()), algo) {
+				if !slices.Contains(algorithmsForKeyFormat(pubKey.Type()), algo) {
 					authErr = fmt.Errorf("ssh: public key type %q not compatible with selected algorithm %q",
 						pubKey.Type(), algo)
 					break
@@ -705,7 +865,7 @@ userAuthLoop:
 				// algorithm name that corresponds to algo with
 				// sig.Format.  This is usually the same, but
 				// for certs, the names differ.
-				if !contains(config.PublicKeyAuthAlgorithms, sig.Format) {
+				if !slices.Contains(config.PublicKeyAuthAlgorithms, sig.Format) {
 					authErr = fmt.Errorf("ssh: algorithm %q not accepted", sig.Format)
 					break
 				}
@@ -715,16 +875,29 @@ userAuthLoop:
 				}
 
 				signedData := buildDataSignedForAuth(sessionID, userAuthReq, algo, pubKeyData)
-
-				if err := pubKey.Verify(signedData, sig); err != nil {
+				// pubKey is reused below for VerifiedPublicKeyCallback and
+				// must remain the key as presented by the client; derive a
+				// separate value for Verify that carries any applicable
+				// no-touch-required opt-out.
+				pubKeyForVerify := pubKey
+				if noTouchAllowed(pubKey, candidate.perms) {
+					pubKeyForVerify = skKeyWithoutUP(pubKey)
+				}
+				if err := pubKeyForVerify.Verify(signedData, sig); err != nil {
 					return nil, err
 				}
 
 				authErr = candidate.result
 				perms = candidate.perms
+				if authErr == nil && config.VerifiedPublicKeyCallback != nil {
+					// Only call VerifiedPublicKeyCallback after the key has been accepted
+					// and successfully verified. If authErr is non-nil, the key is not
+					// considered verified and the callback must not run.
+					perms, authErr = config.VerifiedPublicKeyCallback(s, pubKey, perms, sig.Format)
+				}
 			}
 		case "gssapi-with-mic":
-			if authConfig.GSSAPIWithMICConfig == nil {
+			if !gssapiWithMICConfigured(authConfig.GSSAPIWithMICConfig) {
 				authErr = errors.New("ssh: gssapi-with-mic auth not configured")
 				break
 			}
@@ -774,6 +947,17 @@ userAuthLoop:
 			authErr = fmt.Errorf("ssh: unknown method %q", userAuthReq.Method)
 		}
 
+		// The source-address critical option is enforced on the Permissions
+		// returned by any authentication callback. Permissions returned
+		// together with a PartialSuccessError skip this check: that is safe
+		// because they are required to be nil, as enforced in the partial
+		// success handling below.
+		if authErr == nil {
+			if err := checkSourceAddressCriticalOption(s.RemoteAddr(), perms); err != nil {
+				authErr = err
+			}
+		}
+
 		authErrs = append(authErrs, authErr)
 
 		if config.AuthLogCallback != nil {
@@ -796,6 +980,13 @@ userAuthLoop:
 		var failureMsg userAuthFailureMsg
 
 		if partialSuccess, ok := authErr.(*PartialSuccessError); ok {
+			// Permissions are not preserved between authentication steps. To
+			// avoid confusion about the final state of the connection, we
+			// disallow returning non-nil Permissions combined with
+			// PartialSuccessError.
+			if perms != nil {
+				return nil, errors.New("ssh: permissions must be nil when returning PartialSuccessError")
+			}
 			// After a partial success error we don't allow changing the user
 			// name and execute the NoClientAuthCallback.
 			partialSuccessReturned = true
@@ -850,8 +1041,7 @@ userAuthLoop:
 		if authConfig.KeyboardInteractiveCallback != nil {
 			failureMsg.Methods = append(failureMsg.Methods, "keyboard-interactive")
 		}
-		if authConfig.GSSAPIWithMICConfig != nil && authConfig.GSSAPIWithMICConfig.Server != nil &&
-			authConfig.GSSAPIWithMICConfig.AllowLogin != nil {
+		if gssapiWithMICConfigured(authConfig.GSSAPIWithMICConfig) {
 			failureMsg.Methods = append(failureMsg.Methods, "gssapi-with-mic")
 		}
 

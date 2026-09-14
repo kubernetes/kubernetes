@@ -274,6 +274,21 @@ func doExpansionTest(t *testing.T, mapping func(string) string) {
 			input:    "\n",
 			expected: "\n",
 		},
+		{
+			name:     "dollar sign followed by non-ASCII UTF-8 character",
+			input:    "$£FOO",
+			expected: "$£FOO",
+		},
+		{
+			name:     "dollar sign followed by multi-byte UTF-8 character in middle",
+			input:    "prefix-$€-suffix",
+			expected: "prefix-$€-suffix",
+		},
+		{
+			name:     "dollar sign followed by Chinese character",
+			input:    "$中文",
+			expected: "$中文",
+		},
 	}
 
 	for _, tc := range cases {

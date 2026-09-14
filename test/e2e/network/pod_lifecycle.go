@@ -183,7 +183,7 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 		ginkgo.By("Try to connect to the blue pod through the service")
 		scvAddress := net.JoinHostPort(blueGreenService.Spec.ClusterIP, strconv.Itoa(80))
 		// assert 5 times that we can connect only to the blue pod
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			err := wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
 				cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, scvAddress)
 				stdout, err := e2eoutput.RunHostCmd(clientPod.Namespace, clientPod.Name, cmd)
@@ -301,7 +301,7 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 
 		ginkgo.By("Try to connect to the green pod through the service")
 		// assert 5 times that we can connect ONLY to the green pod
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			err := wait.PollUntilContextTimeout(ctx, 3*time.Second, e2eservice.KubeProxyEndpointLagTimeout, true, func(ctx context.Context) (done bool, err error) {
 				cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, scvAddress)
 				stdout, err := e2eoutput.RunHostCmd(clientPod.Namespace, clientPod.Name, cmd)

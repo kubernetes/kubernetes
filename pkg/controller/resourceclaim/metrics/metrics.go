@@ -23,8 +23,8 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
-// ResourceClaimSubsystem - subsystem name used for ResourceClaim creation
-const ResourceClaimSubsystem = "resourceclaim_controller"
+// subsystem is intentionally generic because similar metrics exist also elsewhere.
+const subsystem = "dynamic_resource_allocation"
 
 type NumResourceClaimLabels struct {
 	Allocated   string
@@ -33,25 +33,12 @@ type NumResourceClaimLabels struct {
 }
 
 var (
-	// ResourceClaimCreate tracks the total number of
-	// ResourceClaims creation requests
-	// categorized by their creation status and admin access.
-	ResourceClaimCreate = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:      ResourceClaimSubsystem,
-			Name:           "creates_total",
-			Help:           "Number of ResourceClaims creation requests, categorized by creation status and admin access",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"status", "admin_access"},
-	)
-
 	// NumResourceClaimsDesc tracks the number of ResourceClaims,
 	// categorized by their allocation status, admin access, and source.
 	// Source can be 'resource_claim_template' (created from a template),
 	// 'extended_resource' (extended resources), or empty (manually created by a user).
 	NumResourceClaimsDesc = metrics.NewDesc(
-		metrics.BuildFQName("", ResourceClaimSubsystem, "resource_claims"),
+		metrics.BuildFQName("", subsystem, "resource_claims"),
 		"Number of ResourceClaims, categorized by allocation status, admin access, and source. "+
 			"Source can be 'resource_claim_template' (created from a template), "+
 			"'extended_resource' (extended resources), or empty (manually created by a user).",
@@ -73,7 +60,6 @@ func SetTestMode(enabled bool) {
 // RegisterMetrics registers ResourceClaim metrics.
 func RegisterMetrics(collector metrics.StableCollector) {
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(ResourceClaimCreate)
 		if !testMode && collector != nil {
 			// Only register custom collector in non-test mode
 			legacyregistry.CustomMustRegister(collector)

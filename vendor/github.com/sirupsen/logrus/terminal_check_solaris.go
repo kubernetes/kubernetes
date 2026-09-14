@@ -1,3 +1,5 @@
+//go:build solaris && !tinygo
+
 package logrus
 
 import (

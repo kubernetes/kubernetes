@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog/v2"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 var _ ImagePullManager = &PullManager{}
@@ -77,11 +76,11 @@ func NewImagePullManager(ctx context.Context, recordsAccessor PullRecordsAccesso
 	return m, nil
 }
 
-func (f *PullManager) RecordPullIntent(image string) error {
+func (f *PullManager) RecordPullIntent(logger klog.Logger, image string) error {
 	f.intentAccessors.Lock(image)
 	defer f.intentAccessors.Unlock(image)
 
-	if err := f.recordsAccessor.WriteImagePullIntent(image); err != nil {
+	if err := f.recordsAccessor.WriteImagePullIntent(logger, image); err != nil {
 		return fmt.Errorf("failed to record image pull intent: %w", err)
 	}
 
@@ -153,7 +152,7 @@ func (f *PullManager) writePulledRecordIfChanged(ctx context.Context, image, ima
 		return nil
 	}
 
-	return f.recordsAccessor.WriteImagePulledRecord(pulledRecord)
+	return f.recordsAccessor.WriteImagePulledRecord(logger, pulledRecord)
 }
 
 func (f *PullManager) RecordImagePullFailed(ctx context.Context, image string) {
@@ -169,7 +168,7 @@ func (f *PullManager) decrementImagePullIntent(ctx context.Context, image string
 	defer f.intentAccessors.Unlock(image)
 
 	if f.getIntentCounterForImage(image) <= 1 {
-		if err := f.recordsAccessor.DeleteImagePullIntent(image); err != nil {
+		if err := f.recordsAccessor.DeleteImagePullIntent(logger, image); err != nil {
 			logger.Error(err, "failed to remove image pull intent", "image", image)
 			return
 		}
@@ -350,7 +349,7 @@ func (f *PullManager) PruneUnknownRecords(ctx context.Context, imageList []strin
 			continue
 		}
 
-		if err := f.recordsAccessor.DeleteImagePulledRecord(imageRecord.ImageRef); err != nil {
+		if err := f.recordsAccessor.DeleteImagePulledRecord(logger, imageRecord.ImageRef); err != nil {
 			logger.Error(err, "failed to remove an ImagePulledRecord", "imageRef", imageRecord.ImageRef)
 		}
 	}
@@ -398,7 +397,7 @@ func (f *PullManager) initialize(ctx context.Context) {
 				continue
 			}
 
-			if err := f.recordsAccessor.DeleteImagePullIntent(image); err != nil {
+			if err := f.recordsAccessor.DeleteImagePullIntent(logger, image); err != nil {
 				logger.V(2).Info("failed to remove image pull intent file", "imageName", image, "error", err)
 			}
 		}
@@ -574,12 +573,6 @@ func imagePullSecretLess(a, b kubeletconfiginternal.ImagePullSecret) int {
 	}
 
 	return strings.Compare(a.UID, b.UID)
-}
-
-// trimImageTagDigest removes the tag and digest from an image name
-func trimImageTagDigest(containerImage string) (string, error) {
-	imageName, _, _, err := parsers.ParseImageName(containerImage)
-	return imageName, err
 }
 
 // mergePullServiceAccounts merges two slices of ImagePullServiceAccount object into one while

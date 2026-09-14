@@ -21,7 +21,6 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -29,40 +28,38 @@ import (
 )
 
 // ArgumentsToCommand takes two Arg slices, one with the base arguments and one
-// with optional override arguments. In the return list override arguments will precede base
-// arguments. If an argument is present in the overrides, it will cause
-// all instances of the same argument in the base list to be discarded, leaving
-// only the instances of this argument in the overrides to be applied.
-func ArgumentsToCommand(base []kubeadmapi.Arg, overrides []kubeadmapi.Arg) []string {
-	var command []string
-	// Copy the overrides arguments into a new slice.
-	args := make([]kubeadmapi.Arg, len(overrides))
-	copy(args, overrides)
+// with optional override arguments. In the return list, base arguments will precede
+// override arguments. Depending on MergeMethod, the overrides can append to,
+// prepend to, or replace a base argument.
+func ArgumentsToCommand(base, overrides []kubeadmapi.Arg) []string {
+	// Sort only the base.
+	sortArgsSlice(&base)
 
-	// overrideArgs is a set of args which will replace the args defined in the base
-	overrideArgs := sets.New[string]()
+	// Collect the "replace" overrides.
+	overrideArgs := make(map[string]kubeadmapi.Arg, len(overrides))
+	tail := make([]string, 0, len(overrides))
 	for _, arg := range overrides {
-		overrideArgs.Insert(arg.Name)
+		overrideArgs[arg.Name] = arg
+		if arg.MergeMethod == "" {
+			tail = append(tail, fmt.Sprintf("--%s=%s", arg.Name, arg.Value))
+		}
 	}
 
+	command := make([]string, 0, len(base)+len(tail))
 	for _, arg := range base {
-		if !overrideArgs.Has(arg.Name) {
-			args = append(args, arg)
+		ov, ok := overrideArgs[arg.Name]
+		switch {
+		case !ok:
+			// Base arg is unchanged.
+		case ov.MergeMethod == "":
+			continue
+		default:
+			arg.Value = kubeadmapi.MergeArgWithBase(arg.Value, ov)
 		}
-	}
-
-	sort.Slice(args, func(i, j int) bool {
-		if args[i].Name == args[j].Name {
-			return args[i].Value < args[j].Value
-		}
-		return args[i].Name < args[j].Name
-	})
-
-	for _, arg := range args {
 		command = append(command, fmt.Sprintf("--%s=%s", arg.Name, arg.Value))
 	}
 
-	return command
+	return append(command, tail...)
 }
 
 // ArgumentsFromCommand parses a CLI command in the form "--foo=bar" to an Arg slice.
@@ -85,12 +82,8 @@ func ArgumentsFromCommand(command []string) []kubeadmapi.Arg {
 		args = append(args, kubeadmapi.Arg{Name: key, Value: val})
 	}
 
-	sort.Slice(args, func(i, j int) bool {
-		if args[i].Name == args[j].Name {
-			return args[i].Value < args[j].Value
-		}
-		return args[i].Name < args[j].Name
-	})
+	sortArgsSlice(&args)
+
 	return args
 }
 
@@ -116,4 +109,15 @@ func parseArgument(arg string) (string, string, error) {
 	}
 
 	return keyvalSlice[0], keyvalSlice[1], nil
+}
+
+// sortArgsSlice sorts a slice of Args alpha-numerically.
+func sortArgsSlice(argsPtr *[]kubeadmapi.Arg) {
+	args := *argsPtr
+	sort.Slice(args, func(i, j int) bool {
+		if args[i].Name == args[j].Name {
+			return args[i].Value < args[j].Value
+		}
+		return args[i].Name < args[j].Name
+	})
 }

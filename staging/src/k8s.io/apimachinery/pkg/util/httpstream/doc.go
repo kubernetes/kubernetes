@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package httpstream adds multiplexed streaming support to HTTP requests and
-// responses via connection upgrades.
+// Package httpstream contains compatibility wrappers for streaming transport APIs.
+//
+// Deprecated: use k8s.io/streaming/pkg/httpstream directly.
 package httpstream

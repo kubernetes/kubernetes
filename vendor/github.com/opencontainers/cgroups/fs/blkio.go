@@ -19,6 +19,11 @@ func (s *BlkioGroup) Name() string {
 	return "blkio"
 }
 
+// ID returns the controller ID for blkio subsystem.
+func (s *BlkioGroup) ID() cgroups.Controller {
+	return cgroups.IO
+}
+
 func (s *BlkioGroup) Apply(path string, _ *cgroups.Resources, pid int) error {
 	return apply(path, pid)
 }

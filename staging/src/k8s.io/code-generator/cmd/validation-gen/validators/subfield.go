@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	subfieldTagName = "k8s:subfield"
+	subfieldTagName = "subfield"
 )
 
 func init() {
@@ -34,20 +34,20 @@ func init() {
 }
 
 type subfieldTagValidator struct {
-	validator Validator
+	validator TagValidationExtractor
 }
 
 func (stv *subfieldTagValidator) Init(cfg Config) {
-	stv.validator = cfg.Validator
+	stv.validator = cfg.TagValidator
 }
 
-func (subfieldTagValidator) TagName() string {
+func (*subfieldTagValidator) TagName() string {
 	return subfieldTagName
 }
 
 var subfieldTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 
-func (subfieldTagValidator) ValidScopes() sets.Set[Scope] {
+func (*subfieldTagValidator) ValidScopes() sets.Set[Scope] {
 	return subfieldTagValidScopes
 }
 
@@ -55,7 +55,7 @@ var (
 	validateSubfield = types.Name{Package: libValidationPkg, Name: "Subfield"}
 )
 
-func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	args := tag.Args
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
@@ -69,73 +69,86 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	if submemb == nil {
 		return Validations{}, fmt.Errorf("no field for json name %q", subname)
 	}
-	result := Validations{}
+
 	subContext := Context{
-		Scope:      ScopeField,
-		Type:       submemb.Type,
-		Path:       context.Path.Child(subname),
-		Member:     submemb,
-		ParentPath: context.Path,
+		Scope:          ScopeField,
+		Type:           submemb.Type,
+		Path:           context.Path.Child(subname),
+		Member:         submemb,
+		ParentPath:     context.Path,
+		ParentType:     context.Type,
+		StabilityLevel: context.StabilityLevel,
 	}
-	if validations, err := stv.validator.ExtractValidations(subContext, *tag.ValueTag); err != nil {
+
+	nilableStructType := context.Type
+	if !util.IsNilableType(nilableStructType) {
+		nilableStructType = types.PointerTo(nilableStructType)
+	}
+
+	nilableFieldType := submemb.Type
+	fieldExprPrefix := ""
+	if !util.IsNilableType(nilableFieldType) {
+		nilableFieldType = types.PointerTo(nilableFieldType)
+		fieldExprPrefix = "&"
+	}
+
+	// getFn is the function that retrieves the subfield value from the
+	// struct.
+	getFn := FunctionLiteral{
+		Parameters: []ParamResult{{"o", nilableStructType}},
+		Results:    []ParamResult{{"", nilableFieldType}},
+	}
+	getFn.Body = fmt.Sprintf("return %so.%s", fieldExprPrefix, submemb.Name)
+
+	// equivArg compares the correlated elements in the old and new lists, for
+	// ratcheting. directComparable selects "==" vs semantic DeepEqual.
+	var equivArg any = DeepEqualFunc{}
+	if util.IsDirectComparable(util.NonPointer(util.NativeType(submemb.Type))) {
+		// It must be a pointer, since other nilable types are not directly
+		// comparable.
+		equivArg = Identifier(validateDirectEqual)
+	}
+
+	tagValidations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
+	if err != nil {
 		return Validations{}, err
-	} else {
-		if len(validations.Variables) > 0 {
-			return Validations{}, fmt.Errorf("variable generation is not supported")
+	}
+
+	// These validations are the parent's own, independent of the subfield's
+	// type validations. Content validators ignore nil, so an absent subfield
+	// is simply not validated here.
+	mapped := WrapFunctions(tagValidations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
+		// ParentContext functions (e.g. Union) emit without a cohort.
+		if scope == ParentContext {
+			return fn
 		}
-
-		result.Variables = append(result.Variables, validations.Variables...)
-
-		nilableStructType := context.Type
-		if !util.IsNilableType(nilableStructType) {
-			nilableStructType = types.PointerTo(nilableStructType)
+		f := Function(subfieldTagName, fn.Flags, validateSubfield, subname, getFn, equivArg,
+			WrapperFunction{Function: fn, ObjType: submemb.Type, PathFragment: "." + subname})
+		// The cohort is the short-circuit scope: name the whole path, or
+		// chains through a common hop suppress each other.
+		f.Cohort = subname
+		if fn.Cohort != "" {
+			f.Cohort = subname + "." + fn.Cohort
 		}
+		return f
+	})
 
-		nilableFieldType := submemb.Type
-		fieldExprPrefix := ""
-		if !util.IsNilableType(nilableFieldType) {
-			nilableFieldType = types.PointerTo(nilableFieldType)
-			fieldExprPrefix = "&"
-		}
-
-		// getFn is the function that retrieves the subfield value from the
-		// struct.
-		getFn := FunctionLiteral{
-			Parameters: []ParamResult{{"o", nilableStructType}},
-			Results:    []ParamResult{{"", nilableFieldType}},
-		}
-		getFn.Body = fmt.Sprintf("return %so.%s", fieldExprPrefix, submemb.Name)
-
-		// equivArg is the function that is used to compare the correlated
-		// elements in the old and new lists, for ratcheting.
-		var equivArg any
-
-		// directComparable is used to determine whether we can use the direct
-		// comparison operator "==" or need to use the semantic DeepEqual when
-		// looking up and comparing correlated list elements for validation ratcheting.
-		directComparable := util.IsDirectComparable(util.NonPointer(util.NativeType(submemb.Type)))
-		if directComparable {
-			// It must be a pointer, since other nilable types are not directly
-			// comparable.
-			equivArg = Identifier(validateDirectEqualPtr)
-		} else {
-			equivArg = Identifier(validateSemanticDeepEqual)
-		}
-
-		for _, vfn := range validations.Functions {
-			f := Function(subfieldTagName, vfn.Flags, validateSubfield, subname, getFn, equivArg, WrapperFunction{vfn, submemb.Type})
-			f.Cohort = subname
-			result.AddFunction(f)
+	for i := range mapped.Deferred {
+		// The validations belong to the subfield, so re-scope ParentContext
+		// (which would target the enclosing struct) to ThisContext.
+		if mapped.Deferred[i].Scope == ParentContext {
+			mapped.Deferred[i].Scope = ThisContext
 		}
 	}
-	return result, nil
+
+	return mapped, nil
 }
 
-func (stv subfieldTagValidator) Docs() TagDoc {
-	doc := TagDoc{
+func (stv *subfieldTagValidator) Docs() TagDoc {
+	return TagDoc{
 		Tag:            stv.TagName(),
-		StabilityLevel: Beta,
-		Scopes:         stv.ValidScopes().UnsortedList(),
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         sets.List(stv.ValidScopes()),
 		Description:    "Declares a validation for a subfield of a struct.",
 		Args: []TagArgDoc{{
 			Description: "<field-json-name>",
@@ -150,5 +163,4 @@ func (stv subfieldTagValidator) Docs() TagDoc {
 		PayloadsType:     codetags.ValueTypeTag,
 		PayloadsRequired: true,
 	}
-	return doc
 }

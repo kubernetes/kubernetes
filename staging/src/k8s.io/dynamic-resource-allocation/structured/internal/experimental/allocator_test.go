@@ -27,17 +27,22 @@ import (
 )
 
 func TestAllocator(t *testing.T) {
+	newAllocator := func(
+		ctx context.Context,
+		features Features,
+		allocatedState AllocatedState,
+		classLister DeviceClassLister,
+		slices []*resourceapi.ResourceSlice,
+		celCache *cel.Cache,
+	) (internal.Allocator, error) {
+		return NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+	}
 	allocatortesting.TestAllocator(t,
 		SupportedFeatures,
-		func(
-			ctx context.Context,
-			features Features,
-			allocatedState AllocatedState,
-			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
-			celCache *cel.Cache,
-		) (internal.Allocator, error) {
-			return NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
-		},
+		newAllocator,
+	)
+	allocatortesting.TestLexicographicalAllocator(t,
+		SupportedFeatures,
+		newAllocator,
 	)
 }

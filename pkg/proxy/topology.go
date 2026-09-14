@@ -18,9 +18,7 @@ package proxy
 
 import (
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // CategorizeEndpoints returns:
@@ -155,19 +153,13 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeName str
 
 // topologyModeFromHints returns a topology mode ("", "PreferSameZone", or
 // "PreferSameNode") based on the Endpoint hints:
-//   - If the PreferSameTrafficDistribution feature gate is enabled, and every ready
-//     endpoint has a node hint, and at least one endpoint is hinted for this node, then
-//     it returns "PreferSameNode".
+//   - If every ready endpoint has a node hint, and at least one endpoint is hinted for
+//     this node, then it returns "PreferSameNode".
 //   - Otherwise, if every ready endpoint has a zone hint, and at least one endpoint is
 //     hinted for this node's zone, then it returns "PreferSameZone".
 //   - Otherwise it returns "" (meaning, no topology / default traffic distribution).
 func topologyModeFromHints(svcInfo ServicePort, endpoints []Endpoint, nodeName, zone string) string {
-	if len(endpoints) == 0 {
-		// The code below assumes at least 1 endpoint; if there are no endpoints,
-		// there are no hints.
-		return ""
-	}
-
+	hasReadyEndpoints := false
 	hasEndpointForNode := false
 	allEndpointsHaveNodeHints := true
 	hasEndpointForZone := false
@@ -176,6 +168,7 @@ func topologyModeFromHints(svcInfo ServicePort, endpoints []Endpoint, nodeName, 
 		if !endpoint.IsReady() {
 			continue
 		}
+		hasReadyEndpoints = true
 
 		if endpoint.NodeHints().Len() == 0 {
 			allEndpointsHaveNodeHints = false
@@ -190,15 +183,18 @@ func topologyModeFromHints(svcInfo ServicePort, endpoints []Endpoint, nodeName, 
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
-		if allEndpointsHaveNodeHints {
-			if hasEndpointForNode {
-				return v1.ServiceTrafficDistributionPreferSameNode
-			}
-			klog.V(2).InfoS("Ignoring same-node topology hints for service since no hints were provided for node", "service", svcInfo, "node", nodeName)
-		} else {
-			klog.V(7).InfoS("Ignoring same-node topology hints for service since one or more endpoints is missing a node hint", "service", svcInfo)
+	// If no ready endpoints exist, there are no hints to consider
+	if !hasReadyEndpoints {
+		return ""
+	}
+
+	if allEndpointsHaveNodeHints {
+		if hasEndpointForNode {
+			return v1.ServiceTrafficDistributionPreferSameNode
 		}
+		klog.V(2).InfoS("Ignoring same-node topology hints for service since no hints were provided for node", "service", svcInfo, "node", nodeName)
+	} else {
+		klog.V(7).InfoS("Ignoring same-node topology hints for service since one or more endpoints is missing a node hint", "service", svcInfo)
 	}
 	if allEndpointsHaveZoneHints {
 		if hasEndpointForZone {

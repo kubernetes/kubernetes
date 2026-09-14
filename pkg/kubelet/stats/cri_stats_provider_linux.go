@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2023 The Kubernetes Authors.
@@ -23,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -37,10 +36,10 @@ func (p *criStatsProvider) addCRIPodContainerStats(
 	logger klog.Logger,
 	criSandboxStat *runtimeapi.PodSandboxStats,
 	ps *statsapi.PodStats,
-	fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
+	fsIDtoInfo map[string]*cadvisorapi.FsInfo,
 	containerMap map[string]*runtimeapi.Container,
 	podSandbox *runtimeapi.PodSandbox,
-	rootFsInfo *cadvisorapiv2.FsInfo, updateCPUNanoCoreUsage bool) error {
+	rootFsInfo *cadvisorapi.FsInfo, updateCPUNanoCoreUsage bool) error {
 	for _, criContainerStat := range criSandboxStat.Linux.Containers {
 		container, found := containerMap[criContainerStat.Attributes.Id]
 		if !found {
@@ -55,6 +54,27 @@ func (p *criStatsProvider) addCRIPodContainerStats(
 		ps.Containers = append(ps.Containers, *cs)
 	}
 	return nil
+}
+
+// addCRIPodContainerCPUAndMemoryStats adds container CPU and memory stats from CRI to the PodStats.
+// This is a lighter-weight version of addCRIPodContainerStats that only populates CPU and memory
+// stats needed for the resource metrics endpoint.
+func (p *criStatsProvider) addCRIPodContainerCPUAndMemoryStats(
+	criSandboxStat *runtimeapi.PodSandboxStats,
+	ps *statsapi.PodStats,
+	containerMap map[string]*runtimeapi.Container) {
+	if criSandboxStat == nil || criSandboxStat.Linux == nil {
+		return
+	}
+	for _, criContainerStat := range criSandboxStat.Linux.Containers {
+		container, found := containerMap[criContainerStat.Attributes.Id]
+		if !found {
+			continue
+		}
+		// Fill available CPU and memory stats for resource metrics
+		cs := p.makeContainerCPUAndMemoryStats(criContainerStat, time.Unix(0, container.CreatedAt), true)
+		ps.Containers = append(ps.Containers, *cs)
+	}
 }
 
 func addCRIPodNetworkStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {

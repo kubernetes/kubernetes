@@ -125,6 +125,11 @@ func TestPeerProxy(t *testing.T) {
 				},
 			},
 			wantStatus: http.StatusServiceUnavailable,
+			wantMetricsData: `
+					   # HELP apiserver_peer_proxy_errors_total [ALPHA] Total number of errors encountered while proxying requests to a peer kube apiserver
+					   # TYPE apiserver_peer_proxy_errors_total counter
+					   apiserver_peer_proxy_errors_total{group="",resource="bar",type="endpoint_resolution",version="foo"} 1
+					   `,
 		},
 		{
 			desc:                 "503 unreachable peer bind address",
@@ -148,10 +153,10 @@ func TestPeerProxy(t *testing.T) {
 			},
 			wantStatus: http.StatusServiceUnavailable,
 			wantMetricsData: `
-				# HELP apiserver_rerouted_request_total [ALPHA] Total number of requests that were proxied to a peer kube apiserver because the local apiserver was not capable of serving it
-				# TYPE apiserver_rerouted_request_total counter
-				apiserver_rerouted_request_total{code="503"} 1
-				`,
+					   # HELP apiserver_rerouted_request_total [ALPHA] Total number of requests that were proxied to a peer kube-apiserver because the local apiserver was not capable of serving it, broken down by 'group', 'version', and 'resource' indicating the GVR of the request. If all three are empty (""), the request is a discovery request.
+					   # TYPE apiserver_rerouted_request_total counter
+					   apiserver_rerouted_request_total{code="503",group="",resource="bar",version="foo"} 1
+					   `,
 		},
 		{
 			desc:                 "503 if one apiserver's endpoint lease wasnt found but another valid (unreachable) apiserver was found",
@@ -180,10 +185,10 @@ func TestPeerProxy(t *testing.T) {
 			},
 			wantStatus: http.StatusServiceUnavailable,
 			wantMetricsData: `
-				# HELP apiserver_rerouted_request_total [ALPHA] Total number of requests that were proxied to a peer kube apiserver because the local apiserver was not capable of serving it
-				# TYPE apiserver_rerouted_request_total counter
-				apiserver_rerouted_request_total{code="503"} 1
-				`,
+					   # HELP apiserver_rerouted_request_total [ALPHA] Total number of requests that were proxied to a peer kube-apiserver because the local apiserver was not capable of serving it, broken down by 'group', 'version', and 'resource' indicating the GVR of the request. If all three are empty (""), the request is a discovery request.
+					   # TYPE apiserver_rerouted_request_total counter
+					   apiserver_rerouted_request_total{code="503",group="",resource="bar",version="foo"} 1
+					   `,
 		},
 	}
 
@@ -230,7 +235,7 @@ func TestPeerProxy(t *testing.T) {
 
 			// compare metric
 			if tt.wantMetricsData != "" {
-				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.wantMetricsData), []string{"apiserver_rerouted_request_total"}...); err != nil {
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.wantMetricsData), []string{"apiserver_rerouted_request_total", "apiserver_peer_proxy_errors_total"}...); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -387,7 +392,7 @@ func newFakePeerProxyHandler(informerFinishedSync bool,
 		return nil, err
 	}
 	ppH.localDiscoveryInfoCache.Store(localCache)
-	ppH.peerDiscoveryInfoCache.Store(peerCache)
+	ppH.gvExclusionManager.filteredPeerDiscoveryCache.Store(peerCache)
 
 	ppH.finishedSync.Store(informerFinishedSync)
 	return ppH, nil

@@ -29,15 +29,15 @@ import (
 //
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetConditionApplyConfiguration struct {
-	// Type of statefulset condition.
+	// type of statefulset condition.
 	Type *appsv1beta2.StatefulSetConditionType `json:"type,omitempty"`
-	// Status of the condition, one of True, False, Unknown.
+	// status of the condition, one of True, False, Unknown.
 	Status *v1.ConditionStatus `json:"status,omitempty"`
-	// Last time the condition transitioned from one status to another.
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
-	// The reason for the condition's last transition.
+	// reason for the condition's last transition.
 	Reason *string `json:"reason,omitempty"`
-	// A human readable message indicating details about the transition.
+	// message is a human readable string indicating details about the transition.
 	Message *string `json:"message,omitempty"`
 }
 

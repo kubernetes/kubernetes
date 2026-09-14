@@ -20,13 +20,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgofeaturegate "k8s.io/client-go/features"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -141,6 +144,11 @@ type Controller interface {
 	// HasSynced delegates to the Config's Queue
 	HasSynced() bool
 
+	// HasSyncedChecker enables waiting for syncing without polling.
+	// The returned DoneChecker can be passed to WaitFor.
+	// It delegates to the Config's Queue.
+	HasSyncedChecker() DoneChecker
+
 	// LastSyncResourceVersion delegates to the Reflector when there
 	// is one, otherwise returns the empty string
 	LastSyncResourceVersion() string
@@ -167,11 +175,13 @@ func (c *controller) RunWithContext(ctx context.Context) {
 		<-ctx.Done()
 		c.config.Queue.Close()
 	}()
+	logger := klog.FromContext(ctx)
 	r := NewReflectorWithOptions(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
+			Logger:          &logger,
 			ResyncPeriod:    c.config.FullResyncPeriod,
 			MinWatchTimeout: c.config.MinWatchTimeout,
 			TypeDescription: c.config.ObjectDescription,
@@ -205,6 +215,13 @@ func (c *controller) HasSynced() bool {
 	return c.config.Queue.HasSynced()
 }
 
+// HasSyncedChecker enables waiting for syncing without polling.
+// The returned DoneChecker can be passed to [WaitFor].
+// It delegates to the Config's Queue.
+func (c *controller) HasSyncedChecker() DoneChecker {
+	return c.config.Queue.HasSyncedChecker()
+}
+
 func (c *controller) LastSyncResourceVersion() string {
 	c.reflectorMutex.RLock()
 	defer c.reflectorMutex.RUnlock()
@@ -231,7 +248,7 @@ func (c *controller) processLoop(ctx context.Context) {
 		default:
 			var err error
 			if useBatchProcess {
-				err = batchQueue.PopBatch(c.config.ProcessBatch)
+				err = batchQueue.PopBatch(c.config.ProcessBatch, PopProcessFunc(c.config.Process))
 			} else {
 				// otherwise fallback to non-batch process behavior
 				_, err = c.config.Pop(PopProcessFunc(c.config.Process))
@@ -265,6 +282,126 @@ type ResourceEventHandler interface {
 	OnAdd(obj interface{}, isInInitialList bool)
 	OnUpdate(oldObj, newObj interface{})
 	OnDelete(obj interface{})
+}
+
+// Object is the subset of metav1.Object that is needed to determine the
+// name and, if applicable, namespace of an object. All standard Kubernetes
+// API types satisfy this interface through their embedded ObjectMeta.
+//
+// comparable is required so that a zero T can be compared against
+// OptionalObj to detect a missing object (e.g. a nil pointer).
+type Object interface {
+	comparable
+
+	GetName() string
+	GetNamespace() string
+}
+
+// TypedResourceEventHandler is a type-safe variant of ResourceEventHandler.
+type TypedResourceEventHandler[T Object] interface {
+	OnAdd(obj T, isInInitialList bool)
+	OnUpdate(oldObj, newObj T)
+	OnDelete(obj DeletedObject[T])
+}
+
+// DeletedObject provides information about a deleted object.
+//
+// It implements GetObjectName and GetKey, which replace
+// [DeletionHandlingObjectToName] and [DeletionHandlingMetaNamespaceKeyFunc]
+//
+// It implements the GetName and GetNamespace methods for use
+// with klog.KObj: an OnDelete event handler can log
+// it's parameter directly and is guaranteed to produce the same
+// log output as with klog.KObj applied to the actual object.
+//
+// All of these methods work regardless whether DeletedObject actually has
+// the deleted object.
+type DeletedObject[T Object] struct {
+	// OptionalObj is the deleted object.
+	//
+	// It can be:
+	// - stale: it is some *older* revision, not the one which got deleted
+	// - nil: the informer noticed a deletion without finding *any* copy of the deleted object
+	//
+	// The only guaranteed information is the key under which the deleted
+	// object was stored in the informer cache. Use [DeletedObject.GetObjectName]
+	// and [DeletedObject.GetKey] to extract the namespace and name resp.
+	// the key under which the deleted object was stored. They work in
+	// all cases.
+	OptionalObj T
+
+	// FinalStateUnknown is nil if the deleted object is available and up-to-date.
+	// Otherwise FinalStateUnknown is non-nil to provide the key.
+	// The untyped object inside it matches OptionalObj.
+	FinalStateUnknown *DeletedFinalStateUnknown
+}
+
+// GetObjectName returns the object name (= namespace if available and name)
+// for the deleted object. Note that this is slightly different from
+// GetName which returns just that name without the namespace.
+//
+// This is a type-safe variant of [DeletionHandlingObjectToName] which
+// cannot fail because T is guaranteed to have a name and namespace and
+// the key of FinalStateUnknown, if invalid, is simply treated as a
+// name without a namespace.
+func (d DeletedObject[T]) GetObjectName() ObjectName {
+	if d.FinalStateUnknown != nil {
+		// Same splitting as SplitMetaNamespaceKey and ParseObjectName,
+		// except that a key with more than one "/" is not treated as an error:
+		// the extra "/" become part of the name.
+		namespace, name, found := strings.Cut(d.FinalStateUnknown.Key, "/")
+		if !found {
+			return ObjectName{Name: namespace}
+		}
+		return ObjectName{Namespace: namespace, Name: name}
+	}
+	var null T
+	if d.OptionalObj == null {
+		// Avoid calling GetName/GetNamespace on a zero OptionalObj (e.g. a
+		// nil pointer), which could panic. A nil pointer boxed behind a
+		// further layer of indirection is not detected here and is not
+		// handled.
+		return ObjectName{}
+	}
+	// Same logic as MetaObjectToName, adapted to use T's own
+	// GetNamespace and GetName methods instead of going through
+	// meta.Accessor as ObjectToName does.
+	if namespace := d.OptionalObj.GetNamespace(); len(namespace) > 0 {
+		return ObjectName{Namespace: namespace, Name: d.OptionalObj.GetName()}
+	}
+	return ObjectName{Name: d.OptionalObj.GetName()}
+}
+
+// GetName returns the name without the namespace. Note that this is slightly
+// different from GetObjectName which returns the combination of namespace and name in a
+// struct.
+func (d DeletedObject[T]) GetName() string {
+	return d.GetObjectName().Name
+}
+
+// GetNamespace returns the namespace if there is one, otherwise the empty string.
+func (d DeletedObject[T]) GetNamespace() string {
+	return d.GetObjectName().Namespace
+}
+
+// GetKey returns the key under which the deleted object was stored.
+//
+// This is a type-safe variant of [DeletionHandlingMetaNamespaceKeyFunc]
+// which cannot fail because T is guaranteed to have a name and namespace.
+func (d DeletedObject[T]) GetKey() string {
+	if d.FinalStateUnknown != nil {
+		return d.FinalStateUnknown.Key
+	}
+	var null T
+	if d.OptionalObj == null {
+		return ""
+	}
+	// Same encoding as MetaNamespaceKeyFunc via ObjectName.String,
+	// adapted to use T's own GetNamespace and GetName methods.
+	if namespace := d.OptionalObj.GetNamespace(); len(namespace) > 0 {
+		return namespace + "/" + d.OptionalObj.GetName()
+	}
+	return d.OptionalObj.GetName()
 }
 
 // ResourceEventHandlerFuncs is an adaptor to let you easily specify as many or
@@ -301,6 +438,32 @@ func (r ResourceEventHandlerFuncs) OnDelete(obj interface{}) {
 	}
 }
 
+type TypedResourceEventHandlerFuncs[T Object] struct {
+	AddFunc    func(obj T)
+	UpdateFunc func(oldObj, newObj T)
+	DeleteFunc func(obj DeletedObject[T])
+}
+
+var _ TypedResourceEventHandler[*metav1.ObjectMeta] = TypedResourceEventHandlerFuncs[*metav1.ObjectMeta]{}
+
+func (r TypedResourceEventHandlerFuncs[T]) OnAdd(obj T, isInInitialList bool) {
+	if r.AddFunc != nil {
+		r.AddFunc(obj)
+	}
+}
+
+func (r TypedResourceEventHandlerFuncs[T]) OnUpdate(oldObj, newObj T) {
+	if r.UpdateFunc != nil {
+		r.UpdateFunc(oldObj, newObj)
+	}
+}
+
+func (r TypedResourceEventHandlerFuncs[T]) OnDelete(obj DeletedObject[T]) {
+	if r.DeleteFunc != nil {
+		r.DeleteFunc(obj)
+	}
+}
+
 // ResourceEventHandlerDetailedFuncs is exactly like ResourceEventHandlerFuncs
 // except its AddFunc accepts the isInInitialList parameter, for propagating
 // HasSynced.
@@ -326,6 +489,32 @@ func (r ResourceEventHandlerDetailedFuncs) OnUpdate(oldObj, newObj interface{}) 
 
 // OnDelete calls DeleteFunc if it's not nil.
 func (r ResourceEventHandlerDetailedFuncs) OnDelete(obj interface{}) {
+	if r.DeleteFunc != nil {
+		r.DeleteFunc(obj)
+	}
+}
+
+type TypedResourceEventHandlerDetailedFuncs[T Object] struct {
+	AddFunc    func(obj T, isInInitialList bool)
+	UpdateFunc func(oldObj, newObj T)
+	DeleteFunc func(obj DeletedObject[T])
+}
+
+var _ TypedResourceEventHandler[*metav1.ObjectMeta] = TypedResourceEventHandlerDetailedFuncs[*metav1.ObjectMeta]{}
+
+func (r TypedResourceEventHandlerDetailedFuncs[T]) OnAdd(obj T, isInInitialList bool) {
+	if r.AddFunc != nil {
+		r.AddFunc(obj, isInInitialList)
+	}
+}
+
+func (r TypedResourceEventHandlerDetailedFuncs[T]) OnUpdate(oldObj, newObj T) {
+	if r.UpdateFunc != nil {
+		r.UpdateFunc(oldObj, newObj)
+	}
+}
+
+func (r TypedResourceEventHandlerDetailedFuncs[T]) OnDelete(obj DeletedObject[T]) {
 	if r.DeleteFunc != nil {
 		r.DeleteFunc(obj)
 	}
@@ -373,6 +562,48 @@ func (r FilteringResourceEventHandler) OnDelete(obj interface{}) {
 	r.Handler.OnDelete(obj)
 }
 
+// TypedFilteringResourceEventHandler is a type-safe variant of
+// [FilteringResourceEventHandler].
+type TypedFilteringResourceEventHandler[T Object] struct {
+	FilterFunc func(obj T) bool
+	Handler    TypedResourceEventHandler[T]
+}
+
+// OnAdd calls the nested handler only if the filter succeeds
+func (r TypedFilteringResourceEventHandler[T]) OnAdd(obj T, isInInitialList bool) {
+	if !r.FilterFunc(obj) {
+		return
+	}
+	r.Handler.OnAdd(obj, isInInitialList)
+}
+
+// OnUpdate ensures the proper handler is called depending on whether the filter matches
+func (r TypedFilteringResourceEventHandler[T]) OnUpdate(oldObj, newObj T) {
+	newer := r.FilterFunc(newObj)
+	older := r.FilterFunc(oldObj)
+	switch {
+	case newer && older:
+		r.Handler.OnUpdate(oldObj, newObj)
+	case newer && !older:
+		r.Handler.OnAdd(newObj, false)
+	case !newer && older:
+		r.Handler.OnDelete(DeletedObject[T]{OptionalObj: oldObj})
+	default:
+		// do nothing
+	}
+}
+
+// OnDelete calls the nested handler only if the filter succeeds. The filter
+// is applied to [DeletedObject.OptionalObj], which may be the zero value of T
+// if the deleted object could not be recovered; a FilterFunc that relies on T
+// having a valid state must handle that case itself.
+func (r TypedFilteringResourceEventHandler[T]) OnDelete(obj DeletedObject[T]) {
+	if !r.FilterFunc(obj.OptionalObj) {
+		return
+	}
+	r.Handler.OnDelete(obj)
+}
+
 // DeletionHandlingMetaNamespaceKeyFunc checks for
 // DeletedFinalStateUnknown objects before calling
 // MetaNamespaceKeyFunc.
@@ -395,6 +626,9 @@ func DeletionHandlingObjectToName(obj interface{}) (ObjectName, error) {
 
 // InformerOptions configure a Reflector.
 type InformerOptions struct {
+	// Logger, if not nil, is used instead of klog.Background() for logging.
+	Logger *klog.Logger
+
 	// ListerWatcher implements List and Watch functions for the source of the resource
 	// the informer will be informing about.
 	ListerWatcher ListerWatcher
@@ -429,6 +663,14 @@ type InformerOptions struct {
 	// for them.
 	// Optional - if unset no additional transforming is happening.
 	Transform TransformFunc
+
+	// Identifier is used to identify the FIFO for metrics and logging purposes.
+	// If not set, metrics will not be published.
+	Identifier InformerNameAndResource
+
+	// InformerMetricsProvider is the metrics provider for the informer.
+	// If not set, metrics will be no-ops.
+	InformerMetricsProvider InformerMetricsProvider
 }
 
 // NewInformerWithOptions returns a Store and a controller for populating the store
@@ -438,11 +680,11 @@ type InformerOptions struct {
 func NewInformerWithOptions(options InformerOptions) (Store, Controller) {
 	var clientState Store
 	if options.Indexers == nil {
-		clientState = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		clientState = NewStore(DeletionHandlingMetaNamespaceKeyFunc, WithStoreMetrics(options.Identifier, options.InformerMetricsProvider))
 	} else {
-		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers)
+		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers, WithStoreMetrics(options.Identifier, options.InformerMetricsProvider))
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewInformer returns a Store and a controller for populating the store
@@ -476,7 +718,7 @@ func NewInformer(
 		Handler:       h,
 		ResyncPeriod:  resyncPeriod,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewIndexerInformer returns an Indexer and a Controller for populating the index
@@ -513,7 +755,7 @@ func NewIndexerInformer(
 		ResyncPeriod:  resyncPeriod,
 		Indexers:      indexers,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewTransformingInformer returns a Store and a controller for populating
@@ -542,7 +784,7 @@ func NewTransformingInformer(
 		ResyncPeriod:  resyncPeriod,
 		Transform:     transformer,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewTransformingIndexerInformer returns an Indexer and a controller for
@@ -573,23 +815,43 @@ func NewTransformingIndexerInformer(
 		Indexers:      indexers,
 		Transform:     transformer,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // Multiplexes updates in the form of a list of Deltas into a Store, and informs
 // a given handler of events OnUpdate, OnAdd, OnDelete
 func processDeltas(
+	logger klog.Logger,
 	// Object which receives event notifications from the given deltas
 	handler ResourceEventHandler,
 	clientState Store,
 	deltas Deltas,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	for _, d := range deltas {
 		obj := d.Object
 
 		switch d.Type {
+		case ReplacedAll:
+			info, ok := obj.(ReplacedAllInfo)
+			if !ok {
+				return fmt.Errorf("ReplacedAll did not contain ReplacedAllInfo: %T", obj)
+			}
+			if err := processReplacedAllInfo(logger, handler, info, clientState, isInInitialList, keyFunc); err != nil {
+				return err
+			}
+		case SyncAll:
+			_, ok := obj.(SyncAllInfo)
+			if !ok {
+				return fmt.Errorf("SyncAll did not contain SyncAllInfo: %T", obj)
+			}
+			objs := clientState.List()
+			for _, obj := range objs {
+				handler.OnUpdate(obj, obj)
+			}
+			return nil
 		case Sync, Replaced, Added, Updated:
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				if err := clientState.Update(obj); err != nil {
@@ -607,6 +869,12 @@ func processDeltas(
 				return err
 			}
 			handler.OnDelete(obj)
+		case Bookmark:
+			info, ok := obj.(BookmarkInfo)
+			if !ok {
+				return fmt.Errorf("bookmark delta did not contain BookmarkInfo: %T", obj)
+			}
+			clientState.Bookmark(info.ResourceVersion)
 		}
 	}
 	return nil
@@ -622,10 +890,12 @@ func processDeltas(
 // Returns an error if any Delta or transaction fails. For TransactionError,
 // only successful operations trigger callbacks.
 func processDeltasInBatch(
+	logger klog.Logger,
 	handler ResourceEventHandler,
 	clientState Store,
 	deltas []Delta,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	txns := make([]Transaction, 0)
@@ -634,7 +904,7 @@ func processDeltasInBatch(
 	if !txnSupported {
 		var errs []error
 		for _, delta := range deltas {
-			if err := processDeltas(handler, clientState, Deltas{delta}, isInInitialList); err != nil {
+			if err := processDeltas(logger, handler, clientState, Deltas{delta}, isInInitialList, keyFunc); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -677,6 +947,8 @@ func processDeltasInBatch(
 			callbacks = append(callbacks, func() {
 				handler.OnDelete(obj)
 			})
+		default:
+			return fmt.Errorf("Delta type %s is not supported in batch processing", d.Type)
 		}
 	}
 
@@ -697,31 +969,68 @@ func processDeltasInBatch(
 	return nil
 }
 
+func processReplacedAllInfo(logger klog.Logger, handler ResourceEventHandler, info ReplacedAllInfo, clientState Store, isInInitialList bool, keyFunc KeyFunc) error {
+	var deletions []DeletedFinalStateUnknown
+	type replacement struct {
+		oldObj interface{}
+		newObj interface{}
+	}
+	replacements := make([]replacement, 0, len(info.Objects))
+
+	err := reconcileReplacement(logger, nil, clientState, info.Objects, keyFunc,
+		func(obj DeletedFinalStateUnknown) error {
+			deletions = append(deletions, obj)
+			return nil
+		},
+		func(obj interface{}) error {
+			// This behavior matches processDeltas handling of Replace deltas
+			if old, exists, err := clientState.Get(obj); err == nil && exists {
+				replacements = append(replacements, replacement{newObj: obj, oldObj: old})
+			} else {
+				replacements = append(replacements, replacement{newObj: obj})
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Replace the client state first so the store reflects the events handlers are given
+	if err := clientState.Replace(info.Objects, info.ResourceVersion); err != nil {
+		return err
+	}
+	// Processing all deletions first matches behavior of RealFIFO#Replace
+	for _, objToDelete := range deletions {
+		handler.OnDelete(objToDelete)
+	}
+	// Processing adds/updates in order observed by reconcileReplacement matches behavior of RealFIFO#Replace
+	for _, r := range replacements {
+		if r.oldObj != nil {
+			handler.OnUpdate(r.oldObj, r.newObj)
+		} else {
+			handler.OnAdd(r.newObj, isInInitialList)
+		}
+	}
+	return nil
+}
+
 // newInformer returns a controller for populating the store while also
 // providing event notifications.
 //
 // Parameters
 //   - clientState is the store you want to populate
 //   - options contain the options to configure the controller
-func newInformer(clientState Store, options InformerOptions) Controller {
+func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
 
-	var fifo Queue
-	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
-		fifo = NewRealFIFOWithOptions(RealFIFOOptions{
-			KeyFunction:  MetaNamespaceKeyFunc,
-			KnownObjects: clientState,
-			Transformer:  options.Transform,
-		})
-	} else {
-		fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-			KnownObjects:          clientState,
-			EmitDeltaTypeReplaced: true,
-			Transformer:           options.Transform,
-		})
+	logger := klog.Background()
+	if options.Logger != nil {
+		logger = *options.Logger
 	}
+	logger, fifo := newQueueFIFO(logger, options.ObjectType, clientState, options.Transform, options.Identifier, options.InformerMetricsProvider)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -732,13 +1041,54 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
+				// This must be the logger *of the fifo*.
+				return processDeltas(logger, options.Handler, clientState, deltas, isInInitialList, keyFunc)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
 		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList)
+			// Same here.
+			return processDeltasInBatch(logger, options.Handler, clientState, deltaList, isInInitialList, keyFunc)
 		},
 	}
 	return New(cfg)
+}
+
+// newQueueFIFO constructs a new FIFO, choosing between real and delta FIFO
+// depending on the InOrderInformers feature gate.
+//
+// It returns the FIFO and the logger used by the FIFO.
+// That logger includes the name used for the FIFO,
+// in contrast to the logger which was passed in.
+func newQueueFIFO(logger klog.Logger, objectType any, clientState Store, transform TransformFunc, identifier InformerNameAndResource, metricsProvider InformerMetricsProvider) (klog.Logger, Queue) {
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
+		options := RealFIFOOptions{
+			Logger:          &logger,
+			Name:            fmt.Sprintf("RealFIFO %T", objectType),
+			KeyFunction:     MetaNamespaceKeyFunc,
+			Transformer:     transform,
+			Identifier:      identifier,
+			MetricsProvider: metricsProvider,
+		}
+		// If atomic events are enabled, unset clientState in the case of atomic events as we cannot pass a
+		// store to an atomic fifo.
+		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO) {
+			options.AtomicEvents = true
+			options.UnlockWhileProcessing = clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.UnlockWhileProcessingFIFO)
+			options.EmitDeltaTypeBookmark = true
+		} else {
+			options.KnownObjects = clientState
+		}
+		f := NewRealFIFOWithOptions(options)
+		return f.logger, f
+	} else {
+		f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			Logger:                &logger,
+			Name:                  fmt.Sprintf("DeltaFIFO %T", objectType),
+			KnownObjects:          clientState,
+			EmitDeltaTypeReplaced: true,
+			Transformer:           transform,
+		})
+		return f.logger, f
+	}
 }

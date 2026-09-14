@@ -253,11 +253,6 @@ func setupSuite(ctx context.Context) {
 	if serverVersion != nil {
 		framework.Logf("kube-apiserver version: %s", serverVersion.GitVersion)
 	}
-
-	if framework.TestContext.NodeKiller.Enabled {
-		nodeKiller := e2enode.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
-		go nodeKiller.Run(framework.TestContext.NodeKiller.NodeKillerStopCtx)
-	}
 }
 
 // logClusterImageSources writes out cluster image sources.

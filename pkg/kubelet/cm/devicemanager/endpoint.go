@@ -36,11 +36,13 @@ type endpoint interface {
 	setStopTime(t time.Time)
 	isStopped() bool
 	stopGracePeriodExpired() bool
+	socketPath() string
 }
 
 type endpointImpl struct {
 	mutex        sync.Mutex
 	resourceName string
+	socket       string
 	api          pluginapi.DevicePluginClient
 	stopTime     time.Time
 	client       plugin.Client // for testing only
@@ -52,6 +54,7 @@ func newEndpointImpl(p plugin.DevicePlugin) *endpointImpl {
 	return &endpointImpl{
 		api:          p.API(),
 		resourceName: p.Resource(),
+		socket:       p.SocketPath(),
 	}
 }
 
@@ -62,6 +65,10 @@ func newStoppedEndpointImpl(resourceName string) *endpointImpl {
 		resourceName: resourceName,
 		stopTime:     time.Now(),
 	}
+}
+
+func (e *endpointImpl) socketPath() string {
+	return e.socket
 }
 
 func (e *endpointImpl) isStopped() bool {

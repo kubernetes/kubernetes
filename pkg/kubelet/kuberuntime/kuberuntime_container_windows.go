@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -195,4 +194,11 @@ func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, contai
 // initSwapControllerAvailabilityCheck returns a function that always returns false on Windows
 func initSwapControllerAvailabilityCheck(ctx context.Context) func() bool {
 	return func() bool { return false }
+}
+
+func (m *kubeGenericRuntimeManager) isMemoryQoSEnforced() bool {
+	return false
+}
+
+func (m *kubeGenericRuntimeManager) applyPodLevelMemoryHigh(_ *v1.Pod, _ *cm.ResourceConfig) {
 }

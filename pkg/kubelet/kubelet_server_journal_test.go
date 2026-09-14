@@ -19,6 +19,8 @@ package kubelet
 import (
 	"bytes"
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -33,6 +35,48 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/utils/ptr"
 )
+
+func TestJournalServerMethodRestriction(t *testing.T) {
+	tests := []struct {
+		name           string
+		method         string
+		expectedStatus int
+		expectedAllow  string
+	}{
+		{
+			name:           "GET is allowed by method gate",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "POST is allowed by method gate",
+			method:         http.MethodPost,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "PUT is rejected",
+			method:         http.MethodPut,
+			expectedStatus: http.StatusMethodNotAllowed,
+			expectedAllow:  "GET, POST",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// invalid sinceTime forces an early validation error (400), so we only
+			// validate method gating and avoid invoking external log commands.
+			req := httptest.NewRequest(tt.method, "/logs?sinceTime=invalid", nil)
+			recorder := httptest.NewRecorder()
+
+			journal.ServeHTTP(recorder, req)
+
+			assert.Equal(t, tt.expectedStatus, recorder.Code)
+			if tt.expectedAllow != "" {
+				assert.Equal(t, tt.expectedAllow, recorder.Header().Get("Allow"))
+			}
+		})
+	}
+}
 
 func Test_getLoggingCmd(t *testing.T) {
 	var emptyCmdEnv []string

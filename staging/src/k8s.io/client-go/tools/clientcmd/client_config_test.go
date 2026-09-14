@@ -25,10 +25,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/dump"
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
 

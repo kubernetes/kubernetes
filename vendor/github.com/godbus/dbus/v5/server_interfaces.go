@@ -22,7 +22,7 @@ type Handler interface {
 // of Interface lookup is up to the implementation of
 // the ServerObject. The ServerObject implementation may
 // choose to implement empty string as a valid interface
-// represeting all methods or not per the D-Bus specification.
+// representing all methods or not per the D-Bus specification.
 type ServerObject interface {
 	LookupInterface(name string) (Interface, bool)
 }
@@ -38,17 +38,17 @@ type Interface interface {
 // A Method represents the exposed methods on D-Bus.
 type Method interface {
 	// Call requires that all arguments are decoded before being passed to it.
-	Call(args ...interface{}) ([]interface{}, error)
+	Call(args ...any) ([]any, error)
 	NumArguments() int
 	NumReturns() int
 	// ArgumentValue returns a representative value for the argument at position
 	// it should be of the proper type. reflect.Zero would be a good mechanism
 	// to use for this Value.
-	ArgumentValue(position int) interface{}
+	ArgumentValue(position int) any
 	// ReturnValue returns a representative value for the return at position
 	// it should be of the proper type. reflect.Zero would be a good mechanism
 	// to use for this Value.
-	ReturnValue(position int) interface{}
+	ReturnValue(position int) any
 }
 
 // An Argument Decoder can decode arguments using the non-standard mechanism
@@ -65,7 +65,7 @@ type ArgumentDecoder interface {
 	// To decode the arguments of a method the sender and message are
 	// provided in case the semantics of the implementer provides access
 	// to these as part of the method invocation.
-	DecodeArguments(conn *Conn, sender string, msg *Message, args []interface{}) ([]interface{}, error)
+	DecodeArguments(conn *Conn, sender string, msg *Message, args []any) ([]any, error)
 }
 
 // A SignalHandler is responsible for delivering a signal.
@@ -93,7 +93,7 @@ type SignalRegistrar interface {
 // "org.freedesktop.DBus.Error.Failed" error. By implementing this
 // interface as well a custom encoding may be provided.
 type DBusError interface {
-	DBusError() (string, []interface{})
+	DBusError() (string, []any)
 }
 
 // SerialGenerator is responsible for serials generation.

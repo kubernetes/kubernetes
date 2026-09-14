@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/netip"
+	"slices"
 	"sync"
 	"time"
 
@@ -73,28 +74,36 @@ func NewController(
 	ipAddressInformer networkinginformers.IPAddressInformer,
 	client clientset.Interface,
 ) *Controller {
+	logger := klog.FromContext(ctx)
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 	c := &Controller{
 		client: client,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ipaddresses"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "ipaddresses",
+			},
 		),
 		workerLoopPeriod: time.Second,
 	}
 
-	_, _ = serviceCIDRInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = serviceCIDRInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addServiceCIDR,
 		UpdateFunc: c.updateServiceCIDR,
 		DeleteFunc: c.deleteServiceCIDR,
+	}, cache.HandlerOptions{
+		Logger: &logger,
 	})
 	c.serviceCIDRLister = serviceCIDRInformer.Lister()
 	c.serviceCIDRsSynced = serviceCIDRInformer.Informer().HasSynced
 
-	_, _ = ipAddressInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = ipAddressInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addIPAddress,
 		DeleteFunc: c.deleteIPAddress,
+	}, cache.HandlerOptions{
+		Logger: &logger,
 	})
 
 	c.ipAddressLister = ipAddressInformer.Lister()
@@ -416,10 +425,8 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 }
 
 func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1.ServiceCIDR) error {
-	for _, f := range cidr.GetFinalizers() {
-		if f == ServiceCIDRProtectionFinalizer {
-			return nil
-		}
+	if slices.Contains(cidr.GetFinalizers(), ServiceCIDRProtectionFinalizer) {
+		return nil
 	}
 
 	patch := map[string]interface{}{
@@ -441,14 +448,7 @@ func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *
 }
 
 func (c *Controller) removeServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1.ServiceCIDR) error {
-	found := false
-	for _, f := range cidr.GetFinalizers() {
-		if f == ServiceCIDRProtectionFinalizer {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(cidr.GetFinalizers(), ServiceCIDRProtectionFinalizer) {
 		return nil
 	}
 	patch := map[string]interface{}{

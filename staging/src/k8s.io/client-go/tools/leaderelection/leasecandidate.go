@@ -18,7 +18,9 @@ package leaderelection
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
@@ -34,6 +36,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+
+	coordinationv1beta1listers "k8s.io/client-go/listers/coordination/v1beta1"
 )
 
 const requeueInterval = 5 * time.Minute
@@ -45,6 +49,7 @@ type CacheSyncWaiter interface {
 type LeaseCandidate struct {
 	leaseClient            coordinationv1beta1client.LeaseCandidateInterface
 	leaseCandidateInformer cache.SharedIndexInformer
+	leaseCandidateLister   coordinationv1beta1listers.LeaseCandidateLister
 	informerFactory        informers.SharedInformerFactory
 	hasSynced              cache.InformerSynced
 
@@ -63,44 +68,128 @@ type LeaseCandidate struct {
 	strategy                        v1.CoordinatedLeaseStrategy
 }
 
+// CandidateConfig specifies the configuration for NewCandidateWithConfig.
+type CandidateConfig struct {
+	// Logger is used for contextual logging. If unset, klog.Background() is used.
+	Logger *klog.Logger
+
+	// Clientset is used to interact with the LeaseCandidate API. Required.
+	Clientset kubernetes.Interface
+
+	// CandidateNamespace is the namespace to create the LeaseCandidate object in. Required.
+	CandidateNamespace string
+
+	// CandidateName is the name of the LeaseCandidate object. Required.
+	CandidateName string
+
+	// TargetLease is the name of the lease that this candidate is competing for. Required.
+	TargetLease string
+
+	// BinaryVersion is the binary version of the candidate. Required.
+	BinaryVersion string
+
+	// EmulationVersion is the emulation version of the candidate. Required when
+	// Strategy is v1.OldestEmulationVersion.
+	EmulationVersion string
+
+	// Strategy is the coordinated leader election strategy supported by the candidate. Required.
+	Strategy v1.CoordinatedLeaseStrategy
+}
+
 // NewCandidate creates new LeaseCandidate controller that creates a
 // LeaseCandidate object if it does not exist and watches changes
 // to the corresponding object and renews if PingTime is set.
 // WARNING: This is an ALPHA feature. Ensure that the CoordinatedLeaderElection
 // feature gate is on.
-func NewCandidate(clientset kubernetes.Interface,
+//
+// Contextual logging: NewCandidateWithConfig and logger should be used instead of NewCandidate in code which supports contextual logging.
+func NewCandidate(
+	clientset kubernetes.Interface,
 	candidateNamespace string,
 	candidateName string,
 	targetLease string,
 	binaryVersion, emulationVersion string,
 	strategy v1.CoordinatedLeaseStrategy,
 ) (*LeaseCandidate, CacheSyncWaiter, error) {
+	//nolint:logcheck // Cannot provide Logger here, use NewCandidateWithConfig.
+	return NewCandidateWithConfig(CandidateConfig{
+		Clientset:          clientset,
+		CandidateNamespace: candidateNamespace,
+		CandidateName:      candidateName,
+		TargetLease:        targetLease,
+		BinaryVersion:      binaryVersion,
+		EmulationVersion:   emulationVersion,
+		Strategy:           strategy,
+	})
+}
+
+// NewCandidateWithConfig creates new LeaseCandidate controller that creates a
+// LeaseCandidate object if it does not exist and watches changes
+// to the corresponding object and renews if PingTime is set.
+// WARNING: This is an ALPHA feature. Ensure that the CoordinatedLeaderElection
+// feature gate is on.
+func NewCandidateWithConfig(config CandidateConfig) (*LeaseCandidate, CacheSyncWaiter, error) {
+	if config.Clientset == nil {
+		return nil, nil, fmt.Errorf("required Clientset config parameter is unset")
+	}
+	if config.CandidateNamespace == "" {
+		return nil, nil, fmt.Errorf("required CandidateNamespace config parameter is unset")
+	}
+	if config.CandidateName == "" {
+		return nil, nil, fmt.Errorf("required CandidateName config parameter is unset")
+	}
+	if config.TargetLease == "" {
+		return nil, nil, fmt.Errorf("required TargetLease config parameter is unset")
+	}
+	if config.BinaryVersion == "" {
+		return nil, nil, fmt.Errorf("required BinaryVersion config parameter is unset")
+	}
+	if config.EmulationVersion == "" && config.Strategy == v1.OldestEmulationVersion {
+		return nil, nil, fmt.Errorf("required EmulationVersion config parameter is unset")
+	}
+	if config.Strategy == "" {
+		return nil, nil, fmt.Errorf("required Strategy config parameter is unset")
+	}
+
+	logger := klog.Background()
+	if config.Logger != nil {
+		logger = *config.Logger
+	}
+	clientset := config.Clientset
+	candidateNamespace := config.CandidateNamespace
+	candidateName := config.CandidateName
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", candidateName).String()
 	// A separate informer factory is required because this must start before informerFactories
 	// are started for leader elected components
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(
 		clientset, 5*time.Minute,
+		informers.WithNamespace(candidateNamespace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.FieldSelector = fieldSelector
 		}),
 	)
 	leaseCandidateInformer := informerFactory.Coordination().V1beta1().LeaseCandidates().Informer()
+	leaseCandidateLister := informerFactory.Coordination().V1beta1().LeaseCandidates().Lister()
 
 	lc := &LeaseCandidate{
 		leaseClient:            clientset.CoordinationV1beta1().LeaseCandidates(candidateNamespace),
 		leaseCandidateInformer: leaseCandidateInformer,
+		leaseCandidateLister:   leaseCandidateLister,
 		informerFactory:        informerFactory,
 		name:                   candidateName,
 		namespace:              candidateNamespace,
-		leaseName:              targetLease,
+		leaseName:              config.TargetLease,
 		clock:                  clock.RealClock{},
-		binaryVersion:          binaryVersion,
-		emulationVersion:       emulationVersion,
-		strategy:               strategy,
+		binaryVersion:          config.BinaryVersion,
+		emulationVersion:       config.EmulationVersion,
+		strategy:               config.Strategy,
 	}
-	lc.queue = workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[int](), workqueue.TypedRateLimitingQueueConfig[int]{Name: "leasecandidate"})
+	lc.queue = workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[int](), workqueue.TypedRateLimitingQueueConfig[int]{
+		Logger: &logger,
+		Name:   "leasecandidate",
+	})
 
-	h, err := leaseCandidateInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	h, err := leaseCandidateInformer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			if leasecandidate, ok := newObj.(*v1beta1.LeaseCandidate); ok {
 				if leasecandidate.Spec.PingTime != nil && leasecandidate.Spec.PingTime.After(leasecandidate.Spec.RenewTime.Time) {
@@ -108,7 +197,7 @@ func NewCandidate(clientset kubernetes.Interface,
 				}
 			}
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -118,11 +207,15 @@ func NewCandidate(clientset kubernetes.Interface,
 }
 
 func (c *LeaseCandidate) Run(ctx context.Context) {
-	defer c.queue.ShutDown()
-
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithName(logger, "leasecandidate")
 	ctx = klog.NewContext(ctx, logger)
+
+	var wg sync.WaitGroup
+	defer func() {
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	c.informerFactory.Start(ctx.Done())
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.hasSynced) {
@@ -130,7 +223,9 @@ func (c *LeaseCandidate) Run(ctx context.Context) {
 	}
 
 	c.enqueueLease()
-	go c.runWorker(ctx)
+	wg.Go(func() {
+		c.runWorker(ctx)
+	})
 	<-ctx.Done()
 }
 
@@ -166,7 +261,7 @@ func (c *LeaseCandidate) enqueueLease() {
 // a bool (true if this call created the lease), or any error that occurs.
 func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
-	lease, err := c.leaseClient.Get(ctx, c.name, metav1.GetOptions{})
+	lease, err := c.leaseCandidateLister.LeaseCandidates(c.namespace).Get(c.name)
 	if apierrors.IsNotFound(err) {
 		logger.V(2).Info("Creating lease candidate")
 		// lease does not exist, create it.

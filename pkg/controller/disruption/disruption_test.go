@@ -188,8 +188,8 @@ func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*d
 	dc.dListerSynced = alwaysReady
 	dc.ssListerSynced = alwaysReady
 	dc.recorder = record.NewFakeRecorder(100)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	return &disruptionController{
 		dc,
@@ -1540,7 +1540,7 @@ func TestStalePodDisruption(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			dc, _ := newFakeDisruptionControllerWithTime(tCtx, now)
-			go dc.Run(tCtx)
+			go dc.Run(tCtx, 1)
 			if _, err := dc.coreClient.CoreV1().Pods(tc.pod.Namespace).Create(tCtx, tc.pod, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create pod: %v", err)
 			}

@@ -72,10 +72,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		oldNodeCopy := oldNode
 		updated := false
 		for _, taint := range taints {
-			curNewNode, ok, err := addOrUpdateTaint(oldNodeCopy, taint)
-			if err != nil {
-				return fmt.Errorf("failed to update taint of node")
-			}
+			curNewNode, ok := addOrUpdateTaint(oldNodeCopy, taint)
 			updated = updated || ok
 			newNode = curNewNode
 			oldNodeCopy = curNewNode
@@ -118,7 +115,7 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 
 // addOrUpdateTaint tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
-func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
+func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool) {
 	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 
@@ -127,7 +124,7 @@ func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	for i := range nodeTaints {
 		if taint.MatchTaint(&nodeTaints[i]) {
 			if equality.Semantic.DeepEqual(*taint, nodeTaints[i]) {
-				return newNode, false, nil
+				return newNode, false
 			}
 			newTaints = append(newTaints, *taint)
 			updated = true
@@ -142,7 +139,7 @@ func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	}
 
 	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
+	return newNode, true
 }
 
 // RemoveTaintOffNode is for cleaning up taints temporarily added to node,
@@ -187,10 +184,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		oldNodeCopy := oldNode
 		updated := false
 		for _, taint := range taints {
-			curNewNode, ok, err := removeTaint(oldNodeCopy, taint)
-			if err != nil {
-				return fmt.Errorf("failed to remove taint of node")
-			}
+			curNewNode, ok := removeTaint(oldNodeCopy, taint)
 			updated = updated || ok
 			newNode = curNewNode
 			oldNodeCopy = curNewNode
@@ -214,20 +208,20 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 
 // removeTaint tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
-func removeTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
+func removeTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool) {
 	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 	if len(nodeTaints) == 0 {
-		return newNode, false, nil
+		return newNode, false
 	}
 
 	if !taintExists(nodeTaints, taint) {
-		return newNode, false, nil
+		return newNode, false
 	}
 
 	newTaints, _ := deleteTaint(nodeTaints, taint)
 	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
+	return newNode, true
 }
 
 // deleteTaint removes all the taints that have the same key and effect to given taintToDelete.

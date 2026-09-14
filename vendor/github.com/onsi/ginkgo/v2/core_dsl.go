@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -38,7 +39,6 @@ var flagSet types.GinkgoFlagSet
 var deprecationTracker = types.NewDeprecationTracker()
 var suiteConfig = types.NewDefaultSuiteConfig()
 var reporterConfig = types.NewDefaultReporterConfig()
-var suiteDidRun = false
 var outputInterceptor internal.OutputInterceptor
 var client parallel_support.Client
 
@@ -258,17 +258,17 @@ for more on how specs are parallelized in Ginkgo.
 You can also pass suite-level Label() decorators to RunSpecs.  The passed-in labels will apply to all specs in the suite.
 */
 func RunSpecs(t GinkgoTestingT, description string, args ...any) bool {
-	if suiteDidRun {
+	if global.SuiteDidRun {
 		exitIfErr(types.GinkgoErrors.RerunningSuite())
 	}
-	suiteDidRun = true
+	global.SuiteDidRun = true
 	err := global.PushClone()
 	if err != nil {
 		exitIfErr(err)
 	}
 	defer global.PopClone()
 
-	suiteLabels, suiteSemVerConstraints, suiteAroundNodes := extractSuiteConfiguration(args)
+	suiteLabels, suiteSemVerConstraints, suiteComponentSemVerConstraints, suiteAroundNodes := extractSuiteConfiguration(args)
 
 	var reporter reporters.Reporter
 	if suiteConfig.ParallelTotal == 1 {
@@ -311,7 +311,7 @@ func RunSpecs(t GinkgoTestingT, description string, args ...any) bool {
 	suitePath, err = filepath.Abs(suitePath)
 	exitIfErr(err)
 
-	passed, hasFocusedTests := global.Suite.Run(description, suiteLabels, suiteSemVerConstraints, suiteAroundNodes, suitePath, global.Failer, reporter, writer, outputInterceptor, interrupt_handler.NewInterruptHandler(client), client, internal.RegisterForProgressSignal, suiteConfig)
+	passed, hasFocusedTests := global.Suite.Run(description, suiteLabels, suiteSemVerConstraints, suiteComponentSemVerConstraints, suiteAroundNodes, suitePath, global.Failer, reporter, writer, outputInterceptor, interrupt_handler.NewInterruptHandler(client), client, internal.RegisterForProgressSignal, suiteConfig)
 	outputInterceptor.Shutdown()
 
 	flagSet.ValidateDeprecations(deprecationTracker)
@@ -330,9 +330,10 @@ func RunSpecs(t GinkgoTestingT, description string, args ...any) bool {
 	return passed
 }
 
-func extractSuiteConfiguration(args []any) (Labels, SemVerConstraints, types.AroundNodes) {
+func extractSuiteConfiguration(args []any) (Labels, SemVerConstraints, ComponentSemVerConstraints, types.AroundNodes) {
 	suiteLabels := Labels{}
 	suiteSemVerConstraints := SemVerConstraints{}
+	suiteComponentSemVerConstraints := ComponentSemVerConstraints{}
 	aroundNodes := types.AroundNodes{}
 	configErrors := []error{}
 	for _, arg := range args {
@@ -345,6 +346,11 @@ func extractSuiteConfiguration(args []any) (Labels, SemVerConstraints, types.Aro
 			suiteLabels = append(suiteLabels, arg...)
 		case SemVerConstraints:
 			suiteSemVerConstraints = append(suiteSemVerConstraints, arg...)
+		case ComponentSemVerConstraints:
+			for component, constraints := range arg {
+				suiteComponentSemVerConstraints[component] = append(suiteComponentSemVerConstraints[component], constraints...)
+				suiteComponentSemVerConstraints[component] = slices.Compact(suiteComponentSemVerConstraints[component])
+			}
 		case types.AroundNodeDecorator:
 			aroundNodes = append(aroundNodes, arg)
 		default:
@@ -355,14 +361,14 @@ func extractSuiteConfiguration(args []any) (Labels, SemVerConstraints, types.Aro
 
 	configErrors = types.VetConfig(flagSet, suiteConfig, reporterConfig)
 	if len(configErrors) > 0 {
-		fmt.Fprintf(formatter.ColorableStdErr, formatter.F("{{red}}Ginkgo detected configuration issues:{{/}}\n"))
+		fmt.Fprint(formatter.ColorableStdErr, formatter.F("{{red}}Ginkgo detected configuration issues:{{/}}\n"))
 		for _, err := range configErrors {
-			fmt.Fprintf(formatter.ColorableStdErr, err.Error())
+			fmt.Fprint(formatter.ColorableStdErr, err.Error())
 		}
 		os.Exit(1)
 	}
 
-	return suiteLabels, suiteSemVerConstraints, aroundNodes
+	return suiteLabels, suiteSemVerConstraints, suiteComponentSemVerConstraints, aroundNodes
 }
 
 func getwd() (string, error) {
@@ -385,7 +391,7 @@ func PreviewSpecs(description string, args ...any) Report {
 	}
 	defer global.PopClone()
 
-	suiteLabels, suiteSemVerConstraints, suiteAroundNodes := extractSuiteConfiguration(args)
+	suiteLabels, suiteSemVerConstraints, suiteComponentSemVerConstraints, suiteAroundNodes := extractSuiteConfiguration(args)
 	priorDryRun, priorParallelTotal, priorParallelProcess := suiteConfig.DryRun, suiteConfig.ParallelTotal, suiteConfig.ParallelProcess
 	suiteConfig.DryRun, suiteConfig.ParallelTotal, suiteConfig.ParallelProcess = true, 1, 1
 	defer func() {
@@ -403,7 +409,7 @@ func PreviewSpecs(description string, args ...any) Report {
 	suitePath, err = filepath.Abs(suitePath)
 	exitIfErr(err)
 
-	global.Suite.Run(description, suiteLabels, suiteSemVerConstraints, suiteAroundNodes, suitePath, global.Failer, reporter, writer, outputInterceptor, interrupt_handler.NewInterruptHandler(client), client, internal.RegisterForProgressSignal, suiteConfig)
+	global.Suite.Run(description, suiteLabels, suiteSemVerConstraints, suiteComponentSemVerConstraints, suiteAroundNodes, suitePath, global.Failer, reporter, writer, outputInterceptor, interrupt_handler.NewInterruptHandler(client), client, internal.RegisterForProgressSignal, suiteConfig)
 
 	return global.Suite.GetPreviewReport()
 }

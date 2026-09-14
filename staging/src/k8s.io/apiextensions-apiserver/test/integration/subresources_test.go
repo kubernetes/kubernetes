@@ -450,11 +450,11 @@ func TestApplyScaleSubresource(t *testing.T) {
 		t.Fatalf("Expected 3 managed fields, got %v: %v", len(managedFields), obj.GetManagedFields())
 	}
 	specEntry := managedFields[0]
-	if specEntry.Manager != "applier" || specEntry.APIVersion != "mygroup.example.com/v1" || specEntry.Operation != "Apply" || string(specEntry.FieldsV1.Raw) != `{"f:spec":{}}` || specEntry.Subresource != "" {
+	if specEntry.Manager != "applier" || specEntry.APIVersion != "mygroup.example.com/v1" || specEntry.Operation != "Apply" || specEntry.FieldsV1.GetRawString() != `{"f:spec":{}}` || specEntry.Subresource != "" {
 		t.Fatalf("Unexpected entry: %v", specEntry)
 	}
 	scaleEntry := managedFields[1]
-	if scaleEntry.Manager != "scaler" || scaleEntry.APIVersion != "mygroup.example.com/v1" || scaleEntry.Operation != "Update" || string(scaleEntry.FieldsV1.Raw) != `{"f:spec":{"f:replicas":{}}}` || scaleEntry.Subresource != "scale" {
+	if scaleEntry.Manager != "scaler" || scaleEntry.APIVersion != "mygroup.example.com/v1" || scaleEntry.Operation != "Update" || scaleEntry.FieldsV1.GetRawString() != `{"f:spec":{"f:replicas":{}}}` || scaleEntry.Subresource != "scale" {
 		t.Fatalf("Unexpected entry: %v", scaleEntry)
 	}
 	restEntry := managedFields[2]

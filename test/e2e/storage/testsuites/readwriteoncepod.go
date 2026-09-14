@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
 
@@ -33,7 +34,6 @@ import (
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -77,11 +77,12 @@ func (t *readWriteOncePodTestSuite) GetTestSuiteInfo() storageframework.TestSuit
 	return t.tsInfo
 }
 
-func (t *readWriteOncePodTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (t *readWriteOncePodTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	driverInfo := driver.GetDriverInfo()
 	if !driverInfo.Capabilities[storageframework.CapReadWriteOncePod] {
-		e2eskipper.Skipf("Driver %q doesn't support ReadWriteOncePod - skipping", driverInfo.Name)
+		return fmt.Sprintf("Driver %q doesn't support ReadWriteOncePod", driverInfo.Name)
 	}
+	return ""
 }
 
 func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
@@ -130,7 +131,7 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 		ginkgo.DeferCleanup(cleanup)
 	})
 
-	ginkgo.It("should preempt lower priority pods using ReadWriteOncePod volumes", func(ctx context.Context) {
+	f.It("should preempt lower priority pods using ReadWriteOncePod volumes", f.WithSerial(), func(ctx context.Context) {
 		// Create the ReadWriteOncePod PVC.
 		accessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}
 		l.volume = storageframework.CreateVolumeResourceWithAccessModes(ctx, driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes, nil)

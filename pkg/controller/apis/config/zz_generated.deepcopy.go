@@ -52,6 +52,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.CSRSigningController = in.CSRSigningController
 	out.DaemonSetController = in.DaemonSetController
 	out.DeploymentController = in.DeploymentController
+	out.DisruptionController = in.DisruptionController
 	out.DeviceTaintEvictionController = in.DeviceTaintEvictionController
 	out.DeprecatedController = in.DeprecatedController
 	out.EndpointController = in.EndpointController
@@ -75,6 +76,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.StatefulSetController = in.StatefulSetController
 	out.TTLAfterFinishedController = in.TTLAfterFinishedController
 	out.ValidatingAdmissionPolicyStatusController = in.ValidatingAdmissionPolicyStatusController
+	out.ResourceClaimController = in.ResourceClaimController
 	return
 }
 

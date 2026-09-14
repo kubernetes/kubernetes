@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -41,13 +42,13 @@ type stateCheckpoint struct {
 }
 
 // NewStateCheckpoint creates new State for keeping track of pod resource information with checkpoint backend
-func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
+func NewStateCheckpoint(logger klog.Logger, stateDir, checkpointName string) (State, error) {
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager for pod resource information tracking: %w", err)
 	}
 
-	pra, checksum, err := restoreState(checkpointManager, checkpointName)
+	pra, checksum, err := restoreState(logger, checkpointManager, checkpointName)
 	if err != nil {
 		//lint:ignore ST1005 user-facing error message
 		return nil, fmt.Errorf("could not restore state from checkpoint: %w, please drain this node and delete pod resource information checkpoint file %q before restarting Kubelet",
@@ -55,7 +56,7 @@ func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
 	}
 
 	stateCheckpoint := &stateCheckpoint{
-		cache:             NewStateMemory(pra),
+		cache:             NewStateMemory(logger, pra),
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
 		lastChecksum:      checksum,
@@ -64,7 +65,7 @@ func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
 }
 
 // restores state from a checkpoint and creates it if it doesn't exist
-func restoreState(checkpointManager checkpointmanager.CheckpointManager, checkpointName string) (PodResourceInfoMap, checksum.Checksum, error) {
+func restoreState(logger klog.Logger, checkpointManager checkpointmanager.CheckpointManager, checkpointName string) (PodResourceInfoMap, checksum.Checksum, error) {
 	checkpoint := &Checkpoint{}
 	if err := checkpointManager.GetCheckpoint(checkpointName, checkpoint); err != nil {
 		if err == errors.ErrCheckpointNotFound {
@@ -78,12 +79,12 @@ func restoreState(checkpointManager checkpointmanager.CheckpointManager, checkpo
 		return nil, 0, fmt.Errorf("failed to get pod resource information: %w", err)
 	}
 
-	klog.V(2).InfoS("State checkpoint: restored pod resource state from checkpoint")
+	logger.V(2).Info("State checkpoint: restored pod resource state from checkpoint")
 	return praInfo.Entries, checkpoint.Checksum, nil
 }
 
 // saves state to a checkpoint, caller is responsible for locking
-func (sc *stateCheckpoint) storeState() error {
+func (sc *stateCheckpoint) storeState(logger klog.Logger) error {
 	resourceInfo := sc.cache.GetPodResourceInfoMap()
 
 	checkpoint, err := NewCheckpoint(&PodResourceCheckpointInfo{
@@ -98,7 +99,7 @@ func (sc *stateCheckpoint) storeState() error {
 	}
 	err = sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	if err != nil {
-		klog.ErrorS(err, "Failed to save pod resource information checkpoint")
+		logger.Error(err, "Failed to save pod resource information checkpoint")
 		return err
 	}
 	sc.lastChecksum = checkpoint.Checksum
@@ -119,6 +120,13 @@ func (sc *stateCheckpoint) GetPodLevelResources(podUID types.UID) (*v1.ResourceR
 	return sc.cache.GetPodLevelResources(podUID)
 }
 
+// GetEmptyDirVolumeLimit returns current resources information for emptyDir volume
+func (sc *stateCheckpoint) GetEmptyDirVolumeLimit(podUID types.UID, volumeName string) (*resource.Quantity, bool) {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+	return sc.cache.GetEmptyDirVolumeLimit(podUID, volumeName)
+}
+
 // GetPodResourceInfoMap returns current pod resource information map
 func (sc *stateCheckpoint) GetPodResourceInfoMap() PodResourceInfoMap {
 	sc.mux.RLock()
@@ -134,46 +142,58 @@ func (sc *stateCheckpoint) GetPodResourceInfo(podUID types.UID) (PodResourceInfo
 }
 
 // SetContainerResoruces sets resources information for a pod's container
-func (sc *stateCheckpoint) SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
+func (sc *stateCheckpoint) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	err := sc.cache.SetContainerResources(podUID, containerName, resources)
+	err := sc.cache.SetContainerResources(logger, podUID, containerName, resources)
 	if err != nil {
 		return err
 	}
-	return sc.storeState()
+	return sc.storeState(logger)
 }
 
 // SetPodLevelResources sets resources information for a pod's resources at pod-level.
-func (sc *stateCheckpoint) SetPodLevelResources(podUID types.UID, resInfo *v1.ResourceRequirements) error {
+func (sc *stateCheckpoint) SetPodLevelResources(logger klog.Logger, podUID types.UID, resInfo *v1.ResourceRequirements) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	err := sc.cache.SetPodLevelResources(podUID, resInfo)
+	err := sc.cache.SetPodLevelResources(logger, podUID, resInfo)
 	if err != nil {
 		return err
 	}
-	return sc.storeState()
+	return sc.storeState(logger)
+}
+
+// SetEmptyDirVolumeLimit sets the size limit for a pod's emptyDir volume.
+func (sc *stateCheckpoint) SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, limit *resource.Quantity) error {
+	logger := klog.TODO()
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	err := sc.cache.SetEmptyDirVolumeLimit(podUID, volumeName, limit)
+	if err != nil {
+		return err
+	}
+	return sc.storeState(logger)
 }
 
 // SetPodResourceInfo sets pod resource information
-func (sc *stateCheckpoint) SetPodResourceInfo(podUID types.UID, resourceInfo PodResourceInfo) error {
+func (sc *stateCheckpoint) SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	err := sc.cache.SetPodResourceInfo(podUID, resourceInfo)
+	err := sc.cache.SetPodResourceInfo(logger, podUID, resourceInfo)
 	if err != nil {
 		return err
 	}
-	return sc.storeState()
+	return sc.storeState(logger)
 }
 
 // Delete deletes resource information for specified pod
-func (sc *stateCheckpoint) RemovePod(podUID types.UID) error {
+func (sc *stateCheckpoint) RemovePod(logger klog.Logger, podUID types.UID) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	// Skip writing the checkpoint for pod deletion, since there is no side effect to
 	// keeping a deleted pod. Deleted pods will eventually be cleaned up by RemoveOrphanedPods.
 	// The deletion will be stored the next time a non-delete update is made.
-	return sc.cache.RemovePod(podUID)
+	return sc.cache.RemovePod(logger, podUID)
 }
 
 func (sc *stateCheckpoint) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
@@ -197,6 +217,10 @@ func (sc *noopStateCheckpoint) GetPodLevelResources(_ types.UID) (*v1.ResourceRe
 	return nil, false
 }
 
+func (sc *noopStateCheckpoint) GetEmptyDirVolumeLimit(_ types.UID, _ string) (*resource.Quantity, bool) {
+	return nil, false
+}
+
 func (sc *noopStateCheckpoint) GetPodResourceInfoMap() PodResourceInfoMap {
 	return nil
 }
@@ -205,19 +229,23 @@ func (sc *noopStateCheckpoint) GetPodResourceInfo(_ types.UID) (PodResourceInfo,
 	return PodResourceInfo{}, false
 }
 
-func (sc *noopStateCheckpoint) SetContainerResources(_ types.UID, _ string, _ v1.ResourceRequirements) error {
+func (sc *noopStateCheckpoint) SetContainerResources(_ klog.Logger, _ types.UID, _ string, _ v1.ResourceRequirements) error {
 	return nil
 }
 
-func (sc *noopStateCheckpoint) SetPodLevelResources(_ types.UID, _ *v1.ResourceRequirements) error {
+func (sc *noopStateCheckpoint) SetPodLevelResources(_ klog.Logger, _ types.UID, _ *v1.ResourceRequirements) error {
 	return nil
 }
 
-func (sc *noopStateCheckpoint) SetPodResourceInfo(_ types.UID, _ PodResourceInfo) error {
+func (sc *noopStateCheckpoint) SetEmptyDirVolumeLimit(_ types.UID, _ string, _ *resource.Quantity) error {
 	return nil
 }
 
-func (sc *noopStateCheckpoint) RemovePod(_ types.UID) error {
+func (sc *noopStateCheckpoint) SetPodResourceInfo(_ klog.Logger, _ types.UID, _ PodResourceInfo) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) RemovePod(_ klog.Logger, _ types.UID) error {
 	return nil
 }
 

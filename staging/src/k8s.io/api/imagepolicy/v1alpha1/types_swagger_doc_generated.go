@@ -29,9 +29,9 @@ package v1alpha1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_ImageReview = map[string]string{
 	"":         "ImageReview checks if the set of images in a pod are allowed.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"spec":     "Spec holds information about the pod being evaluated",
-	"status":   "Status is filled in by the backend and indicates whether the pod should be allowed.",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds information about the pod being evaluated",
+	"status":   "status is filled in by the backend and indicates whether the pod should be allowed.",
 }
 
 func (ImageReview) SwaggerDoc() map[string]string {
@@ -40,7 +40,7 @@ func (ImageReview) SwaggerDoc() map[string]string {
 
 var map_ImageReviewContainerSpec = map[string]string{
 	"":      "ImageReviewContainerSpec is a description of a container within the pod creation request.",
-	"image": "This can be in the form image:tag or image@SHA:012345679abcdef.",
+	"image": "image can be in the form image:tag or image@SHA:012345679abcdef.",
 }
 
 func (ImageReviewContainerSpec) SwaggerDoc() map[string]string {
@@ -49,9 +49,9 @@ func (ImageReviewContainerSpec) SwaggerDoc() map[string]string {
 
 var map_ImageReviewSpec = map[string]string{
 	"":            "ImageReviewSpec is a description of the pod creation request.",
-	"containers":  "Containers is a list of a subset of the information in each container of the Pod being created.",
-	"annotations": "Annotations is a list of key-value pairs extracted from the Pod's annotations. It only includes keys which match the pattern `*.image-policy.k8s.io/*`. It is up to each webhook backend to determine how to interpret these annotations, if at all.",
-	"namespace":   "Namespace is the namespace the pod is being created in.",
+	"containers":  "containers is a list of a subset of the information in each container of the Pod being created.",
+	"annotations": "annotations is a list of key-value pairs extracted from the Pod's annotations. It only includes keys which match the pattern `*.image-policy.k8s.io/*`. It is up to each webhook backend to determine how to interpret these annotations, if at all.",
+	"namespace":   "namespace is the namespace the pod is being created in.",
 }
 
 func (ImageReviewSpec) SwaggerDoc() map[string]string {
@@ -60,9 +60,9 @@ func (ImageReviewSpec) SwaggerDoc() map[string]string {
 
 var map_ImageReviewStatus = map[string]string{
 	"":                 "ImageReviewStatus is the result of the review for the pod creation request.",
-	"allowed":          "Allowed indicates that all images were allowed to be run.",
-	"reason":           "Reason should be empty unless Allowed is false in which case it may contain a short description of what is wrong.  Kubernetes may truncate excessively long errors when displaying to the user.",
-	"auditAnnotations": "AuditAnnotations will be added to the attributes object of the admission controller request using 'AddAnnotation'.  The keys should be prefix-less (i.e., the admission controller will add an appropriate prefix).",
+	"allowed":          "allowed indicates that all images were allowed to be run.",
+	"reason":           "reason should be empty unless Allowed is false in which case it may contain a short description of what is wrong.  Kubernetes may truncate excessively long errors when displaying to the user.",
+	"auditAnnotations": "auditAnnotations will be added to the attributes object of the admission controller request using 'AddAnnotation'.  The keys should be prefix-less (i.e., the admission controller will add an appropriate prefix).",
 }
 
 func (ImageReviewStatus) SwaggerDoc() map[string]string {

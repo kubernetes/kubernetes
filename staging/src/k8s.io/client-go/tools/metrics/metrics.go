@@ -25,7 +25,37 @@ import (
 	"time"
 )
 
-var registerMetrics sync.Once
+var (
+	registerMetrics      sync.Once
+	ensureRegisteredOnce sync.Once
+	// ensureRegisteredFn, if set via RegisterOpts.RegisterFn, is invoked
+	// exactly once before any rest client is constructed. Adapter packages
+	// (e.g. k8s.io/component-base/metrics/prometheus/restclient) install
+	// this callback in their init() so that the actual registration with
+	// legacyregistry — and the metric Create() that reads
+	// feature-gate-derived options like NativeHistograms — happens at
+	// runtime rather than at init() time. See EnsureRegistered for the
+	// caller-side contract.
+	ensureRegisteredFn func()
+)
+
+// EnsureRegistered invokes the callback installed via RegisterOpts.RegisterFn (if
+// any) exactly once. Callers should treat it as idempotent; subsequent calls are
+// effectively free.
+//
+// New public constructors or entry points for packages in client-go that create
+// a REST client, HTTP transport, or credential provider should invoke EnsureRegistered()
+// at the very beginning of the function. Adapter Observe methods
+// also call EnsureRegistered(), so no observations are lost if a constructor
+// forgets to invoke it, but if invoked, the entrypoint call shifts registration from
+// "first-observation" to "first client construction", meaning the metric
+// series is visible to Promteheus scrapes from process startup rather than
+// appearing only after the first request.
+func EnsureRegistered() {
+	if ensureRegisteredFn != nil {
+		ensureRegisteredOnce.Do(ensureRegisteredFn)
+	}
+}
 
 // DurationMetric is a measurement of some amount of time.
 type DurationMetric interface {
@@ -80,8 +110,26 @@ type TransportCacheMetric interface {
 }
 
 // TransportCreateCallsMetric counts the number of times a transport is created
-// partitioned by the result of the cache: hit, miss, uncacheable
+// partitioned by the result of the cache: hit, miss, miss-gc, uncacheable
 type TransportCreateCallsMetric interface {
+	Increment(result string)
+}
+
+// TransportCAReloadsMetric counts the number of times a CA reload is attempted,
+// partitioned by the result and reason.
+type TransportCAReloadsMetric interface {
+	Increment(result, reason string)
+}
+
+// TransportCertRotationGCCallsMetric counts the number of times a cert rotation
+// goroutine cancel func is called via GC cleanup.
+type TransportCertRotationGCCallsMetric interface {
+	Increment()
+}
+
+// TransportCacheGCCallsMetric counts the number of times a GC cleanup
+// attempts to delete a cache entry, partitioned by the result: deleted, skipped.
+type TransportCacheGCCallsMetric interface {
 	Increment(result string)
 }
 
@@ -117,23 +165,40 @@ var (
 	// TransportCreateCalls is the metric that counts the number of times a new transport
 	// is created
 	TransportCreateCalls TransportCreateCallsMetric = noopTransportCreateCalls{}
+	// TransportCAReloads is the metric that counts the number of times a CA reload is attempted
+	TransportCAReloads TransportCAReloadsMetric = noopTransportCAReloads{}
+	// TransportCertRotationGCCalls counts the number of times a cert rotation goroutine
+	// cancel func is called via GC cleanup
+	TransportCertRotationGCCalls TransportCertRotationGCCallsMetric = noopTransportCertRotationGCCalls{}
+	// TransportCacheGCCalls counts the number of times a GC cleanup attempts
+	// to delete a transport cache entry, partitioned by result: deleted, skipped.
+	TransportCacheGCCalls TransportCacheGCCallsMetric = noopTransportCacheGCCalls{}
 )
 
 // RegisterOpts contains all the metrics to register. Metrics may be nil.
 type RegisterOpts struct {
-	ClientCertExpiry      ExpiryMetric
-	ClientCertRotationAge DurationMetric
-	RequestLatency        LatencyMetric
-	ResolverLatency       ResolverLatencyMetric
-	RequestSize           SizeMetric
-	ResponseSize          SizeMetric
-	RateLimiterLatency    LatencyMetric
-	RequestResult         ResultMetric
-	ExecPluginCalls       CallsMetric
-	ExecPluginPolicyCalls PolicyCallsMetric
-	RequestRetry          RetryMetric
-	TransportCacheEntries TransportCacheMetric
-	TransportCreateCalls  TransportCreateCallsMetric
+	ClientCertExpiry             ExpiryMetric
+	ClientCertRotationAge        DurationMetric
+	RequestLatency               LatencyMetric
+	ResolverLatency              ResolverLatencyMetric
+	RequestSize                  SizeMetric
+	ResponseSize                 SizeMetric
+	RateLimiterLatency           LatencyMetric
+	RequestResult                ResultMetric
+	ExecPluginCalls              CallsMetric
+	ExecPluginPolicyCalls        PolicyCallsMetric
+	RequestRetry                 RetryMetric
+	TransportCacheEntries        TransportCacheMetric
+	TransportCreateCalls         TransportCreateCallsMetric
+	TransportCAReloads           TransportCAReloadsMetric
+	TransportCertRotationGCCalls TransportCertRotationGCCallsMetric
+	TransportCacheGCCalls        TransportCacheGCCallsMetric
+
+	// RegisterFn, if non-nil, is invoked exactly once by EnsureRegistered().
+	// before the first rest client is constructed. Adapters use this to defer
+	// registrations that depend on runtime state (eg., feature gates read my metric
+	// Create() without changing the import side contract of the adapter package.)
+	RegisterFn func()
 }
 
 // Register registers metrics for the rest client to use. This can
@@ -168,7 +233,7 @@ func Register(opts RegisterOpts) {
 			ExecPluginCalls = opts.ExecPluginCalls
 		}
 		if opts.ExecPluginPolicyCalls != nil {
-			ExecPluginCalls = opts.ExecPluginCalls
+			ExecPluginPolicyCalls = opts.ExecPluginPolicyCalls
 		}
 		if opts.RequestRetry != nil {
 			RequestRetry = opts.RequestRetry
@@ -178,6 +243,18 @@ func Register(opts RegisterOpts) {
 		}
 		if opts.TransportCreateCalls != nil {
 			TransportCreateCalls = opts.TransportCreateCalls
+		}
+		if opts.TransportCAReloads != nil {
+			TransportCAReloads = opts.TransportCAReloads
+		}
+		if opts.TransportCertRotationGCCalls != nil {
+			TransportCertRotationGCCalls = opts.TransportCertRotationGCCalls
+		}
+		if opts.TransportCacheGCCalls != nil {
+			TransportCacheGCCalls = opts.TransportCacheGCCalls
+		}
+		if opts.RegisterFn != nil {
+			ensureRegisteredFn = opts.RegisterFn
 		}
 	})
 }
@@ -226,3 +303,15 @@ func (noopTransportCache) Observe(int) {}
 type noopTransportCreateCalls struct{}
 
 func (noopTransportCreateCalls) Increment(string) {}
+
+type noopTransportCAReloads struct{}
+
+func (noopTransportCAReloads) Increment(result, reason string) {}
+
+type noopTransportCertRotationGCCalls struct{}
+
+func (noopTransportCertRotationGCCalls) Increment() {}
+
+type noopTransportCacheGCCalls struct{}
+
+func (noopTransportCacheGCCalls) Increment(string) {}

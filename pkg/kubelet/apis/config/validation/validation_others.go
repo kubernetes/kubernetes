@@ -1,5 +1,4 @@
 //go:build !windows && !linux
-// +build !windows,!linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -33,6 +32,10 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 
 	if kc.UserNamespaces != nil {
 		return fmt.Errorf("invalid configuration: userNamespaces is only supported on linux")
+	}
+
+	if len(kc.DefaultPodSysctls) > 0 {
+		return fmt.Errorf("invalid configuration: defaultPodSysctls is only supported on linux")
 	}
 
 	return nil

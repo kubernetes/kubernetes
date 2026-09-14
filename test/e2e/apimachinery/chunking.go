@@ -85,7 +85,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		c := f.ClientSet
 		client := c.CoreV1().PodTemplates(ns)
 		ginkgo.By("retrieving those results in paged fashion several times")
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			opts := metav1.ListOptions{}
 			found := 0
 			var lastRV string

@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -26,6 +27,9 @@ func GoVersion(ctx context.Context, inv Invocation, r *Runner) (int, error) {
 	inv.BuildFlags = nil // This is not a build command.
 	inv.ModFlag = ""
 	inv.ModFile = ""
+	// Set GO111MODULE=off so that we are immune to errors in go.{work,mod}.
+	// Unfortunately, this breaks the Go 1.21+ toolchain directive and
+	// may affect the set of ReleaseTags; see #68495.
 	inv.Env = append(inv.Env[:len(inv.Env):len(inv.Env)], "GO111MODULE=off")
 
 	stdoutBytes, err := r.Run(ctx, inv)
@@ -38,9 +42,9 @@ func GoVersion(ctx context.Context, inv Invocation, r *Runner) (int, error) {
 	}
 	// Split up "[go1.1 go1.15]" and return highest go1.X value.
 	tags := strings.Fields(stdout[1 : len(stdout)-2])
-	for i := len(tags) - 1; i >= 0; i-- {
+	for _, tag := range slices.Backward(tags) {
 		var version int
-		if _, err := fmt.Sscanf(tags[i], "go1.%d", &version); err != nil {
+		if _, err := fmt.Sscanf(tag, "go1.%d", &version); err != nil {
 			continue
 		}
 		return version, nil

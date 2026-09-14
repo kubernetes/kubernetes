@@ -25,6 +25,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -33,11 +34,39 @@ import (
 )
 
 // DeploymentInformer provides access to a shared informer and lister for
-// Deployments.
+// Deployments. Prefer using the type-safe variant (see [TypedDeploymentInformer]).
 type DeploymentInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() extensionsv1beta1.DeploymentLister
 }
+
+// TypedDeploymentInformer provides access to a shared informer and lister for
+// Deployments, including the type-safe TypedInformer variant.
+// It is a superset of DeploymentInformer.
+type TypedDeploymentInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() DeploymentIndexInformer
+	Lister() extensionsv1beta1.DeploymentLister
+}
+
+// DeploymentIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type DeploymentIndexInformer cache.TypedSharedIndexInformer[*apiextensionsv1beta1.Deployment]
+
+// DeploymentHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Deployment.
+type DeploymentHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiextensionsv1beta1.Deployment]
+
+// DeploymentDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Deployment.
+type DeploymentDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiextensionsv1beta1.Deployment]
+
+// DeploymentFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Deployment.
+type DeploymentFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiextensionsv1beta1.Deployment]
+
+// DeploymentIndexers is a specialization of [cache.TypedIndexers] for Deployment.
+type DeploymentIndexers = cache.TypedIndexers[*apiextensionsv1beta1.Deployment]
+
+// DeletedDeployment is a specialization of [cache.DeletedObject] for Deployment.
+type DeletedDeployment = cache.DeletedObject[*apiextensionsv1beta1.Deployment]
 
 type deploymentInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,55 +77,132 @@ type deploymentInformer struct {
 // NewDeploymentInformer constructs a new informer for Deployment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedDeploymentInformer]).
 func NewDeploymentInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredDeploymentInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewDeploymentInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedDeploymentInformer constructs a new informer for Deployment type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedDeploymentInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers DeploymentIndexers) DeploymentIndexInformer {
+	return NewTypedDeploymentInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredDeploymentInformer constructs a new informer for Deployment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredDeploymentInformer]).
 func NewFilteredDeploymentInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewTypedDeploymentInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredDeploymentInformer constructs a new informer for Deployment type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredDeploymentInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers DeploymentIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) DeploymentIndexInformer {
+	return NewTypedDeploymentInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewDeploymentInformerWithOptions constructs a new informer for Deployment type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedDeploymentInformerWithOptions]).
+func NewDeploymentInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedDeploymentInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedDeploymentInformerWithOptions constructs a new informer for Deployment type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedDeploymentInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) DeploymentIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apiextensionsv1beta1.Deployment](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.ExtensionsV1beta1().Deployments(namespace).List(context.Background(), options)
+				return client.ExtensionsV1beta1().Deployments(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.ExtensionsV1beta1().Deployments(namespace).Watch(context.Background(), options)
+				return client.ExtensionsV1beta1().Deployments(namespace).Watch(context.Background(), opts)
 			},
-			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.ExtensionsV1beta1().Deployments(namespace).List(ctx, options)
+				return client.ExtensionsV1beta1().Deployments(namespace).List(ctx, opts)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.ExtensionsV1beta1().Deployments(namespace).Watch(ctx, options)
+				return client.ExtensionsV1beta1().Deployments(namespace).Watch(ctx, opts)
 			},
 		}, client),
 		&apiextensionsv1beta1.Deployment{},
-		resyncPeriod,
-		indexers,
-	)
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
+		},
+	))
 }
 
 func (f *deploymentInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredDeploymentInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedDeploymentInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiextensionsv1beta1.Deployment{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *deploymentInformer) TypedInformer() DeploymentIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiextensionsv1beta1.Deployment](f.factory.InformerFor(&apiextensionsv1beta1.Deployment{}, f.defaultInformer))
 }
 
 func (f *deploymentInformer) Lister() extensionsv1beta1.DeploymentLister {
 	return extensionsv1beta1.NewDeploymentLister(f.Informer().GetIndexer())
+}
+
+// ToTypedDeploymentInformer converts an untyped informer into a TypedDeploymentInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Deployment. If that is not the case, calling type-safe methods of the returned
+// TypedDeploymentInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedDeploymentInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedDeploymentInformer(informer DeploymentInformer) TypedDeploymentInformer {
+	if informer, ok := informer.(TypedDeploymentInformer); ok {
+		return informer
+	}
+	return &deploymentTypedInformerAdapter{informer}
+}
+
+type deploymentTypedInformerAdapter struct {
+	DeploymentInformer
+}
+
+func (a *deploymentTypedInformerAdapter) TypedInformer() DeploymentIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiextensionsv1beta1.Deployment](a.Informer())
+}
+
+// ToDeploymentIndexInformer converts an untyped informer into a DeploymentIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Deployment. If that is not the case, calling type-safe methods of the returned
+// DeploymentIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a DeploymentIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToDeploymentIndexInformer(informer cache.SharedIndexInformer) DeploymentIndexInformer {
+	if informer, ok := informer.(DeploymentIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiextensionsv1beta1.Deployment](informer)
 }

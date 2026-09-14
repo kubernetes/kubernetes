@@ -24,8 +24,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gregjones/httpcache"
 	"github.com/peterbourgon/diskv"
+	"k8s.io/client-go/third_party/forked/httpcache"
 	"k8s.io/klog/v2"
 )
 
@@ -60,13 +60,13 @@ func (rt *cacheRoundTripper) CancelRequest(req *http.Request) {
 	if cr, ok := rt.rt.Transport.(canceler); ok {
 		cr.CancelRequest(req)
 	} else {
-		klog.Errorf("CancelRequest not implemented by %T", rt.rt.Transport)
+		klog.FromContext(req.Context()).Error(nil, "CancelRequest not implemented by round-tripper", "type", fmt.Sprintf("%T", rt.rt.Transport))
 	}
 }
 
 func (rt *cacheRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt.Transport }
 
-// A sumDiskCache is a cache backend for github.com/gregjones/httpcache. It is
+// A sumDiskCache is a cache backend for httpcache. It is
 // similar to httpcache's diskcache package, but uses SHA256 sums to ensure
 // cache integrity at read time rather than fsyncing each cache entry to
 // increase the likelihood they will be persisted at write time. This avoids

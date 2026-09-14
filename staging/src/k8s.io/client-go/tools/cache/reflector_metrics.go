@@ -40,6 +40,12 @@ type SummaryMetric interface {
 	Observe(float64)
 }
 
+// HistogramMetric captures individual observations into configurable buckets.
+// It also provides a sum and count of observations.
+type HistogramMetric interface {
+	Observe(float64)
+}
+
 type noopMetric struct{}
 
 func (noopMetric) Inc()            {}

@@ -24,25 +24,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -53,10 +52,6 @@ import (
 // can't reliably simulate periodic sync of volumes/claims - it would be
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
-	// Default enable the HonorPVReclaimPolicy feature gate.
-	// TODO: this will be removed in 1.36
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
@@ -93,13 +88,15 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name:            "5-2-3 - complete bind when PV and PVC both exist and PV has AnnPreResizeCapacity annotation",
-			initialVolumes:  volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
+			initialVolumes:  volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
 			expectedVolumes: volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
-			initialClaims:   withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil)),
+			initialClaims:   noclaims,
 			expectedClaims:  withExpectedCapacity("1Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "volume5-2", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted)),
 			expectedEvents:  noevents,
 			errors:          noerrors,
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				claim := withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil))[0]
+				reactor.AddClaimEvent(claim)
 				return nil
 			},
 		},
@@ -114,8 +111,7 @@ func TestControllerSync(t *testing.T) {
 			errors:          noerrors,
 			// Custom test function that generates a delete event
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*v1.PersistentVolumeClaim)
+				claim := ctrl.claims.List()[0]
 				reactor.DeleteClaimEvent(claim)
 				return nil
 			},
@@ -131,8 +127,7 @@ func TestControllerSync(t *testing.T) {
 			errors:          noerrors,
 			// Custom test function that generates a delete event
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-				obj := ctrl.volumes.store.List()[0]
-				volume := obj.(*v1.PersistentVolume)
+				volume := ctrl.volumes.List()[0]
 				reactor.DeleteVolumeEvent(volume)
 				return nil
 			},
@@ -154,17 +149,16 @@ func TestControllerSync(t *testing.T) {
 			// event will be generated to trigger "deleteVolume" call for metric reporting
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				test.initialVolumes[0].Annotations[volume.AnnDynamicallyProvisioned] = "gcr.io/vendor-csi"
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*v1.PersistentVolumeClaim)
+				claim := ctrl.claims.List()[0]
 				reactor.DeleteClaimEvent(claim)
 				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-					return len(ctrl.claims.ListKeys()) == 0, nil
+					return len(ctrl.claims.List()) == 0, nil
 				})
 				if err != nil {
 					return err
 				}
 				// claim has been removed from controller's cache, generate a volume deleted event
-				volume := ctrl.volumes.store.List()[0].(*v1.PersistentVolume)
+				volume := ctrl.volumes.List()[0]
 				reactor.DeleteVolumeEvent(volume)
 				return nil
 			},
@@ -184,12 +178,11 @@ func TestControllerSync(t *testing.T) {
 			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				// should have been provisioned by external provisioner
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*v1.PersistentVolumeClaim)
+				claim := ctrl.claims.List()[0]
 				reactor.DeleteClaimEvent(claim)
 				// wait until claim is cleared from cache, i.e., deleteClaim is called
 				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-					return len(ctrl.claims.ListKeys()) == 0, nil
+					return len(ctrl.claims.List()) == 0, nil
 				})
 				if err != nil {
 					return err
@@ -219,10 +212,10 @@ func TestControllerSync(t *testing.T) {
 			// Custom test function that generates a delete claim event which should have been caught by
 			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-				volume := ctrl.volumes.store.List()[0].(*v1.PersistentVolume)
+				volume := ctrl.volumes.List()[0]
 				reactor.DeleteVolumeEvent(volume)
 				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-					return len(ctrl.volumes.store.ListKeys()) == 0, nil
+					return len(ctrl.volumes.List()) == 0, nil
 				})
 				if err != nil {
 					return err
@@ -231,8 +224,7 @@ func TestControllerSync(t *testing.T) {
 				// Wait for the PVC to get fully processed. This avoids races between PV controller and DeleteClaimEvent
 				// below.
 				err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-					obj := ctrl.claims.List()[0]
-					claim := obj.(*v1.PersistentVolumeClaim)
+					claim := ctrl.claims.List()[0]
 					return claim.Status.Phase == v1.ClaimLost, nil
 				})
 				if err != nil {
@@ -240,12 +232,11 @@ func TestControllerSync(t *testing.T) {
 				}
 
 				// trying to remove the claim as well
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*v1.PersistentVolumeClaim)
+				claim := ctrl.claims.List()[0]
 				reactor.DeleteClaimEvent(claim)
 				// wait until claim is cleared from cache, i.e., deleteClaim is called
 				err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-					return len(ctrl.claims.ListKeys()) == 0, nil
+					return len(ctrl.claims.List()) == 0, nil
 				})
 				if err != nil {
 					return err
@@ -278,12 +269,11 @@ func TestControllerSync(t *testing.T) {
 					return err
 				}
 				// delete the claim
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*v1.PersistentVolumeClaim)
+				claim := ctrl.claims.List()[0]
 				reactor.DeleteClaimEvent(claim)
 				// wait until claim is cleared from cache, i.e., deleteClaim is called
 				err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-					return len(ctrl.claims.ListKeys()) == 0, nil
+					return len(ctrl.claims.List()) == 0, nil
 				})
 				if err != nil {
 					return err
@@ -319,13 +309,13 @@ func TestControllerSync(t *testing.T) {
 		// Initialize the controller
 		client := &fake.Clientset{}
 
-		fakeVolumeWatch := watch.NewFake()
+		fakeVolumeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 		client.PrependWatchReactor("persistentvolumes", core.DefaultWatchReactor(fakeVolumeWatch, nil))
-		fakeClaimWatch := watch.NewFake()
+		fakeClaimWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 		client.PrependWatchReactor("persistentvolumeclaims", core.DefaultWatchReactor(fakeClaimWatch, nil))
-		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFake(), nil))
-		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(watch.NewFake(), nil))
-		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFake(), nil))
+		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
+		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
+		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		ctrl, err := newTestController(ctx, client, informers, true)
@@ -367,8 +357,8 @@ func TestControllerSync(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel()
 
-		informers.Start(ctx.Done())
-		informers.WaitForCacheSync(ctx.Done())
+		informers.StartWithContext(ctx)
+		informers.WaitForCacheSyncWithContext(ctx)
 
 		wg.Go(func() {
 			ctrl.Run(ctx)
@@ -376,8 +366,8 @@ func TestControllerSync(t *testing.T) {
 
 		// Wait for the controller to pass initial sync and fill its caches.
 		err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-			return len(ctrl.claims.ListKeys()) >= len(test.initialClaims) &&
-				len(ctrl.volumes.store.ListKeys()) >= len(test.initialVolumes), nil
+			return len(ctrl.claims.List()) >= len(test.initialClaims) &&
+				len(ctrl.volumes.List()) >= len(test.initialVolumes), nil
 		})
 		if err != nil {
 			t.Errorf("Test %q controller sync failed: %v", test.name, err)
@@ -402,80 +392,9 @@ func TestControllerSync(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			doit(test)
 		})
-	}
-}
-
-func storeVersion(t *testing.T, prefix string, c cache.Store, version string, expectedReturn bool) {
-	pv := newVolume("pvName", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty)
-	pv.ResourceVersion = version
-	logger, _ := ktesting.NewTestContext(t)
-	ret, err := storeObjectUpdate(logger, c, pv, "volume")
-	if err != nil {
-		t.Errorf("%s: expected storeObjectUpdate to succeed, got: %v", prefix, err)
-	}
-	if expectedReturn != ret {
-		t.Errorf("%s: expected storeObjectUpdate to return %v, got: %v", prefix, expectedReturn, ret)
-	}
-
-	// find the stored version
-
-	pvObj, found, err := c.GetByKey("pvName")
-	if err != nil {
-		t.Errorf("expected volume 'pvName' in the cache, got error instead: %v", err)
-	}
-	if !found {
-		t.Errorf("expected volume 'pvName' in the cache but it was not found")
-	}
-	pv, ok := pvObj.(*v1.PersistentVolume)
-	if !ok {
-		t.Errorf("expected volume in the cache, got different object instead: %#v", pvObj)
-	}
-
-	if ret {
-		if pv.ResourceVersion != version {
-			t.Errorf("expected volume with version %s in the cache, got %s instead", version, pv.ResourceVersion)
-		}
-	} else {
-		if pv.ResourceVersion == version {
-			t.Errorf("expected volume with version other than %s in the cache, got %s instead", version, pv.ResourceVersion)
-		}
-	}
-}
-
-// TestControllerCache tests func storeObjectUpdate()
-func TestControllerCache(t *testing.T) {
-	// Cache under test
-	c := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
-
-	// Store new PV
-	storeVersion(t, "Step1", c, "1", true)
-	// Store the same PV
-	storeVersion(t, "Step2", c, "1", true)
-	// Store newer PV
-	storeVersion(t, "Step3", c, "2", true)
-	// Store older PV - simulating old "PV updated" event or periodic sync with
-	// old data
-	storeVersion(t, "Step4", c, "1", false)
-	// Store newer PV - test integer parsing ("2" > "10" as string,
-	// while 2 < 10 as integers)
-	storeVersion(t, "Step5", c, "10", true)
-}
-
-func TestControllerCacheParsingError(t *testing.T) {
-	c := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
-	// There must be something in the cache to compare with
-	storeVersion(t, "Step1", c, "1", true)
-
-	pv := newVolume("pvName", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty)
-	pv.ResourceVersion = "xxx"
-	logger, _ := ktesting.NewTestContext(t)
-	_, err := storeObjectUpdate(logger, c, pv, "volume")
-	if err == nil {
-		t.Errorf("Expected parsing error, got nil instead")
 	}
 }
 
@@ -583,7 +502,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
+	cmpm := csimigration.NewPluginManager(translator)
 	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -612,9 +531,6 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	// in-tree plugin is used as migration is disabled. When that plugin is migrated, a different
 	// non-migrated one should be used. If all plugins are migrated this test can be removed. The
 	// gce in-tree plugin is used for a migrated driver as it is feature-locked as of 1.25.
-	// TODO: this will be removed in 1.36
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
 	const nonmigratedDriver = "rbd.csi.ceph.com"
 	const migratedPlugin = "kubernetes.io/gce-pd"
 	const migratedDriver = "pd.csi.storage.gke.io"
@@ -745,7 +661,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
+	cmpm := csimigration.NewPluginManager(translator)
 	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -896,5 +812,90 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	for _, test := range tests {
 		runSyncTests(t, ctx, test.tests, test.storageClasses, nil)
+	}
+}
+
+// The controller must be able to read back its own writes before the informer
+// catches up. That only works if the object handed to AssumeWritten is the one
+// returned by the API call, carrying the server-assigned ResourceVersion.
+func TestAssumeOwnWrites(t *testing.T) {
+	newCtrl := func(t *testing.T, ctx context.Context) (*PersistentVolumeController, *volumeReactor) {
+		client := &fake.Clientset{}
+		ctrl, err := newTestController(ctx, client, nil, true)
+		require.NoError(t, err)
+		return ctrl, newVolumeReactor(ctx, client, ctrl, nil, nil, noerrors)
+	}
+
+	t.Run("removeDeletionProtectionFinalizer", func(t *testing.T) {
+		_, ctx := ktesting.NewTestContext(t)
+		ctrl, reactor := newCtrl(t, ctx)
+		pv := newVolumeWithFinalizers("volume-1", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty,
+			[]string{volume.PVDeletionInTreeProtectionFinalizer}, volume.AnnDynamicallyProvisioned)
+		require.NoError(t, ctrl.volumes.Indexer().Add(pv))
+		reactor.AddVolume(pv)
+
+		require.NoError(t, ctrl.removeDeletionProtectionFinalizer(ctx, pv))
+
+		cached, err := ctrl.volumes.Get(pv.Name)
+		require.NoError(t, err)
+		assert.NotContains(t, cached.Finalizers, volume.PVDeletionInTreeProtectionFinalizer)
+	})
+
+	t.Run("rescheduleProvisioning", func(t *testing.T) {
+		_, ctx := ktesting.NewTestContext(t)
+		ctrl, reactor := newCtrl(t, ctx)
+		claim := claimWithAnnotation(volume.AnnSelectedNode, "node1",
+			newClaimArray("claim-1", "uid-1", "1Gi", "", v1.ClaimPending, &classGold))[0]
+		require.NoError(t, ctrl.claims.Indexer().Add(claim))
+		reactor.AddClaim(claim)
+
+		ctrl.rescheduleProvisioning(ctx, claim)
+
+		cached, err := ctrl.claims.Get(cache.MetaObjectToName(claim).String())
+		require.NoError(t, err)
+		assert.NotContains(t, cached.Annotations, volume.AnnSelectedNode)
+	})
+}
+
+// The size check has to order capacities and requests that do not fit in int64,
+// where Value() wraps to a negative number or to zero and compares them wrongly.
+func TestCheckVolumeSatisfyClaim(t *testing.T) {
+	tests := []struct {
+		name         string
+		pvCapacity   string
+		claimRequest string
+		wantTooSmall bool
+	}{
+		{name: "capacity-past-int64-small-request", pvCapacity: "9223372036854775808", claimRequest: "1Gi", wantTooSmall: false},
+		{name: "small-capacity-request-past-int64", pvCapacity: "1Gi", claimRequest: "9223372036854775808", wantTooSmall: true},
+		{name: "capacity-wraps-to-zero-small-request", pvCapacity: "18446744073709551616", claimRequest: "1Gi", wantTooSmall: false},
+		{name: "small-capacity-request-wraps-to-zero", pvCapacity: "1Gi", claimRequest: "18446744073709551616", wantTooSmall: true},
+		{name: "capacity-at-int64-max-request-one-larger", pvCapacity: "9223372036854775807", claimRequest: "9223372036854775808", wantTooSmall: true},
+		{name: "both-past-int64-capacity-smaller", pvCapacity: "9223372036854775808", claimRequest: "18446744073709551616", wantTooSmall: true},
+		{name: "both-past-int64-equal", pvCapacity: "9223372036854775808", claimRequest: "9223372036854775808", wantTooSmall: false},
+		{name: "ordinary-capacity-larger-than-request", pvCapacity: "10Gi", claimRequest: "1Gi", wantTooSmall: false},
+		{name: "ordinary-capacity-smaller-than-request", pvCapacity: "1Gi", claimRequest: "10Gi", wantTooSmall: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			volume := &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{v1.ResourceStorage: resource.MustParse(tc.pvCapacity)},
+				},
+			}
+			claim := &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					Resources: v1.VolumeResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse(tc.claimRequest)},
+					},
+				},
+			}
+			err := checkVolumeSatisfyClaim(volume, claim)
+			if tc.wantTooSmall {
+				require.EqualError(t, err, "requested PV is too small")
+			} else {
+				require.NoError(t, err)
+			}
+		})
 	}
 }

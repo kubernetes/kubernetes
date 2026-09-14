@@ -36,7 +36,7 @@ import (
 )
 
 // scorer is decorator for resourceAllocationScorer
-type scorer func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer
+type scorer func(strategy *config.ScoringStrategy) *resourceAllocationScorer
 
 // DRACaches holds various caches used for DRA-related computations
 type DRACaches struct {
@@ -58,7 +58,7 @@ type resourceAllocationScorer struct {
 	// used to decide whether to use Requested or NonZeroRequested for
 	// cpu and memory.
 	useRequested bool
-	scorer       func(requested, allocable []int64) int64
+	scorer       func(requested, allocated, allocatable []int64) int64
 	resources    []config.ResourceSpec
 	draFeatures  structured.Features
 	draManager   fwk.SharedDRAManager
@@ -150,19 +150,9 @@ func (r *resourceAllocationScorer) score(
 		return 0, fwk.NewStatus(fwk.Error, "resources not found")
 	}
 
-	requested := make([]int64, len(r.resources))
-	allocatable := make([]int64, len(r.resources))
-	for i := range r.resources {
-		alloc, req := r.calculateResourceAllocatableRequest(ctx, nodeInfo, v1.ResourceName(r.resources[i].Name), podRequests[i], draPreScoreState)
-		// Only fill the extended resource entry when it's non-zero.
-		if alloc == 0 {
-			continue
-		}
-		allocatable[i] = alloc
-		requested[i] = req
-	}
+	requested, allocated, allocatable := r.calculateNodeAllocatableRequest(ctx, nodeInfo, podRequests, draPreScoreState)
 
-	score := r.scorer(requested, allocatable)
+	score := r.scorer(requested, allocated, allocatable)
 
 	if loggerV := logger.V(10); loggerV.Enabled() { // Serializing these maps is costly.
 		loggerV.Info("Listed internal info for allocatable resources, requested resources and score", "pod",
@@ -174,34 +164,55 @@ func (r *resourceAllocationScorer) score(
 	return score, nil
 }
 
+func (r *resourceAllocationScorer) calculateNodeAllocatableRequest(
+	ctx context.Context,
+	nodeInfo fwk.NodeInfo,
+	podRequests []int64,
+	draPreScoreState *draPreScoreState,
+) (requested []int64, allocated []int64, allocatable []int64) {
+	requested = make([]int64, len(r.resources))
+	allocated = make([]int64, len(r.resources))
+	allocatable = make([]int64, len(r.resources))
+	for i := range r.resources {
+		resource := v1.ResourceName(r.resources[i].Name)
+		// If it's an extended resource, and the pod doesn't request it.
+		// We don't fill the resource entry as an implication to bypass scoring on it.
+		if podRequests[i] == 0 && schedutil.IsScalarResourceName(resource) {
+			continue
+		}
+		nodeAllocatable, nodeAllocated := r.calculateResourceAllocatableRequest(ctx, nodeInfo, resource, draPreScoreState)
+		// Only fill the extended resource entry when it's non-zero.
+		if nodeAllocatable == 0 {
+			continue
+		}
+		allocatable[i] = nodeAllocatable
+		allocated[i] = nodeAllocated
+		requested[i] = allocated[i] + podRequests[i]
+	}
+	return requested, allocated, allocatable
+}
+
 // calculateResourceAllocatableRequest returns 2 parameters:
 // - 1st param: quantity of allocatable resource on the node.
 // - 2nd param: aggregated quantity of requested resource on the node.
-// Note: if it's an extended resource, and the pod doesn't request it, (0, 0) is returned.
 func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
 	ctx context.Context,
 	nodeInfo fwk.NodeInfo,
 	resource v1.ResourceName,
-	podRequest int64,
 	draPreScoreState *draPreScoreState,
-) (int64, int64) {
+) (allocatable int64, allocated int64) {
 	requested := nodeInfo.GetNonZeroRequested()
 	if r.useRequested {
 		requested = nodeInfo.GetRequested()
 	}
 
-	// If it's an extended resource, and the pod doesn't request it. We return (0, 0)
-	// as an implication to bypass scoring on this resource.
-	if podRequest == 0 && schedutil.IsScalarResourceName(resource) {
-		return 0, 0
-	}
 	switch resource {
 	case v1.ResourceCPU:
-		return nodeInfo.GetAllocatable().GetMilliCPU(), (requested.GetMilliCPU() + podRequest)
+		return nodeInfo.GetAllocatable().GetMilliCPU(), requested.GetMilliCPU()
 	case v1.ResourceMemory:
-		return nodeInfo.GetAllocatable().GetMemory(), (requested.GetMemory() + podRequest)
+		return nodeInfo.GetAllocatable().GetMemory(), requested.GetMemory()
 	case v1.ResourceEphemeralStorage:
-		return nodeInfo.GetAllocatable().GetEphemeralStorage(), (nodeInfo.GetRequested().GetEphemeralStorage() + podRequest)
+		return nodeInfo.GetAllocatable().GetEphemeralStorage(), nodeInfo.GetRequested().GetEphemeralStorage()
 	default:
 		allocatable, exists := nodeInfo.GetAllocatable().GetScalarResources()[resource]
 		if allocatable == 0 && r.enableDRAExtendedResource && draPreScoreState != nil {
@@ -209,11 +220,11 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
 			// Calculate allocatable and requested for resources backed by DRA.
 			allocatable, allocated := r.calculateDRAExtendedResourceAllocatableRequest(ctx, nodeInfo.Node(), resource, draPreScoreState)
 			if allocatable > 0 {
-				return allocatable, allocated + podRequest
+				return allocatable, allocated
 			}
 		}
 		if exists {
-			return allocatable, (nodeInfo.GetRequested().GetScalarResources()[resource] + podRequest)
+			return allocatable, nodeInfo.GetRequested().GetScalarResources()[resource]
 		}
 	}
 	klog.FromContext(ctx).V(10).Info("Requested resource is omitted for node score calculation", "resourceName", resource)
@@ -489,4 +500,45 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 	}
 
 	return true, nil
+}
+
+func (r *resourceAllocationScorer) scorePlacement(
+	ctx context.Context,
+	podGroupInfo fwk.PodGroupInfo,
+	podGroupAssignments *fwk.PodGroupAssignments,
+) (int64, *fwk.Status) {
+	requested := make([]int64, len(r.resources))
+	// Calculate requests for the pod group pods scheduled for this placement
+	for _, assignment := range podGroupAssignments.ProposedAssignments {
+		pod := assignment.GetPod()
+		podRequests := r.calculatePodResourceRequestList(pod, r.resources)
+		for i := range len(r.resources) {
+			requested[i] += podRequests[i]
+		}
+	}
+	allocatable := make([]int64, len(r.resources))
+	allocated := make([]int64, len(r.resources))
+	// Calculate resources on all nodes in this placement
+	for _, node := range podGroupAssignments.Nodes {
+		_, nodeAllocated, nodeAllocatable := r.calculateNodeAllocatableRequest(ctx, node, requested, nil)
+		for i := range r.resources {
+			allocatable[i] += nodeAllocatable[i]
+			allocated[i] += nodeAllocated[i]
+			// requested includes both the already existing pods
+			// and the pod group pods that are being scheduled for this placement
+			requested[i] += nodeAllocated[i]
+		}
+	}
+
+	score := r.scorer(requested, allocated, allocatable)
+
+	logger := klog.FromContext(ctx)
+	if loggerV := logger.V(10); loggerV.Enabled() { // Serializing these maps is costly.
+		loggerV.Info("Listed internal info for placement's allocatable resources, requested resources and placement score", "podGroup",
+			klog.KRef(podGroupInfo.GetNamespace(), podGroupInfo.GetName()), "placement", podGroupAssignments.Name, "resourceAllocationScorer", r.Name,
+			"allocatableResource", allocatable, "requestedResource", requested, "resourceScore", score,
+		)
+	}
+
+	return score, nil
 }

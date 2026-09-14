@@ -267,14 +267,6 @@ data:
       tag kubelet
     </source>
 
-    <source>
-      @type systemd
-      filters [{ "_SYSTEMD_UNIT": "node-problem-detector.service" }]
-      pos_file /var/log/gcp-journald-node-problem-detector.pos
-      read_from_head true
-      tag node-problem-detector
-    </source>
-
     # BEGIN_NODE_JOURNAL
     # Whether to include node-journal or not is determined when starting the
     # cluster. It is not changed when the cluster is already running.
@@ -289,7 +281,7 @@ data:
       @type grep
       <exclude>
         key _SYSTEMD_UNIT
-        pattern ^(docker|{{ fluentd_container_runtime_service }}|kubelet|node-problem-detector)\.service$
+        pattern ^(docker|{{ fluentd_container_runtime_service }}|kubelet)\.service$
       </exclude>
     </filter>
     # END_NODE_JOURNAL

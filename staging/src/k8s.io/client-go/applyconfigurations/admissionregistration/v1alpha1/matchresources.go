@@ -30,7 +30,7 @@ import (
 // on whether it meets the match criteria.
 // The exclude rules take precedence over include rules (if a resource matches both, it is excluded)
 type MatchResourcesApplyConfiguration struct {
-	// NamespaceSelector decides whether to run the admission control policy on an object based
+	// namespaceSelector decides whether to run the admission control policy on an object based
 	// on whether the namespace for that object matches the selector. If the
 	// object itself is a namespace, the matching is performed on
 	// object.metadata.labels. If the object is another cluster scoped resource,
@@ -74,7 +74,7 @@ type MatchResourcesApplyConfiguration struct {
 	//
 	// Default to the empty LabelSelector, which matches everything.
 	NamespaceSelector *v1.LabelSelectorApplyConfiguration `json:"namespaceSelector,omitempty"`
-	// ObjectSelector decides whether to run the policy based on if the
+	// objectSelector decides whether to run the policy based on if the
 	// object has matching labels. objectSelector is evaluated against both
 	// the oldObject and newObject that would be sent to the policy's expression (CEL), and
 	// is considered to match if either object matches the selector. A null
@@ -86,10 +86,10 @@ type MatchResourcesApplyConfiguration struct {
 	// users may skip the admission webhook by setting the labels.
 	// Default to the empty LabelSelector, which matches everything.
 	ObjectSelector *v1.LabelSelectorApplyConfiguration `json:"objectSelector,omitempty"`
-	// ResourceRules describes what operations on what resources/subresources the admission policy matches.
+	// resourceRules describes what operations on what resources/subresources the admission policy matches.
 	// The policy cares about an operation if it matches _any_ Rule.
 	ResourceRules []NamedRuleWithOperationsApplyConfiguration `json:"resourceRules,omitempty"`
-	// ExcludeResourceRules describes what operations on what resources/subresources the policy should not care about.
+	// excludeResourceRules describes what operations on what resources/subresources the policy should not care about.
 	// The exclude rules take precedence over include rules (if a resource matches both, it is excluded)
 	ExcludeResourceRules []NamedRuleWithOperationsApplyConfiguration `json:"excludeResourceRules,omitempty"`
 	// matchPolicy defines how the "MatchResources" list is used to match incoming requests.

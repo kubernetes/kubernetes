@@ -132,6 +132,200 @@ func TestSchemaDeclTypes(t *testing.T) {
 	}
 }
 
+func TestWithTypeAndObjectMetaNameLength(t *testing.T) {
+	const (
+		defaultMax             = nameMaxLength
+		defaultGenerateNameMax = nameMaxLength - 1 // generated suffix is at least 1 byte
+	)
+
+	maxLengthOf := func(s *schema.Structural, field string) *int64 {
+		md, ok := s.Properties["metadata"]
+		if !ok || md.Properties == nil {
+			return nil
+		}
+		f, ok := md.Properties[field]
+		if !ok || f.ValueValidation == nil {
+			return nil
+		}
+		return f.ValueValidation.MaxLength
+	}
+
+	cases := []struct {
+		name             string
+		input            *schema.Structural
+		wantName         int64
+		wantGenerateName int64
+	}{
+		{
+			name:             "metadata absent, defaults applied to both fields",
+			input:            &schema.Structural{Generic: schema.Generic{Type: "object"}},
+			wantName:         defaultMax,
+			wantGenerateName: defaultGenerateNameMax,
+		},
+		{
+			name: "author maxLength on name preserved, generateName defaulted",
+			input: &schema.Structural{
+				Generic: schema.Generic{Type: "object"},
+				Properties: map[string]schema.Structural{
+					"metadata": {
+						Generic: schema.Generic{Type: "object"},
+						Properties: map[string]schema.Structural{
+							"name": {
+								Generic:         schema.Generic{Type: "string"},
+								ValueValidation: &schema.ValueValidation{MaxLength: ptr.To[int64](10)},
+							},
+						},
+					},
+				},
+			},
+			wantName:         10,
+			wantGenerateName: defaultGenerateNameMax,
+		},
+		{
+			name: "author maxLength on generateName smaller than default is preserved",
+			input: &schema.Structural{
+				Generic: schema.Generic{Type: "object"},
+				Properties: map[string]schema.Structural{
+					"metadata": {
+						Generic: schema.Generic{Type: "object"},
+						Properties: map[string]schema.Structural{
+							"generateName": {
+								Generic:         schema.Generic{Type: "string"},
+								ValueValidation: &schema.ValueValidation{MaxLength: ptr.To[int64](100)},
+							},
+						},
+					},
+				},
+			},
+			wantName:         defaultMax,
+			wantGenerateName: 100,
+		},
+		{
+			name: "author maxLength larger than default is capped to the default",
+			input: &schema.Structural{
+				Generic: schema.Generic{Type: "object"},
+				Properties: map[string]schema.Structural{
+					"metadata": {
+						Generic: schema.Generic{Type: "object"},
+						Properties: map[string]schema.Structural{
+							"name": {
+								Generic:         schema.Generic{Type: "string"},
+								ValueValidation: &schema.ValueValidation{MaxLength: ptr.To[int64](1000)},
+							},
+							"generateName": {
+								Generic:         schema.Generic{Type: "string"},
+								ValueValidation: &schema.ValueValidation{MaxLength: ptr.To[int64](1000)},
+							},
+						},
+					},
+				},
+			},
+			wantName:         defaultMax,
+			wantGenerateName: defaultGenerateNameMax,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := WithTypeAndObjectMeta(tc.input)
+			if ml := maxLengthOf(got, "name"); ml == nil || *ml != tc.wantName {
+				t.Errorf("metadata.name maxLength = %v, want %d", ml, tc.wantName)
+			}
+			if ml := maxLengthOf(got, "generateName"); ml == nil || *ml != tc.wantGenerateName {
+				t.Errorf("metadata.generateName maxLength = %v, want %d", ml, tc.wantGenerateName)
+			}
+
+			// The bound must flow into CEL cost estimation: the declType's
+			// MaxElements for name and generateName reflect the bounded length
+			// (4 bytes per rune), not the request size.
+			root := SchemaDeclType(tc.input, true)
+			meta, ok := root.FindField("metadata")
+			if !ok {
+				t.Fatalf("metadata field missing from declType")
+			}
+			for _, f := range []struct {
+				field string
+				want  int64
+			}{
+				{"name", tc.wantName},
+				{"generateName", tc.wantGenerateName},
+			} {
+				field, ok := meta.Type.FindField(f.field)
+				if !ok {
+					t.Fatalf("metadata.%s field missing from declType", f.field)
+				}
+				if got := field.Type.MaxElements; got != f.want*4 {
+					t.Errorf("metadata.%s declType MaxElements = %d, want %d", f.field, got, f.want*4)
+				}
+				if field.Type.MaxElements >= apiservercel.DefaultMaxRequestSizeBytes-2 {
+					t.Errorf("metadata.%s declType MaxElements = %d, expected it bounded well below the request size", f.field, field.Type.MaxElements)
+				}
+			}
+		})
+	}
+}
+
+// TestWithTypeAndObjectMetaIdempotent ensures re-applying WithTypeAndObjectMeta
+// (which happens when a schema is processed more than once) keeps the bounds stable.
+func TestWithTypeAndObjectMetaIdempotent(t *testing.T) {
+	once := WithTypeAndObjectMeta(&schema.Structural{Generic: schema.Generic{Type: "object"}})
+	twice := WithTypeAndObjectMeta(once)
+	if twice != once {
+		t.Errorf("expected the already-bounded schema to be returned unchanged")
+	}
+	for _, f := range []struct {
+		field string
+		want  int64
+	}{
+		{"name", nameMaxLength},
+		{"generateName", nameMaxLength - 1},
+	} {
+		ml := twice.Properties["metadata"].Properties[f.field].ValueValidation.MaxLength
+		if ml == nil || *ml != f.want {
+			t.Errorf("metadata.%s maxLength = %v, want %d", f.field, ml, f.want)
+		}
+	}
+}
+
+// TestWithTypeAndObjectMetaDoesNotMutateInput verifies the maxLength bound is applied
+// only to the returned (CEL-only) schema and never written back to the caller's schema.
+// The input schema is also used for pruning, defaulting, and to build the value
+// validator, none of which should gain a metadata.name maxLength constraint.
+func TestWithTypeAndObjectMetaDoesNotMutateInput(t *testing.T) {
+	input := &schema.Structural{
+		Generic: schema.Generic{Type: "object"},
+		Properties: map[string]schema.Structural{
+			"metadata": {
+				Generic: schema.Generic{Type: "object"},
+				Properties: map[string]schema.Structural{
+					"name": {
+						Generic:         schema.Generic{Type: "string"},
+						ValueValidation: &schema.ValueValidation{Format: "k8s-short-name"},
+					},
+				},
+			},
+		},
+	}
+
+	result := WithTypeAndObjectMeta(input)
+
+	// The author's metadata.name in the input is untouched: no maxLength was added and
+	// its format is preserved.
+	inName := input.Properties["metadata"].Properties["name"]
+	if inName.ValueValidation == nil || inName.ValueValidation.MaxLength != nil {
+		t.Errorf("input metadata.name must not gain a maxLength, got %+v", inName.ValueValidation)
+	}
+	if inName.ValueValidation == nil || inName.ValueValidation.Format != "k8s-short-name" {
+		t.Errorf("input metadata.name format must be preserved, got %+v", inName.ValueValidation)
+	}
+
+	// The returned schema, used only for CEL cost/type modeling, carries the bound.
+	outName := result.Properties["metadata"].Properties["name"]
+	if outName.ValueValidation == nil || outName.ValueValidation.MaxLength == nil || *outName.ValueValidation.MaxLength != nameMaxLength {
+		t.Errorf("result metadata.name maxLength = %+v, want %d", outName.ValueValidation, nameMaxLength)
+	}
+}
+
 func testSchema() *schema.Structural {
 	// Manual construction of a schema with the following definition:
 	//

@@ -381,7 +381,11 @@ func (log *Logger) check(lvl zapcore.Level, msg string) *zapcore.CheckedEntry {
 
 	if stack.Count() == 0 {
 		if log.addCaller {
-			fmt.Fprintf(log.errorOutput, "%v Logger.check error: failed to get caller\n", ent.Time.UTC())
+			_, _ = fmt.Fprintf(
+				log.errorOutput,
+				"%v Logger.check error: failed to get caller\n",
+				ent.Time.UTC(),
+			)
 			_ = log.errorOutput.Sync()
 		}
 		return ce

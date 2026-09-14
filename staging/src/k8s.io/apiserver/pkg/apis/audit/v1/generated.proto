@@ -135,6 +135,7 @@ message EventList {
 message GroupResources {
   // Group is the name of the API group that contains the resources.
   // The empty string represents the core API group.
+  // `*` matches all groups
   // +optional
   optional string group = 1;
 

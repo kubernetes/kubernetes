@@ -143,6 +143,10 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 300,
+								Shape: []config.UtilizationShapePoint{
+									{Utilization: 0, Score: 10},
+									{Utilization: 100, Score: 0},
+								},
 							},
 						},
 						{
@@ -239,7 +243,10 @@ profiles:
 						},
 						{
 							Name: "DynamicResources",
-							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
+							Args: &config.DynamicResourcesArgs{
+								FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+								BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
+							},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -279,6 +286,10 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 600,
+								Shape: []config.UtilizationShapePoint{
+									{Utilization: 0, Score: 10},
+									{Utilization: 100, Score: 0},
+								},
 							},
 						},
 					},
@@ -392,7 +403,10 @@ profiles:
 						},
 						{
 							Name: "DynamicResources",
-							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
+							Args: &config.DynamicResourcesArgs{
+								FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+								BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
+							},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -417,6 +431,10 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 600,
+								Shape: []config.UtilizationShapePoint{
+									{Utilization: 0, Score: 10},
+									{Utilization: 100, Score: 0},
+								},
 							},
 						},
 						{
@@ -468,7 +486,10 @@ profiles:
 						},
 						{
 							Name: "DynamicResources",
-							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
+							Args: &config.DynamicResourcesArgs{
+								FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+								BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
+							},
 						},
 						{
 							Name: "NodeAffinity",
@@ -502,6 +523,10 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 600,
+								Shape: []config.UtilizationShapePoint{
+									{Utilization: 0, Score: 10},
+									{Utilization: 100, Score: 0},
+								},
 							},
 						},
 					},

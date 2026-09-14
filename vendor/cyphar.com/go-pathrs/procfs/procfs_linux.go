@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0
 /*
  * libpathrs: safe path resolution on Linux
- * Copyright (C) 2019-2025 Aleksa Sarai <cyphar@cyphar.com>
  * Copyright (C) 2019-2025 SUSE LLC
+ * Copyright (C) 2026 Aleksa Sarai <cyphar@cyphar.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -56,16 +56,15 @@ var (
 //     *before* you call wait(2)or any equivalent method that could reap
 //     zombies).
 func ProcPid(pid int) ProcBase {
-	if pid < 0 || pid >= 1<<31 {
+	if pid < 0 || uint64(pid) >= 1<<31 {
 		panic("invalid ProcBasePid value") // TODO: should this be an error?
 	}
-	return ProcBase{inner: libpathrs.ProcPid(uint32(pid))}
+	pid32 := uint32(pid) //nolint:gosec // G115 false positive <https://github.com/securego/gosec/issues/1212>
+	return ProcBase{inner: libpathrs.ProcPid(pid32)}
 }
 
 // ThreadCloser is a callback that needs to be called when you are done
 // operating on an [os.File] fetched using [Handle.OpenThreadSelf].
-//
-// [os.File]: https://pkg.go.dev/os#File
 type ThreadCloser func()
 
 // Handle is a wrapper around an *os.File handle to "/proc", which can be
@@ -128,7 +127,7 @@ func (proc *Handle) fd() int {
 }
 
 // TODO: Should we expose open?
-func (proc *Handle) open(base ProcBase, path string, flags int) (_ *os.File, Closer ThreadCloser, Err error) {
+func (proc *Handle) open(base ProcBase, path string, flags uint64) (_ *os.File, Closer ThreadCloser, Err error) {
 	var closer ThreadCloser
 	if base == ProcThreadSelf {
 		runtime.LockOSThread()
@@ -155,7 +154,7 @@ func (proc *Handle) open(base ProcBase, path string, flags int) (_ *os.File, Clo
 // (such as /proc/cpuinfo) or information about other processes (such as
 // /proc/1). Accessing your own process information should be done using
 // [Handle.OpenSelf] or [Handle.OpenThreadSelf].
-func (proc *Handle) OpenRoot(path string, flags int) (*os.File, error) {
+func (proc *Handle) OpenRoot(path string, flags uint64) (*os.File, error) {
 	file, closer, err := proc.open(ProcRoot, path, flags)
 	if closer != nil {
 		// should not happen
@@ -181,9 +180,7 @@ func (proc *Handle) OpenRoot(path string, flags int) (*os.File, error) {
 // Unlike [Handle.OpenThreadSelf], this method does not involve locking
 // the goroutine to the current OS thread and so is simpler to use and
 // theoretically has slightly less overhead.
-//
-// [runtime.LockOSThread]: https://pkg.go.dev/runtime#LockOSThread
-func (proc *Handle) OpenSelf(path string, flags int) (*os.File, error) {
+func (proc *Handle) OpenSelf(path string, flags uint64) (*os.File, error) {
 	file, closer, err := proc.open(ProcSelf, path, flags)
 	if closer != nil {
 		// should not happen
@@ -201,7 +198,7 @@ func (proc *Handle) OpenSelf(path string, flags int) (*os.File, error) {
 // Be aware that due to PID recycling, using this is generally not safe except
 // in certain circumstances. See the documentation of [ProcPid] for more
 // details.
-func (proc *Handle) OpenPid(pid int, path string, flags int) (*os.File, error) {
+func (proc *Handle) OpenPid(pid int, path string, flags uint64) (*os.File, error) {
 	file, closer, err := proc.open(ProcPid(pid), path, flags)
 	if closer != nil {
 		// should not happen
@@ -228,11 +225,7 @@ func (proc *Handle) OpenPid(pid int, path string, flags int) (*os.File, error) {
 // callback MUST be called AFTER you have finished using the returned
 // [os.File]. This callback is completely separate to [os.File.Close], so it
 // must be called regardless of how you close the handle.
-//
-// [runtime.LockOSThread]: https://pkg.go.dev/runtime#LockOSThread
-// [os.File]: https://pkg.go.dev/os#File
-// [os.File.Close]: https://pkg.go.dev/os#File.Close
-func (proc *Handle) OpenThreadSelf(path string, flags int) (*os.File, ThreadCloser, error) {
+func (proc *Handle) OpenThreadSelf(path string, flags uint64) (*os.File, ThreadCloser, error) {
 	return proc.open(ProcThreadSelf, path, flags)
 }
 

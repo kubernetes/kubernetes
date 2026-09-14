@@ -34,6 +34,12 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.DeviceTaintRuleList{}, func(obj interface{}) {
 		SetObjectDefaults_DeviceTaintRuleList(obj.(*resourcev1alpha3.DeviceTaintRuleList))
 	})
+	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourcePoolStatusRequest{}, func(obj interface{}) {
+		SetObjectDefaults_ResourcePoolStatusRequest(obj.(*resourcev1alpha3.ResourcePoolStatusRequest))
+	})
+	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourcePoolStatusRequestList{}, func(obj interface{}) {
+		SetObjectDefaults_ResourcePoolStatusRequestList(obj.(*resourcev1alpha3.ResourcePoolStatusRequestList))
+	})
 	return nil
 }
 
@@ -45,5 +51,20 @@ func SetObjectDefaults_DeviceTaintRuleList(in *resourcev1alpha3.DeviceTaintRuleL
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_DeviceTaintRule(a)
+	}
+}
+
+func SetObjectDefaults_ResourcePoolStatusRequest(in *resourcev1alpha3.ResourcePoolStatusRequest) {
+	SetDefaults_ResourcePoolStatusRequestSpec(&in.Spec)
+	if in.Spec.Limit == nil {
+		var ptrVar1 int32 = 100
+		in.Spec.Limit = &ptrVar1
+	}
+}
+
+func SetObjectDefaults_ResourcePoolStatusRequestList(in *resourcev1alpha3.ResourcePoolStatusRequestList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_ResourcePoolStatusRequest(a)
 	}
 }

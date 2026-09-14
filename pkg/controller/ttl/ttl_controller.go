@@ -79,22 +79,29 @@ type Controller struct {
 
 // NewTTLController creates a new TTLController
 func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, kubeClient clientset.Interface) *Controller {
+	logger := klog.FromContext(ctx)
 	ttlc := &Controller{
 		kubeClient: kubeClient,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ttlcontroller"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "ttlcontroller",
+			},
 		),
 	}
-	logger := klog.FromContext(ctx)
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ttlc.addNode(logger, obj)
 		},
 		UpdateFunc: func(old, newObj interface{}) {
 			ttlc.updateNode(logger, old, newObj)
 		},
-		DeleteFunc: ttlc.deleteNode,
+		DeleteFunc: func(obj interface{}) {
+			ttlc.deleteNode(logger, obj)
+		},
+	}, cache.HandlerOptions{
+		Logger: &logger,
 	})
 
 	ttlc.nodeStore = listers.NewNodeLister(nodeInformer.Informer().GetIndexer())
@@ -121,7 +128,7 @@ var (
 
 // Run begins watching and syncing.
 func (ttlc *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting TTL controller")
@@ -148,7 +155,7 @@ func (ttlc *Controller) Run(ctx context.Context, workers int) {
 func (ttlc *Controller) addNode(logger klog.Logger, obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected object type passed to addNode", "type", fmt.Sprintf("%T", obj))
 		return
 	}
 
@@ -167,7 +174,7 @@ func (ttlc *Controller) addNode(logger klog.Logger, obj interface{}) {
 func (ttlc *Controller) updateNode(logger klog.Logger, _, newObj interface{}) {
 	node, ok := newObj.(*v1.Node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected object type passed to updateNode", "type", fmt.Sprintf("%T", newObj))
 		return
 	}
 	// Processing all updates of nodes guarantees that we will update
@@ -178,17 +185,17 @@ func (ttlc *Controller) updateNode(logger klog.Logger, _, newObj interface{}) {
 	ttlc.enqueueNode(logger, node)
 }
 
-func (ttlc *Controller) deleteNode(obj interface{}) {
+func (ttlc *Controller) deleteNode(logger klog.Logger, obj interface{}) {
 	_, ok := obj.(*v1.Node)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected object type passed to deleteNode", "type", fmt.Sprintf("%T", obj))
 			return
 		}
 		_, ok = tombstone.Obj.(*v1.Node)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object types: %v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected object type in tombstone", "type", fmt.Sprintf("%T", tombstone.Obj))
 			return
 		}
 	}
@@ -233,7 +240,7 @@ func (ttlc *Controller) processItem(ctx context.Context) bool {
 	}
 
 	ttlc.queue.AddRateLimited(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(ctx, err, "Failed to process node TTL", "key", key)
 	return true
 }
 

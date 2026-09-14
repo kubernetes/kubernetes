@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
+	"strings"
 	"sync"
 
 	"golang.org/x/sys/unix"
@@ -27,7 +29,7 @@ var subsystems = []subsystem{
 	&FreezerGroup{},
 	&RdmaGroup{},
 	&NameGroup{GroupName: "name=systemd", Join: true},
-	&NameGroup{GroupName: "misc", Join: true},
+	&NameGroup{GroupName: "misc", Join: true, GroupID: cgroups.Misc},
 }
 
 var errSubsystemDoesNotExist = errors.New("cgroup: subsystem does not exist")
@@ -43,6 +45,8 @@ func init() {
 type subsystem interface {
 	// Name returns the name of the subsystem.
 	Name() string
+	// ID returns the controller ID for filtering.
+	ID() cgroups.Controller
 	// GetStats fills in the stats for the subsystem.
 	GetStats(path string, stats *cgroups.Stats) error
 	// Apply creates and joins a cgroup, adding pid into it. Some
@@ -139,6 +143,33 @@ func (m *Manager) Apply(pid int) (retErr error) {
 	return retErr
 }
 
+// AddPid adds a process with a given pid to an existing cgroup.
+// The subcgroup argument is either empty, or a path relative to
+// a cgroup under under the manager's cgroup.
+func (m *Manager) AddPid(subcgroup string, pid int) (retErr error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	c := m.cgroups
+
+	for _, dir := range m.paths {
+		path := path.Join(dir, subcgroup)
+		if !strings.HasPrefix(path, dir) {
+			return fmt.Errorf("bad sub cgroup path: %s", subcgroup)
+		}
+
+		if err := cgroups.WriteCgroupProc(path, pid); err != nil {
+			if isIgnorableError(c.Rootless, err) && c.Path == "" {
+				retErr = cgroups.ErrRootless
+				continue
+			}
+			return err
+		}
+	}
+
+	return retErr
+}
+
 func (m *Manager) Destroy() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -152,14 +183,32 @@ func (m *Manager) Path(subsys string) string {
 }
 
 func (m *Manager) GetStats() (*cgroups.Stats, error) {
+	return m.Stats(nil)
+}
+
+// Stats returns cgroup statistics for the specified controllers.
+func (m *Manager) Stats(opts *cgroups.StatsOptions) (*cgroups.Stats, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Default: query all controllers
+	controllers := cgroups.AllControllers
+	if opts != nil && opts.Controllers != 0 {
+		controllers = opts.Controllers
+	}
+
 	stats := cgroups.NewStats()
 	for _, sys := range subsystems {
 		path := m.paths[sys.Name()]
 		if path == "" {
 			continue
 		}
+
+		// Filter based on controller type
+		if sys.ID()&controllers == 0 {
+			continue
+		}
+
 		if err := sys.GetStats(path, stats); err != nil {
 			return nil, err
 		}

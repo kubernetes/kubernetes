@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"sync"
 	"time"
 
 	"k8s.io/component-base/metrics"
@@ -45,8 +46,15 @@ var Metrics ValidationMetrics = &validationMetrics{
 	}),
 }
 
-func init() {
-	legacyregistry.MustRegister(Metrics.(*validationMetrics).RatchetingTime)
+var registerMetricsOnce sync.Once
+
+// RegisterMetrics registers the validation metrics with the legacy registry. It is invoked when the validation
+// metrics are installed into the handler chain (rather than from an init() function), so that metric feature gates
+// such as NativeHistograms have been applied before these histogram metrics are created.
+func RegisterMetrics() {
+	registerMetricsOnce.Do(func() {
+		legacyregistry.MustRegister(Metrics.(*validationMetrics).RatchetingTime)
+	})
 }
 
 type validationMetrics struct {

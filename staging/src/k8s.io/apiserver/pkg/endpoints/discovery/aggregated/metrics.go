@@ -17,8 +17,8 @@ limitations under the License.
 package aggregated
 
 import (
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"sync"
+
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -26,7 +26,8 @@ import (
 const subsystem = "aggregator_discovery"
 
 var (
-	regenerationCounter = metrics.NewCounter(
+	registerPeerMetricsOnce sync.Once
+	regenerationCounter     = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Name:           "aggregation_count_total",
 			Subsystem:      subsystem,
@@ -65,9 +66,12 @@ var (
 
 func init() {
 	legacyregistry.MustRegister(regenerationCounter)
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
+}
+
+func registerPeerMetrics() {
+	registerPeerMetricsOnce.Do(func() {
 		legacyregistry.MustRegister(PeerAggregatedCacheHitsCounter)
 		legacyregistry.MustRegister(PeerAggregatedCacheMissesCounter)
 		legacyregistry.MustRegister(NoPeerDiscoveryRequestCounter)
-	}
+	})
 }

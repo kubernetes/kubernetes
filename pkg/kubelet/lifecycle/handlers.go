@@ -29,11 +29,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -60,7 +58,8 @@ type handlerRunner struct {
 }
 
 type podStatusProvider interface {
-	GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
+	GetPod(ctx context.Context, podUID types.UID) (*kubecontainer.Pod, error)
+	GetPodStatus(ctx context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error)
 }
 
 // NewHandlerRunner returns a configured lifecycle handler for a container.
@@ -82,7 +81,7 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		output, err := hr.commandRunner.RunInContainer(ctx, containerID, handler.Exec.Command, 0)
 		if err != nil {
 			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
-			logger.V(1).Error(err, "Exec lifecycle hook for Container in Pod failed", "execCommand", handler.Exec.Command, "containerName", container.Name, "pod", klog.KObj(pod), "message", string(output))
+			logger.V(1).Info("Exec lifecycle hook for Container in Pod failed", "execCommand", handler.Exec.Command, "containerName", container.Name, "pod", klog.KObj(pod), "message", string(output), "err", err)
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
@@ -90,7 +89,7 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		var msg string
 		if err != nil {
 			msg = fmt.Sprintf("HTTP lifecycle hook (%s) for Container %q in Pod %q failed - error: %v", handler.HTTPGet.Path, container.Name, format.Pod(pod), err)
-			logger.V(1).Error(err, "HTTP lifecycle hook for Container in Pod failed", "path", handler.HTTPGet.Path, "containerName", container.Name, "pod", klog.KObj(pod))
+			logger.V(1).Info("HTTP lifecycle hook for Container in Pod failed", "path", handler.HTTPGet.Path, "containerName", container.Name, "pod", klog.KObj(pod), "err", err)
 		}
 		return msg, err
 	case handler.Sleep != nil:
@@ -98,7 +97,7 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		var msg string
 		if err != nil {
 			msg = fmt.Sprintf("Sleep lifecycle hook (%d) for Container %q in Pod %q failed - error: %v", handler.Sleep.Seconds, container.Name, format.Pod(pod), err)
-			logger.V(1).Error(err, "Sleep lifecycle hook for Container in Pod failed", "sleepSeconds", handler.Sleep.Seconds, "containerName", container.Name, "pod", klog.KObj(pod))
+			logger.V(1).Info("Sleep lifecycle hook for Container in Pod failed", "sleepSeconds", handler.Sleep.Seconds, "containerName", container.Name, "pod", klog.KObj(pod), "err", err)
 		}
 		return msg, err
 	default:
@@ -110,9 +109,6 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 }
 
 func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) {
-		return nil
-	}
 	c := time.After(time.Duration(seconds) * time.Second)
 	select {
 	case <-ctx.Done():
@@ -129,10 +125,13 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 	host := handler.HTTPGet.Host
 	podIP := host
 	if len(host) == 0 {
-		status, err := hr.containerManager.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+		runtimePod, err := hr.containerManager.GetPod(ctx, pod.UID)
 		if err != nil {
-			logger.Error(err, "Unable to get pod info, event handlers may be invalid.", "pod", klog.KObj(pod))
-			return err
+			return fmt.Errorf("unable to get pod, event handlers may be invalid: %w", err)
+		}
+		status, err := hr.containerManager.GetPodStatus(ctx, runtimePod)
+		if err != nil {
+			return fmt.Errorf("unable to get pod status, event handlers may be invalid: %w", err)
 		}
 		if len(status.IPs) == 0 {
 			return fmt.Errorf("failed to find networking container: %v", status)
@@ -149,7 +148,7 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 	discardHTTPRespBody(resp)
 
 	if isHTTPResponseError(err) {
-		logger.V(1).Error(err, "HTTPS request to lifecycle hook got HTTP response, retrying with HTTP.", "pod", klog.KObj(pod), "host", req.URL.Host)
+		logger.V(1).Info("HTTPS request to lifecycle hook got HTTP response, retrying with HTTP.", "pod", klog.KObj(pod), "host", req.URL.Host, "err", err)
 
 		req := req.Clone(ctx)
 		req.URL.Scheme = "http"
@@ -197,7 +196,7 @@ type appArmorAdmitHandler struct {
 	apparmor.Validator
 }
 
-func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (a *appArmorAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	// If the pod is already running or terminated, no need to recheck AppArmor.
 	if attrs.Pod.Status.Phase != v1.PodPending {
 		return PodAdmitResult{Admit: true}
@@ -233,7 +232,7 @@ func NewPodFeaturesAdmitHandler() PodAdmitHandler {
 
 type podFeaturesAdmitHandler struct{}
 
-func (h *podFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (h *podFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	return isPodLevelResourcesSupported(attrs.Pod)
 }
 
@@ -254,7 +253,7 @@ func NewDeclaredFeaturesAdmitHandler(nodeDeclaredFeaturesHelper *ndf.Framework, 
 }
 
 // Admit checks if a pod's feature requirements are met by the node.
-func (c *declaredFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (c *declaredFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	pod := attrs.Pod
 
 	podInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
@@ -267,11 +266,11 @@ func (c *declaredFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmit
 		}
 	}
 
-	if reqs.Len() == 0 {
+	if reqs.IsEmpty() {
 		return PodAdmitResult{Admit: true}
 	}
 
-	matchResult, err := ndf.MatchNodeFeatureSet(reqs, c.ndfSet)
+	matchResult, err := c.ndfFramework.MatchNodeFeatureSet(reqs, c.ndfSet)
 	if err != nil {
 		return PodAdmitResult{
 			Admit:   false,

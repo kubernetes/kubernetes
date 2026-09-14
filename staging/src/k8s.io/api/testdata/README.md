@@ -17,6 +17,11 @@ git add .
 git commit -m "Add ${VERSION} API testdata"
 ```
 
+You can then test with:
+```sh
+go test -count 1 k8s.io/api
+```
+
 ## Current version
 
 The `HEAD` subdirectory contains serialized API objects generated from the current commit:

@@ -6,6 +6,7 @@ package sdk
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"runtime"
 	"strings"
@@ -16,7 +17,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 
@@ -85,7 +86,12 @@ func (s *span) SetAttributes(attrs ...attribute.KeyValue) {
 	limit := maxSpan.Attrs
 	if limit == 0 {
 		// No attributes allowed.
-		s.span.DroppedAttrs += uint32(len(attrs))
+		n := int64(len(attrs))
+		if n > 0 {
+			s.span.DroppedAttrs += uint32( //nolint:gosec  // Bounds checked.
+				min(n, math.MaxUint32),
+			)
+		}
 		return
 	}
 
@@ -121,8 +127,13 @@ func (s *span) SetAttributes(attrs ...attribute.KeyValue) {
 // convCappedAttrs converts up to limit attrs into a []telemetry.Attr. The
 // number of dropped attributes is also returned.
 func convCappedAttrs(limit int, attrs []attribute.KeyValue) ([]telemetry.Attr, uint32) {
+	n := len(attrs)
 	if limit == 0 {
-		return nil, uint32(len(attrs))
+		var out uint32
+		if n > 0 {
+			out = uint32(min(int64(n), math.MaxUint32)) //nolint:gosec  // Bounds checked.
+		}
+		return nil, out
 	}
 
 	if limit < 0 {
@@ -130,8 +141,12 @@ func convCappedAttrs(limit int, attrs []attribute.KeyValue) ([]telemetry.Attr, u
 		return convAttrs(attrs), 0
 	}
 
-	limit = min(len(attrs), limit)
-	return convAttrs(attrs[:limit]), uint32(len(attrs) - limit)
+	if n < 0 {
+		n = 0
+	}
+
+	limit = min(n, limit)
+	return convAttrs(attrs[:limit]), uint32(n - limit) //nolint:gosec  // Bounds checked.
 }
 
 func convAttrs(attrs []attribute.KeyValue) []telemetry.Attr {

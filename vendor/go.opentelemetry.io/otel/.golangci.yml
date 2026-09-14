@@ -10,11 +10,14 @@ linters:
     - depguard
     - errcheck
     - errorlint
+    - gocritic
     - godot
     - gosec
     - govet
     - ineffassign
     - misspell
+    - modernize
+    - noctx
     - perfsprint
     - revive
     - staticcheck
@@ -66,8 +69,6 @@ linters:
               desc: Do not use cross-module internal packages.
             - pkg: go.opentelemetry.io/otel/internal/internaltest
               desc: Do not use cross-module internal packages.
-            - pkg: go.opentelemetry.io/otel/internal/matchers
-              desc: Do not use cross-module internal packages.
         otlp-internal:
           files:
             - '!**/exporters/otlp/internal/**/*.go'
@@ -88,6 +89,28 @@ linters:
           deny:
             - pkg: go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal
               desc: Do not use cross-module internal packages.
+        semconv:
+          list-mode: lax
+          files:
+            - "!**/semconv/**"
+            - "!**/exporters/zipkin/**"
+          deny:
+            - pkg: go.opentelemetry.io/otel/semconv
+              desc: "Use go.opentelemetry.io/otel/semconv/v1.41.0 instead. If a newer semconv version has been released, update the depguard rule."
+          allow:
+            - go.opentelemetry.io/otel/semconv/v1.41.0
+    gocritic:
+      disabled-checks:
+        - appendAssign
+        - commentedOutCode
+        - dupArg
+        - hugeParam
+        - importShadow
+        - preferDecodeRune
+        - rangeValCopy
+        - unnamedResult
+        - whyNoLint
+      enable-all: true
     godot:
       exclude:
         # Exclude links.
@@ -100,6 +123,9 @@ linters:
       locale: US
       ignore-rules:
         - cancelled
+    modernize:
+      disable:
+        - omitzero
     perfsprint:
       int-conversion: true
       err-error: true
@@ -108,13 +134,16 @@ linters:
       strconcat: true
     revive:
       confidence: 0.01
+      enable-all-rules: false
+      enable-default-rules: true
+      max-open-files: 2048
       rules:
         - name: blank-imports
         - name: bool-literal-in-expr
         - name: constant-logical-expr
         - name: context-as-argument
           arguments:
-            - allowTypesBefore: '*testing.T'
+            - allow-types-before: '*testing.T'
           disabled: true
         - name: context-keys-type
         - name: deep-exit
@@ -126,7 +155,7 @@ linters:
         - name: duplicated-imports
         - name: early-return
           arguments:
-            - preserveScope
+            - preserve-scope
         - name: empty-block
         - name: empty-lines
         - name: error-naming
@@ -135,7 +164,7 @@ linters:
         - name: errorf
         - name: exported
           arguments:
-            - sayRepetitiveInsteadOfStutters
+            - say-repetitive-instead-of-stutters
         - name: flag-parameter
         - name: identical-branches
         - name: if-return
@@ -143,11 +172,12 @@ linters:
         - name: increment-decrement
         - name: indent-error-flow
           arguments:
-            - preserveScope
+            - preserve-scope
         - name: package-comments
         - name: range
         - name: range-val-in-closure
         - name: range-val-address
+        - name: receiver-naming
         - name: redefines-builtin-id
         - name: string-format
           arguments:
@@ -157,7 +187,7 @@ linters:
         - name: struct-tag
         - name: superfluous-else
           arguments:
-            - preserveScope
+            - preserve-scope
         - name: time-equal
         - name: unconditional-recursion
         - name: unexported-return
@@ -169,13 +199,17 @@ linters:
             - fmt.Print
             - fmt.Printf
             - fmt.Println
+        - name: unused-parameter
+        - name: unused-receiver
         - name: unnecessary-stmt
+        - name: use-any
         - name: useless-break
         - name: var-declaration
         - name: var-naming
           arguments:
             - ["ID"] # AllowList
             - ["Otel", "Aws", "Gcp"] # DenyList
+            - - skip-package-name-collision-with-go-std: true
         - name: waitgroup-by-value
     testifylint:
       enable-all: true
@@ -183,6 +217,9 @@ linters:
         - float-compare
         - go-require
         - require-error
+    usetesting:
+      context-background: true
+      context-todo: true
   exclusions:
     generated: lax
     presets:
@@ -190,6 +227,10 @@ linters:
       - legacy
       - std-error-handling
     rules:
+      - linters:
+          - revive
+        path: schema/v.*/types/.*
+        text: avoid meaningless package names
       # TODO: Having appropriate comments for exported objects helps development,
       # even for objects in internal packages. Appropriate comments for all
       # exported objects should be added and this exclusion removed.
@@ -222,10 +263,6 @@ linters:
       - linters:
           - gosec
         text: 'G402: TLS MinVersion too low.'
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
@@ -235,14 +272,12 @@ formatters:
     - goimports
     - golines
   settings:
+    gofumpt:
+      extra-rules: true
     goimports:
       local-prefixes:
-        - go.opentelemetry.io
+        - go.opentelemetry.io/otel
     golines:
       max-len: 120
   exclusions:
     generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$

@@ -33,13 +33,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
 	remote "k8s.io/cri-client/pkg"
-	"k8s.io/cri-client/pkg/internal"
 )
 
 // Notice that the current CRI logs implementation doesn't handle
@@ -89,34 +87,28 @@ func (l *logMessage) reset() {
 
 // LogOptions is the CRI internal type of all log options.
 type LogOptions struct {
-	tail      int64
-	bytes     int64
-	since     time.Time
-	follow    bool
-	timestamp bool
-}
-
-// NewLogOptions convert the v1.PodLogOptions to CRI internal LogOptions.
-func NewLogOptions(apiOpts *v1.PodLogOptions, now time.Time) *LogOptions {
-	opts := &LogOptions{
-		tail:      -1, // -1 by default which means read all logs.
-		bytes:     -1, // -1 by default which means read all logs.
-		follow:    apiOpts.Follow,
-		timestamp: apiOpts.Timestamps,
-	}
-	if apiOpts.TailLines != nil {
-		opts.tail = *apiOpts.TailLines
-	}
-	if apiOpts.LimitBytes != nil {
-		opts.bytes = *apiOpts.LimitBytes
-	}
-	if apiOpts.SinceSeconds != nil {
-		opts.since = now.Add(-time.Duration(*apiOpts.SinceSeconds) * time.Second)
-	}
-	if apiOpts.SinceTime != nil && apiOpts.SinceTime.After(opts.since) {
-		opts.since = apiOpts.SinceTime.Time
-	}
-	return opts
+	// TailLines is the number of lines to show from the end of the logs.
+	// If it is nil, it means all log lines will be shown.
+	// If it is 0, no log lines will be shown.
+	// This corresponds to the TailLines field in v1.PodLogOptions.
+	TailLines *int64
+	// LimitBytes is the maximum number of bytes to read from the logs.
+	// If it is nil, it means all bytes will be read.
+	// If it is 0, no bytes will be read.
+	// This corresponds to the LimitBytes field in v1.PodLogOptions.
+	LimitBytes *int64
+	// Since is the absolute time from which to show logs.
+	// Only logs with a timestamp after this time will be returned.
+	// This can be derived from either SinceSeconds or SinceTime in v1.PodLogOptions.
+	Since time.Time
+	// Follow indicates whether the logs should be followed.
+	// If true, the read will continue until the container is stopped or the context is cancelled.
+	// This corresponds to the Follow field in v1.PodLogOptions.
+	Follow bool
+	// Timestamp indicates whether to include timestamps in the log output.
+	// If true, each log line will be prefixed with its RFC3339 timestamp.
+	// This corresponds to the Timestamps field in v1.PodLogOptions.
+	Timestamp bool
 }
 
 // parseFunc is a function parsing one log line to the internal log type.
@@ -236,20 +228,20 @@ func newLogWriter(stdout io.Writer, stderr io.Writer, opts *LogOptions) *logWrit
 		opts:   opts,
 		remain: math.MaxInt64, // initialize it as infinity
 	}
-	if opts.bytes >= 0 {
-		w.remain = opts.bytes
+	if opts.LimitBytes != nil {
+		w.remain = *opts.LimitBytes
 	}
 	return w
 }
 
 // writeLogs writes logs into stdout, stderr.
 func (w *logWriter) write(msg *logMessage, addPrefix bool) error {
-	if msg.timestamp.Before(w.opts.since) {
+	if msg.timestamp.Before(w.opts.Since) {
 		// Skip the line because it's older than since
 		return nil
 	}
 	line := msg.log
-	if w.opts.timestamp && addPrefix {
+	if w.opts.Timestamp && addPrefix {
 		prefix := append([]byte(msg.timestamp.Format(timeFormatOut)), delimiter[0])
 		line = append(prefix, line...)
 	}
@@ -291,7 +283,7 @@ func (w *logWriter) write(msg *logMessage, addPrefix bool) error {
 // ReadLogs read the container log and redirect into stdout and stderr.
 // Note that containerID is only needed when following the log, or else
 // just pass in empty string "".
-func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string, opts *LogOptions, runtimeService internalapi.RuntimeService, stdout, stderr io.Writer) error {
+func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, runtimeService internalapi.RuntimeService, stdout, stderr io.Writer) error {
 	// fsnotify has different behavior for symlinks in different platform,
 	// for example it follows symlink on Linux, but not on Windows,
 	// so we explicitly resolve symlinks before reading the logs.
@@ -309,16 +301,20 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 	defer f.Close()
 
 	// Search start point based on tail line.
-	start, err := findTailLineStartIndex(f, opts.tail)
+	var tail int64 = -1
+	if opts.TailLines != nil {
+		tail = *opts.TailLines
+	}
+	start, err := findTailLineStartIndex(f, tail)
 	if err != nil {
-		return fmt.Errorf("failed to tail %d lines of log file %q: %v", opts.tail, path, err)
+		return fmt.Errorf("failed to tail %d lines of log file %q: %w", tail, path, err)
 	}
 	if _, err := f.Seek(start, io.SeekStart); err != nil {
-		return fmt.Errorf("failed to seek %d in log file %q: %v", start, path, err)
+		return fmt.Errorf("failed to seek %d in log file %q: %w", start, path, err)
 	}
 
-	limitedMode := (opts.tail >= 0) && (!opts.follow)
-	limitedNum := opts.tail
+	limitedMode := (opts.TailLines != nil) && (!opts.Follow)
+	limitedNum := tail
 	// Start parsing the logs.
 	r := bufio.NewReader(f)
 	// Do not create watcher here because it is not needed if `Follow` is false.
@@ -331,9 +327,11 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 	msg := &logMessage{}
 	baseName := filepath.Base(path)
 	dir := filepath.Dir(path)
+	logger := klog.FromContext(ctx)
+
 	for {
 		if stop || (limitedMode && limitedNum == 0) {
-			internal.Log(logger, 2, "Finished parsing log file", "path", path)
+			logger.V(2).Info("Finished parsing log file", "path", path)
 			return nil
 		}
 		l, err := r.ReadBytes(eol[0])
@@ -341,7 +339,7 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 			if err != io.EOF { // This is an real error
 				return fmt.Errorf("failed to read log file %q: %v", path, err)
 			}
-			if opts.follow {
+			if opts.Follow {
 				// The container is not running, we got to the end of the log.
 				if !found {
 					return nil
@@ -366,7 +364,7 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 				}
 				var recreated bool
 				// Wait until the next log change.
-				found, recreated, err = waitLogs(ctx, logger, containerID, baseName, watcher, runtimeService)
+				found, recreated, err = waitLogs(ctx, containerID, baseName, watcher, runtimeService)
 				if err != nil {
 					return err
 				}
@@ -391,7 +389,7 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 			if len(l) == 0 {
 				continue
 			}
-			internal.Log(logger, 0, "Incomplete line in log file", "path", path, "line", l)
+			logger.Info("Incomplete line in log file", "path", path, "line", l)
 		}
 		if parse == nil {
 			// Initialize the log parsing function.
@@ -403,16 +401,20 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 		// Parse the log line.
 		msg.reset()
 		if err := parse(l, msg); err != nil {
-			internal.LogErr(logger, err, "Failed when parsing line in log file", "path", path, "line", l)
+			logger.Error(err, "Failed when parsing line in log file", "path", path, "line", l)
 			continue
 		}
 		// Write the log line into the stream.
 		if err := writer.write(msg, isNewLine); err != nil {
 			if err == errMaximumWrite {
-				internal.Log(logger, 2, "Finished parsing log file, hit bytes limit", "path", path, "limit", opts.bytes)
+				var bytes int64 = -1
+				if opts.LimitBytes != nil {
+					bytes = *opts.LimitBytes
+				}
+				logger.V(2).Info("Finished parsing log file, hit bytes limit", "path", path, "limit", bytes)
 				return nil
 			}
-			internal.LogErr(logger, err, "Failed when writing line to log file", "path", path, "line", msg)
+			logger.Error(err, "Failed when writing line to log file", "path", path, "line", msg)
 			return err
 		}
 		if limitedMode {
@@ -426,7 +428,7 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 	}
 }
 
-func isContainerRunning(ctx context.Context, logger *klog.Logger, id string, r internalapi.RuntimeService) (bool, error) {
+func isContainerRunning(ctx context.Context, id string, r internalapi.RuntimeService) (bool, error) {
 	resp, err := r.ContainerStatus(ctx, id, false)
 	if err != nil {
 		// Assume that the container is still running when the runtime is
@@ -442,9 +444,10 @@ func isContainerRunning(ctx context.Context, logger *klog.Logger, id string, r i
 	if status == nil {
 		return false, remote.ErrContainerStatusNil
 	}
+	logger := klog.FromContext(ctx)
 	// Only keep following container log when it is running.
 	if status.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
-		internal.Log(logger, 5, "Container is not running", "containerId", id, "state", status.State)
+		logger.V(5).Info("Container is not running", "containerId", id, "state", status.State)
 		// Do not return error because it's normal that the container stops
 		// during waiting.
 		return false, nil
@@ -455,9 +458,10 @@ func isContainerRunning(ctx context.Context, logger *klog.Logger, id string, r i
 // waitLogs wait for the next log write. It returns two booleans and an error. The first boolean
 // indicates whether a new log is found; the second boolean if the log file was recreated;
 // the error is error happens during waiting new logs.
-func waitLogs(ctx context.Context, logger *klog.Logger, id string, logName string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
+func waitLogs(ctx context.Context, id string, logName string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
+	logger := klog.FromContext(ctx)
 	// no need to wait if the pod is not running
-	if running, err := isContainerRunning(ctx, logger, id, runtimeService); !running {
+	if running, err := isContainerRunning(ctx, id, runtimeService); !running {
 		return false, false, err
 	}
 	errRetry := 5
@@ -472,10 +476,10 @@ func waitLogs(ctx context.Context, logger *klog.Logger, id string, logName strin
 			case fsnotify.Create:
 				return true, filepath.Base(e.Name) == logName, nil
 			default:
-				internal.LogErr(logger, nil, "Received unexpected fsnotify event, retrying", "event", e)
+				logger.Error(nil, "Received unexpected fsnotify event, retrying", "event", e)
 			}
 		case err := <-w.Errors:
-			internal.LogErr(logger, err, "Received fsnotify watch error, retrying unless no more retries left", "retries", errRetry)
+			logger.Error(err, "Received fsnotify watch error, retrying unless no more retries left", "retries", errRetry)
 			if errRetry == 0 {
 				return false, false, err
 			}

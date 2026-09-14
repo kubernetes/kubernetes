@@ -2,5 +2,6 @@
 
 reviewers:
   - wojtek-t
-approvers:
+approvers: []
+emeritus_approvers:
   - logicalhan

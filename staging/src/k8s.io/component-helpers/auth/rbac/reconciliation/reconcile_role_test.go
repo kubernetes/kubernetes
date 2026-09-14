@@ -19,7 +19,6 @@ package reconciliation
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -392,7 +391,7 @@ func TestComputeReconciledRoleAggregationRules(t *testing.T) {
 			continue
 		}
 		if reconciliationNeeded && !apiequality.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
-			t.Errorf("%s: %v", k, cmp.Diff(tc.expectedReconciledRole, result.Role.(ClusterRoleRuleOwner).ClusterRole))
+			t.Errorf("%s: expected %#v, got %#v", k, tc.expectedReconciledRole, result.Role.(ClusterRoleRuleOwner).ClusterRole)
 		}
 	}
 }

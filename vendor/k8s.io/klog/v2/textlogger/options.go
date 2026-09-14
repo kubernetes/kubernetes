@@ -59,6 +59,7 @@ type configOptions struct {
 	verbosityDefault  int
 	fixedTime         *time.Time
 	unwind            func(int) (string, int)
+	withHeader        bool
 	output            io.Writer
 }
 
@@ -106,6 +107,22 @@ func FixedTime(ts time.Time) ConfigOption {
 	}
 }
 
+// WithHeader controls whether the header (time, source code location, etc.)
+// is included in the output. The default is to include it.
+//
+// This can be useful in combination with redirection to a buffer to
+// turn structured log parameters into a string (see example).
+//
+// # Experimental
+//
+// Notice: This function is EXPERIMENTAL and may be changed or removed in a
+// later release.
+func WithHeader(enabled bool) ConfigOption {
+	return func(co *configOptions) {
+		co.withHeader = enabled
+	}
+}
+
 // Backtrace overrides the default mechanism for determining the call site.
 // The callback is invoked with the number of function calls between itself
 // and the call site. It must return the file name and line number. An empty
@@ -131,6 +148,7 @@ func NewConfig(opts ...ConfigOption) *Config {
 			vmoduleFlagName:   "vmodule",
 			verbosityDefault:  0,
 			unwind:            runtimeBacktrace,
+			withHeader:        true,
 			output:            os.Stderr,
 		},
 	}

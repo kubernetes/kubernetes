@@ -26,6 +26,7 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
@@ -90,7 +91,7 @@ func isCgroupv2Node(f *framework.Framework, ctx context.Context) bool {
 		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
 	}()
 
-	return cgroups.IsPodOnCgroupv2Node(f, pod)
+	return cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
 }
 
 func makeObjectMetadata(name, namespace string) metav1.ObjectMeta {
@@ -286,17 +287,16 @@ func podLevelResourcesTests(f *framework.Framework) {
 			},
 		},
 		{
-			name:         "Burstable QoS pod, pod resources requests, container resources limits",
+			name:         "Guaranteed QoS pod, pod resources requests, container resources limits",
 			podResources: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 			containers: []containerInfo{
 				{Name: "c1", Resources: &cgroups.ContainerResources{CPULim: "50m", MemLim: "50Mi"}},
 				{Name: "c2", Resources: &cgroups.ContainerResources{CPULim: "50m", MemLim: "50Mi"}},
 			},
 			expected: expectedPodConfig{
-				qos:               v1.PodQOSBurstable,
+				qos:               v1.PodQOSGuaranteed,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
 			},
-			expectedPodLevelResourcesOverride: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources requests, partial container resources limits",
@@ -314,22 +314,16 @@ func podLevelResourcesTests(f *framework.Framework) {
 			expectedPodLevelResourcesOverride: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 		},
 		{
-			name:         "Burstable QoS pod, pod resources requests, container resources requests and limits",
+			name:         "Guaranteed QoS pod, pod resources requests, container resources requests and limits",
 			podResources: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 			containers: []containerInfo{
 				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "30m", CPULim: "30m", MemReq: "30Mi", MemLim: "30Mi"}},
 				{Name: "c2", Resources: &cgroups.ContainerResources{CPUReq: "30m", CPULim: "30m", MemReq: "30Mi", MemLim: "30Mi"}},
 			},
 			expected: expectedPodConfig{
-				qos: v1.PodQOSBurstable,
-				// At first glance, this may seem invalid. However, the value of CPUReq is only used
-				// to calculate the ratio for cpu.weight (i.e., CPU shares), and the absolute value
-				// of CPUReq is not directly applied. Therefore, it’s not a problem even if CPUReq
-				// exceeds CPULim. Similarly, when the MemoryQoS feature is disabled, MemReq is not
-				// used for memory.min, so it’s also fine for MemReq to exceed MemLim.
-				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "60m", MemReq: "100Mi", MemLim: "60Mi"},
+				qos:               v1.PodQOSGuaranteed,
+				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
 			},
-			expectedPodLevelResourcesOverride: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 		},
 		{
 			name:         "Burstable QoS pod, no container resources",
@@ -440,7 +434,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 			framework.ExpectNoError(err, "failed to verify pod's cgroup values: %v", err)
 
 			ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
-			err = verifyContainersCgroupLimits(f, pod)
+			err = verifyContainersCgroupLimits(ctx, f, pod)
 			framework.ExpectNoError(err, "failed to verify containers cgroup values: %v", err)
 
 			ginkgo.By("deleting pods")
@@ -450,12 +444,12 @@ func podLevelResourcesTests(f *framework.Framework) {
 	}
 }
 
-func verifyContainersCgroupLimits(f *framework.Framework, pod *v1.Pod) error {
+func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, pod *v1.Pod) error {
 	var errs []error
 	for _, container := range pod.Spec.Containers {
 		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Memory() != nil &&
 			container.Resources.Limits.Memory() == nil {
-			err := cgroups.VerifyContainerMemoryLimit(f, pod, container.Name, &container.Resources, true)
+			err := cgroups.VerifyContainerMemoryLimit(ctx, f, pod, container.Name, &container.Resources, true)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify memory limit cgroup value: %w", err))
 			}
@@ -463,7 +457,7 @@ func verifyContainersCgroupLimits(f *framework.Framework, pod *v1.Pod) error {
 
 		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Cpu() != nil &&
 			container.Resources.Limits.Cpu() == nil {
-			err := cgroups.VerifyContainerCPULimit(f, pod, container.Name, &container.Resources, true)
+			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, &container.Resources, true)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
 			}
@@ -471,3 +465,101 @@ func verifyContainersCgroupLimits(f *framework.Framework, pod *v1.Pod) error {
 	}
 	return utilerrors.NewAggregate(errs)
 }
+
+// podLevelResourcesFixDefaultingTests contains tests that require both
+// PodLevelResources and PodLevelResourcesFixDefaulting feature gates.
+func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
+	// When pod-level requests are set and all containers define limits, pod-level
+	// limits are auto-defaulted to the aggregated container limits. Since req==lim
+	// after defaulting, the pod gets Guaranteed QoS.
+	ginkgo.It("Guaranteed QoS pod, pod resources requests, container resources limits auto-defaulted", func(ctx context.Context) {
+		containers := []containerInfo{
+			{Name: "c1", Resources: &cgroups.ContainerResources{CPULim: "50m", MemLim: "50Mi"}},
+			{Name: "c2", Resources: &cgroups.ContainerResources{CPULim: "50m", MemLim: "50Mi"}},
+		}
+		podResources := &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"}
+		expectedResources := &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"}
+
+		podMetadata := makeObjectMetadata("testpod", f.Namespace.Name)
+		testPod := makePod(&podMetadata, podResources, containers)
+
+		ginkgo.By("creating pod")
+		podClient := e2epod.NewPodClient(f)
+		pod := podClient.CreateSync(ctx, testPod)
+
+		ginkgo.By("verifying pod resources are as expected")
+		verifyPodResources(*pod, podResources, expectedResources)
+
+		ginkgo.By("verifying pod QoS as expected")
+		verifyQoS(*pod, v1.PodQOSGuaranteed)
+
+		ginkgo.By("verifying pod cgroup values")
+		err := cgroups.VerifyPodCgroups(ctx, f, pod, expectedResources)
+		framework.ExpectNoError(err, "failed to verify pod's cgroup values: %v", err)
+
+		ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
+		err = verifyContainersCgroupLimits(ctx, f, pod)
+		framework.ExpectNoError(err, "failed to verify containers cgroup values: %v", err)
+
+		ginkgo.By("deleting pod")
+		delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
+		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+	})
+
+	// When only a CPU request is set at pod level (no memory request or limits), defaulting
+	// populates missing pod-level requests from aggregated container requests and missing
+	// pod-level limits from container limits to maintain complete pod-level accounting.
+	// Furthermore, subsequent updates preserve these defaulted values.
+	ginkgo.It("partial pod-level request: all missing pod requests and limits defaulted from containers, stable across updates", func(ctx context.Context) {
+		containers := []containerInfo{
+			{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "50Mi", MemLim: "50Mi"}},
+		}
+		// Only CPU request set at pod level — no memory request or limits.
+		podResources := &cgroups.ContainerResources{CPUReq: "50m"}
+		// Expected: memory request defaulted from container, CPU and memory limits defaulted from container limits.
+		expectedResources := &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "50Mi", MemLim: "50Mi"}
+
+		podMetadata := makeObjectMetadata("testpod-partial-req", f.Namespace.Name)
+		testPod := makePod(&podMetadata, podResources, containers)
+
+		ginkgo.By("creating pod")
+		podClient := e2epod.NewPodClient(f)
+		pod := podClient.CreateSync(ctx, testPod)
+
+		ginkgo.By("verifying pod resources after create: missing memory request and limits defaulted from container")
+		verifyPodResources(*pod, podResources, expectedResources)
+
+		ginkgo.By("patching an annotation to trigger a decode+update cycle")
+		patch := []byte(`{"metadata":{"annotations":{"test-annotation":"trigger-defaulting"}}}`)
+		updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(
+			ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch pod annotation")
+
+		ginkgo.By("verifying pod resources after annotation update: defaulted memory request and limits remain unchanged")
+		verifyPodResources(*updatedPod, podResources, expectedResources)
+
+		ginkgo.By("deleting pod")
+		delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
+		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+	})
+}
+
+var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial(), framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourcesFixDefaulting), func() {
+	f := framework.NewDefaultFramework("pod-level-resources-fix-defaulting-tests")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+
+		if framework.NodeOSDistroIs("windows") {
+			e2eskipper.Skipf("not supported on windows -- skipping")
+		}
+
+		if !isCgroupv2Node(f, ctx) {
+			e2eskipper.Skipf("not supported on cgroupv1 -- skipping")
+		}
+	})
+
+	podLevelResourcesFixDefaultingTests(f)
+})

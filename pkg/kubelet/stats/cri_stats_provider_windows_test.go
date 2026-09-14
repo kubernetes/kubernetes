@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hnslib"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -459,6 +459,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 	memoryUsageTimestamp := int64(666666)
 	memoryUsageWorkingSetBytes := uint64(0x11223344)
 	memoryUsageAvailableBytes := uint64(0x55667788)
+	memoryCommitBytes := uint64(0x99AABBCC)
 	memoryUsagePageFaults := uint64(200)
 	logStatsUsed := uint64(5000)
 	logStatsInodesUsed := uint64(5050)
@@ -502,6 +503,9 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 			WorkingSetBytes: &runtimeapi.UInt64Value{
 				Value: memoryUsageWorkingSetBytes,
 			},
+			CommitMemoryBytes: &runtimeapi.UInt64Value{
+				Value: memoryCommitBytes,
+			},
 			PageFaults: &runtimeapi.UInt64Value{
 				Value: memoryUsagePageFaults,
 			},
@@ -515,7 +519,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 		},
 	}
 
-	inputRootFsInfo := &cadvisorapiv2.FsInfo{}
+	inputRootFsInfo := &cadvisorapi.FsInfo{}
 
 	// Used by the getPodContainerLogStats() call in makeWinContainerStats()
 	inputPodSandboxMetadata := &runtimeapi.PodSandboxMetadata{
@@ -525,7 +529,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 	}
 
 	logger, _ := ktesting.NewTestContext(t)
-	got, err := p.makeWinContainerStats(logger, inputStats, inputContainer, inputRootFsInfo, make(map[string]*cadvisorapiv2.FsInfo), inputPodSandboxMetadata)
+	got, err := p.makeWinContainerStats(logger, inputStats, inputContainer, inputRootFsInfo, make(map[string]*cadvisorapi.FsInfo), inputPodSandboxMetadata)
 
 	expected := &statsapi.ContainerStats{
 		Name:      "c0",
@@ -538,6 +542,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 		Memory: &statsapi.MemoryStats{
 			Time:            v1.NewTime(time.Unix(0, memoryUsageTimestamp)),
 			AvailableBytes:  ptr.To[uint64](memoryUsageAvailableBytes),
+			UsageBytes:      ptr.To[uint64](memoryCommitBytes),
 			WorkingSetBytes: ptr.To[uint64](memoryUsageWorkingSetBytes),
 			PageFaults:      ptr.To[uint64](memoryUsagePageFaults),
 		},

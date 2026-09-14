@@ -30,13 +30,13 @@ import (
 
 // strategy implements behavior for ClusterRoleBindings
 type strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // strategy is the default logic that applies when creating and updating
 // ClusterRoleBinding objects.
-var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -50,7 +50,7 @@ func (strategy) NamespaceScoped() bool {
 }
 
 // AllowCreateOnUpdate is true for ClusterRoleBindings.
-func (strategy) AllowCreateOnUpdate() bool {
+func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -84,7 +84,9 @@ func (strategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user.
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateClusterRoleBindingUpdate(obj.(*rbac.ClusterRoleBinding), old.(*rbac.ClusterRoleBinding))
+	newObj := obj.(*rbac.ClusterRoleBinding)
+	oldObj := old.(*rbac.ClusterRoleBinding)
+	return validation.ValidateClusterRoleBindingUpdate(newObj, oldObj)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -92,11 +94,19 @@ func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) [
 	return nil
 }
 
+func (strategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	// Match declarative validation short-circuit errors with handwritten child field errors.
+	// This is required because ClusterRoleBinding.RoleRef is immutable.
+	return rest.DeclarativeValidationConfig{
+		ShortCircuitMismatch: true,
+	}
+}
+
 // If AllowUnconditionalUpdate() is true and the object specified by
 // the user does not have a resource version, then generic Update()
 // populates it with the latest version. Else, it checks that the
 // version specified by the user matches the version of latest etcd
 // object.
-func (strategy) AllowUnconditionalUpdate() bool {
+func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }

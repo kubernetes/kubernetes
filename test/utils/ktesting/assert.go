@@ -20,10 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"regexp"
+	"runtime/debug"
 	"strings"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
+	gtypes "github.com/onsi/gomega/types"
 )
 
 // FailureError is an error where the error string is meant to be passed to
@@ -57,52 +61,165 @@ func (f FailureError) Is(target error) bool {
 //	}
 var ErrFailure error = FailureError{}
 
-func expect(tCtx TContext, actual interface{}, extra ...interface{}) gomega.Assertion {
-	tCtx.Helper()
-	return gomega.NewWithT(tCtx).Expect(actual, extra...)
+// NewFailure creates a new [FailureError] with msg as its message, recording
+// the current stack backtrace in [FailureError.FullStackTrace] so that
+// [TContext.ExpectNoError] and [TContext.AssertNoError] can log it later,
+// when the error eventually gets turned into a test failure.
+//
+// Use it in helper code which detects a failure and wants to return an error
+// through normal Go error handling instead of failing the test directly:
+//
+//	func doSomething(tCtx ktesting.TContext) error {
+//	    ...
+//	    if !ok {
+//	        return ktesting.NewFailure(fmt.Sprintf("something went wrong: %s", reason))
+//	    }
+//	    return nil
+//	}
+func NewFailure(msg string) FailureError {
+	return FailureError{
+		Msg:            msg,
+		FullStackTrace: captureBacktrace(),
+	}
 }
 
-// suppressUnexpectedErrorLoggingKeyType is the type for a key which, if set to true in a context,
-// suppresses logging of an unexpected error. The context returned by WithError uses this because
-// the caller catches all failures in an error and then decides about logging.
-type suppressUnexpectedErrorLoggingKeyType struct{}
+// runtimeStackFrameRE matches source file paths of stack frames inside the Go
+// runtime or testing packages, Gomega's own internal plumbing, plus ktesting's
+// own source code (but not code in subpackages like the examples). None of
+// those add useful information for diagnosing test failures: the former are
+// internal implementation details, the latter merely point back at the
+// ktesting API call that triggered capturing the backtrace.
+var runtimeStackFrameRE = regexp.MustCompile(`/src/testing/|/src/runtime/|/onsi/gomega/|/test/utils/ktesting/[^/]+\.go:`)
 
-var suppressUnexpectedErrorLoggingKey suppressUnexpectedErrorLoggingKeyType
+// captureBacktrace returns a pruned stack backtrace pointing at the caller of
+// captureBacktrace, suitable for use as [FailureError.FullStackTrace].
+func captureBacktrace() string {
+	// Skip the frames for runtime/debug.Stack itself and this function.
+	// Any remaining ktesting-internal frames (e.g. Error, Errorf, Fatal,
+	// Fatalf, NewFailure) get filtered out below via runtimeStackFrameRE,
+	// regardless of how deep the call chain to captureBacktrace is.
+	return pruneStack(string(debug.Stack()), 2)
+}
 
-func expectNoError(tCtx TContext, err error, explain ...interface{}) {
+// pruneStack removes the given number of leading frames (as pairs of
+// function name + file:line, in the format produced by [runtime/debug.Stack])
+// plus any frames matched by runtimeStackFrameRE.
+func pruneStack(fullStackTrace string, skip int) string {
+	stack := strings.Split(fullStackTrace, "\n")
+	// Ignore the "goroutine 1 [running]:" header line, if present.
+	if len(stack) > 0 && strings.HasPrefix(stack[0], "goroutine ") {
+		stack = stack[1:]
+	}
+	if len(stack) > 2*skip {
+		stack = stack[2*skip:]
+	}
+	var pruned []string
+	for i := 0; i < len(stack)/2; i++ {
+		if !runtimeStackFrameRE.MatchString(stack[i*2+1]) {
+			pruned = append(pruned, stack[i*2], stack[i*2+1])
+		}
+	}
+	return strings.Join(pruned, "\n")
+}
+
+func gomegaAssertion(tCtx TContext, fatal bool, actual interface{}, extra ...interface{}) gomega.Assertion {
+	testingT := gtypes.GomegaTestingT(tCtx)
+	if !fatal {
+		testingT = assertTestingT{tCtx}
+	}
+	return gomega.NewWithT(testingT).Expect(actual, extra...)
+}
+
+// assertTestingT implements Fatalf (the only function used by Gomega for
+// reporting failures) using TContext.Errorf, i.e. testing continues after a
+// failed assertion. The Helper method gets passed through.
+type assertTestingT struct {
+	TContext
+}
+
+var _ gtypes.GomegaTestingT = assertTestingT{}
+
+func (a assertTestingT) Fatalf(format string, args ...any) {
+	a.Helper()
+	a.Errorf(format, args...)
+}
+
+// ExpectNoError asserts that no error has occurred and fails the test if it does.
+//
+// As in [gomega], the optional explanation can be:
+//   - a [fmt.Sprintf] format string plus its arguments
+//   - a function returning a string, which will be called
+//     lazily to construct the explanation if needed
+//
+// If an explanation is provided, then it replaces the default "Unexpected
+// error" in the failure message. It's combined with additional details by
+// adding a colon at the end, as when wrapping an error. Therefore it should
+// not end with a punctuation mark or line break.
+//
+// Using ExpectNoError instead of the corresponding Gomega or testify
+// assertions has the advantage that the failure message is short (good for
+// aggregation in https://go.k8s.io/triage) with more details captured in the
+// test log output (good when investigating one particular failure).
+//
+// Helper packages should return errors that are derived from [FailureError].
+// The test code then is forced to check for that error by the normal
+// linter and should provide additional context for the failure, just
+// as it would when printing or wrapping an error:
+//
+//	tCtx.ExpectNoError(somehelper.CreateSomething(tCtx, ...), "creating the first foobar")
+//	tCtx.ExpectNoError(somehelper.CreateSomething(tCtx, ...), "creating the second foobar")
+func (tCtx TContext) ExpectNoError(err error, explain ...interface{}) {
+	tCtx.Helper()
+	tCtx.noError(true, err, explain...)
+}
+
+// AssertNoError is a variant of ExpectNoError which reports an unexpected
+// error without aborting the test. It returns true if there was no error.
+func (tCtx TContext) AssertNoError(err error, explain ...interface{}) bool {
+	tCtx.Helper()
+	return tCtx.noError(false, err, explain...)
+}
+
+func (tCtx TContext) noError(fatal bool, err error, explain ...interface{}) bool {
 	if err == nil {
-		return
+		return true
 	}
 
 	tCtx.Helper()
-	value, ok := tCtx.Value(suppressUnexpectedErrorLoggingKey).(bool)
-	suppressLogging := ok && value
-
 	description := buildDescription(explain...)
+
+	fail := tCtx.Errorf
+	if fatal {
+		fail = tCtx.Fatalf
+	}
 
 	if errors.Is(err, ErrFailure) {
 		var failure FailureError
-		if !suppressLogging && errors.As(err, &failure) {
+		if tCtx.capture == nil && errors.As(err, &failure) {
 			if backtrace := failure.Backtrace(); backtrace != "" {
 				if description != "" {
-					tCtx.Log(description)
+					tCtx.Logf("%s: failed at:\n%s", description, backtrace)
+				} else {
+					tCtx.Logf("failed at:\n%s", backtrace)
 				}
-				tCtx.Logf("Failed at:\n    %s", strings.ReplaceAll(backtrace, "\n", "\n    "))
 			}
 		}
 		if description != "" {
-			tCtx.Fatalf("%s: %s", description, err.Error())
+			fail("%s: %s", description, err.Error())
+			return false
 		}
-		tCtx.Fatal(err.Error())
+		fail("%s", err.Error())
+		return false
 	}
 
 	if description == "" {
 		description = "Unexpected error"
 	}
-	if !suppressLogging {
-		tCtx.Logf("%s:\n%s", description, format.Object(err, 1))
+	if tCtx.capture == nil {
+		tCtx.Logf("%s:\n%s", description, format.Object(err, 0))
 	}
-	tCtx.Fatalf("%s: %v", description, err.Error())
+	fail("%s: %v", description, err.Error())
+	return false
 }
 
 func buildDescription(explain ...interface{}) string {
@@ -117,32 +234,56 @@ func buildDescription(explain ...interface{}) string {
 	return fmt.Sprintf(explain[0].(string), explain[1:]...)
 }
 
-// Eventually wraps [gomega.Eventually] such that a failure will be reported via
-// TContext.Fatal.
+// Expect wraps [gomega.Expect] such that a failure will be reported via
+// [TContext.Fatal]. As with [gomega.Expect], additional values
+// may get passed. Those values then all must be nil for the assertion
+// to pass. This can be used with functions which return a value
+// plus error. The error gets checked automatically.
 //
-// In contrast to [gomega.Eventually], the parameter is strongly typed. It must
-// accept a TContext as first argument and return one value, the one which is
-// then checked with the matcher.
+//	myAmazingThing := func(int, error) { ...}
+//	tCtx.Expect(myAmazingThing()).Should(gomega.Equal(1))
+func (tCtx TContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, true, actual, extra...)
+}
+
+// Require is an alias for Expect.
+func (tCtx TContext) Require(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, true, actual, extra...)
+}
+
+// Assert also wraps [gomega.Expect], but in contrast to Expect = Require,
+// it reports a failure through [TContext.Error]. This makes it possible
+// to test several different assertions.
+func (tCtx TContext) Assert(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, false, actual, extra...)
+}
+
+// Eventually wraps [gomega.Eventually]. Supported argument types are:
+//   - A function with a `tCtx ktesting.TContext` or `ctx context.Context`
+//     parameter plus additional parameters and arbitrary return values.
+//   - A value which changes over time, usually a channel.
 //
-// In contrast to direct usage of [gomega.Eventually], make additional
-// assertions inside the callback is okay as long as they use the TContext that
-// is passed in. For example, errors can be checked with ExpectNoError:
+// For functions, the context is provided by Eventually. Additional parameters
+// must be passed via WithParameters. The first return value is passed to the Gomega
+// matcher, all others (in particular an additional error) must be null.
+// As a special case, a function with `tCtx ktesting.TContext` and no return
+// values can be combined with gomega.Succeed as matcher.
 //
-//	cb := func(func(tCtx ktesting.TContext) int {
+// In contrast to direct usage of [gomega.Eventually], making additional
+// assertions inside the callback function is okay in all cases as long as they
+// use the TContext that is passed in. An assertion failure is considered
+// temporary, so Eventually will continue to poll. This can be used to check a
+// value with multiple assertions instead of writing a custom matcher:
+//
+//	cb := func(tCtx ktesting.TContext) {
 //	    value, err := doSomething(...)
 //	    tCtx.ExpectNoError(err, "something failed")
-//	    assert(tCtx, 42, value, "the answer")
-//	    return value
+//	    tCtx.Assert(value.a).To(gomega.Equal(42), "the answer")
+//	    tCtx.Assert(value.b).To(gomega.Equal("the fish"), "thanks")
 //	}
-//	tCtx.Eventually(cb).Should(gomega.Equal(42), "should be the answer to everything")
+//	tCtx.Eventually(cb).Should(gomega.Succeed())
 //
-// If there is no value, then an error can be returned:
-//
-//	cb := func(func(tCtx ktesting.TContext) error {
-//	    err := doSomething(...)
-//	    return err
-//	}
-//	tCtx.Eventually(cb).Should(gomega.Succeed(), "foobar should succeed")
+// The test stops in case of a failure. To continue, use AssertEventually.
 //
 // The default Gomega poll interval and timeout are used. Setting a specific
 // timeout may be useful:
@@ -168,7 +309,7 @@ func buildDescription(explain ...interface{}) string {
 //	        gomega.StopTrying("permanent failure, last value:\n%s", format.Object(value, 1 /* indent one level */)).
 //	            Wrap(err).Now()
 //	    }
-//	    ktesting.ExpectNoError(tCtx, err, "something failed")
+//	    tCtx.ExpectNoError(err, "something failed")
 //	    return value
 //	}
 //	tCtx.Eventually(cb).Should(gomega.Equal(42), "should be the answer to everything")
@@ -182,29 +323,123 @@ func buildDescription(explain ...interface{}) string {
 //	    if errors.As(err, &intermittentErr) {
 //	        gomega.TryAgainAfter(intermittentErr.RetryPeriod).Wrap(err).Now()
 //	    }
-//	    ktesting.ExpectNoError(tCtx, err, "something failed")
+//	    tCtx.ExpectNoError(err, "something failed")
 //	    return value
 //	 }
 //	 tCtx.Eventually(cb).Should(gomega.Equal(42), "should be the answer to everything")
-func Eventually[T any](tCtx TContext, cb func(TContext) T) gomega.AsyncAssertion {
+func (tCtx TContext) Eventually(arg any) gomega.AsyncAssertion {
 	tCtx.Helper()
-	return gomega.NewWithT(tCtx).Eventually(tCtx, func(ctx context.Context) (val T, err error) {
-		tCtx := WithContext(tCtx, ctx)
-		tCtx, finalize := WithError(tCtx, &err)
-		defer finalize()
-		tCtx = WithCancel(tCtx)
-		return cb(tCtx), nil
-	})
+	return tCtx.newAsyncAssertion(gomega.NewWithT(tCtx).Eventually, arg)
+}
+
+// AssertEventually is a variant of Eventually which merely records a failure
+// without stopping the test.
+func (tCtx TContext) AssertEventually(arg any) gomega.AsyncAssertion {
+	tCtx.Helper()
+	return tCtx.newAsyncAssertion(gomega.NewWithT(assertTestingT{tCtx}).Eventually, arg)
 }
 
 // Consistently wraps [gomega.Consistently] the same way as [Eventually] wraps
 // [gomega.Eventually].
-func Consistently[T any](tCtx TContext, cb func(TContext) T) gomega.AsyncAssertion {
+func (tCtx TContext) Consistently(arg any) gomega.AsyncAssertion {
 	tCtx.Helper()
-	return gomega.NewWithT(tCtx).Consistently(tCtx, func(ctx context.Context) (val T, err error) {
-		tCtx := WithContext(tCtx, ctx)
-		tCtx, finalize := WithError(tCtx, &err)
-		defer finalize()
-		return cb(tCtx), nil
-	})
+	return tCtx.newAsyncAssertion(gomega.NewWithT(tCtx).Consistently, arg)
 }
+
+// AssertConsistently is a variant of Consistently which merely records a failure
+// without stopping the test.
+func (tCtx TContext) AssertConsistently(arg any) gomega.AsyncAssertion {
+	tCtx.Helper()
+	return tCtx.newAsyncAssertion(gomega.NewWithT(assertTestingT{tCtx}).Consistently, arg)
+}
+
+// newAsyncAssertion must be kept identical to the corresponding newAsyncAssertion in
+// the client-go ktesting, minus the support for TContext from that package.
+func (tCtx TContext) newAsyncAssertion(eventuallyOrConsistently func(actualOrCtx any, args ...any) gomega.AsyncAssertion, arg any) gomega.AsyncAssertion {
+	tCtx.Helper()
+	// switch arg := arg.(type) {
+	// case func(tCtx TContext):
+	// 	// Tricky to handle via reflect, so let's cover this directly...
+	// 	return eventuallyOrConsistently(tCtx, func(g gomega.Gomega, ctx context.Context) (err error) {
+	// 		tCtx := WithContext(tCtx, ctx)
+	// 		tCtx, finalize := WithError(tCtx, &err)
+	// 		defer finalize()
+	// 		arg(tCtx)
+	// 	})
+	// default:
+	v := reflect.ValueOf(arg)
+	if v.Kind() != reflect.Func {
+		// Gomega must deal with it.
+		return eventuallyOrConsistently(tCtx, arg)
+	}
+	t := v.Type()
+	if t.NumIn() == 0 || t.In(0) != tContextType {
+		// Not a function we can wrap.
+		return eventuallyOrConsistently(tCtx, arg)
+	}
+	// Build a wrapper function with context instead of TContext as first parameter.
+	// The wrapper then builds that TContext when called and invokes the actual function.
+	in := make([]reflect.Type, t.NumIn())
+	in[0] = contextType
+	for i := 1; i < t.NumIn(); i++ {
+		in[i] = t.In(i)
+	}
+	out := make([]reflect.Type, t.NumOut())
+	for i := range t.NumOut() {
+		out[i] = t.Out(i)
+	}
+	// The last result must always be an error because we need the ability to return assertion
+	// failures, so we may have to add an error result value if the function doesn't
+	// already have it.
+	addErrResult := t.NumOut() == 0 || t.Out(t.NumOut()-1) != errorType
+	if addErrResult {
+		out = append(out, errorType)
+	}
+	wrapperType := reflect.FuncOf(in, out, t.IsVariadic())
+	wrapper := reflect.MakeFunc(wrapperType, func(args []reflect.Value) (results []reflect.Value) {
+		var err error
+		tCtx, finalize := tCtx.WithContext(args[0].Interface().(context.Context)).
+			WithCancel().
+			WithError(&err)
+		args[0] = reflect.ValueOf(tCtx)
+		defer func() {
+			// This runs *after* finalize.
+			// If we are returning normally, then we must inject back the err
+			// value that was set by finalize.
+			if r := recover(); r != nil {
+				// Nope, no results needed.
+				panic(r)
+			}
+			errValue := reflect.ValueOf(err)
+			if err == nil {
+				// reflect doesn't like this ("returned zero Value").
+				// We need a value of the right type.
+				errValue = reflect.New(errorType).Elem()
+			}
+			// If the call panicked and the panic was recoved
+			// by finalize(), then results is still nil.
+			// We need to fill in null values.
+			if len(results) == 0 && t.NumOut() > 0 {
+				for t := range t.Outs() {
+					results = append(results, reflect.New(t).Elem())
+				}
+			}
+			if addErrResult {
+				results = append(results, errValue)
+				return
+			}
+			if results[len(results)-1].IsNil() && err != nil {
+				results[len(results)-1] = errValue
+			}
+		}()
+		defer finalize() // Must be called directly, otherwise it cannot recover a panic.
+		return v.Call(args)
+	})
+	return eventuallyOrConsistently(tCtx, wrapper.Interface())
+}
+
+var (
+	contextType  = reflect.TypeFor[context.Context]()
+	errorType    = reflect.TypeFor[error]()
+	tContextType = reflect.TypeFor[TContext]()
+)

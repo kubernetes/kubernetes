@@ -81,11 +81,11 @@ func TestWatchBasedManager(t *testing.T) {
 	t.Log(time.Now(), "creating 1000 secrets")
 	wg := sync.WaitGroup{}
 	errCh := make(chan error, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			for j := 0; j < 100; j++ {
+			for j := range 100 {
 				name := fmt.Sprintf("s%d", i*100+j)
 				if _, err := client.CoreV1().Secrets(testNamespace).Create(ctx, &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{}); err != nil {
 					select {
@@ -109,11 +109,11 @@ func TestWatchBasedManager(t *testing.T) {
 	// fetch all secrets
 	wg = sync.WaitGroup{}
 	errCh = make(chan error, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			for j := 0; j < 100; j++ {
+			for j := range 100 {
 				name := fmt.Sprintf("s%d", i*100+j)
 				start := time.Now()
 				store.AddReference(testNamespace, name, types.UID(name))

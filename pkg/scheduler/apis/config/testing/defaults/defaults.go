@@ -30,8 +30,8 @@ var PluginsV1 = &config.Plugins{
 		Enabled: []config.Plugin{
 			{Name: names.SchedulingGates},
 			{Name: names.PrioritySort},
-			{Name: names.NodeUnschedulable},
 			{Name: names.NodeName},
+			{Name: names.NodeUnschedulable},
 			{Name: names.TaintToleration, Weight: 3},
 			{Name: names.NodeAffinity, Weight: 2},
 			{Name: names.NodePorts},
@@ -47,6 +47,7 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.DefaultBinder},
+			{Name: names.NodeDeclaredFeatures},
 		},
 	},
 }
@@ -67,22 +68,8 @@ var ExpandedPluginsV1 = &config.Plugins{
 	},
 	PreFilter: config.PluginSet{
 		Enabled: []config.Plugin{
-			{Name: names.NodeAffinity},
-			{Name: names.NodePorts},
-			{Name: names.NodeResourcesFit},
-			{Name: names.VolumeRestrictions},
-			{Name: names.NodeVolumeLimits},
-			{Name: names.VolumeBinding},
-			{Name: names.VolumeZone},
-			{Name: names.PodTopologySpread},
-			{Name: names.InterPodAffinity},
-			{Name: names.DynamicResources},
-		},
-	},
-	Filter: config.PluginSet{
-		Enabled: []config.Plugin{
-			{Name: names.NodeUnschedulable},
 			{Name: names.NodeName},
+			{Name: names.NodeUnschedulable},
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},
@@ -94,9 +81,34 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.DynamicResources},
+			{Name: names.NodeDeclaredFeatures},
+		},
+	},
+	Filter: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.NodeName},
+			{Name: names.NodeUnschedulable},
+			{Name: names.TaintToleration},
+			{Name: names.NodeAffinity},
+			{Name: names.NodePorts},
+			{Name: names.NodeResourcesFit},
+			{Name: names.VolumeRestrictions},
+			{Name: names.NodeVolumeLimits},
+			{Name: names.VolumeBinding},
+			{Name: names.VolumeZone},
+			{Name: names.PodTopologySpread},
+			{Name: names.InterPodAffinity},
+			{Name: names.DynamicResources},
+			{Name: names.NodeDeclaredFeatures},
 		},
 	},
 	PostFilter: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.DynamicResources},
+			{Name: names.DefaultPreemption},
+		},
+	},
+	PodGroupPostFilter: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.DynamicResources},
 			{Name: names.DefaultPreemption},
@@ -156,6 +168,11 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.DefaultBinder},
 		},
 	},
+	PlacementScore: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.NodeResourcesFit, Weight: 1},
+		},
+	},
 }
 
 // PluginConfigsV1 default plugin configurations.
@@ -170,7 +187,8 @@ var PluginConfigsV1 = []config.PluginConfig{
 	{
 		Name: "DynamicResources",
 		Args: &config.DynamicResourcesArgs{
-			FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+			FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+			BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
 		},
 	},
 	{
@@ -208,6 +226,10 @@ var PluginConfigsV1 = []config.PluginConfig{
 		Name: "VolumeBinding",
 		Args: &config.VolumeBindingArgs{
 			BindTimeoutSeconds: 600,
+			Shape: []config.UtilizationShapePoint{
+				{Utilization: 0, Score: 10},
+				{Utilization: 100, Score: 0},
+			},
 		},
 	},
 }

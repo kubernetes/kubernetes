@@ -117,7 +117,7 @@ func setupTest(ctx context.Context, customReconciler func(string, string, runtim
 			return tracker.List(fakeGVR, fakeGVK, "")
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return tracker.Watch(fakeGVR, "")
+			return tracker.Watch(fakeGVR, "", options)
 		},
 	}, tracker), &unstructured.Unstructured{}, 30*time.Second, nil)}
 
@@ -370,7 +370,7 @@ func TestIgnoredUpdate(t *testing.T) {
 
 // Shows that an object which fails reconciliation will retry
 func TestReconcileRetry(t *testing.T) {
-	testContext, testCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	testContext, testCancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
 	defer testCancel()
 
 	calls := atomic.Uint64{}

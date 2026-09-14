@@ -103,11 +103,13 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 			f.Namespace.Name,
 			time.Duration(0),
 			nil,
-			nil,
+			func(options *metav1.ListOptions) {
+				options.LabelSelector = "watchlist=true"
+			},
 		)
 
 		_ = addWellKnownSecrets(ctx, f)
-		expectedSecrets, err := metadataClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		expectedSecrets, err := metadataClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Starting the secret meta informer")
@@ -131,7 +133,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(ctx, secret, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 
-		expectedSecrets, err = metadataClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		expectedSecrets, err = metadataClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 		verifyStoreFor(ctx, verifyPartialObjectMetadataStore(toPointerSlice(expectedSecrets.Items), secretMetaInformer.Informer().GetStore()))
 	})
@@ -256,44 +258,33 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 	})
 
 	ginkgo.It("reflector doesn't support receiving resources as Tables", func(ctx context.Context) {
-		modifiedClientConfig := dynamic.ConfigFor(f.ClientConfig())
-		modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
-			fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
-		}, ",")
-		modifiedClientConfig.GroupVersion = &v1.SchemeGroupVersion
-		restClient, err := rest.RESTClientFor(modifiedClientConfig)
-		framework.ExpectNoError(err)
-		dynamicClient := dynamic.New(restClient)
-
-		stopCh := make(chan struct{})
-		defer close(stopCh)
-
-		secretInformer := cache.NewSharedIndexInformer(
-			&cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return nil, fmt.Errorf("unexpected list call")
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					options.LabelSelector = "watchlist=true"
-					return dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Watch(context.TODO(), options)
-				},
+		dynamicClient := setupDynamicTableClient(f)
+		lw := &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return nil, fmt.Errorf("unexpected list call")
 			},
-			&unstructured.Unstructured{},
-			time.Duration(0),
-			nil,
-		)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = "watchlist=true"
+				return dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Watch(ctx, options)
+			},
+		}
+		verifyReflectorRejectsTableResources(ctx, f, lw)
+	})
 
-		_ = addWellKnownUnstructuredSecrets(ctx, f)
-
-		ginkgo.By("Starting the secret informer")
-		go secretInformer.Run(stopCh)
-
-		ginkgo.By("Checking if the secret informer hasn't been synced")
-		err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(context.Context) (done bool, err error) {
-			return secretInformer.HasSynced(), nil
-		})
-		gomega.Expect(err).To(gomega.HaveOccurred())
-		gomega.Expect(secretInformer.GetStore().List()).To(gomega.BeEmpty(), "unsupported resources should not have been added to the store")
+	ginkgo.It("reflector using standard List doesn't support receiving resources as Tables", func(ctx context.Context) {
+		dynamicClient := setupDynamicTableClient(f)
+		lw := &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.LabelSelector = "watchlist=true"
+				return dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				// a dummy error triggers the fallback logic
+				// which uses a standard LIST call
+				return nil, fmt.Errorf("dummy error")
+			},
+		}
+		verifyReflectorRejectsTableResources(ctx, f, lw)
 	})
 })
 
@@ -323,6 +314,41 @@ func clientConfigWithRoundTripper(f *framework.Framework) (*roundTripper, *rest.
 	clientConfig.Wrap(rt.Wrap)
 
 	return rt, clientConfig
+}
+
+func setupDynamicTableClient(f *framework.Framework) dynamic.Interface {
+	modifiedClientConfig := dynamic.ConfigFor(f.ClientConfig())
+	modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
+		fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
+	}, ",")
+	modifiedClientConfig.GroupVersion = &v1.SchemeGroupVersion
+	restClient, err := rest.RESTClientFor(modifiedClientConfig)
+	framework.ExpectNoError(err)
+	return dynamic.New(restClient)
+}
+
+func verifyReflectorRejectsTableResources(ctx context.Context, f *framework.Framework, lw *cache.ListWatch) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	secretInformer := cache.NewSharedIndexInformer(
+		lw,
+		&unstructured.Unstructured{},
+		time.Duration(0),
+		nil,
+	)
+
+	_ = addWellKnownUnstructuredSecrets(ctx, f)
+
+	ginkgo.By("Starting the secret informer")
+	go secretInformer.Run(stopCh)
+
+	ginkgo.By("Checking if the secret informer hasn't been synced")
+	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(context.Context) (done bool, err error) {
+		return secretInformer.HasSynced(), nil
+	})
+	gomega.Expect(err).To(gomega.HaveOccurred())
+	gomega.Expect(secretInformer.GetStore().List()).To(gomega.BeEmpty(), "unsupported resources should not have been added to the store")
 }
 
 func verifyStoreFor(ctx context.Context, verifier func() bool) {

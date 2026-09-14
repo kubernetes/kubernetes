@@ -130,7 +130,7 @@ func main(cmd *cobra.Command, args []string) {
 	stringData := strings.Repeat("x", chunkSize)
 	data := []byte(stringData)
 
-	for i := 0; i < chunks; i++ {
+	for i := range chunks {
 		written, err := conn.Write(data)
 		if written != chunkSize {
 			fmt.Printf("Expected to write %d bytes from client, but wrote %d instead. err=%v\n", chunkSize, written, err)

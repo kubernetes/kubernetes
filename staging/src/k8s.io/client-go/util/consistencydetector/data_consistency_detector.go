@@ -45,21 +45,40 @@ func IsDataConsistencyDetectionForWatchListEnabled() bool {
 	return dataConsistencyDetectionForWatchListEnabled
 }
 
+// SetDataConsistencyDetectionForWatchListEnabledForTest allows to enable/disable data consistency detection for testing purposes.
+// It returns a function that restores the original value.
+func SetDataConsistencyDetectionForWatchListEnabledForTest(enabled bool) func() {
+	original := dataConsistencyDetectionForWatchListEnabled
+	dataConsistencyDetectionForWatchListEnabled = enabled
+	return func() {
+		dataConsistencyDetectionForWatchListEnabled = original
+	}
+}
+
 type RetrieveItemsFunc[U any] func() []U
 
 type ListFunc[T runtime.Object] func(ctx context.Context, options metav1.ListOptions) (T, error)
+
+type TransformFunc func(interface{}) (interface{}, error)
 
 // CheckDataConsistency exists solely for testing purposes.
 // we cannot use checkWatchListDataConsistencyIfRequested because
 // it is guarded by an environmental variable.
 // we cannot manipulate the environmental variable because
 // it will affect other tests in this package.
-func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn ListFunc[T], listOptions metav1.ListOptions, retrieveItemsFn RetrieveItemsFunc[U]) {
+//
+// The identity string can be left empty if the logger in the context already
+// identifies what is being watched.
+func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn ListFunc[T], listItemTransformFunc TransformFunc, listOptions metav1.ListOptions, retrieveItemsFn RetrieveItemsFunc[U]) {
+	logger := klog.FromContext(ctx)
+	if identity != "" {
+		logger = klog.LoggerWithName(logger, identity)
+	}
 	if !canFormAdditionalListCall(lastSyncedResourceVersion, listOptions) {
-		klog.V(4).Infof("data consistency check for %s is enabled but the parameters (RV, ListOptions) doesn't allow for creating a valid LIST request. Skipping the data consistency check.", identity)
+		logger.V(4).Info("Data consistency check is enabled but the parameters (RV, ListOptions) doesn't allow for creating a valid LIST request. Skipping the data consistency check.")
 		return
 	}
-	klog.Warningf("data consistency check for %s is enabled, this will result in an additional call to the API server.", identity)
+	logger.Info("Warning: data consistency check is enabled, this will result in an additional call to the API server.")
 
 	retrievedItems := toMetaObjectSliceOrDie(retrieveItemsFn())
 	listOptions = prepareListCallOptions(lastSyncedResourceVersion, listOptions, len(retrievedItems))
@@ -70,13 +89,13 @@ func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity
 			// the consistency check will only be enabled in the CI
 			// and LIST calls in general will be retired by the client-go library
 			// if we fail simply log and retry
-			klog.Errorf("failed to list data from the server, retrying until stopCh is closed, err: %v", err)
+			logger.Info("Failed to list data from the server, retrying until context is canceled", "err", err)
 			return false, nil
 		}
 		return true, nil
 	})
 	if err != nil {
-		klog.Errorf("failed to list data from the server, the data consistency check for %s won't be performed, stopCh was closed, err: %v", identity, err)
+		logger.Error(err, "Failed to list data from the server, the data consistency check won't be performed, stopCh was closed")
 		return
 	}
 
@@ -84,13 +103,22 @@ func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity
 	if err != nil {
 		panic(err) // this should never happen
 	}
+	if listItemTransformFunc != nil {
+		for i := range rawListItems {
+			obj, err := listItemTransformFunc(rawListItems[i])
+			if err != nil {
+				panic(err)
+			}
+			rawListItems[i] = obj.(runtime.Object)
+		}
+	}
 	listItems := toMetaObjectSliceOrDie(rawListItems)
 
 	sort.Sort(byUID(listItems))
 	sort.Sort(byUID(retrievedItems))
 
 	if !reflect.DeepEqual(listItems, retrievedItems) {
-		klog.Infof("previously received data for %s is different than received by the standard list api call against etcd, diff: %v", identity, diff.Diff(listItems, retrievedItems))
+		logger.Info("Previously received data is different than received by the standard list api call against etcd", "diff", diff.Diff(listItems, retrievedItems))
 		msg := fmt.Sprintf("data inconsistency detected for %s, panicking!", identity)
 		panic(msg)
 	}

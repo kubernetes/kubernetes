@@ -101,7 +101,7 @@ ALLOWED_NOTREADY_NODES=${ALLOWED_NOTREADY_NODES:-$(($(get-num-nodes) / 100))}
 # By default, the latest image from the image family will be used unless an
 # explicit image will be set.
 GCI_VERSION=${KUBE_GCI_VERSION:-}
-IMAGE_FAMILY=${KUBE_GCE_IMAGE_FAMILY:-cos-121-lts}
+IMAGE_FAMILY=${KUBE_GCE_IMAGE_FAMILY:-cos-129-lts}
 IMAGE_PROJECT=${KUBE_GCE_IMAGE_PROJECT:-cos-cloud}
 export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 export MASTER_IMAGE_FAMILY=${KUBE_GCE_MASTER_IMAGE_FAMILY:-${IMAGE_FAMILY}}
@@ -246,7 +246,7 @@ fi
 if [[ "${MASTER_OS_DISTRIBUTION}" = 'gci' ]] || [[ "${MASTER_OS_DISTRIBUTION}" = 'ubuntu' ]]; then
   MASTER_KUBELET_TEST_ARGS="${MASTER_KUBELET_TEST_ARGS:-} --kernel-memcg-notification=true"
 fi
-APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-} --runtime-config=extensions/v1beta1,scheduling.k8s.io/v1alpha1 ${TEST_CLUSTER_DELETE_COLLECTION_WORKERS} ${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT}"
+APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-} --runtime-config=extensions/v1beta1 ${TEST_CLUSTER_DELETE_COLLECTION_WORKERS} ${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT}"
 CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-} ${TEST_CLUSTER_RESYNC_PERIOD} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
@@ -330,16 +330,6 @@ export DNS_MEMORY_LIMIT=${KUBE_DNS_MEMORY_LIMIT:-170Mi}
 
 # Optional: Enable DNS horizontal autoscaler
 export ENABLE_DNS_HORIZONTAL_AUTOSCALER=${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-true}
-
-# Optional: Install node problem detector.
-#   none           - Not run node problem detector.
-#   daemonset      - Run node problem detector as daemonset.
-#   standalone     - Run node problem detector as standalone system daemon.
-export ENABLE_NODE_PROBLEM_DETECTOR=${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-daemonset}
-NODE_PROBLEM_DETECTOR_VERSION=${NODE_PROBLEM_DETECTOR_VERSION:-}
-NODE_PROBLEM_DETECTOR_TAR_HASH=${NODE_PROBLEM_DETECTOR_TAR_HASH:-}
-NODE_PROBLEM_DETECTOR_RELEASE_PATH=${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}
-NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS=${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}
 
 CNI_HASH=${CNI_HASH:-}
 CNI_TAR_PREFIX=${CNI_TAR_PREFIX:-cni-plugins-linux-amd64-}
@@ -522,17 +512,6 @@ PROMETHEUS_TO_SD_ENDPOINT=${PROMETHEUS_TO_SD_ENDPOINT:-https://monitoring.google
 PROMETHEUS_TO_SD_PREFIX=${PROMETHEUS_TO_SD_PREFIX:-custom.googleapis.com}
 ENABLE_PROMETHEUS_TO_SD=${ENABLE_PROMETHEUS_TO_SD:-true}
 
-# TODO(#51292): Make kube-proxy Daemonset default and remove the configuration here.
-# Optional: [Experiment Only] Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
-KUBE_PROXY_DAEMONSET=${KUBE_PROXY_DAEMONSET:-false} # true, false
-
-# Control whether the startup scripts manage the lifecycle of kube-proxy
-# When true, the startup scripts do not enable kube-proxy either as a daemonset addon or as a static pod
-# regardless of the value of KUBE_PROXY_DAEMONSET.
-# When false, the value of KUBE_PROXY_DAEMONSET controls whether kube-proxy comes up as a static pod or
-# as an addon daemonset.
-KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
-
 # Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs, nftables].
 KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-iptables}
 
@@ -588,11 +567,6 @@ export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
 
 # Enable Windows DSR (Direct Server Return)
 export WINDOWS_ENABLE_DSR="${WINDOWS_ENABLE_DSR:-false}"
-
-# Install Node Problem Detector (NPD) on Windows nodes.
-# NPD analyzes the host for problems that can disrupt workloads.
-export WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR="${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR:-none}"
-export WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
 
 # TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver.
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.

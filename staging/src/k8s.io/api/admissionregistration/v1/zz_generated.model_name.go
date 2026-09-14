@@ -22,6 +22,11 @@ limitations under the License.
 package v1
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ApplyConfiguration) OpenAPIModelName() string {
+	return "io.k8s.api.admissionregistration.v1.ApplyConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in AuditAnnotation) OpenAPIModelName() string {
 	return "io.k8s.api.admissionregistration.v1.AuditAnnotation"
 }
@@ -32,6 +37,11 @@ func (in ExpressionWarning) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in JSONPatch) OpenAPIModelName() string {
+	return "io.k8s.api.admissionregistration.v1.JSONPatch"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in MatchCondition) OpenAPIModelName() string {
 	return "io.k8s.api.admissionregistration.v1.MatchCondition"
 }
@@ -39,6 +49,36 @@ func (in MatchCondition) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in MatchResources) OpenAPIModelName() string {
 	return "io.k8s.api.admissionregistration.v1.MatchResources"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in MutatingAdmissionPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.admissionregistration.v1.MutatingAdmissionPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in MutatingAdmissionPolicyBinding) OpenAPIModelName() string {
+	return "io.k8s.api.admissionregistration.v1.MutatingAdmissionPolicyBinding"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in MutatingAdmissionPolicyBindingList) OpenAPIModelName() string {
+	return "io.k8s.api.admissionregistration.v1.MutatingAdmissionPolicyBindingList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in MutatingAdmissionPolicyBindingSpec) OpenAPIModelName() string {
+	return "io.k8s.api.admissionregistration.v1.MutatingAdmissionPolicyBindingSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in MutatingAdmissionPolicyList) OpenAPIModelName() string {
+	return "io.k8s.api.admissionregistration.v1.MutatingAdmissionPolicyList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in MutatingAdmissionPolicySpec) OpenAPIModelName() string {
+	return "io.k8s.api.admissionregistration.v1.MutatingAdmissionPolicySpec"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -54,6 +94,11 @@ func (in MutatingWebhookConfiguration) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in MutatingWebhookConfigurationList) OpenAPIModelName() string {
 	return "io.k8s.api.admissionregistration.v1.MutatingWebhookConfigurationList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in Mutation) OpenAPIModelName() string {
+	return "io.k8s.api.admissionregistration.v1.Mutation"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

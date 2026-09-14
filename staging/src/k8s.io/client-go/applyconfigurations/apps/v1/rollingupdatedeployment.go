@@ -27,7 +27,7 @@ import (
 //
 // Spec to control the desired behavior of rolling update.
 type RollingUpdateDeploymentApplyConfiguration struct {
-	// The maximum number of pods that can be unavailable during the update.
+	// maxUnavailable is the maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down.
 	// This can not be 0 if MaxSurge is 0.
@@ -38,8 +38,7 @@ type RollingUpdateDeploymentApplyConfiguration struct {
 	// that the total number of pods available at all times during the update is at
 	// least 70% of desired pods.
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
-	// The maximum number of pods that can be scheduled above the desired number of
-	// pods.
+	// maxSurge is the maximum number of pods that can be scheduled above the desired number of pods.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// This can not be 0 if MaxUnavailable is 0.
 	// Absolute number is calculated from percentage by rounding up.

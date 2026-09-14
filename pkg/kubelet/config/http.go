@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -36,14 +35,14 @@ type sourceURL struct {
 	url         string
 	header      http.Header
 	nodeName    types.NodeName
-	updates     chan<- interface{}
+	updates     chan<- sourceUpdate
 	data        []byte
 	failureLogs int
 	client      *http.Client
 }
 
 // NewSourceURL specifies the URL where to read the Pod configuration from, then watches it for changes.
-func NewSourceURL(logger klog.Logger, url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
+func NewSourceURL(logger klog.Logger, url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) {
 	config := &sourceURL{
 		url:      url,
 		header:   header,
@@ -102,7 +101,7 @@ func (s *sourceURL) extractFromURL(logger klog.Logger) error {
 	}
 	if len(data) == 0 {
 		// Emit an update with an empty PodList to allow HTTPSource to be marked as seen
-		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{}, Op: kubetypes.SET, Source: kubetypes.HTTPSource}
+		s.updates <- sourceUpdate{Pods: []*v1.Pod{}}
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
 	// Short circuit if the data has not changed since the last time it was read.
@@ -118,7 +117,7 @@ func (s *sourceURL) extractFromURL(logger klog.Logger) error {
 			// It parsed but could not be used.
 			return singlePodErr
 		}
-		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{pod}, Op: kubetypes.SET, Source: kubetypes.HTTPSource}
+		s.updates <- sourceUpdate{Pods: []*v1.Pod{pod}}
 		return nil
 	}
 
@@ -133,7 +132,7 @@ func (s *sourceURL) extractFromURL(logger klog.Logger) error {
 		for i := range podList.Items {
 			pods = append(pods, &podList.Items[i])
 		}
-		s.updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.HTTPSource}
+		s.updates <- sourceUpdate{Pods: pods}
 		return nil
 	}
 

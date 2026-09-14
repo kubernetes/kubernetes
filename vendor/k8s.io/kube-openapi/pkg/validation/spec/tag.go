@@ -15,11 +15,10 @@
 package spec
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // TagProps describe a tag entry in the top level tags section of a swagger spec
@@ -41,48 +40,30 @@ type Tag struct {
 
 // MarshalJSON marshal this to JSON
 func (t Tag) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(t)
-	}
-	b1, err := json.Marshal(t.TagProps)
-	if err != nil {
-		return nil, err
-	}
-	b2, err := json.Marshal(t.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2), nil
+	return internal.DeterministicMarshal(t)
 }
 
-func (t Tag) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (t Tag) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		Extensions
+		Extensions Extensions `json:",embed"`
 		TagProps
 	}
 	x.Extensions = internal.SanitizeExtensions(t.Extensions)
 	x.TagProps = t.TagProps
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 // UnmarshalJSON marshal this from JSON
 func (t *Tag) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, t)
-	}
-
-	if err := json.Unmarshal(data, &t.TagProps); err != nil {
-		return err
-	}
-	return json.Unmarshal(data, &t.VendorExtensible)
+	return jsonv2.Unmarshal(data, t)
 }
 
-func (t *Tag) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (t *Tag) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		Extensions
+		Extensions Extensions `json:",embed"`
 		TagProps
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	t.Extensions = internal.SanitizeExtensions(x.Extensions)

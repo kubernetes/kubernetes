@@ -20,16 +20,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-)
-
-var (
-	ignoreBadValue = cmpopts.IgnoreFields(field.Error{}, "BadValue")
 )
 
 func TestNodeSelectorMatch(t *testing.T) {
@@ -76,14 +71,16 @@ func TestNodeSelectorMatch(t *testing.T) {
 			}},
 			wantErr: field.ErrorList{
 				&field.Error{
-					Type:   field.ErrorTypeInvalid,
-					Field:  "nodeSelectorTerms[0].matchFields[0].values",
-					Detail: "must have one element",
+					Type:     field.ErrorTypeInvalid,
+					Field:    "nodeSelectorTerms[0].matchFields[0].values",
+					Detail:   "must have one element",
+					BadValue: []string{"host_1", "host_2"},
 				},
 				&field.Error{
-					Type:   field.ErrorTypeInvalid,
-					Field:  "nodeSelectorTerms[2].matchExpressions[0].key",
-					Detail: `name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+					Type:     field.ErrorTypeInvalid,
+					Field:    "nodeSelectorTerms[2].matchExpressions[0].key",
+					Detail:   `name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+					BadValue: "invalid key",
 				},
 			}.ToAggregate(),
 		},
@@ -149,8 +146,8 @@ func TestNodeSelectorMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeSelector, err := NewNodeSelector(&tt.nodeSelector)
-			if diff := cmp.Diff(tt.wantErr, err, ignoreBadValue); diff != "" {
-				t.Errorf("NewNodeSelector returned unexpected error (-want,+got):\n%s", diff)
+			if !reflect.DeepEqual(tt.wantErr, err) {
+				t.Errorf("NewNodeSelector returned unexpected error (-want,+got):\n%s", diff.Diff(tt.wantErr, err))
 			}
 			if tt.wantErr != nil {
 				return
@@ -212,14 +209,16 @@ func TestPreferredSchedulingTermsScore(t *testing.T) {
 			},
 			wantErr: field.ErrorList{
 				&field.Error{
-					Type:   field.ErrorTypeInvalid,
-					Field:  "[0].matchFields[0].values",
-					Detail: "must have one element",
+					Type:     field.ErrorTypeInvalid,
+					Field:    "[0].matchFields[0].values",
+					Detail:   "must have one element",
+					BadValue: []string{"host_1", "host_2"},
 				},
 				&field.Error{
-					Type:   field.ErrorTypeInvalid,
-					Field:  "[2].matchExpressions[0].key",
-					Detail: `name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+					Type:     field.ErrorTypeInvalid,
+					Field:    "[2].matchExpressions[0].key",
+					Detail:   `name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+					BadValue: "invalid key",
 				},
 			}.ToAggregate(),
 		},
@@ -280,8 +279,8 @@ func TestPreferredSchedulingTermsScore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			prefSchedTerms, err := NewPreferredSchedulingTerms(tt.prefSchedTerms)
-			if diff := cmp.Diff(tt.wantErr, err, ignoreBadValue); diff != "" {
-				t.Errorf("NewPreferredSchedulingTerms returned unexpected error (-want,+got):\n%s", diff)
+			if !reflect.DeepEqual(tt.wantErr, err) {
+				t.Errorf("NewPreferredSchedulingTerms returned unexpected error (-want,+got):\n%s", diff.Diff(tt.wantErr, err))
 			}
 			if tt.wantErr != nil {
 				return
@@ -326,7 +325,7 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 			}},
 			wantErr: []error{
 				field.ErrorList{
-					field.Invalid(field.NewPath("root").Index(0).Child("values"), nil, "values set must be empty for exists and does not exist"),
+					field.Invalid(field.NewPath("root").Index(0).Child("values"), []string{"bar", "baz"}, "values set must be empty for exists and does not exist"),
 				}.ToAggregate(),
 			},
 		},
@@ -360,8 +359,8 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 
 	for i, tc := range tc {
 		out, err := nodeSelectorRequirementsAsSelector(tc.in, field.NewPath("root"))
-		if diff := cmp.Diff(tc.wantErr, err, ignoreBadValue); diff != "" {
-			t.Errorf("nodeSelectorRequirementsAsSelector returned unexpected error (-want,+got):\n%s", diff)
+		if !reflect.DeepEqual(tc.wantErr, err) {
+			t.Errorf("nodeSelectorRequirementsAsSelector returned unexpected error (-want,+got):\n%s", diff.Diff(tc.wantErr, err))
 		}
 		if !reflect.DeepEqual(out, tc.out) {
 			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)

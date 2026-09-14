@@ -207,6 +207,9 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				t.Fatalf("failed to reset signer for the test %q: %v", tc.desc, err)
 			}
 			mockSigner.WaitForSupportedKeysFetch()
+			// Wait for the apiserver to process the refreshed keys so that
+			// token signing and verification use a consistent key set.
+			waitForDataTimestamp(t, client, time.Now())
 
 			// Adjust parameters on mock signer for the test.
 			tc.preTestSignerUpdate(t)

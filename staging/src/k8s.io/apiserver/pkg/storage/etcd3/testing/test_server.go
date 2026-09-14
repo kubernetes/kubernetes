@@ -37,7 +37,7 @@ func (e *EtcdTestServer) Terminate(t testing.TB) {
 // NewUnsecuredEtcd3TestClientServer creates a new client and server for testing
 func NewUnsecuredEtcd3TestClientServer(t testing.TB) (*EtcdTestServer, *storagebackend.Config) {
 	server := &EtcdTestServer{}
-	server.V3Client = testserver.RunEtcd(t, nil)
+	server.V3Client = testserver.RunEtcd(t)
 	config := &storagebackend.Config{
 		Type:   "etcd3",
 		Prefix: PathPrefix(),

@@ -7,7 +7,7 @@ metrics from the pseudo-filesystems /proc and /sys.
 backwards-incompatible ways without warnings. Use it at your own risk.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/prometheus/procfs.svg)](https://pkg.go.dev/github.com/prometheus/procfs)
-[![CircleCI](https://circleci.com/gh/prometheus/procfs/tree/master.svg?style=svg)](https://circleci.com/gh/prometheus/procfs/tree/master)
+[![Build Status](https://github.com/prometheus/procfs/actions/workflows/ci.yml/badge.svg)](https://github.com/prometheus/procfs/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/prometheus/procfs)](https://goreportcard.com/report/github.com/prometheus/procfs)
 
 ## Usage

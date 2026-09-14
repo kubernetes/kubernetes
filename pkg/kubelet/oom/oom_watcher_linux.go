@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -27,26 +26,25 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-
-	"github.com/google/cadvisor/utils/oomparser"
+	"k8s.io/kubernetes/third_party/forked/cadvisor/oomparser"
 )
 
 type streamer interface {
-	StreamOoms(chan<- *oomparser.OomInstance)
+	StreamOoms(ctx context.Context, outStream chan<- *oomparser.OomInstance)
 }
 
 var _ streamer = &oomparser.OomParser{}
 
 type realWatcher struct {
-	recorder    record.EventRecorder
+	recorder    record.EventRecorderLogger
 	oomStreamer streamer
 }
 
 var _ Watcher = &realWatcher{}
 
-// NewWatcher creates and initializes a OOMWatcher backed by Cadvisor as
-// the oom streamer.
-func NewWatcher(recorder record.EventRecorder) (Watcher, error) {
+// NewWatcher creates and initializes an OOMWatcher backed by the kernel log
+// (/dev/kmsg) oom streamer.
+func NewWatcher(recorder record.EventRecorderLogger) (Watcher, error) {
 	// for test purpose
 	_, ok := recorder.(*record.FakeRecorder)
 	if ok {
@@ -74,20 +72,24 @@ const (
 // Start watches for system oom's and records an event for every system oom encountered.
 func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error {
 	outStream := make(chan *oomparser.OomInstance, 10)
-	go ow.oomStreamer.StreamOoms(outStream)
+	go ow.oomStreamer.StreamOoms(ctx, outStream)
 
 	go func() {
 		logger := klog.FromContext(ctx)
-		defer runtime.HandleCrash()
+		defer runtime.HandleCrashWithContext(ctx)
 
 		for event := range outStream {
+			// Count every OOM kill per container to back the
+			// container_oom_events_total metric.
+			recordOOMKill(event.ContainerName)
+
 			if event.VictimContainerName == recordEventContainerName {
 				logger.V(1).Info("Got sys oom event", "event", event)
 				eventMsg := "System OOM encountered"
 				if event.ProcessName != "" && event.Pid != 0 {
 					eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
 				}
-				ow.recorder.Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
+				ow.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, systemOOMEvent, "%s", eventMsg)
 			}
 		}
 		logger.Error(nil, "Unexpectedly stopped receiving OOM notifications")

@@ -48,7 +48,7 @@ var (
 	udpPort            = 8081
 	sctpPort           = -1
 	shellPath          = "/bin/sh"
-	serverReady        = &atomicBool{0}
+	serverReady        atomic.Bool
 	certFile           = ""
 	privKeyFile        = ""
 	httpOverride       = ""
@@ -100,6 +100,9 @@ var CmdNetexec = &cobra.Command{
   server is healthy (don't kill it), but the it should not be sent traffic (remove from endpoints).
 - "/hostname": Returns the server's hostname.
 - "/hostName": Returns the server's hostname.
+- "/envvar": Returns the value of the environment variable named by the "var" query
+  parameter ("/envvar?var=NODE_NAME"). Returns 400 if the parameter is missing or empty,
+  500 if the variable is not set. For UDP/SCTP, send "envvar <VAR_NAME>" as the command.
 - "/redirect": Returns a redirect response to the given "location", with the optional status "code"
   ("/redirect?location=/echo%3Fmsg=foobar&code=307").
 - "/shell": Executes the given "shellCommand" or "cmd" ("/shell?cmd=some-command") and
@@ -121,6 +124,7 @@ It will also start a UDP server on the indicated UDP port and addresses that res
 
 - "hostname": Returns the server's hostname
 - "echo <msg>": Returns the given <msg>
+- "envvar <VAR_NAME>": Returns the value of the named environment variable (empty string if not set)
 - "clientip": Returns the request's IP address
 - "serverport": Returns the server port
 
@@ -144,25 +148,6 @@ func init() {
 	CmdNetexec.Flags().StringVar(&httpOverride, "http-override", "", "Override the HTTP handler to always respond as if it were a GET with this path & params")
 	CmdNetexec.Flags().StringVar(&udpListenAddresses, "udp-listen-addresses", "", "A comma separated list of ip addresses the udp servers listen from")
 	CmdNetexec.Flags().IntVar(&delayShutdown, "delay-shutdown", 0, "Number of seconds to delay shutdown when receiving SIGTERM.")
-}
-
-// atomicBool uses load/store operations on an int32 to simulate an atomic boolean.
-type atomicBool struct {
-	v int32
-}
-
-// set sets the int32 to the given boolean.
-func (a *atomicBool) set(value bool) {
-	if value {
-		atomic.StoreInt32(&a.v, 1)
-		return
-	}
-	atomic.StoreInt32(&a.v, 0)
-}
-
-// get returns true if the int32 == 1
-func (a *atomicBool) get() bool {
-	return atomic.LoadInt32(&a.v) == 1
 }
 
 func main(cmd *cobra.Command, args []string) {
@@ -238,6 +223,7 @@ func addRoutes(mux *http.ServeMux, sigTermReceived chan struct{}, exitCh chan sh
 	mux.HandleFunc("/healthz", healthzHandler)
 	mux.HandleFunc("/readyz", readyzHandler(sigTermReceived))
 	mux.HandleFunc("/hostname", hostnameHandler)
+	mux.HandleFunc("/envvar", envvarHandler)
 	mux.HandleFunc("/redirect", redirectHandler)
 	mux.HandleFunc("/shell", shellHandler)
 	mux.HandleFunc("/upload", uploadHandler)
@@ -350,11 +336,26 @@ func hostnameHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, getHostName())
 }
 
+func envvarHandler(w http.ResponseWriter, r *http.Request) {
+	varName := r.FormValue("var")
+	if varName == "" {
+		http.Error(w, "'var' query parameter is required", http.StatusBadRequest)
+		return
+	}
+	log.Printf("GET /envvar?var=%s", varName)
+	val, ok := os.LookupEnv(varName)
+	if !ok {
+		http.Error(w, fmt.Sprintf("env var %q is not set", varName), http.StatusInternalServerError)
+		return
+	}
+	_, _ = fmt.Fprint(w, val)
+}
+
 // healthHandler response with a 200 if the UDP server is ready. It also serves
 // as a health check of the HTTP server by virtue of being a HTTP handler.
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /healthz")
-	if serverReady.get() {
+	if serverReady.Load() {
 		w.WriteHeader(200)
 		return
 	}
@@ -376,7 +377,7 @@ func readyzHandler(sigTermReceived chan struct{}) func(w http.ResponseWriter, r 
 			return
 
 		default:
-			if serverReady.get() {
+			if serverReady.Load() {
 				if _, err := w.Write([]byte("ok")); err != nil {
 					utilruntime.HandleError(err)
 				}
@@ -651,19 +652,31 @@ func startUDPServer(address string, udpPort int) {
 
 	log.Printf("Started UDP server on port %s %d", address, udpPort)
 	// Start responding to readiness probes.
-	serverReady.set(true)
+	serverReady.Store(true)
 	defer func() {
 		log.Printf("UDP server exited")
-		serverReady.set(false)
+		serverReady.Store(false)
 	}()
 	for {
 		n, clientAddress, err := serverConn.ReadFromUDP(buf)
-		assertNoError(err, fmt.Sprintf("failed accepting UDP connections"))
-		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))
+		assertNoError(err, "failed accepting UDP connections")
+		rawText := strings.TrimSpace(string(buf[0:n]))
+		receivedText := strings.ToLower(rawText)
 		if receivedText == "hostname" {
 			log.Println("Sending udp hostName response")
 			_, err = serverConn.WriteToUDP([]byte(getHostName()), clientAddress)
 			assertNoError(err, fmt.Sprintf("failed to write hostname to UDP client %s", clientAddress))
+		} else if strings.HasPrefix(receivedText, "envvar ") {
+			parts := strings.SplitN(rawText, " ", 2)
+			if len(parts) != 2 {
+				log.Printf("Unknown UDP command received from %s: %v\n", clientAddress, receivedText)
+				continue
+			}
+			varName := strings.TrimSpace(parts[1])
+			val, _ := os.LookupEnv(varName)
+			log.Printf("Sending UDP envvar response for %s", varName)
+			_, err = serverConn.WriteToUDP([]byte(val), clientAddress)
+			assertNoError(err, fmt.Sprintf("failed to write envvar to UDP client %s", clientAddress))
 		} else if strings.HasPrefix(receivedText, "echo ") {
 			parts := strings.SplitN(receivedText, " ", 2)
 			resp := ""
@@ -698,14 +711,14 @@ func startSCTPServer(sctpPort int) {
 
 	log.Printf("Started SCTP server")
 	// Start responding to readiness probes.
-	serverReady.set(true)
+	serverReady.Store(true)
 	defer func() {
 		log.Printf("SCTP server exited")
-		serverReady.set(false)
+		serverReady.Store(false)
 	}()
 	for {
 		conn, err := listener.AcceptSCTP()
-		assertNoError(err, fmt.Sprintf("failed accepting SCTP connections"))
+		assertNoError(err, "failed accepting SCTP connections")
 		remoteAddr, err := conn.SCTPRemoteAddr(0)
 		if err != nil {
 			assertNoError(err, "failed to get SCTP client remote address")
@@ -713,7 +726,8 @@ func startSCTPServer(sctpPort int) {
 		clientAddress := remoteAddr.String()
 		n, err := conn.Read(buf)
 		assertNoError(err, fmt.Sprintf("failed to read from SCTP client %s", clientAddress))
-		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))
+		rawText := strings.TrimSpace(string(buf[0:n]))
+		receivedText := strings.ToLower(rawText)
 		if receivedText == "hostname" {
 			log.Println("Sending SCTP hostName response")
 			_, err = conn.Write([]byte(getHostName()))
@@ -735,6 +749,17 @@ func startSCTPServer(sctpPort int) {
 			log.Printf("Sending server port to SCTP client %s\n", strconv.Itoa(sctpPort))
 			_, err = conn.Write([]byte(strconv.Itoa(sctpPort)))
 			assertNoError(err, fmt.Sprintf("failed to write server port to SCTP client %s", clientAddress))
+		} else if strings.HasPrefix(receivedText, "envvar ") {
+			parts := strings.SplitN(rawText, " ", 2)
+			if len(parts) != 2 {
+				log.Printf("Unknown SCTP command received from %s: %v\n", clientAddress, receivedText)
+				continue
+			}
+			varName := strings.TrimSpace(parts[1])
+			val, _ := os.LookupEnv(varName)
+			log.Printf("Sending SCTP envvar response for %s", varName)
+			_, err = conn.Write([]byte(val))
+			assertNoError(err, fmt.Sprintf("failed to write envvar to SCTP client %s", clientAddress))
 		} else if len(receivedText) > 0 {
 			log.Printf("Unknown SCTP command received from %s: %v\n", clientAddress, receivedText)
 		}

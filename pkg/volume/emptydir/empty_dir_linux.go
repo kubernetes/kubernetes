@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -21,6 +20,7 @@ package emptydir
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -29,12 +29,7 @@ import (
 	"k8s.io/mount-utils"
 
 	"k8s.io/api/core/v1"
-)
-
-// Defined by Linux - the type number for tmpfs mounts.
-const (
-	linuxTmpfsMagic     = 0x01021994
-	linuxHugetlbfsMagic = 0x958458f6
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // realMountDetector implements mountDetector in terms of syscalls.
@@ -98,9 +93,9 @@ func (m *realMountDetector) GetMountMedium(path string, requestedMedium v1.Stora
 
 	klog.V(3).Infof("Statfs_t of %v: %+v", path, buf)
 
-	if buf.Type == linuxTmpfsMagic {
+	if buf.Type == unix.TMPFS_MAGIC {
 		return v1.StorageMediumMemory, !notMnt, nil, nil
-	} else if int64(buf.Type) == linuxHugetlbfsMagic {
+	} else if int64(buf.Type) == unix.HUGETLBFS_MAGIC {
 		// Skip page size detection if requested medium doesn't have size specified
 		if requestedMedium == v1.StorageMediumHugePages {
 			return v1.StorageMediumHugePages, !notMnt, nil, nil
@@ -113,4 +108,40 @@ func (m *realMountDetector) GetMountMedium(path string, requestedMedium v1.Stora
 		return v1.StorageMediumHugePages, !notMnt, pageSize, nil
 	}
 	return v1.StorageMediumDefault, !notMnt, nil, nil
+}
+
+// ResizeEphemeralVolume resizes the volume on the node.
+func (plugin *emptyDirPlugin) ResizeEphemeralVolume(spec *volume.Spec, pod *v1.Pod, newSize *resource.Quantity) error {
+	if spec.Volume == nil || spec.Volume.EmptyDir == nil {
+		return fmt.Errorf("spec does not reference an emptyDir volume type")
+	}
+	if spec.Volume.EmptyDir.Medium != v1.StorageMediumMemory {
+		return fmt.Errorf("only memory-backed emptyDir volumes support direct resize")
+	}
+	if newSize == nil || newSize.Value() == 0 {
+		return fmt.Errorf("addition or removal of size limit is not supported")
+	}
+
+	dir := getPath(pod.UID, spec.Name(), plugin.host)
+	mounter := plugin.host.GetMounter()
+
+	var isNotMnt bool
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		isNotMnt = true
+	} else {
+		var err error
+		isNotMnt, err = mounter.IsLikelyNotMountPoint(dir)
+		if err != nil {
+			return err
+		}
+	}
+
+	if isNotMnt {
+		return fmt.Errorf("volume %s is not yet mounted; deferring resize", spec.Name())
+	}
+
+	options := []string{"remount", fmt.Sprintf("size=%d", newSize.Value())}
+
+	klog.V(2).InfoS("Resizing emptyDir volume", "pod", klog.KObj(pod), "volume", spec.Name(), "newSize", newSize)
+	return mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)
 }

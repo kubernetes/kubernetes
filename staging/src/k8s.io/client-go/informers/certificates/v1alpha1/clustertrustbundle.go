@@ -25,6 +25,7 @@ import (
 	apicertificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -33,11 +34,39 @@ import (
 )
 
 // ClusterTrustBundleInformer provides access to a shared informer and lister for
-// ClusterTrustBundles.
+// ClusterTrustBundles. Prefer using the type-safe variant (see [TypedClusterTrustBundleInformer]).
 type ClusterTrustBundleInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() certificatesv1alpha1.ClusterTrustBundleLister
 }
+
+// TypedClusterTrustBundleInformer provides access to a shared informer and lister for
+// ClusterTrustBundles, including the type-safe TypedInformer variant.
+// It is a superset of ClusterTrustBundleInformer.
+type TypedClusterTrustBundleInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ClusterTrustBundleIndexInformer
+	Lister() certificatesv1alpha1.ClusterTrustBundleLister
+}
+
+// ClusterTrustBundleIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ClusterTrustBundleIndexInformer cache.TypedSharedIndexInformer[*apicertificatesv1alpha1.ClusterTrustBundle]
+
+// ClusterTrustBundleHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for ClusterTrustBundle.
+type ClusterTrustBundleHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apicertificatesv1alpha1.ClusterTrustBundle]
+
+// ClusterTrustBundleDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for ClusterTrustBundle.
+type ClusterTrustBundleDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apicertificatesv1alpha1.ClusterTrustBundle]
+
+// ClusterTrustBundleFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for ClusterTrustBundle.
+type ClusterTrustBundleFilteringHandler = cache.TypedFilteringResourceEventHandler[*apicertificatesv1alpha1.ClusterTrustBundle]
+
+// ClusterTrustBundleIndexers is a specialization of [cache.TypedIndexers] for ClusterTrustBundle.
+type ClusterTrustBundleIndexers = cache.TypedIndexers[*apicertificatesv1alpha1.ClusterTrustBundle]
+
+// DeletedClusterTrustBundle is a specialization of [cache.DeletedObject] for ClusterTrustBundle.
+type DeletedClusterTrustBundle = cache.DeletedObject[*apicertificatesv1alpha1.ClusterTrustBundle]
 
 type clusterTrustBundleInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -47,55 +76,132 @@ type clusterTrustBundleInformer struct {
 // NewClusterTrustBundleInformer constructs a new informer for ClusterTrustBundle type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedClusterTrustBundleInformer]).
 func NewClusterTrustBundleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredClusterTrustBundleInformer(client, resyncPeriod, indexers, nil)
+	return NewClusterTrustBundleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedClusterTrustBundleInformer constructs a new informer for ClusterTrustBundle type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedClusterTrustBundleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers ClusterTrustBundleIndexers) ClusterTrustBundleIndexInformer {
+	return NewTypedClusterTrustBundleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredClusterTrustBundleInformer constructs a new informer for ClusterTrustBundle type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredClusterTrustBundleInformer]).
 func NewFilteredClusterTrustBundleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewTypedClusterTrustBundleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredClusterTrustBundleInformer constructs a new informer for ClusterTrustBundle type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredClusterTrustBundleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers ClusterTrustBundleIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ClusterTrustBundleIndexInformer {
+	return NewTypedClusterTrustBundleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewClusterTrustBundleInformerWithOptions constructs a new informer for ClusterTrustBundle type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedClusterTrustBundleInformerWithOptions]).
+func NewClusterTrustBundleInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedClusterTrustBundleInformerWithOptions(client, options)
+}
+
+// NewTypedClusterTrustBundleInformerWithOptions constructs a new informer for ClusterTrustBundle type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedClusterTrustBundleInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) ClusterTrustBundleIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1alpha1", Resource: "clustertrustbundles"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apicertificatesv1alpha1.ClusterTrustBundle](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CertificatesV1alpha1().ClusterTrustBundles().List(context.Background(), options)
+				return client.CertificatesV1alpha1().ClusterTrustBundles().List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CertificatesV1alpha1().ClusterTrustBundles().Watch(context.Background(), options)
+				return client.CertificatesV1alpha1().ClusterTrustBundles().Watch(context.Background(), opts)
 			},
-			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CertificatesV1alpha1().ClusterTrustBundles().List(ctx, options)
+				return client.CertificatesV1alpha1().ClusterTrustBundles().List(ctx, opts)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CertificatesV1alpha1().ClusterTrustBundles().Watch(ctx, options)
+				return client.CertificatesV1alpha1().ClusterTrustBundles().Watch(ctx, opts)
 			},
 		}, client),
 		&apicertificatesv1alpha1.ClusterTrustBundle{},
-		resyncPeriod,
-		indexers,
-	)
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
+		},
+	))
 }
 
 func (f *clusterTrustBundleInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredClusterTrustBundleInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedClusterTrustBundleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *clusterTrustBundleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicertificatesv1alpha1.ClusterTrustBundle{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *clusterTrustBundleInformer) TypedInformer() ClusterTrustBundleIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicertificatesv1alpha1.ClusterTrustBundle](f.factory.InformerFor(&apicertificatesv1alpha1.ClusterTrustBundle{}, f.defaultInformer))
 }
 
 func (f *clusterTrustBundleInformer) Lister() certificatesv1alpha1.ClusterTrustBundleLister {
 	return certificatesv1alpha1.NewClusterTrustBundleLister(f.Informer().GetIndexer())
+}
+
+// ToTypedClusterTrustBundleInformer converts an untyped informer into a TypedClusterTrustBundleInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ClusterTrustBundle. If that is not the case, calling type-safe methods of the returned
+// TypedClusterTrustBundleInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedClusterTrustBundleInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedClusterTrustBundleInformer(informer ClusterTrustBundleInformer) TypedClusterTrustBundleInformer {
+	if informer, ok := informer.(TypedClusterTrustBundleInformer); ok {
+		return informer
+	}
+	return &clusterTrustBundleTypedInformerAdapter{informer}
+}
+
+type clusterTrustBundleTypedInformerAdapter struct {
+	ClusterTrustBundleInformer
+}
+
+func (a *clusterTrustBundleTypedInformerAdapter) TypedInformer() ClusterTrustBundleIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicertificatesv1alpha1.ClusterTrustBundle](a.Informer())
+}
+
+// ToClusterTrustBundleIndexInformer converts an untyped informer into a ClusterTrustBundleIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ClusterTrustBundle. If that is not the case, calling type-safe methods of the returned
+// ClusterTrustBundleIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a ClusterTrustBundleIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToClusterTrustBundleIndexInformer(informer cache.SharedIndexInformer) ClusterTrustBundleIndexInformer {
+	if informer, ok := informer.(ClusterTrustBundleIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apicertificatesv1alpha1.ClusterTrustBundle](informer)
 }

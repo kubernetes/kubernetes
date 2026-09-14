@@ -17,7 +17,6 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -396,7 +395,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			}
 			secrets.Add(tc.ExistingSecret)
 
-			ctx := context.TODO()
+			ctx := t.Context()
 			cleaner.evaluateSATokens(ctx)
 
 			actions := client.Actions()

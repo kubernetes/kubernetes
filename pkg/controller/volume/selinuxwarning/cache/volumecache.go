@@ -17,12 +17,15 @@ limitations under the License.
 package cache
 
 import (
+	"slices"
 	"sort"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/internal/parse"
 	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/translator"
 )
 
@@ -45,8 +48,8 @@ type VolumeCache interface {
 	// change their SELinux support dynamically.
 	GetPodsForCSIDriver(driverName string) []cache.ObjectName
 
-	// SendConflicts sends all current conflicts to the given channel.
-	SendConflicts(logger klog.Logger, ch chan<- Conflict)
+	// GetConflicts returns the current set of active conflicts (both directions).
+	GetConflicts(logger klog.Logger) []Conflict
 }
 
 // VolumeCache stores all volumes used by Pods and their properties that the controller needs to track,
@@ -56,6 +59,11 @@ type volumeCache struct {
 	seLinuxTranslator *translator.ControllerSELinuxTranslator
 	// All volumes of all existing Pods.
 	volumes map[v1.UniqueVolumeName]usedVolume
+	// Reverse index: maps each pod to the list of volumes it uses.
+	// The index is used during pod deletion.
+	podToVolumes map[cache.ObjectName]sets.Set[v1.UniqueVolumeName]
+	// Currently active conflicts per volume (both directions, symmetric pairs).
+	conflicts map[v1.UniqueVolumeName][]Conflict
 }
 
 var _ VolumeCache = &volumeCache{}
@@ -65,6 +73,8 @@ func NewVolumeLabelCache(seLinuxTranslator *translator.ControllerSELinuxTranslat
 	return &volumeCache{
 		seLinuxTranslator: seLinuxTranslator,
 		volumes:           make(map[v1.UniqueVolumeName]usedVolume),
+		podToVolumes:      make(map[cache.ObjectName]sets.Set[v1.UniqueVolumeName]),
+		conflicts:         make(map[v1.UniqueVolumeName][]Conflict),
 	}
 }
 
@@ -81,6 +91,8 @@ type podInfo struct {
 	// SELinux seLinuxLabel to be applied to the volume in the Pod.
 	// Either as mount option or recursively by the container runtime.
 	seLinuxLabel string
+	// Pre-parsed SELinux label parts for fast conflict detection.
+	seLinuxParts [4]string
 	// SELinuxChangePolicy of the Pod.
 	changePolicy v1.PodSELinuxChangePolicy
 }
@@ -89,6 +101,7 @@ func newPodInfoListForPod(podKey cache.ObjectName, seLinuxLabel string, changePo
 	return map[cache.ObjectName]podInfo{
 		podKey: {
 			seLinuxLabel: seLinuxLabel,
+			seLinuxParts: parse.ParseSELinuxLabel(seLinuxLabel),
 			changePolicy: changePolicy,
 		},
 	}
@@ -110,15 +123,30 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 			pods:      newPodInfoListForPod(podKey, label, changePolicy),
 		}
 		c.volumes[volumeName] = volume
+
+		// Add to reverse index
+		c.registerPodVolume(podKey, volumeName)
 		return conflicts
 	}
 
 	// The volume is already known
-	// Add the pod to the cache or update its properties
-	volume.pods[podKey] = podInfo{
+	podInfo := podInfo{
 		seLinuxLabel: label,
+		seLinuxParts: parse.ParseSELinuxLabel(label),
 		changePolicy: changePolicy,
 	}
+	oldPodInfo, found := volume.pods[podKey]
+	if found && oldPodInfo == podInfo {
+		// The Pod is already known too and nothing changed since the last update.
+		// All conflicts were already reported when the Pod was added / updated in the cache last time.
+		return conflicts
+	}
+
+	// Add the updated pod info to the cache
+	volume.pods[podKey] = podInfo
+
+	// Add to reverse index
+	c.registerPodVolume(podKey, volumeName)
 
 	// Emit conflicts for the pod
 	for otherPodKey, otherPodInfo := range volume.pods {
@@ -139,8 +167,9 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 				OtherPod:           podKey,
 				OtherPropertyValue: string(changePolicy),
 			})
+
 		}
-		if c.seLinuxTranslator.Conflicts(otherPodInfo.seLinuxLabel, label) {
+		if c.seLinuxTranslator.ConflictsParsed(otherPodInfo.seLinuxParts, podInfo.seLinuxParts) {
 			// Send conflict to both pods
 			conflicts = append(conflicts, Conflict{
 				PropertyName:       "SELinuxLabel",
@@ -159,6 +188,21 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 			})
 		}
 	}
+	// Update the conflict cache for this volume: remove stale conflicts for this pod, then add new ones
+	volumeConflicts := c.conflicts[volumeName]
+	updated := make([]Conflict, 0, len(volumeConflicts))
+	for _, existing := range volumeConflicts {
+		if existing.Pod != podKey && existing.OtherPod != podKey {
+			updated = append(updated, existing)
+		}
+	}
+	updated = append(updated, conflicts...)
+	if len(updated) == 0 {
+		delete(c.conflicts, volumeName)
+	} else {
+		c.conflicts[volumeName] = updated
+	}
+
 	return conflicts
 }
 
@@ -168,11 +212,46 @@ func (c *volumeCache) DeletePod(logger klog.Logger, podKey cache.ObjectName) {
 	defer c.mutex.Unlock()
 	defer c.dump(logger)
 
-	for volumeName, volume := range c.volumes {
+	for volumeName := range c.podToVolumes[podKey] {
+		conflicts, found := c.conflicts[volumeName]
+		if !found {
+			continue
+		}
+		updated := make([]Conflict, 0, len(conflicts))
+		for _, existing := range conflicts {
+			// preserve other conflicts belonging to volume
+			if existing.Pod != podKey && existing.OtherPod != podKey {
+				updated = append(updated, existing)
+			}
+		}
+		if len(updated) == 0 {
+			delete(c.conflicts, volumeName)
+		} else {
+			c.conflicts[volumeName] = updated
+		}
+	}
+
+	// Use reverse index to only iterate through volumes this pod actually uses.
+	for volumeName := range c.podToVolumes[podKey] {
+		volume, found := c.volumes[volumeName]
+		if !found {
+			continue
+		}
 		delete(volume.pods, podKey)
 		if len(volume.pods) == 0 {
 			delete(c.volumes, volumeName)
 		}
+	}
+	delete(c.podToVolumes, podKey)
+}
+
+// registerPodVolume adds volumeName to the pod volume index.
+// Make sure to hold c.mutex when calling this function.
+func (c *volumeCache) registerPodVolume(podKey cache.ObjectName, volumeName v1.UniqueVolumeName) {
+	if podVolumes, ok := c.podToVolumes[podKey]; ok {
+		podVolumes.Insert(volumeName)
+	} else {
+		c.podToVolumes[podKey] = sets.New(volumeName)
 	}
 }
 
@@ -187,9 +266,7 @@ func (c *volumeCache) dump(logger klog.Logger) {
 	for volumeID := range c.volumes {
 		volumeIDs = append(volumeIDs, volumeID)
 	}
-	sort.Slice(volumeIDs, func(i, j int) bool {
-		return volumeIDs[i] < volumeIDs[j]
-	})
+	slices.Sort(volumeIDs)
 	for _, volumeID := range volumeIDs {
 		volume := c.volumes[volumeID]
 		logger.Info("Cached volume", "volume", volumeID, "csiDriver", volume.csiDriver)
@@ -206,6 +283,22 @@ func (c *volumeCache) dump(logger klog.Logger) {
 			podInfo := volume.pods[podKey]
 			logger.Info("  pod", "pod", podKey, "seLinuxLabel", podInfo.seLinuxLabel, "changePolicy", podInfo.changePolicy)
 		}
+	}
+
+	// Collect all pods, sort them and print the associated volumes.
+	podKeys := make([]cache.ObjectName, 0, len(c.podToVolumes))
+	for podKey := range c.podToVolumes {
+		podKeys = append(podKeys, podKey)
+	}
+	sort.Slice(podKeys, func(i, j int) bool {
+		return podKeys[i].String() < podKeys[j].String()
+	})
+
+	logger.Info("VolumeCache reverse index dump:")
+	for _, podKey := range podKeys {
+		podVolumes := sets.List(c.podToVolumes[podKey])
+		slices.Sort(podVolumes)
+		logger.Info("  pod", "pod", podKey, "volumes", podVolumes)
 	}
 }
 
@@ -226,42 +319,16 @@ func (c *volumeCache) GetPodsForCSIDriver(driverName string) []cache.ObjectName 
 	return pods
 }
 
-// SendConflicts sends all current conflicts to the given channel.
-func (c *volumeCache) SendConflicts(logger klog.Logger, ch chan<- Conflict) {
+// GetConflicts returns the current set of active conflicts (both directions, symmetric pairs).
+func (c *volumeCache) GetConflicts(logger klog.Logger) []Conflict {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	logger.V(4).Info("Scraping conflicts")
 	c.dump(logger)
 
-	for _, volume := range c.volumes {
-		// compare pods that use the same volume with each other
-		for podKey, podInfo := range volume.pods {
-			for otherPodKey, otherPodInfo := range volume.pods {
-				if podKey == otherPodKey {
-					continue
-				}
-				// create conflict only for the first pod. The other pod will get the same conflict in its own iteration of `volume.pods` loop.
-				if podInfo.changePolicy != otherPodInfo.changePolicy {
-					ch <- Conflict{
-						PropertyName:       "SELinuxChangePolicy",
-						EventReason:        "SELinuxChangePolicyConflict",
-						Pod:                podKey,
-						PropertyValue:      string(podInfo.changePolicy),
-						OtherPod:           otherPodKey,
-						OtherPropertyValue: string(otherPodInfo.changePolicy),
-					}
-				}
-				if c.seLinuxTranslator.Conflicts(podInfo.seLinuxLabel, otherPodInfo.seLinuxLabel) {
-					ch <- Conflict{
-						PropertyName:       "SELinuxLabel",
-						EventReason:        "SELinuxLabelConflict",
-						Pod:                podKey,
-						PropertyValue:      podInfo.seLinuxLabel,
-						OtherPod:           otherPodKey,
-						OtherPropertyValue: otherPodInfo.seLinuxLabel,
-					}
-				}
-			}
-		}
+	result := sets.New[Conflict]()
+	for _, volConflicts := range c.conflicts {
+		result.Insert(volConflicts...)
 	}
+	return result.UnsortedList()
 }

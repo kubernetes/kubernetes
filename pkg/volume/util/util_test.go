@@ -20,6 +20,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +31,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/utils/ptr"
 )
@@ -386,7 +386,9 @@ func TestMountOptionFromSpec(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		mountOptions := MountOptionFromSpec(scenario.volume, scenario.systemOptions...)
-		if !reflect.DeepEqual(slice.SortStrings(mountOptions), slice.SortStrings(scenario.expectedMountList)) {
+		slices.Sort(mountOptions)
+		slices.Sort(scenario.expectedMountList)
+		if !reflect.DeepEqual(mountOptions, scenario.expectedMountList) {
 			t.Errorf("for %s expected mount options : %v got %v", name, scenario.expectedMountList, mountOptions)
 		}
 	}
@@ -959,5 +961,126 @@ func TestGetPodVolumeNames(t *testing.T) {
 				t.Errorf("Expected SELinuxContexts: %+v\ngot: %+v", test.expectedSELinuxContexts, contexts)
 			}
 		})
+	}
+}
+
+func TestVolumeHealthConditionSetsEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		a    []v1.VolumeHealthCondition
+		b    []v1.VolumeHealthCondition
+		want bool
+	}{
+		{
+			name: "nil and empty are equal",
+			a:    nil,
+			b:    []v1.VolumeHealthCondition{},
+			want: true,
+		},
+		{
+			name: "same condition different message is equal",
+			a: []v1.VolumeHealthCondition{{
+				Status:  v1.VolumeHealthInaccessible,
+				Reason:  "TargetPathNotFound",
+				Message: "old message",
+			}},
+			b: []v1.VolumeHealthCondition{{
+				Status:  v1.VolumeHealthInaccessible,
+				Reason:  "TargetPathNotFound",
+				Message: "new message",
+			}},
+			want: true,
+		},
+		{
+			name: "same set different order is equal",
+			a: []v1.VolumeHealthCondition{
+				{
+					Status: v1.VolumeHealthInaccessible,
+					Reason: "TargetPathNotFound",
+				},
+				{
+					Status: v1.VolumeHealthDegraded,
+					Reason: "DiskSlow",
+				},
+			},
+			b: []v1.VolumeHealthCondition{
+				{
+					Status: v1.VolumeHealthDegraded,
+					Reason: "DiskSlow",
+				},
+				{
+					Status: v1.VolumeHealthInaccessible,
+					Reason: "TargetPathNotFound",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "duplicates do not change set equality",
+			a: []v1.VolumeHealthCondition{
+				{
+					Status: v1.VolumeHealthDegraded,
+					Reason: "DiskSlow",
+				},
+				{
+					Status: v1.VolumeHealthDegraded,
+					Reason: "DiskSlow",
+				},
+			},
+			b: []v1.VolumeHealthCondition{{
+				Status: v1.VolumeHealthDegraded,
+				Reason: "DiskSlow",
+			}},
+			want: true,
+		},
+		{
+			name: "different status is not equal",
+			a: []v1.VolumeHealthCondition{{
+				Status: v1.VolumeHealthDegraded,
+				Reason: "DiskSlow",
+			}},
+			b: []v1.VolumeHealthCondition{{
+				Status: v1.VolumeHealthDataLoss,
+				Reason: "DiskSlow",
+			}},
+			want: false,
+		},
+		{
+			name: "different reason is not equal",
+			a: []v1.VolumeHealthCondition{{
+				Status: v1.VolumeHealthDegraded,
+				Reason: "DiskSlow",
+			}},
+			b: []v1.VolumeHealthCondition{{
+				Status: v1.VolumeHealthDegraded,
+				Reason: "TargetPathNotFound",
+			}},
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := VolumeHealthConditionSetsEqual(tc.a, tc.b); got != tc.want {
+				t.Fatalf("VolumeHealthConditionSetsEqual() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestVolumeHealthConditionSetsEqual_IgnoresMessageChanges(t *testing.T) {
+	a := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthInaccessible,
+		Reason:  "TargetPathNotFound",
+		Message: "first message",
+	}}
+	b := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthInaccessible,
+		Reason:  "TargetPathNotFound",
+		Message: "second message",
+	}}
+
+	if !VolumeHealthConditionSetsEqual(a, b) {
+		t.Fatal("expected same status/reason with different message to be equal")
 	}
 }

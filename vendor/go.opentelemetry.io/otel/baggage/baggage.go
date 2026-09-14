@@ -14,8 +14,11 @@ import (
 )
 
 const (
-	maxMembers               = 180
-	maxBytesPerMembers       = 4096
+	maxParseErrors = 5
+
+	// W3C Baggage specification limits.
+	// https://www.w3.org/TR/baggage/#limits
+	maxMembers               = 64
 	maxBytesPerBaggageString = 8192
 
 	listDelimiter     = ","
@@ -29,7 +32,6 @@ var (
 	errInvalidProperty = errors.New("invalid baggage list-member property")
 	errInvalidMember   = errors.New("invalid baggage list-member")
 	errMemberNumber    = errors.New("too many list-members in baggage-string")
-	errMemberBytes     = errors.New("list-member too large")
 	errBaggageBytes    = errors.New("baggage-string too large")
 )
 
@@ -309,15 +311,11 @@ func newInvalidMember() Member {
 // an error if the input is invalid according to the W3C Baggage
 // specification.
 func parseMember(member string) (Member, error) {
-	if n := len(member); n > maxBytesPerMembers {
-		return newInvalidMember(), fmt.Errorf("%w: %d", errMemberBytes, n)
-	}
-
 	var props properties
 	keyValue, properties, found := strings.Cut(member, propertyDelimiter)
 	if found {
 		// Parse the member properties.
-		for _, pStr := range strings.Split(properties, propertyDelimiter) {
+		for pStr := range strings.SplitSeq(properties, propertyDelimiter) {
 			p, err := parseProperty(pStr)
 			if err != nil {
 				return newInvalidMember(), err
@@ -430,6 +428,10 @@ type Baggage struct { //nolint:golint
 // New returns a new valid Baggage. It returns an error if it results in a
 // Baggage exceeding limits set in that specification.
 //
+// If the resulting Baggage exceeds the maximum allowed members or bytes,
+// members are dropped until the limits are satisfied and an error is returned
+// along with the partial result.
+//
 // It expects all the provided members to have already been validated.
 func New(members ...Member) (Baggage, error) {
 	if len(members) == 0 {
@@ -441,7 +443,6 @@ func New(members ...Member) (Baggage, error) {
 		if !m.hasData {
 			return Baggage{}, errInvalidMember
 		}
-
 		// OpenTelemetry resolves duplicates by last-one-wins.
 		b[m.key] = baggage.Item{
 			Value:      m.value,
@@ -449,17 +450,42 @@ func New(members ...Member) (Baggage, error) {
 		}
 	}
 
-	// Check member numbers after deduplication.
+	var truncateErr error
+
+	// Check member count after deduplication.
 	if len(b) > maxMembers {
-		return Baggage{}, errMemberNumber
+		truncateErr = errors.Join(truncateErr, errMemberNumber)
+		for k := range b {
+			if len(b) <= maxMembers {
+				break
+			}
+			delete(b, k)
+		}
 	}
 
-	bag := Baggage{b}
-	if n := len(bag.String()); n > maxBytesPerBaggageString {
-		return Baggage{}, fmt.Errorf("%w: %d", errBaggageBytes, n)
+	// Check byte size and drop members if necessary.
+	totalBytes := 0
+	first := true
+	for k := range b {
+		m := Member{
+			key:        k,
+			value:      b[k].Value,
+			properties: fromInternalProperties(b[k].Properties),
+		}
+		memberSize := len(m.String())
+		if !first {
+			memberSize++ // comma separator
+		}
+		if totalBytes+memberSize > maxBytesPerBaggageString {
+			truncateErr = errors.Join(truncateErr, fmt.Errorf("%w: %d", errBaggageBytes, totalBytes+memberSize))
+			delete(b, k)
+			continue
+		}
+		totalBytes += memberSize
+		first = false
 	}
 
-	return bag, nil
+	return Baggage{b}, truncateErr
 }
 
 // Parse attempts to decode a baggage-string from the passed string. It
@@ -470,6 +496,19 @@ func New(members ...Member) (Baggage, error) {
 // defined (reading left-to-right) will be the only one kept. This diverges
 // from the W3C Baggage specification which allows duplicate list-members, but
 // conforms to the OpenTelemetry Baggage specification.
+//
+// If the raw baggage-string exceeds the maximum allowed bytes (8192), an
+// empty Baggage and an error are returned.
+//
+// Otherwise, members are parsed left-to-right and accumulated until one of
+// the following conditions is reached, at which point parsing stops and an
+// error is returned alongside the partial result:
+//   - accepting the next member would cause the encoded baggage to exceed
+//     8192 bytes, or
+//   - the baggage already contains 64 distinct keys.
+//
+// Invalid members are skipped and the error is returned along with the
+// partial result containing the valid members.
 func Parse(bStr string) (Baggage, error) {
 	if bStr == "" {
 		return Baggage{}, nil
@@ -480,26 +519,66 @@ func Parse(bStr string) (Baggage, error) {
 	}
 
 	b := make(baggage.List)
-	for _, memberStr := range strings.Split(bStr, listDelimiter) {
+	sizes := make(map[string]int) // Track per-key byte sizes
+	var totalBytes int
+	var parseErrors int
+	var truncateErr error
+	for memberStr := range strings.SplitSeq(bStr, listDelimiter) {
+		// Check member count limit.
+		if len(b) >= maxMembers {
+			truncateErr = errors.Join(truncateErr, errMemberNumber)
+			break
+		}
+
 		m, err := parseMember(memberStr)
 		if err != nil {
-			return Baggage{}, err
+			parseErrors++
+			if parseErrors <= maxParseErrors {
+				truncateErr = errors.Join(truncateErr, err)
+			}
+			continue // skip invalid member, keep processing
 		}
+
+		// Check byte size limit.
+		// Account for comma separator between members.
+		memberBytes := len(m.String())
+		_, existingKey := b[m.key]
+		if !existingKey && len(b) > 0 {
+			memberBytes++ // comma separator only for new keys
+		}
+
+		// Calculate new totalBytes if we add/overwrite this key
+		var newTotalBytes int
+		if oldSize, exists := sizes[m.key]; exists {
+			// Overwriting existing key: subtract old size, add new size
+			newTotalBytes = totalBytes - oldSize + memberBytes
+		} else {
+			// New key
+			newTotalBytes = totalBytes + memberBytes
+		}
+
+		if newTotalBytes > maxBytesPerBaggageString {
+			truncateErr = errors.Join(truncateErr, errBaggageBytes)
+			break
+		}
+
 		// OpenTelemetry resolves duplicates by last-one-wins.
 		b[m.key] = baggage.Item{
 			Value:      m.value,
 			Properties: m.properties.asInternal(),
 		}
+		sizes[m.key] = memberBytes
+		totalBytes = newTotalBytes
 	}
 
-	// OpenTelemetry does not allow for duplicate list-members, but the W3C
-	// specification does. Now that we have deduplicated, ensure the baggage
-	// does not exceed list-member limits.
-	if len(b) > maxMembers {
-		return Baggage{}, errMemberNumber
+	if dropped := parseErrors - maxParseErrors; dropped > 0 {
+		truncateErr = errors.Join(truncateErr, fmt.Errorf("and %d more invalid member(s)", dropped))
 	}
 
-	return Baggage{b}, nil
+	if len(b) == 0 {
+		return Baggage{}, truncateErr
+	}
+	return Baggage{b}, truncateErr
 }
 
 // Member returns the baggage list-member identified by key.
@@ -648,7 +727,7 @@ func parsePropertyInternal(s string) (p Property, ok bool) {
 	// If we couldn't find any valid key character,
 	// it means the key is either empty or invalid.
 	if keyStart == keyEnd {
-		return
+		return p, ok
 	}
 
 	// Skip spaces after the key: "   key<    >=    value  ".
@@ -658,13 +737,13 @@ func parsePropertyInternal(s string) (p Property, ok bool) {
 		// A key can have no value, like: "   key    ".
 		ok = true
 		p.key = s[keyStart:keyEnd]
-		return
+		return p, ok
 	}
 
 	// If we have not reached the end and we can't find the '=' delimiter,
 	// it means the property is invalid.
 	if s[index] != keyValueDelimiter[0] {
-		return
+		return p, ok
 	}
 
 	// Attempting to parse the value.
@@ -690,14 +769,14 @@ func parsePropertyInternal(s string) (p Property, ok bool) {
 	// we have not reached the end, it means the property is
 	// invalid, something like: "   key    =    value  value1".
 	if index != len(s) {
-		return
+		return p, ok
 	}
 
 	// Decode a percent-encoded value.
 	rawVal := s[valueStart:valueEnd]
 	unescapeVal, err := url.PathUnescape(rawVal)
 	if err != nil {
-		return
+		return p, ok
 	}
 	value := replaceInvalidUTF8Sequences(len(rawVal), unescapeVal)
 
@@ -706,7 +785,7 @@ func parsePropertyInternal(s string) (p Property, ok bool) {
 	p.hasValue = true
 
 	p.value = value
-	return
+	return p, ok
 }
 
 func skipSpace(s string, offset int) int {
@@ -812,7 +891,7 @@ var safeKeyCharset = [utf8.RuneSelf]bool{
 // validateBaggageName checks if the string is a valid OpenTelemetry Baggage name.
 // Baggage name is a valid, non-empty UTF-8 string.
 func validateBaggageName(s string) bool {
-	if len(s) == 0 {
+	if s == "" {
 		return false
 	}
 
@@ -828,7 +907,7 @@ func validateBaggageValue(s string) bool {
 
 // validateKey checks if the string is a valid W3C Baggage key.
 func validateKey(s string) bool {
-	if len(s) == 0 {
+	if s == "" {
 		return false
 	}
 

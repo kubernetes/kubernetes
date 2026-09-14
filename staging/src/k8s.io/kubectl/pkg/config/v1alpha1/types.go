@@ -22,7 +22,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // Preference stores elements of KubeRC configuration file
 type Preference struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// overrides allows changing default flag values of commands.
 	// This is especially useful, when user doesn't want to explicitly

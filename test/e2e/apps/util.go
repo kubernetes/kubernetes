@@ -56,7 +56,9 @@ func NewIndexedPodAnnotationTracker(ownerName, ownerNs, labelSelector, podIndexA
 
 func (t *IndexedPodAnnotationTracker) Start(ctx context.Context, c clientset.Interface) context.CancelFunc {
 	trackerCtx, trackerCancel := context.WithCancel(ctx)
+	logger := klog.LoggerWithName(klog.FromContext(ctx), "IndexedPodAnnotationTracker")
 	_, podTracker := cache.NewInformerWithOptions(cache.InformerOptions{
+		Logger: &logger,
 		ListerWatcher: &cache.ListWatch{
 			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = t.labelSelector

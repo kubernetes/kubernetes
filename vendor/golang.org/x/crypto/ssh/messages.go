@@ -44,7 +44,7 @@ type disconnectMsg struct {
 }
 
 func (d *disconnectMsg) Error() string {
-	return fmt.Sprintf("ssh: disconnect, reason %d: %s", d.Reason, d.Message)
+	return fmt.Sprintf("ssh: disconnect, reason %d: %q", d.Reason, d.Message)
 }
 
 // See RFC 4253, section 7.1.
@@ -792,7 +792,7 @@ func marshalString(to []byte, s []byte) []byte {
 	return to[len(s):]
 }
 
-var bigIntType = reflect.TypeOf((*big.Int)(nil))
+var bigIntType = reflect.TypeFor[*big.Int]()
 
 // Decode a packet into its corresponding message.
 func decode(packet []byte) (interface{}, error) {

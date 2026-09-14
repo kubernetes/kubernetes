@@ -17,7 +17,9 @@ package auth
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"sort"
 	"strings"
@@ -39,7 +41,7 @@ import (
 var _ AuthStore = (*authStore)(nil)
 
 var (
-	rootPerm = authpb.Permission{PermType: authpb.READWRITE, Key: []byte{}, RangeEnd: []byte{0}}
+	rootPerm = authpb.Permission{PermType: authpb.Permission_READWRITE, Key: []byte{}, RangeEnd: []byte{0}}
 
 	ErrRootUserNotExist     = errors.New("auth: root user does not exist")
 	ErrRootRoleNotExist     = errors.New("auth: root user does not have root role")
@@ -349,11 +351,10 @@ func (as *authStore) Authenticate(ctx context.Context, username, password string
 		return nil, err
 	}
 
-	as.lg.Debug(
-		"authenticated a user",
-		zap.String("user-name", username),
-		zap.String("token", token),
-	)
+	if ce := as.lg.Check(zap.DebugLevel, "authenticated a user"); ce != nil {
+		tokenFingerprint := redactToken(token)
+		ce.Write(zap.String("user-name", username), zap.String("token-fingerprint", tokenFingerprint))
+	}
 	return &pb.AuthenticateResponse{Token: token}, nil
 }
 
@@ -898,15 +899,15 @@ func (as *authStore) isOpPermitted(userName string, revision uint64, key, rangeE
 }
 
 func (as *authStore) IsPutPermitted(authInfo *AuthInfo, key []byte) error {
-	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, nil, authpb.WRITE)
+	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, nil, authpb.Permission_WRITE)
 }
 
 func (as *authStore) IsRangePermitted(authInfo *AuthInfo, key, rangeEnd []byte) error {
-	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, rangeEnd, authpb.READ)
+	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, rangeEnd, authpb.Permission_READ)
 }
 
 func (as *authStore) IsDeleteRangePermitted(authInfo *AuthInfo, key, rangeEnd []byte) error {
-	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, rangeEnd, authpb.WRITE)
+	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, rangeEnd, authpb.Permission_WRITE)
 }
 
 func (as *authStore) IsAdminPermitted(authInfo *AuthInfo) error {
@@ -1071,10 +1072,11 @@ func (as *authStore) AuthInfoFromCtx(ctx context.Context) (*AuthInfo, error) {
 		return nil, nil
 	}
 
-	token := ts[0]
+	token := strings.TrimPrefix(ts[0], "Bearer ")
 	authInfo, uok := as.authInfoFromToken(ctx, token)
 	if !uok {
-		as.lg.Warn("invalid auth token", zap.String("token", token))
+		tokenFingerprint := redactToken(token)
+		as.lg.Warn("invalid auth token", zap.String("token-fingerprint", tokenFingerprint))
 		return nil, ErrInvalidAuthToken
 	}
 
@@ -1227,4 +1229,9 @@ func (as *authStore) setupMetricsReporter() {
 		return float64(as.Revision())
 	}
 	reportCurrentAuthRevMu.Unlock()
+}
+
+func redactToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])[:12]
 }

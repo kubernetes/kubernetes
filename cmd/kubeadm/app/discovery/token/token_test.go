@@ -17,6 +17,7 @@ limitations under the License.
 package token
 
 import (
+	_ "embed"
 	"testing"
 	"time"
 
@@ -34,44 +35,16 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
+var (
+	//go:embed testdata/ca-cert.pem
+	caCert string
+
+	//go:embed testdata/expected-kubeconfig.yaml
+	expectedKubeconfig string
+)
+
 func TestRetrieveValidatedConfigInfo(t *testing.T) {
-	const (
-		caCert = `-----BEGIN CERTIFICATE-----
-MIICyDCCAbCgAwIBAgIBADANBgkqhkiG9w0BAQsFADAVMRMwEQYDVQQDEwprdWJl
-cm5ldGVzMB4XDTE5MTEyMDAwNDk0MloXDTI5MTExNzAwNDk0MlowFTETMBEGA1UE
-AxMKa3ViZXJuZXRlczCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMqQ
-ctECzA8yFSuVYupOUYgrTmfQeKe/9BaDWagaq7ow9+I2IvsfWFvlrD8QQr8sea6q
-xjq7TV67Vb4RxBaoYDA+yI5vIcujWUxULun64lu3Q6iC1sj2UnmUpIdgazRXXEkZ
-vxA6EbAnoxA0+lBOn1CZWl23IQ4s70o2hZ7wIp/vevB88RRRjqtvgc5elsjsbmDF
-LS7L1Zuye8c6gS93bR+VjVmSIfr1IEq0748tIIyXjAVCWPVCvuP41MlfPc/JVpZD
-uD2+pO6ZYREcdAnOf2eD4/eLOMKko4L1dSFy9JKM5PLnOC0Zk0AYOd1vS8DTAfxj
-XPEIY8OBYFhlsxf4TE8CAwEAAaMjMCEwDgYDVR0PAQH/BAQDAgKkMA8GA1UdEwEB
-/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAH/OYq8zyl1+zSTmuow3yI/15PL1
-dl8hB7IKnZNWmC/LTdm/+noh3Sb1IdRv6HkKg/GUn0UMuRUngLhju3EO4ozJPQcX
-quaxzgmTKNWJ6ErDvRvWhGX0ZcbdBfZv+dowyRqzd5nlJ49hC+NrtFFQq6P05BYn
-7SemguqeXmXwIj2Sa+1DeR6lRm9o8shAYjnyThUFqaMn18kI3SANJ5vk/3DFrPEO
-CKC9EzFku2kuxg2dM12PbRGZQ2o0K6HEZgrrIKTPOy3ocb8r9M0aSFhjOV/NqGA4
-SaupXSW6XfvIi/UHoIbU3pNcsnUJGnQfQvip95XKk/gqcUr+m50vxgumxtA=
------END CERTIFICATE-----`
-
-		caCertHash = "sha256:98be2e6d4d8a89aa308fb15de0c07e2531ce549c68dec1687cdd5c06f0826658"
-
-		expectedKubeconfig = `apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN5RENDQWJDZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRFNU1URXlNREF3TkRrME1sb1hEVEk1TVRFeE56QXdORGswTWxvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTXFRCmN0RUN6QTh5RlN1Vll1cE9VWWdyVG1mUWVLZS85QmFEV2FnYXE3b3c5K0kySXZzZldGdmxyRDhRUXI4c2VhNnEKeGpxN1RWNjdWYjRSeEJhb1lEQSt5STV2SWN1aldVeFVMdW42NGx1M1E2aUMxc2oyVW5tVXBJZGdhelJYWEVrWgp2eEE2RWJBbm94QTArbEJPbjFDWldsMjNJUTRzNzBvMmhaN3dJcC92ZXZCODhSUlJqcXR2Z2M1ZWxzanNibURGCkxTN0wxWnV5ZThjNmdTOTNiUitWalZtU0lmcjFJRXEwNzQ4dElJeVhqQVZDV1BWQ3Z1UDQxTWxmUGMvSlZwWkQKdUQyK3BPNlpZUkVjZEFuT2YyZUQ0L2VMT01La280TDFkU0Z5OUpLTTVQTG5PQzBaazBBWU9kMXZTOERUQWZ4agpYUEVJWThPQllGaGxzeGY0VEU4Q0F3RUFBYU1qTUNFd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFIL09ZcTh6eWwxK3pTVG11b3czeUkvMTVQTDEKZGw4aEI3SUtuWk5XbUMvTFRkbS8rbm9oM1NiMUlkUnY2SGtLZy9HVW4wVU11UlVuZ0xoanUzRU80b3pKUFFjWApxdWF4emdtVEtOV0o2RXJEdlJ2V2hHWDBaY2JkQmZaditkb3d5UnF6ZDVubEo0OWhDK05ydEZGUXE2UDA1QlluCjdTZW1ndXFlWG1Yd0lqMlNhKzFEZVI2bFJtOW84c2hBWWpueVRoVUZxYU1uMThrSTNTQU5KNXZrLzNERnJQRU8KQ0tDOUV6Rmt1Mmt1eGcyZE0xMlBiUkdaUTJvMEs2SEVaZ3JySUtUUE95M29jYjhyOU0wYVNGaGpPVi9OcUdBNApTYXVwWFNXNlhmdklpL1VIb0liVTNwTmNzblVKR25RZlF2aXA5NVhLay9ncWNVcittNTB2eGd1bXh0QT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQ==
-    server: https://127.0.0.1
-  name: somecluster
-contexts:
-- context:
-    cluster: somecluster
-    user: token-bootstrap-client
-  name: token-bootstrap-client@somecluster
-current-context: token-bootstrap-client@somecluster
-kind: Config
-users: null
-`
-	)
+	const caCertHash = "sha256:98be2e6d4d8a89aa308fb15de0c07e2531ce549c68dec1687cdd5c06f0826658"
 
 	tests := []struct {
 		name                     string

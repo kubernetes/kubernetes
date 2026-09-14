@@ -33,3 +33,11 @@ func SetDefaults_DeviceTaint(obj *resourceapi.DeviceTaint) {
 		obj.TimeAdded = &metav1.Time{Time: time.Now().Truncate(time.Second)}
 	}
 }
+
+// SetDefaults_ResourcePoolStatusRequestSpec sets defaults for ResourcePoolStatusRequestSpec.
+func SetDefaults_ResourcePoolStatusRequestSpec(obj *resourceapi.ResourcePoolStatusRequestSpec) {
+	if obj.Limit == nil {
+		defaultLimit := resourceapi.ResourcePoolStatusRequestLimitDefault
+		obj.Limit = &defaultLimit
+	}
+}

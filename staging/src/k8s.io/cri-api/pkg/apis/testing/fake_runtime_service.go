@@ -76,6 +76,20 @@ type FakeRuntimeService struct {
 	FakeLinuxConfiguration *runtimeapi.LinuxRuntimeConfiguration
 
 	ErrorOnSandboxCreate bool
+
+	// CheckpointedPods records the CheckpointPod requests received, in order, so
+	// tests can assert on the request passed to a checkpoint.
+	CheckpointedPods []*runtimeapi.CheckpointPodRequest
+	// CheckpointPodDeadline records the most recent CheckpointPod context
+	// deadline observed by the fake runtime.
+	CheckpointPodDeadline time.Time
+
+	// RestoredPods records the RestorePod requests received, in order, so tests
+	// can assert on the sandbox config passed to a restore.
+	RestoredPods []*runtimeapi.RestorePodRequest
+	// RestorePodDeadline records the most recent RestorePod context deadline
+	// observed by the fake runtime.
+	RestorePodDeadline time.Time
 }
 
 // GetContainerID returns the unique container ID from the FakeRuntimeService.
@@ -717,6 +731,47 @@ func (r *FakeRuntimeService) CheckpointContainer(_ context.Context, options *run
 	return nil
 }
 
+// CheckpointPod emulates call to checkpoint a pod sandbox in the FakeRuntimeService.
+func (r *FakeRuntimeService) CheckpointPod(ctx context.Context, options *runtimeapi.CheckpointPodRequest) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "CheckpointPod")
+	r.CheckpointedPods = append(r.CheckpointedPods, options)
+	r.CheckpointPodDeadline, _ = ctx.Deadline()
+
+	if err := r.popError("CheckpointPod"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RestorePod emulates call to restore a pod sandbox in the FakeRuntimeService.
+func (r *FakeRuntimeService) RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "RestorePod")
+	r.RestoredPods = append(r.RestoredPods, options)
+	r.RestorePodDeadline, _ = ctx.Deadline()
+
+	if err := r.popError("RestorePod"); err != nil {
+		return nil, err
+	}
+
+	response := &runtimeapi.RestorePodResponse{PodSandboxId: "fake-restored-pod-id"}
+	for _, config := range options.GetContainerConfigs() {
+		name := config.GetMetadata().GetName()
+		containerID := "fake-restored-container-" + name
+		response.RestoredContainers = append(response.RestoredContainers, &runtimeapi.RestoredContainer{
+			Name:        name,
+			ContainerId: containerID,
+		})
+	}
+	return response, nil
+}
+
 func (f *FakeRuntimeService) GetContainerEvents(ctx context.Context, containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
 	return nil
 }
@@ -810,7 +865,7 @@ func (r *FakeRuntimeService) UpdatePodSandboxResources(context.Context, *runtime
 }
 
 // Close will shutdown the internal gRPC client connection.
-func (r *FakeRuntimeService) Close() error {
+func (r *FakeRuntimeService) Close(_ context.Context) error {
 	r.Lock()
 	defer r.Unlock()
 

@@ -43,21 +43,34 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	cdi "tags.cncf.io/container-device-interface/specs-go"
 )
 
 type Options struct {
 	EnableHealthService bool
+
+	// DisableHealthV1 and DisableHealthV1alpha1 restrict which
+	// DRAResourceHealth gRPC API versions the driver advertises and serves,
+	// to test a kubelet against plugins which only support one version.
+	// The zero values keep both enabled, matching the kubeletplugin helper
+	// defaults.
+	DisableHealthV1       bool
+	DisableHealthV1alpha1 bool
 }
 
 type DeviceHealthUpdate struct {
 	PoolName   string
 	DeviceName string
 	Health     string
+	Message    string
+}
+
+type deviceHealthInfo struct {
+	status  string
+	message string
 }
 
 type ExamplePlugin struct {
-	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
 	stopCh         <-chan struct{}
 	logger         klog.Logger
 	resourceClient cgoresource.ResourceV1Interface
@@ -76,7 +89,7 @@ type ExamplePlugin struct {
 	gRPCCalls []GRPCCall
 
 	healthMutex       sync.Mutex
-	deviceHealth      map[string]string
+	deviceHealth      map[string]deviceHealthInfo
 	HealthControlChan chan DeviceHealthUpdate
 
 	blockPrepareResourcesMutex   sync.Mutex
@@ -94,10 +107,6 @@ type ExamplePlugin struct {
 }
 
 var _ kubeletplugin.DRAPlugin = &ExamplePlugin{}
-var _ drahealthv1alpha1.DRAResourceHealthServer = &ExamplePlugin{}
-
-//nolint:unused
-func (ex *ExamplePlugin) mustEmbedUnimplementedDRAResourceHealthServer() {}
 
 type GRPCCall struct {
 	// FullMethod is the fully qualified, e.g. /package.service/method.
@@ -205,13 +214,19 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		nodeName:          nodeName,
 		prepared:          make(map[ClaimID][]kubeletplugin.Device),
 		cancelMainContext: testOpts.cancelMainContext,
-		deviceHealth:      make(map[string]string),
+		deviceHealth:      make(map[string]deviceHealthInfo),
 		HealthControlChan: make(chan DeviceHealthUpdate, 10),
 	}
 
 	publicOpts = append(publicOpts,
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
+		// ExamplePlugin always implements WatchHealthStatus; whether device
+		// health is actually advertised and served, and in which API
+		// versions, is controlled here.
+		kubeletplugin.HealthService(pluginOpts.EnableHealthService),
+		kubeletplugin.HealthV1(!pluginOpts.DisableHealthV1),
+		kubeletplugin.HealthV1alpha1(!pluginOpts.DisableHealthV1alpha1),
 	)
 	d, err := kubeletplugin.Start(ctx, ex, publicOpts...)
 	if err != nil {
@@ -226,6 +241,16 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 	}
 
 	return ex, nil
+}
+
+// PublishResources re-publishes the driver's resources, replacing any set that
+// was published before. This resets the resourceslice controller's desired
+// state: if the apiserver previously dropped fields (e.g. because a feature
+// gate was disabled), the controller latches its desired state to what could be
+// stored to avoid a hot update loop. Re-publishing restores the original
+// resources once the apiserver accepts them again.
+func (ex *ExamplePlugin) PublishResources(ctx context.Context, resources resourceslice.DriverResources) error {
+	return ex.d.PublishResources(ctx, resources)
 }
 
 // Stop ensures that all servers are stopped and resources freed.
@@ -376,20 +401,22 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourc
 			continue
 		}
 
-		spec := &spec{
-			Version: "0.3.0", // This has to be a version accepted by the runtimes.
-			Kind:    vendor + "/" + class,
-			// At least one device is required and its entry must have more
-			// than just the name.
-			Devices: []device{
+		spec := &cdi.Spec{
+			Kind: vendor + "/" + class,
+			Devices: []cdi.Device{
 				{
 					Name: deviceName,
-					ContainerEdits: containerEdits{
+					ContainerEdits: cdi.ContainerEdits{
 						Env: envs,
 					},
 				},
 			},
 		}
+		minVersion, err := cdi.MinimumRequiredVersion(spec)
+		if err != nil {
+			return nil, fmt.Errorf("determine CDI spec version: %w", err)
+		}
+		spec.Version = minVersion
 		filePath := ex.getJSONFilePath(claim.UID, baseRequestName)
 		buffer, err := json.Marshal(spec)
 		if err != nil {
@@ -404,6 +431,13 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourc
 			ShareID:      result.ShareID,
 			Requests:     []string{result.Request}, // May also return baseRequestName here.
 			CDIDeviceIDs: []string{cdiDeviceID},
+			Metadata: &kubeletplugin.DeviceMetadata{
+				Attributes: map[string]resourceapi.DeviceAttribute{
+					"driverName": {StringValue: &ex.driverName},
+					"pool":       {StringValue: &result.Pool},
+					"device":     {StringValue: &result.Device},
+				},
+			},
 		}
 		devices = append(devices, device)
 	}
@@ -462,6 +496,8 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimRef kub
 
 	logger := klog.FromContext(ctx)
 
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
 	claimID := ClaimID{Name: claimRef.Name, UID: claimRef.UID}
 	devices, ok := ex.prepared[claimID]
 	if !ok {
@@ -497,6 +533,16 @@ func (ex *ExamplePlugin) UnprepareResourceClaims(ctx context.Context, claims []k
 		result[claimRef.UID] = err
 	}
 	return result, nil
+}
+
+// UnprepareClaim manually unprepares a single resource claim on the plugin.
+// This is required in tests where kubelet intentionally bypasses unprepare (e.g. SkipNodeOperationNodeUnprepareResources)
+// so that test cleanup assertions on prepared resources can succeed.
+func (ex *ExamplePlugin) UnprepareClaim(ctx context.Context, claim *resourceapi.ResourceClaim) error {
+	return ex.nodeUnprepareResource(ctx, kubeletplugin.NamespacedObject{
+		NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
+		UID:            claim.UID,
+	})
 }
 
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
@@ -595,93 +641,116 @@ func (ex *ExamplePlugin) SetGetInfoError(err error) {
 	ex.d.SetGetInfoError(err)
 }
 
-func (ex *ExamplePlugin) NodeWatchResources(req *drahealthv1alpha1.NodeWatchResourcesRequest, srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
-	logger := klog.FromContext(srv.Context())
-	logger.V(3).Info("Starting dynamic NodeWatchResources stream")
+// SetNotifyRegistrationStatusError sets an error to be returned by the
+// plugin's NotifyRegistrationStatus call.
+// This can be used in tests to simulate a registration failure scenario,
+// allowing verification that the kubelet plugin manager retries registration
+// when NotifyRegistrationStatus fails.
+//
+// To restore normal NotifyRegistrationStatus behavior, call SetNotifyRegistrationStatusError(nil).
+func (ex *ExamplePlugin) SetNotifyRegistrationStatusError(err error) {
+	ex.d.SetNotifyRegistrationStatusError(err)
+}
+
+// WatchHealthStatus implements [kubeletplugin.DRAPlugin] by streaming device
+// health reports using the version-neutral helper API. The helper translates
+// the reports into whichever DRAResourceHealth gRPC version the kubelet
+// supports.
+func (ex *ExamplePlugin) WatchHealthStatus(ctx context.Context, reports chan<- kubeletplugin.DeviceHealthReport) error {
+	logger := klog.FromContext(ctx)
+	logger.V(3).Info("Starting dynamic WatchHealthStatus stream")
 
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
+	// send builds the current report and delivers it, respecting cancellation.
+	// It returns false once the stream is done so the caller can stop.
+	send := func() bool {
+		report := ex.buildHealthReport()
+		logger.V(5).Info("Test driver sending health update", "report", report)
+		select {
+		case <-ctx.Done():
+			return false
+		case reports <- report:
+			return true
+		}
+	}
+
 	// Send an initial update immediately to report on pre-configured devices.
-	if err := ex.sendHealthUpdate(srv); err != nil {
-		logger.Error(err, "Failed to send initial health update")
+	if !send() {
+		logger.V(3).Info("WatchHealthStatus stream canceled by kubelet")
+		return nil
 	}
 
 	for {
 		select {
-		case <-srv.Context().Done():
-			logger.V(3).Info("NodeWatchResources stream canceled by kubelet")
+		case <-ctx.Done():
+			logger.V(3).Info("WatchHealthStatus stream canceled by kubelet")
 			return nil
 		case update, ok := <-ex.HealthControlChan:
 			if !ok {
-				logger.V(3).Info("HealthControlChan closed, exiting NodeWatchResources stream.")
+				logger.V(3).Info("HealthControlChan closed, exiting WatchHealthStatus stream.")
 				return nil
 			}
 			logger.V(3).Info("Received health update from control channel", "update", update)
 			ex.healthMutex.Lock()
 			key := update.PoolName + "/" + update.DeviceName
-			ex.deviceHealth[key] = update.Health
+			ex.deviceHealth[key] = deviceHealthInfo{
+				status:  update.Health,
+				message: update.Message,
+			}
 			ex.healthMutex.Unlock()
 
-			if err := ex.sendHealthUpdate(srv); err != nil {
-				logger.Error(err, "Failed to send health update after control message")
+			if !send() {
+				return nil
 			}
 		case <-ticker.C:
-			if err := ex.sendHealthUpdate(srv); err != nil {
-				if srv.Context().Err() != nil {
-					logger.V(3).Info("NodeWatchResources stream closed during periodic update, exiting.")
-					return nil
-				}
-				logger.Error(err, "Failed to send periodic health update")
+			if !send() {
+				return nil
 			}
 		}
 	}
 }
 
-// sendHealthUpdate dynamically builds the health report from the current state of the deviceHealth map.
-func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
-	logger := klog.FromContext(srv.Context())
-	healthUpdates := []*drahealthv1alpha1.DeviceHealth{}
+// buildHealthReport dynamically builds the health report from the current state
+// of the deviceHealth map.
+func (ex *ExamplePlugin) buildHealthReport() kubeletplugin.DeviceHealthReport {
+	devices := []kubeletplugin.DeviceHealth{}
 
 	ex.healthMutex.Lock()
-	for key, health := range ex.deviceHealth {
+	for key, healthInfo := range ex.deviceHealth {
 		parts := strings.SplitN(key, "/", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		poolName := parts[0]
-		deviceName := parts[1]
 
-		var healthEnum drahealthv1alpha1.HealthStatus
-		switch health {
+		var status kubeletplugin.HealthStatus
+		switch healthInfo.status {
 		case "Healthy":
-			healthEnum = drahealthv1alpha1.HealthStatus_HEALTHY
+			status = kubeletplugin.HealthStatusHealthy
 		case "Unhealthy":
-			healthEnum = drahealthv1alpha1.HealthStatus_UNHEALTHY
+			status = kubeletplugin.HealthStatusUnhealthy
 		default:
-			healthEnum = drahealthv1alpha1.HealthStatus_UNKNOWN
+			status = kubeletplugin.HealthStatusUnknown
 		}
 
-		healthUpdates = append(healthUpdates, &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
-				PoolName:   poolName,
-				DeviceName: deviceName,
-			},
-			Health:          healthEnum,
-			LastUpdatedTime: time.Now().Unix(),
+		devices = append(devices, kubeletplugin.DeviceHealth{
+			PoolName:    parts[0],
+			DeviceName:  parts[1],
+			Health:      status,
+			LastUpdated: time.Now(),
+			Message:     healthInfo.message,
 		})
 	}
 	ex.healthMutex.Unlock()
 
-	// Sorting slice to ensure consistent ordering in tests.
-	sort.Slice(healthUpdates, func(i, j int) bool {
-		if healthUpdates[i].GetDevice().GetPoolName() != healthUpdates[j].GetDevice().GetPoolName() {
-			return healthUpdates[i].GetDevice().GetPoolName() < healthUpdates[j].GetDevice().GetPoolName()
+	// Sort to ensure consistent ordering in tests.
+	sort.Slice(devices, func(i, j int) bool {
+		if devices[i].PoolName != devices[j].PoolName {
+			return devices[i].PoolName < devices[j].PoolName
 		}
-		return healthUpdates[i].GetDevice().GetDeviceName() < healthUpdates[j].GetDevice().GetDeviceName()
+		return devices[i].DeviceName < devices[j].DeviceName
 	})
 
-	resp := &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: healthUpdates}
-	logger.V(5).Info("Test driver sending health update", "response", resp)
-	return srv.Send(resp)
+	return kubeletplugin.DeviceHealthReport{Devices: devices}
 }

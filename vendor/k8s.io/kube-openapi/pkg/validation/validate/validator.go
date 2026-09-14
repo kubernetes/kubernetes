@@ -71,6 +71,19 @@ func (b *basicCommonValidator) Validate(data interface{}) (res *Result) {
 	return nil
 }
 
+// numberValidator validates numeric values against constraints and standard formats.
+//
+// It is responsible for checking:
+//   - MultipleOf: The value must be a multiple of the given factor.
+//   - Maximum/ExclusiveMaximum: The value must be less than or equal to (or strictly less than) the maximum.
+//   - Minimum/ExclusiveMinimum: The value must be greater than or equal to (or strictly greater than) the minimum.
+//   - Numeric Format Enforcement:
+//   - int32 and float (float32): The validator verifies that the value fits within the
+//     range of the specified type. If a value overflows (e.g., an int64 provided for an
+//     int32 field), a validation error is returned.
+//   - double (float64): Values exceeding the maximum representable float64 (e.g., 1e500)
+//     fail during the initial parsing phase with an "invalid type conversion" error,
+//     before this validator is reached.
 type numberValidator struct {
 	Path             string
 	In               string

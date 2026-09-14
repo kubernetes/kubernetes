@@ -72,6 +72,7 @@ type GinkgoTInterface interface {
 	TempDir() string
 	Attr(key, value string)
 	Output() io.Writer
+	ArtifactDir() string
 }
 
 /*
@@ -195,4 +196,7 @@ func (g *GinkgoTBWrapper) Attr(key, value string) {
 }
 func (g *GinkgoTBWrapper) Output() io.Writer {
 	return g.GinkgoT.Output()
+}
+func (g *GinkgoTBWrapper) ArtifactDir() string {
+	return g.GinkgoT.ArtifactDir()
 }

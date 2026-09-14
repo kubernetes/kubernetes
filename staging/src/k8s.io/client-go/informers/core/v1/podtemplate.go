@@ -25,6 +25,7 @@ import (
 	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -33,11 +34,39 @@ import (
 )
 
 // PodTemplateInformer provides access to a shared informer and lister for
-// PodTemplates.
+// PodTemplates. Prefer using the type-safe variant (see [TypedPodTemplateInformer]).
 type PodTemplateInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.PodTemplateLister
 }
+
+// TypedPodTemplateInformer provides access to a shared informer and lister for
+// PodTemplates, including the type-safe TypedInformer variant.
+// It is a superset of PodTemplateInformer.
+type TypedPodTemplateInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() PodTemplateIndexInformer
+	Lister() corev1.PodTemplateLister
+}
+
+// PodTemplateIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type PodTemplateIndexInformer cache.TypedSharedIndexInformer[*apicorev1.PodTemplate]
+
+// PodTemplateHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for PodTemplate.
+type PodTemplateHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apicorev1.PodTemplate]
+
+// PodTemplateDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for PodTemplate.
+type PodTemplateDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apicorev1.PodTemplate]
+
+// PodTemplateFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for PodTemplate.
+type PodTemplateFilteringHandler = cache.TypedFilteringResourceEventHandler[*apicorev1.PodTemplate]
+
+// PodTemplateIndexers is a specialization of [cache.TypedIndexers] for PodTemplate.
+type PodTemplateIndexers = cache.TypedIndexers[*apicorev1.PodTemplate]
+
+// DeletedPodTemplate is a specialization of [cache.DeletedObject] for PodTemplate.
+type DeletedPodTemplate = cache.DeletedObject[*apicorev1.PodTemplate]
 
 type podTemplateInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,55 +77,132 @@ type podTemplateInformer struct {
 // NewPodTemplateInformer constructs a new informer for PodTemplate type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPodTemplateInformer]).
 func NewPodTemplateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPodTemplateInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewPodTemplateInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedPodTemplateInformer constructs a new informer for PodTemplate type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPodTemplateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers PodTemplateIndexers) PodTemplateIndexInformer {
+	return NewTypedPodTemplateInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredPodTemplateInformer constructs a new informer for PodTemplate type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredPodTemplateInformer]).
 func NewFilteredPodTemplateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewTypedPodTemplateInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredPodTemplateInformer constructs a new informer for PodTemplate type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredPodTemplateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers PodTemplateIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) PodTemplateIndexInformer {
+	return NewTypedPodTemplateInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewPodTemplateInformerWithOptions constructs a new informer for PodTemplate type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPodTemplateInformerWithOptions]).
+func NewPodTemplateInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedPodTemplateInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedPodTemplateInformerWithOptions constructs a new informer for PodTemplate type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPodTemplateInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) PodTemplateIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "podtemplates"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apicorev1.PodTemplate](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CoreV1().PodTemplates(namespace).List(context.Background(), options)
+				return client.CoreV1().PodTemplates(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CoreV1().PodTemplates(namespace).Watch(context.Background(), options)
+				return client.CoreV1().PodTemplates(namespace).Watch(context.Background(), opts)
 			},
-			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+			ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CoreV1().PodTemplates(namespace).List(ctx, options)
+				return client.CoreV1().PodTemplates(namespace).List(ctx, opts)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CoreV1().PodTemplates(namespace).Watch(ctx, options)
+				return client.CoreV1().PodTemplates(namespace).Watch(ctx, opts)
 			},
 		}, client),
 		&apicorev1.PodTemplate{},
-		resyncPeriod,
-		indexers,
-	)
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
+		},
+	))
 }
 
 func (f *podTemplateInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPodTemplateInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedPodTemplateInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *podTemplateInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.PodTemplate{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *podTemplateInformer) TypedInformer() PodTemplateIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.PodTemplate](f.factory.InformerFor(&apicorev1.PodTemplate{}, f.defaultInformer))
 }
 
 func (f *podTemplateInformer) Lister() corev1.PodTemplateLister {
 	return corev1.NewPodTemplateLister(f.Informer().GetIndexer())
+}
+
+// ToTypedPodTemplateInformer converts an untyped informer into a TypedPodTemplateInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *PodTemplate. If that is not the case, calling type-safe methods of the returned
+// TypedPodTemplateInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedPodTemplateInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedPodTemplateInformer(informer PodTemplateInformer) TypedPodTemplateInformer {
+	if informer, ok := informer.(TypedPodTemplateInformer); ok {
+		return informer
+	}
+	return &podTemplateTypedInformerAdapter{informer}
+}
+
+type podTemplateTypedInformerAdapter struct {
+	PodTemplateInformer
+}
+
+func (a *podTemplateTypedInformerAdapter) TypedInformer() PodTemplateIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.PodTemplate](a.Informer())
+}
+
+// ToPodTemplateIndexInformer converts an untyped informer into a PodTemplateIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *PodTemplate. If that is not the case, calling type-safe methods of the returned
+// PodTemplateIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a PodTemplateIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToPodTemplateIndexInformer(informer cache.SharedIndexInformer) PodTemplateIndexInformer {
+	if informer, ok := informer.(PodTemplateIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apicorev1.PodTemplate](informer)
 }

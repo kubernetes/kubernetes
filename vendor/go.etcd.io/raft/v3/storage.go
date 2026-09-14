@@ -18,6 +18,8 @@ import (
 	"errors"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
+
 	pb "go.etcd.io/raft/v3/raftpb"
 )
 
@@ -47,7 +49,11 @@ type Storage interface {
 	// TODO(tbg): split this into two interfaces, LogStorage and StateStorage.
 
 	// InitialState returns the saved HardState and ConfState information.
-	InitialState() (pb.HardState, pb.ConfState, error)
+	// The returned HardState may be nil to indicate that no HardState has been
+	// persisted yet; IsEmptyHardState treats nil as empty.
+	// The returned ConfState must not be nil; if no ConfState has been
+	// persisted yet, return an empty ConfState instead.
+	InitialState() (*pb.HardState, *pb.ConfState, error)
 
 	// Entries returns a slice of consecutive log entries in the range [lo, hi),
 	// starting from lo. The maxSize limits the total size of the log entries
@@ -68,7 +74,7 @@ type Storage interface {
 	//
 	// Returns ErrCompacted if entry lo has been compacted, or ErrUnavailable if
 	// encountered an unavailable entry in [lo, hi).
-	Entries(lo, hi, maxSize uint64) ([]pb.Entry, error)
+	Entries(lo, hi, maxSize uint64) ([]*pb.Entry, error)
 
 	// Term returns the term of entry i, which must be in the range
 	// [FirstIndex()-1, LastIndex()]. The term of the entry before
@@ -86,7 +92,7 @@ type Storage interface {
 	// If snapshot is temporarily unavailable, it should return ErrSnapshotTemporarilyUnavailable,
 	// so raft state machine could know that Storage needs some time to prepare
 	// snapshot and call Snapshot later.
-	Snapshot() (pb.Snapshot, error)
+	Snapshot() (*pb.Snapshot, error)
 }
 
 type inMemStorageCallStats struct {
@@ -101,30 +107,34 @@ type MemoryStorage struct {
 	// goroutine.
 	sync.Mutex
 
-	hardState pb.HardState
-	snapshot  pb.Snapshot
-	// ents[i] has raft log position i+snapshot.Metadata.Index
-	ents []pb.Entry
+	hardState *pb.HardState
+	snapshot  *pb.Snapshot
+	// ents[i] has raft log position i+ms.snapshot.GetMetadata().GetIndex()
+	ents []*pb.Entry
 
 	callStats inMemStorageCallStats
 }
 
 // NewMemoryStorage creates an empty MemoryStorage.
 func NewMemoryStorage() *MemoryStorage {
-	return &MemoryStorage{
+	ms := &MemoryStorage{
 		// When starting from scratch populate the list with a dummy entry at term zero.
-		ents: make([]pb.Entry, 1),
+		ents: []*pb.Entry{{}},
 	}
+	ms.snapshot = pb.EnsureSnapshot(ms.snapshot)
+	return ms
 }
 
 // InitialState implements the Storage interface.
-func (ms *MemoryStorage) InitialState() (pb.HardState, pb.ConfState, error) {
+func (ms *MemoryStorage) InitialState() (*pb.HardState, *pb.ConfState, error) {
 	ms.callStats.initialState++
-	return ms.hardState, ms.snapshot.Metadata.ConfState, nil
+	cs := ms.snapshot.GetMetadata().GetConfState()
+	cs = pb.EnsureConfState(cs)
+	return ms.hardState, cs, nil
 }
 
 // SetHardState saves the current HardState.
-func (ms *MemoryStorage) SetHardState(st pb.HardState) error {
+func (ms *MemoryStorage) SetHardState(st *pb.HardState) error {
 	ms.Lock()
 	defer ms.Unlock()
 	ms.hardState = st
@@ -132,11 +142,11 @@ func (ms *MemoryStorage) SetHardState(st pb.HardState) error {
 }
 
 // Entries implements the Storage interface.
-func (ms *MemoryStorage) Entries(lo, hi, maxSize uint64) ([]pb.Entry, error) {
+func (ms *MemoryStorage) Entries(lo, hi, maxSize uint64) ([]*pb.Entry, error) {
 	ms.Lock()
 	defer ms.Unlock()
 	ms.callStats.entries++
-	offset := ms.ents[0].Index
+	offset := ms.ents[0].GetIndex()
 	if lo <= offset {
 		return nil, ErrCompacted
 	}
@@ -160,14 +170,14 @@ func (ms *MemoryStorage) Term(i uint64) (uint64, error) {
 	ms.Lock()
 	defer ms.Unlock()
 	ms.callStats.term++
-	offset := ms.ents[0].Index
+	offset := ms.ents[0].GetIndex()
 	if i < offset {
 		return 0, ErrCompacted
 	}
 	if int(i-offset) >= len(ms.ents) {
 		return 0, ErrUnavailable
 	}
-	return ms.ents[i-offset].Term, nil
+	return ms.ents[i-offset].GetTerm(), nil
 }
 
 // LastIndex implements the Storage interface.
@@ -179,7 +189,7 @@ func (ms *MemoryStorage) LastIndex() (uint64, error) {
 }
 
 func (ms *MemoryStorage) lastIndex() uint64 {
-	return ms.ents[0].Index + uint64(len(ms.ents)) - 1
+	return ms.ents[0].GetIndex() + uint64(len(ms.ents)) - 1
 }
 
 // FirstIndex implements the Storage interface.
@@ -191,32 +201,38 @@ func (ms *MemoryStorage) FirstIndex() (uint64, error) {
 }
 
 func (ms *MemoryStorage) firstIndex() uint64 {
-	return ms.ents[0].Index + 1
+	return ms.ents[0].GetIndex() + 1
 }
 
 // Snapshot implements the Storage interface.
-func (ms *MemoryStorage) Snapshot() (pb.Snapshot, error) {
+func (ms *MemoryStorage) Snapshot() (*pb.Snapshot, error) {
 	ms.Lock()
 	defer ms.Unlock()
 	ms.callStats.snapshot++
-	return ms.snapshot, nil
+	ms.snapshot = pb.EnsureSnapshot(ms.snapshot)
+	return proto.Clone(ms.snapshot).(*pb.Snapshot), nil
 }
 
 // ApplySnapshot overwrites the contents of this Storage object with
 // those of the given snapshot.
-func (ms *MemoryStorage) ApplySnapshot(snap pb.Snapshot) error {
+func (ms *MemoryStorage) ApplySnapshot(snap *pb.Snapshot) error {
 	ms.Lock()
 	defer ms.Unlock()
 
+	snap = pb.EnsureSnapshot(snap)
+
 	//handle check for old snapshot being applied
-	msIndex := ms.snapshot.Metadata.Index
-	snapIndex := snap.Metadata.Index
-	if msIndex >= snapIndex {
+	msIndex := ms.snapshot.GetMetadata().GetIndex()
+	snapIndex := snap.GetMetadata().GetIndex()
+	// During bootstrap, applications (e.g., etcd) may initialize only the
+	// ConfState in the snapshot. In this case, both the snapshot index and
+	// term are 0.
+	if msIndex != 0 && msIndex >= snapIndex {
 		return ErrSnapOutOfDate
 	}
 
-	ms.snapshot = snap
-	ms.ents = []pb.Entry{{Term: snap.Metadata.Term, Index: snap.Metadata.Index}}
+	ms.snapshot = proto.Clone(snap).(*pb.Snapshot)
+	ms.ents = []*pb.Entry{{Term: new(snap.GetMetadata().GetTerm()), Index: new(snap.GetMetadata().GetIndex())}}
 	return nil
 }
 
@@ -224,25 +240,26 @@ func (ms *MemoryStorage) ApplySnapshot(snap pb.Snapshot) error {
 // can be used to reconstruct the state at that point.
 // If any configuration changes have been made since the last compaction,
 // the result of the last ApplyConfChange must be passed in.
-func (ms *MemoryStorage) CreateSnapshot(i uint64, cs *pb.ConfState, data []byte) (pb.Snapshot, error) {
+func (ms *MemoryStorage) CreateSnapshot(i uint64, cs *pb.ConfState, data []byte) (*pb.Snapshot, error) {
 	ms.Lock()
 	defer ms.Unlock()
-	if i <= ms.snapshot.Metadata.Index {
-		return pb.Snapshot{}, ErrSnapOutOfDate
+	if i <= ms.snapshot.GetMetadata().GetIndex() {
+		return nil, ErrSnapOutOfDate
 	}
 
-	offset := ms.ents[0].Index
+	offset := ms.ents[0].GetIndex()
 	if i > ms.lastIndex() {
 		getLogger().Panicf("snapshot %d is out of bound lastindex(%d)", i, ms.lastIndex())
 	}
 
-	ms.snapshot.Metadata.Index = i
-	ms.snapshot.Metadata.Term = ms.ents[i-offset].Term
+	ms.snapshot = pb.EnsureSnapshot(ms.snapshot)
+	ms.snapshot.Metadata.Index = new(i)
+	ms.snapshot.Metadata.Term = new(ms.ents[i-offset].GetTerm())
 	if cs != nil {
-		ms.snapshot.Metadata.ConfState = *cs
+		ms.snapshot.Metadata.ConfState = proto.Clone(cs).(*pb.ConfState)
 	}
 	ms.snapshot.Data = data
-	return ms.snapshot, nil
+	return proto.Clone(ms.snapshot).(*pb.Snapshot), nil
 }
 
 // Compact discards all log entries prior to compactIndex.
@@ -251,7 +268,7 @@ func (ms *MemoryStorage) CreateSnapshot(i uint64, cs *pb.ConfState, data []byte)
 func (ms *MemoryStorage) Compact(compactIndex uint64) error {
 	ms.Lock()
 	defer ms.Unlock()
-	offset := ms.ents[0].Index
+	offset := ms.ents[0].GetIndex()
 	if compactIndex <= offset {
 		return ErrCompacted
 	}
@@ -263,9 +280,8 @@ func (ms *MemoryStorage) Compact(compactIndex uint64) error {
 	// NB: allocate a new slice instead of reusing the old ms.ents. Entries in
 	// ms.ents are immutable, and can be referenced from outside MemoryStorage
 	// through slices returned by ms.Entries().
-	ents := make([]pb.Entry, 1, uint64(len(ms.ents))-i)
-	ents[0].Index = ms.ents[i].Index
-	ents[0].Term = ms.ents[i].Term
+	ents := make([]*pb.Entry, 1, uint64(len(ms.ents))-i)
+	ents[0] = &pb.Entry{Index: new(ms.ents[i].GetIndex()), Term: new(ms.ents[i].GetTerm())}
 	ents = append(ents, ms.ents[i+1:]...)
 	ms.ents = ents
 	return nil
@@ -274,7 +290,7 @@ func (ms *MemoryStorage) Compact(compactIndex uint64) error {
 // Append the new entries to storage.
 // TODO (xiangli): ensure the entries are continuous and
 // entries[0].Index > ms.entries[0].Index
-func (ms *MemoryStorage) Append(entries []pb.Entry) error {
+func (ms *MemoryStorage) Append(entries []*pb.Entry) error {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -283,18 +299,18 @@ func (ms *MemoryStorage) Append(entries []pb.Entry) error {
 	defer ms.Unlock()
 
 	first := ms.firstIndex()
-	last := entries[0].Index + uint64(len(entries)) - 1
+	last := entries[0].GetIndex() + uint64(len(entries)) - 1
 
 	// shortcut if there is no new entry.
 	if last < first {
 		return nil
 	}
 	// truncate compacted entries
-	if first > entries[0].Index {
-		entries = entries[first-entries[0].Index:]
+	if first > entries[0].GetIndex() {
+		entries = entries[first-entries[0].GetIndex():]
 	}
 
-	offset := entries[0].Index - ms.ents[0].Index
+	offset := entries[0].GetIndex() - ms.ents[0].GetIndex()
 	switch {
 	case uint64(len(ms.ents)) > offset:
 		// NB: full slice expression protects ms.ents at index >= offset from
@@ -304,7 +320,7 @@ func (ms *MemoryStorage) Append(entries []pb.Entry) error {
 		ms.ents = append(ms.ents, entries...)
 	default:
 		getLogger().Panicf("missing log entry [last: %d, append at: %d]",
-			ms.lastIndex(), entries[0].Index)
+			ms.lastIndex(), entries[0].GetIndex())
 	}
 	return nil
 }

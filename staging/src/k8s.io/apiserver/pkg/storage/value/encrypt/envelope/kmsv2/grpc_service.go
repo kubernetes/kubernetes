@@ -83,7 +83,7 @@ func NewGRPCService(ctx context.Context, endpoint, providerName string, callTime
 	s.kmsClient = kmsapi.NewKeyManagementServiceClient(s.connection)
 
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(ctx)
 
 		<-ctx.Done()
 		_ = s.connection.Close()

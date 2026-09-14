@@ -44,11 +44,11 @@ var (
 	)
 	betaOptions = sets.New[string](
 		DistributeCPUsAcrossNUMAOption,
-		PreferAlignByUnCoreCacheOption,
 	)
 	stableOptions = sets.New[string](
 		FullPCPUsOnlyOption,
 		StrictCPUReservationOption,
+		PreferAlignByUnCoreCacheOption,
 	)
 )
 

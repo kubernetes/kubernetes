@@ -22,12 +22,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestPodSandboxChanged(t *testing.T) {
@@ -37,6 +40,7 @@ func TestPodSandboxChanged(t *testing.T) {
 		expectedChanged   bool
 		expectedAttempt   uint32
 		expectedSandboxID string
+		expectedReason    string
 	}{
 		"Pod with no existing sandboxes": {
 			pod:               &v1.Pod{},
@@ -44,6 +48,7 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   true,
 			expectedAttempt:   0,
 			expectedSandboxID: "",
+			expectedReason:    kubetypes.PodSandboxNotReadyMsgNoPodSandbox,
 		},
 		"Pod with multiple ready sandbox statuses": {
 			pod: &v1.Pod{},
@@ -64,6 +69,7 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   true,
 			expectedAttempt:   2,
 			expectedSandboxID: "sandboxID2",
+			expectedReason:    kubetypes.PodSandboxNotReadyMsgMultipleSandboxes,
 		},
 		"Pod with no ready sandbox statuses": {
 			pod: &v1.Pod{},
@@ -84,6 +90,7 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   true,
 			expectedAttempt:   2,
 			expectedSandboxID: "sandboxID2",
+			expectedReason:    kubetypes.PodSandboxNotReadyMsgSandboxNotReady,
 		},
 		"Pod with ready sandbox status but network namespace mismatch": {
 			pod: &v1.Pod{
@@ -110,6 +117,7 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   true,
 			expectedAttempt:   1,
 			expectedSandboxID: "",
+			expectedReason:    kubetypes.PodSandboxNotReadyMsgNetworkNamespaceMode,
 		},
 		"Pod with ready sandbox status but no IP": {
 			pod: &v1.Pod{
@@ -132,6 +140,7 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   true,
 			expectedAttempt:   1,
 			expectedSandboxID: "sandboxID1",
+			expectedReason:    kubetypes.PodSandboxNotReadyMsgNoIPAddress,
 		},
 		"Pod with ready sandbox status with IP": {
 			pod: &v1.Pod{
@@ -154,13 +163,15 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   false,
 			expectedAttempt:   0,
 			expectedSandboxID: "sandboxID1",
+			expectedReason:    "",
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			changed, attempt, id := PodSandboxChanged(test.pod, test.status)
+			changed, attempt, id, reason := PodSandboxChanged(test.pod, test.status)
 			require.Equal(t, test.expectedChanged, changed)
 			require.Equal(t, test.expectedAttempt, attempt)
 			require.Equal(t, test.expectedSandboxID, id)
+			require.Equal(t, test.expectedReason, reason)
 		})
 	}
 }
@@ -172,6 +183,7 @@ func (*fakeRuntimeHandlerResolver) LookupRuntimeHandler(s *string) (string, erro
 }
 
 func TestNamespacesForPod(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	usernsIDs := &runtimeapi.IDMapping{
 		HostId:      65536,
 		ContainerId: 0,
@@ -305,12 +317,16 @@ func TestNamespacesForPod(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, test.usernsEnabled)
+			if !test.usernsEnabled {
+				// Set emulation version so that the feature gate can be disabled in the test
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
+			}
 
 			fakeRuntimeHelper := kubecontainertest.FakeRuntimeHelper{
 				RuntimeHandlers: test.runtimeHandlers,
 			}
-			actual, err := NamespacesForPod(test.input, &fakeRuntimeHelper, &fakeRuntimeHandlerResolver{})
+			actual, err := NamespacesForPod(tCtx, test.input, &fakeRuntimeHelper, &fakeRuntimeHandlerResolver{})
 			if test.expErr {
 				require.Error(t, err)
 			} else {

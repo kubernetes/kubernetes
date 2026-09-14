@@ -18,6 +18,7 @@ package structured
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	resourceapi "k8s.io/api/resource/v1"
@@ -37,6 +38,16 @@ func TestAllocator(t *testing.T) {
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (allocatortesting.Allocator, error) {
-			return NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+			allocator, err := NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+			if err != nil {
+				return nil, err
+			}
+			// Return the allocator with the internal interface so the tests can
+			// check the channel for the allocator.
+			internalAllocator, ok := allocator.(internal.Allocator)
+			if !ok {
+				return nil, fmt.Errorf("allocator doesn't implement internal interface")
+			}
+			return internalAllocator, nil
 		})
 }

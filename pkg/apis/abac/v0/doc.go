@@ -16,6 +16,7 @@ limitations under the License.
 
 // +k8s:conversion-gen=false
 // +k8s:deepcopy-gen=package
+// +k8s:openapi-gen=false
 
 // +groupName=abac.authorization.kubernetes.io
 

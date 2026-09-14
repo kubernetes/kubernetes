@@ -18,10 +18,8 @@ package delegator
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func ShouldDelegateListMeta(opts *metav1.ListOptions, cache Helper) (Result, error) {
@@ -107,7 +105,5 @@ func (c CacheWithoutSnapshots) ShouldDelegateConsistentRead() (Result, error) {
 // ConsistentReadSupported returns whether cache can be used to serve reads with RV not yet observed by cache, including both consistent reads.
 // Function is located here to avoid import cycles between staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go and staging/src/k8s.io/apiserver/pkg/util/flow_control/request/list_work_estimator.go.
 func ConsistentReadSupported() bool {
-	consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
-	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-	return consistentListFromCacheEnabled && requestWatchProgressSupported
+	return etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 }

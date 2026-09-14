@@ -30,7 +30,7 @@ import (
 // If value implements the Marshaler interface, Marshal calls its
 // MarshalCBOR method.
 //
-// If value implements encoding.BinaryMarshaler, Marhsal calls its
+// If value implements encoding.BinaryMarshaler, Marshal calls its
 // MarshalBinary method and encode it as CBOR byte string.
 //
 // Boolean values encode as CBOR booleans (type 7).
@@ -343,7 +343,7 @@ const (
 	// non-UTC timezone then a "localtime - UTC" numeric offset will be included as specified in RFC3339.
 	// NOTE: User applications can avoid including the RFC3339 numeric offset by:
 	// - providing a time.Time value set to UTC, or
-	// - using the TimeUnix, TimeUnixMicro, or TimeUnixDynamic option instead of TimeRFC3339.
+	// - using the TimeUnix, TimeUnixMicro, TimeUnixDynamic, or TimeRFC3339NanoUTC option.
 	TimeRFC3339
 
 	// TimeRFC3339Nano causes time.Time to encode to a CBOR time (tag 0) with a text string content
@@ -351,8 +351,12 @@ const (
 	// non-UTC timezone then a "localtime - UTC" numeric offset will be included as specified in RFC3339.
 	// NOTE: User applications can avoid including the RFC3339 numeric offset by:
 	// - providing a time.Time value set to UTC, or
-	// - using the TimeUnix, TimeUnixMicro, or TimeUnixDynamic option instead of TimeRFC3339Nano.
+	// - using the TimeUnix, TimeUnixMicro, TimeUnixDynamic, or TimeRFC3339NanoUTC option.
 	TimeRFC3339Nano
+
+	// TimeRFC3339NanoUTC causes time.Time to encode to a CBOR time (tag 0) with a text string content
+	// representing UTC time using nanosecond precision in RFC3339 format.
+	TimeRFC3339NanoUTC
 
 	maxTimeMode
 )
@@ -436,7 +440,7 @@ const (
 	// FieldNameToTextString encodes struct fields to CBOR text string (major type 3).
 	FieldNameToTextString FieldNameMode = iota
 
-	// FieldNameToTextString encodes struct fields to CBOR byte string (major type 2).
+	// FieldNameToByteString encodes struct fields to CBOR byte string (major type 2).
 	FieldNameToByteString
 
 	maxFieldNameMode
@@ -567,7 +571,7 @@ type EncOptions struct {
 	// RFC3339 format gets tag number 0, and numeric epoch time tag number 1.
 	TimeTag EncTagMode
 
-	// IndefLength specifies whether to allow indefinite length CBOR items.
+	// IndefLength specifies whether to allow indefinite-length CBOR items.
 	IndefLength IndefLengthMode
 
 	// NilContainers specifies how to encode nil slices and maps.
@@ -1132,10 +1136,11 @@ func encodeFloat(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	if fopt == ShortestFloat16 {
 		var f16 float16.Float16
 		p := float16.PrecisionFromfloat32(f32)
-		if p == float16.PrecisionExact {
+		switch p {
+		case float16.PrecisionExact:
 			// Roundtrip float32->float16->float32 test isn't needed.
 			f16 = float16.Fromfloat32(f32)
-		} else if p == float16.PrecisionUnknown {
+		case float16.PrecisionUnknown:
 			// Try roundtrip float32->float16->float32 to determine if float32 can fit into float16.
 			f16 = float16.Fromfloat32(f32)
 			if f16.Float32() == f32 {
@@ -1293,10 +1298,10 @@ func encodeByteString(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	if slen == 0 {
 		return e.WriteByte(byte(cborTypeByteString))
 	}
-	encodeHead(e, byte(cborTypeByteString), uint64(slen))
+	encodeHead(e, byte(cborTypeByteString), uint64(slen)) //nolint:gosec
 	if vk == reflect.Array {
 		for i := 0; i < slen; i++ {
-			e.WriteByte(byte(v.Index(i).Uint()))
+			e.WriteByte(byte(v.Index(i).Uint())) //nolint:gosec
 		}
 		return nil
 	}
@@ -1333,7 +1338,7 @@ func (ae arrayEncodeFunc) encode(e *bytes.Buffer, em *encMode, v reflect.Value) 
 	if alen == 0 {
 		return e.WriteByte(byte(cborTypeArray))
 	}
-	encodeHead(e, byte(cborTypeArray), uint64(alen))
+	encodeHead(e, byte(cborTypeArray), uint64(alen)) //nolint:gosec
 	for i := 0; i < alen; i++ {
 		if err := ae.f(e, em, v.Index(i)); err != nil {
 			return err
@@ -1364,7 +1369,7 @@ func (me mapEncodeFunc) encode(e *bytes.Buffer, em *encMode, v reflect.Value) er
 		return e.WriteByte(byte(cborTypeMap))
 	}
 
-	encodeHead(e, byte(cborTypeMap), uint64(mlen))
+	encodeHead(e, byte(cborTypeMap), uint64(mlen)) //nolint:gosec
 	if em.sort == SortNone || em.sort == SortFastShuffle || mlen <= 1 {
 		return me.e(e, em, v, nil)
 	}
@@ -1427,7 +1432,7 @@ func (x *bytewiseKeyValueSorter) Swap(i, j int) {
 
 func (x *bytewiseKeyValueSorter) Less(i, j int) bool {
 	kvi, kvj := x.kvs[i], x.kvs[j]
-	return bytes.Compare(x.data[kvi.offset:kvi.valueOffset], x.data[kvj.offset:kvj.valueOffset]) <= 0
+	return bytes.Compare(x.data[kvi.offset:kvi.valueOffset], x.data[kvj.offset:kvj.valueOffset]) < 0
 }
 
 type lengthFirstKeyValueSorter struct {
@@ -1448,7 +1453,7 @@ func (x *lengthFirstKeyValueSorter) Less(i, j int) bool {
 	if keyLengthDifference := (kvi.valueOffset - kvi.offset) - (kvj.valueOffset - kvj.offset); keyLengthDifference != 0 {
 		return keyLengthDifference < 0
 	}
-	return bytes.Compare(x.data[kvi.offset:kvi.valueOffset], x.data[kvj.offset:kvj.valueOffset]) <= 0
+	return bytes.Compare(x.data[kvi.offset:kvi.valueOffset], x.data[kvj.offset:kvj.valueOffset]) < 0
 }
 
 var keyValuePool = sync.Pool{}
@@ -1535,8 +1540,8 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 	// Head is rewritten later if actual encoded field count is different from struct field count.
 	encodedHeadLen := encodeHead(e, byte(cborTypeMap), uint64(len(flds)))
 
-	kvbegin := e.Len()
-	kvcount := 0
+	kvBeginOffset := e.Len()
+	kvCount := 0
 	for offset := 0; offset < len(flds); offset++ {
 		f := flds[(start+offset)%len(flds)]
 
@@ -1582,10 +1587,10 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 			return err
 		}
 
-		kvcount++
+		kvCount++
 	}
 
-	if len(flds) == kvcount {
+	if len(flds) == kvCount {
 		// Encoded element count in head is the same as actual element count.
 		return nil
 	}
@@ -1593,8 +1598,8 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 	// Overwrite the bytes that were reserved for the head before encoding the map entries.
 	var actualHeadLen int
 	{
-		headbuf := *bytes.NewBuffer(e.Bytes()[kvbegin-encodedHeadLen : kvbegin-encodedHeadLen : kvbegin])
-		actualHeadLen = encodeHead(&headbuf, byte(cborTypeMap), uint64(kvcount))
+		headbuf := *bytes.NewBuffer(e.Bytes()[kvBeginOffset-encodedHeadLen : kvBeginOffset-encodedHeadLen : kvBeginOffset])
+		actualHeadLen = encodeHead(&headbuf, byte(cborTypeMap), uint64(kvCount))
 	}
 
 	if actualHeadLen == encodedHeadLen {
@@ -1607,8 +1612,8 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 	// encoded. The encoded entries are offset to the right by the number of excess reserved
 	// bytes. Shift the entries left to remove the gap.
 	excessReservedBytes := encodedHeadLen - actualHeadLen
-	dst := e.Bytes()[kvbegin-excessReservedBytes : e.Len()-excessReservedBytes]
-	src := e.Bytes()[kvbegin:e.Len()]
+	dst := e.Bytes()[kvBeginOffset-excessReservedBytes : e.Len()-excessReservedBytes]
+	src := e.Bytes()[kvBeginOffset:e.Len()]
 	copy(dst, src)
 
 	// After shifting, the excess bytes are at the end of the output buffer and they are
@@ -1633,7 +1638,7 @@ func encodeTime(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	}
 	if em.timeTag == EncTagRequired {
 		tagNumber := 1
-		if em.time == TimeRFC3339 || em.time == TimeRFC3339Nano {
+		if em.time == TimeRFC3339 || em.time == TimeRFC3339Nano || em.time == TimeRFC3339NanoUTC {
 			tagNumber = 0
 		}
 		encodeHead(e, byte(cborTypeTag), uint64(tagNumber))
@@ -1650,7 +1655,7 @@ func encodeTime(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 
 	case TimeUnixDynamic:
 		t = t.UTC().Round(time.Microsecond)
-		secs, nsecs := t.Unix(), uint64(t.Nanosecond())
+		secs, nsecs := t.Unix(), uint64(t.Nanosecond()) //nolint:gosec
 		if nsecs == 0 {
 			return encodeInt(e, em, reflect.ValueOf(secs))
 		}
@@ -1659,6 +1664,10 @@ func encodeTime(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 
 	case TimeRFC3339:
 		s := t.Format(time.RFC3339)
+		return encodeString(e, em, reflect.ValueOf(s))
+
+	case TimeRFC3339NanoUTC:
+		s := t.UTC().Format(time.RFC3339Nano)
 		return encodeString(e, em, reflect.ValueOf(s))
 
 	default: // TimeRFC3339Nano

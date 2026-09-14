@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
-// Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
+// Copyright 2008 Google LLC.  All rights reserved.
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
@@ -69,6 +46,9 @@ const (
 	// comparison.
 	Edition_EDITION_2023 Edition = 1000
 	Edition_EDITION_2024 Edition = 1001
+	Edition_EDITION_2026 Edition = 1002
+	// A placeholder edition for developing and testing unscheduled features.
+	Edition_EDITION_UNSTABLE Edition = 9999
 	// Placeholder editions for testing feature resolution.  These should not be
 	// used or relied on outside of tests.
 	Edition_EDITION_1_TEST_ONLY     Edition = 1
@@ -91,6 +71,8 @@ var (
 		999:        "EDITION_PROTO3",
 		1000:       "EDITION_2023",
 		1001:       "EDITION_2024",
+		1002:       "EDITION_2026",
+		9999:       "EDITION_UNSTABLE",
 		1:          "EDITION_1_TEST_ONLY",
 		2:          "EDITION_2_TEST_ONLY",
 		99997:      "EDITION_99997_TEST_ONLY",
@@ -105,6 +87,8 @@ var (
 		"EDITION_PROTO3":          999,
 		"EDITION_2023":            1000,
 		"EDITION_2024":            1001,
+		"EDITION_2026":            1002,
+		"EDITION_UNSTABLE":        9999,
 		"EDITION_1_TEST_ONLY":     1,
 		"EDITION_2_TEST_ONLY":     2,
 		"EDITION_99997_TEST_ONLY": 99997,
@@ -1209,6 +1193,7 @@ const (
 	FeatureSet_ENFORCE_NAMING_STYLE_UNKNOWN FeatureSet_EnforceNamingStyle = 0
 	FeatureSet_STYLE2024                    FeatureSet_EnforceNamingStyle = 1
 	FeatureSet_STYLE_LEGACY                 FeatureSet_EnforceNamingStyle = 2
+	FeatureSet_STYLE2026                    FeatureSet_EnforceNamingStyle = 3
 )
 
 // Enum value maps for FeatureSet_EnforceNamingStyle.
@@ -1217,11 +1202,13 @@ var (
 		0: "ENFORCE_NAMING_STYLE_UNKNOWN",
 		1: "STYLE2024",
 		2: "STYLE_LEGACY",
+		3: "STYLE2026",
 	}
 	FeatureSet_EnforceNamingStyle_value = map[string]int32{
 		"ENFORCE_NAMING_STYLE_UNKNOWN": 0,
 		"STYLE2024":                    1,
 		"STYLE_LEGACY":                 2,
+		"STYLE2026":                    3,
 	}
 )
 
@@ -4200,8 +4187,11 @@ type FieldOptions_FeatureSupport struct {
 	// this one, the last default assigned will be used, and proto files will
 	// not be able to override it.
 	EditionRemoved *Edition `protobuf:"varint,4,opt,name=edition_removed,json=editionRemoved,enum=google.protobuf.Edition" json:"edition_removed,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// The removal error text if this feature is used after the edition it was
+	// removed in.
+	RemovalError  *string `protobuf:"bytes,5,opt,name=removal_error,json=removalError" json:"removal_error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FieldOptions_FeatureSupport) Reset() {
@@ -4260,6 +4250,13 @@ func (x *FieldOptions_FeatureSupport) GetEditionRemoved() Edition {
 		return *x.EditionRemoved
 	}
 	return Edition_EDITION_UNKNOWN
+}
+
+func (x *FieldOptions_FeatureSupport) GetRemovalError() string {
+	if x != nil && x.RemovalError != nil {
+		return *x.RemovalError
+	}
+	return ""
 }
 
 // The name of the uninterpreted option.  Each string represents a segment in
@@ -4715,7 +4712,7 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\aoptions\x18\x03 \x01(\v2&.google.protobuf.ExtensionRangeOptionsR\aoptions\x1a7\n" +
 	"\rReservedRange\x12\x14\n" +
 	"\x05start\x18\x01 \x01(\x05R\x05start\x12\x10\n" +
-	"\x03end\x18\x02 \x01(\x05R\x03end\"\xcc\x04\n" +
+	"\x03end\x18\x02 \x01(\x05R\x03end\"\xd4\x04\n" +
 	"\x15ExtensionRangeOptions\x12X\n" +
 	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption\x12Y\n" +
 	"\vdeclaration\x18\x02 \x03(\v22.google.protobuf.ExtensionRangeOptions.DeclarationB\x03\x88\x01\x02R\vdeclaration\x127\n" +
@@ -4731,7 +4728,7 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\x11VerificationState\x12\x0f\n" +
 	"\vDECLARATION\x10\x00\x12\x0e\n" +
 	"\n" +
-	"UNVERIFIED\x10\x01*\t\b\xe8\a\x10\x80\x80\x80\x80\x02\"\xc1\x06\n" +
+	"UNVERIFIED\x10\x01*\x06\b\xde\a\x10\xe7\a*\t\b\xe8\a\x10\x80\x80\x80\x80\x02\"\xc1\x06\n" +
 	"\x14FieldDescriptorProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06number\x18\x03 \x01(\x05R\x06number\x12A\n" +
@@ -4793,11 +4790,11 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\x18EnumValueDescriptorProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12;\n" +
-	"\aoptions\x18\x03 \x01(\v2!.google.protobuf.EnumValueOptionsR\aoptions\"\xa7\x01\n" +
+	"\aoptions\x18\x03 \x01(\v2!.google.protobuf.EnumValueOptionsR\aoptions\"\xb5\x01\n" +
 	"\x16ServiceDescriptorProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12>\n" +
 	"\x06method\x18\x02 \x03(\v2&.google.protobuf.MethodDescriptorProtoR\x06method\x129\n" +
-	"\aoptions\x18\x03 \x01(\v2\x1f.google.protobuf.ServiceOptionsR\aoptions\"\x89\x02\n" +
+	"\aoptions\x18\x03 \x01(\v2\x1f.google.protobuf.ServiceOptionsR\aoptionsJ\x04\b\x04\x10\x05R\x06stream\"\x89\x02\n" +
 	"\x15MethodDescriptorProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
@@ -4806,12 +4803,13 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"outputType\x128\n" +
 	"\aoptions\x18\x04 \x01(\v2\x1e.google.protobuf.MethodOptionsR\aoptions\x120\n" +
 	"\x10client_streaming\x18\x05 \x01(\b:\x05falseR\x0fclientStreaming\x120\n" +
-	"\x10server_streaming\x18\x06 \x01(\b:\x05falseR\x0fserverStreaming\"\xad\t\n" +
+	"\x10server_streaming\x18\x06 \x01(\b:\x05falseR\x0fserverStreaming\"\xfa\n" +
+	"\n" +
 	"\vFileOptions\x12!\n" +
 	"\fjava_package\x18\x01 \x01(\tR\vjavaPackage\x120\n" +
-	"\x14java_outer_classname\x18\b \x01(\tR\x12javaOuterClassname\x125\n" +
+	"\x14java_outer_classname\x18\b \x01(\tR\x12javaOuterClassname\x12\xf9\x01\n" +
 	"\x13java_multiple_files\x18\n" +
-	" \x01(\b:\x05falseR\x11javaMultipleFiles\x12D\n" +
+	" \x01(\b:\x05falseB\xc1\x01\xb2\x01\xbd\x01\b\xe6\a \xe9\a*\xb4\x01This behavior is enabled by default in editions 2024 and above. To disable it, you can set `features.(pb.java).nest_in_file_class = YES` on individual messages, enums, or services.R\x11javaMultipleFiles\x12D\n" +
 	"\x1djava_generate_equals_and_hash\x18\x14 \x01(\bB\x02\x18\x01R\x19javaGenerateEqualsAndHash\x12:\n" +
 	"\x16java_string_check_utf8\x18\x1b \x01(\b:\x05falseR\x13javaStringCheckUtf8\x12S\n" +
 	"\foptimize_for\x18\t \x01(\x0e2).google.protobuf.FileOptions.OptimizeMode:\x05SPEEDR\voptimizeFor\x12\x1d\n" +
@@ -4836,7 +4834,7 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\fOptimizeMode\x12\t\n" +
 	"\x05SPEED\x10\x01\x12\r\n" +
 	"\tCODE_SIZE\x10\x02\x12\x10\n" +
-	"\fLITE_RUNTIME\x10\x03*\t\b\xe8\a\x10\x80\x80\x80\x80\x02J\x04\b*\x10+J\x04\b&\x10'R\x14php_generic_services\"\xf4\x03\n" +
+	"\fLITE_RUNTIME\x10\x03*\x06\b\xde\a\x10\xe7\a*\t\b\xe8\a\x10\x80\x80\x80\x80\x02J\x04\b*\x10+J\x04\b&\x10'R\x14php_generic_services\"\xfc\x03\n" +
 	"\x0eMessageOptions\x12<\n" +
 	"\x17message_set_wire_format\x18\x01 \x01(\b:\x05falseR\x14messageSetWireFormat\x12L\n" +
 	"\x1fno_standard_descriptor_accessor\x18\x02 \x01(\b:\x05falseR\x1cnoStandardDescriptorAccessor\x12%\n" +
@@ -4846,8 +4844,8 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\tmap_entry\x18\a \x01(\bR\bmapEntry\x12V\n" +
 	"&deprecated_legacy_json_field_conflicts\x18\v \x01(\bB\x02\x18\x01R\"deprecatedLegacyJsonFieldConflicts\x127\n" +
 	"\bfeatures\x18\f \x01(\v2\x1b.google.protobuf.FeatureSetR\bfeatures\x12X\n" +
-	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption*\t\b\xe8\a\x10\x80\x80\x80\x80\x02J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\b\x10\tJ\x04\b\t\x10\n" +
-	"\"\xa1\r\n" +
+	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption*\x06\b\xde\a\x10\xe7\a*\t\b\xe8\a\x10\x80\x80\x80\x80\x02J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\b\x10\tJ\x04\b\t\x10\n" +
+	"\"\xce\r\n" +
 	"\fFieldOptions\x12A\n" +
 	"\x05ctype\x18\x01 \x01(\x0e2#.google.protobuf.FieldOptions.CType:\x06STRINGR\x05ctype\x12\x16\n" +
 	"\x06packed\x18\x02 \x01(\bR\x06packed\x12G\n" +
@@ -4868,12 +4866,13 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption\x1aZ\n" +
 	"\x0eEditionDefault\x122\n" +
 	"\aedition\x18\x03 \x01(\x0e2\x18.google.protobuf.EditionR\aedition\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\x1a\x96\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x1a\xbb\x02\n" +
 	"\x0eFeatureSupport\x12G\n" +
 	"\x12edition_introduced\x18\x01 \x01(\x0e2\x18.google.protobuf.EditionR\x11editionIntroduced\x12G\n" +
 	"\x12edition_deprecated\x18\x02 \x01(\x0e2\x18.google.protobuf.EditionR\x11editionDeprecated\x12/\n" +
 	"\x13deprecation_warning\x18\x03 \x01(\tR\x12deprecationWarning\x12A\n" +
-	"\x0fedition_removed\x18\x04 \x01(\x0e2\x18.google.protobuf.EditionR\x0eeditionRemoved\"/\n" +
+	"\x0fedition_removed\x18\x04 \x01(\x0e2\x18.google.protobuf.EditionR\x0eeditionRemoved\x12#\n" +
+	"\rremoval_error\x18\x05 \x01(\tR\fremovalError\"/\n" +
 	"\x05CType\x12\n" +
 	"\n" +
 	"\x06STRING\x10\x00\x12\b\n" +
@@ -4897,10 +4896,10 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\x10TARGET_TYPE_ENUM\x10\x06\x12\x1a\n" +
 	"\x16TARGET_TYPE_ENUM_ENTRY\x10\a\x12\x17\n" +
 	"\x13TARGET_TYPE_SERVICE\x10\b\x12\x16\n" +
-	"\x12TARGET_TYPE_METHOD\x10\t*\t\b\xe8\a\x10\x80\x80\x80\x80\x02J\x04\b\x04\x10\x05J\x04\b\x12\x10\x13\"\xac\x01\n" +
+	"\x12TARGET_TYPE_METHOD\x10\t*\x06\b\xde\a\x10\xe7\a*\t\b\xe8\a\x10\x80\x80\x80\x80\x02J\x04\b\x04\x10\x05J\x04\b\x12\x10\x13\"\xb4\x01\n" +
 	"\fOneofOptions\x127\n" +
 	"\bfeatures\x18\x01 \x01(\v2\x1b.google.protobuf.FeatureSetR\bfeatures\x12X\n" +
-	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption*\t\b\xe8\a\x10\x80\x80\x80\x80\x02\"\xd1\x02\n" +
+	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption*\x06\b\xde\a\x10\xe7\a*\t\b\xe8\a\x10\x80\x80\x80\x80\x02\"\xd9\x02\n" +
 	"\vEnumOptions\x12\x1f\n" +
 	"\vallow_alias\x18\x02 \x01(\bR\n" +
 	"allowAlias\x12%\n" +
@@ -4909,7 +4908,7 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"deprecated\x12V\n" +
 	"&deprecated_legacy_json_field_conflicts\x18\x06 \x01(\bB\x02\x18\x01R\"deprecatedLegacyJsonFieldConflicts\x127\n" +
 	"\bfeatures\x18\a \x01(\v2\x1b.google.protobuf.FeatureSetR\bfeatures\x12X\n" +
-	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption*\t\b\xe8\a\x10\x80\x80\x80\x80\x02J\x04\b\x05\x10\x06\"\xd8\x02\n" +
+	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption*\x06\b\xde\a\x10\xe7\a*\t\b\xe8\a\x10\x80\x80\x80\x80\x02J\x04\b\x05\x10\x06\"\xe0\x02\n" +
 	"\x10EnumValueOptions\x12%\n" +
 	"\n" +
 	"deprecated\x18\x01 \x01(\b:\x05falseR\n" +
@@ -4917,13 +4916,13 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\bfeatures\x18\x02 \x01(\v2\x1b.google.protobuf.FeatureSetR\bfeatures\x12(\n" +
 	"\fdebug_redact\x18\x03 \x01(\b:\x05falseR\vdebugRedact\x12U\n" +
 	"\x0ffeature_support\x18\x04 \x01(\v2,.google.protobuf.FieldOptions.FeatureSupportR\x0efeatureSupport\x12X\n" +
-	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption*\t\b\xe8\a\x10\x80\x80\x80\x80\x02\"\xd5\x01\n" +
+	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption*\x06\b\xde\a\x10\xe7\a*\t\b\xe8\a\x10\x80\x80\x80\x80\x02\"\xdd\x01\n" +
 	"\x0eServiceOptions\x127\n" +
 	"\bfeatures\x18\" \x01(\v2\x1b.google.protobuf.FeatureSetR\bfeatures\x12%\n" +
 	"\n" +
 	"deprecated\x18! \x01(\b:\x05falseR\n" +
 	"deprecated\x12X\n" +
-	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption*\t\b\xe8\a\x10\x80\x80\x80\x80\x02\"\x99\x03\n" +
+	"\x14uninterpreted_option\x18\xe7\a \x03(\v2$.google.protobuf.UninterpretedOptionR\x13uninterpretedOption*\x06\b\xde\a\x10\xe7\a*\t\b\xe8\a\x10\x80\x80\x80\x80\x02\"\xa1\x03\n" +
 	"\rMethodOptions\x12%\n" +
 	"\n" +
 	"deprecated\x18! \x01(\b:\x05falseR\n" +
@@ -4935,7 +4934,7 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\x13IDEMPOTENCY_UNKNOWN\x10\x00\x12\x13\n" +
 	"\x0fNO_SIDE_EFFECTS\x10\x01\x12\x0e\n" +
 	"\n" +
-	"IDEMPOTENT\x10\x02*\t\b\xe8\a\x10\x80\x80\x80\x80\x02\"\x9a\x03\n" +
+	"IDEMPOTENT\x10\x02*\x06\b\xde\a\x10\xe7\a*\t\b\xe8\a\x10\x80\x80\x80\x80\x02\"\x9a\x03\n" +
 	"\x13UninterpretedOption\x12A\n" +
 	"\x04name\x18\x02 \x03(\v2-.google.protobuf.UninterpretedOption.NamePartR\x04name\x12)\n" +
 	"\x10identifier_value\x18\x03 \x01(\tR\x0fidentifierValue\x12,\n" +
@@ -4946,7 +4945,7 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\x0faggregate_value\x18\b \x01(\tR\x0eaggregateValue\x1aJ\n" +
 	"\bNamePart\x12\x1b\n" +
 	"\tname_part\x18\x01 \x02(\tR\bnamePart\x12!\n" +
-	"\fis_extension\x18\x02 \x02(\bR\visExtension\"\x8e\x0f\n" +
+	"\fis_extension\x18\x02 \x02(\bR\visExtension\"\xae\x0f\n" +
 	"\n" +
 	"FeatureSet\x12\x91\x01\n" +
 	"\x0efield_presence\x18\x01 \x01(\x0e2).google.protobuf.FeatureSet.FieldPresenceB?\x88\x01\x01\x98\x01\x04\x98\x01\x01\xa2\x01\r\x12\bEXPLICIT\x18\x84\a\xa2\x01\r\x12\bIMPLICIT\x18\xe7\a\xa2\x01\r\x12\bEXPLICIT\x18\xe8\a\xb2\x01\x03\b\xe8\aR\rfieldPresence\x12l\n" +
@@ -4956,8 +4955,8 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\x10message_encoding\x18\x05 \x01(\x0e2+.google.protobuf.FeatureSet.MessageEncodingB&\x88\x01\x01\x98\x01\x04\x98\x01\x01\xa2\x01\x14\x12\x0fLENGTH_PREFIXED\x18\x84\a\xb2\x01\x03\b\xe8\aR\x0fmessageEncoding\x12\x82\x01\n" +
 	"\vjson_format\x18\x06 \x01(\x0e2&.google.protobuf.FeatureSet.JsonFormatB9\x88\x01\x01\x98\x01\x03\x98\x01\x06\x98\x01\x01\xa2\x01\x17\x12\x12LEGACY_BEST_EFFORT\x18\x84\a\xa2\x01\n" +
 	"\x12\x05ALLOW\x18\xe7\a\xb2\x01\x03\b\xe8\aR\n" +
-	"jsonFormat\x12\xab\x01\n" +
-	"\x14enforce_naming_style\x18\a \x01(\x0e2..google.protobuf.FeatureSet.EnforceNamingStyleBI\x88\x01\x02\x98\x01\x01\x98\x01\x02\x98\x01\x03\x98\x01\x04\x98\x01\x05\x98\x01\x06\x98\x01\a\x98\x01\b\x98\x01\t\xa2\x01\x11\x12\fSTYLE_LEGACY\x18\x84\a\xa2\x01\x0e\x12\tSTYLE2024\x18\xe9\a\xb2\x01\x03\b\xe9\aR\x12enforceNamingStyle\x12\xb9\x01\n" +
+	"jsonFormat\x12\xbc\x01\n" +
+	"\x14enforce_naming_style\x18\a \x01(\x0e2..google.protobuf.FeatureSet.EnforceNamingStyleBZ\x88\x01\x02\x98\x01\x01\x98\x01\x02\x98\x01\x03\x98\x01\x04\x98\x01\x05\x98\x01\x06\x98\x01\a\x98\x01\b\x98\x01\t\xa2\x01\x11\x12\fSTYLE_LEGACY\x18\x84\a\xa2\x01\x0e\x12\tSTYLE2024\x18\xe9\a\xa2\x01\x0e\x12\tSTYLE2026\x18\x8fN\xb2\x01\x03\b\xe9\aR\x12enforceNamingStyle\x12\xb9\x01\n" +
 	"\x19default_symbol_visibility\x18\b \x01(\x0e2E.google.protobuf.FeatureSet.VisibilityFeature.DefaultSymbolVisibilityB6\x88\x01\x02\x98\x01\x01\xa2\x01\x0f\x12\n" +
 	"EXPORT_ALL\x18\x84\a\xa2\x01\x15\x12\x10EXPORT_TOP_LEVEL\x18\xe9\a\xb2\x01\x03\b\xe9\aR\x17defaultSymbolVisibility\x1a\xa1\x01\n" +
 	"\x11VisibilityFeature\"\x81\x01\n" +
@@ -4997,11 +4996,12 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"JsonFormat\x12\x17\n" +
 	"\x13JSON_FORMAT_UNKNOWN\x10\x00\x12\t\n" +
 	"\x05ALLOW\x10\x01\x12\x16\n" +
-	"\x12LEGACY_BEST_EFFORT\x10\x02\"W\n" +
+	"\x12LEGACY_BEST_EFFORT\x10\x02\"f\n" +
 	"\x12EnforceNamingStyle\x12 \n" +
 	"\x1cENFORCE_NAMING_STYLE_UNKNOWN\x10\x00\x12\r\n" +
 	"\tSTYLE2024\x10\x01\x12\x10\n" +
-	"\fSTYLE_LEGACY\x10\x02*\x06\b\xe8\a\x10\x8bN*\x06\b\x8bN\x10\x90N*\x06\b\x90N\x10\x91NJ\x06\b\xe7\a\x10\xe8\a\"\xef\x03\n" +
+	"\fSTYLE_LEGACY\x10\x02\x12\r\n" +
+	"\tSTYLE2026\x10\x03*\x06\b\xe8\a\x10\x8bN*\x06\b\x8bN\x10\x90N*\x06\b\x90N\x10\x91NJ\x06\b\xe7\a\x10\xe8\a\"\xef\x03\n" +
 	"\x12FeatureSetDefaults\x12X\n" +
 	"\bdefaults\x18\x01 \x03(\v2<.google.protobuf.FeatureSetDefaults.FeatureSetEditionDefaultR\bdefaults\x12A\n" +
 	"\x0fminimum_edition\x18\x04 \x01(\x0e2\x18.google.protobuf.EditionR\x0eminimumEdition\x12A\n" +
@@ -5033,14 +5033,16 @@ const file_google_protobuf_descriptor_proto_rawDesc = "" +
 	"\bSemantic\x12\b\n" +
 	"\x04NONE\x10\x00\x12\a\n" +
 	"\x03SET\x10\x01\x12\t\n" +
-	"\x05ALIAS\x10\x02*\xa7\x02\n" +
+	"\x05ALIAS\x10\x02*\xd1\x02\n" +
 	"\aEdition\x12\x13\n" +
 	"\x0fEDITION_UNKNOWN\x10\x00\x12\x13\n" +
 	"\x0eEDITION_LEGACY\x10\x84\a\x12\x13\n" +
 	"\x0eEDITION_PROTO2\x10\xe6\a\x12\x13\n" +
 	"\x0eEDITION_PROTO3\x10\xe7\a\x12\x11\n" +
 	"\fEDITION_2023\x10\xe8\a\x12\x11\n" +
-	"\fEDITION_2024\x10\xe9\a\x12\x17\n" +
+	"\fEDITION_2024\x10\xe9\a\x12\x11\n" +
+	"\fEDITION_2026\x10\xea\a\x12\x15\n" +
+	"\x10EDITION_UNSTABLE\x10\x8fN\x12\x17\n" +
 	"\x13EDITION_1_TEST_ONLY\x10\x01\x12\x17\n" +
 	"\x13EDITION_2_TEST_ONLY\x10\x02\x12\x1d\n" +
 	"\x17EDITION_99997_TEST_ONLY\x10\x9d\x8d\x06\x12\x1d\n" +

@@ -15,10 +15,10 @@
 package api
 
 import (
+	"github.com/coreos/go-semver/semver"
+
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
-
-	"github.com/coreos/go-semver/semver"
 )
 
 // Cluster is an interface representing a collection of members in one etcd cluster.

@@ -31,6 +31,26 @@ type DeviceCounterConsumptionApplyConfiguration struct {
 	//
 	// The maximum number of counters is 32.
 	Counters map[string]CounterApplyConfiguration `json:"counters,omitempty"`
+	// CompatibilityGroups is a list of opaque group names for
+	// this counter set consumption.
+	//
+	// Devices that consume counters from the same counter set may only be
+	// allocated at the same time ("co-allocated") if they all share at least
+	// one common group: the intersection of the CompatibilityGroups of all
+	// co-allocated devices on that counter set must be non-empty. Devices
+	// that consume from different counter sets are never compared via this
+	// field.
+	//
+	// An unset field, an explicit nil, and an empty list are equivalent and
+	// mean "no groups": such a device is only co-allocatable with sibling
+	// devices on the same counter set that also have no groups, and is never
+	// co-allocatable with a device that declares one or more groups.
+	//
+	// Group names are opaque and meaningful only within the
+	// publishing driver's pool.
+	//
+	// The maximum number of groups is 2, and the names must be unique.
+	CompatibilityGroups []string `json:"compatibilityGroups,omitempty"`
 }
 
 // DeviceCounterConsumptionApplyConfiguration constructs a declarative configuration of the DeviceCounterConsumption type for use with
@@ -57,6 +77,16 @@ func (b *DeviceCounterConsumptionApplyConfiguration) WithCounters(entries map[st
 	}
 	for k, v := range entries {
 		b.Counters[k] = v
+	}
+	return b
+}
+
+// WithCompatibilityGroups adds the given value to the CompatibilityGroups field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the CompatibilityGroups field.
+func (b *DeviceCounterConsumptionApplyConfiguration) WithCompatibilityGroups(values ...string) *DeviceCounterConsumptionApplyConfiguration {
+	for i := range values {
+		b.CompatibilityGroups = append(b.CompatibilityGroups, values[i])
 	}
 	return b
 }

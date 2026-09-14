@@ -29,14 +29,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
+	"k8s.io/kubernetes/pkg/controller/util/protectionutil"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/dump"
 )
 
 var (
@@ -292,8 +292,8 @@ func TestVACProtectionController(t *testing.T) {
 		}
 
 		// Create the controller
-		logger, _ := ktesting.NewTestContext(t)
-		ctrl, err := NewVACProtectionController(logger, client, pvcInformer, pvInformer, vacInformer)
+		logger, ctx := ktesting.NewTestContext(t)
+		ctrl, err := NewVACProtectionController(ctx, client, pvcInformer, pvInformer, vacInformer)
 		require.NoError(t, err, "failed to create controller")
 
 		// Start the test by simulating an event

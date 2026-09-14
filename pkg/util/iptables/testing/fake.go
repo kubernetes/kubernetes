@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -31,8 +30,7 @@ import (
 
 // FakeIPTables is no-op implementation of iptables Interface.
 type FakeIPTables struct {
-	hasRandomFully bool
-	protocol       iptables.Protocol
+	protocol iptables.Protocol
 
 	Dump *IPTablesDump
 }
@@ -75,12 +73,6 @@ func NewFake() *FakeIPTables {
 func NewIPv6Fake() *FakeIPTables {
 	f := NewFake()
 	f.protocol = iptables.ProtocolIPv6
-	return f
-}
-
-// SetHasRandomFully sets f's return value for HasRandomFully()
-func (f *FakeIPTables) SetHasRandomFully(can bool) *FakeIPTables {
-	f.hasRandomFully = can
 	return f
 }
 
@@ -320,11 +312,6 @@ func (f *FakeIPTables) RestoreAll(data []byte, flush iptables.FlushFlag, counter
 
 // Monitor is part of iptables.Interface
 func (f *FakeIPTables) Monitor(canary iptables.Chain, tables []iptables.Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
-}
-
-// HasRandomFully is part of iptables.Interface
-func (f *FakeIPTables) HasRandomFully() bool {
-	return f.hasRandomFully
 }
 
 func (f *FakeIPTables) Present() error {

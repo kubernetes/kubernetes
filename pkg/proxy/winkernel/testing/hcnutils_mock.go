@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -34,8 +33,11 @@ var (
 )
 
 type HcnMock struct {
-	supportedFeatures hcn.SupportedFeatures
-	network           *hcn.HostComputeNetwork
+	supportedFeatures            hcn.SupportedFeatures
+	network                      *hcn.HostComputeNetwork
+	ShouldFailDeleteLoadBalancer bool
+	ShouldReturnHnsNotRunning    bool
+	CreateLoadBalancerError      error
 }
 
 func (hcnObj HcnMock) generateEndpointGuid() (endpointId string, endpointName string) {
@@ -70,6 +72,15 @@ func NewHcnMock(hnsNetwork *hcn.HostComputeNetwork) *HcnMock {
 }
 
 func (hcnObj HcnMock) PopulateQueriedEndpoints(epId, hnsId, ipAddress, mac string, prefixLen uint8) {
+
+	if endpoint, ok := endpointMap[epId]; ok {
+		endpoint.IpConfigurations = append(endpoint.IpConfigurations, hcn.IpConfig{
+			IpAddress:    ipAddress,
+			PrefixLength: prefixLen,
+		})
+		return
+	}
+
 	endpoint := &hcn.HostComputeEndpoint{
 		Id:                 epId,
 		Name:               epId,
@@ -85,6 +96,40 @@ func (hcnObj HcnMock) PopulateQueriedEndpoints(epId, hnsId, ipAddress, mac strin
 
 	endpointMap[endpoint.Id] = endpoint
 	endpointMap[endpoint.Name] = endpoint
+}
+
+func (hcnObj HcnMock) PopulateQueriedLoadbalancers(lbID, vip string, protocol uint16, internalPort, externalPort uint16, isIPv6 bool, endpointIDs ...string) {
+	if lb, ok := loadbalancerMap[lbID]; ok {
+		lb.HostComputeEndpoints = append(lb.HostComputeEndpoints, endpointIDs...)
+		return
+	}
+
+	lb := &hcn.HostComputeLoadBalancer{
+		Id:                   lbID,
+		HostComputeEndpoints: append([]string(nil), endpointIDs...),
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{
+				Protocol:     uint32(protocol),
+				InternalPort: internalPort,
+				ExternalPort: externalPort,
+			},
+		},
+	}
+
+	if vip != "" {
+		lb.FrontendVIPs = []string{vip}
+	}
+	if isIPv6 {
+		lb.Flags |= hcn.LoadBalancerFlagsIPv6
+	}
+
+	loadbalancerMap[lbID] = lb
+}
+
+// PopulateRawQueriedLoadbalancer injects a load balancer into the mocked HNS state verbatim,
+// bypassing the validation CreateLoadBalancer performs.
+func (hcnObj HcnMock) PopulateRawQueriedLoadbalancer(lb *hcn.HostComputeLoadBalancer) {
+	loadbalancerMap[lb.Id] = lb
 }
 
 func (hcnObj HcnMock) GetNetworkByName(networkName string) (*hcn.HostComputeNetwork, error) {
@@ -168,6 +213,9 @@ func (hcnObj HcnMock) ListLoadBalancers() ([]hcn.HostComputeLoadBalancer, error)
 }
 
 func (hcnObj HcnMock) GetLoadBalancerByID(loadBalancerId string) (*hcn.HostComputeLoadBalancer, error) {
+	if hcnObj.ShouldReturnHnsNotRunning {
+		return nil, fmt.Errorf("HNS error: 0x6b5")
+	}
 	if lb, ok := loadbalancerMap[loadBalancerId]; ok {
 		return lb, nil
 	}
@@ -176,8 +224,22 @@ func (hcnObj HcnMock) GetLoadBalancerByID(loadBalancerId string) (*hcn.HostCompu
 }
 
 func (hcnObj HcnMock) CreateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer) (*hcn.HostComputeLoadBalancer, error) {
+	if hcnObj.CreateLoadBalancerError != nil {
+		return nil, hcnObj.CreateLoadBalancerError
+	}
 	if _, ok := loadbalancerMap[loadBalancer.Id]; ok {
 		return nil, fmt.Errorf("LoadBalancer id %s Already Present", loadBalancer.Id)
+	}
+	for _, lb := range loadbalancerMap {
+		portMappingMatched := lb.PortMappings != nil && lb.PortMappings[0].ExternalPort == loadBalancer.PortMappings[0].ExternalPort && lb.PortMappings[0].Protocol == loadBalancer.PortMappings[0].Protocol
+		portMappingMatched = portMappingMatched && (lb.PortMappings[0].InternalPort == loadBalancer.PortMappings[0].InternalPort)
+		portMappingMatched = portMappingMatched && len(lb.FrontendVIPs) != 0 && len(loadBalancer.FrontendVIPs) != 0 && lb.FrontendVIPs[0] == loadBalancer.FrontendVIPs[0]
+		if portMappingMatched && ((lb.Flags & hcn.LoadBalancerFlagsIPv6) == (loadBalancer.Flags & hcn.LoadBalancerFlagsIPv6)) {
+			return nil, fmt.Errorf("HNS error: 0xb7 - The specified port already exists.")
+		}
+		if portMappingMatched && lb.PortMappings[0].Flags&hcn.LoadBalancerPortMappingFlagsLocalRoutedVIP == 0 && lb.FrontendVIPs[0] == loadBalancer.FrontendVIPs[0] {
+			return nil, fmt.Errorf("HNS error: 0xb7 - The specified port already exists.")
+		}
 	}
 	loadBalancer.Id = hcnObj.generateLoadbalancerGuid()
 	loadbalancerMap[loadBalancer.Id] = loadBalancer
@@ -196,6 +258,9 @@ func (hcnObj HcnMock) UpdateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalanc
 func (hcnObj HcnMock) DeleteLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer) error {
 	if _, ok := loadbalancerMap[loadBalancer.Id]; !ok {
 		return hcn.LoadBalancerNotFoundError{LoadBalancerId: loadBalancer.Id}
+	}
+	if hcnObj.ShouldFailDeleteLoadBalancer {
+		return fmt.Errorf("injected DeleteLoadBalancer failure for %s", loadBalancer.Id)
 	}
 	delete(loadbalancerMap, loadBalancer.Id)
 	return nil

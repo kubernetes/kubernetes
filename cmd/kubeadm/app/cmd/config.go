@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -311,7 +312,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 // newCmdConfigValidate returns cobra.Command for the "kubeadm config validate" command
 func newCmdConfigValidate(out io.Writer) *cobra.Command {
 	var cfgPath string
-	var allowExperimental bool
+	var allowDeprecated, allowExperimental bool
 
 	cmd := &cobra.Command{
 		Use:   "validate",
@@ -336,7 +337,7 @@ func newCmdConfigValidate(out io.Writer) *cobra.Command {
 				return err
 			}
 
-			if err := configutil.ValidateConfig(cfgBytes, allowExperimental); err != nil {
+			if err := configutil.ValidateConfig(cfgBytes, allowDeprecated, allowExperimental); err != nil {
 				return err
 			}
 			fmt.Fprintln(out, "ok")
@@ -346,6 +347,7 @@ func newCmdConfigValidate(out io.Writer) *cobra.Command {
 		Args: cobra.NoArgs,
 	}
 	options.AddConfigFlag(cmd.Flags(), &cfgPath)
+	cmd.Flags().BoolVar(&allowDeprecated, options.AllowDeprecatedAPI, false, "Allow validation of deprecated APIs.")
 	cmd.Flags().BoolVar(&allowExperimental, options.AllowExperimentalAPI, false, "Allow validation of experimental, unreleased APIs.")
 	return cmd
 }
@@ -387,7 +389,7 @@ func newCmdConfigImagesPull() *cobra.Command {
 			if err := containerRuntime.Connect(); err != nil {
 				return err
 			}
-			defer containerRuntime.Close()
+			defer containerRuntime.Close(context.Background())
 			return PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
 		},
 		Args: cobra.NoArgs,

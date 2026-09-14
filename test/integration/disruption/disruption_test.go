@@ -123,7 +123,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	createNs(tCtx, t, nsName, clientSet)
 
 	informers.Start(tCtx.Done())
-	go pdbc.Run(tCtx)
+	go pdbc.Run(tCtx, 1)
 
 	crdDefinition := newCustomResourceDefinition()
 	etcd.CreateTestCRDs(t, apiExtensionClient, true, crdDefinition)
@@ -161,7 +161,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 			Controller: &trueValue,
 		},
 	}
-	for i := 0; i < replicas; i++ {
+	for i := range replicas {
 		createPod(tCtx, t, fmt.Sprintf("pod-%d", i), nsName, map[string]string{"app": "test-crd"}, clientSet, ownerRefs)
 	}
 
@@ -255,12 +255,12 @@ func TestEmptySelector(t *testing.T) {
 			createNs(tCtx, t, nsName, clientSet)
 
 			informers.Start(tCtx.Done())
-			go pdbc.Run(tCtx)
+			go pdbc.Run(tCtx, 1)
 
 			replicas := 4
 			minAvailable := intstr.FromInt32(2)
 
-			for j := 0; j < replicas; j++ {
+			for j := range replicas {
 				createPod(tCtx, t, fmt.Sprintf("pod-%d", j), nsName, map[string]string{"app": "test-crd"},
 					clientSet, []metav1.OwnerReference{})
 			}
@@ -369,7 +369,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 			createNs(tCtx, t, nsName, clientSet)
 
 			informers.Start(tCtx.Done())
-			go pdbc.Run(tCtx)
+			go pdbc.Run(tCtx, 1)
 
 			minAvailable := intstr.FromInt32(1)
 
@@ -541,7 +541,7 @@ func TestPatchCompatibility(t *testing.T) {
 	// We can't cancel immediately but later, because when the context is canceled,
 	// the event broadcaster will be shut down .
 	defer tCtx.Cancel("cleaning up")
-	go pdbc.Run(tCtx)
+	go pdbc.Run(tCtx, 1)
 
 	testcases := []struct {
 		name             string
@@ -646,7 +646,7 @@ func TestStalePodDisruption(t *testing.T) {
 
 	informers.Start(tCtx.Done())
 	informers.WaitForCacheSync(tCtx.Done())
-	go pdbc.Run(tCtx)
+	go pdbc.Run(tCtx, 1)
 
 	cases := map[string]struct {
 		deletePod      bool

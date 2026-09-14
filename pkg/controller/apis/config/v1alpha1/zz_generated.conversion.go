@@ -22,6 +22,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	unsafe "unsafe"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +37,7 @@ import (
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
 	deploymentconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1"
 	devicetaintevictionconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/devicetainteviction/config/v1alpha1"
+	disruptionconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/disruption/config/v1alpha1"
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
 	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
 	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
@@ -47,6 +50,7 @@ import (
 	podgcconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/podgc/config/v1alpha1"
 	replicasetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/replicaset/config/v1alpha1"
 	replicationconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/replication/config/v1alpha1"
+	resourceclaimconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/resourceclaim/config/v1alpha1"
 	resourcequotaconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/resourcequota/config/v1alpha1"
 	serviceaccountconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1"
 	statefulsetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/statefulset/config/v1alpha1"
@@ -98,6 +102,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_DeprecatedControllerConfiguration_To_config_DeprecatedControllerConfiguration(in *configv1alpha1.DeprecatedControllerConfiguration, out *config.DeprecatedControllerConfiguration, s conversion.Scope) error {
+	*out = *(*config.DeprecatedControllerConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -107,6 +112,7 @@ func Convert_v1alpha1_DeprecatedControllerConfiguration_To_config_DeprecatedCont
 }
 
 func autoConvert_config_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration(in *config.DeprecatedControllerConfiguration, out *configv1alpha1.DeprecatedControllerConfiguration, s conversion.Scope) error {
+	*out = *(*configv1alpha1.DeprecatedControllerConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -116,8 +122,7 @@ func Convert_config_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedCont
 }
 
 func autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in *configv1alpha1.GroupResource, out *v1.GroupResource, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
+	*out = *(*v1.GroupResource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -127,8 +132,7 @@ func Convert_v1alpha1_GroupResource_To_v1_GroupResource(in *configv1alpha1.Group
 }
 
 func autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, out *configv1alpha1.GroupResource, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
+	*out = *(*configv1alpha1.GroupResource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -154,6 +158,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 		return err
 	}
 	if err := deploymentconfigv1alpha1.Convert_v1alpha1_DeploymentControllerConfiguration_To_config_DeploymentControllerConfiguration(&in.DeploymentController, &out.DeploymentController, s); err != nil {
+		return err
+	}
+	if err := disruptionconfigv1alpha1.Convert_v1alpha1_DisruptionControllerConfiguration_To_config_DisruptionControllerConfiguration(&in.DisruptionController, &out.DisruptionController, s); err != nil {
 		return err
 	}
 	if err := statefulsetconfigv1alpha1.Convert_v1alpha1_StatefulSetControllerConfiguration_To_config_StatefulSetControllerConfiguration(&in.StatefulSetController, &out.StatefulSetController, s); err != nil {
@@ -228,6 +235,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := devicetaintevictionconfigv1alpha1.Convert_v1alpha1_DeviceTaintEvictionControllerConfiguration_To_config_DeviceTaintEvictionControllerConfiguration(&in.DeviceTaintEvictionController, &out.DeviceTaintEvictionController, s); err != nil {
 		return err
 	}
+	if err := resourceclaimconfigv1alpha1.Convert_v1alpha1_ResourceClaimControllerConfiguration_To_config_ResourceClaimControllerConfiguration(&in.ResourceClaimController, &out.ResourceClaimController, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -256,6 +266,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := deploymentconfigv1alpha1.Convert_config_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(&in.DeploymentController, &out.DeploymentController, s); err != nil {
+		return err
+	}
+	if err := disruptionconfigv1alpha1.Convert_config_DisruptionControllerConfiguration_To_v1alpha1_DisruptionControllerConfiguration(&in.DisruptionController, &out.DisruptionController, s); err != nil {
 		return err
 	}
 	if err := devicetaintevictionconfigv1alpha1.Convert_config_DeviceTaintEvictionControllerConfiguration_To_v1alpha1_DeviceTaintEvictionControllerConfiguration(&in.DeviceTaintEvictionController, &out.DeviceTaintEvictionController, s); err != nil {
@@ -325,6 +338,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := validatingadmissionpolicystatusconfigv1alpha1.Convert_config_ValidatingAdmissionPolicyStatusControllerConfiguration_To_v1alpha1_ValidatingAdmissionPolicyStatusControllerConfiguration(&in.ValidatingAdmissionPolicyStatusController, &out.ValidatingAdmissionPolicyStatusController, s); err != nil {
+		return err
+	}
+	if err := resourceclaimconfigv1alpha1.Convert_config_ResourceClaimControllerConfiguration_To_v1alpha1_ResourceClaimControllerConfiguration(&in.ResourceClaimController, &out.ResourceClaimController, s); err != nil {
 		return err
 	}
 	return nil

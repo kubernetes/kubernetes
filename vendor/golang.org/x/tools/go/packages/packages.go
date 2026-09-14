@@ -284,6 +284,8 @@ func Load(cfg *Config, patterns ...string) ([]*Package, error) {
 		}
 	}
 
+	ld.externalDriver = external
+
 	return ld.refine(response)
 }
 
@@ -400,6 +402,10 @@ func callDriverOnChunks(driver driver, cfg *Config, chunks [][]string) (*DriverR
 func mergeResponses(responses ...*DriverResponse) *DriverResponse {
 	if len(responses) == 0 {
 		return nil
+	}
+	// No dedup needed
+	if len(responses) == 1 {
+		return responses[0]
 	}
 	response := newDeduper()
 	response.dr.NotHandled = false
@@ -533,6 +539,11 @@ type Package struct {
 
 	// depsErrors is the DepsErrors field from the go list response, if any.
 	depsErrors []*packagesinternal.PackageError
+
+	// exportDataError is the error encountered reading export data, if any.
+	// Decoding export data should ordinarily be infallible, so this typically
+	// indicates a producer/consumer version skew.
+	exportDataError error
 }
 
 // Module provides module information for a package.
@@ -692,10 +703,11 @@ type loaderPackage struct {
 type loader struct {
 	pkgs map[string]*loaderPackage // keyed by Package.ID
 	Config
-	sizes        types.Sizes // non-nil if needed by mode
-	parseCache   map[string]*parseValue
-	parseCacheMu sync.Mutex
-	exportMu     sync.Mutex // enforces mutual exclusion of exportdata operations
+	sizes          types.Sizes // non-nil if needed by mode
+	parseCache     map[string]*parseValue
+	parseCacheMu   sync.Mutex
+	exportMu       sync.Mutex // enforces mutual exclusion of exportdata operations
+	externalDriver bool       // true if an external GOPACKAGESDRIVER handled the request
 
 	// Config.Mode contains the implied mode (see impliedLoadMode).
 	// Implied mode contains all the fields we need the data for.
@@ -802,6 +814,12 @@ func (ld *loader) refine(response *DriverResponse) ([]*Package, error) {
 			needtypes: needtypes,
 			needsrc:   needsrc,
 			goVersion: response.GoVersion,
+		}
+		// Don't trust the driver to respond with duplicate-free
+		// package names (go.dev/issue/63822).
+		if _, ok := ld.pkgs[lpkg.ID]; ok {
+			return nil, fmt.Errorf("%s response contained duplicate packages for ID %q",
+				cond(ld.externalDriver, "go/packages driver", "go list"), lpkg.ID)
 		}
 		ld.pkgs[lpkg.ID] = lpkg
 		if rootIndex >= 0 {
@@ -1027,11 +1045,15 @@ func (ld *loader) refine(response *DriverResponse) ([]*Package, error) {
 // Precondition: ld.Mode&(NeedSyntax|NeedTypes|NeedTypesInfo) != 0.
 func (ld *loader) loadPackage(lpkg *loaderPackage) {
 	if lpkg.PkgPath == "unsafe" {
-		// Fill in the blanks to avoid surprises.
+		// To avoid surprises, fill in the blanks consistent
+		// with other packages. (For example, some analyzers
+		// assert that each needed types.Info map is non-nil
+		// even when there is no syntax that would cause them
+		// to consult the map.)
 		lpkg.Types = types.Unsafe
 		lpkg.Fset = ld.Fset
 		lpkg.Syntax = []*ast.File{}
-		lpkg.TypesInfo = new(types.Info)
+		lpkg.TypesInfo = ld.newTypesInfo()
 		lpkg.TypesSizes = ld.sizes
 		return
 	}
@@ -1062,10 +1084,11 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 	}
 
 	// TODO(adonovan): this condition looks wrong:
-	// I think it should be lpkg.needtypes && !lpg.needsrc,
+	// I think it should be lpkg.needtypes && !lpkg.needsrc,
 	// so that NeedSyntax without NeedTypes can be satisfied by export data.
 	if !lpkg.needsrc {
 		if err := ld.loadFromExportData(lpkg); err != nil {
+			lpkg.exportDataError = err
 			lpkg.Errors = append(lpkg.Errors, Error{
 				Pos:  "-",
 				Msg:  err.Error(),
@@ -1180,20 +1203,7 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 		return
 	}
 
-	// Populate TypesInfo only if needed, as it
-	// causes the type checker to work much harder.
-	if ld.Config.Mode&NeedTypesInfo != 0 {
-		lpkg.TypesInfo = &types.Info{
-			Types:        make(map[ast.Expr]types.TypeAndValue),
-			Defs:         make(map[*ast.Ident]types.Object),
-			Uses:         make(map[*ast.Ident]types.Object),
-			Implicits:    make(map[ast.Node]types.Object),
-			Instances:    make(map[*ast.Ident]types.Instance),
-			Scopes:       make(map[ast.Node]*types.Scope),
-			Selections:   make(map[*ast.SelectorExpr]*types.Selection),
-			FileVersions: make(map[*ast.File]string),
-		}
-	}
+	lpkg.TypesInfo = ld.newTypesInfo()
 	lpkg.TypesSizes = ld.sizes
 
 	importer := importerFunc(func(path string) (*types.Package, error) {
@@ -1217,7 +1227,13 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 		if ipkg.Types != nil && ipkg.Types.Complete() {
 			return ipkg.Types, nil
 		}
-		log.Fatalf("internal error: package %q without types was imported from %q", path, lpkg)
+
+		// If types are unavailable, there must be an export data error.
+		if ipkg.exportDataError != nil {
+			return nil, ipkg.exportDataError
+		}
+
+		log.Fatalf("internal error: expected complete types for package %q", path)
 		panic("unreachable")
 	})
 
@@ -1235,6 +1251,10 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 	}
 	if lpkg.Module != nil && lpkg.Module.GoVersion != "" {
 		tc.GoVersion = "go" + lpkg.Module.GoVersion
+	} else if ld.externalDriver && lpkg.goVersion != 0 {
+		// Module information is missing when GOPACKAGESDRIVER is used,
+		// so use the go version from the driver response.
+		tc.GoVersion = fmt.Sprintf("go1.%d", lpkg.goVersion)
 	}
 	if (ld.Mode & typecheckCgo) != 0 {
 		if !typesinternal.SetUsesCgo(tc) {
@@ -1305,6 +1325,24 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 		}
 	}
 	lpkg.IllTyped = illTyped
+}
+
+func (ld *loader) newTypesInfo() *types.Info {
+	// Populate TypesInfo only if needed, as it
+	// causes the type checker to work much harder.
+	if ld.Config.Mode&NeedTypesInfo == 0 {
+		return nil
+	}
+	return &types.Info{
+		Types:        make(map[ast.Expr]types.TypeAndValue),
+		Defs:         make(map[*ast.Ident]types.Object),
+		Uses:         make(map[*ast.Ident]types.Object),
+		Implicits:    make(map[ast.Node]types.Object),
+		Instances:    make(map[*ast.Ident]types.Instance),
+		Scopes:       make(map[ast.Node]*types.Scope),
+		Selections:   make(map[*ast.SelectorExpr]*types.Selection),
+		FileVersions: make(map[*ast.File]string),
+	}
 }
 
 // An importFunc is an implementation of the single-method
@@ -1557,3 +1595,11 @@ func usesExportData(cfg *Config) bool {
 }
 
 type unit struct{}
+
+func cond[T any](cond bool, t, f T) T {
+	if cond {
+		return t
+	} else {
+		return f
+	}
+}

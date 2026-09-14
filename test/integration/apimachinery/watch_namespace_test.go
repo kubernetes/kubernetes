@@ -100,7 +100,6 @@ func TestWatchNamespaceEvent(t *testing.T) {
 
 	t.Run("group", func(t *testing.T) {
 		for _, tc := range tt {
-			tc := tc // we need to copy it for parallel runs
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				startTest := time.Now()

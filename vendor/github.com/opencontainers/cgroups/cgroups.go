@@ -29,6 +29,11 @@ type Manager interface {
 	// can be used to merely create a cgroup.
 	Apply(pid int) error
 
+	// AddPid adds a process with a given pid to an existing cgroup.
+	// The subcgroup argument is either empty, or a path relative to
+	// a cgroup under under the manager's cgroup.
+	AddPid(subcgroup string, pid int) error
+
 	// GetPids returns the PIDs of all processes inside the cgroup.
 	GetPids() ([]int, error)
 
@@ -38,6 +43,9 @@ type Manager interface {
 
 	// GetStats returns cgroups statistics.
 	GetStats() (*Stats, error)
+
+	// Stats returns statistics for specified controllers.
+	Stats(opts *StatsOptions) (*Stats, error)
 
 	// Freeze sets the freezer cgroup to the specified state.
 	Freeze(state FreezerState) error

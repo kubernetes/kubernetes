@@ -145,12 +145,34 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string, minArgs 
 		return nil
 	}
 
+	pluginEnv, err := pluginEnvironment()
+	if err != nil {
+		return err
+	}
+
 	// invoke cmd binary relaying the current environment and args given
-	if err := pluginHandler.Execute(foundBinaryPath, cmdArgs[len(remainingArgs):], os.Environ()); err != nil {
+	if err := pluginHandler.Execute(foundBinaryPath, cmdArgs[len(remainingArgs):], pluginEnv); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func pluginEnvironment() ([]string, error) {
+	env := os.Environ()
+	pluginEnv := make([]string, 0, len(env)+1)
+	for _, e := range env {
+		if !strings.HasPrefix(e, "KUBECTL_PATH=") {
+			pluginEnv = append(pluginEnv, e)
+		}
+	}
+
+	kubectlPath, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+
+	return append(pluginEnv, "KUBECTL_PATH="+kubectlPath), nil
 }
 
 // IsSubcommandPluginAllowed returns the given command is allowed

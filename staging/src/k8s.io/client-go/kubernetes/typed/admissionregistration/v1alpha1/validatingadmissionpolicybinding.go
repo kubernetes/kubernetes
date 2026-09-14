@@ -41,6 +41,7 @@ type ValidatingAdmissionPolicyBindingInterface interface {
 	Create(ctx context.Context, validatingAdmissionPolicyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, opts v1.CreateOptions) (*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, error)
 	Update(ctx context.Context, validatingAdmissionPolicyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, opts v1.UpdateOptions) (*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, error)
 	List(ctx context.Context, opts v1.ListOptions) (*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList, error)

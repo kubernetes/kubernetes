@@ -33,14 +33,16 @@ import (
 // pod.  For more details, see
 // https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 type RuntimeClass struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec represents specification of the RuntimeClass
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +required
 	Spec RuntimeClassSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 }
 
@@ -59,6 +61,10 @@ type RuntimeClassSpec struct {
 	// in a pod.
 	// The runtimeHandler must be lowercase, conform to the DNS Label (RFC 1123)
 	// requirements, and is immutable.
+	// +required
+	// +k8s:beta(since: "1.37")=+k8s:format="k8s-short-name"
+	// +k8s:beta(since: "1.37")=+k8s:immutable
+	// +k8s:beta(since: "1.37")=+k8s:required
 	RuntimeHandler string `json:"runtimeHandler" protobuf:"bytes,1,opt,name=runtimeHandler"`
 
 	// overhead represents the resource overhead associated with running a pod for a
@@ -72,6 +78,7 @@ type RuntimeClassSpec struct {
 	// If scheduling is nil, this RuntimeClass is assumed to be supported by all
 	// nodes.
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
 	Scheduling *Scheduling `json:"scheduling,omitempty" protobuf:"bytes,3,opt,name=scheduling"`
 }
 
@@ -99,6 +106,7 @@ type Scheduling struct {
 	// tolerated by the pod and the RuntimeClass.
 	// +optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.37")=+k8s:optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,2,rep,name=tolerations"`
 }
 
@@ -106,7 +114,7 @@ type Scheduling struct {
 
 // RuntimeClassList is a list of RuntimeClass objects.
 type RuntimeClassList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

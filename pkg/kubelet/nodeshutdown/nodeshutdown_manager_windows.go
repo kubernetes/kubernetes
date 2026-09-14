@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -21,6 +20,7 @@ limitations under the License.
 package nodeshutdown
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -56,7 +56,7 @@ type managerImpl struct {
 	nodeRef  *v1.ObjectReference
 
 	getPods        eviction.ActivePodsFunc
-	syncNodeStatus func()
+	syncNodeStatus func(context.Context)
 
 	nodeShuttingDownMutex sync.Mutex
 	nodeShuttingDownNow   bool
@@ -64,6 +64,15 @@ type managerImpl struct {
 
 	enableMetrics bool
 	storage       storage
+}
+
+type preShutdownHandler struct {
+	manager *managerImpl
+}
+
+func (h *preShutdownHandler) ProcessShutdownEvent() error {
+	// Windows SCM preshutdown callback has no context, so start a root context at this callback boundary.
+	return h.manager.ProcessShutdownEvent(context.Background())
 }
 
 // NewManager returns a new node shutdown manager.
@@ -104,7 +113,7 @@ func NewManager(conf *Config) Manager {
 }
 
 // Admit rejects all pods if node is shutting
-func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *managerImpl) Admit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	nodeShuttingDown := m.ShutdownStatus() != nil
 
 	if nodeShuttingDown {
@@ -136,7 +145,7 @@ func (m *managerImpl) setMetrics() {
 }
 
 // Start starts the node shutdown manager and will start watching the node for shutdown events.
-func (m *managerImpl) Start() error {
+func (m *managerImpl) Start(_ context.Context) error {
 	m.logger.V(1).Info("Shutdown manager get started")
 
 	_, err := m.start()
@@ -145,7 +154,7 @@ func (m *managerImpl) Start() error {
 		return err
 	}
 
-	service.SetPreShutdownHandler(m)
+	service.SetPreShutdownHandler(&preShutdownHandler{manager: m})
 
 	m.setMetrics()
 
@@ -238,7 +247,7 @@ func (m *managerImpl) ShutdownStatus() error {
 	return nil
 }
 
-func (m *managerImpl) ProcessShutdownEvent() error {
+func (m *managerImpl) ProcessShutdownEvent(ctx context.Context) error {
 	m.logger.V(1).Info("Shutdown manager detected new preshutdown event", "event", "preshutdown")
 
 	m.recorder.Event(m.nodeRef, v1.EventTypeNormal, kubeletevents.NodeShutdown, "Shutdown manager detected preshutdown event")
@@ -247,7 +256,8 @@ func (m *managerImpl) ProcessShutdownEvent() error {
 	m.nodeShuttingDownNow = true
 	m.nodeShuttingDownMutex.Unlock()
 
-	go m.syncNodeStatus()
+	nodeStatusCtx := klog.NewContext(ctx, m.logger)
+	go m.syncNodeStatus(nodeStatusCtx)
 
 	m.logger.V(1).Info("Shutdown manager processing preshutdown event")
 	activePods := m.getPods()
@@ -280,7 +290,7 @@ func (m *managerImpl) ProcessShutdownEvent() error {
 		}()
 	}
 
-	return m.podManager.killPods(activePods)
+	return m.podManager.killPods(ctx, activePods)
 }
 
 func (m *managerImpl) periodRequested() time.Duration {

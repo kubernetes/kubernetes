@@ -38,7 +38,7 @@ type DeviceAllocationConfigurationApplyConfiguration struct {
 	// and may include the subrequest using the format <main request>[/<subrequest>]. If just
 	// the main request is given, the configuration applies to all subrequests.
 	Requests                              []string `json:"requests,omitempty"`
-	DeviceConfigurationApplyConfiguration `json:",inline"`
+	DeviceConfigurationApplyConfiguration `json:""`
 }
 
 // DeviceAllocationConfigurationApplyConfiguration constructs a declarative configuration of the DeviceAllocationConfiguration type for use with

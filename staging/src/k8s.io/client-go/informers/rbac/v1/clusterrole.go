@@ -25,6 +25,7 @@ import (
 	apirbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -33,11 +34,39 @@ import (
 )
 
 // ClusterRoleInformer provides access to a shared informer and lister for
-// ClusterRoles.
+// ClusterRoles. Prefer using the type-safe variant (see [TypedClusterRoleInformer]).
 type ClusterRoleInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() rbacv1.ClusterRoleLister
 }
+
+// TypedClusterRoleInformer provides access to a shared informer and lister for
+// ClusterRoles, including the type-safe TypedInformer variant.
+// It is a superset of ClusterRoleInformer.
+type TypedClusterRoleInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ClusterRoleIndexInformer
+	Lister() rbacv1.ClusterRoleLister
+}
+
+// ClusterRoleIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ClusterRoleIndexInformer cache.TypedSharedIndexInformer[*apirbacv1.ClusterRole]
+
+// ClusterRoleHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for ClusterRole.
+type ClusterRoleHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apirbacv1.ClusterRole]
+
+// ClusterRoleDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for ClusterRole.
+type ClusterRoleDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apirbacv1.ClusterRole]
+
+// ClusterRoleFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for ClusterRole.
+type ClusterRoleFilteringHandler = cache.TypedFilteringResourceEventHandler[*apirbacv1.ClusterRole]
+
+// ClusterRoleIndexers is a specialization of [cache.TypedIndexers] for ClusterRole.
+type ClusterRoleIndexers = cache.TypedIndexers[*apirbacv1.ClusterRole]
+
+// DeletedClusterRole is a specialization of [cache.DeletedObject] for ClusterRole.
+type DeletedClusterRole = cache.DeletedObject[*apirbacv1.ClusterRole]
 
 type clusterRoleInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -47,55 +76,132 @@ type clusterRoleInformer struct {
 // NewClusterRoleInformer constructs a new informer for ClusterRole type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedClusterRoleInformer]).
 func NewClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredClusterRoleInformer(client, resyncPeriod, indexers, nil)
+	return NewClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedClusterRoleInformer constructs a new informer for ClusterRole type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers ClusterRoleIndexers) ClusterRoleIndexInformer {
+	return NewTypedClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredClusterRoleInformer constructs a new informer for ClusterRole type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredClusterRoleInformer]).
 func NewFilteredClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewTypedClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredClusterRoleInformer constructs a new informer for ClusterRole type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers ClusterRoleIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ClusterRoleIndexInformer {
+	return NewTypedClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewClusterRoleInformerWithOptions constructs a new informer for ClusterRole type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedClusterRoleInformerWithOptions]).
+func NewClusterRoleInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedClusterRoleInformerWithOptions(client, options)
+}
+
+// NewTypedClusterRoleInformerWithOptions constructs a new informer for ClusterRole type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedClusterRoleInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) ClusterRoleIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apirbacv1.ClusterRole](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.RbacV1().ClusterRoles().List(context.Background(), options)
+				return client.RbacV1().ClusterRoles().List(context.Background(), opts)
 			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.RbacV1().ClusterRoles().Watch(context.Background(), options)
+				return client.RbacV1().ClusterRoles().Watch(context.Background(), opts)
 			},
-			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+			ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.RbacV1().ClusterRoles().List(ctx, options)
+				return client.RbacV1().ClusterRoles().List(ctx, opts)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.RbacV1().ClusterRoles().Watch(ctx, options)
+				return client.RbacV1().ClusterRoles().Watch(ctx, opts)
 			},
 		}, client),
 		&apirbacv1.ClusterRole{},
-		resyncPeriod,
-		indexers,
-	)
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
+		},
+	))
 }
 
 func (f *clusterRoleInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredClusterRoleInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *clusterRoleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apirbacv1.ClusterRole{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *clusterRoleInformer) TypedInformer() ClusterRoleIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apirbacv1.ClusterRole](f.factory.InformerFor(&apirbacv1.ClusterRole{}, f.defaultInformer))
 }
 
 func (f *clusterRoleInformer) Lister() rbacv1.ClusterRoleLister {
 	return rbacv1.NewClusterRoleLister(f.Informer().GetIndexer())
+}
+
+// ToTypedClusterRoleInformer converts an untyped informer into a TypedClusterRoleInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ClusterRole. If that is not the case, calling type-safe methods of the returned
+// TypedClusterRoleInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedClusterRoleInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedClusterRoleInformer(informer ClusterRoleInformer) TypedClusterRoleInformer {
+	if informer, ok := informer.(TypedClusterRoleInformer); ok {
+		return informer
+	}
+	return &clusterRoleTypedInformerAdapter{informer}
+}
+
+type clusterRoleTypedInformerAdapter struct {
+	ClusterRoleInformer
+}
+
+func (a *clusterRoleTypedInformerAdapter) TypedInformer() ClusterRoleIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apirbacv1.ClusterRole](a.Informer())
+}
+
+// ToClusterRoleIndexInformer converts an untyped informer into a ClusterRoleIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ClusterRole. If that is not the case, calling type-safe methods of the returned
+// ClusterRoleIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a ClusterRoleIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToClusterRoleIndexInformer(informer cache.SharedIndexInformer) ClusterRoleIndexInformer {
+	if informer, ok := informer.(ClusterRoleIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apirbacv1.ClusterRole](informer)
 }

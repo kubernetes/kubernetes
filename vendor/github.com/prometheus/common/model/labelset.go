@@ -16,6 +16,7 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 )
 
@@ -107,9 +108,7 @@ func (ls LabelSet) Before(o LabelSet) bool {
 // Clone returns a copy of the label set.
 func (ls LabelSet) Clone() LabelSet {
 	lsn := make(LabelSet, len(ls))
-	for ln, lv := range ls {
-		lsn[ln] = lv
-	}
+	maps.Copy(lsn, ls)
 	return lsn
 }
 
@@ -117,13 +116,9 @@ func (ls LabelSet) Clone() LabelSet {
 func (ls LabelSet) Merge(other LabelSet) LabelSet {
 	result := make(LabelSet, len(ls))
 
-	for k, v := range ls {
-		result[k] = v
-	}
+	maps.Copy(result, ls)
 
-	for k, v := range other {
-		result[k] = v
-	}
+	maps.Copy(result, other)
 
 	return result
 }

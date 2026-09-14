@@ -25,6 +25,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // Name of the plugin used in the plugin registry and configurations.
@@ -67,7 +68,7 @@ func (b DefaultBinder) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod
 		return nil
 	}
 	logger.V(3).Info("Attempting to bind pod to node", "pod", klog.KObj(p), "node", klog.KRef("", nodeName))
-	err := b.handle.ClientSet().CoreV1().Pods(binding.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
+	err := util.BindPod(ctx, b.handle.ClientSet(), binding)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}

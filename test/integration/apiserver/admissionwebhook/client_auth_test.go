@@ -123,13 +123,13 @@ kind: AdmissionConfiguration
 plugins:
 - name: ValidatingAdmissionWebhook
   configuration:
-    apiVersion: apiserver.config.k8s.io/v1alpha1
-    kind: WebhookAdmission
+    apiVersion: apiserver.config.k8s.io/v1
+    kind: WebhookAdmissionConfiguration
     kubeConfigFile: "`+kubeConfigFile.Name()+`"
 - name: MutatingAdmissionWebhook
   configuration:
-    apiVersion: apiserver.config.k8s.io/v1alpha1
-    kind: WebhookAdmission
+    apiVersion: apiserver.config.k8s.io/v1
+    kind: WebhookAdmissionConfiguration
     kubeConfigFile: "`+kubeConfigFile.Name()+`"
 `), os.FileMode(0755)); err != nil {
 		t.Fatal(err)

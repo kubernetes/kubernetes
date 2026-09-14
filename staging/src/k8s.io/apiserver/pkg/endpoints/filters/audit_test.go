@@ -23,6 +23,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"regexp"
 	"sync"
 	"testing"
 	"time"
@@ -224,7 +225,7 @@ func TestAudit(t *testing.T) {
 	shortRunningPath := "/api/v1/namespaces/default/pods/foo"
 	longRunningPath := "/api/v1/namespaces/default/pods?watch=true"
 
-	delay := 500 * time.Millisecond
+	delay := 501 * time.Millisecond
 
 	for _, test := range []struct {
 		desc       string
@@ -351,6 +352,10 @@ func TestAudit(t *testing.T) {
 					Verb:           "update",
 					RequestURI:     shortRunningPath,
 					ResponseStatus: &metav1.Status{Code: 200},
+					Annotations: map[string]string{
+						"apiserver.latency.k8s.io/response-write": "^[0-9.]+[µnm]s$",
+						"apiserver.latency.k8s.io/total":          "^[0-9.]+[µnm]s$",
+					},
 				},
 			},
 			true,
@@ -713,6 +718,7 @@ func TestAudit(t *testing.T) {
 				// simplified long-running check
 				return ri.Verb == "watch"
 			})
+			handler = WithLatencyTrackers(handler)
 			handler = WithAuditInit(handler)
 
 			req, _ := http.NewRequestWithContext(ctx, test.verb, test.path, nil)
@@ -771,6 +777,19 @@ func TestAudit(t *testing.T) {
 				}
 				if (event.ResponseStatus != nil) && (event.ResponseStatus.Code != expect.ResponseStatus.Code) {
 					t.Errorf("Unexpected status code : %d", event.ResponseStatus.Code)
+				}
+
+				for k, v := range expect.Annotations {
+					if actual, exists := event.Annotations[k]; !exists {
+						t.Errorf("Expect key %s in the annotations but it does not exist", k)
+					} else if matched, _ := regexp.MatchString(v, actual); !matched {
+						t.Errorf("Annotation %s value %q does not match regex %q", k, actual, v)
+					}
+				}
+				for k := range event.Annotations {
+					if _, exists := expect.Annotations[k]; !exists {
+						t.Errorf("Unexpected key %s in the annotations", k)
+					}
 				}
 			}
 		})

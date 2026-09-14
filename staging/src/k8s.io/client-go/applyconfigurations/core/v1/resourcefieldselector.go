@@ -31,7 +31,8 @@ type ResourceFieldSelectorApplyConfiguration struct {
 	ContainerName *string `json:"containerName,omitempty"`
 	// Required: resource to select
 	Resource *string `json:"resource,omitempty"`
-	// Specifies the output format of the exposed resources, defaults to "1"
+	// Divisor optionally indicates how the resource from the container should be scaled.
+	// If unset or 0, the resource is not scaled (divisor is treated as 1).
 	Divisor *resource.Quantity `json:"divisor,omitempty"`
 }
 

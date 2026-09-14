@@ -38,6 +38,17 @@
       ]
     },
     {
+      "kind": "CSINode",
+      "name": "csinodes/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
       "kind": "CSIStorageCapacity",
       "name": "csistoragecapacities",
       "namespaced": true,
@@ -110,7 +121,7 @@
         "vac"
       ],
       "singularName": "volumeattributesclass",
-      "storageVersionHash": "Bl3MtjZ/n/s=",
+      "storageVersionHash": "tIjydgKBC5w=",
       "verbs": [
         "create",
         "delete",

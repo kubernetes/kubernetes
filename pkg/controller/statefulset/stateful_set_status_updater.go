@@ -21,11 +21,13 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 )
 
 // StatefulSetStatusUpdaterInterface is an interface used to update the StatefulSetStatus associated with a StatefulSet.
@@ -40,13 +42,15 @@ type StatefulSetStatusUpdaterInterface interface {
 // using the supplied client and setLister.
 func NewRealStatefulSetStatusUpdater(
 	client clientset.Interface,
-	setLister appslisters.StatefulSetLister) StatefulSetStatusUpdaterInterface {
-	return &realStatefulSetStatusUpdater{client, setLister}
+	setLister appslisters.StatefulSetLister,
+	consistencyStore consistencyutil.ConsistencyStore) StatefulSetStatusUpdaterInterface {
+	return &realStatefulSetStatusUpdater{client, setLister, consistencyStore}
 }
 
 type realStatefulSetStatusUpdater struct {
-	client    clientset.Interface
-	setLister appslisters.StatefulSetLister
+	client           clientset.Interface
+	setLister        appslisters.StatefulSetLister
+	consistencyStore consistencyutil.ConsistencyStore
 }
 
 func (ssu *realStatefulSetStatusUpdater) UpdateStatefulSetStatus(
@@ -58,10 +62,17 @@ func (ssu *realStatefulSetStatusUpdater) UpdateStatefulSetStatus(
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		set.Status = *status
 		// TODO: This context.TODO should use a real context once we have RetryOnConflictWithContext
-		_, updateErr := ssu.client.AppsV1().StatefulSets(set.Namespace).UpdateStatus(context.TODO(), set, metav1.UpdateOptions{})
+		updatedSet, updateErr := ssu.client.AppsV1().StatefulSets(set.Namespace).UpdateStatus(context.TODO(), set, metav1.UpdateOptions{})
 		if updateErr == nil {
+			ssu.consistencyStore.WroteAt(
+				types.NamespacedName{Namespace: updatedSet.Namespace, Name: updatedSet.Name},
+				updatedSet.UID,
+				statefulSetGroupResource,
+				updatedSet.ResourceVersion,
+			)
 			return nil
 		}
+
 		if updated, err := ssu.setLister.StatefulSets(set.Namespace).Get(set.Name); err == nil {
 			// make a copy so we don't mutate the shared cache
 			set = updated.DeepCopy()

@@ -161,7 +161,7 @@ func (tk *TestKubeconfig) ReadFileViaContainer(podName, containerName string, pa
 }
 
 func (tk *TestKubeconfig) kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
-	for numRetries := 0; numRetries < maxKubectlExecRetries; numRetries++ {
+	for numRetries := range maxKubectlExecRetries {
 		if numRetries > 0 {
 			framework.Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
 		}

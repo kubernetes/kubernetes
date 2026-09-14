@@ -38,13 +38,20 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type Struct
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
@@ -53,104 +60,155 @@ var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tag
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
-	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_undiscriminated_multiple_Struct_union1, func(obj *Struct) bool {
-		if obj == nil {
-			return false
-		}
-		return obj.U1M1 != nil
-	}, func(obj *Struct) bool {
-		if obj == nil {
-			return false
-		}
-		return obj.U1M2 != nil
-	})...)
-	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_undiscriminated_multiple_Struct_union2, func(obj *Struct) bool {
-		if obj == nil {
-			return false
-		}
-		return obj.U2M1 != nil
-	}, func(obj *Struct) bool {
-		if obj == nil {
-			return false
-		}
-		return obj.U2M2 != nil
-	})...)
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
+	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_undiscriminated_multiple_Struct_union1,
+		func(obj *Struct) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.U1M1 != nil
+		},
+		func(obj *Struct) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.U1M2 != nil
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_undiscriminated_multiple_Struct_union2,
+		func(obj *Struct) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.U2M1 != nil
+		},
+		func(obj *Struct) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.U2M2 != nil
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	// field Struct.TypeMeta has no validation
 	// field Struct.NonUnionField has no validation
 
-	// field Struct.U1M1
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *M1, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.U1M1
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *M1,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("u1m1"), obj.U1M1, safe.Field(oldObj, func(oldObj *Struct) *M1 { return oldObj.U1M1 }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *M1 {
+				return oldObj.U1M1
+			})
+		errs = append(errs, fn(fldPath.Child("u1m1"), obj.U1M1, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.U1M2
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *M2, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.U1M2
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *M2,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("u1m2"), obj.U1M2, safe.Field(oldObj, func(oldObj *Struct) *M2 { return oldObj.U1M2 }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *M2 {
+				return oldObj.U1M2
+			})
+		errs = append(errs, fn(fldPath.Child("u1m2"), obj.U1M2, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.U2M1
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *M1, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.U2M1
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *M1,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("u2m1"), obj.U2M1, safe.Field(oldObj, func(oldObj *Struct) *M1 { return oldObj.U2M1 }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *M1 {
+				return oldObj.U2M1
+			})
+		errs = append(errs, fn(fldPath.Child("u2m1"), obj.U2M1, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.U2M2
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *M2, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.U2M2
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *M2,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("u2m2"), obj.U2M2, safe.Field(oldObj, func(oldObj *Struct) *M2 { return oldObj.U2M2 }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *M2 {
+				return oldObj.U2M2
+			})
+		errs = append(errs, fn(fldPath.Child("u2m2"), obj.U2M2, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

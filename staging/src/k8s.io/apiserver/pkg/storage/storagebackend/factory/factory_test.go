@@ -28,6 +28,7 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/kubernetes"
+
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
@@ -41,6 +42,9 @@ func (mkv mockKV) Put(ctx context.Context, key, val string, opts ...clientv3.OpO
 }
 func (mkv mockKV) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
 	return mkv.get(ctx)
+}
+func (mockKV) GetStream(ctx context.Context, key string, opts ...clientv3.OpOption) (clientv3.GetStreamChan, error) {
+	return nil, nil
 }
 func (mockKV) Delete(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.DeleteResponse, error) {
 	return nil, nil
@@ -56,8 +60,7 @@ func (mockKV) Txn(ctx context.Context) clientv3.Txn {
 }
 
 func TestCreateHealthcheck(t *testing.T) {
-	etcdConfig := testserver.NewTestConfig(t)
-	client := testserver.RunEtcd(t, etcdConfig)
+	client := testserver.RunEtcd(t)
 	newETCD3ClientFn := newETCD3Client
 	defer func() {
 		newETCD3Client = newETCD3ClientFn
@@ -146,8 +149,7 @@ func TestCreateHealthcheck(t *testing.T) {
 }
 
 func TestCreateReadycheck(t *testing.T) {
-	etcdConfig := testserver.NewTestConfig(t)
-	client := testserver.RunEtcd(t, etcdConfig)
+	client := testserver.RunEtcd(t)
 	newETCD3ClientFn := newETCD3Client
 	defer func() {
 		newETCD3Client = newETCD3ClientFn
@@ -247,8 +249,7 @@ func TestCreateReadycheck(t *testing.T) {
 }
 
 func TestRateLimitHealthcheck(t *testing.T) {
-	etcdConfig := testserver.NewTestConfig(t)
-	client := testserver.RunEtcd(t, etcdConfig)
+	client := testserver.RunEtcd(t)
 	newETCD3ClientFn := newETCD3Client
 	defer func() {
 		newETCD3Client = newETCD3ClientFn
@@ -356,8 +357,7 @@ func TestRateLimitHealthcheck(t *testing.T) {
 }
 
 func TestTimeTravelHealthcheck(t *testing.T) {
-	etcdConfig := testserver.NewTestConfig(t)
-	client := testserver.RunEtcd(t, etcdConfig)
+	client := testserver.RunEtcd(t)
 	newETCD3ClientFn := newETCD3Client
 	defer func() {
 		newETCD3Client = newETCD3ClientFn
@@ -372,6 +372,7 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 
 	ready := make(chan struct{})
 	signal := make(chan struct{})
+	probeStarted := make(chan struct{})
 
 	var counter uint64
 	newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
@@ -387,6 +388,7 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 				// the race limiter to server the new request from the cache or allow
 				// it to go through
 				if val == 1 {
+					close(probeStarted)
 					select {
 					case <-ctx.Done():
 						return nil, ctx.Err()
@@ -419,6 +421,7 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 		close(signal)
 	}()
 
+	<-probeStarted
 	// wait until the rate limit allows new connections
 	time.Sleep(cfg.HealthcheckTimeout / 2)
 

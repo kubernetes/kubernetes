@@ -33,6 +33,7 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
 )
 
@@ -94,7 +95,7 @@ type pluginResourceUpdateFuncType func(*schedulerframework.NodeInfo, *PodAdmitAt
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
 type AdmissionFailureHandler interface {
-	HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []PredicateFailureReason) ([]PredicateFailureReason, error)
+	HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []PredicateFailureReason, operation Operation) ([]PredicateFailureReason, error)
 }
 
 type predicateAdmitHandler struct {
@@ -115,10 +116,7 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 	}
 }
 
-func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
-	// TODO: pass context to Admit when migrating this component to
-	// contextual logging
-	ctx := context.TODO()
+func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	logger := klog.FromContext(ctx)
 	node, err := w.getNodeAnyWayFunc(ctx, true)
 	if err != nil {
@@ -186,7 +184,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	reasons := w.generalFilter(ctx, podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0
 	if !fit {
-		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons)
+		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons, attrs.Operation)
 		fit = len(reasons) == 0 && err == nil
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
@@ -346,6 +344,20 @@ func rejectPodAdmissionBasedOnSupplementalGroupsPolicy(pod *v1.Pod, node *v1.Nod
 }
 
 func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
+	isResourceBackedByDRA := func(resourceName v1.ResourceName, containerName string) bool {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+			return false
+		}
+		if pod.Status.ExtendedResourceClaimStatus == nil {
+			return false
+		}
+		for _, resourceMapping := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
+			if v1.ResourceName(resourceMapping.ResourceName) == resourceName && resourceMapping.ContainerName == containerName {
+				return true
+			}
+		}
+		return false
+	}
 	filterExtendedResources := func(containers []v1.Container) {
 		for i, c := range containers {
 			// We only handle requests in Requests but not Limits because the
@@ -353,6 +365,9 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.No
 			// does not use Limits.
 			filteredResources := make(v1.ResourceList)
 			for rName, rQuant := range c.Resources.Requests {
+				if schedutil.IsDRAExtendedResourceName(rName) && isResourceBackedByDRA(rName, c.Name) {
+					continue
+				}
 				if v1helper.IsExtendedResourceName(rName) {
 					if _, found := nodeInfo.Allocatable.ScalarResources[rName]; !found {
 						continue

@@ -54,6 +54,7 @@ const (
 	coordinationGroup            = "coordination.k8s.io"
 	discoveryGroup               = "discovery.k8s.io"
 	extensionsGroup              = "extensions"
+	lifecycleGroup               = "lifecycle.k8s.io"
 	policyGroup                  = "policy"
 	rbacGroup                    = "rbac.authorization.k8s.io"
 	resourceGroup                = "resource.k8s.io"
@@ -146,6 +147,15 @@ func viewRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaims/status", "resourceclaimtemplates").RuleOrDie())
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads", "podgroups", "podgroups/status").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("compositepodgroups", "compositepodgroups/status").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(lifecycleGroup).Resources("evictionrequests", "evictions").RuleOrDie())
+	}
 	return rules
 }
 
@@ -186,6 +196,16 @@ func editRules() []rbacv1.PolicyRule {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaimtemplates").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("compositepodgroups").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
+		// "evictions" are in the domain of the system and should be only updated by the evictionrequest-controller. "evictionrequests" are user-scoped.
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(lifecycleGroup).Resources("evictionrequests").RuleOrDie())
 	}
 	return rules
 }
@@ -258,6 +278,12 @@ func NodeRules() []rbacv1.PolicyRule {
 	nodePolicyRules = append(nodePolicyRules, csiDriverRule)
 	csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
 	nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
+	// Use the Node authorization mode to limit a node to update status of its own CSINode.
+	// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		csiNodeStatusRule := rbacv1helpers.NewRule("get", "update", "patch").Groups("storage.k8s.io").Resources("csinodes/status").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, csiNodeStatusRule)
+	}
 
 	// RuntimeClass
 	nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
@@ -287,23 +313,25 @@ func NodeRules() []rbacv1.PolicyRule {
 
 // ClusterRoles returns the cluster roles to bootstrap an API server with
 func ClusterRoles() []rbacv1.ClusterRole {
-	monitoringRules := []rbacv1.PolicyRule{
-		rbacv1helpers.NewRule("get").URLs(
-			"/metrics", "/metrics/slis",
-			"/livez", "/readyz", "/healthz",
-			"/livez/*", "/readyz/*", "/healthz/*",
-		).RuleOrDie(),
-
-		// Needed for kubelet metrics
-		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes/metrics").RuleOrDie(),
+	monitoringURLs := []string{
+		"/metrics", "/metrics/slis",
+		"/livez", "/readyz", "/healthz",
+		"/livez/*", "/readyz/*", "/healthz/*",
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-		monitoringRules = append(monitoringRules, rbacv1helpers.NewRule("get").URLs("/flagz").RuleOrDie())
+		monitoringURLs = append(monitoringURLs, "/flagz")
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		monitoringRules = append(monitoringRules, rbacv1helpers.NewRule("get").URLs("/statusz").RuleOrDie())
+		monitoringURLs = append(monitoringURLs, "/statusz")
+	}
+
+	monitoringRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("get").URLs(monitoringURLs...).RuleOrDie(),
+
+		// Needed for kubelet metrics
+		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes/metrics").RuleOrDie(),
 	}
 
 	roles := []rbacv1.ClusterRole{
@@ -588,11 +616,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	nodeProxierRules := []rbacv1.PolicyRule{
 		rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
 		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-
+		rbacv1helpers.NewRule("list", "watch").Groups(networkingGroup).Resources("servicecidrs").RuleOrDie(),
 		eventsRule(),
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(networkingGroup).Resources("servicecidrs").RuleOrDie())
 	}
 
 	nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
@@ -649,9 +674,19 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 			kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie())
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimGranularStatusAuthorization) {
+			kubeSchedulerRules = append(kubeSchedulerRules,
+				rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourceclaims/binding").RuleOrDie(),
+			)
+		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads").RuleOrDie())
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("podgroups").RuleOrDie())
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources("podgroups/status").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("compositepodgroups").RuleOrDie())
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources("compositepodgroups/status").RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler

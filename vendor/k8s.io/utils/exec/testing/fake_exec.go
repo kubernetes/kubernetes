@@ -86,7 +86,7 @@ func (fake *FakeExec) nextCommand(cmd string, args []string) exec.Cmd {
 }
 
 // CommandContext wraps arguments into exec.Cmd
-func (fake *FakeExec) CommandContext(ctx context.Context, cmd string, args ...string) exec.Cmd {
+func (fake *FakeExec) CommandContext(_ context.Context, cmd string, args ...string) exec.Cmd {
 	return fake.Command(cmd, args...)
 }
 

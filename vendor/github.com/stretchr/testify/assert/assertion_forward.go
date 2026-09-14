@@ -146,7 +146,7 @@ func (a *Assertions) Equal(expected interface{}, actual interface{}, msgAndArgs 
 	return Equal(a.t, expected, actual, msgAndArgs...)
 }
 
-// EqualError asserts that a function returned an error (i.e. not `nil`)
+// EqualError asserts that a function returned a non-nil error (i.e. an error)
 // and that it is equal to the provided error.
 //
 //	actualObj, err := SomeFunction()
@@ -158,7 +158,7 @@ func (a *Assertions) EqualError(theError error, errString string, msgAndArgs ...
 	return EqualError(a.t, theError, errString, msgAndArgs...)
 }
 
-// EqualErrorf asserts that a function returned an error (i.e. not `nil`)
+// EqualErrorf asserts that a function returned a non-nil error (i.e. an error)
 // and that it is equal to the provided error.
 //
 //	actualObj, err := SomeFunction()
@@ -240,7 +240,7 @@ func (a *Assertions) Equalf(expected interface{}, actual interface{}, msg string
 	return Equalf(a.t, expected, actual, msg, args...)
 }
 
-// Error asserts that a function returned an error (i.e. not `nil`).
+// Error asserts that a function returned a non-nil error (ie. an error).
 //
 //	actualObj, err := SomeFunction()
 //	a.Error(err)
@@ -269,8 +269,8 @@ func (a *Assertions) ErrorAsf(err error, target interface{}, msg string, args ..
 	return ErrorAsf(a.t, err, target, msg, args...)
 }
 
-// ErrorContains asserts that a function returned an error (i.e. not `nil`)
-// and that the error contains the specified substring.
+// ErrorContains asserts that a function returned a non-nil error (i.e. an
+// error) and that the error contains the specified substring.
 //
 //	actualObj, err := SomeFunction()
 //	a.ErrorContains(err,  expectedErrorSubString)
@@ -281,8 +281,8 @@ func (a *Assertions) ErrorContains(theError error, contains string, msgAndArgs .
 	return ErrorContains(a.t, theError, contains, msgAndArgs...)
 }
 
-// ErrorContainsf asserts that a function returned an error (i.e. not `nil`)
-// and that the error contains the specified substring.
+// ErrorContainsf asserts that a function returned a non-nil error (i.e. an
+// error) and that the error contains the specified substring.
 //
 //	actualObj, err := SomeFunction()
 //	a.ErrorContainsf(err,  expectedErrorSubString, "error message %s", "formatted")
@@ -311,7 +311,7 @@ func (a *Assertions) ErrorIsf(err error, target error, msg string, args ...inter
 	return ErrorIsf(a.t, err, target, msg, args...)
 }
 
-// Errorf asserts that a function returned an error (i.e. not `nil`).
+// Errorf asserts that a function returned a non-nil error (ie. an error).
 //
 //	actualObj, err := SomeFunction()
 //	a.Errorf(err, "error message %s", "formatted")
@@ -372,10 +372,10 @@ func (a *Assertions) EventuallyWithT(condition func(collect *CollectT), waitFor 
 //		time.Sleep(8*time.Second)
 //		externalValue = true
 //	}()
-//	a.EventuallyWithTf(func(c *assert.CollectT, "error message %s", "formatted") {
+//	a.EventuallyWithTf(func(c *assert.CollectT) {
 //		// add assertions as needed; any assertion failure will fail the current tick
 //		assert.True(c, externalValue, "expected 'externalValue' to be true")
-//	}, 10*time.Second, 1*time.Second, "external state has not changed to 'true'; still false")
+//	}, 10*time.Second, 1*time.Second, "error message %s", "formatted")
 func (a *Assertions) EventuallyWithTf(condition func(collect *CollectT), waitFor time.Duration, tick time.Duration, msg string, args ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -1096,7 +1096,7 @@ func (a *Assertions) NoDirExistsf(path string, msg string, args ...interface{}) 
 	return NoDirExistsf(a.t, path, msg, args...)
 }
 
-// NoError asserts that a function returned no error (i.e. `nil`).
+// NoError asserts that a function returned a nil error (ie. no error).
 //
 //	  actualObj, err := SomeFunction()
 //	  if a.NoError(err) {
@@ -1109,7 +1109,7 @@ func (a *Assertions) NoError(err error, msgAndArgs ...interface{}) bool {
 	return NoError(a.t, err, msgAndArgs...)
 }
 
-// NoErrorf asserts that a function returned no error (i.e. `nil`).
+// NoErrorf asserts that a function returned a nil error (ie. no error).
 //
 //	  actualObj, err := SomeFunction()
 //	  if a.NoErrorf(err, "error message %s", "formatted") {
@@ -1690,7 +1690,19 @@ func (a *Assertions) WithinRangef(actual time.Time, start time.Time, end time.Ti
 	return WithinRangef(a.t, actual, start, end, msg, args...)
 }
 
-// YAMLEq asserts that two YAML strings are equivalent.
+// YAMLEq asserts that the first documents in the two YAML strings are equivalent.
+//
+//	expected := `---
+//	key: value
+//	---
+//	key: this is a second document, it is not evaluated
+//	`
+//	actual := `---
+//	key: value
+//	---
+//	key: this is a subsequent document, it is not evaluated
+//	`
+//	a.YAMLEq(expected, actual)
 func (a *Assertions) YAMLEq(expected string, actual string, msgAndArgs ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -1698,7 +1710,19 @@ func (a *Assertions) YAMLEq(expected string, actual string, msgAndArgs ...interf
 	return YAMLEq(a.t, expected, actual, msgAndArgs...)
 }
 
-// YAMLEqf asserts that two YAML strings are equivalent.
+// YAMLEqf asserts that the first documents in the two YAML strings are equivalent.
+//
+//	expected := `---
+//	key: value
+//	---
+//	key: this is a second document, it is not evaluated
+//	`
+//	actual := `---
+//	key: value
+//	---
+//	key: this is a subsequent document, it is not evaluated
+//	`
+//	a.YAMLEqf(expected, actual, "error message %s", "formatted")
 func (a *Assertions) YAMLEqf(expected string, actual string, msg string, args ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()

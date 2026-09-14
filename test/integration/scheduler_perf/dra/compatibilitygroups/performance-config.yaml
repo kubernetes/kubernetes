@@ -1,0 +1,123 @@
+# CompatibilityGroups measures the scheduling-throughput impact of the
+# DRADeviceCompatibilityGroups compatibility check. It mirrors the Partitionable
+# workload - per node, one ResourceSlice provides a shared counter set and
+# another provides two partitionable devices consuming those counters - but every
+# device additionally declares the same compatibility group ("mig"). Each
+# allocation requests both devices, so the allocator runs the compatibility-group
+# intersection on every co-allocation. One pod (or claim) fits onto one node.
+- name: CompatibilityGroups
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAPartitionableDevices: true
+    DRADeviceCompatibilityGroups: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-partitionable-countersets.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-compatibilitygroups-devices.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaim-partitionable.yaml
+    namespace: init
+    countParam: $initClaims
+  - opcode: allocResourceClaims
+    namespace: init
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate-for-two-devices.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyStateParam: $steadyState
+    durationParam: $duration
+    podTemplatePath: ../templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      # Runs through all code paths without taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      measurePods: 1
+      steadyState: false
+      duration: 0s # unused
+  - name: empty_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initClaims: 50 # 50 nodes * 1 claim/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: empty_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 250 # 250 nodes * 1 claim/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: full_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 490 # 500 nodes * 1 claim/node - 10 pods
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: empty_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initClaims: 500 # 500 nodes * 1 claim/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: full_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initClaims: 990 # 1000 nodes * 1 claim/node - 10 pods
+      measurePods: 10
+      steadyState: true
+      duration: 10s

@@ -4,18 +4,21 @@
 
 // Package http2 implements the HTTP/2 protocol.
 //
-// This package is low-level and intended to be used directly by very
-// few people. Most users will use it indirectly through the automatic
-// use by the net/http package (from Go 1.6 and later).
-// For use in earlier Go versions see ConfigureServer. (Transport support
-// requires Go 1.6 or later)
+// Almost no users should need to import this package directly.
+// The net/http package supports HTTP/2 natively.
 //
-// See https://http2.github.io/ for more information on HTTP/2.
+// To enable or disable HTTP/2 support in net/http clients and servers, see
+// [http.Transport.Protocols] and [http.Server.Protocols].
+//
+// To configure HTTP/2 parameters, see
+// [http.Transport.HTTP2] and [http.Server.HTTP2].
+//
+// To create HTTP/1 or HTTP/2 connections, see
+// [http.Transport.NewClientConn].
 package http2 // import "golang.org/x/net/http2"
 
 import (
 	"bufio"
-	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -35,7 +38,6 @@ var (
 	VerboseLogs    bool
 	logFrameWrites bool
 	logFrameReads  bool
-	inTests        bool
 
 	// Enabling extended CONNECT by causes browsers to attempt to use
 	// WebSockets-over-HTTP/2. This results in problems when the server's websocket
@@ -171,6 +173,7 @@ const (
 	SettingMaxFrameSize          SettingID = 0x5
 	SettingMaxHeaderListSize     SettingID = 0x6
 	SettingEnableConnectProtocol SettingID = 0x8
+	SettingNoRFC7540Priorities   SettingID = 0x9
 )
 
 var settingName = map[SettingID]string{
@@ -181,6 +184,7 @@ var settingName = map[SettingID]string{
 	SettingMaxFrameSize:          "MAX_FRAME_SIZE",
 	SettingMaxHeaderListSize:     "MAX_HEADER_LIST_SIZE",
 	SettingEnableConnectProtocol: "ENABLE_CONNECT_PROTOCOL",
+	SettingNoRFC7540Priorities:   "NO_RFC7540_PRIORITIES",
 }
 
 func (s SettingID) String() string {
@@ -191,7 +195,7 @@ func (s SettingID) String() string {
 }
 
 // validWireHeaderFieldName reports whether v is a valid header field
-// name (key). See httpguts.ValidHeaderName for the base rules.
+// name (key). See httpguts.ValidHeaderFieldName for the base rules.
 //
 // Further, http2 says:
 //
@@ -255,15 +259,13 @@ func (cw closeWaiter) Wait() {
 // idle memory usage with many connections.
 type bufferedWriter struct {
 	_           incomparable
-	group       synctestGroupInterface // immutable
-	conn        net.Conn               // immutable
-	bw          *bufio.Writer          // non-nil when data is buffered
-	byteTimeout time.Duration          // immutable, WriteByteTimeout
+	conn        net.Conn      // immutable
+	bw          *bufio.Writer // non-nil when data is buffered
+	byteTimeout time.Duration // immutable, WriteByteTimeout
 }
 
-func newBufferedWriter(group synctestGroupInterface, conn net.Conn, timeout time.Duration) *bufferedWriter {
+func newBufferedWriter(conn net.Conn, timeout time.Duration) *bufferedWriter {
 	return &bufferedWriter{
-		group:       group,
 		conn:        conn,
 		byteTimeout: timeout,
 	}
@@ -314,24 +316,18 @@ func (w *bufferedWriter) Flush() error {
 type bufferedWriterTimeoutWriter bufferedWriter
 
 func (w *bufferedWriterTimeoutWriter) Write(p []byte) (n int, err error) {
-	return writeWithByteTimeout(w.group, w.conn, w.byteTimeout, p)
+	return writeWithByteTimeout(w.conn, w.byteTimeout, p)
 }
 
 // writeWithByteTimeout writes to conn.
 // If more than timeout passes without any bytes being written to the connection,
 // the write fails.
-func writeWithByteTimeout(group synctestGroupInterface, conn net.Conn, timeout time.Duration, p []byte) (n int, err error) {
+func writeWithByteTimeout(conn net.Conn, timeout time.Duration, p []byte) (n int, err error) {
 	if timeout <= 0 {
 		return conn.Write(p)
 	}
 	for {
-		var now time.Time
-		if group == nil {
-			now = time.Now()
-		} else {
-			now = group.Now()
-		}
-		conn.SetWriteDeadline(now.Add(timeout))
+		conn.SetWriteDeadline(time.Now().Add(timeout))
 		nn, err := conn.Write(p[n:])
 		n += nn
 		if n == len(p) || nn == 0 || !errors.Is(err, os.ErrDeadlineExceeded) {
@@ -417,14 +413,3 @@ func (s *sorter) SortStrings(ss []string) {
 // makes that struct also non-comparable, and generally doesn't add
 // any size (as long as it's first).
 type incomparable [0]func()
-
-// synctestGroupInterface is the methods of synctestGroup used by Server and Transport.
-// It's defined as an interface here to let us keep synctestGroup entirely test-only
-// and not a part of non-test builds.
-type synctestGroupInterface interface {
-	Join()
-	Now() time.Time
-	NewTimer(d time.Duration) timer
-	AfterFunc(d time.Duration, f func()) timer
-	ContextWithTimeout(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc)
-}

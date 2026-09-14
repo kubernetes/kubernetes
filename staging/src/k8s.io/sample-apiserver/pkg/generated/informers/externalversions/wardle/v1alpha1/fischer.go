@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 	apiswardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
@@ -33,11 +34,39 @@ import (
 )
 
 // FischerInformer provides access to a shared informer and lister for
-// Fischers.
+// Fischers. Prefer using the type-safe variant (see [TypedFischerInformer]).
 type FischerInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() wardlev1alpha1.FischerLister
 }
+
+// TypedFischerInformer provides access to a shared informer and lister for
+// Fischers, including the type-safe TypedInformer variant.
+// It is a superset of FischerInformer.
+type TypedFischerInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() FischerIndexInformer
+	Lister() wardlev1alpha1.FischerLister
+}
+
+// FischerIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type FischerIndexInformer cache.TypedSharedIndexInformer[*apiswardlev1alpha1.Fischer]
+
+// FischerHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Fischer.
+type FischerHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiswardlev1alpha1.Fischer]
+
+// FischerDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Fischer.
+type FischerDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiswardlev1alpha1.Fischer]
+
+// FischerFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Fischer.
+type FischerFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiswardlev1alpha1.Fischer]
+
+// FischerIndexers is a specialization of [cache.TypedIndexers] for Fischer.
+type FischerIndexers = cache.TypedIndexers[*apiswardlev1alpha1.Fischer]
+
+// DeletedFischer is a specialization of [cache.DeletedObject] for Fischer.
+type DeletedFischer = cache.DeletedObject[*apiswardlev1alpha1.Fischer]
 
 type fischerInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -47,55 +76,132 @@ type fischerInformer struct {
 // NewFischerInformer constructs a new informer for Fischer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFischerInformer]).
 func NewFischerInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredFischerInformer(client, resyncPeriod, indexers, nil)
+	return NewFischerInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedFischerInformer constructs a new informer for Fischer type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFischerInformer(client versioned.Interface, resyncPeriod time.Duration, indexers FischerIndexers) FischerIndexInformer {
+	return NewTypedFischerInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredFischerInformer constructs a new informer for Fischer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredFischerInformer]).
 func NewFilteredFischerInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewTypedFischerInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredFischerInformer constructs a new informer for Fischer type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredFischerInformer(client versioned.Interface, resyncPeriod time.Duration, indexers FischerIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) FischerIndexInformer {
+	return NewTypedFischerInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewFischerInformerWithOptions constructs a new informer for Fischer type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFischerInformerWithOptions]).
+func NewFischerInformerWithOptions(client versioned.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedFischerInformerWithOptions(client, options)
+}
+
+// NewTypedFischerInformerWithOptions constructs a new informer for Fischer type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFischerInformerWithOptions(client versioned.Interface, options internalinterfaces.InformerOptions) FischerIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "wardle.example.com", Version: "v1alpha1", Resource: "fischers"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apiswardlev1alpha1.Fischer](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.WardleV1alpha1().Fischers().List(context.Background(), options)
+				return client.WardleV1alpha1().Fischers().List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.WardleV1alpha1().Fischers().Watch(context.Background(), options)
+				return client.WardleV1alpha1().Fischers().Watch(context.Background(), opts)
 			},
-			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.WardleV1alpha1().Fischers().List(ctx, options)
+				return client.WardleV1alpha1().Fischers().List(ctx, opts)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.WardleV1alpha1().Fischers().Watch(ctx, options)
+				return client.WardleV1alpha1().Fischers().Watch(ctx, opts)
 			},
 		}, client),
 		&apiswardlev1alpha1.Fischer{},
-		resyncPeriod,
-		indexers,
-	)
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
+		},
+	))
 }
 
 func (f *fischerInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredFischerInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedFischerInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *fischerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiswardlev1alpha1.Fischer{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *fischerInformer) TypedInformer() FischerIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiswardlev1alpha1.Fischer](f.factory.InformerFor(&apiswardlev1alpha1.Fischer{}, f.defaultInformer))
 }
 
 func (f *fischerInformer) Lister() wardlev1alpha1.FischerLister {
 	return wardlev1alpha1.NewFischerLister(f.Informer().GetIndexer())
+}
+
+// ToTypedFischerInformer converts an untyped informer into a TypedFischerInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Fischer. If that is not the case, calling type-safe methods of the returned
+// TypedFischerInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedFischerInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedFischerInformer(informer FischerInformer) TypedFischerInformer {
+	if informer, ok := informer.(TypedFischerInformer); ok {
+		return informer
+	}
+	return &fischerTypedInformerAdapter{informer}
+}
+
+type fischerTypedInformerAdapter struct {
+	FischerInformer
+}
+
+func (a *fischerTypedInformerAdapter) TypedInformer() FischerIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiswardlev1alpha1.Fischer](a.Informer())
+}
+
+// ToFischerIndexInformer converts an untyped informer into a FischerIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Fischer. If that is not the case, calling type-safe methods of the returned
+// FischerIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a FischerIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToFischerIndexInformer(informer cache.SharedIndexInformer) FischerIndexInformer {
+	if informer, ok := informer.(FischerIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiswardlev1alpha1.Fischer](informer)
 }

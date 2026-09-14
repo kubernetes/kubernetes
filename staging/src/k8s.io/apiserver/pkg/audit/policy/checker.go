@@ -191,7 +191,7 @@ func ruleMatchesResource(r *audit.PolicyRule, attrs authorizer.Attributes) bool 
 	name := attrs.GetName()
 
 	for _, gr := range r.Resources {
-		if gr.Group == apiGroup {
+		if gr.Group == apiGroup || gr.Group == "*" {
 			if len(gr.Resources) == 0 {
 				return true
 			}

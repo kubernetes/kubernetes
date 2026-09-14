@@ -131,6 +131,14 @@ type KubeletConfiguration struct {
 	// Note that TLS 1.3 ciphersuites are not configurable.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	TLSCipherSuites []string
+	// TLSCurvePreferences is the set of allowed key exchange mechanisms for the server,
+	// specified as numeric Go crypto/tls CurveID values.
+	// The supported values depend on the Go version used.
+	// See https://pkg.go.dev/crypto/tls#CurveID for values supported for each Go version.
+	// The order of the list is ignored, and key exchange mechanisms are
+	// chosen by Go from this list using an internal preference order.
+	// If empty, the default Go curves will be used.
+	TLSCurvePreferences []int32
 	// TLSMinVersion is the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	TLSMinVersion string
@@ -206,19 +214,21 @@ type KubeletConfiguration struct {
 	// Deprecated: no longer has any effect.
 	StreamingConnectionIdleTimeout metav1.Duration
 	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
-	// status. If node lease feature is not enabled, it is also the frequency that
-	// kubelet posts node status to master. In that case, be cautious when
-	// changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller.
+	// status and checks if an update to the API server is necessary. Status
+	// is posted to the API server either when it changes or when
+	// nodeStatusReportFrequency has elapsed since the last report.
 	NodeStatusUpdateFrequency metav1.Duration
 	// nodeStatusReportFrequency is the frequency that kubelet posts node
-	// status to master if node status does not change. Kubelet will ignore this
-	// frequency and post node status immediately if any change is detected. It is
-	// only used when node lease feature is enabled.
+	// status to the API server if node status does not change. Kubelet will
+	// ignore this frequency and post node status immediately if any change
+	// is detected.
 	NodeStatusReportFrequency metav1.Duration
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
 	NodeLeaseDurationSeconds int32
 	// ImageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
+	// The field value must be greater than 0.
+	// If unset or 0, defaults to 2m.
 	ImageMinimumGCAge metav1.Duration
 	// ImageMaximumGCAge is the maximum age an image can be unused before it is garbage collected.
 	// The default of this field is "0s", which disables this field--meaning images won't be garbage
@@ -308,6 +318,7 @@ type KubeletConfiguration struct {
 	// specify CPU limits
 	CPUCFSQuota bool
 	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us, defaults to 100ms
+	// Default: "100ms". Changing this value requires enabling the CustomCPUCFSQuotaPeriod feature gate.
 	CPUCFSQuotaPeriod metav1.Duration
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
@@ -395,6 +406,12 @@ type KubeletConfiguration struct {
 	// For example: "`kernel.msg*,net.ipv4.route.min_pmtu`"
 	// +optional
 	AllowedUnsafeSysctls []string
+	// DefaultPodSysctls is a set of default sysctls that will be applied to all pods.
+	// It can be overridden by sysctls set in pod spec.securityContext.sysctls.
+	// Support namespaced groups: `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`, `net.*`, `kernel.domainname`, and `user.*`.
+	// For example: {"net.ipv4.ip_forward": "1", "kernel.shmall": "1048576"}
+	// +optional
+	DefaultPodSysctls map[string]string
 	// kernelMemcgNotification if enabled, the kubelet will integrate with the kernel memcg
 	// notification to determine if memory eviction thresholds are crossed rather than polling.
 	KernelMemcgNotification bool
@@ -418,7 +435,7 @@ type KubeletConfiguration struct {
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) doc for more information.
 	KubeReservedCgroup string
 	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
-	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
+	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved`, `system-reserved-compressible`, `kube-reserved`, and `kube-reserved-compressible`.
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) doc for more information.
 	EnforceNodeAllocatable []string
 	// This option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
@@ -440,7 +457,6 @@ type KubeletConfiguration struct {
 	// EnableSystemLogHandler has to be enabled in addition for this feature to work.
 	// Enabling this feature has security implications. The recommendation is to enable it on a need basis for debugging
 	// purposes and disabling otherwise.
-	// +featureGate=NodeLogQuery
 	// +optional
 	EnableSystemLogQuery bool
 	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
@@ -486,12 +502,22 @@ type KubeletConfiguration struct {
 	// MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory
 	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
 	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
-	// while increasing will put less reclaim pressure.
+	// while increasing will put less reclaim pressure. If nil, memory.high is not set.
 	// See https://kep.k8s.io/2570 for more details.
-	// Default: 0.9
+	// Default: nil
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64
+	// MemoryReservationPolicy controls how the kubelet applies cgroup v2 memory protection.
+	// "None" (default): The kubelet does not set memory.min for containers and pods,
+	// ensuring no hard memory is locked by the kernel.
+	// "TieredReservation": The kubelet sets cgroup v2 memory.min for Guaranteed pods and memory.low for Burstable pods based on memory requests.
+	// Guaranteed memory is never reclaimed by the kernel; Burstable memory is preferentially retained but may be reclaimed under extreme pressure.
+	// See https://kep.k8s.io/2570 for more details.
+	// Default: None
+	// +featureGate=MemoryQoS
+	// +optional
+	MemoryReservationPolicy MemoryReservationPolicy
 	// registerWithTaints are an array of taints to add to a node object when
 	// the kubelet registers itself. This only takes effect when registerNode
 	// is true and upon the initial registration of the node.
@@ -839,6 +865,18 @@ const (
 	// AlwaysVerify requires credential verification for accessing any image on the
 	// node irregardless how it was pulled
 	AlwaysVerify ImagePullCredentialsVerificationPolicy = "AlwaysVerify"
+)
+
+// MemoryReservationPolicy defines how the kubelet applies cgroup v2 memory protection.
+type MemoryReservationPolicy string
+
+const (
+	// NoneMemoryReservationPolicy disables memory.min protection for containers and pods.
+	// This is the default to maintain node stability by preventing "locked" memory.
+	NoneMemoryReservationPolicy MemoryReservationPolicy = "None"
+	// TieredReservationMemoryReservationPolicy enables tiered memory protection:
+	// memory.min for Guaranteed pods, memory.low for Burstable pods.
+	TieredReservationMemoryReservationPolicy MemoryReservationPolicy = "TieredReservation"
 )
 
 // ImagePullIntent is a record of the kubelet attempting to pull an image.

@@ -424,27 +424,34 @@ func (d *Decoder) parseFieldName() (tok Token, err error) {
 	return Token{}, d.newSyntaxError("invalid field name: %s", errId(d.in))
 }
 
-// parseTypeName parses Any type URL or extension field name. The name is
-// enclosed in [ and ] characters. The C++ parser does not handle many legal URL
-// strings. This implementation is more liberal and allows for the pattern
-// ^[-_a-zA-Z0-9]+([./][-_a-zA-Z0-9]+)*`). Whitespaces and comments are allowed
-// in between [ ], '.', '/' and the sub names.
+// parseTypeName parses an Any type URL or an extension field name. The name is
+// enclosed in [ and ] characters. We allow almost arbitrary type URL prefixes,
+// closely following the text-format spec [1,2]. We implement "ExtensionName |
+// AnyName" as follows (with some exceptions for backwards compatibility):
+//
+// char      = [-_a-zA-Z0-9]
+// url_char  = char | [.~!$&'()*+,;=] | "%", hex, hex
+//
+// Ident         = char, { char }
+// TypeName      = Ident, { ".", Ident } ;
+// UrlPrefix     = url_char, { url_char | "/" } ;
+// ExtensionName = "[", TypeName, "]" ;
+// AnyName       = "[", UrlPrefix, "/", TypeName, "]" ;
+//
+// Additionally, we allow arbitrary whitespace and comments between [ and ].
+//
+// [1] https://protobuf.dev/reference/protobuf/textformat-spec/#characters
+// [2] https://protobuf.dev/reference/protobuf/textformat-spec/#field-names
 func (d *Decoder) parseTypeName() (Token, error) {
-	startPos := len(d.orig) - len(d.in)
 	// Use alias s to advance first in order to use d.in for error handling.
-	// Caller already checks for [ as first character.
+	// Caller already checks for [ as first character (d.in[0] == '[').
 	s := consume(d.in[1:], 0)
 	if len(s) == 0 {
 		return Token{}, ErrUnexpectedEOF
 	}
 
+	// Collect everything between [ and ] in name.
 	var name []byte
-	for len(s) > 0 && isTypeNameChar(s[0]) {
-		name = append(name, s[0])
-		s = s[1:]
-	}
-	s = consume(s, 0)
-
 	var closed bool
 	for len(s) > 0 && !closed {
 		switch {
@@ -452,23 +459,20 @@ func (d *Decoder) parseTypeName() (Token, error) {
 			s = s[1:]
 			closed = true
 
-		case s[0] == '/', s[0] == '.':
-			if len(name) > 0 && (name[len(name)-1] == '/' || name[len(name)-1] == '.') {
-				return Token{}, d.newSyntaxError("invalid type URL/extension field name: %s",
-					d.orig[startPos:len(d.orig)-len(s)+1])
-			}
+		case s[0] == '/' || isTypeNameChar(s[0]) || isUrlExtraChar(s[0]):
 			name = append(name, s[0])
-			s = s[1:]
-			s = consume(s, 0)
-			for len(s) > 0 && isTypeNameChar(s[0]) {
-				name = append(name, s[0])
-				s = s[1:]
+			s = consume(s[1:], 0)
+
+		// URL percent-encoded chars
+		case s[0] == '%':
+			if len(s) < 3 || !isHexChar(s[1]) || !isHexChar(s[2]) {
+				return Token{}, d.parseTypeNameError(s, 3)
 			}
-			s = consume(s, 0)
+			name = append(name, s[0], s[1], s[2])
+			s = consume(s[3:], 0)
 
 		default:
-			return Token{}, d.newSyntaxError(
-				"invalid type URL/extension field name: %s", d.orig[startPos:len(d.orig)-len(s)+1])
+			return Token{}, d.parseTypeNameError(s, 1)
 		}
 	}
 
@@ -476,15 +480,38 @@ func (d *Decoder) parseTypeName() (Token, error) {
 		return Token{}, ErrUnexpectedEOF
 	}
 
-	// First character cannot be '.'. Last character cannot be '.' or '/'.
-	size := len(name)
-	if size == 0 || name[0] == '.' || name[size-1] == '.' || name[size-1] == '/' {
-		return Token{}, d.newSyntaxError("invalid type URL/extension field name: %s",
-			d.orig[startPos:len(d.orig)-len(s)])
+	// Split collected name on last '/' into urlPrefix and typeName (if '/' is
+	// present).
+	typeName := name
+	if i := bytes.LastIndexByte(name, '/'); i != -1 {
+		urlPrefix := name[:i]
+		typeName = name[i+1:]
+
+		// urlPrefix may be empty (for backwards compatibility).
+		// If non-empty, it must not start with '/'.
+		if len(urlPrefix) > 0 && urlPrefix[0] == '/' {
+			return Token{}, d.parseTypeNameError(s, 0)
+		}
 	}
 
+	// typeName must not be empty (note: "" splits to [""]) and all identifier
+	// parts must not be empty.
+	for _, ident := range bytes.Split(typeName, []byte{'.'}) {
+		if len(ident) == 0 {
+			return Token{}, d.parseTypeNameError(s, 0)
+		}
+	}
+
+	// typeName must not contain any percent-encoded or special URL chars.
+	for _, b := range typeName {
+		if b == '%' || (b != '.' && isUrlExtraChar(b)) {
+			return Token{}, d.parseTypeNameError(s, 0)
+		}
+	}
+
+	startPos := len(d.orig) - len(d.in)
+	endPos := len(d.orig) - len(s)
 	d.in = s
-	endPos := len(d.orig) - len(d.in)
 	d.consume(0)
 
 	return Token{
@@ -496,16 +523,32 @@ func (d *Decoder) parseTypeName() (Token, error) {
 	}, nil
 }
 
-func isTypeNameChar(b byte) bool {
-	return (b == '-' || b == '_' ||
-		('0' <= b && b <= '9') ||
-		('a' <= b && b <= 'z') ||
-		('A' <= b && b <= 'Z'))
+func (d *Decoder) parseTypeNameError(s []byte, numUnconsumedChars int) error {
+	return d.newSyntaxError(
+		"invalid type URL/extension field name: %s",
+		d.in[:len(d.in)-len(s)+min(numUnconsumedChars, len(s))],
+	)
 }
 
-func isWhiteSpace(b byte) bool {
+func isHexChar(b byte) bool {
+	return ('0' <= b && b <= '9') ||
+		('a' <= b && b <= 'f') ||
+		('A' <= b && b <= 'F')
+}
+
+func isTypeNameChar(b byte) bool {
+	return b == '-' || b == '_' ||
+		('0' <= b && b <= '9') ||
+		('a' <= b && b <= 'z') ||
+		('A' <= b && b <= 'Z')
+}
+
+// isUrlExtraChar complements isTypeNameChar with extra characters that we allow
+// in URLs but not in type names. Note that '/' is not included so that it can
+// be treated specially.
+func isUrlExtraChar(b byte) bool {
 	switch b {
-	case ' ', '\n', '\r', '\t':
+	case '.', '~', '!', '$', '&', '(', ')', '*', '+', ',', ';', '=':
 		return true
 	default:
 		return false

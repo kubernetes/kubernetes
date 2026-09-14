@@ -39,8 +39,8 @@ if [[ $# == 0 ]]; then
 fi
 
 ret=0
-TYPECHECK_SERIAL="${TYPECHECK_SERIAL:-false}"
-go run ./test/typecheck "$@" "--serial=$TYPECHECK_SERIAL" || ret=$?
+TYPECHECK_SERIAL="${TYPECHECK_SERIAL:-true}"
+go run ./test/typecheck "--serial=$TYPECHECK_SERIAL" "$@" || ret=$?
 
 if [[ $ret -ne 0 ]]; then
   echo "!!! Typecheck has failed. This may cause cross platform build failures." >&2

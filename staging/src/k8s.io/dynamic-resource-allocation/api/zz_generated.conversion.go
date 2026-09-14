@@ -164,6 +164,7 @@ func autoConvert_api_Device_To_v1_Device(in *Device, out *v1.Device, s conversio
 	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
 	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	out.AllowMultipleAllocations = (*bool)(unsafe.Pointer(in.AllowMultipleAllocations))
+	out.NodeAllocatableResources = *(*map[corev1.ResourceName]v1.NodeAllocatableResource)(unsafe.Pointer(&in.NodeAllocatableResources))
 	return nil
 }
 
@@ -199,6 +200,7 @@ func autoConvert_v1_Device_To_api_Device(in *v1.Device, out *Device, s conversio
 	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
 	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	out.AllowMultipleAllocations = (*bool)(unsafe.Pointer(in.AllowMultipleAllocations))
+	out.NodeAllocatableResources = *(*map[corev1.ResourceName]v1.NodeAllocatableResource)(unsafe.Pointer(&in.NodeAllocatableResources))
 	return nil
 }
 
@@ -212,6 +214,7 @@ func autoConvert_api_DeviceCounterConsumption_To_v1_DeviceCounterConsumption(in 
 		return err
 	}
 	out.Counters = *(*map[string]v1.Counter)(unsafe.Pointer(&in.Counters))
+	out.CompatibilityGroups = *(*[]string)(unsafe.Pointer(&in.CompatibilityGroups))
 	return nil
 }
 
@@ -225,6 +228,7 @@ func autoConvert_v1_DeviceCounterConsumption_To_api_DeviceCounterConsumption(in 
 		return err
 	}
 	out.Counters = *(*map[string]v1.Counter)(unsafe.Pointer(&in.Counters))
+	out.CompatibilityGroups = *(*[]string)(unsafe.Pointer(&in.CompatibilityGroups))
 	return nil
 }
 
@@ -322,6 +326,8 @@ func autoConvert_api_ResourceSliceSpec_To_v1_ResourceSliceSpec(in *ResourceSlice
 	} else {
 		out.SharedCounters = nil
 	}
+	out.PartitionTypeAttribute = (*v1.FullyQualifiedName)(unsafe.Pointer(in.PartitionTypeAttribute))
+	out.SkipNodeOperations = *(*[]v1.SkipNodeOperation)(unsafe.Pointer(&in.SkipNodeOperations))
 	return nil
 }
 
@@ -365,6 +371,8 @@ func autoConvert_v1_ResourceSliceSpec_To_api_ResourceSliceSpec(in *v1.ResourceSl
 	} else {
 		out.SharedCounters = nil
 	}
+	out.PartitionTypeAttribute = (*v1.FullyQualifiedName)(unsafe.Pointer(in.PartitionTypeAttribute))
+	out.SkipNodeOperations = *(*[]v1.SkipNodeOperation)(unsafe.Pointer(&in.SkipNodeOperations))
 	return nil
 }
 

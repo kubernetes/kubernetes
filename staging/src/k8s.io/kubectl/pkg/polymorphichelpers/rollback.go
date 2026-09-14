@@ -102,7 +102,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	}
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return "", fmt.Errorf("failed to create accessor for kind %v: %s", obj.GetObjectKind(), err.Error())
+		return "", fmt.Errorf("failed to create accessor for kind %v: %w", obj.GetObjectKind(), err)
 	}
 	name := accessor.GetName()
 	namespace := accessor.GetNamespace()
@@ -266,7 +266,7 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	}
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return "", fmt.Errorf("failed to create accessor for kind %v: %s", obj.GetObjectKind(), err.Error())
+		return "", fmt.Errorf("failed to create accessor for kind %v: %w", obj.GetObjectKind(), err)
 	}
 	ds, history, err := daemonSetHistory(r.c.AppsV1(), accessor.GetNamespace(), accessor.GetName())
 	if err != nil {
@@ -357,7 +357,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	}
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return "", fmt.Errorf("failed to create accessor for kind %v: %s", obj.GetObjectKind(), err.Error())
+		return "", fmt.Errorf("failed to create accessor for kind %v: %w", obj.GetObjectKind(), err)
 	}
 	sts, history, err := statefulSetHistory(r.c.AppsV1(), accessor.GetNamespace(), accessor.GetName())
 	if err != nil {

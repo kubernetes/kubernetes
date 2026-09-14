@@ -8,6 +8,7 @@ reviewers:
   - cblecker
   - dchen1107
   - justaugustus
+  - jpbetz
   - liggitt
   - mikedanese
   - pohly
@@ -23,6 +24,7 @@ approvers:
   - deads2k
   - dims # for local-up-cluster related files
   - enj # for sig-auth related stuff like cert testdata
+  - jpbetz
   - liggitt
   - mikedanese
   - pohly # for logging and linting

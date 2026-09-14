@@ -30,6 +30,27 @@ const (
 	// referring to a PCIe (Peripheral Component Interconnect Express) Root Complex.
 	// This attribute can be used to identify devices that share the same PCIe Root Complex.
 	StandardDeviceAttributePCIeRoot resourceapi.QualifiedName = StandardDeviceAttributePrefix + "pcieRoot"
+
+	// StandardDeviceAttributePCIBusID is a standard device attribute name
+	// which describes the PCI Bus address of the PCI device.
+	// The value is a string value in the extended BDF notation (Domain:Bus:Device.Function),
+	// referring to a PCI (Peripheral Component Interconnect) device.
+	// This attribute can be used to identify PCI devices.
+	StandardDeviceAttributePCIBusID resourceapi.QualifiedName = StandardDeviceAttributePrefix + "pciBusID"
+
+	// StandardDeviceAttributeNUMANode is a standard device attribute name
+	// which identifies the NUMA topology of a device. The value can be:
+	//
+	//   - A scalar int — the device's physical NUMA node (from the kernel's
+	//     numa_node sysfs entry). Works without any feature gate.
+	//   - An integer list (requires DRAListTypeAttributes feature gate) —
+	//     physical NUMA node first, followed by same-socket NUMA nodes at
+	//     the minimum ACPI SLIT distance.
+	//
+	// The helpers GetNUMANodeAttributeByPCIBusID and GetNUMANodeAttribute
+	// accept a listEnabled parameter that selects the form. Devices with
+	// no NUMA affinity (numa_node = -1) must not publish this attribute.
+	StandardDeviceAttributeNUMANode resourceapi.QualifiedName = StandardDeviceAttributePrefix + "numaNode"
 )
 
 // DeviceAttribute represents a device attribute name and its value

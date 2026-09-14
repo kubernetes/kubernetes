@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -32,7 +31,10 @@ import (
 
 type HostNetworkService interface {
 	getNetworkByName(name string) (*hnsNetworkInfo, error)
-	getAllEndpointsByNetwork(networkName string) (map[string]*endpointInfo, error)
+	// Returns a map of endpoints keyed by both endpoint ID and IP address for all endpoints on the specified network, and a map of remote endpoints with duplicate IPs to be deleted.
+	getAllEndpointsByNetwork(networkName string) (map[string]*endpointInfo, map[string]bool, error)
+	// deleteAllRemoteEndpointsWithDupIP deletes all remote endpoints with duplicate IPs that were found in getAllEndpointsByNetwork. This is needed to clean up stale remote endpoints that can be left behind due to a Windows bug.
+	deleteAllRemoteEndpointsWithDupIP(remoteEPsWithDupIP map[string]bool)
 	getEndpointByID(id string) (*endpointInfo, error)
 	getEndpointByIpAddress(ip string, networkName string) (*endpointInfo, error)
 	getEndpointByName(id string) (*endpointInfo, error)
@@ -40,6 +42,7 @@ type HostNetworkService interface {
 	deleteEndpoint(hnsID string) error
 	getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error)
 	getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error)
+	createOrReplaceLoadbalancer(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) (*hcn.HostComputeLoadBalancer, error)
 	updateLoadBalancer(hnsID string, sourceVip, vip string, endpoints []endpointInfo, flags loadBalancerFlags, protocol, internalPort, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error)
 	deleteLoadBalancer(hnsID string) error
 }
@@ -54,6 +57,58 @@ var (
 	// LoadBalancerPortMappingFlagsVipExternalIP enables VipExternalIP.
 	LoadBalancerPortMappingFlagsVipExternalIP hcn.LoadBalancerPortMappingFlags = 16
 )
+
+const (
+
+	// 0x6b5 is a standard Win32 RPC error (RPC_S_UNKNOWN_IF).
+	// It is returned by the RPC runtime when the target service's
+	// RPC interface is not registered. In this context, it typically
+	// indicates that the HNS service is not running or not yet initialized.
+	errorCodeHnsNotRunning = "0x6b5"
+
+	// 0xb7 (ERROR_ALREADY_EXISTS): Object already exists.
+	// Returned when attempting to create a resource that already exists.
+	errorCodeFileAlreadyExists = "0xb7"
+)
+
+// IsHnsNotRunningError checks if the error is due to HNS service not running by looking for the specific error code in the error message.
+func IsHnsNotRunningError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), errorCodeHnsNotRunning)
+}
+
+// IsPolicyAlreadyExists checks if the error is due to a load balancer policy already existing with
+// the same frontend configuration by checking for specific error conditions, including the presence
+// of a specific error code or message indicating a resource already exists.
+func IsPolicyAlreadyExists(err error) bool {
+	if err == nil {
+		return false
+	}
+	return hcn.IsPortAlreadyExistsError(err) || strings.Contains(err.Error(), errorCodeFileAlreadyExists)
+}
+
+// findExistingLBIdByFrontend finds the ID of an existing load balancer that matches the frontend configuration of the proposed load balancer.
+func findExistingLBIdByFrontend(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) string {
+	if len(proposedLB.PortMappings) == 0 {
+		return ""
+	}
+	lbID := ""
+	frontEndVIP, isProposedLbIPv6 := "", (proposedLB.Flags&LoadBalancerFlagsIPv6) == LoadBalancerFlagsIPv6
+	if len(proposedLB.FrontendVIPs) != 0 {
+		frontEndVIP = proposedLB.FrontendVIPs[0]
+	}
+	for id, lbInfo := range existingLBs {
+		if id.vip == frontEndVIP && id.protocol == uint16(proposedLB.PortMappings[0].Protocol) && id.internalPort == proposedLB.PortMappings[0].InternalPort && id.externalPort == proposedLB.PortMappings[0].ExternalPort && id.isIPv6 == isProposedLbIPv6 {
+			if lbID != "" {
+				// More than 1 existing LB has the same frontend configuration, return no match to avoid deleting any of them
+				klog.Warning("More than 1 existing lb has matching frontend, will not delete any existing lbs", "existingLBID1", lbID, "existingLBID2", lbInfo.hnsID, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort, "isIPv6", isProposedLbIPv6)
+				return ""
+			}
+			lbID = lbInfo.hnsID
+		}
+	}
+	klog.V(4).InfoS("Search for existing lb with matching frontend completed", "lbID", lbID, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort, "isIPv6", isProposedLbIPv6)
+	return lbID
+}
 
 func getLoadBalancerPolicyFlags(flags loadBalancerFlags) (lbPortMappingFlags hcn.LoadBalancerPortMappingFlags, lbFlags hcn.LoadBalancerFlags) {
 	lbPortMappingFlags = hcn.LoadBalancerPortMappingFlagsNone
@@ -115,17 +170,20 @@ func (hns hns) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	}, nil
 }
 
-func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointInfo), error) {
+func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointInfo), map[string]bool, error) {
 	hcnnetwork, err := hns.hcn.GetNetworkByName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "failed to get HNS network by name", "name", networkName)
-		return nil, err
+		return nil, nil, err
 	}
 	endpoints, err := hns.hcn.ListEndpointsOfNetwork(hcnnetwork.Id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list endpoints: %w", err)
+		return nil, nil, fmt.Errorf("failed to list endpoints: %w", err)
 	}
+
 	endpointInfos := make(map[string]*(endpointInfo))
+	remoteEPsWithDupIP := make(map[string]bool)
+
 	for _, ep := range endpoints {
 
 		if len(ep.IpConfigurations) == 0 {
@@ -143,14 +201,22 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 				break
 			}
 
-			isLocal := uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0
+			curEpIsLocal := uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0
 
-			if existingEp, ok := endpointInfos[ipConfig.IpAddress]; ok && isLocal {
-				// If the endpoint is already part of the queried endpoints map and is local,
-				// then we should not add it again to the map
-				// This is to avoid overwriting the remote endpoint info with a local endpoint.
-				klog.V(3).InfoS("Endpoint already exists in queried endpoints map; skipping.", "newLocalEndpoint", ep, "ipConfig", ipConfig, "existingEndpoint", existingEp)
-				continue
+			if existingEp, ok := endpointInfos[ipConfig.IpAddress]; ok {
+				if curEpIsLocal && !existingEp.isLocal {
+					// Local found, stale remote in map → delete remote from HNS, overwrite
+					remoteEPsWithDupIP[existingEp.hnsID] = true
+					delete(endpointInfos, existingEp.hnsID)
+					delete(endpointInfos, existingEp.ip)
+					// fall through to add local
+				} else if !curEpIsLocal && existingEp.isLocal {
+					// Local already in map, remote arriving → delete remote from HNS, skip
+					remoteEPsWithDupIP[ep.Id] = true
+					continue
+				} else {
+					continue // same type, keep existing
+				}
 			}
 
 			// Add to map with key endpoint ID or IP address
@@ -158,7 +224,7 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 			// TODO: Store by IP only and remove any lookups by endpoint ID.
 			epInfo := &endpointInfo{
 				ip:         ipConfig.IpAddress,
-				isLocal:    isLocal,
+				isLocal:    curEpIsLocal,
 				macAddress: ep.MacAddress,
 				hnsID:      ep.Id,
 				hns:        hns,
@@ -173,7 +239,17 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 	}
 	klog.V(3).InfoS("Queried endpoints from network", "network", networkName, "count", len(endpointInfos))
 	klog.V(5).InfoS("Queried endpoints details", "network", networkName, "endpointInfos", endpointInfos)
-	return endpointInfos, nil
+	return endpointInfos, remoteEPsWithDupIP, nil
+}
+
+func (hns hns) deleteAllRemoteEndpointsWithDupIP(remoteEPsWithDupIP map[string]bool) {
+	for hnsID := range remoteEPsWithDupIP {
+		klog.V(3).InfoS("Deleting stale remote endpoint with duplicate IP", "hnsID", hnsID)
+		err := hns.deleteEndpoint(hnsID)
+		if err != nil {
+			klog.ErrorS(err, "Failed to delete stale remote endpoint with duplicate IP", "hnsID", hnsID)
+		}
+	}
 }
 
 func (hns hns) getEndpointByID(id string) (*endpointInfo, error) {
@@ -202,7 +278,7 @@ func (hns hns) getEndpointByIpAddress(ip string, networkName string) (*endpointI
 	}
 	for _, endpoint := range endpoints {
 		equal := false
-		if endpoint.IpConfigurations != nil && len(endpoint.IpConfigurations) > 0 {
+		if len(endpoint.IpConfigurations) > 0 {
 			equal = endpoint.IpConfigurations[0].IpAddress == ip
 
 			if !equal && len(endpoint.IpConfigurations) > 1 {
@@ -276,11 +352,13 @@ func (hns hns) createEndpoint(ep *endpointInfo, networkName string) (*endpointIn
 		if err != nil {
 			return nil, err
 		}
+		klog.V(3).InfoS("Created remote endpoint resource", "hnsID", createdEndpoint.Id)
 	} else {
 		createdEndpoint, err = hns.hcn.CreateEndpoint(hnsNetwork, hnsEndpoint)
 		if err != nil {
 			return nil, err
 		}
+		klog.V(3).InfoS("Created local endpoint resource", "hnsID", createdEndpoint.Id)
 	}
 	return &endpointInfo{
 		ip:              createdEndpoint.IpConfigurations[0].IpAddress,
@@ -304,17 +382,14 @@ func (hns hns) deleteEndpoint(hnsID string) error {
 }
 
 // findLoadBalancerID will construct a id from the provided loadbalancer fields
-func findLoadBalancerID(endpoints []endpointInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error) {
+func findLoadBalancerID(endpoints []endpointInfo, vip string, protocol, internalPort, externalPort uint16, isIpv6 bool) (loadBalancerIdentifier, error) {
 	// Compute hash from backends (endpoint IDs)
 	hash, err := hashEndpoints(endpoints)
 	if err != nil {
 		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
 		return loadBalancerIdentifier{}, err
 	}
-	if len(vip) > 0 {
-		return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}, nil
-	}
-	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}, nil
+	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash, isIPv6: isIpv6}, nil
 }
 
 func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
@@ -325,7 +400,14 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 	}
 	loadBalancers := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 	for _, lb := range lbs {
+		// PortMappings is populated by HNS and can be empty, for example when a load
+		// balancer is partially created. Such an entry cannot be keyed by port.
+		if len(lb.PortMappings) == 0 {
+			klog.V(2).InfoS("Skipping load balancer with no port mappings", "hnsLbID", lb.Id)
+			continue
+		}
 		portMap := lb.PortMappings[0]
+		isIPv6 := (lb.Flags & LoadBalancerFlagsIPv6) == LoadBalancerFlagsIPv6
 		// Compute hash from backends (endpoint IDs)
 		hash, err := hashEndpoints(lb.HostComputeEndpoints)
 		if err != nil {
@@ -334,9 +416,9 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 		}
 		if len(lb.FrontendVIPs) == 0 {
 			// Leave VIP uninitialized
-			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, endpointsHash: hash}
+			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, endpointsHash: hash, isIPv6: isIPv6}
 		} else {
-			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, vip: lb.FrontendVIPs[0], endpointsHash: hash}
+			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, vip: lb.FrontendVIPs[0], endpointsHash: hash, isIPv6: isIPv6}
 		}
 		loadBalancers[id] = &loadBalancerInfo{
 			hnsID: lb.Id,
@@ -344,6 +426,29 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 	}
 	klog.V(3).InfoS("Queried load balancers", "count", len(lbs))
 	return loadBalancers, nil
+}
+
+func (hns hns) createOrReplaceLoadbalancer(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) (*hcn.HostComputeLoadBalancer, error) {
+	lb, err := hns.hcn.CreateLoadBalancer(proposedLB)
+	if IsPolicyAlreadyExists(err) && len(proposedLB.PortMappings) > 0 {
+		frontEndVIP := ""
+		if len(proposedLB.FrontendVIPs) != 0 {
+			frontEndVIP = proposedLB.FrontendVIPs[0]
+		}
+		existingLbID := findExistingLBIdByFrontend(proposedLB, existingLBs)
+		if existingLbID != "" {
+			klog.V(4).InfoS("Deleting matching load balancer and retrying create load balancer again", "existingLBID", existingLbID, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort)
+			err = hns.deleteLoadBalancer(existingLbID)
+			if err != nil {
+				klog.V(1).InfoS("Failed to delete existing load balancer", "lbID", existingLbID, "error", err)
+				return nil, err
+			}
+			lb, err = hns.hcn.CreateLoadBalancer(proposedLB)
+		} else {
+			klog.V(4).InfoS("Did not find a unique existing load balancer with matching frontend configuration", "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort)
+		}
+	}
+	return lb, err
 }
 
 func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
@@ -355,6 +460,7 @@ func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags
 		protocol,
 		internalPort,
 		externalPort,
+		flags.isIPv6,
 	)
 
 	if lbIdErr != nil {
@@ -426,9 +532,10 @@ func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags
 		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, ep.hnsID)
 	}
 
-	lb, err := hns.hcn.CreateLoadBalancer(loadBalancer)
+	lb, err := hns.createOrReplaceLoadbalancer(loadBalancer, previousLoadBalancers)
 
 	if err != nil {
+		klog.V(2).ErrorS(err, "Error creating Hns loadbalancer policy resource", "error", err, "endpoints", endpoints)
 		return nil, err
 	}
 
@@ -461,10 +568,10 @@ func (hns hns) updateLoadBalancer(hnsID string,
 		return nil, err
 	}
 	if len(vip) > 0 {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash, isIPv6: flags.isIPv6}
 		vips = append(vips, vip)
 	} else {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash, isIPv6: flags.isIPv6}
 	}
 
 	if lb, found := previousLoadBalancers[id]; found {
@@ -522,8 +629,17 @@ func (hns hns) updateLoadBalancer(hnsID string,
 func (hns hns) deleteLoadBalancer(hnsID string) error {
 	lb, err := hns.hcn.GetLoadBalancerByID(hnsID)
 	if err != nil {
-		// Return silently
-		return nil
+		if hcn.IsNotFoundError(err) {
+			klog.V(1).InfoS("LoadBalancer policy resource not found, may have already been deleted", "lbID", hnsID)
+			// Return silently
+			return nil
+		}
+		if IsHnsNotRunningError(err) {
+			klog.V(1).ErrorS(err, "HNS is not running, skipping delete loadbalancer", "lbID", hnsID)
+			return err
+		}
+		klog.V(2).ErrorS(err, "Error getting Hns loadbalancer policy resource by ID", "lbID", hnsID)
+		return err
 	}
 
 	err = hns.hcn.DeleteLoadBalancer(lb)
@@ -531,8 +647,13 @@ func (hns hns) deleteLoadBalancer(hnsID string) error {
 		// There is a bug in Windows Server 2019, that can cause the delete call to fail sometimes. We retry one more time.
 		// TODO: The logic in syncProxyRules  should be rewritten in the future to better stage and handle a call like this failing using the policyApplied fields.
 		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource. Attempting one more time...", "loadBalancer", lb)
-		return hns.hcn.DeleteLoadBalancer(lb)
+		err = hns.hcn.DeleteLoadBalancer(lb)
 	}
+	if err != nil {
+		klog.V(2).ErrorS(err, "Error deleting Hns loadbalancer policy resource again.", "hnsID", hnsID)
+		return err
+	}
+	klog.V(3).InfoS("Deleted Hns loadbalancer policy resource", "hnsID", hnsID)
 	return err
 }
 

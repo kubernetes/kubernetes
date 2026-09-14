@@ -31,6 +31,7 @@ type DefaultReporter struct {
 	specDenoter  string
 	retryDenoter string
 	formatter    formatter.Formatter
+	fdHierarchy  []string
 
 	runningInParallel bool
 	lock              *sync.Mutex
@@ -75,10 +76,15 @@ func (r *DefaultReporter) SuiteWillBegin(report types.Report) {
 		if len(report.SuiteSemVerConstraints) > 0 {
 			r.emit(r.f("{{coral}}[%s]{{/}} ", strings.Join(report.SuiteSemVerConstraints, ", ")))
 		}
+		if len(report.SuiteComponentSemVerConstraints) > 0 {
+			r.emit(r.f("{{coral}}[Components: %s]{{/}} ", formatComponentSemVerConstraintsToString(report.SuiteComponentSemVerConstraints)))
+		}
 		r.emit(r.f("- %d/%d specs ", report.PreRunStats.SpecsThatWillRun, report.PreRunStats.TotalSpecs))
 		if report.SuiteConfig.ParallelTotal > 1 {
 			r.emit(r.f("- %d procs ", report.SuiteConfig.ParallelTotal))
 		}
+	} else if r.conf.FdOutput {
+		return
 	} else {
 		banner := r.f("Running Suite: %s - %s", report.SuiteDescription, report.SuitePath)
 		r.emitBlock(banner)
@@ -95,6 +101,13 @@ func (r *DefaultReporter) SuiteWillBegin(report types.Report) {
 			r.emitBlock(r.f("{{coral}}[%s]{{/}} ", semVerConstraints))
 			if len(semVerConstraints)+2 > bannerWidth {
 				bannerWidth = len(semVerConstraints) + 2
+			}
+		}
+		if len(report.SuiteComponentSemVerConstraints) > 0 {
+			componentSemVerConstraints := formatComponentSemVerConstraintsToString(report.SuiteComponentSemVerConstraints)
+			r.emitBlock(r.f("{{coral}}[Components: %s]{{/}} ", componentSemVerConstraints))
+			if len(componentSemVerConstraints)+2 > bannerWidth {
+				bannerWidth = len(componentSemVerConstraints) + 2
 			}
 		}
 		r.emitBlock(strings.Repeat("=", bannerWidth))
@@ -114,7 +127,7 @@ func (r *DefaultReporter) SuiteWillBegin(report types.Report) {
 
 func (r *DefaultReporter) SuiteDidEnd(report types.Report) {
 	failures := report.SpecReports.WithState(types.SpecStateFailureStates)
-	if len(failures) > 0 {
+	if !r.conf.FdOutput && len(failures) > 0 {
 		r.emitBlock("\n")
 		if len(failures) > 1 {
 			r.emitBlock(r.f("{{red}}{{bold}}Summarizing %d Failures:{{/}}", len(failures)))
@@ -217,6 +230,10 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 		return
 	}
 
+	if r.conf.FdOutput {
+		r.didRunFd(report)
+		return
+	}
 	header := r.specDenoter
 	if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
 		header = fmt.Sprintf("[%s]", report.LeafNodeType)
@@ -348,6 +365,51 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 	r.emitDelimiter(0)
 }
 
+func (r *DefaultReporter) didRunFd(report types.SpecReport) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if !report.LeafNodeType.Is(types.NodeTypeIt) {
+		return
+	}
+
+	hierarchy := report.ContainerHierarchyTexts
+
+	// blank line when top-level container changes
+	if len(r.fdHierarchy) > 0 &&
+		(len(hierarchy) == 0 || hierarchy[0] != r.fdHierarchy[0]) {
+		fmt.Fprintln(r.writer)
+	}
+
+	// emit newly-diverged container lines
+	divergeAt := 0
+	for divergeAt < len(r.fdHierarchy) && divergeAt < len(hierarchy) &&
+		r.fdHierarchy[divergeAt] == hierarchy[divergeAt] {
+		divergeAt++
+	}
+	for i := divergeAt; i < len(hierarchy); i++ {
+		fmt.Fprintf(r.writer, "%s%s\n", strings.Repeat("  ", i), hierarchy[i])
+	}
+
+	// leaf label
+	depth := len(hierarchy)
+	indent := strings.Repeat("  ", depth)
+	label := report.LeafNodeText
+
+	switch report.State {
+	case types.SpecStateFailed, types.SpecStatePanicked:
+		label = fmt.Sprintf("%s (FAILED)", label)
+	case types.SpecStatePending:
+		label = fmt.Sprintf("%s (PENDING)", label)
+	case types.SpecStateSkipped:
+		label = fmt.Sprintf("%s (SKIPPED)", label)
+	}
+
+	color := r.highlightColorForState(report.State)
+	fmt.Fprintf(r.writer, "%s%s\n", indent, r.f(color+"%s{{/}}", label))
+	r.fdHierarchy = hierarchy
+}
+
 func (r *DefaultReporter) highlightColorForState(state types.SpecState) string {
 	switch state {
 	case types.SpecStatePassed:
@@ -413,7 +475,7 @@ func (r *DefaultReporter) emitTimeline(indent uint, report types.SpecReport, tim
 		case types.ReportEntry:
 			r.emitReportEntry(indent, x)
 		case types.ProgressReport:
-			r.emitProgressReport(indent, false, isVeryVerbose, x)
+			r.emitProgressReport(indent, isVeryVerbose, false, x)
 		case types.SpecEvent:
 			if isVeryVerbose || !x.IsOnlyVisibleAtVeryVerbose() || r.conf.ShowNodeEvents {
 				r.emitSpecEvent(indent, x, isVeryVerbose)
@@ -523,6 +585,7 @@ func (r *DefaultReporter) emitProgressReport(indent uint, emitGinkgoWriterOutput
 		indent -= 1
 	}
 
+	// Emit only top-level groups because github logging cannot handle nested groups correctly.
 	if r.conf.GithubOutput && emitGroup {
 		r.emitBlock(r.fi(indent, "::group::Progress Report"))
 	}
@@ -725,8 +788,12 @@ func (r *DefaultReporter) cycleJoin(elements []string, joiner string) string {
 }
 
 func (r *DefaultReporter) codeLocationBlock(report types.SpecReport, highlightColor string, veryVerbose bool, usePreciseFailureLocation bool) string {
-	texts, locations, labels, semVerConstraints := []string{}, []types.CodeLocation{}, [][]string{}, [][]string{}
-	texts, locations, labels, semVerConstraints = append(texts, report.ContainerHierarchyTexts...), append(locations, report.ContainerHierarchyLocations...), append(labels, report.ContainerHierarchyLabels...), append(semVerConstraints, report.ContainerHierarchySemVerConstraints...)
+	texts, locations, labels, semVerConstraints, componentSemVerConstraints := []string{}, []types.CodeLocation{}, [][]string{}, [][]string{}, []map[string][]string{}
+	texts = append(texts, report.ContainerHierarchyTexts...)
+	locations = append(locations, report.ContainerHierarchyLocations...)
+	labels = append(labels, report.ContainerHierarchyLabels...)
+	semVerConstraints = append(semVerConstraints, report.ContainerHierarchySemVerConstraints...)
+	componentSemVerConstraints = append(componentSemVerConstraints, report.ContainerHierarchyComponentSemVerConstraints...)
 
 	if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
 		texts = append(texts, r.f("[%s] %s", report.LeafNodeType, report.LeafNodeText))
@@ -735,6 +802,7 @@ func (r *DefaultReporter) codeLocationBlock(report types.SpecReport, highlightCo
 	}
 	labels = append(labels, report.LeafNodeLabels)
 	semVerConstraints = append(semVerConstraints, report.LeafNodeSemVerConstraints)
+	componentSemVerConstraints = append(componentSemVerConstraints, report.LeafNodeComponentSemVerConstraints)
 	locations = append(locations, report.LeafNodeLocation)
 
 	failureLocation := report.Failure.FailureNodeLocation
@@ -749,6 +817,7 @@ func (r *DefaultReporter) codeLocationBlock(report types.SpecReport, highlightCo
 		locations = append([]types.CodeLocation{failureLocation}, locations...)
 		labels = append([][]string{{}}, labels...)
 		semVerConstraints = append([][]string{{}}, semVerConstraints...)
+		componentSemVerConstraints = append([]map[string][]string{{}}, componentSemVerConstraints...)
 		highlightIndex = 0
 	case types.FailureNodeInContainer:
 		i := report.Failure.FailureNodeContainerIndex
@@ -779,6 +848,9 @@ func (r *DefaultReporter) codeLocationBlock(report types.SpecReport, highlightCo
 			if len(semVerConstraints[i]) > 0 {
 				out += r.f(" {{coral}}[%s]{{/}}", strings.Join(semVerConstraints[i], ", "))
 			}
+			if len(componentSemVerConstraints[i]) > 0 {
+				out += r.f(" {{coral}}[%s]{{/}}", formatComponentSemVerConstraintsToString(componentSemVerConstraints[i]))
+			}
 			out += "\n"
 			out += r.fi(uint(i), "{{gray}}%s{{/}}\n", locations[i])
 		}
@@ -805,6 +877,10 @@ func (r *DefaultReporter) codeLocationBlock(report types.SpecReport, highlightCo
 		flattenedSemVerConstraints := report.SemVerConstraints()
 		if len(flattenedSemVerConstraints) > 0 {
 			out += r.f(" {{coral}}[%s]{{/}}", strings.Join(flattenedSemVerConstraints, ", "))
+		}
+		flattenedComponentSemVerConstraints := report.ComponentSemVerConstraints()
+		if len(flattenedComponentSemVerConstraints) > 0 {
+			out += r.f(" {{coral}}[%s]{{/}}", formatComponentSemVerConstraintsToString(flattenedComponentSemVerConstraints))
 		}
 		out += "\n"
 		if usePreciseFailureLocation {

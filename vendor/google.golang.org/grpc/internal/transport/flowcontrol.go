@@ -28,7 +28,7 @@ import (
 // writeQuota is a soft limit on the amount of data a stream can
 // schedule before some of it is written out.
 type writeQuota struct {
-	quota int32
+	_ noCopy
 	// get waits on read from when quota goes less than or equal to zero.
 	// replenish writes on it when quota goes positive again.
 	ch chan struct{}
@@ -38,16 +38,17 @@ type writeQuota struct {
 	// It is implemented as a field so that it can be updated
 	// by tests.
 	replenish func(n int)
+	quota     int32
 }
 
-func newWriteQuota(sz int32, done <-chan struct{}) *writeQuota {
-	w := &writeQuota{
-		quota: sz,
-		ch:    make(chan struct{}, 1),
-		done:  done,
-	}
+// init allows a writeQuota to be initialized in-place, which is useful for
+// resetting a buffer or for avoiding a heap allocation when the buffer is
+// embedded in another struct.
+func (w *writeQuota) init(sz int32, done <-chan struct{}) {
+	w.quota = sz
+	w.ch = make(chan struct{}, 1)
+	w.done = done
 	w.replenish = w.realReplenish
-	return w
 }
 
 func (w *writeQuota) get(sz int32) error {
@@ -67,9 +68,9 @@ func (w *writeQuota) get(sz int32) error {
 
 func (w *writeQuota) realReplenish(n int) {
 	sz := int32(n)
-	a := atomic.AddInt32(&w.quota, sz)
-	b := a - sz
-	if b <= 0 && a > 0 {
+	newQuota := atomic.AddInt32(&w.quota, sz)
+	previousQuota := newQuota - sz
+	if previousQuota <= 0 && newQuota > 0 {
 		select {
 		case w.ch <- struct{}{}:
 		default:
@@ -114,7 +115,6 @@ func (f *trInFlow) getSize() uint32 {
 	return atomic.LoadUint32(&f.effectiveWindowSize)
 }
 
-// TODO(mmukhi): Simplify this code.
 // inFlow deals with inbound flow control
 type inFlow struct {
 	mu sync.Mutex
@@ -173,14 +173,14 @@ func (f *inFlow) maybeAdjust(n uint32) uint32 {
 // onData is invoked when some data frame is received. It updates pendingData.
 func (f *inFlow) onData(n uint32) error {
 	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	f.pendingData += n
 	if f.pendingData+f.pendingUpdate > f.limit+f.delta {
 		limit := f.limit
 		rcvd := f.pendingData + f.pendingUpdate
-		f.mu.Unlock()
 		return fmt.Errorf("received %d-bytes data exceeding the limit %d bytes", rcvd, limit)
 	}
-	f.mu.Unlock()
 	return nil
 }
 
@@ -188,8 +188,9 @@ func (f *inFlow) onData(n uint32) error {
 // to be sent to the peer.
 func (f *inFlow) onRead(n uint32) uint32 {
 	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if f.pendingData == 0 {
-		f.mu.Unlock()
 		return 0
 	}
 	f.pendingData -= n
@@ -204,9 +205,7 @@ func (f *inFlow) onRead(n uint32) uint32 {
 	if f.pendingUpdate >= f.limit/4 {
 		wu := f.pendingUpdate
 		f.pendingUpdate = 0
-		f.mu.Unlock()
 		return wu
 	}
-	f.mu.Unlock()
 	return 0
 }

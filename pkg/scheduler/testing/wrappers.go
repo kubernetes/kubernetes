@@ -24,18 +24,22 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
 )
 
 var zero int64
+
+// pauseImage is a placeholder image name for pod fixtures.
+// It is suitable for tests that need a valid non-empty image name, but never actually pull that image.
+const pauseImage = "pause"
 
 // NodeSelectorWrapper wraps a NodeSelector inside.
 type NodeSelectorWrapper struct{ v1.NodeSelector }
@@ -513,14 +517,14 @@ func (p *PodWrapper) Toleration(key string) *PodWrapper {
 // HostPort creates a container with a hostPort valued `hostPort`,
 // and injects into the inner pod.
 func (p *PodWrapper) HostPort(port int32) *PodWrapper {
-	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image("pause").HostPort(port).Obj())
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image(pauseImage).HostPort(port).Obj())
 	return p
 }
 
 // ContainerPort creates a container with ports valued `ports`,
 // and injects into the inner pod.
 func (p *PodWrapper) ContainerPort(ports []v1.ContainerPort) *PodWrapper {
-	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image("pause").ContainerPort(ports).Obj())
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image(pauseImage).ContainerPort(ports).Obj())
 	return p
 }
 
@@ -529,7 +533,7 @@ func (p *PodWrapper) ContainerPort(ports []v1.ContainerPort) *PodWrapper {
 func (p *PodWrapper) InitContainerPort(sidecar bool, ports []v1.ContainerPort) *PodWrapper {
 	c := MakeContainer().
 		Name("init-container").
-		Image("pause").
+		Image(pauseImage).
 		ContainerPort(ports)
 	if sidecar {
 		c.RestartPolicy(v1.ContainerRestartPolicyAlways)
@@ -790,7 +794,7 @@ func (p *PodWrapper) Res(resMap map[v1.ResourceName]string) *PodWrapper {
 	}
 
 	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
-	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).Resources(resMap).Obj())
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(pauseImage).Resources(resMap).Obj())
 	return p
 }
 
@@ -817,7 +821,7 @@ func (p *PodWrapper) Req(reqMap map[v1.ResourceName]string) *PodWrapper {
 	}
 
 	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
-	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).ResourceRequests(reqMap).Obj())
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(pauseImage).ResourceRequests(reqMap).Obj())
 	return p
 }
 
@@ -828,7 +832,7 @@ func (p *PodWrapper) Lim(limMap map[v1.ResourceName]string) *PodWrapper {
 	}
 
 	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
-	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).ResourceLimits(limMap).Obj())
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(pauseImage).ResourceLimits(limMap).Obj())
 	return p
 }
 
@@ -839,7 +843,7 @@ func (p *PodWrapper) InitReq(resMap map[v1.ResourceName]string) *PodWrapper {
 	}
 
 	name := fmt.Sprintf("init-con%d", len(p.Spec.InitContainers))
-	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).Resources(resMap).Obj())
+	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(pauseImage).Resources(resMap).Obj())
 	return p
 }
 
@@ -850,7 +854,7 @@ func (p *PodWrapper) SidecarReq(resMap map[v1.ResourceName]string) *PodWrapper {
 	}
 
 	name := fmt.Sprintf("sidecar-con%d", len(p.Spec.InitContainers))
-	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).RestartPolicy(v1.ContainerRestartPolicyAlways).Resources(resMap).Obj())
+	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(pauseImage).RestartPolicy(v1.ContainerRestartPolicyAlways).Resources(resMap).Obj())
 	return p
 }
 
@@ -866,9 +870,11 @@ func (p *PodWrapper) Overhead(rl v1.ResourceList) *PodWrapper {
 	return p
 }
 
-// WorkloadRef sets workloadRef of the inner pod.
-func (p *PodWrapper) WorkloadRef(workloadRef *v1.WorkloadReference) *PodWrapper {
-	p.Spec.WorkloadRef = workloadRef
+// PodGroupName sets `name` as the PodGroupName of the inner pod.
+func (p *PodWrapper) PodGroupName(name string) *PodWrapper {
+	p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+		PodGroupName: new(name),
+	}
 	return p
 }
 
@@ -1322,6 +1328,11 @@ func (wrapper *ResourceClaimWrapper) ReservedForPod(podName string, podUID types
 	return wrapper.ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: podUID})
 }
 
+// ReservedForPodGroup sets that field of the inner object given information about one podgroup.
+func (wrapper *ResourceClaimWrapper) ReservedForPodGroup(podGroupName string, podGroupUID types.UID) *ResourceClaimWrapper {
+	return wrapper.ReservedFor(resourceapi.ResourceClaimConsumerReference{APIGroup: schedulingv1beta1.GroupName, Resource: "podgroups", Name: podGroupName, UID: podGroupUID})
+}
+
 type ResourceSliceWrapper struct {
 	resourceapi.ResourceSlice
 }
@@ -1331,6 +1342,26 @@ func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
 	wrapper.Name = nodeName + "-" + driverName
 	wrapper.Spec.NodeName = &nodeName
 	wrapper.Spec.Pool.Name = nodeName
+	wrapper.Spec.Pool.ResourceSliceCount = 1
+	wrapper.Spec.Driver = driverName
+	return wrapper
+}
+
+func MakeResourceSliceWithPerDeviceNodeSelection(namePrefix, driverName string) *ResourceSliceWrapper {
+	wrapper := new(ResourceSliceWrapper)
+	wrapper.Name = namePrefix + "-" + driverName
+	wrapper.Spec.PerDeviceNodeSelection = ptr.To(true)
+	wrapper.Spec.Pool.Name = namePrefix
+	wrapper.Spec.Pool.ResourceSliceCount = 1
+	wrapper.Spec.Driver = driverName
+	return wrapper
+}
+
+func MakeResourceSliceWithAllNodes(namePrefix, driverName string) *ResourceSliceWrapper {
+	wrapper := new(ResourceSliceWrapper)
+	wrapper.Name = namePrefix + "-" + driverName
+	wrapper.Spec.AllNodes = new(true)
+	wrapper.Spec.Pool.Name = namePrefix
 	wrapper.Spec.Pool.ResourceSliceCount = 1
 	wrapper.Spec.Driver = driverName
 	return wrapper
@@ -1353,6 +1384,8 @@ func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrap
 	return wrapper
 }
 
+type NodeName string
+
 // Device extends the devices field of the inner object.
 // The device must have a name and may have arbitrary additional fields.
 func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *ResourceSliceWrapper {
@@ -1365,6 +1398,10 @@ func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *Re
 			device.Capacity = typedField
 		case resourceapi.DeviceTaint:
 			device.Taints = append(device.Taints, typedField)
+		case NodeName:
+			device.NodeName = (*string)(&typedField)
+		case *v1.NodeSelector:
+			device.NodeSelector = typedField
 		default:
 			panic(fmt.Sprintf("expected a type which matches a field in BasicDevice, got %T", field))
 		}
@@ -1375,6 +1412,11 @@ func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *Re
 
 func (wrapper *ResourceSliceWrapper) ResourceSliceCount(count int) *ResourceSliceWrapper {
 	wrapper.Spec.Pool.ResourceSliceCount = int64(count)
+	return wrapper
+}
+
+func (wrapper *ResourceSliceWrapper) SkipNodeOperations(skip ...resourceapi.SkipNodeOperation) *ResourceSliceWrapper {
+	wrapper.Spec.SkipNodeOperations = skip
 	return wrapper
 }
 
@@ -1550,48 +1592,12 @@ func (c *VolumeAttachmentWrapper) Attached(attached bool) *VolumeAttachmentWrapp
 	return c
 }
 
-// WorkloadWrapper wraps a Workload inside.
-type WorkloadWrapper struct{ schedulingapi.Workload }
-
-// MakeWorkload creates a Workload wrapper.
-func MakeWorkload() *WorkloadWrapper {
-	return &WorkloadWrapper{}
-}
-
-// Obj returns the inner Workload.
-func (wrapper *WorkloadWrapper) Obj() *schedulingapi.Workload {
-	return &wrapper.Workload
-}
-
-// Name sets `name` as the name of the inner Workload.
-func (wrapper *WorkloadWrapper) Name(name string) *WorkloadWrapper {
-	wrapper.SetName(name)
-	return wrapper
-}
-
-// Namespace sets `namespace` as the namespace of the inner Workload.
-func (wrapper *WorkloadWrapper) Namespace(namespace string) *WorkloadWrapper {
-	wrapper.SetNamespace(namespace)
-	return wrapper
-}
-
-// PodGroup injects the pod group into the inner Workload.
-func (wrapper *WorkloadWrapper) PodGroup(pg *schedulingapi.PodGroup) *WorkloadWrapper {
-	wrapper.Spec.PodGroups = append(wrapper.Spec.PodGroups, *pg)
-	return wrapper
-}
-
 // PodGroupWrapper wraps a PodGroup inside.
-type PodGroupWrapper struct{ schedulingapi.PodGroup }
+type PodGroupWrapper struct{ schedulingv1beta1.PodGroup }
 
 // MakePodGroup creates a PodGroup wrapper.
 func MakePodGroup() *PodGroupWrapper {
 	return &PodGroupWrapper{}
-}
-
-// Obj returns the inner PodGroup.
-func (wrapper *PodGroupWrapper) Obj() *schedulingapi.PodGroup {
-	return &wrapper.PodGroup
 }
 
 // Name sets `name` as the name of the inner PodGroup.
@@ -1600,17 +1606,355 @@ func (wrapper *PodGroupWrapper) Name(name string) *PodGroupWrapper {
 	return wrapper
 }
 
+// Namespace sets `namespace` as the namespace of the inner PodGroup.
+func (wrapper *PodGroupWrapper) Namespace(namespace string) *PodGroupWrapper {
+	wrapper.PodGroup.Namespace = namespace
+	return wrapper
+}
+
+// UID sets `uid` as the UID of the inner PodGroup.
+func (wrapper *PodGroupWrapper) UID(uid types.UID) *PodGroupWrapper {
+	wrapper.PodGroup.UID = uid
+	return wrapper
+}
+
+// Obj returns the inner PodGroup.
+func (wrapper *PodGroupWrapper) Obj() *schedulingv1beta1.PodGroup {
+	return &wrapper.PodGroup
+}
+
 // MinCount sets the MinCount for the Gang scheduling policy.
 func (wrapper *PodGroupWrapper) MinCount(count int32) *PodGroupWrapper {
-	if wrapper.Policy.Gang == nil {
-		wrapper.Policy.Gang = &schedulingapi.GangSchedulingPolicy{}
+	if wrapper.PodGroup.Spec.SchedulingPolicy.Gang == nil {
+		wrapper.PodGroup.Spec.SchedulingPolicy.Gang = &schedulingv1beta1.GangSchedulingPolicy{}
 	}
-	wrapper.Policy.Gang.MinCount = count
+	wrapper.PodGroup.Spec.SchedulingPolicy.Gang.MinCount = count
 	return wrapper
 }
 
 // BasicPolicy sets the PodGroup policy to Basic.
 func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
-	wrapper.Policy.Basic = &schedulingapi.BasicSchedulingPolicy{}
+	wrapper.PodGroup.Spec.SchedulingPolicy.Basic = &schedulingv1beta1.BasicSchedulingPolicy{}
+	return wrapper
+}
+
+// WorkloadRef sets appropriate WorkloadRef field of the inner PodGroup.
+func (wrapper *PodGroupWrapper) WorkloadRef(templateName, workloadName string) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.WorkloadRef = &schedulingv1beta1.WorkloadReference{
+		TemplateName: templateName,
+		WorkloadName: workloadName,
+	}
+	return wrapper
+}
+
+// TopologyKey sets appropriate TopologyKey field in the SchedulingConstraints of the inner PodGroup.
+func (wrapper *PodGroupWrapper) TopologyKey(topologyKey string) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.SchedulingConstraints = &schedulingv1beta1.PodGroupSchedulingConstraints{
+		Topology: []schedulingv1beta1.TopologyConstraint{
+			{
+				Key: topologyKey,
+			},
+		},
+	}
+	return wrapper
+}
+
+// ResourceClaims adds resource claims to the inner PodGroup.
+func (wrapper *PodGroupWrapper) ResourceClaims(claims ...schedulingv1beta1.PodGroupResourceClaim) *PodGroupWrapper {
+	wrapper.Spec.ResourceClaims = append(wrapper.Spec.ResourceClaims, claims...)
+	return wrapper
+}
+
+// ResourceClaimStatuses adds resource claim statuses to the inner PodGroup.
+func (wrapper *PodGroupWrapper) ResourceClaimStatuses(statuses ...schedulingv1beta1.PodGroupResourceClaimStatus) *PodGroupWrapper {
+	wrapper.Status.ResourceClaimStatuses = append(wrapper.Status.ResourceClaimStatuses, statuses...)
+	return wrapper
+}
+
+// DisruptionModeAll sets the disruption mode of the inner PodGroup to All.
+func (wrapper *PodGroupWrapper) DisruptionModeAll() *PodGroupWrapper {
+	wrapper.PodGroup.Spec.DisruptionMode = &schedulingv1beta1.DisruptionMode{All: &schedulingv1beta1.AllDisruptionMode{}}
+	return wrapper
+}
+
+// DisruptionModeSingle sets the disruption mode of the inner PodGroup to Single.
+func (wrapper *PodGroupWrapper) DisruptionModeSingle() *PodGroupWrapper {
+	wrapper.PodGroup.Spec.DisruptionMode = &schedulingv1beta1.DisruptionMode{Single: &schedulingv1beta1.SingleDisruptionMode{}}
+	return wrapper
+}
+
+// Priority sets the priority of the inner PodGroup.
+func (wrapper *PodGroupWrapper) Priority(priority int32) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.Priority = &priority
+	return wrapper
+}
+
+// PreemptionPolicy sets the preemption policy of the inner PodGroup.
+func (wrapper *PodGroupWrapper) PreemptionPolicy(policy schedulingv1beta1.PreemptionPolicy) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.PreemptionPolicy = &policy
+	return wrapper
+}
+
+// ParentCompositePodGroup sets the parent composite pod group name of the inner PodGroup.
+func (wrapper *PodGroupWrapper) ParentCompositePodGroup(parent string) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.ParentCompositePodGroupName = &parent
+	return wrapper
+}
+
+// WorkloadWrapper wraps a Workload inside.
+type WorkloadWrapper struct{ schedulingv1beta1.Workload }
+
+// MakeWorkload creates a Workload wrapper.
+func MakeWorkload() *WorkloadWrapper {
+	return &WorkloadWrapper{}
+}
+
+// Obj returns the inner Workload.
+func (wrapper *WorkloadWrapper) Obj() *schedulingv1beta1.Workload {
+	return &wrapper.Workload
+}
+
+// Name sets `name` as the name of the inner Workload.
+func (wrapper *WorkloadWrapper) Name(name string) *WorkloadWrapper {
+	wrapper.Workload.Name = name
+	return wrapper
+}
+
+// Namespace sets `namespace` as the namespace of the inner Workload.
+func (wrapper *WorkloadWrapper) Namespace(namespace string) *WorkloadWrapper {
+	wrapper.Workload.Namespace = namespace
+	return wrapper
+}
+
+// PodGroupTemplate appends the given PodGroupTemplate to the Workload spec.
+func (wrapper *WorkloadWrapper) PodGroupTemplate(t schedulingv1beta1.PodGroupTemplate) *WorkloadWrapper {
+	wrapper.Workload.Spec.PodGroupTemplates = append(wrapper.Workload.Spec.PodGroupTemplates, t)
+	return wrapper
+}
+
+// PodGroupTemplateWrapper wraps a PodGroupTemplate inside.
+type PodGroupTemplateWrapper struct {
+	schedulingv1beta1.PodGroupTemplate
+}
+
+// MakePodGroupTemplate creates a PodGroupTemplate wrapper.
+func MakePodGroupTemplate() *PodGroupTemplateWrapper {
+	return &PodGroupTemplateWrapper{}
+}
+
+// Obj returns the inner PodGroupTemplate.
+func (wrapper *PodGroupTemplateWrapper) Obj() schedulingv1beta1.PodGroupTemplate {
+	return wrapper.PodGroupTemplate
+}
+
+// Name sets `name` as the name of the inner PodGroupTemplate.
+func (wrapper *PodGroupTemplateWrapper) Name(name string) *PodGroupTemplateWrapper {
+	wrapper.PodGroupTemplate.Name = name
+	return wrapper
+}
+
+// Priority sets the priority of the inner PodGroupTemplate.
+func (wrapper *PodGroupTemplateWrapper) Priority(priority int32) *PodGroupTemplateWrapper {
+	wrapper.PodGroupTemplate.Priority = &priority
+	return wrapper
+}
+
+// MinCount sets the MinCount for the Gang scheduling policy.
+func (wrapper *PodGroupTemplateWrapper) MinCount(count int32) *PodGroupTemplateWrapper {
+	if wrapper.SchedulingPolicy.Gang == nil {
+		wrapper.SchedulingPolicy.Gang = &schedulingv1beta1.GangSchedulingPolicy{}
+	}
+	wrapper.SchedulingPolicy.Gang.MinCount = count
+	return wrapper
+}
+
+// BasicPolicy sets the PodGroup policy to Basic.
+func (wrapper *PodGroupTemplateWrapper) BasicPolicy() *PodGroupTemplateWrapper {
+	wrapper.SchedulingPolicy.Basic = &schedulingv1beta1.BasicSchedulingPolicy{}
+	return wrapper
+}
+
+// DisruptionModeAll sets the disruption mode of the inner PodGroupTemplate to All.
+func (wrapper *PodGroupTemplateWrapper) DisruptionModeAll() *PodGroupTemplateWrapper {
+	wrapper.PodGroupTemplate.DisruptionMode = &schedulingv1beta1.DisruptionMode{All: &schedulingv1beta1.AllDisruptionMode{}}
+	return wrapper
+}
+
+// DisruptionModeSingle sets the disruption mode of the inner PodGroupTemplate to Single.
+func (wrapper *PodGroupTemplateWrapper) DisruptionModeSingle() *PodGroupTemplateWrapper {
+	wrapper.PodGroupTemplate.DisruptionMode = &schedulingv1beta1.DisruptionMode{Single: &schedulingv1beta1.SingleDisruptionMode{}}
+	return wrapper
+}
+
+// CompositePodGroupTemplate appends the given CompositePodGroupTemplate to the Workload spec.
+func (wrapper *WorkloadWrapper) CompositePodGroupTemplate(t schedulingv1beta1.CompositePodGroupTemplate) *WorkloadWrapper {
+	wrapper.Workload.Spec.CompositePodGroupTemplates = append(wrapper.Workload.Spec.CompositePodGroupTemplates, t)
+	return wrapper
+}
+
+// Children adds children to the Workload.
+// It accepts *PodGroupTemplateWrapper and *CompositePodGroupTemplateWrapper.
+func (wrapper *WorkloadWrapper) Children(children ...any) *WorkloadWrapper {
+	for _, child := range children {
+		switch c := child.(type) {
+		case *PodGroupTemplateWrapper:
+			wrapper.Workload.Spec.PodGroupTemplates = append(wrapper.Workload.Spec.PodGroupTemplates, c.Obj())
+		case *CompositePodGroupTemplateWrapper:
+			wrapper.Workload.Spec.CompositePodGroupTemplates = append(wrapper.Workload.Spec.CompositePodGroupTemplates, c.Obj())
+		default:
+			panic(fmt.Sprintf("unexpected child type %T", child))
+		}
+	}
+	return wrapper
+}
+
+// CompositePodGroupTemplateWrapper wraps a CompositePodGroupTemplate inside.
+type CompositePodGroupTemplateWrapper struct {
+	schedulingv1beta1.CompositePodGroupTemplate
+}
+
+// MakeCompositePodGroupTemplate creates a CompositePodGroupTemplate wrapper.
+func MakeCompositePodGroupTemplate() *CompositePodGroupTemplateWrapper {
+	return &CompositePodGroupTemplateWrapper{}
+}
+
+// Obj returns the inner CompositePodGroupTemplate.
+func (wrapper *CompositePodGroupTemplateWrapper) Obj() schedulingv1beta1.CompositePodGroupTemplate {
+	return wrapper.CompositePodGroupTemplate
+}
+
+// Name sets `name` as the name of the inner CompositePodGroupTemplate.
+func (wrapper *CompositePodGroupTemplateWrapper) Name(name string) *CompositePodGroupTemplateWrapper {
+	wrapper.CompositePodGroupTemplate.Name = name
+	return wrapper
+}
+
+// Priority sets the priority of the inner CompositePodGroupTemplate.
+func (wrapper *CompositePodGroupTemplateWrapper) Priority(priority int32) *CompositePodGroupTemplateWrapper {
+	wrapper.CompositePodGroupTemplate.Priority = &priority
+	return wrapper
+}
+
+// Children adds children to the CompositePodGroupTemplate.
+// It accepts *PodGroupTemplateWrapper and *CompositePodGroupTemplateWrapper.
+func (wrapper *CompositePodGroupTemplateWrapper) Children(children ...any) *CompositePodGroupTemplateWrapper {
+	for _, child := range children {
+		switch c := child.(type) {
+		case *PodGroupTemplateWrapper:
+			wrapper.PodGroupTemplates = append(wrapper.PodGroupTemplates, c.Obj())
+		case *CompositePodGroupTemplateWrapper:
+			wrapper.CompositePodGroupTemplates = append(wrapper.CompositePodGroupTemplates, c.Obj())
+		default:
+			panic(fmt.Sprintf("unexpected child type %T", child))
+		}
+	}
+	return wrapper
+}
+
+// MinGroupCount sets the policy to Gang with the given minGroupCount.
+func (wrapper *CompositePodGroupTemplateWrapper) MinGroupCount(minGroupCount int32) *CompositePodGroupTemplateWrapper {
+	wrapper.SchedulingPolicy.Gang = &schedulingv1beta1.CompositeGangSchedulingPolicy{MinGroupCount: minGroupCount}
+	return wrapper
+}
+
+// BasicPolicy sets the policy to Basic.
+func (wrapper *CompositePodGroupTemplateWrapper) BasicPolicy() *CompositePodGroupTemplateWrapper {
+	wrapper.SchedulingPolicy.Basic = &schedulingv1beta1.CompositeBasicSchedulingPolicy{}
+	return wrapper
+}
+
+// CompositePodGroupWrapper wraps a CompositePodGroup inside.
+type CompositePodGroupWrapper struct {
+	schedulingv1alpha3.CompositePodGroup
+}
+
+// MakeCompositePodGroup creates a CompositePodGroup wrapper.
+func MakeCompositePodGroup() *CompositePodGroupWrapper {
+	return &CompositePodGroupWrapper{}
+}
+
+// Obj returns the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Obj() *schedulingv1alpha3.CompositePodGroup {
+	return &wrapper.CompositePodGroup
+}
+
+// Name sets `name` as the name of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Name(name string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Name = name
+	return wrapper
+}
+
+// Priority sets the priority of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Priority(priority int32) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.Priority = &priority
+	return wrapper
+}
+
+// PreemptionPolicy sets the preemption policy of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) PreemptionPolicy(policy schedulingv1alpha3.PreemptionPolicy) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.PreemptionPolicy = &policy
+	return wrapper
+}
+
+// Namespace sets `namespace` as the namespace of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Namespace(namespace string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Namespace = namespace
+	return wrapper
+}
+
+// UID sets the UID of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) UID(uid string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.UID = types.UID(uid)
+	return wrapper
+}
+
+// ParentCompositePodGroup sets the parent CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) ParentCompositePodGroup(parent string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.ParentCompositePodGroupName = new(parent)
+	return wrapper
+}
+
+// MinGroupCount sets the policy to Gang with the given minGroupCount.
+func (wrapper *CompositePodGroupWrapper) MinGroupCount(minGroupCount int32) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.SchedulingPolicy.Gang = &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: minGroupCount}
+	return wrapper
+}
+
+// BasicPolicy sets the policy to Basic.
+func (wrapper *CompositePodGroupWrapper) BasicPolicy() *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.SchedulingPolicy.Basic = &schedulingv1alpha3.CompositeBasicSchedulingPolicy{}
+	return wrapper
+}
+
+// DisruptionModeAll sets the disruption mode of the inner CompositePodGroup to All.
+func (wrapper *CompositePodGroupWrapper) DisruptionModeAll() *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.DisruptionMode = &schedulingv1alpha3.CompositeDisruptionMode{All: &schedulingv1alpha3.AllCompositeDisruptionMode{}}
+	return wrapper
+}
+
+// DisruptionModeSingle sets the disruption mode of the inner CompositePodGroup to Single.
+func (wrapper *CompositePodGroupWrapper) DisruptionModeSingle() *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.DisruptionMode = &schedulingv1alpha3.CompositeDisruptionMode{Single: &schedulingv1alpha3.SingleCompositeDisruptionMode{}}
+	return wrapper
+}
+
+// WorkloadRef sets the WorkloadReference for the CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) WorkloadRef(workloadName, templateName string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.WorkloadRef = &schedulingv1alpha3.WorkloadReference{
+		WorkloadName: workloadName,
+		TemplateName: templateName,
+	}
+	return wrapper
+}
+
+// TopologyKey sets appropriate TopologyKey field in the SchedulingConstraints of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) TopologyKey(topologyKey string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.SchedulingConstraints = &schedulingv1alpha3.CompositePodGroupSchedulingConstraints{
+		Topology: []schedulingv1alpha3.TopologyConstraint{
+			{
+				Key: topologyKey,
+			},
+		},
+	}
 	return wrapper
 }

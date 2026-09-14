@@ -18,8 +18,10 @@ package core
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
@@ -41,14 +43,24 @@ var legacyObjectCountAliases = map[schema.GroupVersionResource]corev1.ResourceNa
 }
 
 // NewEvaluators returns the list of static evaluators that manage more than counts
-func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFactory) []quota.Evaluator {
-	// these evaluators have special logic
-	result := []quota.Evaluator{
-		NewPodEvaluator(f, clock.RealClock{}),
-		NewServiceEvaluator(f),
-		NewPersistentVolumeClaimEvaluator(f),
+func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFactory, isEnabled func(schema.GroupVersionResource) bool) ([]quota.Evaluator, error) {
+	if isEnabled == nil {
+		isEnabled = func(schema.GroupVersionResource) bool { return true }
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+
+	// these evaluators have special logic
+	result := []quota.Evaluator{}
+	if isEnabled(corev1.SchemeGroupVersion.WithResource("pods")) {
+		result = append(result, NewPodEvaluator(f, clock.RealClock{}))
+	}
+	if isEnabled(corev1.SchemeGroupVersion.WithResource("services")) {
+		result = append(result, NewServiceEvaluator(f))
+	}
+	if isEnabled(corev1.SchemeGroupVersion.WithResource("persistentvolumeclaims")) {
+		result = append(result, NewPersistentVolumeClaimEvaluator(f))
+	}
+	if isEnabled(resourcev1.SchemeGroupVersion.WithResource("resourceclaims")) && utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		var claimGetter resourceClaimPodOwnerGetter
 		var podLister corev1listers.PodLister
 		var deviceClassMapping *extendedresourcecache.ExtendedResourceCache
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
@@ -56,10 +68,15 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 			logger := klog.FromContext(context.Background())
 			deviceClassMapping = extendedresourcecache.NewExtendedResourceCache(logger)
 			if _, err := i.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceClassMapping); err != nil {
-				logger.Error(err, "failed to add device class informer event handler")
+				return nil, fmt.Errorf("failed to add device class informer event handler: %w", err)
+			}
+			var err error
+			claimGetter, err = makeResourceClaimPodOwnerGetter(i.Resource().V1().ResourceClaims())
+			if err != nil {
+				return nil, err
 			}
 		}
-		result = append(result, NewResourceClaimEvaluator(f, deviceClassMapping, podLister))
+		result = append(result, NewResourceClaimEvaluator(f, deviceClassMapping, podLister, claimGetter))
 	}
 
 	// these evaluators require an alias for backwards compatibility
@@ -67,5 +84,5 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 		result = append(result,
 			generic.NewObjectCountEvaluator(gvr.GroupResource(), generic.ListResourceUsingListerFunc(f, gvr), alias))
 	}
-	return result
+	return result, nil
 }

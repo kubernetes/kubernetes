@@ -28,9 +28,9 @@ import (
 
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicy struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -77,6 +77,7 @@ type NetworkPolicySpec struct {
 	// solely to ensure that the pods it selects are isolated by default)
 	// +optional
 	// +listType=atomic
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty" protobuf:"bytes,2,rep,name=ingress"`
 
 	// egress is a list of egress rules to be applied to the selected pods. Outgoing traffic
@@ -88,6 +89,7 @@ type NetworkPolicySpec struct {
 	// This field is beta-level in 1.8
 	// +optional
 	// +listType=atomic
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
 	// policyTypes is a list of rule types that the NetworkPolicy relates to.
@@ -124,6 +126,7 @@ type NetworkPolicyIngressRule struct {
 	// allows traffic only if the traffic matches at least one item in the from list.
 	// +optional
 	// +listType=atomic
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`
 }
 
@@ -147,6 +150,7 @@ type NetworkPolicyEgressRule struct {
 	// allows traffic only if the traffic matches at least one item in the to list.
 	// +optional
 	// +listType=atomic
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	To []NetworkPolicyPeer `json:"to,omitempty" protobuf:"bytes,2,rep,name=to"`
 }
 
@@ -178,6 +182,8 @@ type NetworkPolicyPort struct {
 type IPBlock struct {
 	// cidr is a string representing the IPBlock
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+	// +required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
 
 	// except is a slice of CIDRs that should not be included within an IPBlock
@@ -212,6 +218,7 @@ type NetworkPolicyPeer struct {
 	// ipBlock defines policy on a particular IPBlock. If this field is set then
 	// neither of the other fields can be.
 	// +optional
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
 }
 
@@ -220,7 +227,7 @@ type NetworkPolicyPeer struct {
 
 // NetworkPolicyList is a list of NetworkPolicy objects.
 type NetworkPolicyList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -239,10 +246,11 @@ type NetworkPolicyList struct {
 // endpoints defined by a backend. An Ingress can be configured to give services
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
+// +k8s:supportsSubresource="/status"
 type Ingress struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -263,7 +271,7 @@ type Ingress struct {
 
 // IngressList is a collection of Ingress.
 type IngressList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -365,10 +373,12 @@ type IngressLoadBalancerIngress struct {
 // IngressPortStatus represents the error condition of a service port
 type IngressPortStatus struct {
 	// port is the port number of the ingress port.
+	// +optional
 	Port int32 `json:"port" protobuf:"varint,1,opt,name=port"`
 
 	// protocol is the protocol of the ingress port.
 	// The supported values are: "TCP", "UDP", "SCTP"
+	// +optional
 	Protocol v1.Protocol `json:"protocol" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
 
 	// error is to record the problem with the service port
@@ -420,7 +430,7 @@ type IngressRule struct {
 	// default backend, is left to the controller fulfilling the Ingress. Http is
 	// currently the only supported IngressRuleValue.
 	// +optional
-	IngressRuleValue `json:",inline" protobuf:"bytes,2,opt,name=ingressRuleValue"`
+	IngressRuleValue `json:"" protobuf:"bytes,2,opt,name=ingressRuleValue"`
 }
 
 // IngressRuleValue represents a rule to apply against incoming requests. If the
@@ -428,6 +438,7 @@ type IngressRule struct {
 // mixing different types of rules in a single Ingress is disallowed, so exactly
 // one of the following must be set.
 type IngressRuleValue struct {
+	// http is a HTTP IngressRuleValue, which contains a list of http selectors
 	// +optional
 	HTTP *HTTPIngressRuleValue `json:"http,omitempty" protobuf:"bytes,1,opt,name=http"`
 }
@@ -440,6 +451,7 @@ type IngressRuleValue struct {
 type HTTPIngressRuleValue struct {
 	// paths is a collection of paths that map requests to backends.
 	// +listType=atomic
+	// +required
 	Paths []HTTPIngressPath `json:"paths" protobuf:"bytes,1,rep,name=paths"`
 }
 
@@ -498,6 +510,7 @@ type HTTPIngressPath struct {
 	//   the IngressClass. Implementations can treat this as a separate PathType
 	//   or treat it identically to Prefix or Exact path types.
 	// Implementations are required to support all path types.
+	// +required
 	PathType *PathType `json:"pathType" protobuf:"bytes,3,opt,name=pathType"`
 
 	// backend defines the referenced service endpoint to which the traffic
@@ -524,6 +537,7 @@ type IngressBackend struct {
 type IngressServiceBackend struct {
 	// name is the referenced service. The service must exist in
 	// the same namespace as the Ingress object.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// port of the referenced service. A port name or port number
@@ -556,16 +570,16 @@ type ServiceBackendPort struct {
 // single IngressClass resource has this annotation set to true, new Ingress
 // resources without a class specified will be assigned this default class.
 type IngressClass struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec is the desired state of the IngressClass.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec IngressClassSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -577,12 +591,14 @@ type IngressClassSpec struct {
 	// same implementing controller. This should be specified as a
 	// domain-prefixed path no more than 250 characters in length, e.g.
 	// "acme.io/ingress-controller". This field is immutable.
+	// +required
 	Controller string `json:"controller,omitempty" protobuf:"bytes,1,opt,name=controller"`
 
 	// parameters is a link to a custom resource containing additional
 	// configuration for the controller. This is optional if the controller does
 	// not require extra parameters.
 	// +optional
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	Parameters *IngressClassParametersReference `json:"parameters,omitempty" protobuf:"bytes,2,opt,name=parameters"`
 }
 
@@ -605,9 +621,13 @@ type IngressClassParametersReference struct {
 	APIGroup *string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=aPIGroup"`
 
 	// kind is the type of resource being referenced.
+	// +required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 
 	// name is the name of resource being referenced.
+	// +required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 
 	// scope represents if this refers to a cluster or namespace scoped resource.
@@ -627,7 +647,7 @@ type IngressClassParametersReference struct {
 
 // IngressClassList is a collection of IngressClasses.
 type IngressClassList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata.
 	// +optional
@@ -650,38 +670,42 @@ type IngressClassList struct {
 // Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1
 // Invalid: 10.01.2.3 or 2001:db8:0:0:0::1
 type IPAddress struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+	metav1.TypeMeta `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// spec is the desired state of the IPAddress.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec IPAddressSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 // IPAddressSpec describe the attributes in an IP Address.
 type IPAddressSpec struct {
-	// ParentRef references the resource that an IPAddress is attached to.
+	// parentRef references the resource that an IPAddress is attached to.
 	// An IPAddress must reference a parent object.
 	// +required
+	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:immutable
 	ParentRef *ParentReference `json:"parentRef,omitempty" protobuf:"bytes,1,opt,name=parentRef"`
 }
 
 // ParentReference describes a reference to a parent object.
 type ParentReference struct {
-	// Group is the group of the object being referenced.
+	// group is the group of the object being referenced.
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
-	// Resource is the resource of the object being referenced.
+	// resource is the resource of the object being referenced.
 	// +required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	Resource string `json:"resource,omitempty" protobuf:"bytes,2,opt,name=resource"`
-	// Namespace is the namespace of the object being referenced.
+	// namespace is the namespace of the object being referenced.
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
-	// Name is the name of the object being referenced.
+	// name is the name of the object being referenced.
 	// +required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	Name string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
 }
 
@@ -690,7 +714,7 @@ type ParentReference struct {
 
 // IPAddressList contains a list of IPAddress.
 type IPAddressList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -706,9 +730,10 @@ type IPAddressList struct {
 
 // ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64).
 // This range is used to allocate ClusterIPs to Service objects.
+// +k8s:supportsSubresource="/status"
 type ServiceCIDR struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+	metav1.TypeMeta `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -724,7 +749,7 @@ type ServiceCIDR struct {
 
 // ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.
 type ServiceCIDRSpec struct {
-	// CIDRs defines the IP blocks in CIDR notation (e.g. "192.168.0.0/24" or "2001:db8::/64")
+	// cidrs defines the IP blocks in CIDR notation (e.g. "192.168.0.0/24" or "2001:db8::/64")
 	// from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family.
 	// This field is immutable.
 	// +optional
@@ -750,6 +775,7 @@ type ServiceCIDRStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
+	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
@@ -758,7 +784,7 @@ type ServiceCIDRStatus struct {
 
 // ServiceCIDRList contains a list of ServiceCIDR objects.
 type ServiceCIDRList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional

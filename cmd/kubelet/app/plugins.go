@@ -52,11 +52,6 @@ func ProbeVolumePlugins(ctx context.Context, featureGate featuregate.FeatureGate
 	//
 	// Kubelet does not currently need to configure volume plugins.
 	// If/when it does, see kube-controller-manager/app/plugins.go for example of using volume.VolumeConfig
-	var err error
-	allPlugins, err = appendLegacyProviderVolumes(ctx, allPlugins, featureGate)
-	if err != nil {
-		return allPlugins, err
-	}
 	allPlugins = append(allPlugins, emptydir.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(volume.VolumeConfig{})...)
@@ -78,6 +73,6 @@ func ProbeVolumePlugins(ctx context.Context, featureGate featuregate.FeatureGate
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for kubelet.
 // Currently only Flexvolume plugins are dynamically discoverable.
-func GetDynamicPluginProber(pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
-	return flexvolume.GetDynamicPluginProber(pluginDir, runner)
+func GetDynamicPluginProber(ctx context.Context, pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
+	return flexvolume.GetDynamicPluginProber(ctx, pluginDir, runner)
 }

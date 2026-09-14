@@ -17,6 +17,7 @@ limitations under the License.
 package initializer
 
 import (
+	admissionregistrationv1api "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -42,7 +43,13 @@ type WantsExternalKubeInformerFactory interface {
 	admission.InitializationValidator
 }
 
-// WantsAuthorizer defines a function which sets Authorizer for admission plugins that need it.
+// WantsUnconditionalAuthorizer defines a function which sets a narrower, conditions-unaware UnconditionalAuthorizer for admission plugins that need it.
+type WantsUnconditionalAuthorizer interface {
+	SetUnconditionalAuthorizer(authorizer.UnconditionalAuthorizer)
+	admission.InitializationValidator
+}
+
+// WantsAuthorizer defines a function which sets a standard, possibly conditions-aware Authorizer for admission plugins that need it.
 type WantsAuthorizer interface {
 	SetAuthorizer(authorizer.Authorizer)
 	admission.InitializationValidator
@@ -103,4 +110,42 @@ type WantsSchemaResolver interface {
 type WantsExcludedAdmissionResources interface {
 	SetExcludedAdmissionResources(excludedAdmissionResources []schema.GroupResource)
 	admission.InitializationValidator
+}
+
+// WantsAPIServerID defines a function which sets the API server ID for admission plugins
+// that need it (e.g., for metrics labeling in HA setups).
+type WantsAPIServerID interface {
+	SetAPIServerID(apiServerID string)
+	admission.InitializationValidator
+}
+
+// ValidatingWebhookManifestLoadFunc loads ValidatingWebhookConfiguration manifests from a directory.
+type ValidatingWebhookManifestLoadFunc func(dir string) ([]*admissionregistrationv1api.ValidatingWebhookConfiguration, string, error)
+
+// MutatingWebhookManifestLoadFunc loads MutatingWebhookConfiguration manifests from a directory.
+type MutatingWebhookManifestLoadFunc func(dir string) ([]*admissionregistrationv1api.MutatingWebhookConfiguration, string, error)
+
+// ValidatingPolicyManifestLoadFunc loads ValidatingAdmissionPolicy manifests from a directory.
+type ValidatingPolicyManifestLoadFunc func(dir string) ([]*admissionregistrationv1api.ValidatingAdmissionPolicy, []*admissionregistrationv1api.ValidatingAdmissionPolicyBinding, string, error)
+
+// MutatingPolicyManifestLoadFunc loads MutatingAdmissionPolicy manifests from a directory.
+type MutatingPolicyManifestLoadFunc func(dir string) ([]*admissionregistrationv1api.MutatingAdmissionPolicy, []*admissionregistrationv1api.MutatingAdmissionPolicyBinding, string, error)
+
+// ManifestLoaders provides functions to load admission configurations from static manifest files
+// with scheme-based defaulting and validation.
+type ManifestLoaders struct {
+	// LoadValidatingWebhookManifests loads ValidatingWebhookConfiguration manifests.
+	LoadValidatingWebhookManifests ValidatingWebhookManifestLoadFunc
+	// LoadMutatingWebhookManifests loads MutatingWebhookConfiguration manifests.
+	LoadMutatingWebhookManifests MutatingWebhookManifestLoadFunc
+	// LoadValidatingPolicyManifests loads ValidatingAdmissionPolicy manifests.
+	LoadValidatingPolicyManifests ValidatingPolicyManifestLoadFunc
+	// LoadMutatingPolicyManifests loads MutatingAdmissionPolicy manifests.
+	LoadMutatingPolicyManifests MutatingPolicyManifestLoadFunc
+}
+
+// WantsManifestLoaders is implemented by admission plugins that load configurations
+// from static manifest files and need scheme-based defaulting and validation.
+type WantsManifestLoaders interface {
+	SetManifestLoaders(loaders *ManifestLoaders)
 }

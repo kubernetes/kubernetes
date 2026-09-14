@@ -32,6 +32,10 @@ func (c *FakeResourceV1alpha3) DeviceTaintRules() v1alpha3.DeviceTaintRuleInterf
 	return newFakeDeviceTaintRules(c)
 }
 
+func (c *FakeResourceV1alpha3) ResourcePoolStatusRequests() v1alpha3.ResourcePoolStatusRequestInterface {
+	return newFakeResourcePoolStatusRequests(c)
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeResourceV1alpha3) RESTClient() rest.Interface {

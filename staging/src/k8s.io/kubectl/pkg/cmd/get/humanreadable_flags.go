@@ -58,7 +58,7 @@ func (f *HumanPrintFlags) EnsureWithNamespace() error {
 	return nil
 }
 
-// AllowedFormats returns more customized formating options
+// AllowedFormats returns more customized formatting options
 func (f *HumanPrintFlags) AllowedFormats() []string {
 	return []string{"wide"}
 }

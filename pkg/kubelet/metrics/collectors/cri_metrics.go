@@ -107,7 +107,7 @@ func (c *criMetricsCollector) criMetricToProm(logger klog.Logger, m *runtimeapi.
 	desc, ok := c.descriptors[m.Name]
 	if !ok {
 		err := fmt.Errorf("error converting CRI Metric to prometheus format")
-		logger.V(5).Error(err, "Descriptor not present in pre-populated list of descriptors", "name", m.Name)
+		logger.V(5).Info("Descriptor not present in pre-populated list of descriptors", "name", m.Name, "err", err)
 		return nil, err
 	}
 

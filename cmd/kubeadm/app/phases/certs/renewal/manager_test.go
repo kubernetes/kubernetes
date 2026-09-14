@@ -35,7 +35,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs/testing"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 

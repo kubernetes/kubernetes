@@ -1479,8 +1479,18 @@ func TestValidateExtraArgs(t *testing.T) {
 		expectedErrors int
 	}{
 		{
-			name:           "valid argument",
+			name:           "valid argument without merge method",
 			args:           []kubeadmapi.Arg{{Name: "foo", Value: "bar"}},
+			expectedErrors: 0,
+		},
+		{
+			name:           "valid argument with append merge method",
+			args:           []kubeadmapi.Arg{{Name: "foo", Value: "bar", MergeMethod: kubeadmapi.ArgMergeMethodAppend}},
+			expectedErrors: 0,
+		},
+		{
+			name:           "valid argument with prepend merge method",
+			args:           []kubeadmapi.Arg{{Name: "foo", Value: "bar", MergeMethod: kubeadmapi.ArgMergeMethodPrepend}},
 			expectedErrors: 0,
 		},
 		{
@@ -1492,6 +1502,11 @@ func TestValidateExtraArgs(t *testing.T) {
 			name:           "invalid two arguments",
 			args:           []kubeadmapi.Arg{{Name: "", Value: "foo"}, {Name: "", Value: "bar"}},
 			expectedErrors: 2,
+		},
+		{
+			name:           "invalid merge method",
+			args:           []kubeadmapi.Arg{{Name: "foo", Value: "bar", MergeMethod: "foo"}},
+			expectedErrors: 1,
 		},
 	}
 

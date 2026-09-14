@@ -1,0 +1,21 @@
+use (
+	.
+	./cmdutils
+	./conv
+	./fileutils
+	./jsonname
+	./jsonutils
+	./jsonutils/adapters/easyjson
+	./jsonutils/adapters/testintegration
+	./jsonutils/adapters/testintegration/benchmarks
+	./jsonutils/fixtures_test
+	./loading
+	./mangling
+	./netutils
+	./pools
+	./stringutils
+	./typeutils
+	./yamlutils
+)
+
+go 1.25.0

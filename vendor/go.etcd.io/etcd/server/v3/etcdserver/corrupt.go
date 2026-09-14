@@ -438,7 +438,7 @@ func (s *EtcdServer) triggerCorruptAlarm(id types.ID) {
 		Alarm:    pb.AlarmType_CORRUPT,
 	}
 	s.GoAttach(func() {
-		s.raftRequest(s.ctx, pb.InternalRaftRequest{Alarm: a})
+		s.raftRequest(s.ctx, &pb.InternalRaftRequest{Alarm: a})
 	})
 }
 
@@ -590,7 +590,7 @@ func HashByRev(ctx context.Context, cid types.ID, cc *http.Client, url string, r
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Etcd-Cluster-ID", cid.String())
-	req.Cancel = ctx.Done()
+	req.Cancel = ctx.Done() //nolint:staticcheck // TODO: remove for a supported version
 
 	resp, err := cc.Do(req)
 	if err != nil {

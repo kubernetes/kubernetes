@@ -19,35 +19,73 @@
 package transport
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/mem"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 )
 
+// nonGRPCDataMaxLen is the maximum length of nonGRPCDataBuf.
+//
+// NOTE: If changed this value, you MUST update the corresponding test in:
+//   - /test/end2end_test.go:TestHTTPServerSendsNonGRPCHeaderSurfaceFurtherData
+const nonGRPCDataMaxLen = 1024
+
 // ClientStream implements streaming functionality for a gRPC client.
 type ClientStream struct {
-	*Stream // Embed for common stream functionality.
+	Stream // Embed for common stream functionality.
 
 	ct       *http2Client
 	done     chan struct{} // closed at the end of stream to unblock writers.
 	doneFunc func()        // invoked at the end of stream.
 
-	headerChan       chan struct{} // closed to indicate the end of header metadata.
-	headerChanClosed uint32        // set when headerChan is closed. Used to avoid closing headerChan multiple times.
+	headerChan chan struct{} // closed to indicate the end of header metadata.
+	header     metadata.MD   // the received header metadata
+
+	status *status.Status // the status error received from the server
+
+	// Non-pointer fields are at the end to optimize GC allocations.
+
 	// headerValid indicates whether a valid header was received.  Only
 	// meaningful after headerChan is closed (always call waitOnHeader() before
 	// reading its value).
 	headerValid bool
-	header      metadata.MD // the received header metadata
-	noHeaders   bool        // set if the client never received headers (set only after the stream is done).
 
-	bytesReceived atomic.Bool // indicates whether any bytes have been received on this stream
-	unprocessed   atomic.Bool // set if the server sends a refused stream or GOAWAY including this stream
+	nonGRPCStatus  *status.Status // the initial status from the non-gRPC response header, finalized with collected data before closing.
+	nonGRPCDataBuf []byte         // stores the data of a non-gRPC response.
 
-	status *status.Status // the status error received from the server
+	noHeaders        bool          // set if the client never received headers (set only after the stream is done).
+	headerChanClosed uint32        // set when headerChan is closed. Used to avoid closing headerChan multiple times.
+	bytesReceived    atomic.Bool   // indicates whether any bytes have been received on this stream
+	unprocessed      atomic.Bool   // set if the server sends a refused stream or GOAWAY including this stream
+	statsHandler     stats.Handler // nil for internal streams (e.g., health check, ORCA) where telemetry is not supported.
+}
+
+func (s *ClientStream) startNonGRPCDataCollection(st *status.Status) {
+	s.nonGRPCStatus = st
+	s.nonGRPCDataBuf = make([]byte, 0, nonGRPCDataMaxLen)
+}
+
+// finalizeNonGRPCStatus builds the terminal status by appending the collected
+// response body to the original non-gRPC status message.
+func (s *ClientStream) finalizeNonGRPCStatus() *status.Status {
+	msg := fmt.Sprintf("%s\ndata: %q", s.nonGRPCStatus.Message(), s.nonGRPCDataBuf)
+	return status.New(s.nonGRPCStatus.Code(), msg)
+}
+
+// handleNonGRPCData collects non-gRPC body from the given data frame.
+// It returns non-nil value when the stream should be closed with it.
+func (s *ClientStream) handleNonGRPCData(f *parsedDataFrame) *status.Status {
+	n := min(f.data.Len(), nonGRPCDataMaxLen-len(s.nonGRPCDataBuf))
+	s.nonGRPCDataBuf = append(s.nonGRPCDataBuf, f.data.ReadOnlyData()[0:n]...)
+	if len(s.nonGRPCDataBuf) >= nonGRPCDataMaxLen || f.StreamEnded() {
+		return s.finalizeNonGRPCStatus()
+	}
+	return nil
 }
 
 // Read reads an n byte message from the input stream.
@@ -141,4 +179,12 @@ func (s *ClientStream) TrailersOnly() bool {
 // that is, after Done() is closed.
 func (s *ClientStream) Status() *status.Status {
 	return s.status
+}
+
+func (s *ClientStream) requestRead(n int) {
+	s.ct.adjustWindow(s, uint32(n))
+}
+
+func (s *ClientStream) updateWindow(n int) {
+	s.ct.updateWindow(s, uint32(n))
 }

@@ -26,6 +26,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
 	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
+	applyconfigurationsamplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/generated/applyconfiguration/samplecontroller/v1alpha1"
 	scheme "k8s.io/sample-controller/pkg/generated/clientset/versioned/scheme"
 )
 
@@ -42,23 +43,27 @@ type FooInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, foo *samplecontrollerv1alpha1.Foo, opts v1.UpdateOptions) (*samplecontrollerv1alpha1.Foo, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*samplecontrollerv1alpha1.Foo, error)
 	List(ctx context.Context, opts v1.ListOptions) (*samplecontrollerv1alpha1.FooList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *samplecontrollerv1alpha1.Foo, err error)
+	Apply(ctx context.Context, foo *applyconfigurationsamplecontrollerv1alpha1.FooApplyConfiguration, opts v1.ApplyOptions) (result *samplecontrollerv1alpha1.Foo, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, foo *applyconfigurationsamplecontrollerv1alpha1.FooApplyConfiguration, opts v1.ApplyOptions) (result *samplecontrollerv1alpha1.Foo, err error)
 	FooExpansion
 }
 
 // foos implements FooInterface
 type foos struct {
-	*gentype.ClientWithList[*samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList]
+	*gentype.ClientWithListAndApply[*samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList, *applyconfigurationsamplecontrollerv1alpha1.FooApplyConfiguration]
 }
 
 // newFoos returns a Foos
 func newFoos(c *SamplecontrollerV1alpha1Client, namespace string) *foos {
 	return &foos{
-		gentype.NewClientWithList[*samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList](
+		gentype.NewClientWithListAndApply[*samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList, *applyconfigurationsamplecontrollerv1alpha1.FooApplyConfiguration](
 			"foos",
 			c.RESTClient(),
 			scheme.ParameterCodec,

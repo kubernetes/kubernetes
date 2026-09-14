@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/proxy"
@@ -156,6 +158,25 @@ func New(
 	return c, nil
 }
 
+// BuildTransportConfig builds a transport.Config for an APIService.
+// It ignores TLS verification if InsecureSkipTLSVerify is true.
+func BuildTransportConfig(
+	proxyTransportDial *transport.DialHolder,
+	proxyClientCert, proxyClientKey []byte,
+	apiService *apiregistrationv1.APIService,
+) *transport.Config {
+	return &transport.Config{
+		TLS: transport.TLSConfig{
+			Insecure:   apiService.Spec.InsecureSkipTLSVerify,
+			ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
+			CertData:   proxyClientCert,
+			KeyData:    proxyClientKey,
+			CAData:     apiService.Spec.CABundle,
+		},
+		DialHolder: proxyTransportDial,
+	}
+}
+
 func (c *AvailableConditionController) sync(key string) error {
 	originalAPIService, err := c.apiServiceLister.Get(key)
 	if apierrors.IsNotFound(err) {
@@ -172,35 +193,6 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 
 	apiService := originalAPIService.DeepCopy()
-
-	// if a particular transport was specified, use that otherwise build one
-	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
-	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
-	transportConfig := &transport.Config{
-		TLS: transport.TLSConfig{
-			Insecure: true,
-		},
-		DialHolder: c.proxyTransportDial,
-	}
-
-	if c.proxyCurrentCertKeyContent != nil {
-		proxyClientCert, proxyClientKey := c.proxyCurrentCertKeyContent()
-
-		transportConfig.TLS.CertData = proxyClientCert
-		transportConfig.TLS.KeyData = proxyClientKey
-	}
-	restTransport, err := transport.New(transportConfig)
-	if err != nil {
-		return err
-	}
-	discoveryClient := &http.Client{
-		Transport: restTransport,
-		// the request should happen quickly.
-		Timeout: 5 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
 
 	availableCondition := apiregistrationv1.APIServiceCondition{
 		Type:               apiregistrationv1.Available,
@@ -262,26 +254,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 			return err
 		}
-		hasActiveEndpoints := false
-	outer:
-		for _, slice := range endpointSlices {
-			ready := false
-			for _, endpoint := range slice.Endpoints {
-				if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
-					ready = true
-					break
-				}
-			}
-			if !ready {
-				continue
-			}
-			for _, endpointPort := range slice.Ports {
-				if endpointPort.Name != nil && *endpointPort.Name == portName && endpointPort.Port != nil {
-					hasActiveEndpoints = true
-					break outer
-				}
-			}
-		}
+		hasActiveEndpoints := hasAvailableEndpoint(portName, endpointSlices...)
 		if !hasActiveEndpoints {
 			availableCondition.Status = apiregistrationv1.ConditionFalse
 			availableCondition.Reason = "MissingEndpoints"
@@ -293,9 +266,29 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 	// actually try to hit the discovery endpoint when it isn't local and when we're routing as a service.
 	if apiService.Spec.Service != nil && c.serviceResolver != nil {
+		// if a particular transport was specified, use that otherwise build one
+		var proxyClientCert, proxyClientKey []byte
+		if c.proxyCurrentCertKeyContent != nil {
+			proxyClientCert, proxyClientKey = c.proxyCurrentCertKeyContent()
+		}
+
+		transportConfig := BuildTransportConfig(c.proxyTransportDial, proxyClientCert, proxyClientKey, apiService)
+		restTransport, err := transport.New(transportConfig)
+		if err != nil {
+			return err
+		}
+		discoveryClient := &http.Client{
+			Transport: restTransport,
+			// the request should happen quickly.
+			Timeout: 5 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+
 		attempts := 5
 		results := make(chan error, attempts)
-		for i := 0; i < attempts; i++ {
+		for range attempts {
 			go func() {
 				discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, *apiService.Spec.Service.Port)
 				if err != nil {
@@ -336,6 +329,7 @@ func (c *AvailableConditionController) sync(key string) error {
 				select {
 				case err = <-errCh:
 					if err != nil {
+						utilnet.CloseIdleConnectionsFor(restTransport)
 						results <- fmt.Errorf("failing or missing response from %v: %w", discoveryURL, err)
 						return
 					}
@@ -343,6 +337,7 @@ func (c *AvailableConditionController) sync(key string) error {
 					// we had trouble with slow dial and DNS responses causing us to wait too long.
 					// we added this as insurance
 				case <-time.After(6 * time.Second):
+					utilnet.CloseIdleConnectionsFor(restTransport)
 					results <- fmt.Errorf("timed out waiting for %v", discoveryURL)
 					return
 				}
@@ -352,7 +347,7 @@ func (c *AvailableConditionController) sync(key string) error {
 		}
 
 		var lastError error
-		for i := 0; i < attempts; i++ {
+		for range attempts {
 			lastError = <-results
 			// if we had at least one success, we are successful overall and we can return now
 			if lastError == nil {
@@ -380,6 +375,20 @@ func (c *AvailableConditionController) sync(key string) error {
 	apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
 	_, err = c.updateAPIServiceStatus(originalAPIService, apiService)
 	return err
+}
+
+func hasAvailableEndpoint(portName string, es ...*discoveryv1.EndpointSlice) bool {
+	return slices.ContainsFunc(es, func(s *discoveryv1.EndpointSlice) bool {
+		if !slices.ContainsFunc(s.Endpoints, func(e discoveryv1.Endpoint) bool {
+			return e.Conditions.Ready == nil || *e.Conditions.Ready
+		}) {
+			return false
+		}
+
+		return slices.ContainsFunc(s.Ports, func(p discoveryv1.EndpointPort) bool {
+			return p.Name != nil && *p.Name == portName && p.Port != nil
+		})
+	})
 }
 
 // updateAPIServiceStatus only issues an update if a change is detected.  We have a tight resync loop to quickly detect dead
@@ -433,7 +442,7 @@ func (c *AvailableConditionController) Run(workers int, stopCh <-chan struct{}) 
 		return
 	}
 
-	for i := 0; i < workers; i++ {
+	for range workers {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
@@ -474,7 +483,7 @@ func (c *AvailableConditionController) addAPIService(obj interface{}) {
 	c.queue.Add(castObj.Name)
 }
 
-func (c *AvailableConditionController) updateAPIService(oldObj, newObj interface{}) {
+func (c *AvailableConditionController) updateAPIService(oldObj, newObj any) {
 	castObj := newObj.(*apiregistrationv1.APIService)
 	oldCastObj := oldObj.(*apiregistrationv1.APIService)
 	klog.V(4).Infof("Updating %s", oldCastObj.Name)

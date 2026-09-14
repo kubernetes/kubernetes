@@ -23,5 +23,5 @@ type encoder interface {
 
 type decoder interface {
 	// decode decodes the message from an input stream.
-	decode() (raftpb.Message, error)
+	decode() (*raftpb.Message, error)
 }

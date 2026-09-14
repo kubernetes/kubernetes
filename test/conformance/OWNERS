@@ -2,11 +2,12 @@
 
 # This is the owner of the test code.  The test data itself is owned by sig-architecture.
 reviewers:
-  - bentheelder
+  - BenTheElder
   - cheftako
   - oomichi
   - johnbelamaric
 approvers:
+  - BenTheElder
   - cheftako
   - johnbelamaric
 emeritus_approvers:

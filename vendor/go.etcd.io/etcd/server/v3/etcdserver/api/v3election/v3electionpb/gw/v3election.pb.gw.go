@@ -9,8 +9,6 @@ It translates gRPC into RESTful JSON APIs.
 package gw
 
 import (
-	protov1 "github.com/golang/protobuf/proto"
-
 	"context"
 	"errors"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v3election/v3electionpb"
@@ -43,11 +41,14 @@ func request_Election_Campaign_0(ctx context.Context, marshaler runtime.Marshale
 		protoReq v3electionpb.CampaignRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
 	msg, err := client.Campaign(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 func local_request_Election_Campaign_0(ctx context.Context, marshaler runtime.Marshaler, server v3electionpb.ElectionServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -55,11 +56,11 @@ func local_request_Election_Campaign_0(ctx context.Context, marshaler runtime.Ma
 		protoReq v3electionpb.CampaignRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.Campaign(ctx, &protoReq)
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 func request_Election_Proclaim_0(ctx context.Context, marshaler runtime.Marshaler, client v3electionpb.ElectionClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -67,11 +68,14 @@ func request_Election_Proclaim_0(ctx context.Context, marshaler runtime.Marshale
 		protoReq v3electionpb.ProclaimRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
 	msg, err := client.Proclaim(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 func local_request_Election_Proclaim_0(ctx context.Context, marshaler runtime.Marshaler, server v3electionpb.ElectionServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -79,11 +83,11 @@ func local_request_Election_Proclaim_0(ctx context.Context, marshaler runtime.Ma
 		protoReq v3electionpb.ProclaimRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.Proclaim(ctx, &protoReq)
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 func request_Election_Leader_0(ctx context.Context, marshaler runtime.Marshaler, client v3electionpb.ElectionClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -91,11 +95,14 @@ func request_Election_Leader_0(ctx context.Context, marshaler runtime.Marshaler,
 		protoReq v3electionpb.LeaderRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
 	msg, err := client.Leader(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 func local_request_Election_Leader_0(ctx context.Context, marshaler runtime.Marshaler, server v3electionpb.ElectionServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -103,11 +110,11 @@ func local_request_Election_Leader_0(ctx context.Context, marshaler runtime.Mars
 		protoReq v3electionpb.LeaderRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.Leader(ctx, &protoReq)
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 func request_Election_Observe_0(ctx context.Context, marshaler runtime.Marshaler, client v3electionpb.ElectionClient, req *http.Request, pathParams map[string]string) (v3electionpb.Election_ObserveClient, runtime.ServerMetadata, error) {
@@ -115,8 +122,11 @@ func request_Election_Observe_0(ctx context.Context, marshaler runtime.Marshaler
 		protoReq v3electionpb.LeaderRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
 	}
 	stream, err := client.Observe(ctx, &protoReq)
 	if err != nil {
@@ -135,11 +145,14 @@ func request_Election_Resign_0(ctx context.Context, marshaler runtime.Marshaler,
 		protoReq v3electionpb.ResignRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
 	msg, err := client.Resign(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 func local_request_Election_Resign_0(ctx context.Context, marshaler runtime.Marshaler, server v3electionpb.ElectionServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -147,11 +160,11 @@ func local_request_Election_Resign_0(ctx context.Context, marshaler runtime.Mars
 		protoReq v3electionpb.ResignRequest
 		metadata runtime.ServerMetadata
 	)
-	if err := marshaler.NewDecoder(req.Body).Decode(protov1.MessageV2(&protoReq)); err != nil && !errors.Is(err, io.EOF) {
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.Resign(ctx, &protoReq)
-	return protov1.MessageV2(msg), metadata, err
+	return msg, metadata, err
 }
 
 // v3electionpb.RegisterElectionHandlerServer registers the http handlers for service Election to "mux".
@@ -353,10 +366,7 @@ func RegisterElectionHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Election_Observe_0(annotatedContext, mux, outboundMarshaler, w, req, func() (proto.Message, error) {
-			m1, err := resp.Recv()
-			return protov1.MessageV2(m1), err
-		}, mux.GetForwardResponseOptions()...)
+		forward_Election_Observe_0(annotatedContext, mux, outboundMarshaler, w, req, func() (proto.Message, error) { return resp.Recv() }, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPost, pattern_Election_Resign_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())

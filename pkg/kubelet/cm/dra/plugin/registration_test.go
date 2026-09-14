@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
 	"path"
 	"sort"
 	"strings"
@@ -37,7 +38,7 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -47,7 +48,7 @@ const (
 	pluginB  = "pluginB"
 )
 
-func getFakeNode() (*v1.Node, error) {
+func getFakeNode(context.Context) (*v1.Node, error) {
 	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}, nil
 }
 
@@ -104,7 +105,7 @@ func getFakeClient(t *testing.T, nodeName, driverName string, slice *resourceapi
 
 func requireNoSlices(tCtx ktesting.TContext) {
 	tCtx.Helper()
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+	tCtx.Eventually(func(tCtx ktesting.TContext) error {
 		slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, metav1.ListOptions{})
 		if err != nil {
 			return err
@@ -202,12 +203,12 @@ func TestRegistrationHandler(t *testing.T) {
 			service := drapb.DRAPluginService
 			tmp := t.TempDir()
 			endpointA := path.Join(tmp, socketFileA)
-			teardownA, err := setupFakeGRPCServer(service, endpointA)
+			teardownA, err := setupFakeGRPCServer(tCtx, service, endpointA)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardownA)
 
 			endpoint := path.Join(tmp, test.socketFile)
-			teardown, err := setupFakeGRPCServer(service, endpoint)
+			teardown, err := setupFakeGRPCServer(tCtx, service, endpoint)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardown)
 
@@ -217,7 +218,7 @@ func TestRegistrationHandler(t *testing.T) {
 			if test.withClient {
 				fakeClient := getFakeClient(t, nodeName, test.driverName, getSlice("test-slice"))
 				client = fakeClient
-				tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
+				tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 			}
 
 			// The DRAPluginManager wipes all slices at startup.
@@ -228,14 +229,14 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// Simulate one existing plugin A.
-			err = draPlugins.RegisterPlugin(pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
+			err = draPlugins.RegisterPlugin(tCtx, pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				tCtx.Logf("Removing plugin %s", pluginA)
-				draPlugins.DeRegisterPlugin(pluginA, endpointA)
+				draPlugins.DeRegisterPlugin(tCtx, pluginA, endpointA)
 			})
 
-			err = draPlugins.ValidatePlugin(test.driverName, endpoint, test.supportedServices)
+			err = draPlugins.ValidatePlugin(tCtx, test.driverName, endpoint, test.supportedServices)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -249,7 +250,7 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// Add plugin for the first time.
-			err = draPlugins.RegisterPlugin(test.driverName, endpoint, test.supportedServices, nil)
+			err = draPlugins.RegisterPlugin(tCtx, test.driverName, endpoint, test.supportedServices, nil)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -257,7 +258,12 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 			plugin := draPlugins.get(test.driverName)
 			require.NotNil(t, plugin, "plugin should be registered")
-			t.Cleanup(func() {
+			// This runs as a defer instead of a t.Cleanup/tCtx.Cleanup callback
+			// because it depends on tCtx and draPlugins' background wiping
+			// (which uses tCtx as its context) still being active. By the time
+			// Cleanup callbacks run, tCtx is already canceled; a defer in the
+			// test function itself still executes beforehand.
+			defer func() {
 				if client != nil {
 					// Create the slice as if the plugin had done that while it runs.
 					_, err := client.ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
@@ -265,13 +271,13 @@ func TestRegistrationHandler(t *testing.T) {
 				}
 
 				tCtx.Logf("Removing plugin %s", test.driverName)
-				draPlugins.DeRegisterPlugin(test.driverName, endpoint)
+				draPlugins.DeRegisterPlugin(tCtx, test.driverName, endpoint)
 				// Nop.
-				draPlugins.DeRegisterPlugin(test.driverName, endpoint)
+				draPlugins.DeRegisterPlugin(tCtx, test.driverName, endpoint)
 				if test.withClient {
 					requireNoSlices(tCtx)
 				}
-			})
+			}()
 			// Which plugin was chosen is random in this test: it depends on which plugin was detected as connected,
 			// which can be both, one, or none at this point. Some attributes are common to both.
 			assert.Equal(t, test.driverName, plugin.driverName, "DRA driver driver name")
@@ -306,7 +312,7 @@ func TestConnectionHandling(t *testing.T) {
 
 			slice := getSlice(sliceName)
 			client := getFakeClient(t, nodeName, driverName, slice)
-			tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 
 			// The handler wipes all slices at startup.
 			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, test.delay)
@@ -315,11 +321,11 @@ func TestConnectionHandling(t *testing.T) {
 
 			// Run GRPC service.
 			endpoint := path.Join(t.TempDir(), "dra.sock")
-			teardown, err := setupFakeGRPCServer(service, endpoint)
+			teardown, err := setupFakeGRPCServer(tCtx, service, endpoint)
 			require.NoError(t, err)
 			defer teardown()
 
-			err = draPlugins.RegisterPlugin(driverName, endpoint, []string{service}, nil)
+			err = draPlugins.RegisterPlugin(tCtx, driverName, endpoint, []string{service}, nil)
 			require.NoError(t, err)
 
 			plugin := draPlugins.get(driverName)
@@ -344,7 +350,7 @@ func TestConnectionHandling(t *testing.T) {
 
 				// Start up gRPC server again.
 				tCtx.Log("Restarting plugin gRPC server")
-				teardown, err = setupFakeGRPCServer(service, endpoint)
+				teardown, err = setupFakeGRPCServer(tCtx, service, endpoint)
 				require.NoError(t, err)
 				defer teardown()
 

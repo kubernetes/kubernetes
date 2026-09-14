@@ -38,7 +38,7 @@ func (p *bestEffortPolicy) Name() string {
 	return PolicyBestEffort
 }
 
-func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) bool {
+func (p *bestEffortPolicy) canAdmitPodResult(_ *TopologyHint) bool {
 	return true
 }
 

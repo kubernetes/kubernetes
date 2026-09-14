@@ -28,17 +28,17 @@ import (
 //
 // LeaseCandidateSpec is a specification of a Lease.
 type LeaseCandidateSpecApplyConfiguration struct {
-	// LeaseName is the name of the lease for which this candidate is contending.
+	// leaseName is the name of the lease for which this candidate is contending.
 	// The limits on this field are the same as on Lease.name. Multiple lease candidates
 	// may reference the same Lease.name.
 	// This field is immutable.
 	LeaseName *string `json:"leaseName,omitempty"`
-	// PingTime is the last time that the server has requested the LeaseCandidate
+	// pingTime is the last time that the server has requested the LeaseCandidate
 	// to renew. It is only done during leader election to check if any
 	// LeaseCandidates have become ineligible. When PingTime is updated, the
 	// LeaseCandidate will respond by updating RenewTime.
 	PingTime *v1.MicroTime `json:"pingTime,omitempty"`
-	// RenewTime is the time that the LeaseCandidate was last updated.
+	// renewTime is the time that the LeaseCandidate was last updated.
 	// Any time a Lease needs to do leader election, the PingTime field
 	// is updated to signal to the LeaseCandidate that they should update
 	// the RenewTime.
@@ -46,14 +46,14 @@ type LeaseCandidateSpecApplyConfiguration struct {
 	// since the last renew. The PingTime field is updated regularly to prevent
 	// garbage collection for still active LeaseCandidates.
 	RenewTime *v1.MicroTime `json:"renewTime,omitempty"`
-	// BinaryVersion is the binary version. It must be in a semver format without leading `v`.
+	// binaryVersion is the binary version. It must be in a semver format without leading `v`.
 	// This field is required.
 	BinaryVersion *string `json:"binaryVersion,omitempty"`
-	// EmulationVersion is the emulation version. It must be in a semver format without leading `v`.
+	// emulationVersion is the emulation version. It must be in a semver format without leading `v`.
 	// EmulationVersion must be less than or equal to BinaryVersion.
 	// This field is required when strategy is "OldestEmulationVersion"
 	EmulationVersion *string `json:"emulationVersion,omitempty"`
-	// Strategy is the strategy that coordinated leader election will use for picking the leader.
+	// strategy is the strategy that coordinated leader election will use for picking the leader.
 	// If multiple candidates for the same Lease return different strategies, the strategy provided
 	// by the candidate with the latest BinaryVersion will be used. If there is still conflict,
 	// this is a user error and coordinated leader election will not operate the Lease until resolved.

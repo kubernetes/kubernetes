@@ -23,6 +23,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 var (
@@ -66,6 +68,7 @@ func SetFeatureGateDuringTest(tb TB, gate featuregate.FeatureGate, f featuregate
 //	})
 func SetFeatureGatesDuringTest(tb TB, gate featuregate.FeatureGate, features FeatureOverrides) {
 	tb.Helper()
+	logger := newLogger(tb)
 	originalEmuVer := gate.(featuregate.MutableVersionedFeatureGate).EmulationVersion()
 	originalValues := map[string]bool{}
 	var originalUnset []featuregate.Feature
@@ -121,7 +124,7 @@ func SetFeatureGatesDuringTest(tb TB, gate featuregate.FeatureGate, features Fea
 	for f, v := range overrides {
 		m[string(f)] = v
 	}
-	if err := gate.(featuregate.MutableFeatureGate).SetFromMap(m); err != nil {
+	if err := setFromMap(logger, gate, m); err != nil {
 		tb.Errorf("Failed to set feature gates: %v", err)
 		for f, v := range features {
 			if s := suggestChangeEmulationVersion(tb, gate, f, v); s != "" {
@@ -139,7 +142,7 @@ func SetFeatureGatesDuringTest(tb TB, gate featuregate.FeatureGate, features Fea
 		}
 		// To avoid violating feature dependencies, first atomicaly restore all original values,
 		// then reset features that were unset (the value should be unchanged).
-		if err := gate.(featuregate.MutableVersionedFeatureGate).SetFromMap(originalValues); err != nil {
+		if err := setFromMap(logger, gate, originalValues); err != nil {
 			tb.Errorf("error restoring features %v: %v", originalValues, err)
 		}
 		for _, f := range originalUnset {
@@ -148,6 +151,41 @@ func SetFeatureGatesDuringTest(tb TB, gate featuregate.FeatureGate, features Fea
 			}
 		}
 	})
+}
+
+func newLogger(tb TB) klog.Logger {
+	logger, _ := ktesting.NewTestContext(testingT{tb})
+	return logger
+}
+
+// testingT is a bridge between what this package traditionally has required (Logf) and
+// what ktesting needs (Log).
+type testingT struct {
+	TB
+}
+
+func (tb testingT) Log(args ...any) {
+	// testing.T.Log emulates fmt.Println, not fmt.Print, i.e. it always
+	// adds spaces between arguments.
+	tb.Logf("%s", fmt.Sprintln(args...))
+}
+
+func setFromMap(logger klog.Logger, gate featuregate.FeatureGate, m map[string]bool) error {
+	if gateWithLogger, ok := gate.(featuregate.MutableFeatureGateWithLogger); ok {
+		helper, logger := logger.WithCallStackHelper()
+		helper()
+		return gateWithLogger.SetFromMapWithLogger(logger, m)
+	}
+	return gate.(featuregate.MutableFeatureGate).SetFromMap(m)
+}
+
+func setEmulationVersionAndMinCompatibilityVersion(logger klog.Logger, gate featuregate.FeatureGate, emulationVersion *version.Version, minCompatibilityVersion *version.Version) error {
+	if gateWithLogger, ok := gate.(featuregate.MutableVersionedFeatureGateWithLogger); ok {
+		helper, logger := logger.WithCallStackHelper()
+		helper()
+		return gateWithLogger.SetEmulationVersionAndMinCompatibilityVersionWithLogger(logger, emulationVersion, minCompatibilityVersion)
+	}
+	return gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersionAndMinCompatibilityVersion(emulationVersion, minCompatibilityVersion)
 }
 
 // hasDisabledDependency recursively walks the dependencies for feature f, and checks whether any are explicitly disabled in the features map.
@@ -193,6 +231,7 @@ func suggestChangeEmulationVersion(tb TB, gate featuregate.FeatureGate, f featur
 // featuregatetesting.SetFeatureGateVersionsDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"), version.MustParse("1.31"))
 func SetFeatureGateVersionsDuringTest(tb TB, gate featuregate.FeatureGate, emuVer, minCompatVer *version.Version) {
 	tb.Helper()
+	logger := newLogger(tb)
 	versions := fmt.Sprintf("emu=%s,min=%s", emuVer.String(), minCompatVer.String())
 	detectParallelOverrideCleanup := detectParallelOverrideVersions(tb, versions)
 
@@ -200,14 +239,14 @@ func SetFeatureGateVersionsDuringTest(tb TB, gate featuregate.FeatureGate, emuVe
 	originalEmuVer := mutableGate.EmulationVersion()
 	originalMinCompatVer := mutableGate.MinCompatibilityVersion()
 
-	if err := mutableGate.SetEmulationVersionAndMinCompatibilityVersion(emuVer, minCompatVer); err != nil {
+	if err := setEmulationVersionAndMinCompatibilityVersion(logger, gate, emuVer, minCompatVer); err != nil {
 		tb.Fatalf("failed to set versions (emu=%s, min=%s) during test: %v", emuVer.String(), minCompatVer.String(), err)
 	}
 
 	tb.Cleanup(func() {
 		tb.Helper()
 		detectParallelOverrideCleanup()
-		if err := mutableGate.SetEmulationVersionAndMinCompatibilityVersion(originalEmuVer, originalMinCompatVer); err != nil {
+		if err := setEmulationVersionAndMinCompatibilityVersion(logger, gate, originalEmuVer, originalMinCompatVer); err != nil {
 			tb.Fatalf("failed to restore versions (emu=%s, min=%s) during test: %v", originalEmuVer.String(), originalMinCompatVer.String(), err)
 		}
 	})

@@ -25,6 +25,7 @@ import (
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type optionAvailTest struct {
@@ -106,18 +107,6 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			featureGateEnable: true,
 			expectedAvailable: false,
 		},
-		{
-			option:            PreferAlignByUnCoreCacheOption,
-			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
-			featureGateEnable: false,
-			expectedAvailable: false,
-		},
-		{
-			option:            PreferAlignByUnCoreCacheOption,
-			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
-			featureGateEnable: true,
-			expectedAvailable: true,
-		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
@@ -135,6 +124,7 @@ func TestPolicyOptionsAlwaysAvailableOnceGA(t *testing.T) {
 	options := []string{
 		FullPCPUsOnlyOption,
 		StrictCPUReservationOption,
+		PreferAlignByUnCoreCacheOption,
 	}
 	for _, option := range options {
 		t.Run(option, func(t *testing.T) {
@@ -150,6 +140,7 @@ func TestPolicyOptionsAlwaysAvailableOnceGA(t *testing.T) {
 }
 
 func TestValidateStaticPolicyOptions(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		description   string
 		policyOption  map[string]string
@@ -206,7 +197,7 @@ func TestValidateStaticPolicyOptions(t *testing.T) {
 			if testCase.topoMgrPolicy == topologymanager.PolicySingleNumaNode {
 				topoMgrPolicy = topologymanager.NewSingleNumaNodePolicy(&topologymanager.NUMAInfo{}, topologymanager.PolicyOptions{})
 			}
-			topoMgrStore := topologymanager.NewFakeManagerWithPolicy(topoMgrPolicy)
+			topoMgrStore := topologymanager.NewFakeManagerWithPolicy(logger, topoMgrPolicy)
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 			policyOpt, _ := NewStaticPolicyOptions(testCase.policyOption)

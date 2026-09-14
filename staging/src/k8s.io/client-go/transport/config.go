@@ -134,7 +134,8 @@ type TLSConfig struct {
 	CAFile         string // Path of the PEM-encoded server trusted root certificates.
 	CertFile       string // Path of the PEM-encoded client certificate.
 	KeyFile        string // Path of the PEM-encoded client key.
-	ReloadTLSFiles bool   // Set to indicate that the original config provided files, and that they should be reloaded
+	ReloadTLSFiles bool   // Set to indicate that the original config provided files, and that they should be reloaded.
+	ReloadCAFiles  bool   // Set to indicate that CA files should be reloaded from disk.
 
 	Insecure   bool   // Server should be accessed without verifying the certificate. For testing only.
 	ServerName string // Override for the server name passed to the server for SNI and used to verify certificates.

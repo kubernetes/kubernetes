@@ -27,9 +27,9 @@ type webhookReinvokeContext struct {
 	lastWebhookOutput runtime.Object
 	// previouslyInvokedReinvocableWebhooks holds the set of webhooks that have been invoked and
 	// should be reinvoked if a later mutation occurs
-	previouslyInvokedReinvocableWebhooks sets.String
+	previouslyInvokedReinvocableWebhooks sets.Set[string]
 	// reinvokeWebhooks holds the set of webhooks that should be reinvoked
-	reinvokeWebhooks sets.String
+	reinvokeWebhooks sets.Set[string]
 }
 
 func (rc *webhookReinvokeContext) ShouldReinvokeWebhook(webhook string) bool {
@@ -50,7 +50,7 @@ func (rc *webhookReinvokeContext) SetLastWebhookInvocationOutput(object runtime.
 
 func (rc *webhookReinvokeContext) AddReinvocableWebhookToPreviouslyInvoked(webhook string) {
 	if rc.previouslyInvokedReinvocableWebhooks == nil {
-		rc.previouslyInvokedReinvocableWebhooks = sets.NewString()
+		rc.previouslyInvokedReinvocableWebhooks = sets.New[string]()
 	}
 	rc.previouslyInvokedReinvocableWebhooks.Insert(webhook)
 }
@@ -58,11 +58,11 @@ func (rc *webhookReinvokeContext) AddReinvocableWebhookToPreviouslyInvoked(webho
 func (rc *webhookReinvokeContext) RequireReinvokingPreviouslyInvokedPlugins() {
 	if len(rc.previouslyInvokedReinvocableWebhooks) > 0 {
 		if rc.reinvokeWebhooks == nil {
-			rc.reinvokeWebhooks = sets.NewString()
+			rc.reinvokeWebhooks = sets.New[string]()
 		}
 		for s := range rc.previouslyInvokedReinvocableWebhooks {
 			rc.reinvokeWebhooks.Insert(s)
 		}
-		rc.previouslyInvokedReinvocableWebhooks = sets.NewString()
+		rc.previouslyInvokedReinvocableWebhooks = sets.New[string]()
 	}
 }

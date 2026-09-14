@@ -135,8 +135,8 @@ func NewCmdBuild(
 func Validate(args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf(
-			"specify one path to " +
-				konfig.DefaultKustomizationFileName())
+			"specify one path to %s",
+			konfig.DefaultKustomizationFileName())
 	}
 	if len(args) == 0 {
 		theArgs.kustomizationPath = filesys.SelfDir

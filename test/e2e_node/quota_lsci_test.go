@@ -34,6 +34,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/mount-utils"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 )
@@ -47,12 +48,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 	sizeLimit := resource.MustParse("100Mi")
 	useOverLimit := 101 /* Mb */
 	useUnderLimit := 99 /* Mb */
-	// TODO: remove hardcoded kubelet volume directory path
-	// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
-	// As for why we do this: see comment below at isXfs.
-	if isXfs("/var/lib/kubelet") {
-		useUnderLimit = 50 /* Mb */
-	}
+
 	priority := 0
 	if quotasRequested {
 		priority = 1
@@ -60,12 +56,10 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 	ginkgo.Context(fmt.Sprintf(testContextFmt, fmt.Sprintf("use quotas for LSCI monitoring (quotas enabled: %v, userNamespacesEnabled: %v)", quotasRequested, userNamespacesEnabled)), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			defer withFeatureGate(LSCIQuotaFeature, quotasRequested)()
-			// TODO: remove hardcoded kubelet volume directory path
-			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
 			if !supportsUserNS(ctx, f) {
 				e2eskipper.Skipf("runtime does not support user namespaces")
 			}
-			if quotasRequested && !supportsQuotas("/var/lib/kubelet", userNamespacesEnabled) {
+			if quotasRequested && !supportsQuotas(framework.TestContext.KubeletRootDir, userNamespacesEnabled) {
 				// No point in running this as a positive test if quotas are not
 				// enabled on the underlying filesystem.
 				e2eskipper.Skipf("Cannot run LocalStorageCapacityIsolationFSQuotaMonitoring on filesystem without project quota enabled")
@@ -90,6 +84,16 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 				pod: diskConcealingPod(fmt.Sprintf("emptydir-concealed-disk-under-sizelimit-quotas-%v", quotasRequested), useUnderLimit, &v1.VolumeSource{
 					EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: &sizeLimit},
 				}, v1.ResourceRequirements{}),
+				prePodCreationModificationFunc: func(ctx context.Context, pod *v1.Pod) {
+					// XFS speculative preallocation can inflate apparent usage (see isXfs).
+					if isXfs(framework.TestContext.KubeletRootDir) {
+						pod.Spec.Containers[0].Command = []string{
+							"perl",
+							"-e",
+							fmt.Sprintf(writeConcealedPodCommand, filepath.Join(volumeMountPath, "file"), 50 /* Mb */),
+						}
+					}
+				},
 			},
 		})
 	})
@@ -134,7 +138,7 @@ func diskConcealingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeS
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-pod", name)},
 		Spec: v1.PodSpec{
-			HostUsers:     &falseVar,
+			HostUsers:     ptr.To(false),
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{

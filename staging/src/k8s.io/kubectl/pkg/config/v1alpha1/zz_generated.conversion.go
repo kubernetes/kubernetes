@@ -80,11 +80,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_AliasOverride_To_config_AliasOverride(in *AliasOverride, out *config.AliasOverride, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Command = in.Command
-	out.PrependArgs = *(*[]string)(unsafe.Pointer(&in.PrependArgs))
-	out.AppendArgs = *(*[]string)(unsafe.Pointer(&in.AppendArgs))
-	out.Options = *(*[]config.CommandOptionDefault)(unsafe.Pointer(&in.Options))
+	*out = *(*config.AliasOverride)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -94,11 +90,7 @@ func Convert_v1alpha1_AliasOverride_To_config_AliasOverride(in *AliasOverride, o
 }
 
 func autoConvert_config_AliasOverride_To_v1alpha1_AliasOverride(in *config.AliasOverride, out *AliasOverride, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Command = in.Command
-	out.PrependArgs = *(*[]string)(unsafe.Pointer(&in.PrependArgs))
-	out.AppendArgs = *(*[]string)(unsafe.Pointer(&in.AppendArgs))
-	out.Options = *(*[]CommandOptionDefault)(unsafe.Pointer(&in.Options))
+	*out = *(*AliasOverride)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -108,8 +100,7 @@ func Convert_config_AliasOverride_To_v1alpha1_AliasOverride(in *config.AliasOver
 }
 
 func autoConvert_v1alpha1_CommandDefaults_To_config_CommandDefaults(in *CommandDefaults, out *config.CommandDefaults, s conversion.Scope) error {
-	out.Command = in.Command
-	out.Options = *(*[]config.CommandOptionDefault)(unsafe.Pointer(&in.Options))
+	*out = *(*config.CommandDefaults)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -119,8 +110,7 @@ func Convert_v1alpha1_CommandDefaults_To_config_CommandDefaults(in *CommandDefau
 }
 
 func autoConvert_config_CommandDefaults_To_v1alpha1_CommandDefaults(in *config.CommandDefaults, out *CommandDefaults, s conversion.Scope) error {
-	out.Command = in.Command
-	out.Options = *(*[]CommandOptionDefault)(unsafe.Pointer(&in.Options))
+	*out = *(*CommandDefaults)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -130,8 +120,7 @@ func Convert_config_CommandDefaults_To_v1alpha1_CommandDefaults(in *config.Comma
 }
 
 func autoConvert_v1alpha1_CommandOptionDefault_To_config_CommandOptionDefault(in *CommandOptionDefault, out *config.CommandOptionDefault, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Default = in.Default
+	*out = *(*config.CommandOptionDefault)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -141,8 +130,7 @@ func Convert_v1alpha1_CommandOptionDefault_To_config_CommandOptionDefault(in *Co
 }
 
 func autoConvert_config_CommandOptionDefault_To_v1alpha1_CommandOptionDefault(in *config.CommandOptionDefault, out *CommandOptionDefault, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Default = in.Default
+	*out = *(*CommandOptionDefault)(unsafe.Pointer(in))
 	return nil
 }
 

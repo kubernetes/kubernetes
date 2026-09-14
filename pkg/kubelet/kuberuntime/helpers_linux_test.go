@@ -92,12 +92,12 @@ func TestGetSeccompProfile(t *testing.T) {
 		{
 			description:   "pod seccomp profile set to SeccompProfileTypeLocalhost with empty LocalhostProfile returns error",
 			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost}},
-			expectedError: "localhostProfile must be set if seccompProfile type is Localhost.",
+			expectedError: "localhostProfile must be set if seccompProfile type is Localhost",
 		},
 		{
 			description:   "container seccomp profile set to SeccompProfileTypeLocalhost with empty LocalhostProfile returns error",
 			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost}},
-			expectedError: "localhostProfile must be set if seccompProfile type is Localhost.",
+			expectedError: "localhostProfile must be set if seccompProfile type is Localhost",
 		},
 		{
 			description: "container seccomp profile set to SeccompProfileTypeLocalhost returns 'localhost/' + LocalhostProfile",
@@ -122,6 +122,26 @@ func TestGetSeccompProfile(t *testing.T) {
 				ProfileType:  runtimeapi.SecurityProfile_Localhost,
 				LocalhostRef: seccompLocalhostRef("field-cont-profile.json"),
 			},
+		},
+		{
+			description:   "unknown pod seccomp profile type returns error",
+			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: "Unknown"}},
+			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost)`,
+		},
+		{
+			description:   "unknown container seccomp profile type returns error",
+			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: "Unknown"}},
+			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost)`,
+		},
+		{
+			description:   "empty pod seccomp profile type returns error",
+			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{}},
+			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost)`,
+		},
+		{
+			description:   "empty container seccomp profile type returns error",
+			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{}},
+			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost)`,
 		},
 	}
 
@@ -193,12 +213,12 @@ func TestGetSeccompProfileDefaultSeccomp(t *testing.T) {
 		{
 			description:   "pod seccomp profile set to SeccompProfileTypeLocalhost with empty LocalhostProfile returns error",
 			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost}},
-			expectedError: "localhostProfile must be set if seccompProfile type is Localhost.",
+			expectedError: "localhostProfile must be set if seccompProfile type is Localhost",
 		},
 		{
 			description:   "container seccomp profile set to SeccompProfileTypeLocalhost with empty LocalhostProfile returns error",
 			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost}},
-			expectedError: "localhostProfile must be set if seccompProfile type is Localhost.",
+			expectedError: "localhostProfile must be set if seccompProfile type is Localhost",
 		},
 		{
 			description: "container seccomp profile set to SeccompProfileTypeLocalhost returns 'localhost/' + LocalhostProfile",
@@ -223,6 +243,26 @@ func TestGetSeccompProfileDefaultSeccomp(t *testing.T) {
 				ProfileType:  runtimeapi.SecurityProfile_Localhost,
 				LocalhostRef: seccompLocalhostRef("field-cont-profile.json"),
 			},
+		},
+		{
+			description:   "unknown pod seccomp profile type returns error",
+			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: "Unknown"}},
+			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost)`,
+		},
+		{
+			description:   "unknown container seccomp profile type returns error",
+			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: "Unknown"}},
+			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost)`,
+		},
+		{
+			description:   "empty pod seccomp profile type returns error",
+			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{}},
+			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost)`,
+		},
+		{
+			description:   "empty container seccomp profile type returns error",
+			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{}},
+			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost)`,
 		},
 	}
 
@@ -267,7 +307,7 @@ func TestSharesToMilliCPU(t *testing.T) {
 			if testMilliCPU < 2 {
 				expectedMilliCPU = 2
 			}
-			milliCPU := sharesToMilliCPU(shares)
+			milliCPU := cm.SharesToMilliCPU(shares)
 			if milliCPU != expectedMilliCPU {
 				t.Errorf("Test sharesToMilliCPU: Input shares %v, expected milliCPU %v, but got %v", shares, expectedMilliCPU, milliCPU)
 			}
@@ -307,7 +347,7 @@ func TestQuotaToMilliCPU(t *testing.T) {
 			expected: int64(1500),
 		}} {
 		t.Run(tc.name, func(t *testing.T) {
-			milliCPU := quotaToMilliCPU(tc.quota, tc.period)
+			milliCPU := cm.QuotaToMilliCPU(tc.quota, tc.period)
 			if milliCPU != tc.expected {
 				t.Errorf("Test %s: Input quota %v and period %v, expected milliCPU %v, but got %v", tc.name, tc.quota, tc.period, tc.expected, milliCPU)
 			}

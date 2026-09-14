@@ -537,21 +537,75 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 		wantErr  error
 	}{
 		{
-			name: "zero is a valid config",
+			name: "[StorageCapacityScoring=off] zero is a valid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: false,
+			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 0,
 			},
 		},
 		{
-			name: "positive value is valid config",
+			name: "[StorageCapacityScoring=on] zero is a valid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 0,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 100, Score: 10},
+				},
+			},
+		},
+		{
+			name: "[StorageCapacityScoring=off] positive value is valid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: false,
+			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
 			},
 		},
 		{
-			name: "negative value is invalid config ",
+			name: "[StorageCapacityScoring=on] positive value is valid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 100, Score: 10},
+				},
+			},
+		},
+		{
+			name: "[StorageCapacityScoring=off] negative value is invalid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: false,
+			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: -10,
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "bindTimeoutSeconds",
+				BadValue: int64(-10),
+				Detail:   "invalid BindTimeoutSeconds, should not be a negative value",
+			}}),
+		},
+		{
+			name: "[StorageCapacityScoring=on] negative value is invalid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: -10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 100, Score: 10},
+				},
 			},
 			wantErr: errors.NewAggregate([]error{&field.Error{
 				Type:     field.ErrorTypeInvalid,
@@ -754,12 +808,28 @@ func TestValidateFitArgs(t *testing.T) {
 			},
 			expect: `Unsupported value: "Invalid"`,
 		},
+		{
+			name: "ScoringStrategy: requestedToCapacityRatio field is missing",
+			args: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type: config.RequestedToCapacityRatio,
+				},
+			},
+			expect: "must be specified when type is RequestedToCapacityRatio",
+		},
 	}
 
 	for _, test := range argsTest {
 		t.Run(test.name, func(t *testing.T) {
-			if err := ValidateNodeResourcesFitArgs(nil, &test.args); err != nil && (!strings.Contains(err.Error(), test.expect)) {
-				t.Errorf("case[%v]: error details do not include %v", test.name, err)
+			err := ValidateNodeResourcesFitArgs(nil, &test.args)
+			if err != nil {
+				if test.expect == "" {
+					t.Errorf("case[%v]: unexpected validation error %v", test.name, err)
+				} else if !strings.Contains(err.Error(), test.expect) {
+					t.Errorf("case[%v]: error details do not include %v", test.name, err)
+				}
+			} else if test.expect != "" {
+				t.Errorf("case[%v]: expected validation error", test.name)
 			}
 		})
 	}
@@ -974,7 +1044,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeRequired,
-					Field: "scoringStrategy.shape",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape",
 				},
 			},
 		},
@@ -1026,7 +1096,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[0].utilization",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].utilization",
 				},
 			},
 		},
@@ -1041,7 +1111,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[0].utilization",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].utilization",
 				},
 			},
 		},
@@ -1060,7 +1130,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[1].utilization",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[1].utilization",
 				},
 			},
 		},
@@ -1101,7 +1171,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[2].utilization",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[2].utilization",
 				},
 			},
 		},
@@ -1116,7 +1186,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[0].score",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].score",
 				},
 			},
 		},
@@ -1131,7 +1201,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[0].score",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].score",
 				},
 			},
 		},

@@ -2,6 +2,7 @@ package systemd
 
 import (
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,6 +46,8 @@ func NewLegacyManager(cg *cgroups.Cgroup, paths map[string]string) (*LegacyManag
 type subsystem interface {
 	// Name returns the name of the subsystem.
 	Name() string
+	// ID returns the controller ID for filtering.
+	ID() cgroups.Controller
 	// GetStats returns the stats, as 'stats', corresponding to the cgroup under 'path'.
 	GetStats(path string, stats *cgroups.Stats) error
 	// Set sets cgroup resource limits.
@@ -68,7 +71,7 @@ var legacySubsystems = []subsystem{
 	&fs.NetClsGroup{},
 	&fs.NameGroup{GroupName: "name=systemd"},
 	&fs.RdmaGroup{},
-	&fs.NameGroup{GroupName: "misc"},
+	&fs.NameGroup{GroupName: "misc", GroupID: cgroups.Misc},
 }
 
 func genV1ResourcesProperties(r *cgroups.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
@@ -97,9 +100,17 @@ func genV1ResourcesProperties(r *cgroups.Resources, cm *dbusConnManager) ([]syst
 			newProp("BlockIOWeight", uint64(r.BlkioWeight)))
 	}
 
-	if r.PidsLimit > 0 || r.PidsLimit == -1 {
+	if r.PidsLimit != nil {
+		var tasksMax uint64
+		if limit := *r.PidsLimit; limit < 0 {
+			tasksMax = math.MaxUint64 // "infinity"
+		} else if limit == 0 {
+			tasksMax = 1 // systemd does not accept "0" for TasksMax
+		} else {
+			tasksMax = uint64(limit)
+		}
 		properties = append(properties,
-			newProp("TasksMax", uint64(r.PidsLimit)))
+			newProp("TasksMax", tasksMax))
 	}
 
 	err = addCpuset(cm, &properties, r.CpusetCpus, r.CpusetMems)
@@ -215,6 +226,25 @@ func (m *LegacyManager) Apply(pid int) error {
 	return nil
 }
 
+// AddPid adds a process with a given pid to an existing cgroup.
+// The subcgroup argument is either empty, or a path relative to
+// a cgroup under under the manager's cgroup.
+func (m *LegacyManager) AddPid(subcgroup string, pid int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if err := addPid(m.dbus, getUnitName(m.cgroups), subcgroup, pid); err != nil {
+		return err
+	}
+
+	// Since systemd only joins controllers it knows, use cgroupfs for the rest.
+	fsMgr, err := fs.NewManager(m.cgroups, m.paths)
+	if err != nil {
+		return err
+	}
+	return fsMgr.AddPid(subcgroup, pid)
+}
+
 func (m *LegacyManager) Destroy() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -311,14 +341,32 @@ func (m *LegacyManager) GetAllPids() ([]int, error) {
 }
 
 func (m *LegacyManager) GetStats() (*cgroups.Stats, error) {
+	return m.Stats(nil)
+}
+
+// Stats returns cgroup statistics for the specified controllers.
+func (m *LegacyManager) Stats(opts *cgroups.StatsOptions) (*cgroups.Stats, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Default: query all controllers (same as original GetStats behavior)
+	controllers := cgroups.AllControllers
+	if opts != nil && opts.Controllers != 0 {
+		controllers = opts.Controllers
+	}
+
 	stats := cgroups.NewStats()
 	for _, sys := range legacySubsystems {
 		path := m.paths[sys.Name()]
 		if path == "" {
 			continue
 		}
+
+		// Filter based on controller type
+		if sys.ID()&controllers == 0 {
+			continue
+		}
+
 		if err := sys.GetStats(path, stats); err != nil {
 			return nil, err
 		}

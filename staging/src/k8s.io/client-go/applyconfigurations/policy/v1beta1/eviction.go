@@ -34,10 +34,10 @@ import (
 // This is a subresource of Pod.  A request to cause such an eviction is
 // created by POSTing to .../pods/<pod name>/evictions.
 type EvictionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// ObjectMeta describes the pod that is being evicted.
+	v1.TypeMetaApplyConfiguration `json:""`
+	// metadata describes the pod that is being evicted.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// DeleteOptions may be provided
+	// deleteOptions may be provided
 	DeleteOptions *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
 }
 

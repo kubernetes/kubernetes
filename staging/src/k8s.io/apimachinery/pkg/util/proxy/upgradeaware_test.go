@@ -42,8 +42,8 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 const fakeStatusCode = 567

@@ -830,6 +830,10 @@ func (e *InvalidNodeKindError) Error() string {
 	return msg
 }
 
+func (e *InvalidNodeKindError) Unwrap() error {
+	return errors.Errorf("InvalidNodeKindError")
+}
+
 func (e *InvalidNodeKindError) ActualNodeKind() Kind {
 	return e.node.YNode().Kind
 }

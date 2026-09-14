@@ -107,7 +107,7 @@ func getOrphanOptions() metav1.DeleteOptions {
 
 var (
 	zero       = int64(0)
-	lablecount = int64(0)
+	lablecount atomic.Int64
 )
 
 const (
@@ -312,7 +312,7 @@ func newCronJob(name, schedule string) *batchv1.CronJob {
 
 // getUniqLabel returns a UniqLabel based on labeLkey and labelvalue.
 func getUniqLabel(labelkey, labelvalue string) map[string]string {
-	count := atomic.AddInt64(&lablecount, 1)
+	count := lablecount.Add(1)
 	uniqlabelkey := fmt.Sprintf("%s-%05d", labelkey, count)
 	uniqlabelvalue := fmt.Sprintf("%s-%05d", labelvalue, count)
 	return map[string]string{uniqlabelkey: uniqlabelvalue}
@@ -748,7 +748,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		pods, err := podClient.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list pods in namespace: %s", f.Namespace.Name)
 		patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"ReplicationController","name":"%s","uid":"%s"}]}}`, rc2.ObjectMeta.Name, rc2.ObjectMeta.UID)
-		for i := 0; i < halfReplicas; i++ {
+		for i := range halfReplicas {
 			pod := pods.Items[i]
 			_, err := podClient.Patch(ctx, pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod.Name, f.Namespace.Name, patch)

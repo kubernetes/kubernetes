@@ -42,12 +42,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/streaming/pkg/httpstream/wsstream"
 )
 
 // TestWebSocketClient_LoopbackStdinToStdout returns random data sent on the STDIN channel
@@ -1049,6 +1050,7 @@ func TestWebSocketClient_ExecutorErrors(t *testing.T) {
 }
 
 func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	var upgrader = gwebsocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // Accepting all requests
@@ -1081,7 +1083,7 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 	var expectedMsg = "test heartbeat message"
 	var period = 100 * time.Millisecond
 	var deadline = 200 * time.Millisecond
-	heartbeat := newHeartbeat(client, period, deadline)
+	heartbeat := newHeartbeat(logger, client, period, deadline)
 	heartbeat.setMessage(expectedMsg)
 	// Add a channel to the handler to retrieve the "pong" message.
 	pongMsgCh := make(chan string)
@@ -1121,7 +1123,8 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 }
 
 func TestLateStreamCreation(t *testing.T) {
-	c := newWSStreamCreator(nil)
+	logger, _ := ktesting.NewTestContext(t)
+	c := newWSStreamCreator(logger, nil)
 	c.closeAllStreamReaders(nil)
 	if err := c.setStream(0, nil); err == nil {
 		t.Fatal("expected error adding stream after closeAllStreamReaders")
@@ -1129,8 +1132,10 @@ func TestLateStreamCreation(t *testing.T) {
 }
 
 func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	// Validate Stream functions.
-	c := newWSStreamCreator(nil)
+	c := newWSStreamCreator(logger, nil)
 	headers := http.Header{}
 	headers.Set(v1.StreamType, v1.StreamTypeStdin)
 	s, err := c.CreateStream(headers)

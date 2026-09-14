@@ -137,6 +137,7 @@ type WarningHandler func(error)
 
 func (handler WarningHandler) Warn(err error) {
 	if handler == nil {
+		//nolint:logcheck // This is the fallback when logging is not initialized. With nothing provided, using the global logger is the only option.
 		klog.V(1).Info(err)
 	} else {
 		handler(err)
@@ -299,7 +300,8 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 			return err
 		}
 
-		if sourceInfo, err := os.Stat(source); err != nil {
+		sourceInfo, err := os.Stat(source)
+		if err != nil {
 			if os.IsNotExist(err) || os.IsPermission(err) {
 				// if the source file doesn't exist or we can't access it, there's no work to do.
 				continue
@@ -315,8 +317,8 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 		if err != nil {
 			return err
 		}
-		// destination is created with mode 0666 before umask
-		err = os.WriteFile(destination, data, 0666)
+		// destination created with source perm, but never executable, and subject to umask
+		err = os.WriteFile(destination, data, sourceInfo.Mode().Perm()&0666)
 		if err != nil {
 			return err
 		}
@@ -402,6 +404,7 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	//nolint:logcheck // A helper function like this should not log. But this is probably part of the the established client-go API and not worth changing.
 	klog.V(6).Infoln("Config loaded from file: ", filename)
 
 	// set LocationOfOrigin on every Cluster, User, and Context
@@ -639,7 +642,7 @@ func RelativizePathWithNoBacksteps(refs []*string, base string) error {
 			}
 
 			// if we have a backstep, don't mess with the path
-			if strings.HasPrefix(rel, "../") {
+			if strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 				if filepath.IsAbs(*ref) {
 					continue
 				}

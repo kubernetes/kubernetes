@@ -15,5 +15,6 @@ limitations under the License.
 */
 
 // +k8s:register-gen=simpletype
+// +k8s:deepcopy-gen=false
 
 package v1

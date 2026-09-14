@@ -1,5 +1,4 @@
 //go:build !linux
-// +build !linux
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -53,4 +52,8 @@ func getCoreSiblingList(cpuRes int64) string {
 // getNumaNodeCPUs retrieves CPUs for each NUMA node.
 func getNumaNodeCPUs() (map[int]cpuset.CPUSet, error) {
 	return nil, errors.New("not implemented")
+}
+
+func getCPUSocketID(cpuID int) (int, error) {
+	return -1, errors.New("not implemented")
 }

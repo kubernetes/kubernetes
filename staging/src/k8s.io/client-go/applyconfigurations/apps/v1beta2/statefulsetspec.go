@@ -79,9 +79,9 @@ type StatefulSetSpecApplyConfiguration struct {
 	// consists of all revisions not represented by a currently applied
 	// StatefulSetSpec version. The default value is 10.
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
-	// Minimum number of seconds for which a newly created pod should be ready
-	// without any of its container crashing for it to be considered available.
-	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// minReadySeconds is the minimum number of seconds for which a newly created pod should
+	// be ready without any of its container crashing for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready).
 	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
 	// persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
 	// volume claims created from volumeClaimTemplates. By default, all persistent

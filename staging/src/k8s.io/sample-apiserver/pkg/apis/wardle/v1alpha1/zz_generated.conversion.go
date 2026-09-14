@@ -231,6 +231,7 @@ func autoConvert_wardle_FlunderSpec_To_v1alpha1_FlunderSpec(in *wardle.FlunderSp
 }
 
 func autoConvert_v1alpha1_FlunderStatus_To_wardle_FlunderStatus(in *FlunderStatus, out *wardle.FlunderStatus, s conversion.Scope) error {
+	*out = *(*wardle.FlunderStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -240,6 +241,7 @@ func Convert_v1alpha1_FlunderStatus_To_wardle_FlunderStatus(in *FlunderStatus, o
 }
 
 func autoConvert_wardle_FlunderStatus_To_v1alpha1_FlunderStatus(in *wardle.FlunderStatus, out *FlunderStatus, s conversion.Scope) error {
+	*out = *(*FlunderStatus)(unsafe.Pointer(in))
 	return nil
 }
 

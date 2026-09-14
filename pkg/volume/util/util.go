@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -220,12 +221,7 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 
 // ContainsAccessMode returns whether the requested mode is contained by modes
 func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(modes, mode)
 }
 
 // ContainsAllAccessModes returns whether all of the requested modes are contained by modes
@@ -680,4 +676,50 @@ func GetReliableMountRefs(mounter mount.Interface, mountPath string) ([]string, 
 		return nil, lastErr
 	}
 	return paths, err
+}
+
+func VolumeHealthConditionSetsEqual(a, b []v1.VolumeHealthCondition) bool {
+	type key struct {
+		status v1.VolumeHealthStatusType
+		reason string
+	}
+	toSet := func(conds []v1.VolumeHealthCondition) map[key]struct{} {
+		s := make(map[key]struct{}, len(conds))
+		for _, c := range conds {
+			s[key{c.Status, c.Reason}] = struct{}{}
+		}
+		return s
+	}
+	sa, sb := toSet(a), toSet(b)
+	if len(sa) != len(sb) {
+		return false
+	}
+	for k := range sa {
+		if _, ok := sb[k]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// FindDetachablePluginBySpec is a variant of VolumePluginMgr.FindAttachablePluginByName() function.
+// The difference is that it bypass the CanAttach() check for CSI plugin, i.e. it assumes all CSI plugin supports detach.
+// The intention here is that a CSI plugin volume can end up in an Uncertain state,  so that a detach
+// operation will help it to detach no matter it actually has the ability to attach/detach.
+func FindDetachablePluginBySpec(spec *volume.Spec, pm *volume.VolumePluginMgr) (volume.AttachableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if attachableVolumePlugin, ok := volumePlugin.(volume.AttachableVolumePlugin); ok {
+		if attachableVolumePlugin.GetPluginName() == "kubernetes.io/csi" {
+			return attachableVolumePlugin, nil
+		}
+		if canAttach, err := attachableVolumePlugin.CanAttach(spec); err != nil {
+			return nil, err
+		} else if canAttach {
+			return attachableVolumePlugin, nil
+		}
+	}
+	return nil, nil
 }

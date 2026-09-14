@@ -108,7 +108,7 @@ type Message struct {
 	Type
 	Flags
 	Headers map[HeaderField]Variant
-	Body    []interface{}
+	Body    []any
 
 	serial uint32
 }
@@ -158,7 +158,9 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 	if err != nil {
 		return nil, err
 	}
-	binary.Read(bytes.NewBuffer(b), order, &hlength)
+	if err := binary.Read(bytes.NewBuffer(b), order, &hlength); err != nil {
+		return nil, err
+	}
 	if hlength+length+16 > 1<<27 {
 		return nil, InvalidMessageError("message is too long")
 	}
@@ -186,7 +188,7 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 		}
 	}
 
-	if err = msg.IsValid(); err != nil {
+	if err = msg.validateHeader(); err != nil {
 		return nil, err
 	}
 	sig, _ := msg.Headers[FieldSignature].value.(Signature)
@@ -230,7 +232,7 @@ func (msg *Message) EncodeToWithFDs(out io.Writer, order binary.ByteOrder) (fds 
 	if err := msg.validateHeader(); err != nil {
 		return nil, err
 	}
-	var vs [7]interface{}
+	var vs [7]any
 	switch order {
 	case binary.LittleEndian:
 		vs[0] = byte('l')
@@ -265,12 +267,14 @@ func (msg *Message) EncodeToWithFDs(out io.Writer, order binary.ByteOrder) (fds 
 		return
 	}
 	enc.align(8)
-	body.WriteTo(&buf)
+	if _, err := body.WriteTo(&buf); err != nil {
+		return nil, err
+	}
 	if buf.Len() > 1<<27 {
-		return make([]int, 0), InvalidMessageError("message is too long")
+		return nil, InvalidMessageError("message is too long")
 	}
 	if _, err := buf.WriteTo(out); err != nil {
-		return make([]int, 0), err
+		return nil, err
 	}
 	return enc.fds, nil
 }
@@ -286,8 +290,7 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) (err error) 
 // IsValid checks whether msg is a valid message and returns an
 // InvalidMessageError or FormatError if it is not.
 func (msg *Message) IsValid() error {
-	var b bytes.Buffer
-	return msg.EncodeTo(&b, nativeEndian)
+	return msg.EncodeTo(io.Discard, nativeEndian)
 }
 
 func (msg *Message) validateHeader() error {

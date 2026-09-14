@@ -59,8 +59,8 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 	// maxLengthSignerName is a signerName that is of maximum length, utilising
 	// the max length specifications defined in validation.go.
 	// It is of the form <fqdn(253)>/<resource-namespace(63)>.<resource-name(253)>
-	maxLengthFQDN := fmt.Sprintf("%s.%s.%s.%s", repeatString("a", 63), repeatString("a", 63), repeatString("a", 63), repeatString("a", 61))
-	maxLengthSignerName := fmt.Sprintf("%s/%s.%s", maxLengthFQDN, repeatString("a", 63), repeatString("a", 253))
+	maxLengthFQDN := fmt.Sprintf("%s.%s.%s.%s", strings.Repeat("a", 63), strings.Repeat("a", 63), strings.Repeat("a", 63), strings.Repeat("a", 61))
+	maxLengthSignerName := fmt.Sprintf("%s/%s.%s", maxLengthFQDN, strings.Repeat("a", 63), strings.Repeat("a", 253))
 	tests := map[string]struct {
 		csr  capi.CertificateSigningRequest
 		errs field.ErrorList
@@ -99,7 +99,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("usages"), ""),
+				field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative(),
 			},
 		},
 		"CSR with no signerName set should fail": {
@@ -236,7 +236,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				Spec: capi.CertificateSigningRequestSpec{
 					Usages:     validUsages,
 					Request:    newCSRPEM(t),
-					SignerName: fmt.Sprintf("abc.io/%s.%s", repeatString("a", 253), repeatString("a", 253)),
+					SignerName: fmt.Sprintf("abc.io/%s.%s", strings.Repeat("a", 253), strings.Repeat("a", 253)),
 				},
 			},
 		},
@@ -246,11 +246,11 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				Spec: capi.CertificateSigningRequestSpec{
 					Usages:     validUsages,
 					Request:    newCSRPEM(t),
-					SignerName: fmt.Sprintf("%s.example.io/valid-path", repeatString("a", 66)),
+					SignerName: fmt.Sprintf("%s.example.io/valid-path", strings.Repeat("a", 66)),
 				},
 			},
 			errs: field.ErrorList{
-				field.Invalid(specPath.Child("signerName"), fmt.Sprintf("%s.example.io", repeatString("a", 66)), fmt.Sprintf(`validating label "%s": must be no more than 63 characters`, repeatString("a", 66))),
+				field.Invalid(specPath.Child("signerName"), fmt.Sprintf("%s.example.io", strings.Repeat("a", 66)), fmt.Sprintf(`validating label "%s": must be no more than 63 characters`, strings.Repeat("a", 66))),
 			},
 		},
 		"signerName of max length in format <fully-qualified-domain-name>/<resource-namespace>.<resource-name> is valid": {
@@ -347,7 +347,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("usages"), ""),
+				field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative(),
 			},
 		},
 		"unknown and duplicate usages": {
@@ -360,8 +360,8 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.NotSupported(specPath.Child("usages").Index(0), capi.KeyUsage("unknown"), allValidUsages.List()),
-				field.NotSupported(specPath.Child("usages").Index(1), capi.KeyUsage("unknown"), allValidUsages.List()),
+				field.NotSupported(specPath.Child("usages").Index(0), capi.KeyUsage("unknown"), allValidUsages.List()).MarkCoveredByDeclarative(),
+				field.NotSupported(specPath.Child("usages").Index(1), capi.KeyUsage("unknown"), allValidUsages.List()).MarkCoveredByDeclarative(),
 				field.Duplicate(specPath.Child("usages").Index(1), capi.KeyUsage("unknown")),
 			},
 		},
@@ -439,14 +439,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func repeatString(s string, num int) string {
-	l := make([]string, num)
-	for i := 0; i < num; i++ {
-		l[i] = s
-	}
-	return strings.Join(l, "")
 }
 
 func newCSRPEM(t *testing.T) []byte {
@@ -1526,7 +1518,7 @@ func TestValidateClusterTrustBundleUpdate(t *testing.T) {
 		},
 		wantErrors: field.ErrorList{
 			field.Invalid(field.NewPath("metadata", "name"), "k8s.io:foo:bar", "ClusterTrustBundle for signerName k8s.io/bar must be named with prefix k8s.io:bar:"),
-			field.Invalid(field.NewPath("spec", "signerName"), "k8s.io/bar", "field is immutable"),
+			field.Invalid(field.NewPath("spec", "signerName"), "k8s.io/bar", "field is immutable").WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative(),
 		},
 	}, {
 		description: "adding certificate allowed",
@@ -1610,9 +1602,9 @@ func TestValidateClusterTrustBundleUpdate(t *testing.T) {
 
 func TestValidatePodCertificateRequestCreate(t *testing.T) {
 	podUID1 := "pod-uid-1"
-	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
-	_, _, ed25519PubPKIX2, ed25519Proof2 := mustMakeEd25519KeyAndProof(t, []byte("other-value"))
-	_, _, _, ed25519Proof3 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
+	_, _, ed25519PubPKIX1, ed25519Proof1, ed25519CSR1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1), []string{})
+	_, _, ed25519PubPKIX2, ed25519Proof2, _ := mustMakeEd25519KeyAndProof(t, []byte("other-value"), []string{})
+	_, _, _, ed25519Proof3, _ := mustMakeEd25519KeyAndProof(t, []byte(podUID1), []string{})
 	_, _, ecdsaP224PubPKIX1, ecdsaP224Proof1 := mustMakeECDSAKeyAndProof(t, elliptic.P224(), []byte(podUID1))
 	_, _, ecdsaP256PubPKIX1, ecdsaP256Proof1 := mustMakeECDSAKeyAndProof(t, elliptic.P256(), []byte(podUID1))
 	_, _, ecdsaP384PubPKIX1, ecdsaP384Proof1 := mustMakeECDSAKeyAndProof(t, elliptic.P384(), []byte(podUID1))
@@ -1624,7 +1616,7 @@ func TestValidatePodCertificateRequestCreate(t *testing.T) {
 	_, _, rsaWrongProofPKIX, rsaWrongProof := mustMakeRSAKeyAndProof(t, 3072, []byte("other-value"))
 
 	podUIDEmpty := ""
-	_, _, pubPKIXEmpty, proofEmpty := mustMakeEd25519KeyAndProof(t, []byte(podUIDEmpty))
+	_, _, pubPKIXEmpty, proofEmpty, _ := mustMakeEd25519KeyAndProof(t, []byte(podUIDEmpty), []string{})
 
 	testCases := []struct {
 		description string
@@ -1652,6 +1644,52 @@ func TestValidatePodCertificateRequestCreate(t *testing.T) {
 				},
 			},
 			wantErrors: nil,
+		},
+		{
+			description: "valid Ed25519 PCR (using PKCS#10)",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					StubPKCS10Request:    ed25519CSR1,
+				},
+			},
+			wantErrors: nil,
+		},
+		{
+			description: "invalid Ed25519 PCR (both StubPKCS10Request and PKIXPublicKey set)",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+					StubPKCS10Request:    ed25519CSR1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), field.OmitValueType{}, "exactly one of (stubPKCS10Request) or (pkixPublicKey, proofOfPossession) must be set"),
+			},
 		},
 		{
 			description: "invalid Ed25519 proof of possession (correct key signed wrong message)",
@@ -2187,7 +2225,7 @@ func TestValidatePodCertificateRequestCreate(t *testing.T) {
 					NodeUID:              "node-uid-1",
 					MaxExpirationSeconds: ptr.To[int32](86400),
 					PKIXPublicKey:        make([]byte, capi.MaxPKIXPublicKeySize+1),
-					ProofOfPossession:    []byte{},
+					ProofOfPossession:    []byte("abc"),
 				},
 			},
 			wantErrors: field.ErrorList{
@@ -2210,7 +2248,7 @@ func TestValidatePodCertificateRequestCreate(t *testing.T) {
 					NodeName:             "node-1",
 					NodeUID:              "node-uid-1",
 					MaxExpirationSeconds: ptr.To[int32](86400),
-					PKIXPublicKey:        []byte{},
+					PKIXPublicKey:        ed25519PubPKIX1,
 					ProofOfPossession:    make([]byte, capi.MaxProofOfPossessionSize+1),
 				},
 			},
@@ -2308,7 +2346,7 @@ func TestValidatePodCertificateRequestCreate(t *testing.T) {
 
 func TestValidatePodCertificateRequestUpdate(t *testing.T) {
 	podUID1 := "pod-uid-1"
-	_, _, pubPKIX1, proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
+	_, _, pubPKIX1, proof1, _ := mustMakeEd25519KeyAndProof(t, []byte(podUID1), []string{})
 
 	testCases := []struct {
 		description    string
@@ -2396,7 +2434,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 	intermediateCACertDER, intermediateCAPrivKey := mustMakeIntermediateCA(t, caCertDER, caPrivKey)
 
 	podUID1 := "pod-uid-1"
-	_, pub1, pubPKIX1, proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
+	_, pub1, pubPKIX1, proof1, _ := mustMakeEd25519KeyAndProof(t, []byte(podUID1), []string{})
 
 	pod1Cert1 := mustSignCertForPublicKey(t, 24*time.Hour, pub1, caCertDER, caPrivKey, false, "", "")
 	pod1Cert2 := mustSignCertForPublicKey(t, 18*time.Hour, pub1, caCertDER, caPrivKey, false, "", "")
@@ -2504,7 +2542,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "type"), "Unknown", []string{capi.PodCertificateRequestConditionTypeIssued, capi.PodCertificateRequestConditionTypeDenied, capi.PodCertificateRequestConditionTypeFailed}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("type"), "Unknown", []string{capi.PodCertificateRequestConditionTypeIssued, capi.PodCertificateRequestConditionTypeDenied, capi.PodCertificateRequestConditionTypeFailed}),
 			},
 		},
 		{
@@ -2557,7 +2595,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
 			},
 		},
 		{
@@ -2610,7 +2648,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
 			},
 		},
 		{
@@ -2663,7 +2701,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
 			},
 		},
 		{
@@ -3119,7 +3157,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+				field.Invalid(field.NewPath("status", "conditions").Index(1).Child("type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
 			},
 		},
 		{
@@ -3183,7 +3221,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Denied", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+				field.Invalid(field.NewPath("status", "conditions").Index(1).Child("type"), "Denied", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
 			},
 		},
 		{
@@ -3247,7 +3285,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+				field.Invalid(field.NewPath("status", "conditions").Index(1).Child("type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
 			},
 		},
 		{
@@ -4438,7 +4476,7 @@ func mustParseTime(t *testing.T, stamp string) time.Time {
 	return got
 }
 
-func mustMakeEd25519KeyAndProof(t *testing.T, toBeSigned []byte) (ed25519.PrivateKey, ed25519.PublicKey, []byte, []byte) {
+func mustMakeEd25519KeyAndProof(t *testing.T, toBeSigned []byte, pkcs10DNSSANS []string) (ed25519.PrivateKey, ed25519.PublicKey, []byte, []byte, []byte) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("Error while generating ed25519 key: %v", err)
@@ -4448,7 +4486,13 @@ func mustMakeEd25519KeyAndProof(t *testing.T, toBeSigned []byte) (ed25519.Privat
 		t.Fatalf("Error while marshaling PKIX public key: %v", err)
 	}
 	sig := ed25519.Sign(priv, toBeSigned)
-	return priv, pub, pubPKIX, sig
+
+	pkcs10DER, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{DNSNames: pkcs10DNSSANS}, priv)
+	if err != nil {
+		t.Fatalf("Error while creating PKCS#10 certificate signing request: %v", err)
+	}
+
+	return priv, pub, pubPKIX, sig, pkcs10DER
 }
 
 func mustMakeECDSAKeyAndProof(t *testing.T, curve elliptic.Curve, toBeSigned []byte) (*ecdsa.PrivateKey, *ecdsa.PublicKey, []byte, []byte) {

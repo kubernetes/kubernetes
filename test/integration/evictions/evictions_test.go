@@ -75,7 +75,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	defer tCtx.Cancel("test has completed")
 
 	informers.Start(tCtx.Done())
-	go rm.Run(tCtx)
+	go rm.Run(tCtx, 1)
 
 	var gracePeriodSeconds int64 = 30
 	deleteOption := metav1.DeleteOptions{
@@ -83,7 +83,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	}
 
 	// Generate numOfEvictions pods to evict
-	for i := 0; i < numOfEvictions; i++ {
+	for i := range numOfEvictions {
 		podName := fmt.Sprintf(podNameFormat, i)
 		pod := newPod(podName)
 
@@ -106,11 +106,11 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 	waitPDBStable(t, clientSet, ns.Name, pdb.Name, numOfEvictions)
 
-	var numberPodsEvicted uint32
+	var numberPodsEvicted atomic.Uint32
 	errCh := make(chan error, 3*numOfEvictions)
 	var wg sync.WaitGroup
 	// spawn numOfEvictions goroutines to concurrently evict the pods
-	for i := 0; i < numOfEvictions; i++ {
+	for i := range numOfEvictions {
 		wg.Add(1)
 		go func(id int, errCh chan error) {
 			defer wg.Done()
@@ -139,7 +139,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			_, err = clientSet.CoreV1().Pods(ns.Name).Get(context.TODO(), podName, metav1.GetOptions{})
 			switch {
 			case apierrors.IsNotFound(err):
-				atomic.AddUint32(&numberPodsEvicted, 1)
+				numberPodsEvicted.Add(1)
 				// pod was evicted and deleted so return from goroutine immediately
 				return
 			case err == nil:
@@ -172,8 +172,8 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		t.Fatal(utilerrors.NewAggregate(errList))
 	}
 
-	if atomic.LoadUint32(&numberPodsEvicted) != numOfEvictions {
-		t.Fatalf("fewer number of successful evictions than expected : %d", numberPodsEvicted)
+	if numberPodsEvicted.Load() != numOfEvictions {
+		t.Fatalf("fewer number of successful evictions than expected : %d", numberPodsEvicted.Load())
 	}
 }
 
@@ -188,7 +188,7 @@ func TestTerminalPodEviction(t *testing.T) {
 	defer tCtx.Cancel("test has completed")
 
 	informers.Start(tCtx.Done())
-	go rm.Run(tCtx)
+	go rm.Run(tCtx, 1)
 
 	var gracePeriodSeconds int64 = 30
 	deleteOption := metav1.DeleteOptions{
@@ -259,7 +259,7 @@ func TestEvictionVersions(t *testing.T) {
 	defer tCtx.Cancel("test has completed")
 
 	informers.Start(tCtx.Done())
-	go rm.Run(tCtx)
+	go rm.Run(tCtx, 1)
 
 	ns := "default"
 	subresource := "eviction"
@@ -372,7 +372,7 @@ func TestEvictionWithFinalizers(t *testing.T) {
 			defer tCtx.Cancel("test has completed")
 
 			informers.Start(tCtx.Done())
-			go rm.Run(tCtx)
+			go rm.Run(tCtx, 1)
 
 			pod := newPod("pod")
 			pod.ObjectMeta.Finalizers = []string{"test.k8s.io/finalizer"}
@@ -447,7 +447,7 @@ func TestEvictionWithUnhealthyPodEvictionPolicy(t *testing.T) {
 			defer tCtx.Cancel("test has completed")
 
 			informers.Start(tCtx.Done())
-			go rm.Run(tCtx)
+			go rm.Run(tCtx, 1)
 
 			pod := newPod("pod")
 			if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
@@ -540,7 +540,7 @@ func TestEvictionWithPrecondition(t *testing.T) {
 
 			defer tCtx.Cancel("test has completed")
 			informers.Start(tCtx.Done())
-			go rm.Run(tCtx)
+			go rm.Run(tCtx, 1)
 
 			pod := newPod("pod")
 			pod, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})

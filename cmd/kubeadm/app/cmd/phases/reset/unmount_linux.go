@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -70,6 +69,12 @@ func unmountKubeletDirectory(kubeletRunDirectory string, flags []string) error {
 		}
 		klog.V(5).Infof("[reset] Unmounting %q", m[1])
 		if err := syscall.Unmount(m[1], flagsInt); err != nil {
+			// EINVAL is expected here if a duplicate mount entry
+			// was already unmounted via its shared peer.
+			if err == syscall.EINVAL {
+				klog.Warningf("[reset] Ignoring EINVAL error while unmounting %q", m[1])
+				continue
+			}
 			errList = append(errList, errors.WithMessagef(err, "failed to unmount %q", m[1]))
 		}
 	}

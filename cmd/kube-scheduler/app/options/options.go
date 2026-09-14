@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
@@ -79,6 +81,9 @@ type Options struct {
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
+
+	// InformerName identifies the scheduler's shared informers in client-go informer metrics.
+	InformerName *cache.InformerName
 
 	// Flags hold the parsed CLI flags.
 	Flags *cliflag.NamedFlagSets
@@ -261,6 +266,7 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 			return err
 		}
 	}
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 	o.Metrics.Apply()
 
 	// Apply value independently instead of using ApplyDeprecated() because it can't be configured via ComponentConfig.
@@ -333,7 +339,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	}
 
 	c.Client = client
-	c.InformerFactory = scheduler.NewInformerFactory(client, 0)
+	c.InformerFactory = scheduler.NewInformerFactory(client, 0, o.InformerName)
 	dynClient := dynamic.NewForConfigOrDie(c.KubeConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
 	c.LeaderElection = leaderElectionConfig

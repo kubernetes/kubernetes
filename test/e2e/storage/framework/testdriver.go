@@ -36,16 +36,15 @@ type TestDriver interface {
 	// information.
 	GetDriverInfo() *DriverInfo
 
-	// SkipUnsupportedTest skips test if Testpattern is not
+	// SkipUnsupportedTest returns the reason for skipping test if Testpattern is not
 	// suitable to test with the TestDriver. It gets called after
 	// parsing parameters of the test suite and before the
-	// framework is initialized. Cheap tests that just check
-	// parameters like the cloud provider can and should be
-	// done in SkipUnsupportedTest to avoid setting up more
-	// expensive resources like framework.Framework. Tests that
+	// framework is initialized.
+	//
+	// Tests that
 	// depend on a connection to the cluster can be done in
 	// PrepareTest once the framework is ready.
-	SkipUnsupportedTest(TestPattern)
+	SkipUnsupportedTest(TestPattern) string
 
 	// PrepareTest is called at test execution time each time a new test case is about to start.
 	// It sets up all necessary resources and returns the per-test configuration.
@@ -130,6 +129,10 @@ type SnapshottableTestDriver interface {
 	GetSnapshotClass(ctx context.Context, config *PerTestConfig, parameters map[string]string) *unstructured.Unstructured
 }
 
+type SnapshotMetadataTestDriver interface {
+	TestDriver
+}
+
 // VolumeGroupSnapshottableTestDriver represents an interface for a TestDriver that supports DynamicGroupSnapshot
 type VolumeGroupSnapshottableTestDriver interface {
 	TestDriver
@@ -171,6 +174,7 @@ const (
 	CapVolumeMountGroup    Capability = "volumeMountGroup"   // Driver has the VolumeMountGroup CSI node capability. Because this is a FSGroup feature, the fsGroup capability must also be set to true.
 	CapExec                Capability = "exec"               // exec a file in the volume
 	CapSnapshotDataSource  Capability = "snapshotDataSource" // support populate data from snapshot
+	CapSnapshotMetadata    Capability = "snapshotMetadata"   // support snapshot metadata
 	CapVolumeGroupSnapshot Capability = "groupSnapshot"      // support group snapshot
 	CapPVCDataSource       Capability = "pvcDataSource"      // support populate data from pvc
 
@@ -271,6 +275,8 @@ type DriverInfo struct {
 	VolumeModifyStressTestOptions *VolumeModifyStressTestOptions
 	// [Optional] Parameters for performance tests
 	PerformanceTestOptions *PerformanceTestOptions
+	// [Optional] Scale parameters for volume group snapshot stress tests.
+	VolumeGroupSnapshotStressTestOptions *VolumeGroupSnapshotStressTestOptions
 }
 
 // StressTestOptions contains parameters used for stress tests.
@@ -317,4 +323,13 @@ type PerformanceTestProvisioningOptions struct {
 // PerformanceTestOptions contains parameters used for performance tests
 type PerformanceTestOptions struct {
 	ProvisioningOptions *PerformanceTestProvisioningOptions
+}
+
+// VolumeGroupSnapshotStressTestOptions contains parameters used for volume group snapshot stress tests.
+type VolumeGroupSnapshotStressTestOptions struct {
+	// Number of pods to create in the StatefulSet. This will create
+	// that many PVCs with the same label for group snapshotting.
+	NumPods int
+	// Number of volume group snapshots to create.
+	NumSnapshots int
 }

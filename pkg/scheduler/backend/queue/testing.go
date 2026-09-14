@@ -47,7 +47,8 @@ func NewTestQueueWithObjects(
 	recorder := metrics.NewMetricsAsyncRecorder(10, 20*time.Microsecond, ctx.Done())
 	// We set it before the options that users provide, so that users can override it.
 	opts = append([]Option{WithMetricsRecorder(recorder)}, opts...)
-	return NewTestQueueWithInformerFactory(ctx, lessFn, informerFactory, opts...)
+	pq := NewTestQueueWithInformerFactory(ctx, lessFn, informerFactory, opts...)
+	return pq
 }
 
 func NewTestQueueWithInformerFactory(

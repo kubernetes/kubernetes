@@ -19,7 +19,6 @@ package scheduler
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -333,7 +331,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, time.Duration(0), nil)
+			cache := internalcache.New(ctx, nil, false, false)
 			for _, name := range test.nodes {
 				cache.AddNode(logger, createNode(name))
 			}
@@ -345,22 +343,26 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				runtime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				runtime.WithLogger(logger),
 				runtime.WithSnapshotSharedLister(emptySnapshot),
+				runtime.WithExtenders(extenders),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			sched := &Scheduler{
-				Cache:                    cache,
-				nodeInfoSnapshot:         emptySnapshot,
-				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-				Extenders:                extenders,
-				logger:                   logger,
+				Cache:            cache,
+				nodeInfoSnapshot: emptySnapshot,
+				logger:           logger,
 			}
+			sched.initAlgorithm()
 			sched.applyDefaultHandlers()
 
-			podIgnored := &v1.Pod{}
-			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
+			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
+				t.Fatalf("Unexpected error updating snapshot: %v", err)
+			}
+
+			podInfoIgnored := queuedPodInfoForPod(&v1.Pod{})
+			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfoIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)

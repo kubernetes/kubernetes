@@ -73,13 +73,11 @@ func TestCreateMasterAuditPolicy(t *testing.T) {
 		scheduler           = newUserInfo(user.KubeScheduler, user.AllAuthenticated)
 		apiserver           = newUserInfo(user.APIServerUser, user.SystemPrivilegedGroup)
 		autoscaler          = newUserInfo("cluster-autoscaler", user.AllAuthenticated)
-		npd                 = newUserInfo("system:node-problem-detector", user.AllAuthenticated)
-		npdSA               = serviceaccount.UserInfo("kube-system", "node-problem-detector", "")
 		namespaceController = serviceaccount.UserInfo("kube-system", "namespace-controller", "")
 		endpointController  = serviceaccount.UserInfo("kube-system", "endpoint-controller", "")
 		defaultSA           = serviceaccount.UserInfo("default", "default", "")
 
-		allUsers = []user.Info{anonymous, kubeproxy, ingress, kubelet, node, controller, scheduler, apiserver, autoscaler, npd, npdSA, namespaceController, endpointController, defaultSA}
+		allUsers = []user.Info{anonymous, kubeproxy, ingress, kubelet, node, controller, scheduler, apiserver, autoscaler, namespaceController, endpointController, defaultSA}
 	)
 
 	// Resources for test cases
@@ -149,15 +147,15 @@ func TestCreateMasterAuditPolicy(t *testing.T) {
 
 	at.testResources(none, node, apiserver, defaultSA, anonymous, "get", "list", "create", "patch", "update", "delete", events)
 
-	at.testResources(request, kubelet, node, npd, npdSA, "update", "patch", nodeStatus, podStatus)
+	at.testResources(request, kubelet, node, "update", "patch", nodeStatus, podStatus)
 
 	at.testResources(request, namespaceController, "deletecollection", pods, namespaces)
 
-	at.testResources(metadata, defaultSA, anonymous, npd, namespaceController, "get", "create", "update", secrets, configmaps, sysConfigmaps, tokenReviews)
-	at.testResources(request, defaultSA, anonymous, npd, namespaceController, "get", "list", "watch", sysEndpoints, podMetrics, pods, clusterRoles, deployments)
-	at.testResources(response, defaultSA, anonymous, npd, namespaceController, "create", "update", "patch", "delete", sysEndpoints, podMetrics, pods, clusterRoles, deployments)
+	at.testResources(metadata, defaultSA, anonymous, namespaceController, "get", "create", "update", secrets, configmaps, sysConfigmaps, tokenReviews)
+	at.testResources(request, defaultSA, anonymous, namespaceController, "get", "list", "watch", sysEndpoints, podMetrics, pods, clusterRoles, deployments)
+	at.testResources(response, defaultSA, anonymous, namespaceController, "create", "update", "patch", "delete", sysEndpoints, podMetrics, pods, clusterRoles, deployments)
 
-	at.testResources(metadata, defaultSA, anonymous, npd, namespaceController, "get", "list", "watch", "create", "update", "patch", "delete", foobars, foobarbaz)
+	at.testResources(metadata, defaultSA, anonymous, namespaceController, "get", "list", "watch", "create", "update", "patch", "delete", foobars, foobarbaz)
 }
 
 type auditTester struct {

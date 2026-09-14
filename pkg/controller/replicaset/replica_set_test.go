@@ -625,8 +625,8 @@ func TestRelatedPodsLookup(t *testing.T) {
 }
 
 func TestWatchControllers(t *testing.T) {
-
-	fakeWatch := watch.NewFake()
+	logger, _ := ktesting.NewTestContext(t)
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	client := fake.NewSimpleClientset()
 	client.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fakeWatch, nil))
 	stopCh := make(chan struct{})
@@ -640,8 +640,8 @@ func TestWatchControllers(t *testing.T) {
 		client,
 		BurstReplicas,
 	)
-	informers.Start(stopCh)
-	informers.WaitForCacheSync(stopCh)
+	informers.StartWithContext(tCtx)
+	informers.WaitForCacheSyncWithContext(tCtx)
 
 	var testRSSpec apps.ReplicaSet
 	received := make(chan string)
@@ -676,10 +676,10 @@ func TestWatchControllers(t *testing.T) {
 }
 
 func TestWatchPods(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 
-	fakeWatch := watch.NewFake()
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	client.PrependWatchReactor("pods", core.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
@@ -879,7 +879,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	manager.podControl = &fakePodControl
 
 	// Enqueue once. Then process it. Disable rate-limiting for this.
-	manager.queue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedMaxOfRateLimiter[string]())
+	manager.queue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedMaxOfRateLimiter[string]()) //nolint:logcheck // Intentionally testing old API here.
 	manager.enqueueRS(rs)
 	manager.processNextWorkItem(ctx)
 	// It should have been requeued.
@@ -1210,8 +1210,8 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		client,
 		100,
 	)
-	f.Start(stopCh)
-	f.WaitForCacheSync(stopCh)
+	f.StartWithContext(tCtx)
+	f.WaitForCacheSyncWithContext(tCtx)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 
@@ -1631,7 +1631,7 @@ func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
 }
 
 func TestReplicaSetAvailabilityCheck(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(4, labelMap)
@@ -1665,7 +1665,7 @@ func TestReplicaSetAvailabilityCheck(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 
-	err := manager.syncReplicaSet(ctx, GetKey(rs, t))
+	err := manager.syncReplicaSet(tCtx, GetKey(rs, t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1703,9 +1703,7 @@ func TestReplicaSetAvailabilityCheck(t *testing.T) {
 	}
 
 	// RS should be re-queued after 700ms to recompute .status.availableReplicas (200ms extra for the test).
-	ktesting.Eventually(ctx, func(tCtx ktesting.TContext) int {
-		return manager.queue.Len()
-	}).WithTimeout(900*time.Millisecond).
+	tCtx.Eventually(manager.queue.Len).WithTimeout(900*time.Millisecond).
 		WithPolling(10*time.Millisecond).
 		Should(gomega.Equal(1), " RS should be re-queued to recompute .status.availableReplicas")
 

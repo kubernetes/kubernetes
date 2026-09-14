@@ -75,13 +75,13 @@ func testingDeployment(name, ns string, numberOfPods int32) appsv1.Deployment {
 							Name:    "container-1",
 							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 							Command: []string{"/bin/sh", "-c"},
-							Args:    []string{"/agnhost logs-generator --log-lines-total 10 --run-duration 3s && /agnhost pause"},
+							Args:    []string{"/agnhost logs-generator --log-lines-total 10 --run-duration 30s && /agnhost pause"},
 						},
 						{
 							Name:    "container-2",
 							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 							Command: []string{"/bin/sh", "-c"},
-							Args:    []string{"/agnhost logs-generator --log-lines-total 20 --run-duration 3s && /agnhost pause"},
+							Args:    []string{"/agnhost logs-generator --log-lines-total 20 --run-duration 30s && /agnhost pause"},
 						},
 					},
 					RestartPolicy:                 v1.RestartPolicyAlways,
@@ -274,17 +274,12 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				ginkgo.By("creating the Deployment")
 				var err error
 				deploy, err = deployClient.Create(ctx, deploy, metav1.CreateOptions{})
-				if err != nil {
-					framework.Failf("Failed to create Deployment: %v", err)
-				}
+				framework.ExpectNoError(err, "failed to create deployment")
 
-				if err = e2edeployment.WaitForDeploymentComplete(c, deploy); err != nil {
-					framework.Failf("Failed to wait for Deployment to complete: %v", err)
-				}
-
-				if err = e2epod.WaitForPodsRunningReady(ctx, c, ns, 2, framework.PodStartTimeout); err != nil {
-					framework.Failf("Failed to wait for Pods are running: %v", err)
-				}
+				framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy),
+					"failed to wait for deployment to complete")
+				framework.ExpectNoError(e2epod.WaitForPodsRunningReady(ctx, c, ns, 2, framework.PodStartTimeout),
+					"failed to wait for pods are running")
 			})
 
 			ginkgo.AfterEach(func() {
@@ -294,67 +289,50 @@ var _ = SIGDescribe("Kubectl logs", func() {
 			ginkgo.It("should get logs from all pods based on default container", func(ctx context.Context) {
 				ginkgo.By("Waiting for Deployment pods to be running.")
 
-				// get the pod names
 				pods, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
-				if err != nil {
-					framework.Failf("Failed to get pods for Deployment: %v", err)
-				}
+				framework.ExpectNoError(err, "failed to get pods for deployment")
 
 				podOne := pods.Items[0].GetName()
 				podTwo := pods.Items[1].GetName()
 
-				ginkgo.By("expecting logs from both replicas in Deployment")
-				out := e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("deploy/%s", deployName), "--all-pods")
-				framework.Logf("got output %q", out)
-				logLines := strings.Split(out, "\n")
-				logFound := false
-				for _, line := range logLines {
-					var deployPod bool
-					if line != "" {
-						if strings.Contains(line, fmt.Sprintf("[pod/%s/container-2]", podOne)) || strings.Contains(line, fmt.Sprintf("[pod/%s/container-2]", podTwo)) {
-							logFound = true
-							deployPod = true
-						}
-						gomega.Expect(deployPod).To(gomega.BeTrueBecause("each log should be from the default container from each pod in the Deployment"))
-					}
+				ginkgo.By("expecting logs from the default container from both pods in a deployment")
+				var out string
+				gomega.Eventually(func() (string, error) {
+					var runErr error
+					out, runErr = e2ekubectl.RunKubectl(ns, "logs", fmt.Sprintf("deploy/%s", deployName), "--all-pods")
+					return out, runErr
+				}, framework.PodStartTimeout, 5*time.Second).Should(
+					gomega.SatisfyAll(
+						gomega.ContainSubstring(fmt.Sprintf("[pod/%s/container-2]", podOne)),
+						gomega.ContainSubstring(fmt.Sprintf("[pod/%s/container-2]", podTwo)),
+					),
+				)
 
-				}
-				gomega.Expect(logFound).To(gomega.BeTrueBecause("log should be present"))
+				ginkgo.By("logs should NOT contain data from the non-default container from both pods in a deployment")
+				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s/container-1]", podOne))).To(gomega.BeFalseBecause("pod 1 container 1 log should NOT be present"))
+				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s/container-1]", podTwo))).To(gomega.BeFalseBecause("pod 2 container 1 log should NOT be present"))
 			})
 
 			ginkgo.It("should get logs from each pod and each container in Deployment", func(ctx context.Context) {
 				ginkgo.By("Waiting for Deployment pods to be running.")
 
 				pods, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
-				if err != nil {
-					framework.Failf("Failed to get pods for Deployment: %v", err)
-				}
+				framework.ExpectNoError(err, "failed to get pods for deployment")
 
 				podOne := pods.Items[0].GetName()
 				podTwo := pods.Items[1].GetName()
 
-				ginkgo.By("all containers and all containers")
-				out := e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("deploy/%s", deployName), "--all-pods", "--all-containers")
-				framework.Logf("got output %q", out)
-				logLines := strings.Split(out, "\n")
-				logFound := false
-				for _, line := range logLines {
-					if line != "" {
-						var deployPodContainer bool
-						if strings.Contains(line, fmt.Sprintf("[pod/%s/container-1]", podOne)) || strings.Contains(line, fmt.Sprintf("[pod/%s/container-1]", podTwo)) || strings.Contains(line, fmt.Sprintf("[pod/%s/container-2]", podOne)) || strings.Contains(line, fmt.Sprintf("[pod/%s/container-2]", podTwo)) {
-							logFound = true
-							deployPodContainer = true
-						}
-						gomega.Expect(deployPodContainer).To(gomega.BeTrueBecause("each log should be from all containers from all pods in the Deployment"))
-					}
-				}
-				gomega.Expect(logFound).To(gomega.BeTrueBecause("log should be present"))
-				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s/container-1]", podOne))).To(gomega.BeTrueBecause("pod 1 container 1 log should be present"))
-				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s/container-2]", podOne))).To(gomega.BeTrueBecause("pod 1 container 2 log should be present"))
-				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s/container-1]", podTwo))).To(gomega.BeTrueBecause("pod 2 container 1 log should be present"))
-				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s/container-2]", podTwo))).To(gomega.BeTrueBecause("pod 2 container 2 log should be present"))
-				gomega.Expect(out).NotTo(gomega.BeEmpty())
-
+				ginkgo.By("expecting logs from all containers from both pods in a deployment")
+				gomega.Eventually(func() (string, error) {
+					return e2ekubectl.RunKubectl(ns, "logs", fmt.Sprintf("deploy/%s", deployName), "--all-pods", "--all-containers")
+				}, framework.PodStartTimeout, 5*time.Second).Should(
+					gomega.SatisfyAll(
+						gomega.ContainSubstring(fmt.Sprintf("[pod/%s/container-1]", podOne)),
+						gomega.ContainSubstring(fmt.Sprintf("[pod/%s/container-2]", podOne)),
+						gomega.ContainSubstring(fmt.Sprintf("[pod/%s/container-1]", podTwo)),
+						gomega.ContainSubstring(fmt.Sprintf("[pod/%s/container-2]", podTwo)),
+					),
+				)
 			})
 
 		})

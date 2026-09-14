@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -72,11 +73,12 @@ var (
 // DescribeFlags directly reflect the information that CLI is gathering via flags. They will be converted to Options,
 // which reflect the runtime requirements for the command.
 type DescribeFlags struct {
-	Factory           cmdutil.Factory
-	Selector          string
-	AllNamespaces     bool
-	FilenameOptions   *resource.FilenameOptions
-	DescriberSettings *describe.DescriberSettings
+	Factory                 cmdutil.Factory
+	Selector                string
+	AllNamespaces           bool
+	ShowEventsExplicitlySet bool
+	FilenameOptions         *resource.FilenameOptions
+	DescriberSettings       *describe.DescriberSettings
 	genericiooptions.IOStreams
 }
 
@@ -98,7 +100,11 @@ func (flags *DescribeFlags) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddFilenameOptionFlags(cmd, flags.FilenameOptions, "containing the resource to describe")
 	cmdutil.AddLabelSelectorFlagVar(cmd, &flags.Selector)
 	cmd.Flags().BoolVarP(&flags.AllNamespaces, "all-namespaces", "A", flags.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	cmd.Flags().BoolVar(&flags.DescriberSettings.ShowEvents, "show-events", flags.DescriberSettings.ShowEvents, "If true, display events related to the described object.")
+	cmd.Flags().BoolVar(&flags.DescriberSettings.ShowEvents, "show-events", flags.DescriberSettings.ShowEvents, "If true, display events related to the described object. Defaults to true for a single object, false for multiple objects and prefix matching.")
+
+	f := cmd.Flags().Lookup("show-events")
+	f.Value = cliflag.NewTracker(f.Value, &flags.ShowEventsExplicitlySet)
+
 	cmdutil.AddChunkSizeFlag(cmd, &flags.DescriberSettings.ChunkSize)
 }
 
@@ -126,16 +132,17 @@ func (flags *DescribeFlags) ToOptions(parent string, args []string) (*DescribeOp
 	}
 
 	o := &DescribeOptions{
-		Selector:          flags.Selector,
-		Namespace:         namespace,
-		Describer:         describer,
-		NewBuilder:        flags.Factory.NewBuilder,
-		BuilderArgs:       builderArgs,
-		EnforceNamespace:  enforceNamespace,
-		AllNamespaces:     flags.AllNamespaces,
-		FilenameOptions:   flags.FilenameOptions,
-		DescriberSettings: flags.DescriberSettings,
-		IOStreams:         flags.IOStreams,
+		Selector:                flags.Selector,
+		Namespace:               namespace,
+		Describer:               describer,
+		NewBuilder:              flags.Factory.NewBuilder,
+		BuilderArgs:             builderArgs,
+		EnforceNamespace:        enforceNamespace,
+		AllNamespaces:           flags.AllNamespaces,
+		ShowEventsExplicitlySet: flags.ShowEventsExplicitlySet,
+		FilenameOptions:         flags.FilenameOptions,
+		DescriberSettings:       flags.DescriberSettings,
+		IOStreams:               flags.IOStreams,
 	}
 
 	return o, nil
@@ -157,6 +164,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericiooptions.I
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
+		SuggestFor: []string{"inspect"},
 	}
 
 	flags.AddFlags(cmd)
@@ -186,6 +194,9 @@ func (o *DescribeOptions) Run() error {
 
 	allErrs := []error{}
 	infos, err := r.Infos()
+	if (err != nil || len(infos) > 1) && !o.ShowEventsExplicitlySet {
+		o.DescriberSettings.ShowEvents = false
+	}
 	if err != nil {
 		if apierrors.IsNotFound(err) && len(o.BuilderArgs) == 2 {
 			return o.DescribeMatchingResources(err, o.BuilderArgs[0], o.BuilderArgs[1])
@@ -284,8 +295,9 @@ type DescribeOptions struct {
 
 	BuilderArgs []string
 
-	EnforceNamespace bool
-	AllNamespaces    bool
+	EnforceNamespace        bool
+	AllNamespaces           bool
+	ShowEventsExplicitlySet bool
 
 	DescriberSettings *describe.DescriberSettings
 	FilenameOptions   *resource.FilenameOptions

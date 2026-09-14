@@ -31,12 +31,12 @@ import (
 
 // strategy implements verification logic for RuntimeClass.
 type strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating RuntimeClass objects.
-var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -50,7 +50,7 @@ func (strategy) NamespaceScoped() bool {
 }
 
 // AllowCreateOnUpdate is true for RuntimeClasses.
-func (strategy) AllowCreateOnUpdate() bool {
+func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -73,6 +73,12 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidateRuntimeClass(runtimeClass)
 }
 
+// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
+// validation options to the generic BeforeCreate/BeforeUpdate code path.
+func (strategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{NormalizationRules: validation.NodeNormalizationRules}
+}
+
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	return nodeapi.GetWarningsForRuntimeClass(obj.(*node.RuntimeClass))
@@ -87,7 +93,8 @@ func (strategy) Canonicalize(obj runtime.Object) {
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newObj := obj.(*node.RuntimeClass)
 	errorList := validation.ValidateRuntimeClass(newObj)
-	return append(errorList, validation.ValidateRuntimeClassUpdate(newObj, old.(*node.RuntimeClass))...)
+	errorList = append(errorList, validation.ValidateRuntimeClassUpdate(newObj, old.(*node.RuntimeClass))...)
+	return errorList
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -100,6 +107,6 @@ func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) [
 // populates it with the latest version. Else, it checks that the
 // version specified by the user matches the version of latest etcd
 // object.
-func (strategy) AllowUnconditionalUpdate() bool {
+func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

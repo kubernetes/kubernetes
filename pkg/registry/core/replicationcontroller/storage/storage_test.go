@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -64,10 +63,7 @@ func newStorage(t *testing.T) (ControllerStorage, *etcd3testing.EtcdTestServer) 
 
 // createController is a helper function that returns a controller with the updated resource version.
 func createController(storage *REST, rc api.ReplicationController, t *testing.T) (api.ReplicationController, error) {
-	ctx := genericapirequest.WithRequestInfo(
-		genericapirequest.WithNamespace(genericapirequest.NewContext(), rc.Namespace),
-		&genericapirequest.RequestInfo{APIGroup: "", APIVersion: "v1"},
-	)
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, rc.Namespace)
 	obj, err := storage.Create(ctx, &rc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create controller, %v", err)
@@ -161,7 +157,7 @@ func TestGenerationNumber(t *testing.T) {
 	modifiedSno := *validNewController()
 	modifiedSno.Generation = 100
 	modifiedSno.Status.ObservedGeneration = 10
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Controller.Store, metav1.NamespaceDefault)
 	rc, err := createController(storage.Controller, modifiedSno, t)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -260,7 +256,7 @@ func TestUpdateStatus(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Controller.Store.Destroy()
 
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	statusCtx := genericregistrytest.NewNamespaceScopeContext(storage.Controller.Store, namespace, "status")
 	rcStart, err := createController(storage.Controller, *validController, t)
 	if err != nil {
 		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
@@ -268,11 +264,11 @@ func TestUpdateStatus(t *testing.T) {
 
 	rc := rcStart.DeepCopy()
 	rc.Status.Replicas++
-	_, _, err = storage.Status.Update(ctx, rc.Name, rest.DefaultUpdatedObjectInfo(rc), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	_, _, err = storage.Status.Update(statusCtx, rc.Name, rest.DefaultUpdatedObjectInfo(rc), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	obj, err := storage.Status.Get(ctx, rc.Name, &metav1.GetOptions{})
+	obj, err := storage.Status.Get(statusCtx, rc.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -288,7 +284,7 @@ func TestScaleGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Controller.Store.DestroyFunc()
 
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	scaleCtx := genericregistrytest.NewNamespaceScopeContext(storage.Controller.Store, namespace, "scale")
 	rc, err := createController(storage.Controller, *validController, t)
 	if err != nil {
 		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
@@ -310,7 +306,7 @@ func TestScaleGet(t *testing.T) {
 			Selector: labels.SelectorFromSet(validController.Spec.Template.Labels).String(),
 		},
 	}
-	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
+	obj, err := storage.Scale.Get(scaleCtx, name, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
@@ -325,7 +321,7 @@ func TestScaleUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Controller.Store.DestroyFunc()
 
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	scaleCtx := genericregistrytest.NewNamespaceScopeContext(storage.Controller.Store, namespace, "scale")
 	rc, err := createController(storage.Controller, *validController, t)
 	if err != nil {
 		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
@@ -338,10 +334,10 @@ func TestScaleUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+	if _, _, err := storage.Scale.Update(scaleCtx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
-	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
+	obj, err := storage.Scale.Get(scaleCtx, name, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
@@ -353,7 +349,7 @@ func TestScaleUpdate(t *testing.T) {
 	update.ResourceVersion = rc.ResourceVersion
 	update.Spec.Replicas = 15
 
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil && !errors.IsConflict(err) {
+	if _, _, err = storage.Scale.Update(scaleCtx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil && !errors.IsConflict(err) {
 		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
 	}
 }
@@ -382,7 +378,8 @@ func TestScalePatchErrors(t *testing.T) {
 	scaleStore := storage.Scale
 
 	defer resourceStore.DestroyFunc()
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Controller.Store, namespace)
+	scaleCtx := genericregistrytest.NewNamespaceScopeContext(storage.Controller.Store, namespace, "scale")
 
 	{
 		applyNotFoundPatch := func() rest.TransformFunc {
@@ -391,7 +388,7 @@ func TestScalePatchErrors(t *testing.T) {
 				return currentObject, nil
 			}
 		}
-		_, _, err := scaleStore.Update(ctx, "bad-name", rest.DefaultUpdatedObjectInfo(nil, applyNotFoundPatch()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		_, _, err := scaleStore.Update(scaleCtx, "bad-name", rest.DefaultUpdatedObjectInfo(nil, applyNotFoundPatch()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 		if !errors.IsNotFound(err) {
 			t.Errorf("expected notfound, got %v", err)
 		}
@@ -408,7 +405,7 @@ func TestScalePatchErrors(t *testing.T) {
 				return currentObject, nil
 			}
 		}
-		_, _, err := scaleStore.Update(ctx, name, rest.DefaultUpdatedObjectInfo(nil, applyBadUIDPatch()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		_, _, err := scaleStore.Update(scaleCtx, name, rest.DefaultUpdatedObjectInfo(nil, applyBadUIDPatch()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 		if !errors.IsConflict(err) {
 			t.Errorf("expected conflict, got %v", err)
 		}
@@ -421,7 +418,7 @@ func TestScalePatchErrors(t *testing.T) {
 				return currentObject, nil
 			}
 		}
-		_, _, err := scaleStore.Update(ctx, name, rest.DefaultUpdatedObjectInfo(nil, applyBadResourceVersionPatch()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		_, _, err := scaleStore.Update(scaleCtx, name, rest.DefaultUpdatedObjectInfo(nil, applyBadResourceVersionPatch()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 		if !errors.IsConflict(err) {
 			t.Errorf("expected conflict, got %v", err)
 		}
@@ -436,7 +433,8 @@ func TestScalePatchConflicts(t *testing.T) {
 	scaleStore := storage.Scale
 
 	defer resourceStore.DestroyFunc()
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Controller.Store, namespace)
+	scaleCtx := genericregistrytest.NewNamespaceScopeContext(storage.Controller.Store, namespace, "scale")
 	if _, err := resourceStore.Create(ctx, validObj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -481,7 +479,7 @@ func TestScalePatchConflicts(t *testing.T) {
 		}
 	}
 	for i := 0; i < 100; i++ {
-		result, _, err := scaleStore.Update(ctx, name, rest.DefaultUpdatedObjectInfo(nil, applyReplicaPatch(i)), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		result, _, err := scaleStore.Update(scaleCtx, name, rest.DefaultUpdatedObjectInfo(nil, applyReplicaPatch(i)), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 		if err != nil {
 			t.Fatalf("error patching scale: %v", err)
 		}

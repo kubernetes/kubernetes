@@ -338,6 +338,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.TLSCurvePreferences != nil {
+		in, out := &in.TLSCurvePreferences, &out.TLSCurvePreferences
+		*out = make([]int32, len(*in))
+		copy(*out, *in)
+	}
 	in.Authentication.DeepCopyInto(&out.Authentication)
 	out.Authorization = in.Authorization
 	if in.RegistryPullQPS != nil {
@@ -569,6 +574,13 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.DefaultPodSysctls != nil {
+		in, out := &in.DefaultPodSysctls, &out.DefaultPodSysctls
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	in.Logging.DeepCopyInto(&out.Logging)
 	if in.EnableSystemLogHandler != nil {

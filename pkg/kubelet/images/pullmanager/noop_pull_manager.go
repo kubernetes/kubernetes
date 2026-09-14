@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"k8s.io/klog/v2"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
@@ -27,7 +28,7 @@ var _ ImagePullManager = &NoopImagePullManager{}
 
 type NoopImagePullManager struct{}
 
-func (m *NoopImagePullManager) RecordPullIntent(string) error { return nil }
+func (m *NoopImagePullManager) RecordPullIntent(klog.Logger, string) error { return nil }
 func (m *NoopImagePullManager) RecordImagePulled(context.Context, string, string, *kubeletconfiginternal.ImagePullCredentials) {
 }
 func (m *NoopImagePullManager) RecordImagePullFailed(context.Context, string) {}

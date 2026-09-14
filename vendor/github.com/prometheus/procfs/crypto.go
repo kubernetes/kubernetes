@@ -1,4 +1,4 @@
-// Copyright 2019 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -48,11 +48,13 @@ type Crypto struct {
 	Walksize    *uint64
 }
 
+var cryptoFile = "crypto"
+
 // Crypto parses an crypto-file (/proc/crypto) and returns a slice of
 // structs containing the relevant info.  More information available here:
 // https://kernel.readthedocs.io/en/sphinx-samples/crypto-API.html
 func (fs FS) Crypto() ([]Crypto, error) {
-	path := fs.proc.Path("crypto")
+	path := fs.proc.Path(cryptoFile)
 	b, err := util.ReadFileNoStat(path)
 	if err != nil {
 		return nil, fmt.Errorf("%w: Cannot read file %v: %w", ErrFileRead, b, err)
@@ -80,6 +82,10 @@ func parseCrypto(r io.Reader) ([]Crypto, error) {
 			out = append(out, Crypto{})
 		case text == "":
 			continue
+		}
+
+		if len(out) == 0 {
+			return nil, fmt.Errorf("%w: parsed invalid line before name parsed: %q", ErrFileParse, text)
 		}
 
 		kv := strings.Split(text, ":")

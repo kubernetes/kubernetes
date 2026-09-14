@@ -1,5 +1,4 @@
 //go:build example
-// +build example
 
 /*
 Copyright 2023 The Kubernetes Authors.
@@ -24,7 +23,6 @@ package gomega
 // the tests and check the output, use "go test -tags example ."
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -35,10 +33,7 @@ import (
 func TestGomega(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	gomega.NewWithT(tCtx).Eventually(tCtx, func(ctx context.Context) int {
-		// TODO: tCtx = ktesting.WithContext(tCtx, ctx)
-		// Or some dedicated tCtx.Eventually?
-
+	tCtx.Eventually(func(tCtx ktesting.TContext) int {
 		return 42
-	}).WithPolling(time.Second).Should(gomega.Equal(1))
+	}).WithTimeout(3 * time.Second).WithPolling(time.Second).Should(gomega.Equal(1))
 }

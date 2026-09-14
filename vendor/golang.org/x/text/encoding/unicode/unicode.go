@@ -60,9 +60,9 @@ func (utf8bomEncoding) NewDecoder() *encoding.Decoder {
 }
 
 var utf8enc = &internal.Encoding{
-	&internal.SimpleEncoding{utf8Decoder{}, runes.ReplaceIllFormed()},
-	"UTF-8",
-	identifier.UTF8,
+	Encoding: &internal.SimpleEncoding{Decoder: utf8Decoder{}, Encoder: runes.ReplaceIllFormed()},
+	Name:     "UTF-8",
+	MIB:      identifier.UTF8,
 }
 
 type utf8bomDecoder struct {

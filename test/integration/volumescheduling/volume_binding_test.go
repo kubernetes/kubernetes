@@ -50,6 +50,7 @@ type testConfig struct {
 	ns       string
 	stop     <-chan struct{}
 	teardown func()
+	testCtx  *testutil.TestContext
 }
 
 var (
@@ -522,7 +523,7 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 	pvcs := []*v1.PersistentVolumeClaim{}
 
 	// Create PVs for the first node
-	for i := 0; i < numPVsFirstNode; i++ {
+	for i := range numPVsFirstNode {
 		pv := makePV(fmt.Sprintf("pv-node1-%v", i), classWait, "", "", node1)
 		if pv, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
@@ -538,7 +539,7 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 	}
 
 	// Create pods
-	for i := 0; i < numPods; i++ {
+	for i := range numPods {
 		// Create one pvc per pod
 		pvc := makePVC(fmt.Sprintf("pvc-%v", i), config.ns, &classWait, "")
 		if pvc, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
@@ -662,7 +663,7 @@ func TestPVAffinityConflict(t *testing.T) {
 		markNodeAffinity,
 		markNodeSelector,
 	}
-	for i := 0; i < len(nodeMarkers); i++ {
+	for i := range nodeMarkers {
 		podName := "local-pod-" + strconv.Itoa(i+1)
 		pod := makePod(podName, config.ns, []string{"local-pvc"})
 		nodeMarkers[i].(func(*v1.Pod, string))(pod, "node-2")
@@ -1057,7 +1058,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 
 	// Create shared objects
 	// Create nodes
-	for i := 0; i < numberOfNodes; i++ {
+	for i := range numberOfNodes {
 		testNode := makeNode(i + 1)
 		if _, err := clientset.CoreV1().Nodes().Create(context.TODO(), testNode, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create Node %q: %v", testNode.Name, err)
@@ -1089,20 +1090,29 @@ func initPVController(t *testing.T, testCtx *testutil.TestContext, provisionDela
 
 	// Start PV controller for volume binding.
 	host := volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil)
-	plugin := &volumetest.FakeVolumePlugin{
-		PluginName:             provisionerPluginName,
-		Host:                   host,
-		Config:                 volume.VolumeConfig{},
-		LastProvisionerOptions: volume.VolumeOptions{},
-		ProvisionDelaySeconds:  provisionDelaySeconds,
-		NewAttacherCallCount:   0,
-		NewDetacherCallCount:   0,
-		Mounters:               nil,
-		Unmounters:             nil,
-		Attachers:              nil,
-		Detachers:              nil,
+	provisionerNames := sets.New(
+		provisionerPluginName,
+		multiDriverAProvisionerName,
+		multiDriverBProvisionerName,
+		mixedEnabledProvisionerName,
+		mixedDisabledProvisionerName,
+	)
+	plugins := make([]volume.VolumePlugin, 0, provisionerNames.Len())
+	for provisionerName := range provisionerNames {
+		plugins = append(plugins, &volumetest.FakeVolumePlugin{
+			PluginName:             provisionerName,
+			Host:                   host,
+			Config:                 volume.VolumeConfig{},
+			LastProvisionerOptions: volume.VolumeOptions{},
+			ProvisionDelaySeconds:  provisionDelaySeconds,
+			NewAttacherCallCount:   0,
+			NewDetacherCallCount:   0,
+			Mounters:               nil,
+			Unmounters:             nil,
+			Attachers:              nil,
+			Detachers:              nil,
+		})
 	}
-	plugins := []volume.VolumePlugin{plugin}
 
 	params := persistentvolume.ControllerParameters{
 		KubeClient: clientset,
@@ -1276,7 +1286,7 @@ func makeNode(index int) *v1.Node {
 				{
 					Type:              v1.NodeReady,
 					Status:            v1.ConditionTrue,
-					Reason:            fmt.Sprintf("schedulable condition"),
+					Reason:            "schedulable condition",
 					LastHeartbeatTime: metav1.Time{Time: time.Now()},
 				},
 			},

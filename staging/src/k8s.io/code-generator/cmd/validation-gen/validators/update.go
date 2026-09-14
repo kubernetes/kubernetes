@@ -18,43 +18,53 @@ package validators
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
 const (
-	updateTagName = "k8s:update"
+	updateTagName = "update"
 )
 
 func init() {
-	shared := map[string]sets.Set[validate.UpdateConstraint]{}
-	RegisterFieldValidator(updateFieldValidator{byFieldPath: shared})
-	RegisterTagValidator(updateTagCollector{byFieldPath: shared})
+	shared := map[string]*updateMetadata{}
+	RegisterTagValidator(&updateTagCollector{byFieldPath: shared, listByPath: globalListMeta})
+}
+
+// updateMetadata collects constraints for a field, supporting both normal and shadow validation.
+type updateMetadata struct {
+	constraints    sets.Set[validate.UpdateConstraint]
+	stabilityLevel ValidationStabilityLevel
 }
 
 // updateTagCollector collects +k8s:update tags
 type updateTagCollector struct {
-	byFieldPath map[string]sets.Set[validate.UpdateConstraint]
+	byFieldPath map[string]*updateMetadata
+	listByPath  map[string]*listMetadata
+	prefix      string
 }
 
-func (updateTagCollector) Init(_ Config) {}
+func (utc *updateTagCollector) Init(cfg Config) {
+	utc.prefix = cfg.TagPrefix
+}
 
-func (updateTagCollector) TagName() string {
+func (*updateTagCollector) TagName() string {
 	return updateTagName
 }
 
-var updateTagValidScopes = sets.New(ScopeField)
+var updateTagValidScopes = sets.New(ScopeField, ScopeListVal, ScopeMapVal)
 
-func (updateTagCollector) ValidScopes() sets.Set[Scope] {
+func (*updateTagCollector) ValidScopes() sets.Set[Scope] {
 	return updateTagValidScopes
 }
 
-func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (utc *updateTagCollector) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// Parse constraint from this tag
 	var constraint validate.UpdateConstraint
 	switch tag.Value {
@@ -64,44 +74,87 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 		constraint = validate.NoUnset
 	case "NoModify":
 		constraint = validate.NoModify
+	case "NoAddItem":
+		constraint = validate.NoAddItem
+	case "NoRemoveItem":
+		constraint = validate.NoRemoveItem
 	default:
-		return Validations{}, fmt.Errorf("unknown +k8s:update constraint: %s", tag.Value)
+		return Validations{}, fmt.Errorf("unknown +%s constraint: %s", tag.Name, tag.Value)
 	}
 
-	// Initialize set if doesn't exist
+	// Element scope (reached via +k8s:eachVal): only NoModify is valid,
+	// and there is at most one constraint per tag invocation, so emit the
+	// validation directly.
+	// Field scope: fall through and accumulate, so that multiple +k8s:update
+	// tags on the same field can be merged into one call later by
+	// updateFieldValidator.
+	if context.Scope == ScopeListVal || context.Scope == ScopeMapVal {
+		if constraint != validate.NoModify {
+			return Validations{}, fmt.Errorf("+%s=%s does not apply to %s, attach it to the enclosing field", tag.Name, constraintName(constraint), context.Scope)
+		}
+		nt := util.NonPointer(util.NativeType(context.Type))
+		if nt.Kind == types.Slice || nt.Kind == types.Map {
+			return Validations{}, fmt.Errorf("+%s=NoModify cannot be applied to list/map elements that are themselves lists or maps", tag.Name)
+		}
+		// For ScopeListVal, NoModify is only meaningful when the enclosing
+		// list matches items by key (listType=map or unique=map). For
+		// listType=set or listType=atomic, a content change becomes a new
+		// unmatched item that ratchets through as a no-op. Reject upfront.
+		if context.Scope == ScopeListVal && context.ParentPath != nil {
+			if lm := utc.listByPath[context.ParentPath.String()]; lm != nil && lm.semantic != semanticMap {
+				return Validations{}, fmt.Errorf("+%s=+%s=NoModify requires the enclosing list to use listType=map or unique=map (got %s)", utc.prefix+eachValTagName, tag.Name, lm.semantic)
+			}
+		}
+		v := emitScalarUpdate(context, []validate.UpdateConstraint{constraint})
+		applyStabilityLevel(&v, context.StabilityLevel)
+		return v, nil
+	}
+
+	// Initialize metadata if doesn't exist
 	fieldPath := context.Path.String()
 	if utc.byFieldPath[fieldPath] == nil {
-		utc.byFieldPath[fieldPath] = sets.New[validate.UpdateConstraint]()
+		utc.byFieldPath[fieldPath] = &updateMetadata{constraints: sets.New[validate.UpdateConstraint]()}
 	}
+	um := utc.byFieldPath[fieldPath]
+
+	um.stabilityLevel = context.StabilityLevel
 
 	// Add this constraint to the set for this field
-	utc.byFieldPath[fieldPath].Insert(constraint)
+	um.constraints.Insert(constraint)
 
-	if err := utc.validateConstraintsForType(context, utc.byFieldPath[fieldPath].UnsortedList()); err != nil {
+	if err := utc.validateConstraintsForType(context, tag, um.constraints.UnsortedList()); err != nil {
 		return Validations{}, err
 	}
 
-	// Don't generate validations here, just collect
-	return Validations{}, nil
+	return Validations{
+		Deferred: []DeferredGen{
+			Deferred(ThisContext, func() (Validations, error) {
+				return getUpdateValidations(utc.byFieldPath, utc.listByPath, utc.prefix, context)
+			}),
+		},
+	}, nil
 }
 
-func (utc updateTagCollector) validateConstraintsForType(context Context, constraints []validate.UpdateConstraint) error {
+func (utc *updateTagCollector) validateConstraintsForType(context Context, tag codetags.Tag, constraints []validate.UpdateConstraint) error {
 	t := util.NonPointer(util.NativeType(context.Type))
 	isCompound := t.Kind == types.Slice || t.Kind == types.Map
 	isPointer := context.Type.Kind == types.Pointer
 	isStruct := t.Kind == types.Struct
 
-	if isCompound {
-		for _, constraint := range constraints {
-			return fmt.Errorf("+k8s:update=%s is currently not supported on list or map fields", constraintName(constraint))
-		}
-	}
-
-	// For non-pointer struct fields, only NoModify is applicable
-	if isStruct && !isPointer {
-		for _, constraint := range constraints {
-			if constraint == validate.NoSet || constraint == validate.NoUnset {
-				return fmt.Errorf("+k8s:update=%s cannot be used on non-pointer struct fields (they cannot be unset)", constraintName(constraint))
+	for _, constraint := range constraints {
+		switch constraint {
+		case validate.NoAddItem, validate.NoRemoveItem:
+			if !isCompound {
+				return fmt.Errorf("+%s=%s can only be used on list or map fields", tag.Name, constraintName(constraint))
+			}
+		case validate.NoModify:
+			if isCompound {
+				return fmt.Errorf("+%[1]s=NoModify is not supported on list or map fields, use +%[2]s=+%[1]s=NoModify for per-item immutability", tag.Name, utc.prefix+eachValTagName)
+			}
+		case validate.NoSet, validate.NoUnset:
+			// For non-pointer struct fields, only NoModify is applicable
+			if isStruct && !isPointer {
+				return fmt.Errorf("+%s=%s cannot be used on non-pointer struct fields (they cannot be unset)", tag.Name, constraintName(constraint))
 			}
 		}
 	}
@@ -117,72 +170,157 @@ func constraintName(c validate.UpdateConstraint) string {
 		return "NoUnset"
 	case validate.NoModify:
 		return "NoModify"
+	case validate.NoAddItem:
+		return "NoAddItem"
+	case validate.NoRemoveItem:
+		return "NoRemoveItem"
 	default:
 		return fmt.Sprintf("Unknown(%d)", c)
 	}
 }
 
-func (utc updateTagCollector) Docs() TagDoc {
+func (utc *updateTagCollector) Docs() TagDoc {
 	return TagDoc{
 		Tag:            utc.TagName(),
-		StabilityLevel: Alpha,
-		Scopes:         utc.ValidScopes().UnsortedList(),
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         sets.List(utc.ValidScopes()),
 		PayloadsType:   codetags.ValueTypeString,
 		Description: "Provides constraints on the allowed update operations of a field. " +
-			"Currently supports non-list and non-map fields only. " +
 			"Constraints: NoSet (prevents unset->set transitions), NoUnset (prevents set->unset transitions), " +
-			"NoModify (prevents value changes but allows set/unset transitions). " +
+			"NoModify (prevents value changes but allows set/unset transitions), " +
+			"NoAddItem (prevents adding items to a slice or map), NoRemoveItem (prevents removing items from a slice or map). " +
 			"Multiple constraints can be specified using multiple tags. " +
 			"For non-pointer structs, NoSet and NoUnset have no effect as these fields cannot be unset. " +
-			"Future support planned for lists/maps with NoAddItem and NoRemoveItem constraints. " +
-			"Examples: +k8s:update=NoModify +k8s:update=NoUnset for set-once fields; " +
-			"+k8s:update=NoSet for fields that must be set at creation or never.",
+			"For slice and map fields, 'unset' means len == 0. Slice item identity for NoAddItem/NoRemoveItem comes from " +
+			fmt.Sprintf("+%[1]s%[2]s/+%[1]s%[3]s/+%[1]s%[4]s, for maps the key is the item identity. ", utc.prefix, listTypeTagName, ListMapKeyTagName, uniqueTagName) +
+			fmt.Sprintf("NoModify is not supported on slices or maps, use +%[1]s%[2]s=+%[1]s%[3]s=NoModify for per-item immutability. ", utc.prefix, eachValTagName, updateTagName) +
+			fmt.Sprintf("On lists, +%[1]s%[2]s=+%[1]s%[3]s=NoModify requires listType=map or unique=map, otherwise content changes are not detectable. ", utc.prefix, eachValTagName, updateTagName) +
+			fmt.Sprintf("Examples: +%[1]s%[2]s=NoModify +%[1]s%[2]s=NoUnset for set-once fields, ", utc.prefix, updateTagName) +
+			fmt.Sprintf("+%[1]s%[2]s=NoSet for fields that must be set at creation or never, ", utc.prefix, updateTagName) +
+			fmt.Sprintf("+%[1]s%[2]s=NoAddItem +%[1]s%[2]s=NoRemoveItem on a listType=map field to freeze the structural shape of the list.", utc.prefix, updateTagName),
 	}
-}
-
-// updateFieldValidator processes all collected update tags and generates validations
-type updateFieldValidator struct {
-	byFieldPath map[string]sets.Set[validate.UpdateConstraint]
-}
-
-func (updateFieldValidator) Init(_ Config) {}
-
-func (updateFieldValidator) Name() string {
-	return "updateFieldValidator"
 }
 
 var (
-	updateValueValidator          = types.Name{Package: libValidationPkg, Name: "UpdateValueByCompare"}
-	updatePointerValidator        = types.Name{Package: libValidationPkg, Name: "UpdatePointer"}
-	updateValueByReflectValidator = types.Name{Package: libValidationPkg, Name: "UpdateValueByReflect"}
-	updateStructValidator         = types.Name{Package: libValidationPkg, Name: "UpdateStruct"}
+	updateValueValidator    = types.Name{Package: libValidationPkg, Name: "UpdateValue"}
+	updatePointerValidator  = types.Name{Package: libValidationPkg, Name: "UpdatePointer"}
+	updateStructValidator   = types.Name{Package: libValidationPkg, Name: "UpdateStruct"}
+	valSliceUpdateValidator = types.Name{Package: libValidationPkg, Name: "ValSliceUpdate"}
+	ptrSliceUpdateValidator = types.Name{Package: libValidationPkg, Name: "PtrSliceUpdate"}
+	updateMapValidator      = types.Name{Package: libValidationPkg, Name: "UpdateMap"}
 
 	// Constraint constants that will be used as arguments
-	noSetConstraint    = types.Name{Package: libValidationPkg, Name: "NoSet"}
-	noUnsetConstraint  = types.Name{Package: libValidationPkg, Name: "NoUnset"}
-	noModifyConstraint = types.Name{Package: libValidationPkg, Name: "NoModify"}
+	noSetConstraint        = types.Name{Package: libValidationPkg, Name: "NoSet"}
+	noUnsetConstraint      = types.Name{Package: libValidationPkg, Name: "NoUnset"}
+	noModifyConstraint     = types.Name{Package: libValidationPkg, Name: "NoModify"}
+	noAddItemConstraint    = types.Name{Package: libValidationPkg, Name: "NoAddItem"}
+	noRemoveItemConstraint = types.Name{Package: libValidationPkg, Name: "NoRemoveItem"}
 )
 
-func (ufv updateFieldValidator) GetValidations(context Context) (Validations, error) {
-	constraintSet, ok := ufv.byFieldPath[context.Path.String()]
-	if !ok || constraintSet.Len() == 0 {
+func getUpdateValidations(byFieldPath map[string]*updateMetadata, listByPath map[string]*listMetadata, prefix string, context Context) (Validations, error) {
+	um := byFieldPath[context.Path.String()]
+
+	if um == nil || um.constraints.Len() == 0 {
 		return Validations{}, nil
 	}
+	// Delete the entry from the map after processing to avoid reprocessing.
+	delete(byFieldPath, context.Path.String())
 
-	constraints := constraintSet.UnsortedList()
+	constraints := um.constraints.UnsortedList()
 
-	t := util.NonPointer(util.NativeType(context.Type))
-	if t.Kind == types.Slice || t.Kind == types.Map {
-		// TODO: add support for list and map fields
-		return Validations{}, fmt.Errorf("update constraints are currently not supported on list or map fields")
+	v, err := generateUpdateValidation(listByPath, prefix, context, constraints)
+	if err != nil {
+		return Validations{}, err
 	}
 
-	return ufv.generateValidation(context, constraints)
+	level := um.stabilityLevel
+	if context.StabilityLevel != "" {
+		level = context.StabilityLevel
+	}
+
+	applyStabilityLevel(&v, level)
+	return v, nil
 }
 
-func (ufv updateFieldValidator) generateValidation(context Context, constraints []validate.UpdateConstraint) (Validations, error) {
-	var result Validations
+func generateUpdateValidation(listByPath map[string]*listMetadata, prefix string, context Context, constraints []validate.UpdateConstraint) (Validations, error) {
+	// Sort constraints to ensure deterministic order
+	slices.Sort(constraints)
 
+	t := util.NonPointer(util.NativeType(context.Type))
+	switch t.Kind {
+	case types.Slice:
+		return generateSliceValidation(listByPath, prefix, context, constraints)
+	case types.Map:
+		return generateMapValidation(constraints), nil
+	}
+	return emitScalarUpdate(context, constraints), nil
+}
+
+// generateSliceValidation emits validate.ValSliceUpdate. NoAddItem/NoRemoveItem
+// need a match function to pair old and new items, which function we emit is
+// determined by the list's semantic (set/map) as set by
+// +k8s:listType/+k8s:listMapKey/+k8s:unique. For NoSet/NoUnset alone, a nil match is fine.
+//
+// Metadata lookup falls back from the field path to the type path so that
+// typedef-level list annotations apply, mirroring the pattern used by
+// listValidator.
+func generateSliceValidation(listByPath map[string]*listMetadata, prefix string, context Context, constraints []validate.UpdateConstraint) (Validations, error) {
+	var matchArg any = Literal("nil")
+	// NoAddItem/NoRemoveItem need a match function to pair items between old and new, NoSet/NoUnset only check len == 0.
+	if slices.Contains(constraints, validate.NoAddItem) || slices.Contains(constraints, validate.NoRemoveItem) {
+		lm := listByPath[context.Path.String()]
+		if lm == nil {
+			lm = listByPath[context.Type.String()]
+		}
+		if lm == nil {
+			return Validations{}, fmt.Errorf("+%[1]s=NoAddItem/+%[1]s=NoRemoveItem require list metadata (+%[2]s with listMapKey, or +%[3]s) to determine item identity", prefix+updateTagName, prefix+listTypeTagName, prefix+uniqueTagName)
+		}
+		elem := util.NativeType(context.Type).Elem
+		switch lm.semantic {
+		case semanticMap:
+			if len(lm.keyMembers) == 0 {
+				return Validations{}, fmt.Errorf("+%[1]s=NoAddItem/+%[1]s=NoRemoveItem require listMapKey to be set for listType=map", prefix+updateTagName)
+			}
+			matchArg = lm.makeListMapMatchFunc(elem)
+		case semanticSet:
+			if util.IsDirectComparable(util.NonPointer(util.NativeType(elem))) {
+				matchArg = Identifier(validateDirectEqual)
+			} else {
+				matchArg = DeepEqualFunc{}
+			}
+		default:
+			return Validations{}, fmt.Errorf("+%[1]s=NoAddItem/+%[1]s=NoRemoveItem require listType=set, listType=map, unique=set, or unique=map to define item identity", prefix+updateTagName)
+		}
+	}
+
+	args := append([]any{matchArg}, constraintIdentifierArgs(constraints)...)
+
+	validator := valSliceUpdateValidator
+	nt := util.NativeType(context.Type)
+	if nt.Elem.Kind == types.Pointer {
+		validator = ptrSliceUpdateValidator
+	}
+
+	// Use ShortCircuit flag so these run in the same group as +k8s:optional
+	fn := Function(updateTagName, ShortCircuit, validator, args...).
+		WithEmits(compoundUpdateEmissions(constraints, false)...)
+	return Validations{Functions: []FunctionGen{fn}}, nil
+}
+
+// generateMapValidation emits validate.UpdateMap. The map key is the item
+// identity, so no list metadata or match function is needed.
+func generateMapValidation(constraints []validate.UpdateConstraint) Validations {
+	// Use ShortCircuit flag so these run in the same group as +k8s:optional
+	fn := Function(updateTagName, ShortCircuit, updateMapValidator, constraintIdentifierArgs(constraints)...).
+		WithEmits(compoundUpdateEmissions(constraints, true)...)
+	return Validations{Functions: []FunctionGen{fn}}
+}
+
+// emitScalarUpdate emits a call to UpdateValue/UpdatePointer/UpdateStruct
+// based on the Go kind of context.Type.
+// Used for both field scope (scalar/pointer/struct) and list/map element
+// scope via +k8s:eachVal.
+func emitScalarUpdate(context Context, constraints []validate.UpdateConstraint) Validations {
 	// Determine the appropriate validator function based on field type
 	t := util.NonPointer(util.NativeType(context.Type))
 	isPointer := context.Type.Kind == types.Pointer
@@ -190,37 +328,96 @@ func (ufv updateFieldValidator) generateValidation(context Context, constraints 
 	isComparable := util.IsDirectComparable(t)
 
 	var validatorFunc types.Name
+	var args []any
 	if isPointer {
 		validatorFunc = updatePointerValidator
+		args = constraintIdentifierArgs(constraints)
 	} else if isStruct {
 		validatorFunc = updateStructValidator
-	} else if isComparable {
-		validatorFunc = updateValueValidator
+		args = constraintIdentifierArgs(constraints)
 	} else {
-		validatorFunc = updateValueByReflectValidator
+		validatorFunc = updateValueValidator
+		var matchArg any
+		if isComparable {
+			matchArg = FunctionLiteral{
+				Parameters: []ParamResult{{"a", context.Type}, {"b", context.Type}},
+				Results:    []ParamResult{{"", types.Bool}},
+				Body:       "return a == b",
+			}
+		} else {
+			matchArg = DeepEqualFunc{}
+		}
+		args = append([]any{matchArg}, constraintIdentifierArgs(constraints)...)
 	}
 
-	// Sort constraints to ensure deterministic order
-	sort.Slice(constraints, func(i, j int) bool {
-		return constraints[i] < constraints[j]
-	})
+	// Use ShortCircuit flag so these run in the same group as +k8s:optional.
+	// Scalar/pointer/struct fields only accept NoSet/NoUnset/NoModify
+	// (validateConstraintsForType rejects the rest), all of which emit
+	// field.Invalid at the field path.
+	fn := Function(updateTagName, ShortCircuit, validatorFunc, args...).
+		WithEmits(Emission{field.ErrorTypeInvalid, "update", ""})
+	return Validations{Functions: []FunctionGen{fn}}
+}
 
-	// Build the constraint arguments in deterministic order
-	var constraintArgs []any
+// compoundUpdateEmissions returns the (deduplicated) Emissions ValSliceUpdate or
+// UpdateMap produces for the given constraints. Order is stable for
+// reproducible codegen. NoModify is rejected for compound types upstream, so
+// only NoSet/NoUnset/NoAddItem/NoRemoveItem are handled here.
+//
+//   - NoSet/NoUnset       -> Invalid at the field path
+//   - NoAddItem           -> Forbidden at fldPath.Index(i)/fldPath.Key(k) ("[*]")
+//   - NoRemoveItem, slice -> Forbidden at fldPath ("")
+//   - NoRemoveItem, map   -> Forbidden at fldPath.Key(k) ("[*]"), shared with NoAddItem
+func compoundUpdateEmissions(constraints []validate.UpdateConstraint, isMap bool) []Emission {
+	var hasInvalid, hasAdd, hasRemove bool
+	for _, c := range constraints {
+		switch c {
+		case validate.NoSet, validate.NoUnset:
+			hasInvalid = true
+		case validate.NoAddItem:
+			hasAdd = true
+		case validate.NoRemoveItem:
+			hasRemove = true
+		}
+	}
+	var out []Emission
+	if hasInvalid {
+		out = append(out, Emission{field.ErrorTypeInvalid, "update", ""})
+	}
+	if hasAdd || (hasRemove && isMap) {
+		out = append(out, Emission{field.ErrorTypeForbidden, "update", "[*]"})
+	}
+	if hasRemove && !isMap {
+		out = append(out, Emission{field.ErrorTypeForbidden, "update", ""})
+	}
+	return out
+}
+
+// constraintIdentifierArgs builds the constraint arguments in deterministic order.
+func constraintIdentifierArgs(constraints []validate.UpdateConstraint) []any {
+	var args []any
 	for _, constraint := range constraints {
 		switch constraint {
 		case validate.NoSet:
-			constraintArgs = append(constraintArgs, Identifier(noSetConstraint))
+			args = append(args, Identifier(noSetConstraint))
 		case validate.NoUnset:
-			constraintArgs = append(constraintArgs, Identifier(noUnsetConstraint))
+			args = append(args, Identifier(noUnsetConstraint))
 		case validate.NoModify:
-			constraintArgs = append(constraintArgs, Identifier(noModifyConstraint))
+			args = append(args, Identifier(noModifyConstraint))
+		case validate.NoAddItem:
+			args = append(args, Identifier(noAddItemConstraint))
+		case validate.NoRemoveItem:
+			args = append(args, Identifier(noRemoveItemConstraint))
 		}
 	}
+	return args
+}
 
-	// Use ShortCircuit flag so these run in the same group as +k8s:optional
-	fn := Function(updateTagName, ShortCircuit, validatorFunc, constraintArgs...)
-	result.AddFunction(fn)
-
-	return result, nil
+func applyStabilityLevel(v *Validations, level ValidationStabilityLevel) {
+	if level == "" {
+		return
+	}
+	for i := range v.Functions {
+		v.Functions[i] = v.Functions[i].WithStabilityLevel(level)
+	}
 }

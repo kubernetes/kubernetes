@@ -270,10 +270,29 @@ func TestGetPodAndContainerForDevice(t *testing.T) {
 	)
 
 	// dev2 is a new device
-	podUID, _ := podDevices.getPodAndContainerForDevice("dev2")
+	podUID, _ := podDevices.getPodAndContainerForDevice(resourceName1, "dev2")
 	assert.Equal(t, "", podUID)
 
 	// dev1 is a exist device
-	podUID, _ = podDevices.getPodAndContainerForDevice("dev1")
+	podUID, _ = podDevices.getPodAndContainerForDevice(resourceName1, "dev1")
 	assert.Equal(t, "pod1", podUID)
+
+	// a device with the same ID allocated to another pod under a different
+	// resource name must not match: device IDs are only unique per resource.
+	resourceName2 := "domain2.com/resource2"
+	podDevices.insert("pod2", contID, resourceName2,
+		devices,
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r2dev1": "/dev/r2dev1"}),
+		),
+	)
+
+	podUID, _ = podDevices.getPodAndContainerForDevice(resourceName2, "dev1")
+	assert.Equal(t, "pod2", podUID)
+
+	podUID, _ = podDevices.getPodAndContainerForDevice(resourceName1, "dev1")
+	assert.Equal(t, "pod1", podUID)
+
+	podUID, _ = podDevices.getPodAndContainerForDevice("domain3.com/unknown", "dev1")
+	assert.Empty(t, podUID)
 }

@@ -49,8 +49,8 @@ import (
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/test/utils/ktesting/format"
 	"k8s.io/utils/ptr"
 )
 
@@ -59,6 +59,7 @@ const (
 	csiPodUnschedulableTimeout = 5 * time.Minute
 	csiResizeWaitPeriod        = 5 * time.Minute
 	csiVolumeAttachmentTimeout = 7 * time.Minute
+	csiDriverTimeout           = 2 * time.Minute
 	// how long to wait for GetVolumeStats
 	csiNodeVolumeStatWaitPeriod = 2 * time.Minute
 	// how long to wait for Resizing Condition on PVC to appear
@@ -103,6 +104,7 @@ type testParameters struct {
 	enableSnapshot               bool
 	enableVolumeMountGroup       bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
 	enableNodeVolumeCondition    bool
+	enableNodeStorageHealth      bool
 	hooks                        *drivers.Hooks
 	tokenRequests                []storagev1.TokenRequest
 	serviceAccountTokenInSecrets *bool // if true, the service account token should be passed only via secrets
@@ -150,6 +152,7 @@ const (
 var (
 	errPodCompleted   = fmt.Errorf("pod ran to completion")
 	errNotEnoughSpace = errors.New(errReasonNotEnoughSpace)
+	sleepCommand      = []string{"sleep", "infinity"}
 )
 
 func newMockDriverSetup(f *framework.Framework) *mockDriverSetup {
@@ -176,6 +179,7 @@ func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 		EnableResizing:               tp.enableResizing,
 		EnableNodeExpansion:          tp.enableNodeExpansion,
 		EnableNodeVolumeCondition:    tp.enableNodeVolumeCondition,
+		EnableNodeStorageHealth:      tp.enableNodeStorageHealth,
 		DisableControllerExpansion:   tp.disableControllerExpansion,
 		EnableSnapshot:               tp.enableSnapshot,
 		EnableVolumeMountGroup:       tp.enableVolumeMountGroup,
@@ -476,7 +480,15 @@ func (m *mockDriverSetup) createPodWithFSGroup(ctx context.Context, fsGroup *int
 	return class, claim, pod
 }
 
-func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes []v1.PersistentVolumeAccessMode, mountOptions []string, seLinuxOpts *v1.SELinuxOptions, policy *v1.PodSELinuxChangePolicy, privileged bool) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func (m *mockDriverSetup) createPodWithSELinux(
+	ctx context.Context,
+	accessModes []v1.PersistentVolumeAccessMode,
+	mountOptions []string,
+	seLinuxOpts *v1.SELinuxOptions,
+	policy *v1.PodSELinuxChangePolicy,
+	privileged bool,
+	command []string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+
 	ginkgo.By("Creating pod with SELinux context")
 	f := m.f
 	nodeSelection := m.config.ClientNodeSelection
@@ -493,7 +505,7 @@ func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes 
 		ReclaimPolicy:        m.tp.reclaimPolicy,
 	}
 	class, claim := createClaim(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, accessModes)
-	pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts, policy, privileged)
+	pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts, policy, privileged, command)
 	framework.ExpectNoError(err, "Failed to create pause pod with SELinux context %s: %v", seLinuxOpts, err)
 
 	if class != nil {
@@ -868,7 +880,19 @@ func startBusyBoxPodWithVolumeSource(cs clientset.Interface, volumeSource v1.Vol
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
-func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection, ns string, seLinuxOpts *v1.SELinuxOptions, policy *v1.PodSELinuxChangePolicy, privileged bool) (*v1.Pod, error) {
+func startPausePodWithSELinuxOptions(
+	cs clientset.Interface,
+	pvc *v1.PersistentVolumeClaim,
+	node e2epod.NodeSelection,
+	ns string,
+	seLinuxOpts *v1.SELinuxOptions,
+	policy *v1.PodSELinuxChangePolicy,
+	privileged bool,
+	command []string) (*v1.Pod, error) {
+
+	if len(command) == 0 {
+		command = sleepCommand
+	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",
@@ -880,8 +904,9 @@ func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentV
 			},
 			Containers: []v1.Container{
 				{
-					Name:  "volume-tester",
-					Image: imageutils.GetE2EImage(imageutils.Pause),
+					Name:    "volume-tester",
+					Image:   e2epod.GetDefaultTestImage(),
+					Command: command,
 					SecurityContext: &v1.SecurityContext{
 						Privileged: &privileged,
 					},
@@ -1063,13 +1088,13 @@ func createFSGroupRequestPreHook(nodeStageFsGroup, nodePublishFsGroup *string) *
 
 // createPreHook counts invocations of a certain method (identified by a substring in the full gRPC method name).
 func createPreHook(method string, callback func(counter int64) error) *drivers.Hooks {
-	var counter int64
+	var counter atomic.Int64
 
 	return &drivers.Hooks{
 		Pre: func() func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
 			return func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
 				if strings.Contains(fullMethod, method) {
-					counter := atomic.AddInt64(&counter, 1)
+					counter := counter.Add(1)
 					return nil, callback(counter)
 				}
 				return nil, nil
@@ -1244,6 +1269,23 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 	})
 	if waitErr != nil {
 		return fmt.Errorf("error waiting for pod %s/%s to have max volume condition: %v", pod.Namespace, pod.Name, waitErr)
+	}
+	return nil
+}
+
+func waitForCSIDriverDeleted(ctx context.Context, cs clientset.Interface, driverName string, interval, timeout time.Duration) error {
+	waitErr := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		_, err := cs.StorageV1().CSIDrivers().Get(ctx, driverName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting for CSIDriver %s to be deleted: %w", driverName, waitErr)
 	}
 	return nil
 }

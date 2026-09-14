@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -326,7 +325,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		currentPath = filepath.Join(currentPath, dir)
 		klog.V(4).Infof("Creating %s", dir)
 		if err := os.Mkdir(currentPath, perm); err != nil {
-			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
+			return fmt.Errorf("cannot create directory %s: %w", currentPath, err)
 		}
 		handle, err := lockPath(currentPath)
 		if err != nil {

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -167,6 +168,11 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			},
 		},
 	})
+	nilStatusExtendedResourceClaimExternal, err := toExternalResourceClaimOrError(nilStatusExtendedResourceClaim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nilStatusExtendedResourceClaim.Name = "foo-copy"
 	initExtendedResourceClaim := testResourceClaim("foo", "ns", true, "pod-init", api.ResourceClaimSpec{
 		Devices: api.DeviceClaim{
 			Requests: []api.DeviceRequest{
@@ -374,9 +380,13 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	deviceclassmapping := extendedresourcecache.NewExtendedResourceCache(logger)
 	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceclassmapping); err != nil {
-		logger.Error(err, "failed to add device class informer event handler")
+		t.Fatal(err)
 	}
-	evaluatorWithDeviceMapping := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister())
+	var otherOwnedClaims []*resourceapi.ResourceClaim
+	claimGetter := func(namespace string, podUID types.UID) ([]*resourceapi.ResourceClaim, error) {
+		return otherOwnedClaims, nil
+	}
+	evaluatorWithDeviceMapping := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister(), claimGetter)
 
 	informerFactory.Start(tCtx.Done())
 	t.Cleanup(func() {
@@ -390,12 +400,13 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	// wait for informer sync
 	time.Sleep(1 * time.Second)
 
-	evaluator := NewResourceClaimEvaluator(nil, nil, nil)
+	evaluator := NewResourceClaimEvaluator(nil, nil, nil, claimGetter)
 	testCases := map[string]struct {
-		evaluator quota.Evaluator
-		claim     *api.ResourceClaim
-		usage     corev1.ResourceList
-		errMsg    string
+		evaluator   quota.Evaluator
+		claim       *api.ResourceClaim
+		otherClaims []*resourceapi.ResourceClaim
+		usage       corev1.ResourceList
+		errMsg      string
 	}{
 		"implicit-extended-resource-claim": {
 			evaluator: evaluatorWithDeviceMapping,
@@ -425,7 +436,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				"requests.example.com/gpu":                        resource.MustParse("1"),
 			},
 		},
-		"ni-status-extended-resource-claim": {
+		"nil-status-extended-resource-claim": {
 			evaluator: evaluatorWithDeviceMapping,
 			claim:     nilStatusExtendedResourceClaim,
 			usage: corev1.ResourceList{
@@ -433,6 +444,21 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("2"),
 				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
 				"requests.example.com/gpu":                        resource.MustParse("1"),
+			},
+		},
+		// both claims set the same pod as owner, the second claim cannot get the usage
+		// subtraction from pod requests.
+		"nil-status-two-extended-resource-claims": {
+			evaluator: evaluatorWithDeviceMapping,
+			claim:     nilStatusExtendedResourceClaim,
+			otherClaims: []*resourceapi.ResourceClaim{
+				nilStatusExtendedResourceClaimExternal,
+			},
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("2"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("2"),
+				"requests.example.com/gpu":                        resource.MustParse("2"),
 			},
 		},
 		"init-extended-resource-claim": {
@@ -578,6 +604,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
+			otherOwnedClaims = testCase.otherClaims
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
 			if testCase.evaluator == nil {
 				testCase.evaluator = evaluator
@@ -620,7 +647,7 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceclassmapping); err != nil {
 		logger.Error(err, "failed to add device class informer event handler")
 	}
-	evaluator := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister())
+	evaluator := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister(), nil)
 
 	informerFactory.Start(tCtx.Done())
 	t.Cleanup(func() {
@@ -677,7 +704,7 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 }
 
 func TestResourceClaimEvaluatorHandles(t *testing.T) {
-	evaluator := NewResourceClaimEvaluator(nil, nil, nil)
+	evaluator := NewResourceClaimEvaluator(nil, nil, nil, nil)
 	testCases := []struct {
 		name  string
 		attrs admission.Attributes

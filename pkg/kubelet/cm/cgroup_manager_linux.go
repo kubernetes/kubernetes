@@ -42,6 +42,8 @@ const (
 	systemdSuffix string = ".slice"
 	// Cgroup2MemoryMin is memory.min for cgroup v2
 	Cgroup2MemoryMin string = "memory.min"
+	// Cgroup2MemoryLow is memory.low for cgroup v2
+	Cgroup2MemoryLow string = "memory.low"
 	// Cgroup2MemoryHigh is memory.high for cgroup v2
 	Cgroup2MemoryHigh      string = "memory.high"
 	Cgroup2MaxCpuLimit     string = "max"
@@ -159,7 +161,7 @@ func NewCgroupManager(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver str
 	return NewCgroupV1Manager(logger, cs, cgroupDriver)
 }
 
-func newCgroupCommon(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver string) cgroupCommon {
+func newCgroupCommon(_ klog.Logger, cs *CgroupSubsystems, cgroupDriver string) cgroupCommon {
 	return cgroupCommon{
 		subsystems: cs,
 		useSystemd: cgroupDriver == "systemd",
@@ -304,7 +306,7 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 		resources.CpuPeriod = *resourceConfig.CPUPeriod
 	}
 	if resourceConfig.PidsLimit != nil {
-		resources.PidsLimit = *resourceConfig.PidsLimit
+		resources.PidsLimit = resourceConfig.PidsLimit
 	}
 	if !resourceConfig.CPUSet.IsEmpty() {
 		resources.CpusetCpus = resourceConfig.CPUSet.String()

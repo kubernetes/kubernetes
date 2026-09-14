@@ -17,7 +17,8 @@ limitations under the License.
 package validation
 
 import (
-	"k8s.io/apimachinery/pkg/api/validation/path"
+	"k8s.io/apimachinery/pkg/api/validate/content"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,7 +31,7 @@ import (
 // * https://github.com/kubernetes/kubernetes/blob/60db507b279ce45bd16ea3db49bf181f2aeb3c3d/pkg/api/validation/name.go
 // * https://github.com/openshift/origin/blob/388478c40e751c4295dcb9a44dd69e5ac65d0e3b/pkg/api/helpers.go
 func ValidateRBACName(name string, prefix bool) []string {
-	return path.IsValidPathSegmentName(name)
+	return content.IsPathSegmentName(name)
 }
 
 func ValidateRole(role *rbac.Role) field.ErrorList {
@@ -103,7 +104,7 @@ func ValidateClusterRoleUpdate(role *rbac.ClusterRole, oldRole *rbac.ClusterRole
 func ValidatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(rule.Verbs) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("verbs"), "verbs must contain at least one value"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("verbs"), "verbs must contain at least one value").MarkCoveredByDeclarative())
 	}
 
 	if len(rule.NonResourceURLs) > 0 {
@@ -139,7 +140,6 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	case "Role", "ClusterRole":
 	default:
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "kind"), roleBinding.RoleRef.Kind, []string{"Role", "ClusterRole"}))
-
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {
@@ -162,9 +162,7 @@ func ValidateRoleBindingUpdate(roleBinding *rbac.RoleBinding, oldRoleBinding *rb
 	allErrs := ValidateRoleBinding(roleBinding)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&roleBinding.ObjectMeta, &oldRoleBinding.ObjectMeta, field.NewPath("metadata"))...)
 
-	if oldRoleBinding.RoleRef != roleBinding.RoleRef {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef"), roleBinding.RoleRef, "cannot change roleRef"))
-	}
+	allErrs = append(allErrs, validation.ValidateImmutableField(roleBinding.RoleRef, oldRoleBinding.RoleRef, field.NewPath("roleRef")).WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()...)
 
 	return allErrs
 }
@@ -183,7 +181,6 @@ func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.Erro
 	case "ClusterRole":
 	default:
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "kind"), roleBinding.RoleRef.Kind, []string{"ClusterRole"}))
-
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {
@@ -206,9 +203,7 @@ func ValidateClusterRoleBindingUpdate(roleBinding *rbac.ClusterRoleBinding, oldR
 	allErrs := ValidateClusterRoleBinding(roleBinding)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&roleBinding.ObjectMeta, &oldRoleBinding.ObjectMeta, field.NewPath("metadata"))...)
 
-	if oldRoleBinding.RoleRef != roleBinding.RoleRef {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef"), roleBinding.RoleRef, "cannot change roleRef"))
-	}
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(roleBinding.RoleRef, oldRoleBinding.RoleRef, field.NewPath("roleRef")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 
 	return allErrs
 }

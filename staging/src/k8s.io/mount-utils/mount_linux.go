@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -358,7 +357,7 @@ func MakeMountArgsSensitiveWithMountFlags(source, target, fstype string, options
 
 	if len(fstype) > 0 {
 		mountArgs = append(mountArgs, "-t", fstype)
-		mountArgsLogStr += strings.Join(mountArgs, " ")
+		mountArgsLogStr += " -t " + fstype
 	}
 	if len(options) > 0 || len(sensitiveOptions) > 0 {
 		combinedOptions := []string{}

@@ -25,11 +25,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -277,7 +278,7 @@ func TestLabelFunc(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
+		_, _, err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
 		if test.expectErr != "" {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)
@@ -291,7 +292,7 @@ func TestLabelFunc(t *testing.T) {
 			t.Errorf("unexpected error: %v %v", err, test)
 		}
 		if !reflect.DeepEqual(test.obj, test.expected) {
-			t.Errorf("expected: %v, got %v", test.expected, test.obj)
+			t.Errorf("unexpected Pod object:\n%s", cmp.Diff(test.expected, test.obj))
 		}
 	}
 }
@@ -299,6 +300,7 @@ func TestLabelFunc(t *testing.T) {
 func TestLabelErrors(t *testing.T) {
 	testCases := map[string]struct {
 		args  []string
+		list  bool
 		errFn func(error) bool
 	}{
 		"no args": {
@@ -337,6 +339,20 @@ func TestLabelErrors(t *testing.T) {
 				return strings.Contains(err.Error(), "resource(s) were provided, but no name was specified")
 			},
 		},
+		"cannot add labels when --list is specified": {
+			args: []string{"pods", "foo", "app=bar"},
+			list: true,
+			errFn: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "cannot modify labels when --list is specified")
+			},
+		},
+		"cannot remove labels when --list is specified": {
+			args: []string{"pods", "foo", "app-"},
+			list: true,
+			errFn: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "cannot modify labels when --list is specified")
+			},
+		},
 	}
 
 	for k, testCase := range testCases {
@@ -353,6 +369,7 @@ func TestLabelErrors(t *testing.T) {
 			cmd.SetErr(buf)
 
 			opts := NewLabelOptions(ioStreams)
+			opts.list = testCase.list
 			err := opts.Complete(tf, cmd, testCase.args)
 			if err == nil {
 				err = opts.Validate()
@@ -729,6 +746,7 @@ pod/foo not labeled
 
 func TestLabelMsg(t *testing.T) {
 	tests := []struct {
+		name            string
 		obj             runtime.Object
 		overwrite       bool
 		resourceVersion string
@@ -739,6 +757,7 @@ func TestLabelMsg(t *testing.T) {
 		expectErr       bool
 	}{
 		{
+			name: "add existing label with the same value noop",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -748,6 +767,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgNotLabeled,
 		},
 		{
+			name: "add first label",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{},
 			},
@@ -760,6 +780,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgLabeled,
 		},
 		{
+			name: "overwrite existing label",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -775,6 +796,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgLabeled,
 		},
 		{
+			name: "add another label",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -789,6 +811,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgLabeled,
 		},
 		{
+			name: "add another label use resource version",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -805,6 +828,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgLabeled,
 		},
 		{
+			name: "remove the only label",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -820,6 +844,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgUnLabeled,
 		},
 		{
+			name: "both add and remove labels",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b", "c": "d"},
@@ -835,26 +860,10 @@ func TestLabelMsg(t *testing.T) {
 					},
 				},
 			},
-			expectMsg: MsgLabeled,
+			expectMsg: MsgModified,
 		},
 		{
-			obj: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"status": "unhealthy"},
-				},
-			},
-			labels:    map[string]string{"status": "healthy"},
-			overwrite: true,
-			expectObj: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"status": "healthy",
-					},
-				},
-			},
-			expectMsg: MsgLabeled,
-		},
-		{
+			name: "reject modification when overwrite unset",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"status": "unhealthy"},
@@ -869,34 +878,27 @@ func TestLabelMsg(t *testing.T) {
 					},
 				},
 			},
-			expectMsg: MsgNotLabeled,
 			expectErr: true,
 		},
 	}
 
 	for _, test := range tests {
-		oldData, err := json.Marshal(test.obj)
-		if err != nil {
-			t.Errorf("unexpected error: %v %v", err, test)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			added, removed, err := labelFunc(test.obj, test.overwrite, test.resourceVersion, test.labels, test.remove)
+			if test.expectErr {
+				if err == nil {
+					t.Errorf("unexpected non-error: %v", test)
+				}
+				return
+			}
+			if !test.expectErr && err != nil {
+				t.Errorf("unexpected error: %v %v", err, test)
+			}
 
-		err = labelFunc(test.obj, test.overwrite, test.resourceVersion, test.labels, test.remove)
-		if test.expectErr && err == nil {
-			t.Errorf("unexpected non-error: %v", test)
-			continue
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v %v", err, test)
-		}
-
-		newObj, err := json.Marshal(test.obj)
-		if err != nil {
-			t.Errorf("unexpected error: %v %v", err, test)
-		}
-
-		dataChangeMsg := updateDataChangeMsg(oldData, newObj, test.overwrite)
-		if dataChangeMsg != test.expectMsg {
-			t.Errorf("unexpected dataChangeMsg: %v != %v, %v", dataChangeMsg, test.expectMsg, test)
-		}
+			dataChangeMsg := updateDataChangeMsg(added, removed)
+			if dataChangeMsg != test.expectMsg {
+				t.Errorf("unexpected dataChangeMsg: expected = %v; got = %v (test %#v)", test.expectMsg, dataChangeMsg, test)
+			}
+		})
 	}
 }

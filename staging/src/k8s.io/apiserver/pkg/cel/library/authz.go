@@ -24,8 +24,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -619,11 +617,11 @@ type Resource interface {
 	GetSubresource() string
 }
 
-func NewAuthorizerVal(userInfo user.Info, authorizer authorizer.Authorizer) ref.Val {
+func NewAuthorizerVal(userInfo user.Info, authorizer authorizer.UnconditionalAuthorizer) ref.Val {
 	return authorizerVal{receiverOnlyObjectVal: receiverOnlyVal(AuthorizerType), userInfo: userInfo, authAuthorizer: authorizer}
 }
 
-func NewResourceAuthorizerVal(userInfo user.Info, authorizer authorizer.Authorizer, requestResource Resource) ref.Val {
+func NewResourceAuthorizerVal(userInfo user.Info, authorizer authorizer.UnconditionalAuthorizer, requestResource Resource) ref.Val {
 	a := authorizerVal{receiverOnlyObjectVal: receiverOnlyVal(AuthorizerType), userInfo: userInfo, authAuthorizer: authorizer}
 	resource := requestResource.GetResource()
 	g := a.groupCheck(resource.Group)
@@ -637,7 +635,7 @@ func NewResourceAuthorizerVal(userInfo user.Info, authorizer authorizer.Authoriz
 type authorizerVal struct {
 	receiverOnlyObjectVal
 	userInfo       user.Info
-	authAuthorizer authorizer.Authorizer
+	authAuthorizer authorizer.UnconditionalAuthorizer
 }
 
 func (a authorizerVal) pathCheck(path string) pathCheckVal {
@@ -708,22 +706,20 @@ func (a resourceCheckVal) Authorize(ctx context.Context, verb string) ref.Val {
 		User:            a.groupCheck.authorizer.userInfo,
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
-		if len(a.fieldSelector) > 0 {
-			selector, err := fields.ParseSelector(a.fieldSelector)
-			if err != nil {
-				attr.FieldSelectorRequirements, attr.FieldSelectorParsingErr = nil, err
-			} else {
-				attr.FieldSelectorRequirements, attr.FieldSelectorParsingErr = selector.Requirements(), nil
-			}
+	if len(a.fieldSelector) > 0 {
+		selector, err := fields.ParseSelector(a.fieldSelector)
+		if err != nil {
+			attr.FieldSelectorRequirements, attr.FieldSelectorParsingErr = nil, err
+		} else {
+			attr.FieldSelectorRequirements, attr.FieldSelectorParsingErr = selector.Requirements(), nil
 		}
-		if len(a.labelSelector) > 0 {
-			requirements, err := labels.ParseToRequirements(a.labelSelector)
-			if err != nil {
-				attr.LabelSelectorRequirements, attr.LabelSelectorParsingErr = nil, err
-			} else {
-				attr.LabelSelectorRequirements, attr.LabelSelectorParsingErr = requirements, nil
-			}
+	}
+	if len(a.labelSelector) > 0 {
+		requirements, err := labels.ParseToRequirements(a.labelSelector)
+		if err != nil {
+			attr.LabelSelectorRequirements, attr.LabelSelectorParsingErr = nil, err
+		} else {
+			attr.LabelSelectorRequirements, attr.LabelSelectorParsingErr = requirements, nil
 		}
 	}
 

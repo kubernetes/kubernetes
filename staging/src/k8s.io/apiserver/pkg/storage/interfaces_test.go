@@ -173,7 +173,6 @@ func TestValidateListOptions(t *testing.T) {
 		},
 	}
 	for _, tt := range testCases {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			withRev, continueKey, err := ValidateListOptions("", APIObjectVersioner{}, tt.opts)
 			if len(tt.expectedError) > 0 {

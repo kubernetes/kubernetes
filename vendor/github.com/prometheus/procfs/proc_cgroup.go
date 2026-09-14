@@ -1,4 +1,4 @@
-// Copyright 2020 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -60,7 +60,7 @@ func parseCgroupString(cgroupStr string) (*Cgroup, error) {
 	}
 	cgroup.HierarchyID, err = strconv.Atoi(fields[0])
 	if err != nil {
-		return nil, fmt.Errorf("%w: hierarchy ID: %q", ErrFileParse, cgroup.HierarchyID)
+		return nil, fmt.Errorf("%w: hierarchy ID: %q", ErrFileParse, fields[0])
 	}
 	if fields[1] != "" {
 		ssNames := strings.Split(fields[1], ",")

@@ -383,12 +383,22 @@ func TestDirAvailableCheck(t *testing.T) {
 	}
 }
 
+// mockNetListener is a minimal implementation of net.Listener used for testing
+// PortOpenCheck without relying on real network sockets.
+type mockNetListener struct{}
+
+func (m *mockNetListener) Accept() (net.Conn, error) { return nil, nil }
+func (m *mockNetListener) Close() error              { return nil }
+func (m *mockNetListener) Addr() net.Addr            { return nil }
+
 func TestPortOpenCheck(t *testing.T) {
-	ln, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatalf("could not listen on local network: %v", err)
+	mockListenSuccess := func(string, string) (net.Listener, error) {
+		return &mockNetListener{}, nil
 	}
-	defer ln.Close()
+	mockListenFail := func(string, string) (net.Listener, error) {
+		return nil, fmt.Errorf("address already in use")
+	}
+
 	var tests = []struct {
 		name          string
 		check         PortOpenCheck
@@ -396,25 +406,74 @@ func TestPortOpenCheck(t *testing.T) {
 	}{
 		{
 			name:          "Port is available",
-			check:         PortOpenCheck{port: 0},
+			check:         PortOpenCheck{port: 6443, listenFunc: mockListenSuccess},
 			expectedError: false,
 		},
 		{
 			name:          "Port is not available",
-			check:         PortOpenCheck{port: ln.Addr().(*net.TCPAddr).Port},
+			check:         PortOpenCheck{port: 6443, listenFunc: mockListenFail},
+			expectedError: true,
+		},
+		{
+			name:          "Port bound on 127.0.0.1 is available on 127.0.0.2",
+			check:         PortOpenCheck{port: 6443, address: "127.0.0.2", listenFunc: mockListenSuccess},
+			expectedError: false,
+		},
+		{
+			name:          "Port bound on 127.0.0.1 is not available on 127.0.0.1",
+			check:         PortOpenCheck{port: 6443, address: "127.0.0.1", listenFunc: mockListenFail},
 			expectedError: true,
 		},
 	}
+
 	for _, rt := range tests {
-		_, output := rt.check.Check()
-		if (output != nil) != rt.expectedError {
-			t.Errorf(
-				"Failed PortOpenCheck:%v\n\texpectedError: %t\n\t  actual: %t",
-				rt.name,
-				rt.expectedError,
-				(output != nil),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			_, output := rt.check.Check()
+			if (output != nil) != rt.expectedError {
+				t.Errorf(
+					"Failed PortOpenCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+					rt.name,
+					rt.expectedError,
+					(output != nil),
+				)
+			}
+		})
+	}
+}
+
+func TestPortOpenCheckName(t *testing.T) {
+	var tests = []struct {
+		name     string
+		check    PortOpenCheck
+		expected string
+	}{
+		{
+			name:     "Port only",
+			check:    PortOpenCheck{port: 6443},
+			expected: "Port-6443",
+		},
+		{
+			name:     "Port with label",
+			check:    PortOpenCheck{port: 6443, label: "MyLabel"},
+			expected: "MyLabel",
+		},
+		{
+			name:     "Port with address",
+			check:    PortOpenCheck{port: 6443, address: "10.0.0.1"},
+			expected: "Port-6443",
+		},
+		{
+			name:     "Port with address and label",
+			check:    PortOpenCheck{port: 6443, address: "10.0.0.1", label: "MyLabel"},
+			expected: "MyLabel",
+		},
+	}
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			if rt.check.Name() != rt.expected {
+				t.Errorf("expected name %q, got %q", rt.expected, rt.check.Name())
+			}
+		})
 	}
 }
 

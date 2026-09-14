@@ -22,12 +22,15 @@ import (
 	"net/url"
 	"runtime"
 	"sort"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubelet/pkg/types"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -92,7 +95,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 		Annotations: newPodAnnotations(pod),
 	}
 
-	dnsConfig, err := m.runtimeHelper.GetPodDNS(pod)
+	dnsConfig, err := m.runtimeHelper.GetPodDNS(ctx, pod)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +103,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 
 	if !kubecontainer.IsHostNetworkPod(pod) {
 		// TODO: Add domain support in new runtime interface
-		podHostname, podDomain, err := m.runtimeHelper.GeneratePodHostNameAndDomain(pod)
+		podHostname, podDomain, err := m.runtimeHelper.GeneratePodHostNameAndDomain(logger, pod)
 		if err != nil {
 			return nil, err
 		}
@@ -136,7 +139,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 		podSandboxConfig.PortMappings = portMappings
 	}
 
-	lc, err := m.generatePodSandboxLinuxConfig(pod)
+	lc, err := m.generatePodSandboxLinuxConfig(ctx, pod)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +164,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 // We've to call PodSandboxLinuxConfig always irrespective of the underlying OS as securityContext is not part of
 // podSandboxConfig. It is currently part of LinuxPodSandboxConfig. In future, if we have securityContext pulled out
 // in podSandboxConfig we should be able to use it.
-func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
+func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(ctx context.Context, pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
 	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
 	lc := &runtimeapi.LinuxPodSandboxConfig{
 		CgroupParent: cgroupParent,
@@ -177,6 +180,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 	}
 
 	sysctls := make(map[string]string)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DefaultPodSysctls) {
+		applyPodSysctls(sysctls, m.defaultPodSysctls, pod)
+	}
 	if pod.Spec.SecurityContext != nil {
 		for _, c := range pod.Spec.SecurityContext.Sysctls {
 			sysctls[c.Name] = c.Value
@@ -193,7 +199,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 		if sc.RunAsGroup != nil && runtime.GOOS != "windows" {
 			lc.SecurityContext.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*sc.RunAsGroup)}
 		}
-		namespaceOptions, err := runtimeutil.NamespacesForPod(pod, m.runtimeHelper, m.runtimeClassManager)
+		namespaceOptions, err := runtimeutil.NamespacesForPod(ctx, pod, m.runtimeHelper, m.runtimeClassManager)
 		if err != nil {
 			return nil, err
 		}
@@ -279,28 +285,6 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod)
 	return wc, nil
 }
 
-// getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
-func (m *kubeGenericRuntimeManager) getKubeletSandboxes(ctx context.Context, all bool) ([]*runtimeapi.PodSandbox, error) {
-	logger := klog.FromContext(ctx)
-	var filter *runtimeapi.PodSandboxFilter
-	if !all {
-		readyState := runtimeapi.PodSandboxState_SANDBOX_READY
-		filter = &runtimeapi.PodSandboxFilter{
-			State: &runtimeapi.PodSandboxStateValue{
-				State: readyState,
-			},
-		}
-	}
-
-	resp, err := m.runtimeService.ListPodSandbox(ctx, filter)
-	if err != nil {
-		logger.Error(err, "Failed to list pod sandboxes")
-		return nil, err
-	}
-
-	return resp, nil
-}
-
 // determinePodSandboxIP determines the IP addresses of the given pod sandbox.
 func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(ctx context.Context, podNamespace, podName string, podSandbox *runtimeapi.PodSandboxStatus) []string {
 	logger := klog.FromContext(ctx)
@@ -334,19 +318,11 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(ctx context.Context, 
 	return podIPs
 }
 
-// getPodSandboxID gets the sandbox id by podUID and returns ([]sandboxID, error).
+// getPodSandboxIDByPodUID gets the sandbox id by podUID and returns ([]sandboxID, error).
 // Param state could be nil in order to get all sandboxes belonging to same pod.
-func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(ctx context.Context, podUID kubetypes.UID, state *runtimeapi.PodSandboxState) ([]string, error) {
+func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(ctx context.Context, podUID kubetypes.UID) ([]string, error) {
 	logger := klog.FromContext(ctx)
-	filter := &runtimeapi.PodSandboxFilter{
-		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(podUID)},
-	}
-	if state != nil {
-		filter.State = &runtimeapi.PodSandboxStateValue{
-			State: *state,
-		}
-	}
-	sandboxes, err := m.runtimeService.ListPodSandbox(ctx, filter)
+	sandboxes, err := m.getSandboxes(ctx, listOptions{podUID: podUID})
 	if err != nil {
 		logger.Error(err, "Failed to list sandboxes for pod", "podUID", podUID)
 		return nil, err
@@ -358,7 +334,7 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(ctx context.Context, po
 
 	// Sort with newest first.
 	sandboxIDs := make([]string, len(sandboxes))
-	sort.Sort(podSandboxByCreated(sandboxes))
+	sort.Sort(podSandboxByCreatedThenID(sandboxes))
 	for i, s := range sandboxes {
 		sandboxIDs[i] = s.Id
 	}
@@ -368,7 +344,7 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(ctx context.Context, po
 
 // GetPortForward gets the endpoint the runtime will serve the port-forward request from.
 func (m *kubeGenericRuntimeManager) GetPortForward(ctx context.Context, podName, podNamespace string, podUID kubetypes.UID, ports []int32) (*url.URL, error) {
-	sandboxIDs, err := m.getSandboxIDByPodUID(ctx, podUID, nil)
+	sandboxIDs, err := m.getSandboxIDByPodUID(ctx, podUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandboxID for pod %s: %v", format.PodDesc(podName, podNamespace, podUID), err)
 	}
@@ -384,4 +360,55 @@ func (m *kubeGenericRuntimeManager) GetPortForward(ctx context.Context, podName,
 		return nil, err
 	}
 	return url.Parse(resp.Url)
+}
+
+var validSysctlMap = map[string]bool{
+	"kernel.msgmax":          true,
+	"kernel.msgmnb":          true,
+	"kernel.msgmni":          true,
+	"kernel.sem":             true,
+	"kernel.shmall":          true,
+	"kernel.shmmax":          true,
+	"kernel.shmmni":          true,
+	"kernel.shm_rmid_forced": true,
+}
+
+// From https://github.com/opencontainers/runc/blob/master/libcontainer/configs/validate/validator.go
+func applyPodSysctls(sysctls, podSysctls map[string]string, pod *v1.Pod) {
+	for k, v := range podSysctls {
+		normalizedKey := utilsysctl.NormalizeName(k)
+		if validSysctlMap[normalizedKey] || strings.HasPrefix(normalizedKey, "fs.mqueue.") {
+			if !pod.Spec.HostIPC {
+				// Set the IPC parameters unless the pod runs in the host IPC
+				// namespace.
+				sysctls[normalizedKey] = v
+			}
+			continue
+		}
+		if strings.HasPrefix(normalizedKey, "net.") {
+			if !pod.Spec.HostNetwork {
+				// Set the networking parameters unless the pod runs in the
+				// host network namespace.
+				sysctls[normalizedKey] = v
+			}
+			continue
+		}
+		if strings.HasPrefix(normalizedKey, "user.") {
+			// The default for HostUsers is true, so a nil HostUsers means the
+			// pod runs in the host user namespace.
+			if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+				// Set the user parameters unless the pod runs in the host user
+				// namespace.
+				sysctls[normalizedKey] = v
+			}
+			continue
+		}
+		if !pod.Spec.HostNetwork {
+			if normalizedKey == "kernel.domainname" {
+				// This is namespaced and there's no explicit OCI field for it.
+				sysctls[normalizedKey] = v
+			}
+			continue
+		}
+	}
 }

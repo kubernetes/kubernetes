@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // Package subfield contains test types for testing subfield field validation tags.
+// +k8s:validation-gen-nolint
 package shallow
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"

@@ -18,7 +18,7 @@ package load
 
 import (
 	"bytes"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -40,14 +40,14 @@ var defaultConfig = &api.PodSecurityConfiguration{
 
 func writeTempFile(t *testing.T, content string) string {
 	t.Helper()
-	file, err := ioutil.TempFile("", "podsecurityconfig")
+	file, err := os.CreateTemp("", "podsecurityconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
 		utiltesting.CloseAndRemove(t, file)
 	})
-	if err := ioutil.WriteFile(file.Name(), []byte(content), 0600); err != nil {
+	if err := os.WriteFile(file.Name(), []byte(content), 0600); err != nil {
 		t.Fatal(err)
 	}
 	return file.Name()

@@ -10,11 +10,8 @@ import (
 var (
 	byteType        = reflect.TypeOf(byte(0))
 	boolType        = reflect.TypeOf(false)
-	uint8Type       = reflect.TypeOf(uint8(0))
 	int16Type       = reflect.TypeOf(int16(0))
 	uint16Type      = reflect.TypeOf(uint16(0))
-	intType         = reflect.TypeOf(int(0))
-	uintType        = reflect.TypeOf(uint(0))
 	int32Type       = reflect.TypeOf(int32(0))
 	uint32Type      = reflect.TypeOf(uint32(0))
 	int64Type       = reflect.TypeOf(int64(0))
@@ -24,8 +21,8 @@ var (
 	signatureType   = reflect.TypeOf(Signature{""})
 	objectPathType  = reflect.TypeOf(ObjectPath(""))
 	variantType     = reflect.TypeOf(Variant{Signature{""}, nil})
-	interfacesType  = reflect.TypeOf([]interface{}{})
-	interfaceType   = reflect.TypeOf((*interface{})(nil)).Elem()
+	interfacesType  = reflect.TypeOf([]any{})
+	interfaceType   = reflect.TypeOf((*any)(nil)).Elem()
 	unixFDType      = reflect.TypeOf(UnixFD(0))
 	unixFDIndexType = reflect.TypeOf(UnixFDIndex(0))
 	errType         = reflect.TypeOf((*error)(nil)).Elem()
@@ -45,7 +42,7 @@ func (e InvalidTypeError) Error() string {
 // pointers. It converts slices of interfaces from src to corresponding structs
 // in dest. An error is returned if the lengths of src and dest or the types of
 // their elements don't match.
-func Store(src []interface{}, dest ...interface{}) error {
+func Store(src []any, dest ...any) error {
 	if len(src) != len(dest) {
 		return errors.New("dbus.Store: length mismatch")
 	}
@@ -58,7 +55,7 @@ func Store(src []interface{}, dest ...interface{}) error {
 	return nil
 }
 
-func storeInterfaces(src, dest interface{}) error {
+func storeInterfaces(src, dest any) error {
 	return store(reflect.ValueOf(dest), reflect.ValueOf(src))
 }
 
@@ -85,7 +82,7 @@ func storeBase(dest, src reflect.Value) error {
 
 func setDest(dest, src reflect.Value) error {
 	if !isVariant(src.Type()) && isVariant(dest.Type()) {
-		//special conversion for dbus.Variant
+		// special conversion for dbus.Variant
 		dest.Set(reflect.ValueOf(MakeVariant(src.Interface())))
 		return nil
 	}
@@ -166,8 +163,8 @@ func storeMapIntoVariant(dest, src reflect.Value) error {
 func storeMapIntoInterface(dest, src reflect.Value) error {
 	var dv reflect.Value
 	if isVariant(src.Type().Elem()) {
-		//Convert variants to interface{} recursively when converting
-		//to interface{}
+		// Convert variants to interface{} recursively when converting
+		// to interface{}
 		dv = reflect.MakeMap(
 			reflect.MapOf(src.Type().Key(), interfaceType))
 	} else {
@@ -200,7 +197,7 @@ func storeMapIntoMap(dest, src reflect.Value) error {
 func storeSlice(dest, src reflect.Value) error {
 	switch {
 	case src.Type() == interfacesType && dest.Kind() == reflect.Struct:
-		//The decoder always decodes structs as slices of interface{}
+		// The decoder always decodes structs as slices of interface{}
 		return storeStruct(dest, src)
 	case !kindsAreCompatible(dest.Type(), src.Type()):
 		return fmt.Errorf(
@@ -225,7 +222,7 @@ func storeStruct(dest, src reflect.Value) error {
 	if isVariant(dest.Type()) {
 		return storeBase(dest, src)
 	}
-	dval := make([]interface{}, 0, dest.NumField())
+	dval := make([]any, 0, dest.NumField())
 	dtype := dest.Type()
 	for i := 0; i < dest.NumField(); i++ {
 		field := dest.Field(i)
@@ -245,7 +242,7 @@ func storeStruct(dest, src reflect.Value) error {
 				"enough fields need: %d have: %d",
 			src.Len(), len(dval))
 	}
-	return Store(src.Interface().([]interface{}), dval...)
+	return Store(src.Interface().([]any), dval...)
 }
 
 func storeSliceIntoVariant(dest, src reflect.Value) error {
@@ -260,8 +257,8 @@ func storeSliceIntoVariant(dest, src reflect.Value) error {
 func storeSliceIntoInterface(dest, src reflect.Value) error {
 	var dv reflect.Value
 	if isVariant(src.Type().Elem()) {
-		//Convert variants to interface{} recursively when converting
-		//to interface{}
+		// Convert variants to interface{} recursively when converting
+		// to interface{}
 		dv = reflect.MakeSlice(reflect.SliceOf(interfaceType),
 			src.Len(), src.Cap())
 	} else {
@@ -334,7 +331,7 @@ func (o ObjectPath) IsValid() bool {
 }
 
 // A UnixFD is a Unix file descriptor sent over the wire. See the package-level
-// documentation for more information about Unix file descriptor passsing.
+// documentation for more information about Unix file descriptor passing.
 type UnixFD int32
 
 // A UnixFDIndex is the representation of a Unix file descriptor in a message.

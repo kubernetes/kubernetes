@@ -33,11 +33,11 @@ import (
 // DEPRECATED 1.9 - This group version of NetworkPolicy is deprecated by networking/v1/NetworkPolicy.
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	v1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Specification of the desired behavior for this NetworkPolicy.
+	// spec is the specification of the desired behavior for this NetworkPolicy.
 	Spec *NetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 

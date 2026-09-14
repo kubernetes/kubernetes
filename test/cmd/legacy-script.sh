@@ -57,6 +57,7 @@ source "${KUBE_ROOT}/test/cmd/request-timeout.sh"
 source "${KUBE_ROOT}/test/cmd/results.sh"
 source "${KUBE_ROOT}/test/cmd/run.sh"
 source "${KUBE_ROOT}/test/cmd/save-config.sh"
+source "${KUBE_ROOT}/test/cmd/scale.sh"
 source "${KUBE_ROOT}/test/cmd/storage.sh"
 source "${KUBE_ROOT}/test/cmd/template-output.sh"
 source "${KUBE_ROOT}/test/cmd/version.sh"
@@ -1042,8 +1043,8 @@ runTests() {
   # kubectl debug    #
   ####################
   if kube::test::if_supports_resource "${pods}" ; then
-    record_command run_kubectl_debug_pod_tests
-    record_command run_kubectl_debug_general_tests
+    record_command run_kubectl_debug_tests
+    record_command run_kubectl_debug_legacy_tests
     record_command run_kubectl_debug_baseline_tests
     record_command run_kubectl_debug_restricted_tests
     record_command run_kubectl_debug_netadmin_tests
@@ -1052,7 +1053,7 @@ runTests() {
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     record_command run_kubectl_debug_node_tests
-    record_command run_kubectl_debug_general_node_tests
+    record_command run_kubectl_debug_legacy_node_tests
     record_command run_kubectl_debug_baseline_node_tests
     record_command run_kubectl_debug_restricted_node_tests
     record_command run_kubectl_debug_netadmin_node_tests
@@ -1063,6 +1064,12 @@ runTests() {
   #######################
 
   record_command run_kuberc_tests
+
+  ###########
+  # Scale #
+  ###########
+
+  record_command run_kubectl_scale_tests
 
   cleanup_tests
 }

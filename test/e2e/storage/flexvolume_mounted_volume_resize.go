@@ -40,7 +40,7 @@ import (
 	"path"
 )
 
-var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume expand", framework.WithSlow(), func() {
+var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume expand", framework.WithSlow(), framework.WithProvider("aws", "gce", "local"), func() {
 	var (
 		c                 clientset.Interface
 		ns                string
@@ -57,7 +57,6 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume expand", fram
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("aws", "gce", "local")
 		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessSSHKeyPresent()
@@ -174,6 +173,6 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume expand", fram
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+		testsuites.ExpectNoResizeConditions(pvcConditions)
 	})
 })

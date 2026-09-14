@@ -37,7 +37,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
+var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), framework.WithProvider("gce", "aws"), func() {
 
 	f := framework.NewDefaultFramework("etcd-failure")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -46,9 +46,8 @@ var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
 		// This test requires:
 		// - SSH
 		// - master access
-		// ... so the provider check should be identical to the intersection of
+		// ... so the provider check above should be identical to the intersection of
 		// providers that provide those capabilities.
-		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		err := e2erc.RunRC(ctx, testutils.RCConfig{
@@ -74,7 +73,7 @@ var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
 		etcdFailTest(
 			ctx,
 			f,
-			"pgrep etcd | grep -v etcd-manager | xargs -I {} sudo kill -9 {}",
+			"sudo pkill -9 -x etcd",
 			"echo 'do nothing. monit should restart etcd.'",
 		)
 	})
@@ -115,10 +114,6 @@ func masterExec(ctx context.Context, f *framework.Framework, cmd string) {
 
 	host := ips[0] + ":22"
 	result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
-	e2essh.LogResult(result)
-
-	result, err = e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err, "failed to SSH to host %s on provider %s and run command: %q", host, framework.TestContext.Provider, cmd)
 	if result.Code != 0 {
 		e2essh.LogResult(result)

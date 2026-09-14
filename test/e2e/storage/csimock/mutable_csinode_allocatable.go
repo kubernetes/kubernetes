@@ -63,12 +63,12 @@ var _ = utils.SIGDescribe("MutableCSINodeAllocatableCount", framework.WithFeatur
 		)
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			var calls int32
+			var calls atomic.Int32
 			hook := drivers.Hooks{
 				Post: func(_ context.Context, method string, _ interface{}, reply interface{}, err error) (interface{}, error) {
 					if strings.Contains(method, "NodeGetInfo") {
 						if r, ok := reply.(*csipbv1.NodeGetInfoResponse); ok && err == nil {
-							if atomic.AddInt32(&calls, 1) == 1 {
+							if calls.Add(1) == 1 {
 								r.MaxVolumesPerNode = initialMaxVolumesPerNode
 							} else {
 								r.MaxVolumesPerNode = updatedMaxVolumesPerNode

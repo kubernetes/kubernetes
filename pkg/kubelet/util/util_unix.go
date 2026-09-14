@@ -1,5 +1,4 @@
 //go:build freebsd || linux || darwin
-// +build freebsd linux darwin
 
 /*
 Copyright 2017 The Kubernetes Authors.

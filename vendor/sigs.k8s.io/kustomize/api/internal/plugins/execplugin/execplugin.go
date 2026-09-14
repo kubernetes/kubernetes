@@ -161,14 +161,13 @@ func (p *ExecPlugin) invokePlugin(input []byte) ([]byte, error) {
 	_, err = f.Write(p.cfg)
 	if err != nil {
 		return nil, errors.WrapPrefixf(
-			err, "writing plugin config to "+f.Name())
+			err, "writing plugin config to %s", f.Name())
 	}
 	err = f.Close()
 	if err != nil {
 		return nil, errors.WrapPrefixf(
-			err, "closing plugin config file "+f.Name())
+			err, "closing plugin config file %s", f.Name())
 	}
-	//nolint:gosec
 	cmd := exec.Command(
 		p.path, append([]string{f.Name()}, p.args...)...)
 	cmd.Env = p.getEnv()
@@ -180,10 +179,9 @@ func (p *ExecPlugin) invokePlugin(input []byte) ([]byte, error) {
 	}
 	result, err := cmd.Output()
 	if err != nil {
-		//nolint:govet
 		return nil, errors.WrapPrefixf(
-			fmt.Errorf("failure in plugin configured via %s; %w",
-				f.Name(), err), stdErr.String())
+			fmt.Errorf("failure in plugin configured via %s; %w", f.Name(), err),
+			"%s", stdErr.String())
 	}
 	return result, os.Remove(f.Name())
 }

@@ -101,7 +101,7 @@ func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer ou
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
 	klog.V(1).Infoln("[upgrade/plan] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/plan] retrieving configuration from cluster")
-	client, versionGetter, initCfg, upgradeCfg, err := enforceRequirements(flagSet, flags.applyPlanFlags, args, false, false, printer)
+	client, versionGetter, initCfg, upgradeCfg, err := enforceRequirements(flagSet, flags.applyPlanFlags, args, printer)
 	if err != nil {
 		return err
 	}
@@ -234,7 +234,7 @@ func genAvailableUpgrade(up *upgrade.Upgrade, etcdUpgrade bool) outputapiv1alpha
 
 // sortedSliceFromStringStringArrayMap returns a slice of the keys in the map sorted alphabetically
 func sortedSliceFromStringStringArrayMap(strMap map[string][]string) []string {
-	strSlice := []string{}
+	strSlice := make([]string, 0, len(strMap))
 	for k := range strMap {
 		strSlice = append(strSlice, k)
 	}

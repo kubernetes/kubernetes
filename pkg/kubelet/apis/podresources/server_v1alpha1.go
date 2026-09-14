@@ -19,6 +19,7 @@ package podresources
 import (
 	"context"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 
 	v1 "k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -56,10 +57,11 @@ func v1DevicesToAlphaV1(alphaDevs []*v1.ContainerDevices) []*v1alpha1.ContainerD
 
 // List returns information about the resources assigned to pods on the node
 func (p *v1alpha1PodResourcesServer) List(ctx context.Context, req *v1alpha1.ListPodResourcesRequest) (*v1alpha1.ListPodResourcesResponse, error) {
+	logger := klog.FromContext(ctx)
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1alpha1").Inc()
 	pods := p.podsProvider.GetPods()
 	podResources := make([]*v1alpha1.PodResources, len(pods))
-	p.devicesProvider.UpdateAllocatedDevices()
+	p.devicesProvider.UpdateAllocatedDevices(logger)
 
 	for i, pod := range pods {
 		pRes := v1alpha1.PodResources{

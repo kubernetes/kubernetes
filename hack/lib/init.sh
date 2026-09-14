@@ -75,8 +75,6 @@ authorization.k8s.io/v1 \
 authorization.k8s.io/v1beta1 \
 autoscaling/v1 \
 autoscaling/v2 \
-autoscaling/v2beta1 \
-autoscaling/v2beta2 \
 batch/v1 \
 batch/v1beta1 \
 certificates.k8s.io/v1 \
@@ -95,6 +93,7 @@ extensions/v1beta1 \
 events.k8s.io/v1 \
 events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
+lifecycle.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \
 networking.k8s.io/v1beta1 \
 node.k8s.io/v1 \
@@ -105,13 +104,14 @@ policy/v1beta1 \
 rbac.authorization.k8s.io/v1 \
 rbac.authorization.k8s.io/v1beta1 \
 rbac.authorization.k8s.io/v1alpha1 \
-scheduling.k8s.io/v1alpha1 \
+scheduling.k8s.io/v1alpha3 \
 scheduling.k8s.io/v1beta1 \
 scheduling.k8s.io/v1 \
 storage.k8s.io/v1beta1 \
 storage.k8s.io/v1 \
 storage.k8s.io/v1alpha1 \
 flowcontrol.apiserver.k8s.io/v1 \
+storagemigration.k8s.io/v1 \
 storagemigration.k8s.io/v1beta1 \
 flowcontrol.apiserver.k8s.io/v1beta1 \
 flowcontrol.apiserver.k8s.io/v1beta2 \

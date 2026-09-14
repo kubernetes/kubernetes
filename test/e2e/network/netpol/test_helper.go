@@ -84,7 +84,7 @@ func waitForHTTPServers(k *kubeManager, model *Model) error {
 		notReady[caseName] = true
 	}
 
-	for i := 0; i < maxTries; i++ {
+	for range maxTries {
 		for caseName, testCase := range testCases {
 			if notReady[caseName] {
 				reachability := NewReachability(k.AllPodStrings(), true)

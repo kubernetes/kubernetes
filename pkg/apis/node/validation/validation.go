@@ -23,14 +23,33 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/node"
+	"regexp"
 )
+
+// Define normalization rules to handle field name differences across API versions.
+// v1alpha1 nests fields under "spec" (e.g. "spec.runtimeHandler", "spec.scheduling")
+// while v1/v1beta1 expose them at the top level ("handler", "scheduling"), matching
+// the internal type used by handwritten validation.
+var NodeNormalizationRules = []field.NormalizationRule{
+	{
+		Regexp:      regexp.MustCompile(`^spec\.runtimeHandler(.*)$`),
+		Replacement: "handler$1",
+	},
+	{
+		Regexp:      regexp.MustCompile(`^spec\.scheduling(.*)$`),
+		Replacement: "scheduling$1",
+	},
+}
 
 // ValidateRuntimeClass validates the RuntimeClass
 func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&rc.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-
-	for _, msg := range apivalidation.NameIsDNSLabel(rc.Handler, false) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg))
+	if rc.Handler == "" {
+		allErrs = append(allErrs, field.Required(field.NewPath("handler"), "").MarkCoveredByDeclarative())
+	} else {
+		for _, msg := range apivalidation.NameIsDNSLabel(rc.Handler, false) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg).MarkCoveredByDeclarative().WithOrigin("format=k8s-short-name"))
+		}
 	}
 
 	if rc.Overhead != nil {
@@ -47,7 +66,7 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 func ValidateRuntimeClassUpdate(new, old *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(new.Handler, old.Handler, field.NewPath("handler"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(new.Handler, old.Handler, field.NewPath("handler")).MarkCoveredByDeclarative().WithOrigin("immutable")...)
 
 	return allErrs
 }
@@ -68,7 +87,7 @@ func validateScheduling(s *node.Scheduling, fldPath *field.Path) field.ErrorList
 }
 
 func validateTolerations(tolerations []core.Toleration, fldPath *field.Path) field.ErrorList {
-	allErrs := corevalidation.ValidateTolerations(tolerations, fldPath, corevalidation.PodValidationOptions{})
+	allErrs := corevalidation.ValidateTolerations(tolerations, fldPath, corevalidation.PodValidationOptions{}, corevalidation.KeyFormatCovered)
 	// Ensure uniquenes of tolerations.
 	tolerationSet := map[core.Toleration]bool{}
 	for i, t := range tolerations {

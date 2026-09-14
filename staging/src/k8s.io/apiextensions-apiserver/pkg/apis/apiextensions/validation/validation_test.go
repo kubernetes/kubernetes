@@ -31,7 +31,6 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	celschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,8 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -4542,7 +4539,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 }
 
 func TestSelectableFields(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
 	singleVersionList := []apiextensions.CustomResourceDefinitionVersion{
 		{
 			Name:    "version",
@@ -11083,6 +11079,22 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 									Rule: "self.all(x, self.exists_one(y, x.lowerAscii() == y.lowerAscii()))",
 								},
 							},
+						},
+					},
+				},
+			},
+		},
+		{
+			// Validate that metadata.name and metadata.generateName are estimated against the cost limit of a 253 length string.
+			// This will fail with a cost limit exceeded error if either length is incorrectly assumed to be unbounded.
+			name: "x-kubernetes-validations rule referencing metadata.name and generateName is within estimated cost limit",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule: "self.metadata.name.contains(self.metadata.name) && self.metadata.generateName.contains(self.metadata.generateName)",
 						},
 					},
 				},

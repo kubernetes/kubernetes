@@ -31,8 +31,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/klog/v2"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
@@ -64,6 +65,7 @@ import (
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -159,7 +161,7 @@ func (lcm *localCM) GetNodeAllocatableReservation() v1.ResourceList {
 	return lcm.allocatableReservation
 }
 
-func (lcm *localCM) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+func (lcm *localCM) GetCapacity(_ klog.Logger, localStorageCapacityIsolation bool) v1.ResourceList {
 	if !localStorageCapacityIsolation {
 		delete(lcm.capacity, v1.ResourceEphemeralStorage)
 	}
@@ -188,6 +190,7 @@ func (l delegatingNodeLister) List(selector labels.Selector) (ret []*v1.Node, er
 }
 
 func TestUpdateNewNodeStatus(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cases := []struct {
 		desc                string
 		nodeStatusMaxImages int32
@@ -204,7 +207,6 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			// generate one more in inputImageList than we configure the Kubelet to report,
 			// or 5 images if unlimited
 			numTestImages := int(tc.nodeStatusMaxImages) + 1
@@ -297,6 +299,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 						ContainerRuntimeVersion: "test://1.5.0",
 						KubeletVersion:          version.Get().String(),
 						KubeProxyVersion:        "",
+						RunningInUserNamespace:  kubelet.runningInUserNS(),
 					},
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -318,15 +321,15 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				},
 			}
 
-			kubelet.updateRuntimeUp()
-			assert.NoError(t, kubelet.updateNodeStatus(ctx))
+			kubelet.updateRuntimeUp(tCtx)
+			require.NoError(t, kubelet.updateNodeStatus(tCtx))
 			actions := kubeClient.Actions()
 			require.Len(t, actions, 2)
 			require.True(t, actions[1].Matches("patch", "nodes"))
 			require.Equal(t, "status", actions[1].GetSubresource())
 
 			updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			for i, cond := range updatedNode.Status.Conditions {
 				assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
 				assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition is zero", cond.Type)
@@ -344,7 +347,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 }
 
 func TestUpdateExistingNodeStatus(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -477,6 +480,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        "",
+				RunningInUserNamespace:  kubelet.runningInUserNS(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -508,8 +512,8 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		},
 	}
 
-	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	kubelet.updateRuntimeUp(tCtx)
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 	actions := kubeClient.Actions()
 	assert.Len(t, actions, 2)
@@ -537,7 +541,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 }
 
 func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -547,7 +551,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 
 	// set up a listener that hangs connections
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer ln.Close()
 	go func() {
 		// accept connections and just let them hang
@@ -567,7 +571,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 		QPS:     -1,
 		Timeout: time.Second,
 	}
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
@@ -591,7 +595,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	}
 
 	// should return an error, but not hang
-	assert.Error(t, kubelet.updateNodeStatus(ctx))
+	require.Error(t, kubelet.updateNodeStatus(tCtx))
 
 	// should have attempted multiple times
 	if actualAttempts := atomic.LoadInt64(&attempts); actualAttempts < nodeStatusUpdateRetry {
@@ -604,7 +608,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 }
 
 func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -683,6 +687,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        "",
+				RunningInUserNamespace:  kubelet.runningInUserNS(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -715,13 +720,13 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 
 	checkNodeStatus := func(status v1.ConditionStatus, reason string) {
 		kubeClient.ClearActions()
-		assert.NoError(t, kubelet.updateNodeStatus(ctx))
+		require.NoError(t, kubelet.updateNodeStatus(tCtx))
 		actions := kubeClient.Actions()
 		require.Len(t, actions, 2)
 		require.True(t, actions[1].Matches("patch", "nodes"))
 		require.Equal(t, "status", actions[1].GetSubresource())
 
-		updatedNode, err := kubeClient.CoreV1().Nodes().Get(ctx, testKubeletHostname, metav1.GetOptions{})
+		updatedNode, err := kubeClient.CoreV1().Nodes().Get(tCtx, testKubeletHostname, metav1.GetOptions{})
 		require.NoError(t, err, "can't apply node status patch")
 
 		for i, cond := range updatedNode.Status.Conditions {
@@ -750,17 +755,17 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	// TODO(random-liu): Refactor the unit test to be table driven test.
 	// Should report kubelet not ready if the runtime check is out of date
 	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report kubelet ready if the runtime check is updated
 	clock.SetTime(time.Now())
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionTrue, "KubeletReady")
 
 	// Should report kubelet not ready if the runtime check is out of date
 	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report kubelet not ready if the runtime check failed
@@ -768,19 +773,19 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	// Inject error into fake runtime status check, node should be NotReady
 	fakeRuntime.StatusErr = fmt.Errorf("injected runtime status error")
 	clock.SetTime(time.Now())
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	fakeRuntime.StatusErr = nil
 
 	// Should report node not ready if runtime status is nil.
 	fakeRuntime.RuntimeStatus = nil
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report node not ready if runtime status is empty.
 	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report node not ready if RuntimeReady is false.
@@ -790,7 +795,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			{Type: kubecontainer.NetworkReady, Status: true},
 		},
 	}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report node ready if RuntimeReady is true.
@@ -800,7 +805,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			{Type: kubecontainer.NetworkReady, Status: true},
 		},
 	}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionTrue, "KubeletReady")
 
 	// Should report node not ready if NetworkReady is false.
@@ -810,24 +815,24 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			{Type: kubecontainer.NetworkReady, Status: false},
 		},
 	}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(tCtx)
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 }
 
 func TestUpdateNodeStatusError(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{}}).ReactionChain
-	assert.Error(t, kubelet.updateNodeStatus(ctx))
+	require.Error(t, kubelet.updateNodeStatus(tCtx))
 	assert.Len(t, testKubelet.fakeKubeClient.Actions(), nodeStatusUpdateRetry)
 }
 
 func TestUpdateNodeStatusWithLease(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	clock := testKubelet.fakeClock
@@ -917,6 +922,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        "",
+				RunningInUserNamespace:  kubelet.runningInUserNS(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -950,8 +956,8 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 
 	// Update node status when node status is created.
 	// Report node status.
-	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	kubelet.updateRuntimeUp(tCtx)
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 	actions := kubeClient.Actions()
 	assert.Len(t, actions, 2)
@@ -974,7 +980,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status again when nothing is changed (except heartbeat time).
 	// Report node status if it has exceeded the duration of nodeStatusReportFrequency.
 	clock.Step(time.Minute)
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 	// 2 more action (There were 2 actions before).
 	actions = kubeClient.Actions()
@@ -999,7 +1005,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status again when nothing is changed (except heartbeat time).
 	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 	// Only 1 more action (There were 4 actions before).
 	actions = kubeClient.Actions()
@@ -1017,7 +1023,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	newMachineInfo := oldMachineInfo.Clone()
 	newMachineInfo.MemoryCapacity = uint64(newMemoryCapacity)
 	kubelet.setCachedMachineInfo(newMachineInfo)
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 	// 2 more action (There were 5 actions before).
 	actions = kubeClient.Actions()
@@ -1049,7 +1055,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	updatedNode.Spec.PodCIDR = podCIDRs[0]
 	updatedNode.Spec.PodCIDRs = podCIDRs
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*updatedNode}}).ReactionChain
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
 	// 2 more action (There were 7 actions before).
 	actions = kubeClient.Actions()
@@ -1062,7 +1068,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	clock.Step(10 * time.Second)
 	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
 
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 	// Only 1 more action (There were 9 actions before).
 	actions = kubeClient.Actions()
 	assert.Len(t, actions, 10)
@@ -1070,6 +1076,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 }
 
 func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cases := []struct {
 		desc                  string
 		existingVolumes       []v1.UniqueVolumeName // volumes to initially populate volumeManager
@@ -1118,7 +1125,6 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			// Setup
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
@@ -1145,7 +1151,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 			kubelet.nodeLister = delegatingNodeLister{client: kubeClient}
 
 			// Execute
-			assert.NoError(t, kubelet.updateNodeStatus(ctx))
+			require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 			// Validate
 			actions := kubeClient.Actions()
@@ -1221,6 +1227,7 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -1283,7 +1290,7 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 				return true, nil, fmt.Errorf("try again")
 			})
 
-			kubelet.fastStatusUpdateOnce()
+			kubelet.fastStatusUpdateOnce(tCtx)
 
 			assert.True(t, kubelet.containerRuntimeReadyExpected)
 			assert.Equal(t, tc.wantCalls, callCount)
@@ -1327,6 +1334,7 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 }
 
 func TestRegisterWithApiServer(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1373,7 +1381,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		kubelet.registerWithAPIServer()
+		kubelet.registerWithAPIServer(tCtx)
 		done <- struct{}{}
 	}()
 	select {
@@ -1385,6 +1393,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 }
 
 func TestTryRegisterWithApiServer(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	alreadyExists := &apierrors.StatusError{
 		ErrStatus: metav1.Status{Reason: metav1.StatusReasonAlreadyExists},
 	}
@@ -1551,7 +1560,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			})
 			addNotImplatedReaction(kubeClient)
 
-			result := kubelet.tryRegisterWithAPIServer(tc.newNode)
+			result := kubelet.tryRegisterWithAPIServer(tCtx, tc.newNode)
 			require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
 
 			actions := kubeClient.Actions()
@@ -1582,7 +1591,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 }
 
 func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	const nodeStatusMaxImages = 5
 
 	// generate one more in inputImageList than we configure the Kubelet to report
@@ -1640,15 +1649,15 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 		},
 	}
 
-	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	kubelet.updateRuntimeUp(tCtx)
+	require.NoError(t, kubelet.updateNodeStatus(tCtx))
 	actions := kubeClient.Actions()
 	require.Len(t, actions, 1)
 	require.True(t, actions[0].Matches("patch", "nodes"))
 	require.Equal(t, "status", actions[0].GetSubresource())
 
 	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[0].(core.PatchActionImpl).GetPatch())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable), "%s", cmp.Diff(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable))
 }
 
@@ -2168,6 +2177,7 @@ func TestUpdateDefaultResources(t *testing.T) {
 }
 
 func TestReconcileHugePageResource(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	hugePageResourceName64Ki := v1.ResourceName("hugepages-64Ki")
 	hugePageResourceName2Mi := v1.ResourceName("hugepages-2Mi")
@@ -2452,7 +2462,7 @@ func TestReconcileHugePageResource(t *testing.T) {
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 
-			needsUpdate := kubelet.reconcileHugePageResource(tc.initialNode, tc.existingNode)
+			needsUpdate := kubelet.reconcileHugePageResource(logger, tc.initialNode, tc.existingNode)
 			assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 			assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
 		})
@@ -2460,6 +2470,7 @@ func TestReconcileHugePageResource(t *testing.T) {
 
 }
 func TestReconcileExtendedResource(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
@@ -2640,7 +2651,7 @@ func TestReconcileExtendedResource(t *testing.T) {
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 
-		needsUpdate := kubelet.reconcileExtendedResource(tc.initialNode, tc.existingNode)
+		needsUpdate := kubelet.reconcileExtendedResource(logger, tc.initialNode, tc.existingNode)
 		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 		assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
 	}
@@ -2730,7 +2741,7 @@ func TestValidateNodeIPParam(t *testing.T) {
 	for _, test := range tests {
 		err := validateNodeIP(netutils.ParseIPSloppy(test.nodeIP))
 		if test.success {
-			assert.NoErrorf(t, err, "test %s", test.testName)
+			require.NoErrorf(t, err, "test %s", test.testName)
 		} else {
 			assert.Errorf(t, err, "test %s", test.testName)
 		}
@@ -2738,6 +2749,7 @@ func TestValidateNodeIPParam(t *testing.T) {
 }
 
 func TestRegisterWithApiServerWithTaint(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -2772,7 +2784,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 	kubelet.registrationCompleted = false
 
 	// Register node to apiserver.
-	kubelet.registerWithAPIServer()
+	kubelet.registerWithAPIServer(tCtx)
 
 	// Check the unschedulable taint.
 	got := gotNode.(*v1.Node)
@@ -2939,6 +2951,7 @@ func TestNodeStatusHasChanged(t *testing.T) {
 }
 
 func TestUpdateNodeAddresses(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -3053,7 +3066,6 @@ func TestUpdateNodeAddresses(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			ctx := context.Background()
 			oldNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 				Spec:       v1.NodeSpec{},
@@ -3069,15 +3081,15 @@ func TestUpdateNodeAddresses(t *testing.T) {
 				},
 			}
 
-			_, err := kubeClient.CoreV1().Nodes().Update(ctx, oldNode, metav1.UpdateOptions{})
-			assert.NoError(t, err)
+			_, err := kubeClient.CoreV1().Nodes().Update(tCtx, oldNode, metav1.UpdateOptions{})
+			require.NoError(t, err)
 			kubelet.setNodeStatusFuncs = []func(context.Context, *v1.Node) error{
 				func(_ context.Context, node *v1.Node) error {
 					node.Status.Addresses = expectedNode.Status.Addresses
 					return nil
 				},
 			}
-			assert.NoError(t, kubelet.updateNodeStatus(ctx))
+			require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 			actions := kubeClient.Actions()
 			lastAction := actions[len(actions)-1]
@@ -3163,6 +3175,7 @@ func TestCalculateDelay(t *testing.T) {
 }
 
 func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := []struct {
 		name               string
 		featureGateEnabled bool
@@ -3191,7 +3204,10 @@ func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
+			if !tc.featureGateEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+			}
 
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
@@ -3208,7 +3224,7 @@ func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
 
 			// We need to force a status update, so we make the last status report time old.
 			kubelet.lastStatusReportTime = time.Now().Add(-time.Hour)
-			require.NoError(t, kubelet.updateNodeStatus(context.TODO()))
+			require.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 			actions := kubeClient.Actions()
 			// We expect a get and a patch
@@ -3222,4 +3238,72 @@ func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
 			assert.Equal(t, tc.expectedFeatures, updatedNode.Status.DeclaredFeatures)
 		})
 	}
+}
+
+func TestNodeRefWithUID(t *testing.T) {
+	const nodeUID = "66cedd99-0823-46bf-a36d-5db3fa6f28cd"
+
+	newKubelet := func(t *testing.T) *Kubelet {
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		t.Cleanup(testKubelet.Cleanup)
+		kubelet := testKubelet.kubelet
+		// Mirror the static, UID-less reference built in NewMainKubelet.
+		kubelet.nodeRef = &v1.ObjectReference{
+			APIVersion: "v1",
+			Kind:       "Node",
+			Name:       string(kubelet.nodeName),
+		}
+		return kubelet
+	}
+
+	t.Run("fills the UID from the node cache when nodeRef has none", func(t *testing.T) {
+		kubelet := newKubelet(t)
+		node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, UID: nodeUID}}
+		kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{node}}
+
+		ref := kubelet.nodeRefWithUID()
+		assert.Equal(t, nodeUID, string(ref.UID), "expected the node UID to be populated")
+		// The shared reference must remain untouched (no in-place mutation/data race).
+		assert.Empty(t, string(kubelet.nodeRef.UID), "shared nodeRef must not be mutated")
+	})
+
+	t.Run("falls back to the name-only reference when the node is not cached", func(t *testing.T) {
+		kubelet := newKubelet(t)
+		kubelet.nodeLister = testNodeLister{}
+
+		ref := kubelet.nodeRefWithUID()
+		assert.Empty(t, string(ref.UID), "UID should stay empty when the node is unavailable")
+		assert.Equal(t, testKubeletHostname, ref.Name)
+		assert.Equal(t, "Node", ref.Kind)
+	})
+
+	t.Run("does not override an already populated UID", func(t *testing.T) {
+		kubelet := newKubelet(t)
+		kubelet.nodeRef.UID = "preset-uid"
+		// A different UID in the cache must be ignored when one is already set.
+		node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, UID: nodeUID}}
+		kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{node}}
+
+		ref := kubelet.nodeRefWithUID()
+		assert.Equal(t, "preset-uid", string(ref.UID))
+	})
+
+	t.Run("caches the resolved reference and does not refresh", func(t *testing.T) {
+		kubelet := newKubelet(t)
+		node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, UID: nodeUID}}
+		kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{node}}
+
+		first := kubelet.nodeRefWithUID()
+		require.Equal(t, nodeUID, string(first.UID))
+
+		// Simulate the node being recreated with a new UID. Because the resolved
+		// reference is cached once, later calls keep returning the original pointer
+		// and UID rather than re-reading the lister.
+		recreated := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, UID: "new-uid"}}
+		kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{recreated}}
+
+		second := kubelet.nodeRefWithUID()
+		assert.Same(t, first, second, "expected the cached reference to be reused")
+		assert.Equal(t, nodeUID, string(second.UID))
+	})
 }

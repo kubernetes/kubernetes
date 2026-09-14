@@ -260,6 +260,7 @@ func TestCustomTTL(t *testing.T) {
 }
 
 func TestParseNodeAnnotation(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := []struct {
 		node   *v1.Node
 		err    error
@@ -319,8 +320,8 @@ func TestParseNodeAnnotation(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		getNode := func() (*v1.Node, error) { return testCase.node, testCase.err }
-		ttl, exists := GetObjectTTLFromNodeFunc(getNode)()
+		getNode := func(context.Context) (*v1.Node, error) { return testCase.node, testCase.err }
+		ttl, exists := GetObjectTTLFromNodeFunc(tCtx, getNode)()
 		if exists != testCase.exists {
 			t.Errorf("%d: incorrect parsing: %t", i, exists)
 			continue

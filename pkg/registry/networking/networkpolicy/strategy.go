@@ -18,6 +18,7 @@ package networkpolicy
 
 import (
 	"context"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,12 +32,12 @@ import (
 
 // networkPolicyStrategy implements verification logic for NetworkPolicies
 type networkPolicyStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating NetworkPolicy objects.
-var Strategy = networkPolicyStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = networkPolicyStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all NetworkPolicies need to be within a namespace.
 func (networkPolicyStrategy) NamespaceScoped() bool {
@@ -78,16 +79,14 @@ func (networkPolicyStrategy) WarningsOnCreate(ctx context.Context, obj runtime.O
 func (networkPolicyStrategy) Canonicalize(obj runtime.Object) {}
 
 // AllowCreateOnUpdate is false for NetworkPolicy; this means POST is needed to create one.
-func (networkPolicyStrategy) AllowCreateOnUpdate() bool {
+func (networkPolicyStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
 // ValidateUpdate is the default update validation for an end user.
 func (networkPolicyStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	opts := validation.ValidationOptionsForNetworking(obj.(*networking.NetworkPolicy), old.(*networking.NetworkPolicy))
-	validationErrorList := validation.ValidateNetworkPolicy(obj.(*networking.NetworkPolicy), opts)
-	updateErrorList := validation.ValidateNetworkPolicyUpdate(obj.(*networking.NetworkPolicy), old.(*networking.NetworkPolicy), opts)
-	return append(validationErrorList, updateErrorList...)
+	return validation.ValidateNetworkPolicyUpdate(obj.(*networking.NetworkPolicy), old.(*networking.NetworkPolicy), opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -96,7 +95,7 @@ func (networkPolicyStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 }
 
 // AllowUnconditionalUpdate is the default update policy for NetworkPolicy objects.
-func (networkPolicyStrategy) AllowUnconditionalUpdate() bool {
+func (networkPolicyStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

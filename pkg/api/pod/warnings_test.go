@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -1827,13 +1828,18 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				`spec.dnsConfig.nameservers[1]: non-standard IP address "05.06.07.08" will be considered invalid in a future Kubernetes release: use "5.6.7.8"`,
-				`spec.hostAliases[0].ip: non-standard IP address "::ffff:1.2.3.4" will be considered invalid in a future Kubernetes release: use "1.2.3.4"`,
+				`spec.dnsConfig.nameservers[1]: non-standard IP address "05.06.07.08" is invalid: use "5.6.7.8"`,
+				`spec.hostAliases[0].ip: non-standard IP address "::ffff:1.2.3.4" is invalid: use "1.2.3.4"`,
 			},
 		},
 	}
 
 	for _, tc := range testcases {
+
+		if !tc.gitRepoPluginDisabled {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+		}
+
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GitRepoVolumeDriver, !tc.gitRepoPluginDisabled)
 			var oldTemplate *api.PodTemplateSpec

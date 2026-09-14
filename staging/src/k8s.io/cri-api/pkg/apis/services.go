@@ -88,6 +88,10 @@ type PodSandboxManager interface {
 	// This request is treated as best effort, and failure will not block the
 	// Kubelet with proceeding with a resize.
 	UpdatePodSandboxResources(ctx context.Context, request *runtimeapi.UpdatePodSandboxResourcesRequest) (*runtimeapi.UpdatePodSandboxResourcesResponse, error)
+	// CheckpointPod checkpoints a pod sandbox
+	CheckpointPod(ctx context.Context, options *runtimeapi.CheckpointPodRequest) error
+	// RestorePod restores a pod sandbox from a checkpoint
+	RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error)
 }
 
 // ContainerStatsManager contains methods for retrieving the container
@@ -124,7 +128,7 @@ type RuntimeService interface {
 	// RuntimeConfig returns the configuration information of the runtime.
 	RuntimeConfig(ctx context.Context) (*runtimeapi.RuntimeConfigResponse, error)
 	// Close will shutdown the internal gRPC client connection.
-	Close() error
+	Close(ctx context.Context) error
 }
 
 // ImageManagerService interface should be implemented by a container image
@@ -142,5 +146,5 @@ type ImageManagerService interface {
 	// ImageFsInfo returns information of the filesystem(s) used to store the read-only layers and the writeable layer.
 	ImageFsInfo(ctx context.Context) (*runtimeapi.ImageFsInfoResponse, error)
 	// Close will shutdown the internal gRPC client connection.
-	Close() error
+	Close(ctx context.Context) error
 }

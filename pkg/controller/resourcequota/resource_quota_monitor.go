@@ -79,8 +79,9 @@ type QuotaMonitor struct {
 	// This channel is also protected by monitorLock.
 	stopCh <-chan struct{}
 
-	// running tracks whether Run() has been called.
-	// it is protected by monitorLock.
+	// running is set to true when the Run() function has been called.
+	// It will revert to false when the Run() function receives a cancellation.
+	// It is protected by monitorLock.
 	running bool
 
 	// monitors are the producer of the resourceChanges queue
@@ -105,14 +106,18 @@ type QuotaMonitor struct {
 }
 
 // NewMonitor creates a new instance of a QuotaMonitor
-func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactory.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry, updateFilter UpdateFilter) *QuotaMonitor {
+func NewMonitor(ctx context.Context, informersStarted <-chan struct{}, informerFactory informerfactory.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry, updateFilter UpdateFilter) *QuotaMonitor {
+	logger := klog.FromContext(ctx)
 	return &QuotaMonitor{
 		informersStarted: informersStarted,
 		informerFactory:  informerFactory,
 		ignoredResources: ignoredResources,
 		resourceChanges: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[*event](),
-			workqueue.TypedRateLimitingQueueConfig[*event]{Name: "resource_quota_controller_resource_changes"},
+			workqueue.TypedRateLimitingQueueConfig[*event]{
+				Logger: &logger,
+				Name:   "resource_quota_controller_resource_changes",
+			},
 		),
 		resyncPeriod:      resyncPeriod,
 		replenishmentFunc: replenishmentFunc,
@@ -133,7 +138,7 @@ type monitor struct {
 // Run is intended to be called in a goroutine. Multiple calls of this is an
 // error.
 func (m *monitor) Run() {
-	m.controller.Run(m.stopCh)
+	m.controller.RunWithContext(wait.ContextForChannel(m.stopCh))
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
@@ -172,10 +177,14 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 	shared, err := qm.informerFactory.ForResource(resource)
 	if err == nil {
 		logger.V(4).Info("QuotaMonitor using a shared informer", "resource", resource.String())
-		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
+		resyncPeriod := qm.resyncPeriod()
+		_, _ = shared.Informer().AddEventHandlerWithOptions(handlers, cache.HandlerOptions{
+			Logger:       &logger,
+			ResyncPeriod: &resyncPeriod,
+		})
 		return shared.Informer().GetController(), nil
 	}
-	logger.V(4).Error(err, "QuotaMonitor unable to use a shared informer", "resource", resource.String())
+	logger.V(4).Info("QuotaMonitor unable to use a shared informer", "resource", resource.String(), "err", err)
 
 	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
 	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
@@ -333,6 +342,10 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 	// Stop any running monitors.
 	qm.monitorLock.Lock()
 	defer qm.monitorLock.Unlock()
+	// Mark as not running so that no new monitors can be started.
+	// Not doing this here could cause goroutine leaks and deadlocks since it would make it possible for startMonitors
+	// to proceed and start new monitors after stopMonitors has been called.
+	qm.running = false
 	monitors := qm.monitors
 	stopped := 0
 	for _, monitor := range monitors {
@@ -341,6 +354,7 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 			close(monitor.stopCh)
 		}
 	}
+	qm.monitors = nil
 	qm.monitorWG.Wait()
 	logger.Info("QuotaMonitor stopped monitors", "stopped", stopped, "total", len(monitors))
 }

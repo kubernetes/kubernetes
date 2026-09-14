@@ -32,6 +32,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest"
@@ -182,7 +183,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.RunLogs())
+			cmdutil.CheckErr(o.RunLogsContext(cmd.Context()))
 		},
 	}
 	o.AddFlags(cmd)
@@ -356,45 +357,44 @@ func (o LogsOptions) Validate() error {
 	return nil
 }
 
-// RunLogs wraps RunLogsContext with signal handling.
-// When a signal is received, streaming is stopped, then followed by os.Exit(1).
+// Deprecated: Use RunLogsContext instead which allows cancelling.
 func (o LogsOptions) RunLogs() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	intr := interrupt.New(nil, cancel)
-	return intr.Run(func() error {
-		return o.RunLogsContext(ctx)
-	})
+	return o.RunLogsContext(context.Background())
 }
 
 // RunLogsContext retrieves a pod log.
 //
-// This function does not handle signals. To interrupt streaming, cancel the context.
+// When a signal is received, streaming is stopped, then followed by os.Exit(1).
 func (o LogsOptions) RunLogsContext(ctx context.Context) error {
-	var requests map[corev1.ObjectReference]rest.ResponseWrapper
-	var err error
-	if o.AllPods {
-		requests, err = o.AllPodLogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
-	} else {
-		requests, err = o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
-	}
-	if err != nil {
-		return err
-	}
-
-	if o.Follow && len(requests) > 1 {
-		if len(requests) > o.MaxFollowConcurrency {
-			return fmt.Errorf(
-				"you are attempting to follow %d log streams, but maximum allowed concurrency is %d, use --max-log-requests to increase the limit",
-				len(requests), o.MaxFollowConcurrency,
-			)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	intr := interrupt.New(nil, cancel)
+	return intr.Run(func() error {
+		var requests map[corev1.ObjectReference]rest.ResponseWrapper
+		var err error
+		if o.AllPods {
+			requests, err = o.AllPodLogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
+		} else {
+			requests, err = o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
 		}
-	}
+		if err != nil {
+			return err
+		}
 
-	if o.Follow && len(requests) > 1 {
-		return o.parallelConsumeRequest(ctx, requests)
-	}
-	return o.sequentialConsumeRequest(ctx, requests)
+		if o.Follow && len(requests) > 1 {
+			if len(requests) > o.MaxFollowConcurrency {
+				return fmt.Errorf(
+					"you are attempting to follow %d log streams, but maximum allowed concurrency is %d, use --max-log-requests to increase the limit",
+					len(requests), o.MaxFollowConcurrency,
+				)
+			}
+		}
+
+		if o.Follow && len(requests) > 1 {
+			return o.parallelConsumeRequest(ctx, requests)
+		}
+		return o.sequentialConsumeRequest(ctx, requests)
+	})
 }
 
 func (o LogsOptions) parallelConsumeRequest(ctx context.Context, requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
@@ -405,17 +405,11 @@ func (o LogsOptions) parallelConsumeRequest(ctx context.Context, requests map[co
 		go func(objRef corev1.ObjectReference, request rest.ResponseWrapper) {
 			defer wg.Done()
 			out := o.addPrefixIfNeeded(objRef, writer)
-			if err := o.ConsumeRequestFn(ctx, request, out); err != nil {
-				if !o.IgnoreLogErrors {
-					writer.CloseWithError(err)
-
-					// It's important to return here to propagate the error via the pipe
-					return
-				}
-
-				fmt.Fprintf(writer, "error: %v\n", err)
+			if err := o.consumeWithRetry(ctx, request, out, writer); err != nil {
+				writer.CloseWithError(err)
+				// It's important to return here to propagate the error via the pipe
+				return
 			}
-
 		}(objRef, request)
 	}
 
@@ -431,16 +425,43 @@ func (o LogsOptions) parallelConsumeRequest(ctx context.Context, requests map[co
 func (o LogsOptions) sequentialConsumeRequest(ctx context.Context, requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
 	for objRef, request := range requests {
 		out := o.addPrefixIfNeeded(objRef, o.Out)
-		if err := o.ConsumeRequestFn(ctx, request, out); err != nil {
-			if !o.IgnoreLogErrors {
-				return err
-			}
-
-			fmt.Fprintf(o.Out, "error: %v\n", err)
+		if err := o.consumeWithRetry(ctx, request, out, o.Out); err != nil {
+			return err
 		}
 	}
 
 	return nil
+}
+
+func (o LogsOptions) consumeWithRetry(ctx context.Context, request rest.ResponseWrapper, out io.Writer, internalErrOut io.Writer) error {
+	if !o.Follow {
+		err := o.ConsumeRequestFn(ctx, request, out)
+		if err != nil && o.IgnoreLogErrors {
+			_, _ = fmt.Fprint(internalErrOut, "error: "+err.Error()+"\n")
+			return nil
+		}
+		return err
+	}
+
+	return wait.PollUntilContextTimeout(ctx, 1*time.Second, o.GetPodTimeout, true, func(_ context.Context) (bool, error) {
+		err := o.ConsumeRequestFn(ctx, request, out)
+		if err == nil {
+			return true, nil
+		}
+
+		if o.IgnoreLogErrors {
+			_, _ = fmt.Fprint(internalErrOut, "error: "+err.Error()+"\n")
+			return true, nil
+		}
+
+		_, _ = o.ErrOut.Write([]byte(err.Error() + "\n"))
+
+		if _, ok := err.(apierrors.APIStatus); ok {
+			return false, nil
+		}
+
+		return false, err
+	})
 }
 
 func (o LogsOptions) addPrefixIfNeeded(ref corev1.ObjectReference, writer io.Writer) io.Writer {

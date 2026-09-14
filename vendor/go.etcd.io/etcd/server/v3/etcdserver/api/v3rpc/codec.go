@@ -14,7 +14,7 @@
 
 package v3rpc
 
-import "github.com/golang/protobuf/proto"
+import "github.com/golang/protobuf/proto" //nolint:staticcheck // TODO: remove for a supported version
 
 type codec struct{}
 

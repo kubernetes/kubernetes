@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -26,6 +27,9 @@ import (
 )
 
 func TestTerminationOrderingSidecarStopAfterMain(t *testing.T) {
+	synctest.Test(t, testTerminationOrderingSidecarStopAfterMain)
+}
+func testTerminationOrderingSidecarStopAfterMain(t *testing.T) {
 	restartPolicy := v1.ContainerRestartPolicyAlways
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -55,9 +59,11 @@ func TestTerminationOrderingSidecarStopAfterMain(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	var sidecarWaitDelay int64
-	var mainWaitDelay int64
+	var sidecarWaitDelay, mainWaitDelay int64
+	syncChannel := make(chan struct{})
+
 	go func() {
+		close(syncChannel) // notifies other goroutine that this goroutine scheduled.
 		sidecarWaitDelay = int64(to.waitForTurn("init", 30))
 		to.containerTerminated("init")
 		wg.Done()
@@ -65,6 +71,7 @@ func TestTerminationOrderingSidecarStopAfterMain(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
+		<-syncChannel // make sure the other goroutine is scheduled.
 		mainWaitDelay = int64(to.waitForTurn("main", 0))
 		time.Sleep(1 * time.Second)
 		to.containerTerminated("main")
@@ -80,6 +87,9 @@ func TestTerminationOrderingSidecarStopAfterMain(t *testing.T) {
 }
 
 func TestTerminationOrderingSidecarsInReverseOrder(t *testing.T) {
+	synctest.Test(t, testTerminationOrderingSidecarsInReverseOrder)
+}
+func testTerminationOrderingSidecarsInReverseOrder(t *testing.T) {
 	restartPolicy := v1.ContainerRestartPolicyAlways
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -182,6 +192,9 @@ func TestTerminationOrderingSidecarsInReverseOrder(t *testing.T) {
 }
 
 func TestTerminationOrderingObeysGrace(t *testing.T) {
+	synctest.Test(t, testTerminationOrderingObeysGrace)
+}
+func testTerminationOrderingObeysGrace(t *testing.T) {
 	restartPolicy := v1.ContainerRestartPolicyAlways
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

@@ -247,7 +247,7 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 
 	cfg := &pkiutil.CertConfig{
 		Config:              certConfig,
-		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
+		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithm,
 	}
 
 	startTime := kubeadmutil.StartTimeUTC()
@@ -307,7 +307,7 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	}
 	cfg := &pkiutil.CertConfig{
 		Config:              certConfig,
-		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
+		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithm,
 	}
 
 	// generates the CSR request and save it

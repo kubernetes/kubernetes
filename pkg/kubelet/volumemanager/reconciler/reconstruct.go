@@ -185,7 +185,7 @@ func (rc *reconciler) updateReconstructedFromNodeStatus(ctx context.Context) {
 	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(ctx, string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		// This may repeat few times per second until kubelet is able to read its own status for the first time.
-		logger.V(4).Error(fetchErr, "Failed to get Node status to reconstruct device paths")
+		logger.V(4).Info("Failed to get Node status to reconstruct device paths", "err", fetchErr)
 		return
 	}
 

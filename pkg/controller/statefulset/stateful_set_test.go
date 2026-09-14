@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"sort"
 	"testing"
+	"time"
+
+	"github.com/onsi/gomega"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -37,9 +40,9 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var parentKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
@@ -268,7 +271,7 @@ func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
 	}
 
 	// It should not adopt revisions.
-	revisions, err := ssh.ListControllerRevisions(set, selector)
+	revisions, err := ssh.ListControllerRevisions(set, parentKind, selector)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -716,12 +719,14 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 			om.podsIndexer.Add(pod)
 			claims := getPersistentVolumeClaims(set, pod)
 			for _, claim := range claims {
-				om.CreateClaim(&claim)
+				if err := om.CreateClaim(&claim, set); err != nil {
+					t.Errorf("Failed to create claim %s: %v", claim.Name, err)
+				}
 			}
 		}
 
 		for i := range pods {
-			if _, err := om.setPodReadyCondition(set, i, true); err != nil {
+			if _, err := om.setPodReadyCondition(set, i, true, time.Now()); err != nil {
 				t.Errorf("%d: %v", i, err)
 			}
 			if _, err := om.setPodRunning(set, i); err != nil {
@@ -907,6 +912,64 @@ func TestStaleOwnerRefOnScaleup(t *testing.T) {
 	}
 }
 
+func TestStatefulSetAvailabilityCheck(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	set := setMinReadySeconds(newStatefulSet(4), int32(5)) // 5 seconds
+	set = setupPodManagementPolicy(apps.ParallelPodManagement, set)
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx, set)
+	if err := om.setsIndexer.Add(set); err != nil {
+		t.Fatalf("could not add set to the cache: %v", err)
+	}
+	now := time.Now()
+
+	pods := []*v1.Pod{}
+	pods = append(pods, newStatefulSetPod(set, 0))
+	pods = append(pods, newStatefulSetPod(set, 1))
+	pods[1].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: now}}}
+	pods = append(pods, newStatefulSetPod(set, 2))
+	pods[2].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: now.Add(-2 * time.Second)}}}
+	pods = append(pods, newStatefulSetPod(set, 3))
+	pods[3].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: now.Add(-4300 * time.Millisecond)}}}
+
+	for i, pod := range pods {
+		if err := om.podsIndexer.Add(pod); err != nil {
+			t.Fatalf("could not add pod to the cache %d: %v", i, err)
+		}
+		var err error
+		if pods, err = om.setPodRunning(set, i); err != nil {
+			t.Fatalf("%d: %v", i, err)
+		}
+	}
+	err := ssc.syncStatefulSet(tCtx, set, pods)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name); err != nil {
+		t.Fatalf("Could not get StatefulSet: %v", err)
+	}
+
+	// one pod is not ready
+	if set.Status.ReadyReplicas != 3 {
+		t.Errorf("Expected updated StatefulSet to contain ready replicas %v, got %v instead",
+			3, set.Status.ReadyReplicas)
+	}
+	if set.Status.AvailableReplicas != 0 {
+		t.Errorf("Expected updated StatefulSet to contain available replicas %v, got %v instead",
+			0, set.Status.AvailableReplicas)
+	}
+
+	if got, want := ssc.queue.Len(), 0; got != want {
+		t.Errorf("queue.Len() = %v, want %v", got, want)
+	}
+
+	// RS should be re-queued after 700ms to recompute .status.availableReplicas (200ms extra for the test).
+	tCtx.Eventually(ssc.queue.Len).WithTimeout(900*time.Millisecond).
+		WithPolling(10*time.Millisecond).
+		Should(gomega.Equal(1), " StatefulSet should be re-queued to recompute .status.availableReplicas")
+}
+
 func newFakeStatefulSetController(ctx context.Context, initialObjects ...runtime.Object) (*StatefulSetController, *StatefulPodControl, *fakeObjectManager, history.Interface) {
 	client := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
@@ -980,7 +1043,7 @@ func scaleUpStatefulSetControllerBounded(logger klog.Logger, set *apps.StatefulS
 		fakeWorker(ssc)
 		pod = getPodAtOrdinal(pods, ord)
 		prev = *pod
-		if pods, err = om.setPodReadyCondition(set, ord, true); err != nil {
+		if pods, err = om.setPodReadyCondition(set, ord, true, time.Now()); err != nil {
 			return err
 		}
 		pod = getPodAtOrdinal(pods, ord)

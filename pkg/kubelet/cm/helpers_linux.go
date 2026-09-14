@@ -31,11 +31,65 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
+
+// ApplyPodLevelMemoryHigh sets memory.high on the pod cgroup using the KEP-2570 formula.
+// Applies when PodLevelResources is enabled and the pod has memory limits declared
+// (either pod-level or all containers). Skips Guaranteed-like pods where request == limit.
+func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor float64) {
+	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
+	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
+		return
+	}
+	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
+	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	memoryLimitsDeclared := true
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if c.Resources.Limits.Memory().IsZero() {
+			memoryLimitsDeclared = false
+		}
+	}
+	if !pod.Spec.Resources.Limits.Memory().IsZero() {
+		memoryLimitsDeclared = true
+	}
+	if !memoryLimitsDeclared {
+		return
+	}
+	memoryRequest := int64(0)
+	memoryLimit := int64(0)
+	if req, found := reqs[v1.ResourceMemory]; found {
+		memoryRequest = req.Value()
+	}
+	if lim, found := limits[v1.ResourceMemory]; found {
+		memoryLimit = lim.Value()
+	}
+	if val := memoryHighForPod(memoryRequest, memoryLimit, throttlingFactor); val != "" {
+		if rc.Unified == nil {
+			rc.Unified = map[string]string{}
+		}
+		rc.Unified[Cgroup2MemoryHigh] = val
+	}
+}
+
+func memoryHighForPod(memoryRequest, memoryLimit int64, throttlingFactor float64) string {
+	if (memoryRequest == memoryLimit && memoryRequest != 0) || memoryLimit == 0 {
+		return ""
+	}
+	pageSize := int64(os.Getpagesize())
+	memoryHigh := int64(math.Floor(
+		float64(memoryRequest)+
+			(float64(memoryLimit)-float64(memoryRequest))*throttlingFactor)/float64(pageSize)) * pageSize
+	if memoryHigh > 0 && memoryHigh > memoryRequest {
+		return strconv.FormatInt(memoryHigh, 10)
+	}
+	return ""
+}
 
 const (
 	// These limits are defined in the kernel:
@@ -123,13 +177,15 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
+func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool, memoryReservationPolicy kubeletconfig.MemoryReservationPolicy) *ResourceConfig {
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
+	draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 	// sum requests and limits.
 	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !podLevelResourcesEnabled,
-		UseStatusResources:    false,
+		SkipPodLevelResources:                    !podLevelResourcesEnabled,
+		UseStatusResources:                       false,
+		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
@@ -137,16 +193,18 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 
 	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !podLevelResourcesEnabled,
-		ContainerFn: func(res v1.ResourceList, containerType resourcehelper.ContainerType) {
-			if res.Cpu().IsZero() {
-				cpuLimitsDeclared = false
-			}
-			if res.Memory().IsZero() {
-				memoryLimitsDeclared = false
-			}
-		},
+		SkipPodLevelResources:                    !podLevelResourcesEnabled,
+		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
 	})
+
+	for c := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
+		if c.Resources.Limits.Cpu().IsZero() {
+			cpuLimitsDeclared = false
+		}
+		if c.Resources.Limits.Memory().IsZero() {
+			memoryLimitsDeclared = false
+		}
+	}
 
 	if podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(allocatedPod) {
 		if !allocatedPod.Spec.Resources.Limits.Cpu().IsZero() {
@@ -207,14 +265,20 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 	}
 	result.HugePageLimit = hugePageLimits
 
-	if enforceMemoryQoS {
-		memoryMin := int64(0)
+	if enforceMemoryQoS && memoryReservationPolicy == kubeletconfig.TieredReservationMemoryReservationPolicy {
+		memoryRequest := int64(0)
 		if request, found := reqs[v1.ResourceMemory]; found {
-			memoryMin = request.Value()
+			memoryRequest = request.Value()
 		}
-		if memoryMin > 0 {
+		if memoryRequest > 0 {
+			// Guaranteed pods get memory.min (hard protection, kernel never reclaims).
+			// Burstable pods get memory.low (soft protection, kernel prefers not to reclaim).
+			cgroupKey := Cgroup2MemoryLow
+			if qosClass == v1.PodQOSGuaranteed {
+				cgroupKey = Cgroup2MemoryMin
+			}
 			result.Unified = map[string]string{
-				Cgroup2MemoryMin: strconv.FormatInt(memoryMin, 10),
+				cgroupKey: strconv.FormatInt(memoryRequest, 10),
 			}
 		}
 	}
@@ -347,7 +411,7 @@ func GetKubeletContainer(logger klog.Logger, kubeletCgroups string) (string, err
 func CPURequestsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
 	var cpuRequest *resource.Quantity
 	if podConfig != nil && *podConfig.CPUShares > 0 {
-		milliCPU := sharesToMilliCPU(int64(*podConfig.CPUShares))
+		milliCPU := SharesToMilliCPU(int64(*podConfig.CPUShares))
 		if milliCPU > 0 {
 			cpuRequest = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
 		}
@@ -356,11 +420,22 @@ func CPURequestsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
 	return cpuRequest
 }
 
+// CPUSharesEqualAfterV2RoundTrip reports whether readbackShares equals the result of
+// round-tripping allocatedShares through the cgroup v2 conversion path
+// (cpu.shares -> cpu.weight -> cpu.shares).
+//
+// On cgroup v2, cpu.weight has coarse granularity, so writing shares and reading
+// them back can be lossy. Callers can use this to treat the lossy readback as
+// equivalent to the originally allocated shares.
+func CPUSharesEqualAfterV2RoundTrip(allocatedShares, readbackShares uint64) bool {
+	return cpuWeightToCPUShares(getCPUWeight(&allocatedShares)) == readbackShares
+}
+
 func CPULimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
 	var cpuLimit *resource.Quantity
 
 	if podConfig != nil && *podConfig.CPUPeriod > 0 {
-		milliCPU := quotaToMilliCPU(*podConfig.CPUQuota, int64(*podConfig.CPUPeriod))
+		milliCPU := QuotaToMilliCPU(*podConfig.CPUQuota, int64(*podConfig.CPUPeriod))
 		if milliCPU > 0 {
 			cpuLimit = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
 		}
@@ -378,9 +453,8 @@ func MemoryLimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
 	return memLimit
 }
 
-// sharesToMilliCPU converts CpuShares (cpu.shares) to milli-CPU value
-// TODO - dedup sharesToMilliCPU with sharesToMilliCPU in pkg/kubelet/kuberuntime/helpers_linux.go
-func sharesToMilliCPU(shares int64) int64 {
+// SharesToMilliCPU converts CpuShares (cpu.shares) to milli-CPU value
+func SharesToMilliCPU(shares int64) int64 {
 	milliCPU := int64(0)
 	if shares >= int64(MinShares) {
 		milliCPU = int64(math.Ceil(float64(shares*MilliCPUToCPU) / float64(SharesPerCPU)))
@@ -388,10 +462,8 @@ func sharesToMilliCPU(shares int64) int64 {
 	return milliCPU
 }
 
-// quotaToMilliCPU converts cpu.cfs_quota_us and cpu.cfs_period_us to milli-CPU
-// value
-// TODO - dedup quotaToMilliCPU with sharesToMilliCPU in pkg/kubelet/kuberuntime/helpers_linux.go
-func quotaToMilliCPU(quota int64, period int64) int64 {
+// QuotaToMilliCPU converts cpu.cfs_quota_us and cpu.cfs_period_us to milli-CPU value
+func QuotaToMilliCPU(quota int64, period int64) int64 {
 	if quota == -1 {
 		return int64(0)
 	}

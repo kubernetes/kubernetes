@@ -25,9 +25,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -220,7 +218,7 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 					zoneHints.Insert(zone.Name)
 				}
 			}
-			if len(endpoint.Hints.ForNodes) > 0 && utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
+			if len(endpoint.Hints.ForNodes) > 0 {
 				nodeHints = sets.New[string]()
 				for _, node := range endpoint.Hints.ForNodes {
 					nodeHints.Insert(node.Name)
@@ -232,10 +230,19 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 		endpointInfo := newBaseEndpointInfo(endpointIP, portNum, isLocal,
 			ready, serving, terminating, zoneHints, nodeHints)
 
-		// This logic ensures we're deduplicating potential overlapping endpoints
-		// isLocal should not vary between matching endpoints, but if it does, we
-		// favor a true value here if it exists.
-		if _, exists := endpointSet[endpointInfo.String()]; !exists || isLocal {
+		// If an Endpoint gets moved from one slice to another, we may temporarily
+		// see it in both slices. Ideally we want to prefer the Endpoint from the
+		// more-recently-updated EndpointSlice, since it may have newer
+		// conditions. But we can't easily figure that out, and the situation will
+		// resolve itself once we receive the second EndpointSlice update anyway.
+		//
+		// On the other hand, there maybe also be two *different* Endpoints (i.e.,
+		// with different targetRefs) that point to the same IP, if the pod
+		// network reuses the IP from a terminating pod before the Pod object is
+		// fully deleted. In this case we want to prefer the running pod over the
+		// terminating one. (If there are multiple non-terminating pods with the
+		// same podIP, then the result is undefined.)
+		if _, exists := endpointSet[endpointInfo.String()]; !exists || !terminating {
 			endpointSet[endpointInfo.String()] = cache.makeEndpointInfo(endpointInfo, svcPortName)
 		}
 	}
@@ -292,21 +299,10 @@ func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[strin
 			}
 			// Ensure endpoints are always returned in the same order to simplify diffing.
 			sort.Sort(byEndpoint(endpointsMap[svcPortName]))
-
-			klog.V(3).InfoS("Setting endpoints for service port name", "portName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
 	}
 
 	return endpointsMap
-}
-
-// formatEndpointsList returns a string list converted from an endpoints list.
-func formatEndpointsList(endpoints []Endpoint) []string {
-	var formattedList []string
-	for _, ep := range endpoints {
-		formattedList = append(formattedList, ep.String())
-	}
-	return formattedList
 }
 
 // endpointSliceCacheKeys returns cache keys used for a given EndpointSlice.

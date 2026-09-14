@@ -23,10 +23,10 @@ package v1beta3
 //
 // ServiceAccountSubject holds detailed information for service-account-kind subject.
 type ServiceAccountSubjectApplyConfiguration struct {
-	// `namespace` is the namespace of matching ServiceAccount objects.
+	// namespace is the namespace of matching ServiceAccount objects.
 	// Required.
 	Namespace *string `json:"namespace,omitempty"`
-	// `name` is the name of matching ServiceAccount objects, or "*" to match regardless of name.
+	// name is the name of matching ServiceAccount objects, or "*" to match regardless of name.
 	// Required.
 	Name *string `json:"name,omitempty"`
 }

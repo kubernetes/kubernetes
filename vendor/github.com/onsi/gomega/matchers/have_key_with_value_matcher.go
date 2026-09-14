@@ -52,7 +52,7 @@ func (matcher *HaveKeyWithValueMatcher) Match(actual any) (success bool, err err
 	}
 
 	keys := reflect.ValueOf(actual).MapKeys()
-	for i := 0; i < len(keys); i++ {
+	for i := range keys {
 		success, err := keyMatcher.Match(keys[i].Interface())
 		if err != nil {
 			return false, fmt.Errorf("HaveKeyWithValue's key matcher failed with:\n%s%s", format.Indent, err.Error())

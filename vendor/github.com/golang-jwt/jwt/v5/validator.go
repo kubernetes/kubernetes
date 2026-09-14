@@ -1,8 +1,8 @@
 package jwt
 
 import (
-	"crypto/subtle"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -44,6 +44,9 @@ type Validator struct {
 	// requireExp specifies whether the exp claim is required
 	requireExp bool
 
+	// requireNbf specifies whether the nbf claim is required
+	requireNbf bool
+
 	// verifyIat specifies whether the iat (Issued At) claim will be verified.
 	// According to https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6 this
 	// only specifies the age of the token, but no validation check is
@@ -52,8 +55,12 @@ type Validator struct {
 	verifyIat bool
 
 	// expectedAud contains the audience this token expects. Supplying an empty
-	// string will disable aud checking.
-	expectedAud string
+	// slice will disable aud checking.
+	expectedAud []string
+
+	// expectAllAud specifies whether all expected audiences must be present in
+	// the token. If false, only one of the expected audiences must be present.
+	expectAllAud bool
 
 	// expectedIss contains the issuer this token expects. Supplying an empty
 	// string will disable iss checking.
@@ -88,7 +95,7 @@ func NewValidator(opts ...ParserOption) *Validator {
 func (v *Validator) Validate(claims Claims) error {
 	var (
 		now  time.Time
-		errs []error = make([]error, 0, 6)
+		errs = make([]error, 0, 6)
 		err  error
 	)
 
@@ -107,8 +114,9 @@ func (v *Validator) Validate(claims Claims) error {
 	}
 
 	// We always need to check not-before, but usage of the claim itself is
-	// OPTIONAL.
-	if err = v.verifyNotBefore(claims, now, false); err != nil {
+	// OPTIONAL by default. requireNbf overrides this behavior and makes
+	// the nbf claim mandatory.
+	if err = v.verifyNotBefore(claims, now, v.requireNbf); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -120,8 +128,8 @@ func (v *Validator) Validate(claims Claims) error {
 	}
 
 	// If we have an expected audience, we also require the audience claim
-	if v.expectedAud != "" {
-		if err = v.verifyAudience(claims, v.expectedAud, true); err != nil {
+	if len(v.expectedAud) > 0 {
+		if err = v.verifyAudience(claims, v.expectedAud, v.expectAllAud); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -226,33 +234,39 @@ func (v *Validator) verifyNotBefore(claims Claims, cmp time.Time, required bool)
 //
 // Additionally, if any error occurs while retrieving the claim, e.g., when its
 // the wrong type, an ErrTokenUnverifiable error will be returned.
-func (v *Validator) verifyAudience(claims Claims, cmp string, required bool) error {
+func (v *Validator) verifyAudience(claims Claims, cmp []string, expectAllAud bool) error {
 	aud, err := claims.GetAudience()
 	if err != nil {
 		return err
 	}
 
-	if len(aud) == 0 {
+	// Check that aud exists and is not empty. We only require the aud claim
+	// if we expect at least one audience to be present.
+	if len(aud) == 0 || len(aud) == 1 && aud[0] == "" {
+		required := len(v.expectedAud) > 0
 		return errorIfRequired(required, "aud")
 	}
 
-	// use a var here to keep constant time compare when looping over a number of claims
-	result := false
-
-	var stringClaims string
-	for _, a := range aud {
-		if subtle.ConstantTimeCompare([]byte(a), []byte(cmp)) != 0 {
-			result = true
+	if !expectAllAud {
+		for _, a := range aud {
+			// If we only expect one match, we can stop early if we find a match
+			if slices.Contains(cmp, a) {
+				return nil
+			}
 		}
-		stringClaims = stringClaims + a
+
+		return ErrTokenInvalidAudience
 	}
 
-	// case where "" is sent in one or many aud claims
-	if stringClaims == "" {
-		return errorIfRequired(required, "aud")
+	// Note that we are looping cmp here to ensure that all expected audiences
+	// are present in the aud claim.
+	for _, a := range cmp {
+		if !slices.Contains(aud, a) {
+			return ErrTokenInvalidAudience
+		}
 	}
 
-	return errorIfFalse(result, ErrTokenInvalidAudience)
+	return nil
 }
 
 // verifyIssuer compares the iss claim in claims against cmp.

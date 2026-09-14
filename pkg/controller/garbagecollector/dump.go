@@ -148,9 +148,9 @@ func NewDOTVertex(node *node) *dotVertex {
 		gvk:                gv.WithKind(node.identity.Kind),
 		namespace:          node.identity.Namespace,
 		name:               node.identity.Name,
-		beingDeleted:       node.beingDeleted,
-		deletingDependents: node.deletingDependents,
-		virtual:            node.virtual,
+		beingDeleted:       node.isBeingDeleted(),
+		deletingDependents: node.isDeletingDependents(),
+		virtual:            !node.isObserved(),
 	}
 }
 
@@ -195,7 +195,7 @@ func toDOTNodesAndEdges(uidToNode map[types.UID]*node) ([]*dotVertex, []dotEdge)
 	// add the vertices first, then edges.  That avoids having to deal with missing refs.
 	for _, node := range uidToNode {
 		// skip adding objects that don't have owner references and aren't referred to.
-		if len(node.dependents) == 0 && len(node.owners) == 0 {
+		if node.dependentsLength() == 0 && len(node.getOwners()) == 0 {
 			continue
 		}
 		vertex := NewDOTVertex(node)
@@ -204,7 +204,7 @@ func toDOTNodesAndEdges(uidToNode map[types.UID]*node) ([]*dotVertex, []dotEdge)
 	}
 	for _, node := range uidToNode {
 		currVertex := uidToVertex[node.identity.UID]
-		for _, ownerRef := range node.owners {
+		for _, ownerRef := range node.getOwners() {
 			currOwnerVertex, ok := uidToVertex[ownerRef.UID]
 			if !ok {
 				currOwnerVertex = NewMissingdotVertex(ownerRef)
@@ -253,14 +253,14 @@ func toDOTNodesAndEdgesForObj(uidToNode map[types.UID]*node, uids ...types.UID) 
 
 		interestingNodes[node.identity.UID] = node
 
-		for _, ownerRef := range node.owners {
+		for _, ownerRef := range node.getOwners() {
 			// if we've already inspected this UID, don't add it to be inspected again
 			if _, ok := interestingNodes[ownerRef.UID]; ok {
 				continue
 			}
 			uidsToCheck = append(uidsToCheck, ownerRef.UID)
 		}
-		for dependent := range node.dependents {
+		for _, dependent := range node.getDependents() {
 			// if we've already inspected this UID, don't add it to be inspected again
 			if _, ok := interestingNodes[dependent.identity.UID]; ok {
 				continue

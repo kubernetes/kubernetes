@@ -19,26 +19,29 @@ package horizontalpodautoscaler
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // autoscalerStrategy implements behavior for HorizontalPodAutoscalers
 type autoscalerStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating HorizontalPodAutoscaler
 // objects via the REST API.
-var Strategy = autoscalerStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = autoscalerStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for autoscaler.
 func (autoscalerStrategy) NamespaceScoped() bool {
@@ -55,12 +58,6 @@ func (autoscalerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.S
 		"autoscaling/v2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
-		"autoscaling/v2beta1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("status"),
-		),
-		"autoscaling/v2beta2": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("status"),
-		),
 	}
 
 	return fields
@@ -73,6 +70,11 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	// create cannot set status
 	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
 
+	// Feature gated in case someone is setting the generation themselves, they can opt out of this for 1 release
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAGeneration) {
+		newHPA.Generation = 1
+	}
+
 	dropDisabledFields(newHPA, nil)
 }
 
@@ -81,6 +83,24 @@ func (autoscalerStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 	autoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
 	opts := validationOptionsForHorizontalPodAutoscaler(autoscaler, nil)
 	return validation.ValidateHorizontalPodAutoscaler(autoscaler, opts)
+}
+
+// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
+// validation options.
+func (autoscalerStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	// HPAScaleToZero is enabled when its gate is enabled, or (on update) when the
+	// existing object already has MinReplicas == 0.
+	enableScaleToZero := utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero)
+	if !enableScaleToZero && oldObj != nil {
+		if oldHPA, ok := oldObj.(*autoscaling.HorizontalPodAutoscaler); ok {
+			if oldHPA.Spec.MinReplicas != nil && *oldHPA.Spec.MinReplicas == 0 {
+				enableScaleToZero = true
+			}
+		}
+	}
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.HPAScaleToZero): enableScaleToZero,
+	}}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -93,7 +113,7 @@ func (autoscalerStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for autoscalers.
-func (autoscalerStrategy) AllowCreateOnUpdate() bool {
+func (autoscalerStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -105,6 +125,12 @@ func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	newHPA.Status = oldHPA.Status
 
 	dropDisabledFields(newHPA, oldHPA)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAGeneration) {
+		if !apiequality.Semantic.DeepEqual(newHPA.Spec, oldHPA.Spec) {
+			newHPA.Generation = oldHPA.Generation + 1
+		}
+	}
 }
 
 // ValidateUpdate is the default update validation for an end user.
@@ -120,7 +146,7 @@ func (autoscalerStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime
 	return nil
 }
 
-func (autoscalerStrategy) AllowUnconditionalUpdate() bool {
+func (autoscalerStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -139,12 +165,6 @@ func (autoscalerStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"autoscaling/v2": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("spec"),
-		),
-		"autoscaling/v2beta1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("spec"),
-		),
-		"autoscaling/v2beta2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}
@@ -171,7 +191,7 @@ func (autoscalerStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) validation.HorizontalPodAutoscalerSpecValidationOptions {
 	opts := validation.HorizontalPodAutoscalerSpecValidationOptions{
 		MinReplicasLowerBound:           1,
-		ScaleTargetRefValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false},
+		ScaleTargetRefValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true},
 		ObjectMetricsValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{
 			AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
 		},

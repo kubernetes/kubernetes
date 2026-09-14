@@ -54,7 +54,7 @@ func (e *MaxMapPairsError) Error() string {
 	return "cbor: exceeded max number of key-value pairs " + strconv.Itoa(e.maxMapPairs) + " for CBOR map"
 }
 
-// IndefiniteLengthError indicates found disallowed indefinite length items.
+// IndefiniteLengthError indicates found disallowed indefinite-length items.
 type IndefiniteLengthError struct {
 	t cborType
 }
@@ -113,7 +113,7 @@ func (d *decoder) wellformedInternal(depth int, checkBuiltinTags bool) (int, err
 			}
 			return d.wellformedIndefiniteString(t, depth, checkBuiltinTags)
 		}
-		valInt := int(val)
+		valInt := int(val) //nolint:gosec
 		if valInt < 0 {
 			// Detect integer overflow
 			return 0, errors.New("cbor: " + t.String() + " length " + strconv.FormatUint(val, 10) + " is too large, causing integer overflow")
@@ -136,7 +136,7 @@ func (d *decoder) wellformedInternal(depth int, checkBuiltinTags bool) (int, err
 			return d.wellformedIndefiniteArrayOrMap(t, depth, checkBuiltinTags)
 		}
 
-		valInt := int(val)
+		valInt := int(val) //nolint:gosec
 		if valInt < 0 {
 			// Detect integer overflow
 			return 0, errors.New("cbor: " + t.String() + " length " + strconv.FormatUint(val, 10) + " is too large, it would cause integer overflow")
@@ -212,7 +212,7 @@ func (d *decoder) wellformedInternal(depth int, checkBuiltinTags bool) (int, err
 	return depth, nil
 }
 
-// wellformedIndefiniteString checks indefinite length byte/text string's well-formedness and returns max depth and error.
+// wellformedIndefiniteString checks indefinite-length byte/text string's well-formedness and returns max depth and error.
 func (d *decoder) wellformedIndefiniteString(t cborType, depth int, checkBuiltinTags bool) (int, error) {
 	var err error
 	for {
@@ -223,7 +223,7 @@ func (d *decoder) wellformedIndefiniteString(t cborType, depth int, checkBuiltin
 			d.off++
 			break
 		}
-		// Peek ahead to get next type and indefinite length status.
+		// Peek ahead to get next type and indefinite-length status.
 		nt, ai := parseInitialByte(d.data[d.off])
 		if t != nt {
 			return 0, &SyntaxError{"cbor: wrong element type " + nt.String() + " for indefinite-length " + t.String()}
@@ -238,7 +238,7 @@ func (d *decoder) wellformedIndefiniteString(t cborType, depth int, checkBuiltin
 	return depth, nil
 }
 
-// wellformedIndefiniteArrayOrMap checks indefinite length array/map's well-formedness and returns max depth and error.
+// wellformedIndefiniteArrayOrMap checks indefinite-length array/map's well-formedness and returns max depth and error.
 func (d *decoder) wellformedIndefiniteArrayOrMap(t cborType, depth int, checkBuiltinTags bool) (int, error) {
 	var err error
 	maxDepth := depth
@@ -326,7 +326,7 @@ func (d *decoder) wellformedHead() (t cborType, ai byte, val uint64, err error) 
 		val = uint64(binary.BigEndian.Uint16(d.data[d.off : d.off+argumentSize]))
 		d.off += argumentSize
 		if t == cborTypePrimitives {
-			if err := d.acceptableFloat(float64(float16.Frombits(uint16(val)).Float32())); err != nil {
+			if err := d.acceptableFloat(float64(float16.Frombits(uint16(val)).Float32())); err != nil { //nolint:gosec
 				return 0, 0, 0, err
 			}
 		}
@@ -341,7 +341,7 @@ func (d *decoder) wellformedHead() (t cborType, ai byte, val uint64, err error) 
 		val = uint64(binary.BigEndian.Uint32(d.data[d.off : d.off+argumentSize]))
 		d.off += argumentSize
 		if t == cborTypePrimitives {
-			if err := d.acceptableFloat(float64(math.Float32frombits(uint32(val)))); err != nil {
+			if err := d.acceptableFloat(float64(math.Float32frombits(uint32(val)))); err != nil { //nolint:gosec
 				return 0, 0, 0, err
 			}
 		}
@@ -379,12 +379,12 @@ func (d *decoder) wellformedHead() (t cborType, ai byte, val uint64, err error) 
 
 func (d *decoder) acceptableFloat(f float64) error {
 	switch {
-	case d.dm.nanDec == NaNDecodeForbidden && math.IsNaN(f):
+	case d.dm.nan == NaNDecodeForbidden && math.IsNaN(f):
 		return &UnacceptableDataItemError{
 			CBORType: cborTypePrimitives.String(),
 			Message:  "floating-point NaN",
 		}
-	case d.dm.infDec == InfDecodeForbidden && math.IsInf(f, 0):
+	case d.dm.inf == InfDecodeForbidden && math.IsInf(f, 0):
 		return &UnacceptableDataItemError{
 			CBORType: cborTypePrimitives.String(),
 			Message:  "floating-point infinity",

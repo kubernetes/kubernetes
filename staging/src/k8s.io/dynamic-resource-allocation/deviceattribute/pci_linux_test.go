@@ -39,18 +39,22 @@ func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		mockSysfsSetup    func(t *testing.T, mockSysfs sysfsPath)
+		testMachineSetup  func(t *testing.T, testRootPath string)
 		address           string
 		expectedAttribute *DeviceAttribute
 		expectsError      bool
 		expectedErrMsg    string
 	}{
 		"valid": {
-			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
-				devicePath := mockSysfs.devices(filepath.Join(pcieRoot, intermediateBusID, pciBusID))
-				touchFile(t, devicePath)
-				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
-				createSymlink(t, devicePath, busPath)
+			testMachineSetup: func(t *testing.T, testRootPath string) {
+				relDevicePath := filepath.Join("devices", pcieRoot, intermediateBusID, pciBusID)
+				touchFile(t, filepath.Join(testRootPath, relDevicePath))
+				busDir := filepath.Join(testRootPath, "bus", "pci", "devices")
+				mkDirAll(t, busDir)
+				createSymlink(t,
+					filepath.Join("..", "..", "..", relDevicePath),
+					filepath.Join(busDir, pciBusID),
+				)
 			},
 			address:           pciBusID,
 			expectedAttribute: &expectedAttribute,
@@ -75,11 +79,15 @@ func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
 			expectedErrMsg:    "no such file or directory",
 		},
 		"invalid symlink (invalid prefix)": {
-			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
-				devicePath := mockSysfs.devices(filepath.Join("invalid-pci-root", intermediateBusID, pciBusID))
-				touchFile(t, devicePath)
-				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
-				createSymlink(t, devicePath, busPath)
+			testMachineSetup: func(t *testing.T, testRootPath string) {
+				relDevicePath := filepath.Join("devices", "invalid-pci-root", intermediateBusID, pciBusID)
+				touchFile(t, filepath.Join(testRootPath, relDevicePath))
+				busDir := filepath.Join(testRootPath, "bus", "pci", "devices")
+				mkDirAll(t, busDir)
+				createSymlink(t,
+					filepath.Join("..", "..", "..", relDevicePath),
+					filepath.Join(busDir, pciBusID),
+				)
 			},
 			address:           pciBusID,
 			expectedAttribute: nil,
@@ -87,11 +95,15 @@ func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
 			expectedErrMsg:    fmt.Sprintf("symlink target for PCI Bus ID %s is invalid: it must start with", pciBusID),
 		},
 		"invalid symlink (invalid suffix)": {
-			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
-				devicePath := mockSysfs.devices(filepath.Join(pcieRoot, intermediateBusID, "0000:00:13.1")) // different PCI Bus ID
-				touchFile(t, devicePath)
-				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
-				createSymlink(t, devicePath, busPath)
+			testMachineSetup: func(t *testing.T, testRootPath string) {
+				relDevicePath := filepath.Join("devices", pcieRoot, intermediateBusID, "0000:00:13.1") // different PCI Bus ID
+				touchFile(t, filepath.Join(testRootPath, relDevicePath))
+				busDir := filepath.Join(testRootPath, "bus", "pci", "devices")
+				mkDirAll(t, busDir)
+				createSymlink(t,
+					filepath.Join("..", "..", "..", relDevicePath),
+					filepath.Join(busDir, pciBusID),
+				)
 			},
 			address:           pciBusID,
 			expectedAttribute: nil,
@@ -101,20 +113,12 @@ func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockSysfsPath := t.TempDir()
-			mockSysfs := sysfsPath(mockSysfsPath)
-			if test.mockSysfsSetup != nil {
-				test.mockSysfsSetup(t, mockSysfs)
+			// per docs, the testing package ensures cleanup, so no need to do that ourselves
+			testMachinePath := t.TempDir()
+			if test.testMachineSetup != nil {
+				test.testMachineSetup(t, testMachinePath)
 			}
-			sysfs = mockSysfs
-			t.Cleanup(func() {
-				sysfs = sysfsPath(sysfsRoot)
-				if err := os.RemoveAll(mockSysfsPath); err != nil {
-					t.Errorf("Failed to clean up mock sysfs path %s: %v", mockSysfsPath, err)
-				}
-			})
-
-			got, err := GetPCIeRootAttributeByPCIBusID(test.address)
+			got, err := GetPCIeRootAttributeByPCIBusID(test.address, WithFSFromRoot(testMachinePath))
 			if test.expectsError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -136,11 +140,71 @@ func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
 	}
 }
 
+func TestGetPCIBusIDAttribute(t *testing.T) {
+	pciBusID := "0000:02:00.0"
+	expectedAttribute := DeviceAttribute{
+		Name:  StandardDeviceAttributePCIBusID,
+		Value: resourceapi.DeviceAttribute{StringValue: ptr.To(pciBusID)},
+	}
+
+	tests := map[string]struct {
+		address           string
+		expectedAttribute *DeviceAttribute
+		expectsError      bool
+		expectedErrMsg    string
+	}{
+		"valid": {
+			address:           pciBusID,
+			expectedAttribute: &expectedAttribute,
+			expectsError:      false,
+		},
+		"invalid empty PCI Bus ID": {
+			address:           "",
+			expectedAttribute: nil,
+			expectsError:      true,
+			expectedErrMsg:    "PCI Bus ID cannot be empty",
+		},
+		"invalid PCI Bus ID format": {
+			address:           "invalid-pci-id",
+			expectedAttribute: nil,
+			expectsError:      true,
+			expectedErrMsg:    "invalid PCI Bus ID format: invalid-pci-id",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := GetPCIBusIDAttribute(test.address)
+			if test.expectsError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+					return
+				}
+				if !strings.Contains(err.Error(), test.expectedErrMsg) {
+					t.Errorf("Expected error message to contain %q, got %q", test.expectedErrMsg, err.Error())
+					return
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(got, *test.expectedAttribute) {
+				t.Errorf("Expected attribute %v, got %v", test.expectedAttribute, got)
+			}
+		})
+	}
+}
+
+func mkDirAll(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(path, 0755); err != nil {
+		t.Fatalf("Failed to create directory %s: %v", path, err)
+	}
+}
+
 func touchFile(t *testing.T, path string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatalf("Failed to create directory %s: %v", filepath.Dir(path), err)
-	}
+	mkDirAll(t, filepath.Dir(path))
 	if _, err := os.Create(path); err != nil {
 		t.Fatalf("Failed to create file %s: %v", path, err)
 	}
@@ -148,9 +212,6 @@ func touchFile(t *testing.T, path string) {
 
 func createSymlink(t *testing.T, target, link string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(link), 0755); err != nil {
-		t.Fatalf("Failed to create directory for symlink %s: %v", filepath.Dir(link), err)
-	}
 	if err := os.Symlink(target, link); err != nil {
 		t.Fatalf("Failed to create symlink from %s to %s: %v", target, link, err)
 	}

@@ -55,12 +55,12 @@ var registerMetrics sync.Once
 
 // PVLister used to list persistent volumes.
 type PVLister interface {
-	List() []interface{}
+	List() []*v1.PersistentVolume
 }
 
 // PVCLister used to list persistent volume claims.
 type PVCLister interface {
-	List() []interface{}
+	List() []*v1.PersistentVolumeClaim
 }
 
 // Register all metrics for pv controller.
@@ -68,6 +68,7 @@ func Register(pvLister PVLister, pvcLister PVCLister, pluginMgr *volume.VolumePl
 	registerMetrics.Do(func() {
 		legacyregistry.CustomMustRegister(newPVAndPVCCountCollector(pvLister, pvcLister, pluginMgr))
 		legacyregistry.MustRegister(volumeOperationErrorsMetric)
+		legacyregistry.MustRegister(volumeOperationErrorMetric)
 		legacyregistry.MustRegister(retroactiveStorageClassMetric)
 		legacyregistry.MustRegister(retroactiveStorageClassErrorMetric)
 	})
@@ -135,7 +136,16 @@ var (
 
 	volumeOperationErrorsMetric = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Name:           "volume_operation_total_errors",
+			Name:              "volume_operation_total_errors",
+			Help:              "Total volume operation errors",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.36.0",
+		},
+		[]string{"plugin_name", "operation_name"})
+
+	volumeOperationErrorMetric = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "volume_operation_errors_total",
 			Help:           "Total volume operation errors",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -194,11 +204,7 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- metrics.Metric) {
 	boundNumberByStorageClass := make(map[string]int)
 	unboundNumberByStorageClass := make(map[string]int)
 	totalCount := make(volumeCount)
-	for _, pvObj := range collector.pvLister.List() {
-		pv, ok := pvObj.(*v1.PersistentVolume)
-		if !ok {
-			continue
-		}
+	for _, pv := range collector.pvLister.List() {
 		pluginName := collector.getPVPluginName(pv)
 		totalCount.add(pluginName, string(*pv.Spec.VolumeMode))
 		if pv.Status.Phase == v1.VolumeBound {
@@ -236,11 +242,7 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- metrics.Metric) {
 func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- metrics.Metric) {
 	boundNumber := make(map[pvcBindingMetricDimensions]int)
 	unboundNumber := make(map[pvcBindingMetricDimensions]int)
-	for _, pvcObj := range collector.pvcLister.List() {
-		pvc, ok := pvcObj.(*v1.PersistentVolumeClaim)
-		if !ok {
-			continue
-		}
+	for _, pvc := range collector.pvcLister.List() {
 		if pvc.Status.Phase == v1.ClaimBound {
 			boundNumber[getPVCMetricDimensions(pvc)]++
 		} else {
@@ -282,6 +284,7 @@ func RecordVolumeOperationErrorMetric(pluginName, opName string) {
 		pluginName = "N/A"
 	}
 	volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
+	volumeOperationErrorMetric.WithLabelValues(pluginName, opName).Inc()
 }
 
 // operationTimestamp stores the start time of an operation by a plugin

@@ -3,9 +3,9 @@
 package hcn
 
 import (
+	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -87,7 +87,7 @@ func getSupportedFeatures() (SupportedFeatures, error) {
 	globals, err := GetGlobals()
 	if err != nil {
 		// It's expected if this fails once, it should always fail. It should fail on pre 1803 builds for example.
-		return SupportedFeatures{}, errors.Wrap(err, "failed to query HCN version number: this is expected on pre 1803 builds.")
+		return SupportedFeatures{}, fmt.Errorf("failed to query HCN version number (this is expected on pre 1803 builds): %w", err)
 	}
 	features.Acl = AclFeatures{
 		AclAddressLists:       isFeatureSupported(globals.Version, HNSVersion1803),

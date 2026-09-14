@@ -28,12 +28,12 @@ import (
 // HTTPIngressPath associates a path with a backend. Incoming urls matching the
 // path are forwarded to the backend.
 type HTTPIngressPathApplyConfiguration struct {
-	// Path is matched against the path of an incoming request. Currently it can
+	// path is matched against the path of an incoming request. Currently it can
 	// contain characters disallowed from the conventional "path" part of a URL
 	// as defined by RFC 3986. Paths must begin with a '/'. When unspecified,
 	// all paths from incoming requests are matched.
 	Path *string `json:"path,omitempty"`
-	// PathType determines the interpretation of the Path matching. PathType can
+	// pathType determines the interpretation of the Path matching. PathType can
 	// be one of the following values:
 	// * Exact: Matches the URL path exactly.
 	// * Prefix: Matches based on a URL path prefix split by '/'. Matching is
@@ -49,7 +49,7 @@ type HTTPIngressPathApplyConfiguration struct {
 	// Implementations are required to support all path types.
 	// Defaults to ImplementationSpecific.
 	PathType *extensionsv1beta1.PathType `json:"pathType,omitempty"`
-	// Backend defines the referenced service endpoint to which the traffic
+	// backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
 	Backend *IngressBackendApplyConfiguration `json:"backend,omitempty"`
 }

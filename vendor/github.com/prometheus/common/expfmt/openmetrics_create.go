@@ -30,7 +30,6 @@ import (
 
 type encoderOption struct {
 	withCreatedLines bool
-	withUnit         bool
 }
 
 type EncoderOption func(*encoderOption)
@@ -48,17 +47,6 @@ type EncoderOption func(*encoderOption)
 func WithCreatedLines() EncoderOption {
 	return func(t *encoderOption) {
 		t.withCreatedLines = true
-	}
-}
-
-// WithUnit is an EncoderOption enabling a set unit to be written to the output
-// and to be added to the metric name, if it's not there already, as a suffix.
-// Without opting in this way, the unit will not be added to the metric name and,
-// on top of that, the unit will not be passed onto the output, even if it
-// were declared in the *dto.MetricFamily struct, i.e. even if in.Unit !=nil.
-func WithUnit() EncoderOption {
-	return func(t *encoderOption) {
-		t.withUnit = true
 	}
 }
 
@@ -98,15 +86,6 @@ func WithUnit() EncoderOption {
 //     lines. A counter with a missing `_total` suffix is not an error. However,
 //     its type will be set to `unknown` in that case to avoid invalid OpenMetrics
 //     output.
-//
-//   - According to the OM specs, the `# UNIT` line is optional, but if populated,
-//     the unit has to be present in the metric name as its suffix:
-//     (see https://github.com/prometheus/OpenMetrics/blob/v1.0.0/specification/OpenMetrics.md#unit).
-//     However, in order to accommodate any potential scenario where such a change in the
-//     metric name is not desirable, the users are here given the choice of either explicitly
-//     opt in, in case they wish for the unit to be included in the output AND in the metric name
-//     as a suffix (see the description of the WithUnit function above),
-//     or not to opt in, in case they don't want for any of that to happen.
 //
 //   - No support for the following (optional) features: info type,
 //     stateset type, gaugehistogram type.
@@ -151,47 +130,44 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 	if metricType == dto.MetricType_COUNTER && strings.HasSuffix(compliantName, "_total") {
 		compliantName = name[:len(name)-6]
 	}
-	if toOM.withUnit && in.Unit != nil && !strings.HasSuffix(compliantName, "_"+*in.Unit) {
-		compliantName = compliantName + "_" + *in.Unit
-	}
 
 	// Comments, first HELP, then TYPE.
 	if in.Help != nil {
 		n, err = w.WriteString("# HELP ")
 		written += n
 		if err != nil {
-			return
+			return written, err
 		}
 		n, err = writeName(w, compliantName)
 		written += n
 		if err != nil {
-			return
+			return written, err
 		}
 		err = w.WriteByte(' ')
 		written++
 		if err != nil {
-			return
+			return written, err
 		}
 		n, err = writeEscapedString(w, *in.Help, true)
 		written += n
 		if err != nil {
-			return
+			return written, err
 		}
 		err = w.WriteByte('\n')
 		written++
 		if err != nil {
-			return
+			return written, err
 		}
 	}
 	n, err = w.WriteString("# TYPE ")
 	written += n
 	if err != nil {
-		return
+		return written, err
 	}
 	n, err = writeName(w, compliantName)
 	written += n
 	if err != nil {
-		return
+		return written, err
 	}
 	switch metricType {
 	case dto.MetricType_COUNTER:
@@ -208,39 +184,41 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 		n, err = w.WriteString(" unknown\n")
 	case dto.MetricType_HISTOGRAM:
 		n, err = w.WriteString(" histogram\n")
+	case dto.MetricType_GAUGE_HISTOGRAM:
+		n, err = w.WriteString(" gaugehistogram\n")
 	default:
 		return written, fmt.Errorf("unknown metric type %s", metricType.String())
 	}
 	written += n
 	if err != nil {
-		return
+		return written, err
 	}
-	if toOM.withUnit && in.Unit != nil {
+	if in.Unit != nil {
 		n, err = w.WriteString("# UNIT ")
 		written += n
 		if err != nil {
-			return
+			return written, err
 		}
 		n, err = writeName(w, compliantName)
 		written += n
 		if err != nil {
-			return
+			return written, err
 		}
 
 		err = w.WriteByte(' ')
 		written++
 		if err != nil {
-			return
+			return written, err
 		}
 		n, err = writeEscapedString(w, *in.Unit, true)
 		written += n
 		if err != nil {
-			return
+			return written, err
 		}
 		err = w.WriteByte('\n')
 		written++
 		if err != nil {
-			return
+			return written, err
 		}
 	}
 
@@ -304,7 +282,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 				)
 				written += n
 				if err != nil {
-					return
+					return written, err
 				}
 			}
 			n, err = writeOpenMetricsSample(
@@ -314,7 +292,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 			)
 			written += n
 			if err != nil {
-				return
+				return written, err
 			}
 			n, err = writeOpenMetricsSample(
 				w, compliantName, "_count", metric, "", 0,
@@ -325,7 +303,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 				createdTsBytesWritten, err = writeOpenMetricsCreated(w, compliantName, "", metric, "", 0, metric.Summary.GetCreatedTimestamp())
 				n += createdTsBytesWritten
 			}
-		case dto.MetricType_HISTOGRAM:
+		case dto.MetricType_HISTOGRAM, dto.MetricType_GAUGE_HISTOGRAM:
 			if metric.Histogram == nil {
 				return written, fmt.Errorf(
 					"expected histogram in metric %s %s", compliantName, metric,
@@ -333,6 +311,12 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 			}
 			infSeen := false
 			for _, b := range metric.Histogram.Bucket {
+				if b.GetCumulativeCountFloat() > 0 {
+					return written, fmt.Errorf(
+						"OpenMetrics v1.0 does not support float histogram %s %s",
+						compliantName, metric,
+					)
+				}
 				n, err = writeOpenMetricsSample(
 					w, compliantName, "_bucket", metric,
 					model.BucketLabel, b.GetUpperBound(),
@@ -341,7 +325,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 				)
 				written += n
 				if err != nil {
-					return
+					return written, err
 				}
 				if math.IsInf(b.GetUpperBound(), +1) {
 					infSeen = true
@@ -354,9 +338,12 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 					0, metric.Histogram.GetSampleCount(), true,
 					nil,
 				)
+				// We do not check for a float sample count here
+				// because we will check for it below (and error
+				// out if needed).
 				written += n
 				if err != nil {
-					return
+					return written, err
 				}
 			}
 			n, err = writeOpenMetricsSample(
@@ -366,7 +353,13 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 			)
 			written += n
 			if err != nil {
-				return
+				return written, err
+			}
+			if metric.Histogram.GetSampleCountFloat() > 0 {
+				return written, fmt.Errorf(
+					"OpenMetrics v1.0 does not support float histogram %s %s",
+					compliantName, metric,
+				)
 			}
 			n, err = writeOpenMetricsSample(
 				w, compliantName, "_count", metric, "", 0,
@@ -384,10 +377,10 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 		}
 		written += n
 		if err != nil {
-			return
+			return written, err
 		}
 	}
-	return
+	return written, err
 }
 
 // FinalizeOpenMetrics writes the final `# EOF\n` line required by OpenMetrics.

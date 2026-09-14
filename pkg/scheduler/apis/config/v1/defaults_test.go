@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/featuregate"
@@ -57,7 +59,8 @@ var pluginConfigs = []configv1.PluginConfig{
 				Kind:       "DynamicResourcesArgs",
 				APIVersion: "kubescheduler.config.k8s.io/v1",
 			},
-			FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+			FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+			BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
 		}},
 	},
 	{
@@ -121,6 +124,10 @@ var pluginConfigs = []configv1.PluginConfig{
 				APIVersion: "kubescheduler.config.k8s.io/v1",
 			},
 			BindTimeoutSeconds: ptr.To[int64](600),
+			Shape: []configv1.UtilizationShapePoint{
+				{Utilization: 0, Score: 10},
+				{Utilization: 100, Score: 0},
+			},
 		}},
 	},
 }
@@ -279,7 +286,8 @@ func TestSchedulerDefaults(t *testing.T) {
 										Kind:       "DynamicResourcesArgs",
 										APIVersion: "kubescheduler.config.k8s.io/v1",
 									},
-									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+									FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+									BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
 								}},
 							},
 							{
@@ -343,6 +351,10 @@ func TestSchedulerDefaults(t *testing.T) {
 										APIVersion: "kubescheduler.config.k8s.io/v1",
 									},
 									BindTimeoutSeconds: ptr.To[int64](600),
+									Shape: []configv1.UtilizationShapePoint{
+										{Utilization: 0, Score: 10},
+										{Utilization: 100, Score: 0},
+									},
 								}},
 							},
 						},
@@ -354,8 +366,8 @@ func TestSchedulerDefaults(t *testing.T) {
 								Enabled: []configv1.Plugin{
 									{Name: names.SchedulingGates},
 									{Name: names.PrioritySort},
-									{Name: names.NodeUnschedulable},
 									{Name: names.NodeName},
+									{Name: names.NodeUnschedulable},
 									{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 									{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 									{Name: names.NodePorts},
@@ -371,6 +383,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 									{Name: names.DefaultBinder},
+									{Name: names.NodeDeclaredFeatures},
 								},
 							},
 							Bind: configv1.PluginSet{
@@ -915,5 +928,24 @@ func TestPluginArgsDefaults(t *testing.T) {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestPluginsNames(t *testing.T) {
+	plugins := &configv1.Plugins{}
+	val := reflect.ValueOf(plugins).Elem()
+
+	want := sets.New[string]()
+	for i := 0; i < val.NumField(); i++ {
+		name := val.Type().Field(i).Name
+		val.Field(i).Set(reflect.ValueOf(configv1.PluginSet{
+			Enabled: []configv1.Plugin{{Name: name}},
+		}))
+		want.Insert(name)
+	}
+
+	gotNames := pluginsNames(plugins)
+	if diff := cmp.Diff(sets.List(want), gotNames); diff != "" {
+		t.Errorf("pluginsNames() doesn't contain all extension points (-want,+got):\n%s", diff)
 	}
 }

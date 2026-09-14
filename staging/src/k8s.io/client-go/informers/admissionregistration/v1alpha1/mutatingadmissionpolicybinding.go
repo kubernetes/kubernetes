@@ -25,6 +25,7 @@ import (
 	apiadmissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -33,11 +34,39 @@ import (
 )
 
 // MutatingAdmissionPolicyBindingInformer provides access to a shared informer and lister for
-// MutatingAdmissionPolicyBindings.
+// MutatingAdmissionPolicyBindings. Prefer using the type-safe variant (see [TypedMutatingAdmissionPolicyBindingInformer]).
 type MutatingAdmissionPolicyBindingInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingLister
 }
+
+// TypedMutatingAdmissionPolicyBindingInformer provides access to a shared informer and lister for
+// MutatingAdmissionPolicyBindings, including the type-safe TypedInformer variant.
+// It is a superset of MutatingAdmissionPolicyBindingInformer.
+type TypedMutatingAdmissionPolicyBindingInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() MutatingAdmissionPolicyBindingIndexInformer
+	Lister() admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingLister
+}
+
+// MutatingAdmissionPolicyBindingIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type MutatingAdmissionPolicyBindingIndexInformer cache.TypedSharedIndexInformer[*apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding]
+
+// MutatingAdmissionPolicyBindingHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for MutatingAdmissionPolicyBinding.
+type MutatingAdmissionPolicyBindingHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding]
+
+// MutatingAdmissionPolicyBindingDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for MutatingAdmissionPolicyBinding.
+type MutatingAdmissionPolicyBindingDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding]
+
+// MutatingAdmissionPolicyBindingFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for MutatingAdmissionPolicyBinding.
+type MutatingAdmissionPolicyBindingFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding]
+
+// MutatingAdmissionPolicyBindingIndexers is a specialization of [cache.TypedIndexers] for MutatingAdmissionPolicyBinding.
+type MutatingAdmissionPolicyBindingIndexers = cache.TypedIndexers[*apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding]
+
+// DeletedMutatingAdmissionPolicyBinding is a specialization of [cache.DeletedObject] for MutatingAdmissionPolicyBinding.
+type DeletedMutatingAdmissionPolicyBinding = cache.DeletedObject[*apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding]
 
 type mutatingAdmissionPolicyBindingInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -47,55 +76,132 @@ type mutatingAdmissionPolicyBindingInformer struct {
 // NewMutatingAdmissionPolicyBindingInformer constructs a new informer for MutatingAdmissionPolicyBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedMutatingAdmissionPolicyBindingInformer]).
 func NewMutatingAdmissionPolicyBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredMutatingAdmissionPolicyBindingInformer(client, resyncPeriod, indexers, nil)
+	return NewMutatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedMutatingAdmissionPolicyBindingInformer constructs a new informer for MutatingAdmissionPolicyBinding type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedMutatingAdmissionPolicyBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers MutatingAdmissionPolicyBindingIndexers) MutatingAdmissionPolicyBindingIndexInformer {
+	return NewTypedMutatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredMutatingAdmissionPolicyBindingInformer constructs a new informer for MutatingAdmissionPolicyBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredMutatingAdmissionPolicyBindingInformer]).
 func NewFilteredMutatingAdmissionPolicyBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewTypedMutatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredMutatingAdmissionPolicyBindingInformer constructs a new informer for MutatingAdmissionPolicyBinding type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredMutatingAdmissionPolicyBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers MutatingAdmissionPolicyBindingIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) MutatingAdmissionPolicyBindingIndexInformer {
+	return NewTypedMutatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewMutatingAdmissionPolicyBindingInformerWithOptions constructs a new informer for MutatingAdmissionPolicyBinding type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedMutatingAdmissionPolicyBindingInformerWithOptions]).
+func NewMutatingAdmissionPolicyBindingInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedMutatingAdmissionPolicyBindingInformerWithOptions(client, options)
+}
+
+// NewTypedMutatingAdmissionPolicyBindingInformerWithOptions constructs a new informer for MutatingAdmissionPolicyBinding type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedMutatingAdmissionPolicyBindingInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) MutatingAdmissionPolicyBindingIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Resource: "mutatingadmissionpolicybindings"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().List(context.Background(), options)
+				return client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Watch(context.Background(), options)
+				return client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Watch(context.Background(), opts)
 			},
-			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().List(ctx, options)
+				return client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().List(ctx, opts)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Watch(ctx, options)
+				return client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Watch(ctx, opts)
 			},
 		}, client),
 		&apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding{},
-		resyncPeriod,
-		indexers,
-	)
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
+		},
+	))
 }
 
 func (f *mutatingAdmissionPolicyBindingInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredMutatingAdmissionPolicyBindingInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedMutatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *mutatingAdmissionPolicyBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *mutatingAdmissionPolicyBindingInformer) TypedInformer() MutatingAdmissionPolicyBindingIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding](f.factory.InformerFor(&apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding{}, f.defaultInformer))
 }
 
 func (f *mutatingAdmissionPolicyBindingInformer) Lister() admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingLister {
 	return admissionregistrationv1alpha1.NewMutatingAdmissionPolicyBindingLister(f.Informer().GetIndexer())
+}
+
+// ToTypedMutatingAdmissionPolicyBindingInformer converts an untyped informer into a TypedMutatingAdmissionPolicyBindingInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *MutatingAdmissionPolicyBinding. If that is not the case, calling type-safe methods of the returned
+// TypedMutatingAdmissionPolicyBindingInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedMutatingAdmissionPolicyBindingInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedMutatingAdmissionPolicyBindingInformer(informer MutatingAdmissionPolicyBindingInformer) TypedMutatingAdmissionPolicyBindingInformer {
+	if informer, ok := informer.(TypedMutatingAdmissionPolicyBindingInformer); ok {
+		return informer
+	}
+	return &mutatingAdmissionPolicyBindingTypedInformerAdapter{informer}
+}
+
+type mutatingAdmissionPolicyBindingTypedInformerAdapter struct {
+	MutatingAdmissionPolicyBindingInformer
+}
+
+func (a *mutatingAdmissionPolicyBindingTypedInformerAdapter) TypedInformer() MutatingAdmissionPolicyBindingIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding](a.Informer())
+}
+
+// ToMutatingAdmissionPolicyBindingIndexInformer converts an untyped informer into a MutatingAdmissionPolicyBindingIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *MutatingAdmissionPolicyBinding. If that is not the case, calling type-safe methods of the returned
+// MutatingAdmissionPolicyBindingIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a MutatingAdmissionPolicyBindingIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToMutatingAdmissionPolicyBindingIndexInformer(informer cache.SharedIndexInformer) MutatingAdmissionPolicyBindingIndexInformer {
+	if informer, ok := informer.(MutatingAdmissionPolicyBindingIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding](informer)
 }

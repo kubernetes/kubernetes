@@ -17,34 +17,30 @@ limitations under the License.
 package benchmark
 
 import (
+	"context"
 	"fmt"
 	"math/rand/v2"
-	"path/filepath"
 	"reflect"
 	"sync"
 
-	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
-	"k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/ptr"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // createResourceClaimsOp defines an op where resource claims are created.
@@ -80,7 +76,7 @@ func (op *createResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *createResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	if op.CountParam != "" {
 		var err error
 		op.Count, err = w.Params.get(op.CountParam[1:])
@@ -118,135 +114,11 @@ func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
 		}
 	}
 
-	workers := op.Count
-	if workers > 30 {
-		workers = 30
-	}
+	workers := min(op.Count, 30)
 	workqueue.ParallelizeUntil(tCtx, workers, op.Count, create)
 	if createErr != nil {
 		tCtx.Fatal(createErr.Error())
 	}
-}
-
-// createResourceDriverOp defines an op where resource claims are created.
-type createResourceDriverOp struct {
-	// Must be createResourceDriverOpcode.
-	Opcode operationCode
-	// Name of the driver, used to reference it in a resource class.
-	DriverName string
-	// Number of claims to allow per node. Parameterizable through MaxClaimsPerNodeParam.
-	MaxClaimsPerNode int
-	// Template parameter for MaxClaimsPerNode.
-	MaxClaimsPerNodeParam string
-	// Nodes matching this glob pattern have resources managed by the driver.
-	Nodes string
-}
-
-var _ realOp = &createResourceDriverOp{}
-
-func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
-	if !isValidCount(allowParameterization, op.MaxClaimsPerNode, op.MaxClaimsPerNodeParam) {
-		return fmt.Errorf("invalid MaxClaimsPerNode=%d / MaxClaimsPerNodeParam=%q", op.MaxClaimsPerNode, op.MaxClaimsPerNodeParam)
-	}
-	if op.DriverName == "" {
-		return fmt.Errorf("DriverName must be set")
-	}
-	if op.Nodes == "" {
-		return fmt.Errorf("Nodes must be set")
-	}
-	return nil
-}
-
-func (op *createResourceDriverOp) collectsMetrics() bool {
-	return false
-}
-func (op *createResourceDriverOp) patchParams(w *workload) (realOp, error) {
-	if op.MaxClaimsPerNodeParam != "" {
-		var err error
-		op.MaxClaimsPerNode, err = w.Params.get(op.MaxClaimsPerNodeParam[1:])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return op, op.isValid(false)
-}
-
-func (op *createResourceDriverOp) run(tCtx ktesting.TContext, draManager framework.SharedDRAManager) {
-	tCtx.Logf("creating resource driver %q for nodes matching %q", op.DriverName, op.Nodes)
-
-	var driverNodes []string
-
-	nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
-	if err != nil {
-		tCtx.Fatalf("list nodes: %v", err)
-	}
-	for _, node := range nodes.Items {
-		match, err := filepath.Match(op.Nodes, node.Name)
-		if err != nil {
-			tCtx.Fatalf("matching glob pattern %q against node name %q: %v", op.Nodes, node.Name, err)
-		}
-		if match {
-			driverNodes = append(driverNodes, node.Name)
-		}
-	}
-
-	numSlices := 0
-	for _, nodeName := range driverNodes {
-		slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
-		_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create node resource slice")
-		numSlices++
-	}
-
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int {
-		slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
-		tCtx.ExpectNoError(err, "list ResourceSlices")
-		return len(slices)
-	}).Should(gomega.Equal(numSlices), "informer has received all ResourceSlices")
-
-	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		err := tCtx.Client().ResourceV1().ResourceSlices().DeleteCollection(tCtx,
-			metav1.DeleteOptions{},
-			metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + op.DriverName},
-		)
-		tCtx.ExpectNoError(err, "delete node resource slices")
-	})
-}
-
-func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.ResourceSlice {
-	slice := &resourceapi.ResourceSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: nodeName,
-		},
-
-		Spec: resourceapi.ResourceSliceSpec{
-			Driver:   driverName,
-			NodeName: &nodeName,
-			Pool: resourceapi.ResourcePool{
-				Name:               nodeName,
-				ResourceSliceCount: 1,
-			},
-		},
-	}
-
-	for i := 0; i < capacity; i++ {
-		slice.Spec.Devices = append(slice.Spec.Devices,
-			resourceapi.Device{
-				Name: fmt.Sprintf("instance-%d", i),
-				Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					"model":                {StringValue: ptr.To("A100")},
-					"family":               {StringValue: ptr.To("GPU")},
-					"driverVersion":        {VersionValue: ptr.To("1.2.3")},
-					"dra.example.com/numa": {IntValue: ptr.To(int64(i))},
-				},
-				Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-					"memory": {Value: resource.MustParse("1Gi")},
-				},
-			},
-		)
-	}
-
-	return slice
 }
 
 // allocResourceClaimsOp defines an op where resource claims with structured
@@ -268,7 +140,7 @@ func (op *allocResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *allocResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *allocResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *allocResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	return op, op.isValid(false)
 }
 
@@ -278,7 +150,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	claims, err := tCtx.Client().ResourceV1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "list claims")
 	tCtx.Logf("allocating %d ResourceClaims", len(claims.Items))
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 	defer tCtx.Cancel("allocResourceClaimsOp.run is done")
 
 	// Track cluster state.
@@ -292,30 +164,56 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		KubeClient:               tCtx.Client(),
 	}
 	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
-		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
-		resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
+		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	tCtx.ExpectNoError(err, "start resource slice tracker")
-	draManager := dynamicresources.NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil), resourceSliceTracker, informerFactory)
+	assumeCache := assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil)
+	draManager := dynamicresources.NewDRAManager(tCtx, assumeCache, resourceSliceTracker, informerFactory)
 	informerFactory.Start(tCtx.Done())
 	defer func() {
 		tCtx.Cancel("allocResourceClaimsOp.run is shutting down")
 		informerFactory.Shutdown()
 	}()
-	syncedInformers := informerFactory.WaitForCacheSync(tCtx.Done())
-	expectSyncedInformers := map[reflect.Type]bool{
-		reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
-		reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-		reflect.TypeOf(&v1.Node{}):                   true,
+	syncResult := informerFactory.WaitForCacheSyncWithContext(tCtx)
+	expectSyncResult := cache.SyncResult{
+		Synced: map[reflect.Type]bool{
+			reflect.TypeFor[*resourceapi.DeviceClass]():   true,
+			reflect.TypeFor[*resourceapi.ResourceClaim](): true,
+			reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+			reflect.TypeFor[*v1.Node]():                   true,
+		},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
-		expectSyncedInformers[reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{})] = true
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		expectSyncResult.Synced[reflect.TypeFor[*resourceapi.DeviceTaintRule]()] = true
+	}
+	if diff := cmp.Diff(expectSyncResult, syncResult,
+		cmp.Transformer("TypeOf", func(t reflect.Type) string {
+			return t.String()
+		}),
+	); diff != "" {
+		tCtx.Fatalf("unexpected informer sync result (- expected, + actual):\n%s", diff)
 	}
 
-	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
-	celCache := cel.NewCache(10, cel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)})
+	// The ResourceSlice tracker lags behind informers when DeviceTaintRules are enabled.
+	if !cache.WaitForCacheSync(tCtx.Done(), resourceSliceTracker.HasSynced) {
+		tCtx.Fatalf("resource slice tracker failed to sync: %v", context.Cause(tCtx))
+	}
+
+	celCache := cel.NewCache(10, cel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+	})
+
+	// Also wait for the assume cache to catch up.
+	// Without this we cannot reliably store the result of
+	// the UpdateStatus call below.
+	// Has to be done indirectly, the assume cache itself has
+	// no HasSynced method (maybe it should).
+	handle := assumeCache.AddEventHandler(cache.ResourceEventHandlerFuncs{})
+	if !cache.WaitForCacheSync(tCtx.Done(), handle.HasSynced) {
+		tCtx.Fatalf("assume cache failed to sync: %v", context.Cause(tCtx))
+	}
 
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())
@@ -369,6 +267,7 @@ claims:
 			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
 			ConsumableCapacity:   utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+			CompatibilityGroups:  utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceCompatibilityGroups),
 		}, allocatedState, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 

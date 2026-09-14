@@ -21,6 +21,7 @@ import (
 	// This should probably be part of some configuration fed into the build for a
 	// given binary target.
 
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 	"k8s.io/utils/exec"
 )
@@ -52,8 +52,8 @@ func ProbeAttachableVolumePlugins(logger klog.Logger, config persistentvolumecon
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for the attach/detach controller.
 // Currently only Flexvolume plugins are dynamically discoverable.
-func GetDynamicPluginProber(config persistentvolumeconfig.VolumeConfiguration) volume.DynamicPluginProber {
-	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir, exec.New() /*exec.Interface*/)
+func GetDynamicPluginProber(ctx context.Context, config persistentvolumeconfig.VolumeConfiguration) volume.DynamicPluginProber {
+	return flexvolume.GetDynamicPluginProber(ctx, config.FlexVolumePluginDir, exec.New() /*exec.Interface*/)
 }
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
@@ -123,12 +123,6 @@ func probeControllerVolumePlugins(logger klog.Logger, config persistentvolumecon
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
-
-	var err error
-	allPlugins, err = appendLegacyControllerProviders(logger, allPlugins, utilfeature.DefaultFeatureGate)
-	if err != nil {
-		return allPlugins, err
-	}
 
 	var filteredPlugins []volume.VolumePlugin
 	if filter == nil {

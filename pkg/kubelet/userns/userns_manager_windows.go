@@ -37,7 +37,7 @@ func (m *UsernsManager) Release(klog.Logger, types.UID) {
 	return
 }
 
-func (m *UsernsManager) GetOrCreateUserNamespaceMappings(context.Context, *v1.Pod, string) (*runtimeapi.UserNamespace, error) {
+func (m *UsernsManager) GetOrCreateUserNamespaceMappings(klog.Logger, *v1.Pod, string) (*runtimeapi.UserNamespace, error) {
 	return nil, nil
 }
 

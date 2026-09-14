@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -237,6 +238,27 @@ func (f *FakeRuntime) GetPods(_ context.Context, all bool) ([]*kubecontainer.Pod
 	return pods, f.Err
 }
 
+func (f *FakeRuntime) GetPod(_ context.Context, podUID types.UID) (*kubecontainer.Pod, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
+	for _, fakePod := range f.PodList {
+		if fakePod.Pod.ID == podUID {
+			return fakePod.Pod, nil
+		}
+	}
+	for _, fakePod := range f.AllPodList {
+		if fakePod.Pod.ID == podUID {
+			return fakePod.Pod, nil
+		}
+	}
+	return nil, kubecontainer.ErrPodNotFound
+}
+
 func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff, _ bool) (result kubecontainer.PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
@@ -303,7 +325,7 @@ func (f *FakeRuntime) GeneratePodStatus(event *runtimeapi.ContainerEventResponse
 	return &status
 }
 
-func (f *FakeRuntime) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+func (f *FakeRuntime) GetPodStatus(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -574,6 +596,9 @@ func (f *FakeRuntime) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kub
 	return f.PodResizeInProgress
 }
 
-func (f *FakeRuntime) UpdateActuatedPodLevelResources(allocatedPod *v1.Pod) error {
+func (f *FakeRuntime) UpdateActuatedPodLevelResources(logger klog.Logger, allocatedPod *v1.Pod) error {
 	return nil
+}
+
+func (f *FakeRuntime) InitializeActuatedPod(_ klog.Logger, _ *v1.Pod) {
 }

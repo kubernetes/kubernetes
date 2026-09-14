@@ -16,7 +16,7 @@ type (
 	// set into a wire representation.
 	Encoder interface {
 		// Encode returns the serialized encoding of the attribute set using
-		// its Iterator. This result may be cached by a attribute.Set.
+		// its Iterator. This result may be cached by an attribute.Set.
 		Encode(iterator Iterator) string
 
 		// ID returns a value that is unique for each class of attribute
@@ -53,7 +53,7 @@ var (
 	_ Encoder = &defaultAttrEncoder{}
 
 	// encoderIDCounter is for generating IDs for other attribute encoders.
-	encoderIDCounter uint64
+	encoderIDCounter atomic.Uint64
 
 	defaultEncoderOnce     sync.Once
 	defaultEncoderID       = NewEncoderID()
@@ -64,7 +64,7 @@ var (
 // once per each type of attribute encoder. Preferably in init() or in var
 // definition.
 func NewEncoderID() EncoderID {
-	return EncoderID{value: atomic.AddUint64(&encoderIDCounter, 1)}
+	return EncoderID{value: encoderIDCounter.Add(1)}
 }
 
 // DefaultEncoder returns an attribute encoder that encodes attributes in such
@@ -78,7 +78,7 @@ func DefaultEncoder() Encoder {
 	defaultEncoderOnce.Do(func() {
 		defaultEncoderInstance = &defaultAttrEncoder{
 			pool: sync.Pool{
-				New: func() interface{} {
+				New: func() any {
 					return &bytes.Buffer{}
 				},
 			},
@@ -96,16 +96,18 @@ func (d *defaultAttrEncoder) Encode(iter Iterator) string {
 	for iter.Next() {
 		i, keyValue := iter.IndexedAttribute()
 		if i > 0 {
-			_, _ = buf.WriteRune(',')
+			_ = buf.WriteByte(',')
 		}
 		copyAndEscape(buf, string(keyValue.Key))
 
-		_, _ = buf.WriteRune('=')
+		_ = buf.WriteByte('=')
 
 		if keyValue.Value.Type() == STRING {
 			copyAndEscape(buf, keyValue.Value.AsString())
 		} else {
-			_, _ = buf.WriteString(keyValue.Value.Emit())
+			_, _ = buf.WriteString(
+				keyValue.Value.Emit(),
+			) //nolint:staticcheck // Preserve the existing default encoder output.
 		}
 	}
 	return buf.String()
@@ -122,14 +124,14 @@ func copyAndEscape(buf *bytes.Buffer, val string) {
 	for _, ch := range val {
 		switch ch {
 		case '=', ',', escapeChar:
-			_, _ = buf.WriteRune(escapeChar)
+			_ = buf.WriteByte(escapeChar)
 		}
 		_, _ = buf.WriteRune(ch)
 	}
 }
 
-// Valid returns true if this encoder ID was allocated by
-// `NewEncoderID`.  Invalid encoder IDs will not be cached.
+// Valid reports whether this encoder ID was allocated by
+// [NewEncoderID]. Invalid encoder IDs will not be cached.
 func (id EncoderID) Valid() bool {
 	return id.value != 0
 }

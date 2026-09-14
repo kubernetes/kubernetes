@@ -58,12 +58,18 @@ var decode cbor.DecMode = func() cbor.DecMode {
 		// with or without tagging. If a tag number is present, it must be valid.
 		TimeTag: cbor.DecTagOptional,
 
-		// Observed depth up to 16 in fuzzed batch/v1 CronJobList. JSON implementation limit
-		// is 10000.
-		MaxNestedLevels: 64,
+		// MaxNestedLevels is set to the same value used in the JSON implementation.
+		MaxNestedLevels: 10000,
 
-		MaxArrayElements: 1024,
-		MaxMapPairs:      1024,
+		// MaxArrayElements is set to the maximum allowed by the cbor library. We rely on
+		// the library initial wellformedness scan and on the api max request limit to
+		// prevent preallocating very large slices during decoding.
+		MaxArrayElements: 2147483647,
+
+		// MaxMapPairs specifies the maximum number of key-value pairs allowed in a map.
+		// We selected this value as it is large enough so that in practice the API server
+		// decoder will always hit the request body limit before the limit here is reached.
+		MaxMapPairs: 2097152,
 
 		// Indefinite-length sequences aren't produced by this serializer, but other
 		// implementations can.

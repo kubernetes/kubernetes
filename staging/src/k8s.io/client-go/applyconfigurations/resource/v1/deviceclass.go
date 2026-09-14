@@ -34,11 +34,8 @@ import (
 // device configuration and selectors. It can be referenced in
 // the device requests of a claim to apply these presets.
 // Cluster scoped.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type DeviceClassApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	// Standard object metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Spec defines what can be allocated and how to configure it.

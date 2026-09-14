@@ -16,7 +16,6 @@ import (
 	"math/big"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -326,14 +325,14 @@ func (dmkm DupMapKeyMode) valid() bool {
 	return dmkm >= 0 && dmkm < maxDupMapKeyMode
 }
 
-// IndefLengthMode specifies whether to allow indefinite length items.
+// IndefLengthMode specifies whether to allow indefinite-length items.
 type IndefLengthMode int
 
 const (
-	// IndefLengthAllowed allows indefinite length items.
+	// IndefLengthAllowed allows indefinite-length items.
 	IndefLengthAllowed IndefLengthMode = iota
 
-	// IndefLengthForbidden disallows indefinite length items.
+	// IndefLengthForbidden disallows indefinite-length items.
 	IndefLengthForbidden
 
 	maxIndefLengthMode
@@ -378,6 +377,7 @@ const (
 	// - int64 if value fits
 	// - big.Int or *big.Int (see BigIntDecMode) if value < math.MinInt64
 	// - return UnmarshalTypeError if value > math.MaxInt64
+	//
 	// Deprecated: IntDecConvertSigned should not be used.
 	// Please use other options, such as IntDecConvertSignedOrError, IntDecConvertSignedOrBigInt, IntDecConvertNone.
 	IntDecConvertSigned
@@ -811,7 +811,7 @@ type DecOptions struct {
 	// Default is 128*1024=131072 and it can be set to [16, 2147483647]
 	MaxMapPairs int
 
-	// IndefLength specifies whether to allow indefinite length CBOR items.
+	// IndefLength specifies whether to allow indefinite-length CBOR items.
 	IndefLength IndefLengthMode
 
 	// TagsMd specifies whether to allow CBOR tags (major type 6).
@@ -1055,7 +1055,7 @@ func (opts DecOptions) decMode() (*decMode, error) { //nolint:gocritic // ignore
 	}
 
 	if !opts.ExtraReturnErrors.valid() {
-		return nil, errors.New("cbor: invalid ExtraReturnErrors " + strconv.Itoa(int(opts.ExtraReturnErrors)))
+		return nil, errors.New("cbor: invalid ExtraReturnErrors " + strconv.Itoa(int(opts.ExtraReturnErrors))) //nolint:gosec
 	}
 
 	if opts.DefaultMapType != nil && opts.DefaultMapType.Kind() != reflect.Map {
@@ -1149,8 +1149,8 @@ func (opts DecOptions) decMode() (*decMode, error) { //nolint:gocritic // ignore
 		unrecognizedTagToAny:      opts.UnrecognizedTagToAny,
 		timeTagToAny:              opts.TimeTagToAny,
 		simpleValues:              simpleValues,
-		nanDec:                    opts.NaN,
-		infDec:                    opts.Inf,
+		nan:                       opts.NaN,
+		inf:                       opts.Inf,
 		byteStringToTime:          opts.ByteStringToTime,
 		byteStringExpectedFormat:  opts.ByteStringExpectedFormat,
 		bignumTag:                 opts.BignumTag,
@@ -1230,8 +1230,8 @@ type decMode struct {
 	unrecognizedTagToAny      UnrecognizedTagToAnyMode
 	timeTagToAny              TimeTagToAnyMode
 	simpleValues              *SimpleValueRegistry
-	nanDec                    NaNMode
-	infDec                    InfMode
+	nan                       NaNMode
+	inf                       InfMode
 	byteStringToTime          ByteStringToTimeMode
 	byteStringExpectedFormat  ByteStringExpectedFormatMode
 	bignumTag                 BignumTagMode
@@ -1272,8 +1272,8 @@ func (dm *decMode) DecOptions() DecOptions {
 		UnrecognizedTagToAny:      dm.unrecognizedTagToAny,
 		TimeTagToAny:              dm.timeTagToAny,
 		SimpleValues:              simpleValues,
-		NaN:                       dm.nanDec,
-		Inf:                       dm.infDec,
+		NaN:                       dm.nan,
+		Inf:                       dm.inf,
 		ByteStringToTime:          dm.byteStringToTime,
 		ByteStringExpectedFormat:  dm.byteStringExpectedFormat,
 		BignumTag:                 dm.bignumTag,
@@ -1583,11 +1583,11 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 		_, ai, val := d.getHead()
 		switch ai {
 		case additionalInformationAsFloat16:
-			f := float64(float16.Frombits(uint16(val)).Float32())
+			f := float64(float16.Frombits(uint16(val)).Float32()) //nolint:gosec
 			return fillFloat(t, f, v)
 
 		case additionalInformationAsFloat32:
-			f := float64(math.Float32frombits(uint32(val)))
+			f := float64(math.Float32frombits(uint32(val))) //nolint:gosec
 			return fillFloat(t, f, v)
 
 		case additionalInformationAsFloat64:
@@ -1595,10 +1595,10 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 			return fillFloat(t, f, v)
 
 		default: // ai <= 24
-			if d.dm.simpleValues.rejected[SimpleValue(val)] {
+			if d.dm.simpleValues.rejected[SimpleValue(val)] { //nolint:gosec
 				return &UnacceptableDataItemError{
 					CBORType: t.String(),
-					Message:  "simple value " + strconv.FormatInt(int64(val), 10) + " is not recognized",
+					Message:  "simple value " + strconv.FormatInt(int64(val), 10) + " is not recognized", //nolint:gosec
 				}
 			}
 
@@ -1677,20 +1677,23 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 		return d.parseToValue(v, tInfo)
 
 	case cborTypeArray:
-		if tInfo.nonPtrKind == reflect.Slice {
+		switch tInfo.nonPtrKind {
+		case reflect.Slice:
 			return d.parseArrayToSlice(v, tInfo)
-		} else if tInfo.nonPtrKind == reflect.Array {
+		case reflect.Array:
 			return d.parseArrayToArray(v, tInfo)
-		} else if tInfo.nonPtrKind == reflect.Struct {
+		case reflect.Struct:
 			return d.parseArrayToStruct(v, tInfo)
 		}
+
 		d.skip()
 		return &UnmarshalTypeError{CBORType: t.String(), GoType: tInfo.nonPtrType.String()}
 
 	case cborTypeMap:
-		if tInfo.nonPtrKind == reflect.Struct {
+		switch tInfo.nonPtrKind {
+		case reflect.Struct:
 			return d.parseMapToStruct(v, tInfo)
-		} else if tInfo.nonPtrKind == reflect.Map {
+		case reflect.Map:
 			return d.parseMapToMap(v, tInfo)
 		}
 		d.skip()
@@ -1745,8 +1748,8 @@ func (d *decoder) parseToTime() (time.Time, bool, error) {
 			// Read tag number
 			_, _, tagNum := d.getHead()
 			if tagNum != 0 && tagNum != 1 {
-				d.skip() // skip tag content
-				return time.Time{}, false, errors.New("cbor: wrong tag number for time.Time, got " + strconv.Itoa(int(tagNum)) + ", expect 0 or 1")
+				d.skip()                                                                                                                            // skip tag content
+				return time.Time{}, false, errors.New("cbor: wrong tag number for time.Time, got " + strconv.Itoa(int(tagNum)) + ", expect 0 or 1") //nolint:gosec
 			}
 		}
 	} else {
@@ -1815,10 +1818,10 @@ func (d *decoder) parseToTime() (time.Time, bool, error) {
 		var f float64
 		switch ai {
 		case additionalInformationAsFloat16:
-			f = float64(float16.Frombits(uint16(val)).Float32())
+			f = float64(float16.Frombits(uint16(val)).Float32()) //nolint:gosec
 
 		case additionalInformationAsFloat32:
-			f = float64(math.Float32frombits(uint32(val)))
+			f = float64(math.Float32frombits(uint32(val))) //nolint:gosec
 
 		case additionalInformationAsFloat64:
 			f = math.Float64frombits(val)
@@ -1832,6 +1835,13 @@ func (d *decoder) parseToTime() (time.Time, bool, error) {
 			return time.Time{}, true, nil
 		}
 		seconds, fractional := math.Modf(f)
+		if seconds > math.MaxInt64 || seconds < math.MinInt64 {
+			return time.Time{}, false, &UnmarshalTypeError{
+				CBORType: t.String(),
+				GoType:   typeTime.String(),
+				errorMsg: fmt.Sprintf("%v overflows Go's int64", f),
+			}
+		}
 		return time.Unix(int64(seconds), int64(fractional*1e9)), true, nil
 
 	default:
@@ -2145,14 +2155,14 @@ func (d *decoder) parse(skipSelfDescribedTag bool) (any, error) { //nolint:gocyc
 
 	case cborTypePrimitives:
 		_, ai, val := d.getHead()
-		if ai <= 24 && d.dm.simpleValues.rejected[SimpleValue(val)] {
+		if ai <= 24 && d.dm.simpleValues.rejected[SimpleValue(val)] { //nolint:gosec
 			return nil, &UnacceptableDataItemError{
 				CBORType: t.String(),
-				Message:  "simple value " + strconv.FormatInt(int64(val), 10) + " is not recognized",
+				Message:  "simple value " + strconv.FormatInt(int64(val), 10) + " is not recognized", //nolint:gosec
 			}
 		}
 		if ai < 20 || ai == 24 {
-			return SimpleValue(val), nil
+			return SimpleValue(val), nil //nolint:gosec
 		}
 
 		switch ai {
@@ -2165,11 +2175,11 @@ func (d *decoder) parse(skipSelfDescribedTag bool) (any, error) { //nolint:gocyc
 			return nil, nil
 
 		case additionalInformationAsFloat16:
-			f := float64(float16.Frombits(uint16(val)).Float32())
+			f := float64(float16.Frombits(uint16(val)).Float32()) //nolint:gosec
 			return f, nil
 
 		case additionalInformationAsFloat32:
-			f := float64(math.Float32frombits(uint32(val)))
+			f := float64(math.Float32frombits(uint32(val))) //nolint:gosec
 			return f, nil
 
 		case additionalInformationAsFloat64:
@@ -2202,16 +2212,16 @@ func (d *decoder) parse(skipSelfDescribedTag bool) (any, error) { //nolint:gocyc
 func (d *decoder) parseByteString() ([]byte, bool) {
 	_, _, val, indefiniteLength := d.getHeadWithIndefiniteLengthFlag()
 	if !indefiniteLength {
-		b := d.data[d.off : d.off+int(val)]
-		d.off += int(val)
+		b := d.data[d.off : d.off+int(val)] //nolint:gosec
+		d.off += int(val)                   //nolint:gosec
 		return b, false
 	}
-	// Process indefinite length string chunks.
+	// Process indefinite-length string chunks.
 	b := []byte{}
 	for !d.foundBreak() {
 		_, _, val = d.getHead()
-		b = append(b, d.data[d.off:d.off+int(val)]...)
-		d.off += int(val)
+		b = append(b, d.data[d.off:d.off+int(val)]...) //nolint:gosec
+		d.off += int(val)                              //nolint:gosec
 	}
 	return b, true
 }
@@ -2300,19 +2310,19 @@ func (d *decoder) applyByteStringTextConversion(
 func (d *decoder) parseTextString() ([]byte, error) {
 	_, _, val, indefiniteLength := d.getHeadWithIndefiniteLengthFlag()
 	if !indefiniteLength {
-		b := d.data[d.off : d.off+int(val)]
-		d.off += int(val)
+		b := d.data[d.off : d.off+int(val)] //nolint:gosec
+		d.off += int(val)                   //nolint:gosec
 		if d.dm.utf8 == UTF8RejectInvalid && !utf8.Valid(b) {
 			return nil, &SemanticError{"cbor: invalid UTF-8 string"}
 		}
 		return b, nil
 	}
-	// Process indefinite length string chunks.
+	// Process indefinite-length string chunks.
 	b := []byte{}
 	for !d.foundBreak() {
 		_, _, val = d.getHead()
-		x := d.data[d.off : d.off+int(val)]
-		d.off += int(val)
+		x := d.data[d.off : d.off+int(val)] //nolint:gosec
+		d.off += int(val)                   //nolint:gosec
 		if d.dm.utf8 == UTF8RejectInvalid && !utf8.Valid(x) {
 			for !d.foundBreak() {
 				d.skip() // Skip remaining chunk on error
@@ -2327,7 +2337,7 @@ func (d *decoder) parseTextString() ([]byte, error) {
 func (d *decoder) parseArray() ([]any, error) {
 	_, _, val, indefiniteLength := d.getHeadWithIndefiniteLengthFlag()
 	hasSize := !indefiniteLength
-	count := int(val)
+	count := int(val) //nolint:gosec
 	if !hasSize {
 		count = d.numOfItemsUntilBreak() // peek ahead to get array size to preallocate slice for better performance
 	}
@@ -2349,7 +2359,7 @@ func (d *decoder) parseArray() ([]any, error) {
 func (d *decoder) parseArrayToSlice(v reflect.Value, tInfo *typeInfo) error {
 	_, _, val, indefiniteLength := d.getHeadWithIndefiniteLengthFlag()
 	hasSize := !indefiniteLength
-	count := int(val)
+	count := int(val) //nolint:gosec
 	if !hasSize {
 		count = d.numOfItemsUntilBreak() // peek ahead to get array size to preallocate slice for better performance
 	}
@@ -2371,7 +2381,7 @@ func (d *decoder) parseArrayToSlice(v reflect.Value, tInfo *typeInfo) error {
 func (d *decoder) parseArrayToArray(v reflect.Value, tInfo *typeInfo) error {
 	_, _, val, indefiniteLength := d.getHeadWithIndefiniteLengthFlag()
 	hasSize := !indefiniteLength
-	count := int(val)
+	count := int(val) //nolint:gosec
 	gi := 0
 	vLen := v.Len()
 	var err error
@@ -2400,7 +2410,7 @@ func (d *decoder) parseArrayToArray(v reflect.Value, tInfo *typeInfo) error {
 func (d *decoder) parseMap() (any, error) {
 	_, _, val, indefiniteLength := d.getHeadWithIndefiniteLengthFlag()
 	hasSize := !indefiniteLength
-	count := int(val)
+	count := int(val) //nolint:gosec
 	m := make(map[any]any)
 	var k, e any
 	var err, lastErr error
@@ -2465,7 +2475,7 @@ func (d *decoder) parseMap() (any, error) {
 func (d *decoder) parseMapToMap(v reflect.Value, tInfo *typeInfo) error { //nolint:gocyclo
 	_, _, val, indefiniteLength := d.getHeadWithIndefiniteLengthFlag()
 	hasSize := !indefiniteLength
-	count := int(val)
+	count := int(val) //nolint:gosec
 	if v.IsNil() {
 		mapsize := count
 		if !hasSize {
@@ -2566,9 +2576,9 @@ func (d *decoder) parseMapToMap(v reflect.Value, tInfo *typeInfo) error { //noli
 }
 
 func (d *decoder) parseArrayToStruct(v reflect.Value, tInfo *typeInfo) error {
-	structType := getDecodingStructType(tInfo.nonPtrType)
-	if structType.err != nil {
-		return structType.err
+	structType, structTypeErr := getDecodingStructType(tInfo.nonPtrType)
+	if structTypeErr != nil {
+		return structTypeErr
 	}
 
 	if !structType.toArray {
@@ -2584,7 +2594,7 @@ func (d *decoder) parseArrayToStruct(v reflect.Value, tInfo *typeInfo) error {
 	start := d.off
 	_, _, val, indefiniteLength := d.getHeadWithIndefiniteLengthFlag()
 	hasSize := !indefiniteLength
-	count := int(val)
+	count := int(val) //nolint:gosec
 	if !hasSize {
 		count = d.numOfItemsUntilBreak() // peek ahead to get array size
 	}
@@ -2637,11 +2647,72 @@ func (d *decoder) parseArrayToStruct(v reflect.Value, tInfo *typeInfo) error {
 	return err
 }
 
-// parseMapToStruct needs to be fast so gocyclo can be ignored for now.
+// skipMapEntriesFromIndex skips remaining map entries starting from index i.
+func (d *decoder) skipMapEntriesFromIndex(i, count int, hasSize bool) {
+	for ; (hasSize && i < count) || (!hasSize && !d.foundBreak()); i++ {
+		d.skip()
+		d.skip()
+	}
+}
+
+// skipMapForDupKey skips the current map value and all remaining map entries,
+// then returns a DupMapKeyError for the given key at map index i.
+func (d *decoder) skipMapForDupKey(dupKey any, i, count int, hasSize bool) error {
+	// Skip the value of the duplicate key.
+	d.skip()
+	// Skip all remaining map entries.
+	d.skipMapEntriesFromIndex(i+1, count, hasSize)
+	return &DupMapKeyError{dupKey, i}
+}
+
+// skipMapForUnknownField skips the current map value and all remaining map entries,
+// then returns a UnknownFieldError for the given key at map index i.
+func (d *decoder) skipMapForUnknownField(i, count int, hasSize bool) error {
+	// Skip the value of the unknown key.
+	d.skip()
+	// Skip all remaining map entries.
+	d.skipMapEntriesFromIndex(i+1, count, hasSize)
+	return &UnknownFieldError{i}
+}
+
+// decodeToStructField decodes the next CBOR value into the struct field f in v.
+// If the field cannot be resolved, the CBOR value is skipped.
+func (d *decoder) decodeToStructField(v reflect.Value, f *decodingField, tInfo *typeInfo) error {
+	var fv reflect.Value
+
+	if len(f.idx) == 1 {
+		fv = v.Field(f.idx[0])
+	} else {
+		var err error
+		fv, err = getFieldValue(v, f.idx, func(v reflect.Value) (reflect.Value, error) {
+			// Return a new value for embedded field null pointer to point to, or return error.
+			if !v.CanSet() {
+				return reflect.Value{}, errors.New("cbor: cannot set embedded pointer to unexported struct: " + v.Type().String())
+			}
+			v.Set(reflect.New(v.Type().Elem()))
+			return v, nil
+		})
+		if !fv.IsValid() {
+			d.skip()
+			return err
+		}
+	}
+
+	err := d.parseToValue(fv, f.typInfo)
+	if err != nil {
+		if typeError, ok := err.(*UnmarshalTypeError); ok {
+			typeError.StructFieldName = tInfo.nonPtrType.String() + "." + f.name
+		}
+		return err
+	}
+
+	return nil
+}
+
 func (d *decoder) parseMapToStruct(v reflect.Value, tInfo *typeInfo) error { //nolint:gocyclo
-	structType := getDecodingStructType(tInfo.nonPtrType)
-	if structType.err != nil {
-		return structType.err
+	structType, structTypeErr := getDecodingStructType(tInfo.nonPtrType)
+	if structTypeErr != nil {
+		return structTypeErr
 	}
 
 	if structType.toArray {
@@ -2654,14 +2725,12 @@ func (d *decoder) parseMapToStruct(v reflect.Value, tInfo *typeInfo) error { //n
 		}
 	}
 
-	var err, lastErr error
-
 	// Get CBOR map size
 	_, _, val, indefiniteLength := d.getHeadWithIndefiniteLengthFlag()
 	hasSize := !indefiniteLength
-	count := int(val)
+	count := int(val) //nolint:gosec
 
-	// Keeps track of matched struct fields
+	// Keep track of matched struct fields to detect duplicate map keys.
 	var foundFldIdx []bool
 	{
 		const maxStackFields = 128
@@ -2675,99 +2744,80 @@ func (d *decoder) parseMapToStruct(v reflect.Value, tInfo *typeInfo) error { //n
 		}
 	}
 
-	// Keeps track of CBOR map keys to detect duplicate map key
-	keyCount := 0
-	var mapKeys map[any]struct{}
+	// Keep track of unmatched CBOR map keys to detect duplicate map keys.
+	var unmatchedMapKeys map[any]struct{}
 
-	errOnUnknownField := (d.dm.extraReturnErrors & ExtraDecErrorUnknownField) > 0
+	var err error
 
-MapEntryLoop:
-	for j := 0; (hasSize && j < count) || (!hasSize && !d.foundBreak()); j++ {
-		var f *field
+	caseInsensitive := d.dm.fieldNameMatching == FieldNameMatchingPreferCaseSensitive
 
-		// If duplicate field detection is enabled and the key at index j did not match any
-		// field, k will hold the map key.
-		var k any
-
+	for i := 0; (hasSize && i < count) || (!hasSize && !d.foundBreak()); i++ {
 		t := d.nextCBORType()
-		if t == cborTypeTextString || (t == cborTypeByteString && d.dm.fieldNameByteString == FieldNameByteStringAllowed) {
+
+		// Reclassify disallowed byte string keys so they fall to the default case.
+		// keyType is only used for branch control.
+		keyType := t
+		if t == cborTypeByteString && d.dm.fieldNameByteString != FieldNameByteStringAllowed {
+			keyType = 0xff
+		}
+
+		switch keyType {
+		case cborTypeTextString, cborTypeByteString:
 			var keyBytes []byte
 			if t == cborTypeTextString {
-				keyBytes, lastErr = d.parseTextString()
-				if lastErr != nil {
+				var parseErr error
+				keyBytes, parseErr = d.parseTextString()
+				if parseErr != nil {
 					if err == nil {
-						err = lastErr
+						err = parseErr
 					}
-					d.skip() // skip value
+					d.skip() // Skip value
 					continue
 				}
 			} else { // cborTypeByteString
 				keyBytes, _ = d.parseByteString()
 			}
 
-			// Check for exact match on field name.
-			if i, ok := structType.fieldIndicesByName[string(keyBytes)]; ok {
-				fld := structType.fields[i]
+			// Find matching struct field (exact match, then case-insensitive fallback).
+			if fldIdx, ok := findStructFieldByKey(structType, keyBytes, caseInsensitive); ok {
+				fld := structType.fields[fldIdx]
 
-				if !foundFldIdx[i] {
-					f = fld
-					foundFldIdx[i] = true
-				} else if d.dm.dupMapKey == DupMapKeyEnforcedAPF {
-					err = &DupMapKeyError{fld.name, j}
-					d.skip() // skip value
-					j++
-					// skip the rest of the map
-					for ; (hasSize && j < count) || (!hasSize && !d.foundBreak()); j++ {
-						d.skip()
-						d.skip()
+				switch checkDupField(d.dm, foundFldIdx, fldIdx) {
+				case mapActionParseValueAndContinue:
+					if fieldErr := d.decodeToStructField(v, fld, tInfo); fieldErr != nil && err == nil {
+						err = fieldErr
 					}
-					return err
-				} else {
-					// discard repeated match
+					continue
+				case mapActionSkipAllAndReturnError:
+					return d.skipMapForDupKey(string(keyBytes), i, count, hasSize)
+				case mapActionSkipValueAndContinue:
 					d.skip()
-					continue MapEntryLoop
+					continue
 				}
 			}
 
-			// Find field with case-insensitive match
-			if f == nil && d.dm.fieldNameMatching == FieldNameMatchingPreferCaseSensitive {
-				keyLen := len(keyBytes)
-				keyString := string(keyBytes)
-				for i := 0; i < len(structType.fields); i++ {
-					fld := structType.fields[i]
-					if len(fld.name) == keyLen && strings.EqualFold(fld.name, keyString) {
-						if !foundFldIdx[i] {
-							f = fld
-							foundFldIdx[i] = true
-						} else if d.dm.dupMapKey == DupMapKeyEnforcedAPF {
-							err = &DupMapKeyError{keyString, j}
-							d.skip() // skip value
-							j++
-							// skip the rest of the map
-							for ; (hasSize && j < count) || (!hasSize && !d.foundBreak()); j++ {
-								d.skip()
-								d.skip()
-							}
-							return err
-						} else {
-							// discard repeated match
-							d.skip()
-							continue MapEntryLoop
-						}
-						break
-					}
-				}
+			// No matching struct field found.
+			if unmatchedErr := handleUnmatchedMapKey(d, string(keyBytes), i, count, hasSize, &unmatchedMapKeys); unmatchedErr != nil {
+				return unmatchedErr
 			}
 
-			if d.dm.dupMapKey == DupMapKeyEnforcedAPF && f == nil {
-				k = string(keyBytes)
-			}
-		} else if t <= cborTypeNegativeInt { // uint/int
+		case cborTypePositiveInt, cborTypeNegativeInt:
 			var nameAsInt int64
 
 			if t == cborTypePositiveInt {
 				_, _, val := d.getHead()
-				nameAsInt = int64(val)
+				if val > math.MaxInt64 {
+					if err == nil {
+						err = &UnmarshalTypeError{
+							CBORType: t.String(),
+							GoType:   reflect.TypeOf(int64(0)).String(),
+							errorMsg: strconv.FormatUint(val, 10) + " overflows Go's int64",
+						}
+					}
+					d.skip() // skip value
+					continue
+				}
+				nameAsInt = int64(val) //nolint:gosec
 			} else {
 				_, _, val := d.getHead()
 				if val > math.MaxInt64 {
@@ -2781,39 +2831,35 @@ MapEntryLoop:
 					d.skip() // skip value
 					continue
 				}
-				nameAsInt = int64(-1) ^ int64(val)
+				nameAsInt = int64(-1) ^ int64(val) //nolint:gosec
 			}
 
-			// Find field
-			for i := 0; i < len(structType.fields); i++ {
-				fld := structType.fields[i]
-				if fld.keyAsInt && fld.nameAsInt == nameAsInt {
-					if !foundFldIdx[i] {
-						f = fld
-						foundFldIdx[i] = true
-					} else if d.dm.dupMapKey == DupMapKeyEnforcedAPF {
-						err = &DupMapKeyError{nameAsInt, j}
-						d.skip() // skip value
-						j++
-						// skip the rest of the map
-						for ; (hasSize && j < count) || (!hasSize && !d.foundBreak()); j++ {
-							d.skip()
-							d.skip()
-						}
-						return err
-					} else {
-						// discard repeated match
-						d.skip()
-						continue MapEntryLoop
+			// Find field by integer key
+			if fldIdx, ok := structType.fieldIndicesByIntKey[nameAsInt]; ok {
+				fld := structType.fields[fldIdx]
+
+				switch checkDupField(d.dm, foundFldIdx, fldIdx) {
+				case mapActionParseValueAndContinue:
+					if fieldErr := d.decodeToStructField(v, fld, tInfo); fieldErr != nil && err == nil {
+						err = fieldErr
 					}
-					break
+					continue
+				case mapActionSkipAllAndReturnError:
+					return d.skipMapForDupKey(nameAsInt, i, count, hasSize)
+				case mapActionSkipValueAndContinue:
+					d.skip()
+					continue
 				}
 			}
 
-			if d.dm.dupMapKey == DupMapKeyEnforcedAPF && f == nil {
-				k = nameAsInt
+			// No matching struct field found.
+			if unmatchedErr := handleUnmatchedMapKey(d, nameAsInt, i, count, hasSize, &unmatchedMapKeys); unmatchedErr != nil {
+				return unmatchedErr
 			}
-		} else {
+
+		default:
+			// CBOR map keys that can't be matched to any struct field.
+
 			if err == nil {
 				err = &UnmarshalTypeError{
 					CBORType: t.String(),
@@ -2821,97 +2867,31 @@ MapEntryLoop:
 					errorMsg: "map key is of type " + t.String() + " and cannot be used to match struct field name",
 				}
 			}
+
+			var otherKey any
 			if d.dm.dupMapKey == DupMapKeyEnforcedAPF {
 				// parse key
-				k, lastErr = d.parse(true)
-				if lastErr != nil {
+				var parseErr error
+				otherKey, parseErr = d.parse(true)
+				if parseErr != nil {
 					d.skip() // skip value
 					continue
 				}
 				// Detect if CBOR map key can be used as Go map key.
-				if !isHashableValue(reflect.ValueOf(k)) {
+				if !isHashableValue(reflect.ValueOf(otherKey)) {
 					d.skip() // skip value
 					continue
 				}
 			} else {
 				d.skip() // skip key
 			}
-		}
 
-		if f == nil {
-			if errOnUnknownField {
-				err = &UnknownFieldError{j}
-				d.skip() // Skip value
-				j++
-				// skip the rest of the map
-				for ; (hasSize && j < count) || (!hasSize && !d.foundBreak()); j++ {
-					d.skip()
-					d.skip()
-				}
-				return err
-			}
-
-			// Two map keys that match the same struct field are immediately considered
-			// duplicates. This check detects duplicates between two map keys that do
-			// not match a struct field. If unknown field errors are enabled, then this
-			// check is never reached.
-			if d.dm.dupMapKey == DupMapKeyEnforcedAPF {
-				if mapKeys == nil {
-					mapKeys = make(map[any]struct{}, 1)
-				}
-				mapKeys[k] = struct{}{}
-				newKeyCount := len(mapKeys)
-				if newKeyCount == keyCount {
-					err = &DupMapKeyError{k, j}
-					d.skip() // skip value
-					j++
-					// skip the rest of the map
-					for ; (hasSize && j < count) || (!hasSize && !d.foundBreak()); j++ {
-						d.skip()
-						d.skip()
-					}
-					return err
-				}
-				keyCount = newKeyCount
-			}
-
-			d.skip() // Skip value
-			continue
-		}
-
-		// Get field value by index
-		var fv reflect.Value
-		if len(f.idx) == 1 {
-			fv = v.Field(f.idx[0])
-		} else {
-			fv, lastErr = getFieldValue(v, f.idx, func(v reflect.Value) (reflect.Value, error) {
-				// Return a new value for embedded field null pointer to point to, or return error.
-				if !v.CanSet() {
-					return reflect.Value{}, errors.New("cbor: cannot set embedded pointer to unexported struct: " + v.Type().String())
-				}
-				v.Set(reflect.New(v.Type().Elem()))
-				return v, nil
-			})
-			if lastErr != nil && err == nil {
-				err = lastErr
-			}
-			if !fv.IsValid() {
-				d.skip()
-				continue
-			}
-		}
-
-		if lastErr = d.parseToValue(fv, f.typInfo); lastErr != nil {
-			if err == nil {
-				if typeError, ok := lastErr.(*UnmarshalTypeError); ok {
-					typeError.StructFieldName = tInfo.nonPtrType.String() + "." + f.name
-					err = typeError
-				} else {
-					err = lastErr
-				}
+			if unmatchedErr := handleUnmatchedMapKey(d, otherKey, i, count, hasSize, &unmatchedMapKeys); unmatchedErr != nil {
+				return unmatchedErr
 			}
 		}
 	}
+
 	return err
 }
 
@@ -2958,15 +2938,15 @@ func (d *decoder) skip() {
 
 	switch t {
 	case cborTypeByteString, cborTypeTextString:
-		d.off += int(val)
+		d.off += int(val) //nolint:gosec
 
 	case cborTypeArray:
-		for i := 0; i < int(val); i++ {
+		for i := 0; i < int(val); i++ { //nolint:gosec
 			d.skip()
 		}
 
 	case cborTypeMap:
-		for i := 0; i < int(val)*2; i++ {
+		for i := 0; i < int(val)*2; i++ { //nolint:gosec
 			d.skip()
 		}
 

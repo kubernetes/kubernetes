@@ -1,11 +1,9 @@
 package oidc
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -52,19 +50,18 @@ type IDTokenVerifier struct {
 // This constructor can be used to create a verifier directly using the issuer URL and
 // JSON Web Key Set URL without using discovery:
 //
-//		keySet := oidc.NewRemoteKeySet(ctx, "https://www.googleapis.com/oauth2/v3/certs")
-//		verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
+//	keySet := oidc.NewRemoteKeySet(ctx, "https://www.googleapis.com/oauth2/v3/certs")
+//	verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
 //
 // Since KeySet is an interface, this constructor can also be used to supply custom
 // public key sources. For example, if a user wanted to supply public keys out-of-band
 // and hold them statically in-memory:
 //
-//		// Custom KeySet implementation.
-//		keySet := newStatisKeySet(publicKeys...)
+//	// Custom KeySet implementation.
+//	keySet := newStatisKeySet(publicKeys...)
 //
-//		// Verifier uses the custom KeySet implementation.
-//		verifier := oidc.NewVerifier("https://auth.example.com", keySet, config)
-//
+//	// Verifier uses the custom KeySet implementation.
+//	verifier := oidc.NewVerifier("https://auth.example.com", keySet, config)
 func NewVerifier(issuerURL string, keySet KeySet, config *Config) *IDTokenVerifier {
 	return &IDTokenVerifier{keySet: keySet, config: config, issuer: issuerURL}
 }
@@ -192,31 +189,56 @@ func parseClaim(raw []byte, name string, v interface{}) error {
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 //
-//    oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
-//    if err != nil {
-//        // handle error
-//    }
+//	oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
+//	if err != nil {
+//	    // handle error
+//	}
 //
-//    // Extract the ID Token from oauth2 token.
-//    rawIDToken, ok := oauth2Token.Extra("id_token").(string)
-//    if !ok {
-//        // handle error
-//    }
+//	// Extract the ID Token from oauth2 token.
+//	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+//	if !ok {
+//	    // handle error
+//	}
 //
-//    token, err := verifier.Verify(ctx, rawIDToken)
-//
+//	token, err := verifier.Verify(ctx, rawIDToken)
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
+	if strings.Count(rawIDToken, ".") > 2 {
+		// Older versions of go-jose are vulnerable to a scenario where
+		// strings.Cut(token, ".") can lead to excessive allocations. Since the
+		// "v2" branch of this repo explicitly doesn't update its dependencies
+		// at the request of Kubernetes, add a check here first.
+		//
+		// https://github.com/go-jose/go-jose/security/advisories/GHSA-c6gw-w398-hv78
+		return nil, fmt.Errorf("oidc: malformed jwt")
+	}
 	jws, err := jose.ParseSigned(rawIDToken)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
 	}
 
-	// Throw out tokens with invalid claims before trying to verify the token. This lets
-	// us do cheap checks before possibly re-syncing keys.
-	payload, err := parseJWT(rawIDToken)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
+	switch len(jws.Signatures) {
+	case 0:
+		return nil, fmt.Errorf("oidc: id token not signed")
+	case 1:
+	default:
+		return nil, fmt.Errorf("oidc: multiple signatures on id token not supported")
 	}
+
+	sig := jws.Signatures[0]
+	supportedSigAlgs := v.config.SupportedSigningAlgs
+	if len(supportedSigAlgs) == 0 {
+		supportedSigAlgs = []string{RS256}
+	}
+
+	if !contains(supportedSigAlgs, sig.Header.Algorithm) {
+		return nil, fmt.Errorf("oidc: id token signed with unsupported algorithm, expected %q got %q", supportedSigAlgs, sig.Header.Algorithm)
+	}
+
+	payload, err := v.keySet.VerifySignature(ctx, rawIDToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify signature: %v", err)
+	}
+
 	var token idToken
 	if err := json.Unmarshal(payload, &token); err != nil {
 		return nil, fmt.Errorf("oidc: failed to unmarshal claims: %v", err)
@@ -296,36 +318,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		}
 	}
 
-	switch len(jws.Signatures) {
-	case 0:
-		return nil, fmt.Errorf("oidc: id token not signed")
-	case 1:
-	default:
-		return nil, fmt.Errorf("oidc: multiple signatures on id token not supported")
-	}
-
-	sig := jws.Signatures[0]
-	supportedSigAlgs := v.config.SupportedSigningAlgs
-	if len(supportedSigAlgs) == 0 {
-		supportedSigAlgs = []string{RS256}
-	}
-
-	if !contains(supportedSigAlgs, sig.Header.Algorithm) {
-		return nil, fmt.Errorf("oidc: id token signed with unsupported algorithm, expected %q got %q", supportedSigAlgs, sig.Header.Algorithm)
-	}
-
 	t.sigAlgorithm = sig.Header.Algorithm
-
-	gotPayload, err := v.keySet.VerifySignature(ctx, rawIDToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify signature: %v", err)
-	}
-
-	// Ensure that the payload returned by the square actually matches the payload parsed earlier.
-	if !bytes.Equal(gotPayload, payload) {
-		return nil, errors.New("oidc: internal error, payload parsed did not match previous payload")
-	}
-
 	return t, nil
 }
 

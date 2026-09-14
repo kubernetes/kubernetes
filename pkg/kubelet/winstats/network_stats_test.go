@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2023 The Kubernetes Authors.
@@ -23,7 +22,7 @@ import (
 	"errors"
 	"testing"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/klog/v2/ktesting"

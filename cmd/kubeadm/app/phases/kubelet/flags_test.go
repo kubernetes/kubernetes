@@ -43,10 +43,8 @@ func TestBuildKubeletArgs(t *testing.T) {
 						{Name: "hostname-override", Value: "override-name"},
 					},
 				},
-				criSocket: "unix:///var/run/containerd/containerd.sock",
 			},
 			expected: []kubeadmapi.Arg{
-				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
 				{Name: "hostname-override", Value: "override-name"},
 			},
 		},
@@ -67,11 +65,9 @@ func TestBuildKubeletArgs(t *testing.T) {
 						},
 					},
 				},
-				criSocket:                "unix:///var/run/containerd/containerd.sock",
 				registerTaintsUsingFlags: true,
 			},
 			expected: []kubeadmapi.Arg{
-				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
 				{Name: "register-with-taints", Value: "foo=bar:baz,key=val:eff"},
 			},
 		},
@@ -193,10 +189,10 @@ func TestReadKubeadmFlags(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "no container-runtime-endpoint found",
+			name:          "has KUBELET_KUBEADM_ARGS line but no args",
 			fileContent:   `KUBELET_KUBEADM_ARGS=""`,
 			expectedValue: nil,
-			expectError:   true,
+			expectError:   false,
 		},
 		{
 			name:          "no KUBELET_KUBEADM_ARGS line",
@@ -248,8 +244,8 @@ func TestReadKubeadmFlags(t *testing.T) {
 			}
 
 			value, err := ReadKubeletDynamicEnvFile(tmpFile.Name())
-			if !tt.expectError && err != nil {
-				t.Errorf("Unexpected error: %v", err)
+			if tt.expectError != (err != nil) {
+				t.Errorf("Expect error: %v, got: %v, error: %v", tt.expectError, err != nil, err)
 			}
 
 			assert.Equal(t, tt.expectedValue, value)

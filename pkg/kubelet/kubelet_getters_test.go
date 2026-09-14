@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudproviderapi "k8s.io/cloud-provider/api"
+	"k8s.io/klog/v2/ktesting"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -97,6 +98,10 @@ func TestKubeletDirs(t *testing.T) {
 
 	got = kubelet.getPodResourcesDir()
 	exp = filepath.Join(root, "pod-resources")
+	assert.Equal(t, exp, got)
+
+	got = kubelet.getPodsAPIDir()
+	exp = filepath.Join(root, "pods-api")
 	assert.Equal(t, exp, got)
 
 	got = kubelet.getPodVolumeSubpathsDir("abc123")
@@ -285,6 +290,7 @@ func Test_getLastObservedNodeAddresses(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
@@ -295,7 +301,7 @@ func Test_getLastObservedNodeAddresses(t *testing.T) {
 				nodeLister.nodes = append(nodeLister.nodes, tc.node)
 			}
 			kl.nodeLister = nodeLister
-			addrs := kl.getLastObservedNodeAddresses()
+			addrs := kl.getLastObservedNodeAddresses(ctx)
 
 			if len(addrs) != len(tc.expectedAddrs) {
 				t.Errorf("expected %d addresses, got %d", len(tc.expectedAddrs), len(addrs))

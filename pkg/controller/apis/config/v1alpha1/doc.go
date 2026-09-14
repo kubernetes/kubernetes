@@ -23,6 +23,7 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/certificates/signer/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/disruption/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/garbagecollector/config/v1alpha1
@@ -46,6 +47,7 @@ limitations under the License.
 // +k8s:conversion-gen-external-types=k8s.io/kube-controller-manager/config/v1alpha1
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/kube-controller-manager/config/v1alpha1
+// +k8s:validation-gen=false
 // +groupName=kubecontrollermanager.config.k8s.io
 
 package v1alpha1

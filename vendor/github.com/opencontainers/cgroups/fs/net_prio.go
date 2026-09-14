@@ -10,6 +10,12 @@ func (s *NetPrioGroup) Name() string {
 	return "net_prio"
 }
 
+// ID returns the controller ID for net_prio subsystem.
+// Returns 0 as net_prio is not a cgroups.Controller.
+func (s *NetPrioGroup) ID() cgroups.Controller {
+	return 0
+}
+
 func (s *NetPrioGroup) Apply(path string, _ *cgroups.Resources, pid int) error {
 	return apply(path, pid)
 }

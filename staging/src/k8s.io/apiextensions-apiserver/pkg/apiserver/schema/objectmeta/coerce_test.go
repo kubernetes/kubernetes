@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -372,7 +373,7 @@ func TestGetObjectMetaNils(t *testing.T) {
 		t.Errorf("expected null json generateName value to be read as \"\" string, but got: %q", o.GenerateName)
 	}
 	if o.Generation != 0 {
-		t.Errorf("expected null json generation value to be read as zero, but got: %q", o.Generation)
+		t.Errorf("expected null json generation value to be read as zero, but got: %d", o.Generation)
 	}
 	if got, expected := o.Labels, map[string]string{"foo": ""}; !reflect.DeepEqual(got, expected) {
 		t.Errorf("unexpected labels, expected=%#v, got=%#v", expected, got)
@@ -392,7 +393,7 @@ func TestGetObjectMetaNils(t *testing.T) {
 		t.Errorf("expected generatedName to be %q, got %q", expected, got)
 	}
 	if got, expected := o.Generation, pod.ObjectMeta.Generation; got != expected {
-		t.Errorf("expected generation to be %q, got %q", expected, got)
+		t.Errorf("expected generation to be %d, got %d", expected, got)
 	}
 	if got, expected := o.Labels, pod.ObjectMeta.Labels; !reflect.DeepEqual(got, expected) {
 		t.Errorf("expected labels to be %v, got %v", expected, got)

@@ -48,7 +48,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityLevel = api.LevelBaseline
 
-	f.Describe("Deployment (Pod Resource)", func() {
+	f.Describe("Deployment (Pod Resource)", framework.WithSlow(), func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, false, f)
 		})
@@ -81,7 +81,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 		})
 	})
 
-	f.Describe("ReplicaSet", func() {
+	f.Describe("ReplicaSet", framework.WithSlow(), func() {
 		ginkgo.It(titleUp, func(ctx context.Context) {
 			scaleUp(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
 		})
@@ -91,16 +91,16 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 	})
 
 	// These tests take ~20 minutes each.
-	f.Describe("ReplicationController", func() {
+	f.Describe("ReplicaSet", framework.WithSlow(), func() {
 		ginkgo.It(titleUp+" and verify decision stability", func(ctx context.Context) {
-			scaleUp(ctx, "rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
+			scaleUp(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, true, f)
 		})
 		ginkgo.It(titleDown+" and verify decision stability", func(ctx context.Context) {
-			scaleDown(ctx, "rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
+			scaleDown(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, true, f)
 		})
 	})
 
-	f.Describe("ReplicationController light", func() {
+	f.Describe("ReplicaSet light", func() {
 		ginkgo.It("Should scale from 1 pod to 2 pods", func(ctx context.Context) {
 			st := &HPAScaleTest{
 				initPods:         1,
@@ -113,7 +113,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 				resourceType:     cpuResource,
 				metricTargetType: utilizationMetricType,
 			}
-			st.run(ctx, "rc-light", e2eautoscaling.KindRC, f)
+			st.run(ctx, "rs-light", e2eautoscaling.KindReplicaSet, f)
 		})
 		f.It("Should scale from 2 pods to 1 pod", func(ctx context.Context) {
 			st := &HPAScaleTest{
@@ -127,7 +127,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 				resourceType:     cpuResource,
 				metricTargetType: utilizationMetricType,
 			}
-			st.run(ctx, "rc-light", e2eautoscaling.KindRC, f)
+			st.run(ctx, "rs-light", e2eautoscaling.KindReplicaSet, f)
 		})
 	})
 
@@ -201,6 +201,7 @@ type HPAScaleTest struct {
 	secondScale      int32
 	resourceType     v1.ResourceName
 	metricTargetType autoscalingv2.MetricTargetType
+	perPodCPULoad    bool
 }
 
 // run is a method which runs an HPA lifecycle, from a starting state, to an expected
@@ -211,22 +212,38 @@ type HPAScaleTest struct {
 func (st *HPAScaleTest) run(ctx context.Context, name string, kind schema.GroupVersionKind, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
 	initCPUTotal, initMemTotal := 0, 0
-	if st.resourceType == cpuResource {
+	switch st.resourceType {
+	case cpuResource:
 		initCPUTotal = st.initCPUTotal
-	} else if st.resourceType == memResource {
+	case memResource:
 		initMemTotal = st.initMemTotal
 	}
-	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perPodCPURequest, st.perPodMemRequest, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle, nil)
+	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, 0, initMemTotal, 0, st.perPodCPURequest, st.perPodMemRequest, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle, nil)
 	ginkgo.DeferCleanup(rc.CleanUp)
 	hpa := e2eautoscaling.CreateResourceHorizontalPodAutoscaler(ctx, rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
 	ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
+
+	// TODO: the nested ifs to choose the consume mechanism should be refactored in a more generic way
+	// it should be passed as a parameter in e2eautoscaling.NewDynamicResourceConsumer()
+
+	// Pick the CPU load helper. perPodCPULoad addresses each pod
+	// directly via pod proxy (total/N millicores per pod), bypassing the
+	// random kube-proxy LB used by ConsumeCPU.
+	consumeCPU := rc.ConsumeCPU
+	if st.perPodCPULoad {
+		consumeCPU = rc.ConsumeCPUPerPod
+	}
+
+	if initCPUTotal > 0 {
+		consumeCPU(initCPUTotal)
+	}
 
 	rc.WaitForReplicas(ctx, st.firstScale, timeToWait)
 	if st.firstScaleStasis > 0 {
 		rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, st.firstScale+1, st.firstScaleStasis, hpa.Name)
 	}
 	if st.resourceType == cpuResource && st.cpuBurst > 0 && st.secondScale > 0 {
-		rc.ConsumeCPU(st.cpuBurst)
+		consumeCPU(st.cpuBurst)
 		rc.WaitForReplicas(ctx, int(st.secondScale), timeToWait)
 	}
 	if st.resourceType == memResource && st.memBurst > 0 && st.secondScale > 0 {
@@ -252,6 +269,7 @@ func scaleUp(ctx context.Context, name string, kind schema.GroupVersionKind, res
 		secondScale:      5,
 		resourceType:     resourceType,
 		metricTargetType: metricTargetType,
+		perPodCPULoad:    checkStability,
 	}
 	if resourceType == cpuResource {
 		st.initCPUTotal = 250
@@ -282,6 +300,7 @@ func scaleDown(ctx context.Context, name string, kind schema.GroupVersionKind, r
 		secondScale:      1,
 		resourceType:     resourceType,
 		metricTargetType: metricTargetType,
+		perPodCPULoad:    checkStability,
 	}
 	if resourceType == cpuResource {
 		st.initCPUTotal = 325
@@ -319,9 +338,10 @@ type HPAContainerResourceScaleTest struct {
 func (st *HPAContainerResourceScaleTest) run(ctx context.Context, name string, kind schema.GroupVersionKind, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
 	initCPUTotal, initMemTotal := 0, 0
-	if st.resourceType == cpuResource {
+	switch st.resourceType {
+	case cpuResource:
 		initCPUTotal = st.initCPUTotal
-	} else if st.resourceType == memResource {
+	case memResource:
 		initMemTotal = st.initMemTotal
 	}
 	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perContainerCPURequest, st.perContainerMemRequest, f.ClientSet, f.ScalesGetter, st.sidecarStatus, st.sidecarType, nil)

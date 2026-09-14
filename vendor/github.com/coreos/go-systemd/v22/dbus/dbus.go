@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Integration with the systemd D-Bus API.  See http://www.freedesktop.org/wiki/Software/systemd/dbus/
+// Package dbus provides integration with the systemd D-Bus API.
+// See http://www.freedesktop.org/wiki/Software/systemd/dbus/
 package dbus
 
 import (
@@ -94,7 +95,7 @@ type Conn struct {
 	sigobj  dbus.BusObject
 
 	jobListener struct {
-		jobs map[dbus.ObjectPath]chan<- string
+		jobs map[dbus.ObjectPath][]chan<- string
 		sync.Mutex
 	}
 	subStateSubscriber struct {
@@ -206,7 +207,7 @@ func NewConnection(dialBus func() (*dbus.Conn, error)) (*Conn, error) {
 	}
 
 	c.subStateSubscriber.ignore = make(map[dbus.ObjectPath]int64)
-	c.jobListener.jobs = make(map[dbus.ObjectPath]chan<- string)
+	c.jobListener.jobs = make(map[dbus.ObjectPath][]chan<- string)
 
 	// Setup the listeners on jobs so that we can get completions
 	c.sigconn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,

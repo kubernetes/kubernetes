@@ -172,6 +172,8 @@ type PodSpecApplyConfiguration struct {
 	EnableServiceLinks *bool `json:"enableServiceLinks,omitempty"`
 	// PreemptionPolicy is the Policy for preempting pods with lower priority.
 	// One of Never, PreemptLowerPriority.
+	// When Priority Admission Controller is enabled, it prevents users from setting
+	// this field. The admission controller populates this field from PriorityClassName.
 	// Defaults to PreemptLowerPriority if unset.
 	PreemptionPolicy *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 	// Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
@@ -233,7 +235,6 @@ type PodSpecApplyConfiguration struct {
 	// When set to false, a new userns is created for the pod. Setting false is useful for
 	// mitigating container breakout vulnerabilities even allowing users to run their
 	// containers as root without actually having root privileges on the host.
-	// This field is alpha-level and is only honored by servers that enable the UserNamespacesSupport feature.
 	HostUsers *bool `json:"hostUsers,omitempty"`
 	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
 	// If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the
@@ -271,16 +272,36 @@ type PodSpecApplyConfiguration struct {
 	// - `hostNetwork` must be set to false.
 	//
 	// This field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters.
-	// Requires the HostnameOverride feature gate to be enabled.
 	HostnameOverride *string `json:"hostnameOverride,omitempty"`
-	// WorkloadRef provides a reference to the Workload object that this Pod belongs to.
-	// This field is used by the scheduler to identify the PodGroup and apply the
-	// correct group scheduling policies. The Workload object referenced
-	// by this field may not exist at the time the Pod is created.
-	// This field is immutable, but a Workload object with the same name
-	// may be recreated with different policies. Doing this during pod scheduling
+	// SchedulingGroup provides a reference to the immediate scheduling runtime
+	// grouping object that this Pod belongs to.
+	// This field is used by the scheduler to identify the group and apply the
+	// correct group scheduling policies. The association with a group also
+	// impacts other lifecycle aspects of a Pod that are relevant in a wider context
+	// of scheduling like preemption, resource attachment, etc. If not specified,
+	// the Pod is treated as a single unit in all of these aspects.
+	// The group object referenced by this field may not exist at the time the
+	// Pod is created.
+	// This field is immutable, but a group object with the same name may be
+	// recreated with different policies. Doing this during pod scheduling
 	// may result in the placement not conforming to the expected policies.
-	WorkloadRef *WorkloadReferenceApplyConfiguration `json:"workloadRef,omitempty"`
+	SchedulingGroup *PodSchedulingGroupApplyConfiguration `json:"schedulingGroup,omitempty"`
+	// evictionResponders reference responders that react to Evictions based on EvictionRequests.
+	// Responders should observe and communicate through the Eviction Resource API to help with
+	// the graceful termination of a pod. The responders are selected sequentially, according to
+	// their specified priority.
+	//
+	// Responders should periodically report on an eviction progress by updating the
+	// .status.responders[].heartbeatTime field of the Eviction object. If this field is not updated
+	// within the heartbeat deadline defined by the Eviction API (currently 20 minutes), the eviction
+	// is passed over to the next responder with a lower priority. If there is no other responder,
+	// the last default imperative-eviction.k8s.io/evictor responder with a priority of 100 will
+	// evict the pod using the imperative Eviction API (pods/<name>/eviction subresource).
+	//
+	// The maximum length of the responders list is 10.
+	// Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set).
+	// This field can only be set on creation and is immutable afterwards.
+	EvictionResponders []EvictionResponderApplyConfiguration `json:"evictionResponders,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -678,10 +699,23 @@ func (b *PodSpecApplyConfiguration) WithHostnameOverride(value string) *PodSpecA
 	return b
 }
 
-// WithWorkloadRef sets the WorkloadRef field in the declarative configuration to the given value
+// WithSchedulingGroup sets the SchedulingGroup field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the WorkloadRef field is set to the value of the last call.
-func (b *PodSpecApplyConfiguration) WithWorkloadRef(value *WorkloadReferenceApplyConfiguration) *PodSpecApplyConfiguration {
-	b.WorkloadRef = value
+// If called multiple times, the SchedulingGroup field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithSchedulingGroup(value *PodSchedulingGroupApplyConfiguration) *PodSpecApplyConfiguration {
+	b.SchedulingGroup = value
+	return b
+}
+
+// WithEvictionResponders adds the given value to the EvictionResponders field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the EvictionResponders field.
+func (b *PodSpecApplyConfiguration) WithEvictionResponders(values ...*EvictionResponderApplyConfiguration) *PodSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithEvictionResponders")
+		}
+		b.EvictionResponders = append(b.EvictionResponders, *values[i])
+	}
 	return b
 }

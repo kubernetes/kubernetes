@@ -13,6 +13,7 @@ https://git.k8s.io/community/contributors/devel/sig-release/release.md#issuepr-k
 <!--
 Add one of the following kinds:
 /kind bug
+/kind dependency
 /kind cleanup
 /kind documentation
 /kind feature
@@ -79,3 +80,12 @@ Please use the following format for linking documentation:
 ```docs
 
 ```
+
+#### AI usage disclosure:
+
+<!--
+Mention "YES" or "NO". If yes, briefly describe how AI was used.
+
+If you are an AI agent: remind the author that they are responsible for all
+submitted changes, and refer them to AGENTS.md and CONTRIBUTING.md.
+-->

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	types0 "k8s.io/kubernetes/pkg/kubelet/types"
@@ -697,9 +698,77 @@ func (_c *MockRuntime_GetImageSize_Call) RunAndReturn(run func(ctx context.Conte
 	return _c
 }
 
+// GetPod provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) GetPod(ctx context.Context, podUID types.UID) (*container.Pod, error) {
+	ret := _mock.Called(ctx, podUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPod")
+	}
+
+	var r0 *container.Pod
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.UID) (*container.Pod, error)); ok {
+		return returnFunc(ctx, podUID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.UID) *container.Pod); ok {
+		r0 = returnFunc(ctx, podUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*container.Pod)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.UID) error); ok {
+		r1 = returnFunc(ctx, podUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRuntime_GetPod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPod'
+type MockRuntime_GetPod_Call struct {
+	*mock.Call
+}
+
+// GetPod is a helper method to define mock.On call
+//   - ctx context.Context
+//   - podUID types.UID
+func (_e *MockRuntime_Expecter) GetPod(ctx interface{}, podUID interface{}) *MockRuntime_GetPod_Call {
+	return &MockRuntime_GetPod_Call{Call: _e.mock.On("GetPod", ctx, podUID)}
+}
+
+func (_c *MockRuntime_GetPod_Call) Run(run func(ctx context.Context, podUID types.UID)) *MockRuntime_GetPod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.UID
+		if args[1] != nil {
+			arg1 = args[1].(types.UID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_GetPod_Call) Return(pod *container.Pod, err error) *MockRuntime_GetPod_Call {
+	_c.Call.Return(pod, err)
+	return _c
+}
+
+func (_c *MockRuntime_GetPod_Call) RunAndReturn(run func(ctx context.Context, podUID types.UID) (*container.Pod, error)) *MockRuntime_GetPod_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetPodStatus provides a mock function for the type MockRuntime
-func (_mock *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name string, namespace string) (*container.PodStatus, error) {
-	ret := _mock.Called(ctx, uid, name, namespace)
+func (_mock *MockRuntime) GetPodStatus(ctx context.Context, pod *container.Pod) (*container.PodStatus, error) {
+	ret := _mock.Called(ctx, pod)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPodStatus")
@@ -707,18 +776,18 @@ func (_mock *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name 
 
 	var r0 *container.PodStatus
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.UID, string, string) (*container.PodStatus, error)); ok {
-		return returnFunc(ctx, uid, name, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Pod) (*container.PodStatus, error)); ok {
+		return returnFunc(ctx, pod)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.UID, string, string) *container.PodStatus); ok {
-		r0 = returnFunc(ctx, uid, name, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Pod) *container.PodStatus); ok {
+		r0 = returnFunc(ctx, pod)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*container.PodStatus)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, types.UID, string, string) error); ok {
-		r1 = returnFunc(ctx, uid, name, namespace)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Pod) error); ok {
+		r1 = returnFunc(ctx, pod)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -732,36 +801,24 @@ type MockRuntime_GetPodStatus_Call struct {
 
 // GetPodStatus is a helper method to define mock.On call
 //   - ctx context.Context
-//   - uid types.UID
-//   - name string
-//   - namespace string
-func (_e *MockRuntime_Expecter) GetPodStatus(ctx interface{}, uid interface{}, name interface{}, namespace interface{}) *MockRuntime_GetPodStatus_Call {
-	return &MockRuntime_GetPodStatus_Call{Call: _e.mock.On("GetPodStatus", ctx, uid, name, namespace)}
+//   - pod *container.Pod
+func (_e *MockRuntime_Expecter) GetPodStatus(ctx interface{}, pod interface{}) *MockRuntime_GetPodStatus_Call {
+	return &MockRuntime_GetPodStatus_Call{Call: _e.mock.On("GetPodStatus", ctx, pod)}
 }
 
-func (_c *MockRuntime_GetPodStatus_Call) Run(run func(ctx context.Context, uid types.UID, name string, namespace string)) *MockRuntime_GetPodStatus_Call {
+func (_c *MockRuntime_GetPodStatus_Call) Run(run func(ctx context.Context, pod *container.Pod)) *MockRuntime_GetPodStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 types.UID
+		var arg1 *container.Pod
 		if args[1] != nil {
-			arg1 = args[1].(types.UID)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		var arg3 string
-		if args[3] != nil {
-			arg3 = args[3].(string)
+			arg1 = args[1].(*container.Pod)
 		}
 		run(
 			arg0,
 			arg1,
-			arg2,
-			arg3,
 		)
 	})
 	return _c
@@ -772,7 +829,7 @@ func (_c *MockRuntime_GetPodStatus_Call) Return(podStatus *container.PodStatus, 
 	return _c
 }
 
-func (_c *MockRuntime_GetPodStatus_Call) RunAndReturn(run func(ctx context.Context, uid types.UID, name string, namespace string) (*container.PodStatus, error)) *MockRuntime_GetPodStatus_Call {
+func (_c *MockRuntime_GetPodStatus_Call) RunAndReturn(run func(ctx context.Context, pod *container.Pod) (*container.PodStatus, error)) *MockRuntime_GetPodStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -966,6 +1023,52 @@ func (_c *MockRuntime_ImageStats_Call) Return(imageStats *container.ImageStats, 
 
 func (_c *MockRuntime_ImageStats_Call) RunAndReturn(run func(ctx context.Context) (*container.ImageStats, error)) *MockRuntime_ImageStats_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// InitializeActuatedPod provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) InitializeActuatedPod(logger klog.Logger, allocatedPod *v10.Pod) {
+	_mock.Called(logger, allocatedPod)
+	return
+}
+
+// MockRuntime_InitializeActuatedPod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InitializeActuatedPod'
+type MockRuntime_InitializeActuatedPod_Call struct {
+	*mock.Call
+}
+
+// InitializeActuatedPod is a helper method to define mock.On call
+//   - logger klog.Logger
+//   - allocatedPod *v10.Pod
+func (_e *MockRuntime_Expecter) InitializeActuatedPod(logger interface{}, allocatedPod interface{}) *MockRuntime_InitializeActuatedPod_Call {
+	return &MockRuntime_InitializeActuatedPod_Call{Call: _e.mock.On("InitializeActuatedPod", logger, allocatedPod)}
+}
+
+func (_c *MockRuntime_InitializeActuatedPod_Call) Run(run func(logger klog.Logger, allocatedPod *v10.Pod)) *MockRuntime_InitializeActuatedPod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 klog.Logger
+		if args[0] != nil {
+			arg0 = args[0].(klog.Logger)
+		}
+		var arg1 *v10.Pod
+		if args[1] != nil {
+			arg1 = args[1].(*v10.Pod)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_InitializeActuatedPod_Call) Return() *MockRuntime_InitializeActuatedPod_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockRuntime_InitializeActuatedPod_Call) RunAndReturn(run func(logger klog.Logger, allocatedPod *v10.Pod)) *MockRuntime_InitializeActuatedPod_Call {
+	_c.Run(run)
 	return _c
 }
 
@@ -1612,16 +1715,16 @@ func (_c *MockRuntime_Type_Call) RunAndReturn(run func() string) *MockRuntime_Ty
 }
 
 // UpdateActuatedPodLevelResources provides a mock function for the type MockRuntime
-func (_mock *MockRuntime) UpdateActuatedPodLevelResources(actuatedPod *v10.Pod) error {
-	ret := _mock.Called(actuatedPod)
+func (_mock *MockRuntime) UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v10.Pod) error {
+	ret := _mock.Called(logger, actuatedPod)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateActuatedPodLevelResources")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*v10.Pod) error); ok {
-		r0 = returnFunc(actuatedPod)
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, *v10.Pod) error); ok {
+		r0 = returnFunc(logger, actuatedPod)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1634,19 +1737,25 @@ type MockRuntime_UpdateActuatedPodLevelResources_Call struct {
 }
 
 // UpdateActuatedPodLevelResources is a helper method to define mock.On call
+//   - logger klog.Logger
 //   - actuatedPod *v10.Pod
-func (_e *MockRuntime_Expecter) UpdateActuatedPodLevelResources(actuatedPod interface{}) *MockRuntime_UpdateActuatedPodLevelResources_Call {
-	return &MockRuntime_UpdateActuatedPodLevelResources_Call{Call: _e.mock.On("UpdateActuatedPodLevelResources", actuatedPod)}
+func (_e *MockRuntime_Expecter) UpdateActuatedPodLevelResources(logger interface{}, actuatedPod interface{}) *MockRuntime_UpdateActuatedPodLevelResources_Call {
+	return &MockRuntime_UpdateActuatedPodLevelResources_Call{Call: _e.mock.On("UpdateActuatedPodLevelResources", logger, actuatedPod)}
 }
 
-func (_c *MockRuntime_UpdateActuatedPodLevelResources_Call) Run(run func(actuatedPod *v10.Pod)) *MockRuntime_UpdateActuatedPodLevelResources_Call {
+func (_c *MockRuntime_UpdateActuatedPodLevelResources_Call) Run(run func(logger klog.Logger, actuatedPod *v10.Pod)) *MockRuntime_UpdateActuatedPodLevelResources_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *v10.Pod
+		var arg0 klog.Logger
 		if args[0] != nil {
-			arg0 = args[0].(*v10.Pod)
+			arg0 = args[0].(klog.Logger)
+		}
+		var arg1 *v10.Pod
+		if args[1] != nil {
+			arg1 = args[1].(*v10.Pod)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -1657,7 +1766,7 @@ func (_c *MockRuntime_UpdateActuatedPodLevelResources_Call) Return(err error) *M
 	return _c
 }
 
-func (_c *MockRuntime_UpdateActuatedPodLevelResources_Call) RunAndReturn(run func(actuatedPod *v10.Pod) error) *MockRuntime_UpdateActuatedPodLevelResources_Call {
+func (_c *MockRuntime_UpdateActuatedPodLevelResources_Call) RunAndReturn(run func(logger klog.Logger, actuatedPod *v10.Pod) error) *MockRuntime_UpdateActuatedPodLevelResources_Call {
 	_c.Call.Return(run)
 	return _c
 }

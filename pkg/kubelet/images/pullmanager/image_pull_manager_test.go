@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	ctesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -818,12 +819,13 @@ type testWriteCountingFSPullRecordsAccessor struct {
 	fsPullRecordsAccessor
 }
 
-func (a *testWriteCountingFSPullRecordsAccessor) WriteImagePulledRecord(pulledRecord *kubeletconfiginternal.ImagePulledRecord) error {
+func (a *testWriteCountingFSPullRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, pulledRecord *kubeletconfiginternal.ImagePulledRecord) error {
 	a.imagePulledRecordsWrites += 1
-	return a.fsPullRecordsAccessor.WriteImagePulledRecord(pulledRecord)
+	return a.fsPullRecordsAccessor.WriteImagePulledRecord(logger, pulledRecord)
 }
 
 func TestFileBasedImagePullManager_RecordPullIntent(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name         string
 		inputImage   string
@@ -869,7 +871,7 @@ func TestFileBasedImagePullManager_RecordPullIntent(t *testing.T) {
 				f.intentCounters.Store(tt.inputImage, tt.startCounter)
 			}
 
-			_ = f.RecordPullIntent(tt.inputImage)
+			_ = f.RecordPullIntent(logger, tt.inputImage)
 
 			expectFilename := filepath.Join(pullingDir, tt.wantFile)
 			require.FileExists(t, expectFilename)
@@ -1138,6 +1140,58 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 				ImageRef: "testimageref-sa",
 				CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
 					"docker.io/testing/test": {
+						KubernetesServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
+							{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "record with familiar image name - only the last segment",
+			image:    "testing@sha256:f24acc752be18b93b0504c86312bbaf482c9efb0c45e925bbccb0a591cebd7af",
+			imageRef: "testimageref-familiarlast",
+			creds: &kubeletconfiginternal.ImagePullCredentials{
+				KubernetesServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
+					{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+				},
+			},
+			existingPulling:      []string{"sha256-7ffc99ef20589dc844b202c4cba501d1aaf06d1481935aa1e160029afd639847"},
+			expectPulled:         []string{"sha256-f2ba1256df29972c4fe11d8af7d302e37631c6077a2ed29d8bee55ee77cf26ad"},
+			pullsInFlight:        1,
+			expectPullingRemoved: "sha256-7ffc99ef20589dc844b202c4cba501d1aaf06d1481935aa1e160029afd639847",
+			checkedPullFile:      "sha256-f2ba1256df29972c4fe11d8af7d302e37631c6077a2ed29d8bee55ee77cf26ad",
+			expectUpdated:        true,
+			expectedPullRecord: kubeletconfiginternal.ImagePulledRecord{
+				ImageRef: "testimageref-familiarlast",
+				CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+					"testing": {
+						KubernetesServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
+							{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "record with familiar image name - org and name",
+			image:    "secretorg/myimage:customtag",
+			imageRef: "testimageref-familiarwithorg",
+			creds: &kubeletconfiginternal.ImagePullCredentials{
+				KubernetesServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
+					{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+				},
+			},
+			existingPulling:      []string{"sha256-5f3ca9e4d82e32203c2fafb410dfae9c8047bc6ebe57d642fe264d479e152955"},
+			expectPulled:         []string{"sha256-ff66306c3a398c6e6b64d8f7acdd1aebc37fce76add3849f9d3f59274434234a"},
+			pullsInFlight:        1,
+			expectPullingRemoved: "sha256-5f3ca9e4d82e32203c2fafb410dfae9c8047bc6ebe57d642fe264d479e152955",
+			checkedPullFile:      "sha256-ff66306c3a398c6e6b64d8f7acdd1aebc37fce76add3849f9d3f59274434234a",
+			expectUpdated:        true,
+			expectedPullRecord: kubeletconfiginternal.ImagePulledRecord{
+				ImageRef: "testimageref-familiarwithorg",
+				CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+					"secretorg/myimage": {
 						KubernetesServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
 							{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
 						},

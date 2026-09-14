@@ -34,14 +34,14 @@ import (
 // more information.
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	v1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// The desired behavior of this daemon set.
+	// spec is the desired behavior of this daemon set.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec *DaemonSetSpecApplyConfiguration `json:"spec,omitempty"`
-	// The current status of this daemon set. This data may be
+	// status is the current status of this daemon set. This data may be
 	// out of date by some window of time.
 	// Populated by the system.
 	// Read-only.

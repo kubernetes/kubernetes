@@ -29,13 +29,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/dump"
 )
 
 const defaultPVName = "default-pv"
@@ -209,8 +209,11 @@ func TestPVProtectionController(t *testing.T) {
 		}
 
 		// Create the controller
-		logger, _ := ktesting.NewTestContext(t)
-		ctrl := NewPVProtectionController(logger, pvInformer, client)
+		logger, ctx := ktesting.NewTestContext(t)
+		ctrl, err := NewPVProtectionController(ctx, pvInformer, client)
+		if err != nil {
+			t.Fatalf("unexpected error constructing controller: %v", err)
+		}
 
 		// Start the test by simulating an event
 		if test.updatedPV != nil {

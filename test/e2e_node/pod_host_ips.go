@@ -37,7 +37,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = common.SIGDescribe("Pod Host IPs", func() {
+var _ = common.SIGDescribe("Pod Host IPs", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("host-ips")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

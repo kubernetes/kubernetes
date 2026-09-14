@@ -821,7 +821,7 @@ func (m *mockDockerKeyringWithTrackedCreds) Lookup(image string) ([]credentialpr
 }
 
 func pullerTestEnv(
-	t *testing.T,
+	t ktesting.TB,
 	c pullerTestCase,
 	serialized bool,
 	maxParallelImagePulls *int32,
@@ -1125,7 +1125,13 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 }
 
 func TestMaxParallelImagePullsLimit(t *testing.T) {
-	ctx := ktesting.Init(t)
+	ktesting.Init(t).SyncTest("", func(tCtx ktesting.TContext) {
+		testMaxParallelImagePullsLimit(tCtx)
+	})
+}
+
+func testMaxParallelImagePullsLimit(tCtx ktesting.TContext) {
+	t := tCtx.TB()
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
@@ -1165,7 +1171,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < maxParallelImagePulls; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}()
@@ -1177,7 +1183,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}()
@@ -1198,7 +1204,13 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 }
 
 func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
-	ctx := context.Background()
+	ktesting.Init(t).SyncTest("", func(tCtx ktesting.TContext) {
+		testParallelPodPullingTimeRecorderWithErr(tCtx)
+	})
+}
+
+func testParallelPodPullingTimeRecorderWithErr(tCtx ktesting.TContext) {
+	t := tCtx.TB()
 	pod1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod1",
@@ -1256,7 +1268,7 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func(i int) {
-			_, _, _ = puller.EnsureImageExists(ctx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
+			_, _, _ = puller.EnsureImageExists(tCtx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
 			wg.Done()
 		}(i)
 	}
@@ -1284,7 +1296,7 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func(i int) {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(tCtx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}(i)
@@ -1489,9 +1501,8 @@ func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, tc.enableEnsureSecretImages)
-
-			ctx := context.Background()
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			fakeRuntime := &ctest.FakeRuntime{T: t}
 			fakeRecorder := testutil.NewFakeRecorder()
@@ -1543,7 +1554,7 @@ func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
 				ImagePullPolicy: tc.policy,
 			}
 
-			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, []v1.Secret{}, podSandboxConfig, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, []v1.Secret{}, podSandboxConfig, "", container.ImagePullPolicy)
 			require.NoError(t, err)
 
 			if tc.shouldCallMustAttemptPull {
@@ -1563,6 +1574,7 @@ func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
 }
 
 func TestEnsureImageExistsWithNodeCredentialsOnly(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, true)
 
 	pod := &v1.Pod{
@@ -1582,7 +1594,6 @@ func TestEnsureImageExistsWithNodeCredentialsOnly(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	fakeRuntime := &ctest.FakeRuntime{T: t}
 	fakeRecorder := testutil.NewFakeRecorder()
@@ -1625,7 +1636,7 @@ func TestEnsureImageExistsWithNodeCredentialsOnly(t *testing.T) {
 		ImagePullPolicy: v1.PullIfNotPresent,
 	}
 
-	_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, []v1.Secret{}, podSandboxConfig, "", container.ImagePullPolicy)
+	_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, []v1.Secret{}, podSandboxConfig, "", container.ImagePullPolicy)
 	require.NoError(t, err)
 
 	// Verify that MustAttemptImagePull was called with empty secrets and service accounts

@@ -47,7 +47,6 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -88,6 +87,13 @@ const (
 	// netexec dial commands
 	// the destination will echo its hostname.
 	echoHostname = "hostname"
+	// the destination will echo its Kubernetes node name via the /envvar endpoint.
+	// Used for hostNetwork pods where os.Hostname() is unreliable when --hostname-override is set.
+	echoNodename = "envvar?var=NODE_NAME"
+	// echoNodenameUDP is the UDP equivalent of echoNodename. The agnhost UDP handler
+	// expects space-separated "envvar NODE_NAME"; percent-encoding the space here
+	// lets Go's url.ParseQuery at the dial relay decode it back to that form.
+	echoNodenameUDP = "envvar%20NODE_NAME"
 )
 
 // Option is used to configure the NetworkingTest object
@@ -218,12 +224,28 @@ type NetexecDialResponse struct {
 
 // DialFromEndpointContainer executes a curl via kubectl exec in an endpoint container.   Returns an error to be handled by the caller.
 func (config *NetworkingTestConfig) DialFromEndpointContainer(ctx context.Context, protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
-	return config.DialFromContainer(ctx, protocol, echoHostname, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
+	dialCmd := echoHostname
+	if config.EndpointsHostNetwork {
+		if protocol == "udp" || protocol == "sctp" {
+			dialCmd = echoNodenameUDP
+		} else {
+			dialCmd = echoNodename
+		}
+	}
+	return config.DialFromContainer(ctx, protocol, dialCmd, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
 // DialFromTestContainer executes a curl via kubectl exec in a test container. Returns an error to be handled by the caller.
 func (config *NetworkingTestConfig) DialFromTestContainer(ctx context.Context, protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
-	return config.DialFromContainer(ctx, protocol, echoHostname, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedEps)
+	dialCmd := echoHostname
+	if config.EndpointsHostNetwork {
+		if protocol == "udp" || protocol == "sctp" {
+			dialCmd = echoNodenameUDP
+		} else {
+			dialCmd = echoNodename
+		}
+	}
+	return config.DialFromContainer(ctx, protocol, dialCmd, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
 // DialEchoFromTestContainer executes a curl via kubectl exec in a test container. The response is expected to match the echoMessage,  Returns an error to be handled by the caller.
@@ -265,28 +287,12 @@ func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 	for _, p := range config.EndpointPods {
 
 		if config.EndpointsHostNetwork {
-			// Hostname behavior for hostNetwork pods is not well defined and when
-			// using the flag hostname-override in the kubelet, the node reported
-			// hostname on host network pods will not match the node's hostanme.
-			// It seems that the node.status.addresses hostname value is the only
-			// one that matches the value returned by os.Hostname
-			// used by the agnhost web handler, so we'll use that value.
-			// If by any circumstances the node does not provide that hostnae address
-			// we use the value of the node name.
-			// xref: https://issues.k8s.io/126087
-			hostname := p.Spec.NodeSelector["kubernetes.io/hostname"]
-			for _, n := range config.Nodes {
-				if n.Name == p.Spec.NodeSelector["kubernetes.io/hostname"] {
-					for _, address := range n.Status.Addresses {
-						if address.Type == v1.NodeHostName {
-							hostname = address.Address
-							break
-						}
-					}
-					break
-				}
-			}
-			expectedEps.Insert(hostname)
+			// For hostNetwork pods, spec.nodeName is the only reliable node identifier.
+			// os.Hostname() diverges from the k8s node name when --hostname-override is
+			// set on kubelet (e.g. DigitalOcean, kops). We use /envvar?var=NODE_NAME
+			// backed by the Downward API to read spec.nodeName directly.
+			// xref: https://issues.k8s.io/121018
+			expectedEps.Insert(p.Spec.NodeName)
 		} else {
 			expectedEps.Insert(p.Name)
 		}
@@ -328,11 +334,12 @@ func makeCURLDialCommand(ipPort, dialCmd, protocol, targetIP string, targetPort 
 // Returns nil if no error, or error message if failed after trying maxTries.
 func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, protocol, dialCommand, containerIP, targetIP string, containerHTTPPort, targetPort, maxTries, minTries int, expectedResponses sets.String) error {
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
+
 	cmd := makeCURLDialCommand(ipPort, dialCommand, protocol, targetIP, targetPort)
 
 	responses := sets.NewString()
 
-	for i := 0; i < maxTries; i++ {
+	for i := range maxTries {
 		resp, err := config.GetResponseFromContainer(ctx, protocol, dialCommand, containerIP, targetIP, containerHTTPPort, targetPort)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
@@ -363,7 +370,7 @@ func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, proto
 		// TODO: get rid of this delay #36281
 		time.Sleep(hitEndpointRetryDelay)
 	}
-	if dialCommand == echoHostname {
+	if dialCommand == echoHostname || dialCommand == echoNodename || dialCommand == echoNodenameUDP {
 		config.diagnoseMissingEndpoints(responses)
 	}
 	returnMsg := fmt.Errorf("did not find expected responses... \nTries %d\nCommand %v\nretrieved %v\nexpected %v", maxTries, cmd, responses, expectedResponses)
@@ -388,7 +395,7 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(ctx context.Contex
 
 	eps := sets.NewString()
 
-	for i := 0; i < tries; i++ {
+	for i := range tries {
 		stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, config.f, config.TestContainerPod.Name, cmd)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
@@ -478,13 +485,22 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(ctx context.Con
 func (config *NetworkingTestConfig) DialFromNode(ctx context.Context, protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
 	var cmd string
 	if protocol == "udp" {
-		cmd = fmt.Sprintf("echo hostName | nc -w 1 -u %s %d", targetIP, targetPort)
+		if config.EndpointsHostNetwork {
+			// UDP handler expects space-separated "envvar NODE_NAME".
+			cmd = fmt.Sprintf("echo 'envvar NODE_NAME' | nc -w 1 -u %s %d", targetIP, targetPort)
+		} else {
+			cmd = fmt.Sprintf("echo hostName | nc -w 1 -u %s %d", targetIP, targetPort)
+		}
 	} else {
 		ipPort := net.JoinHostPort(targetIP, strconv.Itoa(targetPort))
 		// The current versions of curl included in CentOS and RHEL distros
 		// misinterpret square brackets around IPv6 as globbing, so use the -g
 		// argument to disable globbing to handle the IPv6 case.
-		cmd = fmt.Sprintf("curl -g -q -s --max-time 15 --connect-timeout 1 http://%s/hostName", ipPort)
+		if config.EndpointsHostNetwork {
+			cmd = fmt.Sprintf("curl -g -q -s --max-time 15 --connect-timeout 1 'http://%s/envvar?var=NODE_NAME'", ipPort)
+		} else {
+			cmd = fmt.Sprintf("curl -g -q -s --max-time 15 --connect-timeout 1 http://%s/hostName", ipPort)
+		}
 	}
 
 	// TODO: This simply tells us that we can reach the endpoints. Check that
@@ -494,7 +510,7 @@ func (config *NetworkingTestConfig) DialFromNode(ctx context.Context, protocol, 
 
 	filterCmd := fmt.Sprintf("%s | grep -v '^\\s*$'", cmd)
 	framework.Logf("Going to poll %v on port %v at least %v times, with a maximum of %v tries before failing", targetIP, targetPort, minTries, maxTries)
-	for i := 0; i < maxTries; i++ {
+	for i := range maxTries {
 		stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, config.f, config.HostTestContainerPod.Name, filterCmd)
 		if err != nil || len(stderr) > 0 {
 			// A failure to exec command counts as a try, not a hard fail.
@@ -659,6 +675,14 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 				ValueFrom: &v1.EnvVarSource{
 					FieldRef: &v1.ObjectFieldSelector{
 						FieldPath: "status.podIPs",
+					},
+				},
+			},
+			{
+				Name: "NODE_NAME",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						FieldPath: "spec.nodeName",
 					},
 				},
 			},
@@ -838,14 +862,10 @@ func (config *NetworkingTestConfig) setup(ctx context.Context, selector map[stri
 		config.SecondaryClusterIP = config.NodePortService.Spec.ClusterIPs[1]
 	}
 
-	// Obtain the primary IP family of the Cluster based on the first ClusterIP
-	// TODO: Eventually we should just be getting these from Spec.IPFamilies
-	// but for now that would only if the feature gate is enabled.
-	family := v1.IPv4Protocol
-	secondaryFamily := v1.IPv6Protocol
-	if netutils.IsIPv6String(config.ClusterIP) {
-		family = v1.IPv6Protocol
-		secondaryFamily = v1.IPv4Protocol
+	var family, secondaryFamily v1.IPFamily
+	family = config.NodePortService.Spec.IPFamilies[0]
+	if len(config.NodePortService.Spec.IPFamilies) == 2 {
+		secondaryFamily = config.NodePortService.Spec.IPFamilies[1]
 	}
 	if config.PreferExternalAddresses {
 		// Get Node IPs from the cluster, ExternalIPs take precedence

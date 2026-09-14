@@ -81,6 +81,51 @@ var (
 		delete(paths, "/apis/batch/v1/namespaces/{namespace}/cronjobs/{name}")
 		return res
 	}()
+
+	nestedWidgetGVR = schema.GroupVersionResource{
+		Group:    "example.com",
+		Version:  "v1",
+		Resource: "widgets",
+	}
+
+	nestedWidgetOpenAPI map[string]interface{} = map[string]interface{}{
+		"paths": map[string]interface{}{
+			"/apis/example.com/v1/widgets": map[string]interface{}{
+				"get": map[string]interface{}{
+					"x-kubernetes-group-version-kind": map[string]interface{}{
+						"group":   "example.com",
+						"version": "v1",
+						"kind":    "Widget",
+					},
+				},
+			},
+		},
+		"components": map[string]interface{}{
+			"schemas": map[string]interface{}{
+				"com.example.v1.Widget": map[string]interface{}{
+					"type": "object",
+					"x-kubernetes-group-version-kind": []map[string]interface{}{
+						{"group": "example.com", "version": "v1", "kind": "Widget"},
+					},
+					"properties": map[string]interface{}{
+						"name": map[string]interface{}{"type": "string"},
+						"meta": map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"id": map[string]interface{}{"type": "string"},
+								"tags": map[string]interface{}{
+									"type": "object",
+									"properties": map[string]interface{}{
+										"key": map[string]interface{}{"type": "string"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 )
 
 type testCase struct {
@@ -636,7 +681,10 @@ func TestPlaintext(t *testing.T) {
 				"short": false,
 			},
 			Checks: []check{
-				checkEquals("thefield\t<string> -required-\n  a description that should be printed\n\n"),
+				checkEquals(`thefield	<string> -required-
+  a description that should be printed
+
+`),
 			},
 		},
 		{
@@ -660,6 +708,61 @@ func TestPlaintext(t *testing.T) {
 			},
 			Checks: []check{
 				checkEquals("          thefield\t<string> -required-\n"),
+			},
+		},
+		{
+			// Shows that fieldDetail renders externalDocs after description
+			Name:        "FieldExternalDocs",
+			Subtemplate: "fieldDetail",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "object",
+					"description": "parent description",
+					"properties": map[string]any{
+						"thefield": map[string]any{
+							"type":        "string",
+							"description": "a description that should be printed",
+							"externalDocs": map[string]any{
+								"description": "Find more info here",
+								"url":         "https://example.com/docs",
+							},
+						},
+					},
+				},
+				"name":  "thefield",
+				"short": false,
+			},
+			Checks: []check{
+				checkContains("a description that should be printed"),
+				checkContains("EXTERNAL DOCS:"),
+				checkContains("Find more info here"),
+				checkContains("URL: https://example.com/docs"),
+			},
+		},
+		{
+			// Shows that fieldDetail does not render externalDocs in short mode
+			Name:        "FieldExternalDocsShort",
+			Subtemplate: "fieldDetail",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "object",
+					"description": "parent description",
+					"properties": map[string]any{
+						"thefield": map[string]any{
+							"type":        "string",
+							"description": "a description",
+							"externalDocs": map[string]any{
+								"description": "Find more info here",
+								"url":         "https://example.com/docs",
+							},
+						},
+					},
+				},
+				"name":  "thefield",
+				"short": true,
+			},
+			Checks: []check{
+				checkEquals("thefield\t<string>\n"),
 			},
 		},
 		{
@@ -690,7 +793,11 @@ func TestPlaintext(t *testing.T) {
 				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1\n    2\n    3"),
+				checkEquals(`ENUM:
+    0
+    1
+    2
+    3`),
 			},
 		},
 		{
@@ -707,7 +814,8 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("\n  enum: 0, 1, 2, 3"),
+				checkEquals(`
+  enum: 0, 1, 2, 3`),
 			},
 		},
 		{
@@ -725,7 +833,8 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("\n  enum: 0, 1, ...."),
+				checkEquals(`
+  enum: 0, 1, ....`),
 			},
 		},
 		{
@@ -743,7 +852,9 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1, ...."),
+				checkEquals(`ENUM:
+    0
+    1, ....`),
 			},
 		},
 		{
@@ -760,6 +871,305 @@ func TestPlaintext(t *testing.T) {
 			},
 			Checks: []check{
 				checkEquals("ENUM:\n    Block\n    File\n    \"\""),
+			},
+		},
+		{
+			// Shows that externalDocs renders both description and URL
+			Name:        "ExternalDocsDescriptionAndURL",
+			Subtemplate: "externalDocs",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"externalDocs": map[string]any{
+						"description": "Find more info here",
+						"url":         "https://example.com/docs",
+					},
+				},
+			},
+			Checks: []check{
+				checkContains("EXTERNAL DOCS:"),
+				checkContains("Find more info here"),
+				checkContains("URL: https://example.com/docs"),
+			},
+		},
+		{
+			// Shows that externalDocs renders URL when description is absent
+			Name:        "ExternalDocsURLOnly",
+			Subtemplate: "externalDocs",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"externalDocs": map[string]any{
+						"url": "https://example.com/docs",
+					},
+				},
+			},
+			Checks: []check{
+				checkContains("EXTERNAL DOCS:"),
+				checkContains("URL: https://example.com/docs"),
+			},
+		},
+		{
+			// Shows that externalDocs renders nothing when absent
+			Name:        "ExternalDocsAbsent",
+			Subtemplate: "externalDocs",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type": "object",
+				},
+			},
+			Checks: []check{
+				checkEquals(""),
+			},
+		},
+		{
+			// Integration test: shows that externalDocs appears in full output
+			Name: "SchemaWithExternalDocs",
+			Context: v2.TemplateContext{
+				Document: map[string]any{
+					"paths": map[string]any{
+						"/apis/example.com/v1/widgets": map[string]any{
+							"get": map[string]any{
+								"x-kubernetes-group-version-kind": map[string]any{
+									"group":   "example.com",
+									"version": "v1",
+									"kind":    "Widget",
+								},
+							},
+						},
+					},
+					"components": map[string]any{
+						"schemas": map[string]any{
+							"com.example.v1.Widget": map[string]any{
+								"type":        "object",
+								"description": "A widget is a thing.",
+								"x-kubernetes-group-version-kind": []map[string]any{
+									{
+										"group":   "example.com",
+										"version": "v1",
+										"kind":    "Widget",
+									},
+								},
+								"externalDocs": map[string]any{
+									"description": "Find more info here",
+									"url":         "https://example.com/docs/widgets",
+								},
+								"properties": map[string]any{
+									"apiVersion": map[string]any{
+										"type": "string",
+									},
+									"kind": map[string]any{
+										"type": "string",
+									},
+								},
+							},
+						},
+					},
+				},
+				GVR: schema.GroupVersionResource{
+					Group:    "example.com",
+					Version:  "v1",
+					Resource: "widgets",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("DESCRIPTION:"),
+				checkContains("A widget is a thing."),
+				checkContains("EXTERNAL DOCS:"),
+				checkContains("Find more info here"),
+				checkContains("URL: https://example.com/docs/widgets"),
+			},
+		},
+		{
+			// Integration test: shows that externalDocs on a child field appears in field list
+			Name: "SchemaWithFieldExternalDocs",
+			Context: v2.TemplateContext{
+				Document: map[string]any{
+					"paths": map[string]any{
+						"/apis/example.com/v1/widgets": map[string]any{
+							"get": map[string]any{
+								"x-kubernetes-group-version-kind": map[string]any{
+									"group":   "example.com",
+									"version": "v1",
+									"kind":    "Widget",
+								},
+							},
+						},
+					},
+					"components": map[string]any{
+						"schemas": map[string]any{
+							"com.example.v1.Widget": map[string]any{
+								"type":        "object",
+								"description": "A widget is a thing.",
+								"x-kubernetes-group-version-kind": []map[string]any{
+									{
+										"group":   "example.com",
+										"version": "v1",
+										"kind":    "Widget",
+									},
+								},
+								"properties": map[string]any{
+									"name": map[string]any{
+										"type":        "string",
+										"description": "name of the widget",
+										"externalDocs": map[string]any{
+											"description": "Widget naming conventions",
+											"url":         "https://example.com/docs/naming",
+										},
+									},
+									"size": map[string]any{
+										"type":        "integer",
+										"description": "size of the widget",
+									},
+								},
+							},
+						},
+					},
+				},
+				GVR: schema.GroupVersionResource{
+					Group:    "example.com",
+					Version:  "v1",
+					Resource: "widgets",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("FIELDS:"),
+				checkContains("name of the widget"),
+				checkContains("EXTERNAL DOCS:"),
+				checkContains("Widget naming conventions"),
+				checkContains("URL: https://example.com/docs/naming"),
+				checkContains("size of the widget"),
+			},
+		},
+		{
+			Name: "MaxDepthZeroIsUnlimited",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  0,
+			},
+			Checks: []check{
+				// Non-recursive field details separate descriptions with a blank line,
+				// and the root template emits the final trailing newline.
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    id	<string>
+    tags	<Object>
+      key	<string>
+  name	<string>
+
+`),
+			},
+		},
+		{
+			Name: "MaxDepthOneStopsAtTopLevelFields",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  1,
+			},
+			Checks: []check{
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+  name	<string>
+
+`),
+			},
+		},
+		{
+			Name: "MaxDepthTwoExpandsOneLevelDeeper",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  2,
+			},
+			Checks: []check{
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    id	<string>
+    tags	<Object>
+  name	<string>
+
+`),
+			},
+		},
+		{
+			Name: "MaxDepthLargerThanSchemaEqualsUnlimited",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  100,
+			},
+			Checks: []check{
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    id	<string>
+    tags	<Object>
+      key	<string>
+  name	<string>
+
+`),
+			},
+		},
+		{
+			Name: "MaxDepthIgnoredWhenRecursiveFalse",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: false,
+				MaxDepth:  5,
+			},
+			Checks: []check{
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    <no description>
+
+  name	<string>
+    <no description>
+
+
+`),
 			},
 		},
 	}

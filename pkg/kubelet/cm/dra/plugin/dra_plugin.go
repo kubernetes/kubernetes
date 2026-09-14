@@ -18,18 +18,15 @@ package plugin
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/klog/v2"
+	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -52,81 +49,37 @@ var servicesSupportedByKubelet = []string{
 	drapbv1beta1.DRAPluginService,
 }
 
+// All DRAResourceHealth API versions supported by the kubelet.
+// Sorted by most recent first, oldest last. The kubelet picks the first one
+// that the plugin also advertises.
+//
+// TODO(harche): remove v1alpha1 in 1.40. It exists as a three release
+// transition (1.37 through 1.39) for drivers which shipped a v1alpha1
+// health server before v1 existed.
+var healthServicesSupportedByKubelet = []string{
+	drahealthv1.DRAResourceHealthService,
+	drahealthv1alpha1.DRAResourceHealthService,
+}
+
 // DRAPlugin contains information about one registered plugin of a DRA driver.
 // It implements the kubelet operations for preparing/unpreparing by calling
 // a gRPC interface that is implemented by the plugin.
 type DRAPlugin struct {
-	driverName        string
-	conn              *grpc.ClientConn
-	endpoint          string
-	chosenService     string // e.g. drapbv1.DRAPluginService
-	clientCallTimeout time.Duration
+	driverName    string
+	conn          *grpc.ClientConn
+	endpoint      string
+	chosenService string // e.g. drapbv1.DRAPluginService
+	// chosenHealthService is the negotiated DRAResourceHealth gRPC service
+	// (e.g. drahealthv1.DRAResourceHealthService), or "" if the plugin
+	// does not provide the optional health service.
+	chosenHealthService string
+	clientCallTimeout   time.Duration
 
 	mutex         sync.Mutex
 	backgroundCtx context.Context
 
-	healthClient       drahealthv1alpha1.DRAResourceHealthClient
 	healthStreamCtx    context.Context
 	healthStreamCancel context.CancelFunc
-}
-
-func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	// If connection exists and is ready, return it.
-	if p.conn != nil && p.conn.GetState() != connectivity.Shutdown {
-		// Initialize health client if connection exists but client is nil
-		// This allows lazy init if connection was established before health was added.
-		if p.healthClient == nil {
-			p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
-			klog.FromContext(p.backgroundCtx).V(4).Info("Initialized DRAResourceHealthClient lazily")
-		}
-		return p.conn, nil
-	}
-
-	// If the connection is dead, clean it up before creating a new one.
-	if p.conn != nil {
-		if err := p.conn.Close(); err != nil {
-			return nil, fmt.Errorf("failed to close stale gRPC connection to %s: %w", p.endpoint, err)
-		}
-		p.conn = nil
-		p.healthClient = nil
-	}
-
-	ctx := p.backgroundCtx
-	logger := klog.FromContext(ctx)
-
-	network := "unix"
-	logger.V(4).Info("Creating new gRPC connection", "protocol", network, "endpoint", p.endpoint)
-	// grpc.Dial is deprecated. grpc.NewClient should be used instead.
-	// For now this gets ignored because this function is meant to establish
-	// the connection, with the one second timeout below. Perhaps that
-	// approach should be reconsidered?
-	//nolint:staticcheck
-	conn, err := grpc.Dial(
-		p.endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, target)
-		}),
-		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.driverName)),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
-		return nil, errors.New("timed out waiting for gRPC connection to be ready")
-	}
-
-	p.conn = conn
-	p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
-
-	return p.conn, nil
 }
 
 func (p *DRAPlugin) DriverName() string {
@@ -138,7 +91,7 @@ func (p *DRAPlugin) NodePrepareResources(
 	req *drapbv1.NodePrepareResourcesRequest,
 	opts ...grpc.CallOption,
 ) (*drapbv1.NodePrepareResourcesResponse, error) {
-	logger := klog.FromContext(ctx)
+	logger := klog.FromContext(ctx).WithName("dra-plugin")
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("Calling NodePrepareResources rpc", "request", req)
@@ -154,7 +107,7 @@ func (p *DRAPlugin) NodePrepareResources(
 		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodePrepareResources(ctx, req)
 	case drapbv1.DRAPluginService:
 		client := drapbv1.NewDRAPluginClient(p.conn)
-		response, err = client.NodePrepareResources(ctx, req)
+		response, err = client.NodePrepareResources(ctx, req, opts...)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
@@ -169,10 +122,11 @@ func (p *DRAPlugin) NodeUnprepareResources(
 	req *drapbv1.NodeUnprepareResourcesRequest,
 	opts ...grpc.CallOption,
 ) (*drapbv1.NodeUnprepareResourcesResponse, error) {
-	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
+	logger := klog.FromContext(ctx).WithName("dra-plugin")
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	ctx = klog.NewContext(ctx, logger)
+
+	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
 
 	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
@@ -185,7 +139,7 @@ func (p *DRAPlugin) NodeUnprepareResources(
 		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodeUnprepareResources(ctx, req)
 	case drapbv1.DRAPluginService:
 		client := drapbv1.NewDRAPluginClient(p.conn)
-		response, err = client.NodeUnprepareResources(ctx, req)
+		response, err = client.NodeUnprepareResources(ctx, req, opts...)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
@@ -219,19 +173,30 @@ func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
 	return p.healthStreamCancel
 }
 
-// NodeWatchResources establishes a stream to receive health updates from the DRA plugin.
-func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, error) {
-	// Ensure a connection and the health client exist before proceeding.
-	// This call is idempotent and will create them if they don't exist.
-	_, err := p.getOrCreateGRPCConn()
-	if err != nil {
-		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get gRPC connection for health client")
-		return nil, err
-	}
+// NodeWatchResources establishes a stream to receive health updates from the DRA
+// plugin. It uses the health gRPC service version negotiated at registration
+// time. When the plugin only supports v1alpha1, the returned stream transparently
+// converts the responses to v1 so that the rest of the kubelet only deals
+// with v1 types.
+func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, error) {
+	logger := klog.FromContext(ctx).WithName("dra-plugin")
+	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 
-	logger := klog.FromContext(ctx).WithValues("pluginName", p.driverName)
-	logger.V(4).Info("Starting WatchResources stream")
-	stream, err := p.healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
+	logger.V(4).Info("Starting WatchResources stream", "healthService", p.chosenHealthService)
+	var stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient
+	var err error
+	switch p.chosenHealthService {
+	case drahealthv1.DRAResourceHealthService:
+		client := drahealthv1.NewDRAResourceHealthClient(p.conn)
+		stream, err = client.NodeWatchResources(ctx, &drahealthv1.NodeWatchResourcesRequest{})
+	case drahealthv1alpha1.DRAResourceHealthService:
+		client := drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
+		stream, err = drahealthv1.V1Alpha1ClientWrapper{Client: client}.NodeWatchResources(ctx, &drahealthv1.NodeWatchResourcesRequest{})
+	default:
+		// Shouldn't happen: the health stream is only started when a health
+		// service was negotiated at registration time.
+		return nil, fmt.Errorf("internal error: unsupported chosen health service: %q", p.chosenHealthService)
+	}
 	if err != nil {
 		logger.Error(err, "NodeWatchResources RPC call failed")
 		return nil, err

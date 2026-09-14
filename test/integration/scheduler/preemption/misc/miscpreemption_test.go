@@ -410,7 +410,7 @@ func TestPreemptionStarvation(t *testing.T) {
 					numRunningPods := test.numExistingPod - test.numExpectedPending
 					runningPods := make([]*v1.Pod, numRunningPods)
 					// Create and run existingPods.
-					for i := 0; i < numRunningPods; i++ {
+					for i := range numRunningPods {
 						runningPods[i], err = createPausePod(cs, mkPriorityPodWithGrace(testCtx, fmt.Sprintf("rpod-%v", i), mediumPriority, 0))
 						if err != nil {
 							t.Fatalf("Error creating pause pod: %v", err)

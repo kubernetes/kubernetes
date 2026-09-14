@@ -138,7 +138,7 @@ func (structWithRawFields) DeepCopyObject() runtime.Object {
 }
 
 type structWithEmbeddedMetas struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 }
 
@@ -333,8 +333,8 @@ func TestDecode(t *testing.T) {
 			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Group: "x", Version: "y", Kind: "z"}}},
 			into:        &structWithRawFields{},
 			expectedObj: &structWithRawFields{
-				FieldsV1:            metav1.FieldsV1{Raw: []byte(`{"a":1}`)},
-				FieldsV1Pointer:     &metav1.FieldsV1{Raw: []byte(`{"z":2}`)},
+				FieldsV1:            *metav1.NewFieldsV1(`{"a":1}`),
+				FieldsV1Pointer:     metav1.NewFieldsV1(`{"z":2}`),
 				RawExtension:        runtime.RawExtension{Raw: []byte(`{"b":3}`)},
 				RawExtensionPointer: &runtime.RawExtension{Raw: []byte(`{"y":4}`)},
 			},
@@ -354,8 +354,8 @@ func TestDecode(t *testing.T) {
 			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Group: "x", Version: "y", Kind: "z"}}},
 			into:        &structWithRawFields{},
 			expectedObj: &structWithRawFields{
-				FieldsV1:        metav1.FieldsV1{Raw: []byte{0xa1, 0x41, 'a', 0x01}},
-				FieldsV1Pointer: &metav1.FieldsV1{Raw: []byte{0xa1, 0x41, 'z', 0x02}},
+				FieldsV1:        *metav1.NewFieldsV1(string([]byte{0xa1, 0x41, 'a', 0x01})),
+				FieldsV1Pointer: metav1.NewFieldsV1(string([]byte{0xa1, 0x41, 'z', 0x02})),
 				// RawExtension's UnmarshalCBOR ensures the self-described CBOR tag
 				// is present in the result so that there is never any ambiguity in
 				// distinguishing CBOR from JSON or Protobuf. It is unnecessary for
@@ -779,7 +779,7 @@ func (mf stubMetaFactory) Interpret([]byte) (*schema.GroupVersionKind, error) {
 }
 
 type oneMapField struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	Map             map[string]interface{} `json:"map"`
 }
 
@@ -792,7 +792,7 @@ func (o oneMapField) GetObjectKind() schema.ObjectKind {
 }
 
 type eightStringFields struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	A               string `json:"1"`
 	B               string `json:"2"`
 	C               string `json:"3"`

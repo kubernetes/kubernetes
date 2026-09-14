@@ -26,11 +26,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	v1 "k8s.io/client-go/informers/resource/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
@@ -50,9 +53,9 @@ func V1ResourceByDeviceClass(className string) corev1.ResourceName {
 }
 
 // NewResourceClaimEvaluator returns an evaluator that can evaluate resource claims
-func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *extendedresourcecache.ExtendedResourceCache, podsGetter corev1listers.PodLister) quota.Evaluator {
+func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *extendedresourcecache.ExtendedResourceCache, podsGetter corev1listers.PodLister, claimGetter resourceClaimPodOwnerGetter) quota.Evaluator {
 	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, resourceapi.SchemeGroupVersion.WithResource("resourceclaims"))
-	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace, deviceClassMapping: m, podsGetter: podsGetter}
+	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace, deviceClassMapping: m, podsGetter: podsGetter, claimGetter: claimGetter}
 	return claimEvaluator
 }
 
@@ -64,6 +67,8 @@ type claimEvaluator struct {
 	deviceClassMapping *extendedresourcecache.ExtendedResourceCache
 	// podsGetter is used to get pods
 	podsGetter corev1listers.PodLister
+	// claimGetter is used to get claims for extended resources by namespace and pod owner uid
+	claimGetter resourceClaimPodOwnerGetter
 }
 
 // Constraints verifies that all required resources are present on the item.
@@ -167,7 +172,7 @@ func (p *claimEvaluator) getVerifiedPodUsage(claim *resourceapi.ResourceClaim) c
 	if claim.Annotations[resourceapi.ExtendedResourceClaimAnnotation] != "true" {
 		return nil
 	}
-	controllerRef := metav1.GetControllerOf(claim)
+	controllerRef := metav1.GetControllerOfNoCopy(claim)
 	if controllerRef == nil {
 		return nil
 	}
@@ -187,6 +192,30 @@ func (p *claimEvaluator) getVerifiedPodUsage(claim *resourceapi.ResourceClaim) c
 	if pod.Status.ExtendedResourceClaimStatus != nil && pod.Status.ExtendedResourceClaimStatus.ResourceClaimName != claim.Name {
 		return nil
 	}
+	// if the pod doesn't identify its extended resource claim, make sure we're the first or only extended resource claim for this pod
+	if pod.Status.ExtendedResourceClaimStatus == nil {
+		ownedClaims, err := p.claimGetter(claim.Namespace, pod.UID)
+		if err != nil {
+			return nil
+		}
+		for _, ownedClaim := range ownedClaims {
+			switch ownedClaim.CreationTimestamp.Time.Compare(claim.CreationTimestamp.Time) {
+			case -1:
+				// There's another owned claim created earlier than this one.
+				// Don't exempt this one based on pod usage.
+				return nil
+			case 0:
+				if ownedClaim.Name < claim.Name {
+					// There's another owned claim created at the same time as this one with an earlier name.
+					// Don't exempt this one based on pod usage.
+					return nil
+				}
+			case 1:
+				continue
+			}
+		}
+	}
+
 	quotaReqs, err := PodUsageFunc(pod, clock.RealClock{})
 	if err != nil {
 		return nil
@@ -287,4 +316,55 @@ func toExternalResourceClaimOrError(obj runtime.Object) (*resourceapi.ResourceCl
 		return nil, fmt.Errorf("expect %T or %T, got %v", &resourceapi.ResourceClaim{}, &resourceinternal.ResourceClaim{}, t)
 	}
 	return claim, nil
+}
+
+const extendedResourceClaimPodOwnerIndexName = "extendedResourceClaimPodUIDOwner"
+
+func resourceClaimPodOwnerKey(namespace string, podUID types.UID) string {
+	return namespace + "/" + string(podUID)
+}
+
+type resourceClaimPodOwnerGetter func(namespace string, podUID types.UID) ([]*resourceapi.ResourceClaim, error)
+
+func makeResourceClaimPodOwnerGetter(resourceClaimInformer v1.ResourceClaimInformer) (resourceClaimPodOwnerGetter, error) {
+	indexers := cache.Indexers{extendedResourceClaimPodOwnerIndexName: extendedResourceClaimPodUIDOwnerIndex}
+	if err := resourceClaimInformer.Informer().AddIndexers(indexers); err != nil {
+		_, exists := resourceClaimInformer.Informer().GetIndexer().GetIndexers()[extendedResourceClaimPodOwnerIndexName]
+		if !exists {
+			return nil, fmt.Errorf("failed to add resource claim pod owner indexer: %w", err)
+		}
+	}
+	indexer := resourceClaimInformer.Informer().GetIndexer()
+	return func(namespace string, podUID types.UID) ([]*resourceapi.ResourceClaim, error) {
+		objects, err := indexer.ByIndex(extendedResourceClaimPodOwnerIndexName, resourceClaimPodOwnerKey(namespace, podUID))
+		if err != nil {
+			return nil, err
+		}
+		claims := make([]*resourceapi.ResourceClaim, 0, len(objects))
+		for _, obj := range objects {
+			if claim, ok := obj.(*resourceapi.ResourceClaim); ok {
+				claims = append(claims, claim)
+			} else {
+				return nil, fmt.Errorf("failed to get resource claim from indexer")
+			}
+		}
+		return claims, nil
+	}, nil
+}
+func extendedResourceClaimPodUIDOwnerIndex(obj interface{}) ([]string, error) {
+	claim, ok := obj.(*resourceapi.ResourceClaim)
+	if !ok {
+		return nil, nil
+	}
+	if claim.Annotations[resourceapi.ExtendedResourceClaimAnnotation] != "true" {
+		return nil, nil
+	}
+	controllerRef := metav1.GetControllerOfNoCopy(claim)
+	if controllerRef == nil {
+		return nil, nil
+	}
+	if controllerRef.Kind != "Pod" || controllerRef.APIVersion != "v1" {
+		return nil, nil
+	}
+	return []string{resourceClaimPodOwnerKey(claim.Namespace, controllerRef.UID)}, nil
 }

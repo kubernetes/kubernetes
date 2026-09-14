@@ -29,7 +29,7 @@ import (
 // ParamRef describes how to locate the params to be used as input to
 // expressions of rules applied by a policy binding.
 type ParamRefApplyConfiguration struct {
-	// `name` is the name of the resource being referenced.
+	// name is the name of the resource being referenced.
 	//
 	// `name` and `selector` are mutually exclusive properties. If one is set,
 	// the other must be unset.
@@ -58,7 +58,7 @@ type ParamRefApplyConfiguration struct {
 	// One of `name` or `selector` must be set, but `name` and `selector` are
 	// mutually exclusive properties. If one is set, the other must be unset.
 	Selector *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
-	// `parameterNotFoundAction` controls the behavior of the binding when the resource
+	// parameterNotFoundAction controls the behavior of the binding when the resource
 	// exists, and name or selector is valid, but there are no parameters
 	// matched by the binding. If the value is set to `Allow`, then no
 	// matched parameters will be treated as successful validation by the binding.

@@ -80,15 +80,16 @@ func NewConfig(opts options.CompletedOptions) (*Config, error) {
 	genericConfig, versionedInformers, storageFactory, err := controlplaneapiserver.BuildGenericConfig(
 		opts,
 		[]*runtime.Scheme{legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme},
-		controlplane.DefaultAPIResourceConfigSource(),
+		controlplane.DefaultGenericAPIResourceConfigSource(),
 		generatedopenapi.GetOpenAPIDefinitions,
+		nil,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	serviceResolver := webhook.NewDefaultServiceResolver()
-	kubeAPIs, pluginInitializer, err := controlplaneapiserver.CreateConfig(opts, genericConfig, versionedInformers, storageFactory, serviceResolver, nil)
+	kubeAPIs, pluginInitializer, err := controlplaneapiserver.CreateConfig(opts, genericConfig, versionedInformers, nil, storageFactory, serviceResolver, nil)
 	if err != nil {
 		return nil, err
 	}

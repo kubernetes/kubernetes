@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -44,6 +43,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/watch"
 	kmsv2mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -455,17 +455,16 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"Encode succeeded",
 						"TransformToStorage succeeded",
 						"Txn call succeeded",
-						"decode succeeded",
+						"Decode succeeded",
 					},
 				},
 				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -550,7 +549,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
-					name: "cacher.Get",
+					name: "Get etcd3",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"audit-id": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() != ""
@@ -558,22 +557,23 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"key": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/minions/fake"
 						},
-						"resource-version": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == ""
+						"resource": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "nodes"
 						},
 					},
 					events: []string{
-						"About to Get from underlying storage",
+						"Get call succeeded",
+						"TransformFromStorage succeeded",
+						"Decode succeeded",
 					},
 				},
 				{
 					name: "etcdserverpb.KV/Range",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -605,7 +605,209 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 			},
 		},
 		{
-			desc: "list nodes",
+			desc: "get node from cache",
+			apiCall: func(ctx context.Context) error {
+				_, err = clientSet.CoreV1().Nodes().Get(ctx, "fake", metav1.GetOptions{ResourceVersion: "0"})
+				return err
+			},
+			expectedTrace: []*spanExpectation{
+				{
+					name: "GET /api/v1/nodes/{:name}",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"user_agent.original": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"url.path": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes/fake"
+						},
+						"http.request.method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "GET"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+					},
+				},
+				{
+					name: "Get",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes/fake")
+						},
+						"user-agent": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"client": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "127.0.0.1"
+						},
+						"accept": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+					},
+					events: []string{
+						"About to Get from storage",
+						"About to write a response",
+						"Writing http response done",
+					},
+				},
+				{
+					name: "cacher.Get",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"key": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/minions/fake"
+						},
+						"resource-version": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "0"
+						},
+					},
+					events: []string{
+						"watchCache locked acquired",
+						"watchCache fresh enough",
+						"GetByKey success",
+					},
+				},
+				{
+					name: "SerializeObject",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes/fake"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+						"method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "GET"
+						},
+						"mediaType": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf"
+						},
+						"encoder": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "{\"encodeGV\":\"v1\",\"encoder\":\"protobuf\",\"name\":\"versioning\"}"
+						},
+					},
+					events: []string{
+						"About to start writing response",
+						"Write call succeeded",
+					},
+				},
+			},
+		},
+		{
+			desc: "WatchList nodes",
+			apiCall: func(ctx context.Context) error {
+				sendInitialEvents := true
+				w, err := clientSet.CoreV1().Nodes().Watch(ctx, metav1.ListOptions{SendInitialEvents: &sendInitialEvents, AllowWatchBookmarks: true, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan})
+				if err != nil {
+					return err
+				}
+				defer w.Stop()
+				for e := range w.ResultChan() {
+					switch e.Type {
+					case watch.Bookmark:
+						return nil
+					case watch.Error:
+						return fmt.Errorf("watch error: %v", e.Object)
+					}
+				}
+				return nil
+			},
+			expectedTrace: []*spanExpectation{
+				{
+					name: "GET /api/v1/nodes",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"user_agent.original": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"url.path": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes"
+						},
+						"http.request.method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "GET"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+					},
+				},
+				{
+					name: "WatchList",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes"
+						},
+						"user-agent": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"client": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "127.0.0.1"
+						},
+						"accept": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+					},
+					events: []string{},
+				},
+				{
+					name: "cacher.Watch",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"type": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "nodes"
+						},
+					},
+					events: []string{
+						"watchCache locked acquired",
+						"watchCache fresh enough",
+					},
+				},
+				{
+					name: "WatchServer.HandleHTTP",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+						"method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "GET"
+						},
+						"mediaType": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf;stream=watch"
+						},
+						"encoder": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "{\"encodeGV\":\"v1\",\"encoder\":\"raw-protobuf\",\"name\":\"versioning\"}"
+						},
+					},
+					events: []string{},
+				},
+			},
+		},
+		{
+			desc: "List nodes",
 			apiCall: func(ctx context.Context) error {
 				_, err = clientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 				return err
@@ -650,20 +852,35 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() == "HTTP/2.0"
 						},
 					},
+					events: []string{},
+				},
+				{
+					name: "cacher.GetList",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"type": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "nodes"
+						},
+					},
 					events: []string{
-						"About to List from storage",
-						"Listing from storage done",
-						"Writing http response done",
+						"Ready",
+						"getCurrentRV success",
+						"watchCache locked acquired",
+						"watchCache fresh enough",
+						"GetLatestSnapshotOrBuildLocked success",
+						"Listed items from cache",
+						"Filtered items",
 					},
 				},
 				{
 					name: "etcdserverpb.KV/Range",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -779,17 +996,16 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"Transaction prepared",
 						"Txn call completed",
 						"Transaction committed",
-						"decode succeeded",
+						"Decode succeeded",
 					},
 				},
 				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -923,17 +1139,16 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"Transaction prepared",
 						"Txn call completed",
 						"Transaction committed",
-						"decode succeeded",
+						"Decode succeeded",
 					},
 				},
 				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -1023,11 +1238,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",

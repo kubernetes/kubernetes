@@ -26,10 +26,10 @@ func WithMatchOption(key, value string) MatchOption {
 	return MatchOption{key, value}
 }
 
-// doesn't make sense to export this option because clients can only
-// subscribe to messages with signal type.
-func withMatchType(typ string) MatchOption {
-	return WithMatchOption("type", typ)
+// It does not make sense to have a public WithMatchType function
+// because clients can only subscribe to messages with signal type.
+func withMatchTypeSignal() MatchOption {
+	return WithMatchOption("type", "signal")
 }
 
 // WithMatchSender sets sender match option.

@@ -23,7 +23,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -34,8 +37,6 @@ import (
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcpprobe "k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/utils/exec"
-
-	"k8s.io/klog/v2"
 )
 
 const maxProbeRetries = 3
@@ -48,14 +49,14 @@ type prober struct {
 	grpc   grpcprobe.Prober
 	runner kubecontainer.CommandRunner
 
-	recorder record.EventRecorder
+	recorder record.EventRecorderLogger
 }
 
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
 func newProber(
 	runner kubecontainer.CommandRunner,
-	recorder record.EventRecorder) *prober {
+	recorder record.EventRecorderLogger) *prober {
 
 	const followNonLocalRedirects = false
 	return &prober{
@@ -66,6 +67,17 @@ func newProber(
 		runner:   runner,
 		recorder: recorder,
 	}
+}
+
+// recordContainerEvent should be used by the prober for all container related events.
+func (pb *prober) recordContainerEvent(ctx context.Context, pod *v1.Pod, container *v1.Container, eventType, reason, message string, args ...interface{}) {
+	logger := klog.FromContext(ctx)
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
+	if err != nil {
+		logger.Error(err, "Can't make a ref to pod and container", "pod", klog.KObj(pod), "containerName", container.Name)
+		return
+	}
+	pb.recorder.WithLogger(logger).Eventf(ref, eventType, reason, message, args...)
 }
 
 // probe probes the container and emits values on the container for probe failure or errors
@@ -94,7 +106,7 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 
 	if err != nil {
 		// Handle probe error
-		logger.V(1).Error(err, "Probe errored", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result)
+		logger.V(1).Info("Probe errored", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result, "err", err)
 		RecordContainerEvent(pb.recorder, ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored and resulted in %s state: %s", probeType, result, err)
 		return results.Failure, output, err
 	}
@@ -163,6 +175,10 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 			headers := p.HTTPGet.HTTPHeaders
 			loggerV4.Info("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers, "probeType", probeType)
 		}
+		if p.HTTPGet.Protocol != nil && *p.HTTPGet.Protocol == v1.HTTPProtocolHTTP2 &&
+			utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+			return pb.http.ProbeH2C(req, timeout)
+		}
 		return pb.http.Probe(req, timeout)
 
 	case p.TCPSocket != nil:
@@ -184,8 +200,10 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		if p.GRPC.Service != nil {
 			service = *p.GRPC.Service
 		}
-		logger.V(4).Info("GRPC-Probe", "host", host, "service", service, "port", p.GRPC.Port, "timeout", timeout)
-		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout)
+		useTLS := utilfeature.DefaultFeatureGate.Enabled(features.GRPCContainerProbeTLS) &&
+			p.GRPC.Mode != nil && *p.GRPC.Mode == v1.GRPCProbeModeTLS
+		logger.V(4).Info("GRPC-Probe", "host", host, "service", service, "port", p.GRPC.Port, "timeout", timeout, "tls", useTLS)
+		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout, grpcprobe.ProbeOptions{UseTLS: useTLS})
 
 	default:
 		logger.V(4).Info("Failed to find probe builder for container", "containerName", container.Name)

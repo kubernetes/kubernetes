@@ -2,11 +2,12 @@ package types
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 )
 
-type SemVerFilter func([]string) bool
+type SemVerFilter func(component string, constraints []string) bool
 
 func MustParseSemVerFilter(input string) SemVerFilter {
 	filter, err := ParseSemVerFilter(input)
@@ -16,30 +17,90 @@ func MustParseSemVerFilter(input string) SemVerFilter {
 	return filter
 }
 
-func ParseSemVerFilter(filterVersion string) (SemVerFilter, error) {
-	if filterVersion == "" {
-		return func(_ []string) bool { return true }, nil
+// ParseSemVerFilter parses non-component and component-specific semantic version filter string.
+// The filter string can contain multiple non-component and component-specific versions separated by commas.
+// Each component-specific version is in the format "component=version".
+// If a version is specified without a component, it applies to non-component-specific constraints.
+func ParseSemVerFilter(componentFilterVersions string) (SemVerFilter, error) {
+	if componentFilterVersions == "" {
+		return func(_ string, _ []string) bool { return true }, nil
 	}
 
-	targetVersion, err := semver.NewVersion(filterVersion)
-	if err != nil {
-		return nil, fmt.Errorf("invalid filter version: %w", err)
+	result := map[string]*semver.Version{}
+	parts := strings.Split(componentFilterVersions, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if len(part) == 0 {
+			continue
+		}
+		if strings.Contains(part, "=") {
+			// validate component-specific version string
+			invalidPart, invalidErr := false, fmt.Errorf("invalid component filter version: %s", part)
+			subParts := strings.Split(part, "=")
+			if len(subParts) != 2 {
+				invalidPart = true
+			}
+			component := strings.TrimSpace(subParts[0])
+			versionStr := strings.TrimSpace(subParts[1])
+			if len(component) == 0 || len(versionStr) == 0 {
+				invalidPart = true
+			}
+			if invalidPart {
+				return nil, invalidErr
+			}
+
+			// validate semver
+			v, err := semver.NewVersion(versionStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid component filter version: %s, error: %w", part, err)
+			}
+			result[component] = v
+		} else {
+			v, err := semver.NewVersion(part)
+			if err != nil {
+				return nil, fmt.Errorf("invalid filter version: %s, error: %w", part, err)
+			}
+			result[""] = v
+		}
 	}
 
-	return func(constraints []string) bool {
+	return func(component string, constraints []string) bool {
 		// unconstrained specs always run
-		if len(constraints) == 0 {
+		if len(component) == 0 && len(constraints) == 0 {
 			return true
 		}
 
-		for _, constraintStr := range constraints {
-			constraint, err := semver.NewConstraint(constraintStr)
-			if err != nil {
-				return false
-			}
+		// check non-component specific version constraints
+		if len(component) == 0 && len(constraints) != 0 {
+			v := result[""]
+			if v != nil {
+				for _, constraintStr := range constraints {
+					constraint, err := semver.NewConstraint(constraintStr)
+					if err != nil {
+						return false
+					}
 
-			if !constraint.Check(targetVersion) {
-				return false
+					if !constraint.Check(v) {
+						return false
+					}
+				}
+			}
+		}
+
+		// check component-specific version constraints
+		if len(component) != 0 && len(constraints) != 0 {
+			v := result[component]
+			if v != nil {
+				for _, constraintStr := range constraints {
+					constraint, err := semver.NewConstraint(constraintStr)
+					if err != nil {
+						return false
+					}
+
+					if !constraint.Check(v) {
+						return false
+					}
+				}
 			}
 		}
 

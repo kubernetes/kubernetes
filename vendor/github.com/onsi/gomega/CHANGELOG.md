@@ -1,3 +1,26 @@
+## 1.40.0
+
+We're adopting a new release strategy to minimize dependency bloat in projects that consume Gomega.  It is a limitation of the go mod toolchain that _test_ subdependencies of your project's direct dependencies get pulled in as *indirect* dependencies.  In the case of Gomega, this ends up pulling in all of Ginkgo into your `go.mod` even if you are only using Gomega (Gomega uses Ginkgo for its own tests).
+
+Going forward, releases will strip out all tests, tidy up the `go.mod` and then push this stripped down version to a new `master-lite` branch.  These stripped-down versions will receive the `vx.y.z` git tag and will be picked up by the go toolchain.
+
+Please open an issue if this new release process causes unexpected changes for your projects.
+
+## 1.39.1
+
+Update all dependencies.  This auto-updated the required version of Go to 1.24, consistent with the fact that Go 1.23 has been out of support for almost six months.
+
+## 1.39.0
+
+### Features
+
+Add `MatchErrorStrictly` which only passes if `errors.Is(actual, expected)` returns true.  `MatchError`, by contrast, will fallback to string comparison.
+
+## 1.38.3
+
+### Fixes
+make string formatitng more consistent for users who use format.Object directly
+
 ## 1.38.2
 
 - roll back to go 1.23.0 [c404969]

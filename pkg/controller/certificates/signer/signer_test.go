@@ -24,7 +24,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"os"
+
 	"math/rand"
 	"reflect"
 	"testing"
@@ -88,7 +89,7 @@ func TestSigner(t *testing.T) {
 		t.Fatalf("failed to create signer: %v", err)
 	}
 
-	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
+	csrb, err := os.ReadFile("./testdata/kubelet.csr")
 	if err != nil {
 		t.Fatalf("failed to read CSR: %v", err)
 	}
@@ -499,7 +500,6 @@ func Test_signer_duration(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

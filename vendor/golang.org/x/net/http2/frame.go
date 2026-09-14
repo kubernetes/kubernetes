@@ -11,11 +11,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"slices"
 	"strings"
 	"sync"
 
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2/hpack"
+	"golang.org/x/net/internal/httpsfv"
 )
 
 const frameHeaderLen = 9
@@ -23,33 +25,36 @@ const frameHeaderLen = 9
 var padZeros = make([]byte, 255) // zeros for padding
 
 // A FrameType is a registered frame type as defined in
-// https://httpwg.org/specs/rfc7540.html#rfc.section.11.2
+// https://httpwg.org/specs/rfc7540.html#rfc.section.11.2 and other future
+// RFCs.
 type FrameType uint8
 
 const (
-	FrameData         FrameType = 0x0
-	FrameHeaders      FrameType = 0x1
-	FramePriority     FrameType = 0x2
-	FrameRSTStream    FrameType = 0x3
-	FrameSettings     FrameType = 0x4
-	FramePushPromise  FrameType = 0x5
-	FramePing         FrameType = 0x6
-	FrameGoAway       FrameType = 0x7
-	FrameWindowUpdate FrameType = 0x8
-	FrameContinuation FrameType = 0x9
+	FrameData           FrameType = 0x0
+	FrameHeaders        FrameType = 0x1
+	FramePriority       FrameType = 0x2
+	FrameRSTStream      FrameType = 0x3
+	FrameSettings       FrameType = 0x4
+	FramePushPromise    FrameType = 0x5
+	FramePing           FrameType = 0x6
+	FrameGoAway         FrameType = 0x7
+	FrameWindowUpdate   FrameType = 0x8
+	FrameContinuation   FrameType = 0x9
+	FramePriorityUpdate FrameType = 0x10
 )
 
 var frameNames = [...]string{
-	FrameData:         "DATA",
-	FrameHeaders:      "HEADERS",
-	FramePriority:     "PRIORITY",
-	FrameRSTStream:    "RST_STREAM",
-	FrameSettings:     "SETTINGS",
-	FramePushPromise:  "PUSH_PROMISE",
-	FramePing:         "PING",
-	FrameGoAway:       "GOAWAY",
-	FrameWindowUpdate: "WINDOW_UPDATE",
-	FrameContinuation: "CONTINUATION",
+	FrameData:           "DATA",
+	FrameHeaders:        "HEADERS",
+	FramePriority:       "PRIORITY",
+	FrameRSTStream:      "RST_STREAM",
+	FrameSettings:       "SETTINGS",
+	FramePushPromise:    "PUSH_PROMISE",
+	FramePing:           "PING",
+	FrameGoAway:         "GOAWAY",
+	FrameWindowUpdate:   "WINDOW_UPDATE",
+	FrameContinuation:   "CONTINUATION",
+	FramePriorityUpdate: "PRIORITY_UPDATE",
 }
 
 func (t FrameType) String() string {
@@ -125,21 +130,24 @@ var flagName = map[FrameType]map[Flags]string{
 type frameParser func(fc *frameCache, fh FrameHeader, countError func(string), payload []byte) (Frame, error)
 
 var frameParsers = [...]frameParser{
-	FrameData:         parseDataFrame,
-	FrameHeaders:      parseHeadersFrame,
-	FramePriority:     parsePriorityFrame,
-	FrameRSTStream:    parseRSTStreamFrame,
-	FrameSettings:     parseSettingsFrame,
-	FramePushPromise:  parsePushPromise,
-	FramePing:         parsePingFrame,
-	FrameGoAway:       parseGoAwayFrame,
-	FrameWindowUpdate: parseWindowUpdateFrame,
-	FrameContinuation: parseContinuationFrame,
+	FrameData:           parseDataFrame,
+	FrameHeaders:        parseHeadersFrame,
+	FramePriority:       parsePriorityFrame,
+	FrameRSTStream:      parseRSTStreamFrame,
+	FrameSettings:       parseSettingsFrame,
+	FramePushPromise:    parsePushPromise,
+	FramePing:           parsePingFrame,
+	FrameGoAway:         parseGoAwayFrame,
+	FrameWindowUpdate:   parseWindowUpdateFrame,
+	FrameContinuation:   parseContinuationFrame,
+	FramePriorityUpdate: parsePriorityUpdateFrame,
 }
 
 func typeFrameParser(t FrameType) frameParser {
 	if int(t) < len(frameParsers) {
-		return frameParsers[t]
+		if f := frameParsers[t]; f != nil {
+			return f
+		}
 	}
 	return parseUnknownFrame
 }
@@ -280,6 +288,8 @@ type Framer struct {
 	// lastHeaderStream is non-zero if the last frame was an
 	// unfinished HEADERS/CONTINUATION.
 	lastHeaderStream uint32
+	// lastFrameType holds the type of the last frame for verifying frame order.
+	lastFrameType FrameType
 
 	maxReadSize uint32
 	headerBuf   [frameHeaderLen]byte
@@ -347,7 +357,7 @@ func (fr *Framer) maxHeaderListSize() uint32 {
 func (f *Framer) startWrite(ftype FrameType, flags Flags, streamID uint32) {
 	// Write the FrameHeader.
 	f.wbuf = append(f.wbuf[:0],
-		0, // 3 bytes of length, filled in in endWrite
+		0, // 3 bytes of length, filled in endWrite
 		0,
 		0,
 		byte(ftype),
@@ -488,30 +498,41 @@ func terminalReadFrameError(err error) bool {
 	return err != nil
 }
 
-// ReadFrame reads a single frame. The returned Frame is only valid
-// until the next call to ReadFrame.
+// ReadFrameHeader reads the header of the next frame.
+// It reads the 9-byte fixed frame header, and does not read any portion of the
+// frame payload. The caller is responsible for consuming the payload, either
+// with ReadFrameForHeader or directly from the Framer's io.Reader.
 //
-// If the frame is larger than previously set with SetMaxReadFrameSize, the
-// returned error is ErrFrameTooLarge. Other errors may be of type
-// ConnectionError, StreamError, or anything else from the underlying
-// reader.
+// If the frame is larger than previously set with SetMaxReadFrameSize, it
+// returns the frame header and ErrFrameTooLarge.
 //
-// If ReadFrame returns an error and a non-nil Frame, the Frame's StreamID
-// indicates the stream responsible for the error.
-func (fr *Framer) ReadFrame() (Frame, error) {
+// If the returned FrameHeader.StreamID is non-zero, it indicates the stream
+// responsible for the error.
+func (fr *Framer) ReadFrameHeader() (FrameHeader, error) {
 	fr.errDetail = nil
-	if fr.lastFrame != nil {
-		fr.lastFrame.invalidate()
-	}
 	fh, err := readFrameHeader(fr.headerBuf[:], fr.r)
 	if err != nil {
-		return nil, err
+		return fh, err
 	}
 	if fh.Length > fr.maxReadSize {
 		if fh == invalidHTTP1LookingFrameHeader() {
-			return nil, fmt.Errorf("http2: failed reading the frame payload: %w, note that the frame header looked like an HTTP/1.1 header", ErrFrameTooLarge)
+			return fh, fmt.Errorf("http2: failed reading the frame payload: %w, note that the frame header looked like an HTTP/1.1 header", ErrFrameTooLarge)
 		}
-		return nil, ErrFrameTooLarge
+		return fh, ErrFrameTooLarge
+	}
+	if err := fr.checkFrameOrder(fh); err != nil {
+		return fh, err
+	}
+	return fh, nil
+}
+
+// ReadFrameForHeader reads the payload for the frame with the given FrameHeader.
+//
+// It behaves identically to ReadFrame, other than not checking the maximum
+// frame size.
+func (fr *Framer) ReadFrameForHeader(fh FrameHeader) (Frame, error) {
+	if fr.lastFrame != nil {
+		fr.lastFrame.invalidate()
 	}
 	payload := fr.getReadBuf(fh.Length)
 	if _, err := io.ReadFull(fr.r, payload); err != nil {
@@ -527,9 +548,7 @@ func (fr *Framer) ReadFrame() (Frame, error) {
 		}
 		return nil, err
 	}
-	if err := fr.checkFrameOrder(f); err != nil {
-		return nil, err
-	}
+	fr.lastFrame = f
 	if fr.logReads {
 		fr.debugReadLoggerf("http2: Framer %p: read %v", fr, summarizeFrame(f))
 	}
@@ -537,6 +556,24 @@ func (fr *Framer) ReadFrame() (Frame, error) {
 		return fr.readMetaFrame(f.(*HeadersFrame))
 	}
 	return f, nil
+}
+
+// ReadFrame reads a single frame. The returned Frame is only valid
+// until the next call to ReadFrame or ReadFrameBodyForHeader.
+//
+// If the frame is larger than previously set with SetMaxReadFrameSize, the
+// returned error is ErrFrameTooLarge. Other errors may be of type
+// ConnectionError, StreamError, or anything else from the underlying
+// reader.
+//
+// If ReadFrame returns an error and a non-nil Frame, the Frame's StreamID
+// indicates the stream responsible for the error.
+func (fr *Framer) ReadFrame() (Frame, error) {
+	fh, err := fr.ReadFrameHeader()
+	if err != nil {
+		return nil, err
+	}
+	return fr.ReadFrameForHeader(fh)
 }
 
 // connError returns ConnectionError(code) but first
@@ -551,20 +588,19 @@ func (fr *Framer) connError(code ErrCode, reason string) error {
 // checkFrameOrder reports an error if f is an invalid frame to return
 // next from ReadFrame. Mostly it checks whether HEADERS and
 // CONTINUATION frames are contiguous.
-func (fr *Framer) checkFrameOrder(f Frame) error {
-	last := fr.lastFrame
-	fr.lastFrame = f
+func (fr *Framer) checkFrameOrder(fh FrameHeader) error {
+	lastType := fr.lastFrameType
+	fr.lastFrameType = fh.Type
 	if fr.AllowIllegalReads {
 		return nil
 	}
 
-	fh := f.Header()
 	if fr.lastHeaderStream != 0 {
 		if fh.Type != FrameContinuation {
 			return fr.connError(ErrCodeProtocol,
 				fmt.Sprintf("got %s for stream %d; expected CONTINUATION following %s for stream %d",
 					fh.Type, fh.StreamID,
-					last.Header().Type, fr.lastHeaderStream))
+					lastType, fr.lastHeaderStream))
 		}
 		if fh.StreamID != fr.lastHeaderStream {
 			return fr.connError(ErrCodeProtocol,
@@ -1152,7 +1188,41 @@ type PriorityFrame struct {
 	PriorityParam
 }
 
-// PriorityParam are the stream prioritzation parameters.
+// defaultRFC9218Priority determines what priority we should use as the default
+// value.
+//
+// According to RFC 9218, by default, streams should be given an urgency of 3
+// and should be non-incremental. However, making streams non-incremental by
+// default would be a huge change to our historical behavior where we would
+// round-robin writes across streams. When streams are non-incremental, we
+// would process streams of the same urgency one-by-one to completion instead.
+//
+// To avoid such a sudden change which might break some HTTP/2 users, this
+// function allows the caller to specify whether they can actually use the
+// default value as specified in RFC 9218. If not, this function will return a
+// priority value where streams are incremental by default instead: effectively
+// a round-robin between stream of the same urgency.
+//
+// As an example, a server might not be able to use the RFC 9218 default value
+// when it's not sure that the client it is serving is aware of RFC 9218.
+func defaultRFC9218Priority(canUseDefault bool) PriorityParam {
+	if canUseDefault {
+		return PriorityParam{
+			urgency:     3,
+			incremental: 0,
+		}
+	}
+	return PriorityParam{
+		urgency:     3,
+		incremental: 1,
+	}
+}
+
+// Note that HTTP/2 has had two different prioritization schemes, and
+// PriorityParam struct below is a superset of both schemes. The exported
+// symbols are from RFC 7540 and the non-exported ones are from RFC 9218.
+
+// PriorityParam are the stream prioritization parameters.
 type PriorityParam struct {
 	// StreamDep is a 31-bit stream identifier for the
 	// stream that this stream depends on. Zero means no
@@ -1167,6 +1237,20 @@ type PriorityParam struct {
 	// the spec, "Add one to the value to obtain a weight between
 	// 1 and 256."
 	Weight uint8
+
+	// "The urgency (u) parameter value is Integer (see Section 3.3.1 of
+	// [STRUCTURED-FIELDS]), between 0 and 7 inclusive, in descending order of
+	// priority. The default is 3."
+	urgency uint8
+
+	// "The incremental (i) parameter value is Boolean (see Section 3.3.6 of
+	// [STRUCTURED-FIELDS]). It indicates if an HTTP response can be processed
+	// incrementally, i.e., provide some meaningful output as chunks of the
+	// response arrive."
+	//
+	// We use uint8 (i.e. 0 is false, 1 is true) instead of bool so we can
+	// avoid unnecessary type conversions and because either type takes 1 byte.
+	incremental uint8
 }
 
 func (p PriorityParam) IsZero() bool {
@@ -1212,6 +1296,74 @@ func (f *Framer) WritePriority(streamID uint32, p PriorityParam) error {
 	}
 	f.writeUint32(v)
 	f.writeByte(p.Weight)
+	return f.endWrite()
+}
+
+// PriorityUpdateFrame is a PRIORITY_UPDATE frame as described in
+// https://www.rfc-editor.org/rfc/rfc9218.html#name-the-priority_update-frame.
+type PriorityUpdateFrame struct {
+	FrameHeader
+	Priority            string
+	PrioritizedStreamID uint32
+}
+
+func parseRFC9218Priority(s string, canUseDefault bool) (p PriorityParam, ok bool) {
+	p = defaultRFC9218Priority(canUseDefault)
+	ok = httpsfv.ParseDictionary(s, func(key, val, _ string) {
+		switch key {
+		case "u":
+			if u, ok := httpsfv.ParseInteger(val); ok && u >= 0 && u <= 7 {
+				p.urgency = uint8(u)
+			}
+		case "i":
+			if i, ok := httpsfv.ParseBoolean(val); ok {
+				if i {
+					p.incremental = 1
+				} else {
+					p.incremental = 0
+				}
+			}
+		}
+	})
+	if !ok {
+		return defaultRFC9218Priority(canUseDefault), ok
+	}
+	return p, true
+}
+
+func parsePriorityUpdateFrame(_ *frameCache, fh FrameHeader, countError func(string), payload []byte) (Frame, error) {
+	if fh.StreamID != 0 {
+		countError("frame_priority_update_non_zero_stream")
+		return nil, connError{ErrCodeProtocol, "PRIORITY_UPDATE frame with non-zero stream ID"}
+	}
+	if len(payload) < 4 {
+		countError("frame_priority_update_bad_length")
+		return nil, connError{ErrCodeFrameSize, fmt.Sprintf("PRIORITY_UPDATE frame payload size was %d; want at least 4", len(payload))}
+	}
+	v := binary.BigEndian.Uint32(payload[:4])
+	streamID := v & 0x7fffffff // mask off high bit
+	if streamID == 0 {
+		countError("frame_priority_update_prioritizing_zero_stream")
+		return nil, connError{ErrCodeProtocol, "PRIORITY_UPDATE frame with prioritized stream ID of zero"}
+	}
+	return &PriorityUpdateFrame{
+		FrameHeader:         fh,
+		PrioritizedStreamID: streamID,
+		Priority:            string(payload[4:]),
+	}, nil
+}
+
+// WritePriorityUpdate writes a PRIORITY_UPDATE frame.
+//
+// It will perform exactly one Write to the underlying Writer.
+// It is the caller's responsibility to not call other Write methods concurrently.
+func (f *Framer) WritePriorityUpdate(streamID uint32, priority string) error {
+	if !validStreamID(streamID) && !f.AllowIllegalWrites {
+		return errStreamID
+	}
+	f.startWrite(FramePriorityUpdate, 0, 0)
+	f.writeUint32(streamID)
+	f.writeBytes([]byte(priority))
 	return f.endWrite()
 }
 
@@ -1494,6 +1646,23 @@ func (mh *MetaHeadersFrame) PseudoFields() []hpack.HeaderField {
 		}
 	}
 	return mh.Fields
+}
+
+func (mh *MetaHeadersFrame) rfc9218Priority(priorityAware bool) (p PriorityParam, priorityAwareAfter, hasIntermediary bool) {
+	var s string
+	for _, field := range mh.Fields {
+		if field.Name == "priority" {
+			s = field.Value
+			priorityAware = true
+		}
+		if slices.Contains([]string{"via", "forwarded", "x-forwarded-for"}, field.Name) {
+			hasIntermediary = true
+		}
+	}
+	// No need to check for ok. parseRFC9218Priority will return a default
+	// value if there is no priority field or if the field cannot be parsed.
+	p, _ = parseRFC9218Priority(s, priorityAware && !hasIntermediary)
+	return p, priorityAware, hasIntermediary
 }
 
 func (mh *MetaHeadersFrame) checkPseudos() error {

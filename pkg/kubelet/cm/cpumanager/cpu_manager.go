@@ -23,19 +23,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-logr/logr"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
 )
@@ -62,16 +66,16 @@ type Manager interface {
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
 	// e.g. at pod admission time.
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error
 
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the CPU allocation during the container removal
-	AddContainer(logger logr.Logger, p *v1.Pod, c *v1.Container, containerID string)
+	AddContainer(logger klog.Logger, p *v1.Pod, c *v1.Container, containerID string)
 
 	// RemoveContainer is called after Kubelet decides to kill or delete a
 	// container. After this call, the CPU manager stops trying to reconcile
 	// that container and any CPUs dedicated to the container are freed.
-	RemoveContainer(logger logr.Logger, containerID string) error
+	RemoveContainer(logger klog.Logger, containerID string) error
 
 	// State returns a read-only interface to the internal CPU manager state.
 	State() state.Reader
@@ -79,16 +83,23 @@ type Manager interface {
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint
 
 	// GetExclusiveCPUs implements the podresources.CPUsProvider interface to provide
 	// exclusively allocated cpus for the container
 	GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet
 
+	// GetPodCPUs implements the podresources.CPUsProvider interface to provide
+	// the total cpuset allocated to the pod
+	GetPodCPUs(podUID string) cpuset.CPUSet
+
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment per Pod
 	// among this and other resource controllers.
-	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint
+
+	// AllocatePod is called to trigger the allocation of CPUs to a pod.
+	AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) error
 
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs() cpuset.CPUSet
@@ -100,6 +111,9 @@ type Manager interface {
 	// GetAllCPUs returns all the CPUs known by cpumanager, as reported by the
 	// hardware discovery. Maps to the CPU capacity.
 	GetAllCPUs() cpuset.CPUSet
+
+	// GetResourceIsolationLevel returns the isolation level of the container.
+	GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel
 }
 
 type manager struct {
@@ -155,11 +169,11 @@ var _ Manager = &manager{}
 
 type sourcesReadyStub struct{}
 
-func (s *sourcesReadyStub) AddSource(source string) {}
-func (s *sourcesReadyStub) AllReady() bool          { return true }
+func (s *sourcesReadyStub) AddSource(_ string) {}
+func (s *sourcesReadyStub) AllReady() bool     { return true }
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(logger logr.Logger, cpuPolicyName string, cpuPolicyOptions map[string]string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(logger klog.Logger, cpuPolicyName string, cpuPolicyOptions map[string]string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
 	var topo *topology.CPUTopology
 	var policy Policy
 	var err error
@@ -256,8 +270,8 @@ func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesR
 	return nil
 }
 
-func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
-	logger := klog.TODO() // until we move topology manager to contextual logging
+func (m *manager) Allocate(ctx context.Context, p *v1.Pod, c *v1.Container, operation lifecycle.Operation) error {
+	logger := klog.FromContext(ctx)
 
 	// Garbage collect any stranded resources before allocating CPUs.
 	m.removeStaleState(logger)
@@ -266,7 +280,7 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	err := m.policy.Allocate(logger, m.state, p, c)
+	err := m.policy.Allocate(logger, m.state, p, c, operation)
 	if err != nil {
 		logger.Error(err, "policy error")
 		return err
@@ -275,7 +289,22 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	return nil
 }
 
-func (m *manager) AddContainer(logger logr.Logger, pod *v1.Pod, container *v1.Container, containerID string) {
+func (m *manager) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) error {
+	// Garbage collect any stranded resources before allocating CPUs.
+	m.removeStaleState(logger)
+
+	m.Lock()
+	defer m.Unlock()
+
+	// Call down into the policy to assign this container CPUs if required.
+	if err := m.policy.AllocatePod(logger, m.state, pod, operation); err != nil {
+		logger.Error(err, "AllocatePod error", "pod", klog.KObj(pod))
+		return err
+	}
+	return nil
+}
+
+func (m *manager) AddContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerID string) {
 	m.Lock()
 	defer m.Unlock()
 	if cset, exists := m.state.GetCPUSet(string(pod.UID), container.Name); exists {
@@ -285,7 +314,7 @@ func (m *manager) AddContainer(logger logr.Logger, pod *v1.Pod, container *v1.Co
 	logger.V(4).Info("Added Container", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "containerID", containerID)
 }
 
-func (m *manager) RemoveContainer(logger logr.Logger, containerID string) error {
+func (m *manager) RemoveContainer(logger klog.Logger, containerID string) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -298,7 +327,7 @@ func (m *manager) RemoveContainer(logger logr.Logger, containerID string) error 
 	return nil
 }
 
-func (m *manager) policyRemoveContainerByID(logger logr.Logger, containerID string) error {
+func (m *manager) policyRemoveContainerByID(logger klog.Logger, containerID string) error {
 	podUID, containerName, err := m.containerMap.GetContainerRef(containerID)
 	if err != nil {
 		return nil
@@ -313,7 +342,7 @@ func (m *manager) policyRemoveContainerByID(logger logr.Logger, containerID stri
 	return err
 }
 
-func (m *manager) policyRemoveContainerByRef(logger logr.Logger, podUID string, containerName string) error {
+func (m *manager) policyRemoveContainerByRef(logger klog.Logger, podUID string, containerName string) error {
 	err := m.policy.RemoveContainer(logger, m.state, podUID, containerName)
 	if err == nil {
 		m.lastUpdateState.Delete(podUID, containerName)
@@ -327,20 +356,18 @@ func (m *manager) State() state.Reader {
 	return m.state
 }
 
-func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	logger := klog.TODO()
+func (m *manager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(logger, m.state, pod, container)
+	return m.policy.GetTopologyHints(logger, m.state, pod, container, operation)
 }
 
-func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	logger := klog.TODO()
+func (m *manager) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
 	// Delegate to active policy
-	return m.policy.GetPodTopologyHints(logger, m.state, pod)
+	return m.policy.GetPodTopologyHints(logger, m.state, pod, operation)
 }
 
 func (m *manager) GetAllocatableCPUs() cpuset.CPUSet {
@@ -357,7 +384,7 @@ type reconciledContainer struct {
 	containerID   string
 }
 
-func (m *manager) removeStaleState(rootLogger logr.Logger) {
+func (m *manager) removeStaleState(rootLogger klog.Logger) {
 	// Only once all sources are ready do we attempt to remove any stale state.
 	// This ensures that the call to `m.activePods()` below will succeed with
 	// the actual active pods list.
@@ -480,14 +507,29 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 			// Idempotently add it to the containerMap incase it is missing.
 			// This can happen after a kubelet restart, for example.
 			m.containerMap.Add(string(pod.UID), container.Name, containerID)
-			m.Unlock()
 
 			cset := m.state.GetCPUSetOrDefault(string(pod.UID), container.Name)
+			baselineCPUs, hasBaselineCPUs := m.state.GetBaselineCPUSet(string(pod.UID), container.Name)
+			m.Unlock()
+
 			if cset.IsEmpty() {
 				// NOTE: This should not happen outside of tests.
 				logger.V(2).Info("ReconcileState: skipping container; empty cpuset assigned")
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
 				continue
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScalingExclusiveCPUs) {
+				// this is less clear than it should be because of the constraints of the GetCPUSetOrDefault API which should
+				// be revisited separately. A container can only have baseline CPUs set if it got an exclusive CPU assignment
+				// the first time it was admitted. Baseline CPUs reflects the CPUs promised at that time, which no following
+				// scaleup/down can ever mutate. In that case, we are also guaranteed that the `GetCPUSetOrDefault` will return
+				// _an_ exclusive CPUSet and never the default set. A clear improvement would be get rid of GetCPUSetOrDefault
+				// and make a new API which returns TWO cpusets: the exclusively allocated and the shared set.
+				if hasBaselineCPUs && !baselineCPUs.Equals(cset) {
+					logger.V(4).Info("Current container CPU assignments differ from CPU assignments recorded at admission time",
+						"currentCPUSet", cset, "baselineCPUSet", baselineCPUs)
+				}
 			}
 
 			lcset := m.lastUpdateState.GetCPUSetOrDefault(string(pod.UID), container.Name)
@@ -536,10 +578,37 @@ func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 	if result, ok := m.state.GetCPUSet(podUID, containerName); ok {
 		return result
 	}
+	return cpuset.New()
+}
 
-	return cpuset.CPUSet{}
+func (m *manager) GetPodCPUs(podUID string) cpuset.CPUSet {
+	if result, ok := m.state.GetPodCPUSet(podUID); ok {
+		return result
+	}
+	return cpuset.New()
 }
 
 func (m *manager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	return m.state.GetCPUSetOrDefault(podUID, containerName)
+}
+
+func resourcesQualifyForExclusiveCPUs(container *v1.Container) bool {
+	if !cmqos.IsContainerEquivalentQOSGuaranteed(container) {
+		return false
+	}
+
+	cpuLimit := container.Resources.Limits[v1.ResourceCPU]
+	return cpuLimit.Value()*1000 == cpuLimit.MilliValue()
+}
+
+func (m *manager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel {
+	if _, ok := m.state.GetCPUSet(string(pod.UID), container.Name); !ok {
+		return cmqos.ResourceIsolationHost
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) && !resourcesQualifyForExclusiveCPUs(container) {
+		return cmqos.ResourceIsolationPod
+	}
+
+	return cmqos.ResourceIsolationContainer
 }

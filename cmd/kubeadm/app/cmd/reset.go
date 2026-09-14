@@ -136,7 +136,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		getNodeRegistration := true
 		getAPIEndpoint := staticpodutil.IsControlPlaneNode()
 		getComponentConfigs := true
-		initCfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "reset", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
+		initCfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "reset", getNodeRegistration, getAPIEndpoint, getComponentConfigs, true)
 		if err != nil {
 			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}
@@ -167,7 +167,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		certificatesDir = opts.externalcfg.CertificatesDir
 	} else if len(resetCfg.CertificatesDir) > 0 { // configured in the ResetConfiguration
 		certificatesDir = resetCfg.CertificatesDir
-	} else if len(initCfg.ClusterConfiguration.CertificatesDir) > 0 { // fetch from cluster
+	} else if initCfg != nil && len(initCfg.ClusterConfiguration.CertificatesDir) > 0 { // fetch from cluster
 		certificatesDir = initCfg.ClusterConfiguration.CertificatesDir
 	}
 

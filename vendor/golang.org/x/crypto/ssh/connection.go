@@ -17,7 +17,7 @@ type OpenChannelError struct {
 }
 
 func (e *OpenChannelError) Error() string {
-	return fmt.Sprintf("ssh: rejected: %s (%s)", e.Reason, e.Message)
+	return fmt.Sprintf("ssh: rejected: %s (%q)", e.Reason, e.Message)
 }
 
 // ConnMetadata holds metadata for the connection.
@@ -91,9 +91,17 @@ func DiscardRequests(in <-chan *Request) {
 	}
 }
 
+// A connTransport represents the transport for a connection.
+type connTransport interface {
+	packetConn
+	getAlgorithms() NegotiatedAlgorithms
+	getSessionID() []byte
+	waitSession() error
+}
+
 // A connection represents an incoming connection.
 type connection struct {
-	transport *handshakeTransport
+	transport connTransport
 	sshConn
 
 	// The connection protocol.

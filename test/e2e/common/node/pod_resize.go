@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -29,8 +30,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -51,12 +54,12 @@ const (
 	increasedCPU      = "25m"
 	increasedCPULimit = "35m"
 
-	originalMem       = "20Mi"
-	originalMemLimit  = "30Mi"
-	reducedMem        = "15Mi"
-	reducedMemLimit   = "25Mi"
-	increasedMem      = "25Mi"
-	increasedMemLimit = "35Mi"
+	originalMem       = "35Mi"
+	originalMemLimit  = "45Mi"
+	reducedMem        = "30Mi"
+	reducedMemLimit   = "40Mi"
+	increasedMem      = "40Mi"
+	increasedMemLimit = "50Mi"
 )
 
 func offsetCPU(index int, value string) string {
@@ -80,7 +83,7 @@ func offsetMemory(index int64, value string) string {
 }
 
 func doGuaranteedPodResizeTests(f *framework.Framework) {
-	ginkgo.DescribeTableSubtree("guaranteed qos - 1 container with resize policy", func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy, resizeInitCtrs bool) {
+	ginkgo.DescribeTableSubtree("guaranteed qos - 1 container with resize policy", feature.InPlacePodVerticalScaling, func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy, resizeInitCtrs bool) {
 		ginkgo.DescribeTable("resizing", func(ctx context.Context, desiredCPU, desiredMem string) {
 
 			// The tests for guaranteed pods include extended resources.
@@ -137,12 +140,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 	// All tests will perform the requested resize, and once completed, will roll back the change.
 	// This results in coverage of both the operation as described, and its reverse.
 	ginkgo.Describe("guaranteed pods with multiple containers", func() {
-		/*
-			Release: v1.35
-			Testname: In-place Pod Resize, guaranteed pods with multiple containers, net increase
-			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a guaranteed pod with 3 containers with a net increase MUST result in the Pod resources being updated as expected.
-		*/
-		framework.ConformanceIt("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+		ginkgo.It("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
@@ -167,12 +165,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, nil, nil, true, false)
 		})
 
-		/*
-			Release: v1.35
-			Testname: In-place Pod Resize, guaranteed pods with multiple containers, net decrease
-			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers with a net decrease MUST result in the Pod resources being updated as expected.
-		*/
-		framework.ConformanceIt("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+		ginkgo.It("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
@@ -197,12 +190,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, nil, nil, true, false)
 		})
 
-		/*
-			Release: v1.35
-			Testname: In-place Pod Resize, guaranteed pods with multiple containers, various operations
-			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers with various operations MUST result in the Pod resources being updated as expected.
-		*/
-		framework.ConformanceIt("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2) [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+		ginkgo.It("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2) [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
@@ -237,7 +225,7 @@ type resourceRequestsLimits struct {
 }
 
 func doBurstablePodResizeTests(f *framework.Framework) {
-	ginkgo.DescribeTableSubtree("burstable pods - 1 container with all requests & limits set and resize policy", func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy) {
+	ginkgo.DescribeTableSubtree("burstable pods - 1 container with all requests & limits set and resize policy", feature.InPlacePodVerticalScaling, func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy) {
 		ginkgo.DescribeTable("resizing", func(ctx context.Context, desiredContainerResources resourceRequestsLimits) {
 			originalContainers := makeBurstableContainers(1, cpuPolicy, memPolicy, originalCPU, originalCPULimit, originalMem, originalMemLimit)
 			expectedContainers := makeBurstableContainers(1, cpuPolicy, memPolicy, desiredContainerResources.cpuReq, desiredContainerResources.cpuLim, desiredContainerResources.memReq, desiredContainerResources.memLim)
@@ -366,7 +354,7 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 }
 
 func doPodResizePatchErrorTests(f *framework.Framework) {
-	ginkgo.DescribeTable("apply invalid resize patch requests", func(ctx context.Context, originalContainers, desiredContainers []podresize.ResizableContainerInfo, patchError string, waitForStart bool) {
+	ginkgo.DescribeTable("apply invalid resize patch requests", feature.InPlacePodVerticalScaling, func(ctx context.Context, originalContainers, desiredContainers []podresize.ResizableContainerInfo, patchError string, waitForStart bool) {
 		podClient := e2epod.NewPodClient(f)
 		var newPod *v1.Pod
 
@@ -575,34 +563,6 @@ func doPodResizePatchErrorTests(f *framework.Framework) {
 			"only cpu and memory resources are mutable",
 			true,
 		),
-		ginkgo.Entry("Burstable pod - nonrestartable initContainer",
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:          "c1-init",
-					InitCtr:       true,
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
-					RestartPolicy: v1.ContainerRestartPolicyNever,
-				},
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:          "c1-init",
-					InitCtr:       true,
-					Resources:     &cgroups.ContainerResources{CPUReq: increasedCPU, MemReq: increasedMem},
-					RestartPolicy: v1.ContainerRestartPolicyNever,
-				},
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-			"resources for non-sidecar init containers are immutable",
-			false,
-		),
 	)
 }
 
@@ -611,7 +571,7 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 	// 1. Decrease the limit a little bit - should succeed
 	// 2. Decrease the limit down to a tiny amount - should fail
 	// 3. Revert the limit back to the original value - should succeed
-	ginkgo.It("decrease memory limit below usage", func(ctx context.Context) {
+	ginkgo.It("decrease memory limit below usage", feature.InPlacePodVerticalScaling, func(ctx context.Context) {
 		podClient := e2epod.NewPodClient(f)
 		original := []podresize.ResizableContainerInfo{{
 			Name:      "c1",
@@ -717,6 +677,86 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 	})
 }
 
+func doPodResizeInitContainerResizeTest(f *framework.Framework) {
+	ginkgo.It("should support resizing a non-sidecar init container", func(ctx context.Context) {
+		// A command that never exits, to allow us to patch the init container while it's running.
+		cmd := "tail -f /dev/null"
+
+		originalContainers := []podresize.ResizableContainerInfo{
+			{
+				Name:          "init-c1",
+				InitCtr:       true,
+				Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+				RestartPolicy: v1.ContainerRestartPolicyNever,
+			},
+			{
+				Name:      "main-c1",
+				Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+			},
+		}
+		resizedContainers := []podresize.ResizableContainerInfo{
+			{
+				Name:          "init-c1",
+				InitCtr:       true,
+				Resources:     &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: increasedMem, MemLim: increasedMem},
+				RestartPolicy: v1.ContainerRestartPolicyNever,
+			},
+			{
+				Name:      "main-c1",
+				Resources: originalContainers[1].Resources,
+			},
+		}
+
+		originalInitCtr := cgroups.MakeContainerWithResources(
+			originalContainers[0].Name,
+			originalContainers[0].Resources,
+			cmd,
+		)
+		resizedInitCtr := cgroups.MakeContainerWithResources(
+			resizedContainers[0].Name,
+			resizedContainers[0].Resources,
+			cmd,
+		)
+
+		ginkgo.By("Creating pod with an nonrestartable init container")
+		testPod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "resize-test-",
+			},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{originalInitCtr},
+				Containers: []v1.Container{cgroups.MakeContainerWithResources(
+					originalContainers[1].Name,
+					originalContainers[1].Resources,
+					cmd,
+				)},
+			},
+		}
+		testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+		podClient := e2epod.NewPodClient(f)
+		newPod := podClient.Create(ctx, testPod)
+		verifyInitContainerResources(ctx, f, newPod, originalContainers, originalInitCtr)
+
+		ginkgo.By("patching and verifying pod for resize")
+		patch := podresize.MakeResizePatch(originalContainers, resizedContainers, nil, nil)
+		patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(pErr, "failed to patch pod for resize")
+		verifyInitContainerResources(ctx, f, patchedPod, resizedContainers, resizedInitCtr)
+
+		// Resize has been actuated, test the reverse operation.
+		ginkgo.By("patching and verifying pod to revert to original resources")
+		patch = podresize.MakeResizePatch(resizedContainers, originalContainers, nil, nil)
+		patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(pErr, "failed to patch pod for resize")
+		verifyInitContainerResources(ctx, f, patchedPod, originalContainers, originalInitCtr)
+
+		ginkgo.By("deleting pod")
+		podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+	})
+}
+
 func doPodResizeReadAndReplaceTests(f *framework.Framework) {
 	/*
 		Release: v1.35
@@ -800,6 +840,272 @@ func doPodResizeReadAndReplaceTests(f *framework.Framework) {
 	})
 }
 
+func doPodResizeMemoryVolumeTests(f *framework.Framework) {
+	// Tests the behavior when resizing memory-backed emptyDir volume limits:
+	// 1. Create a pod with memory-backed emptyDir volume of size origSizeLimit.
+	// 2. Resize the volume size limit up to desiredSizeLimit - should succeed without pod restart.
+	// 3. Rollback the volume size limit down to origSizeLimit - should succeed without pod restart.
+	// TODO: When InPlacePodVerticalScalingMemoryBackedVolumes is GA, move these tests to the InPlacePodVerticalScaling table as an
+	// as an additional parameter to test it with memory-backed emptyDir volumes.
+	ginkgo.DescribeTable("memory-backed emptyDir volume resize",
+		func(ctx context.Context, origCPU, desiredCPU, origMem, desiredMem, origSizeLimit, desiredSizeLimit string) {
+			podClient := e2epod.NewPodClient(f)
+
+			originalContainers := []podresize.ResizableContainerInfo{{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: origCPU, CPULim: origCPU,
+					MemReq: origMem, MemLim: origMem,
+				},
+			}}
+			desiredContainers := []podresize.ResizableContainerInfo{{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: desiredCPU, CPULim: desiredCPU,
+					MemReq: desiredMem, MemLim: desiredMem,
+				},
+			}}
+
+			ginkgo.By("creating and verifying pod with memory-backed emptyDir volume")
+			tStamp := strconv.Itoa(time.Now().Nanosecond())
+			testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, originalContainers, nil)
+			testPod.GenerateName = "resize-memory-vol-test-"
+
+			origQty := resource.MustParse(origSizeLimit)
+			testPod.Spec.Volumes = []v1.Volume{
+				{
+					Name: "mem-vol",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &origQty,
+						},
+					},
+				},
+			}
+			testPod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{
+					Name:      "mem-vol",
+					MountPath: "/cache",
+				},
+			}
+			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+			newPod := podClient.CreateSync(ctx, testPod)
+			podresize.VerifyPodResources(newPod, originalContainers, nil)
+
+			ginkgo.By("verifying initial volume mount size via df inside the container")
+			stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache")
+			framework.ExpectNoError(err, "failed to run df inside container")
+			origMB := origQty.Value() / (1024 * 1024)
+			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(origMB, 10)))
+
+			ginkgo.By("patching pod spec's emptyDir sizeLimit and container resources")
+			containerPatchBytes := podresize.MakeResizePatch(originalContainers, desiredContainers, nil, nil)
+			var patchMap map[string]interface{}
+			err = json.Unmarshal(containerPatchBytes, &patchMap)
+			framework.ExpectNoError(err, "failed to unmarshal container patch")
+
+			if patchMap == nil {
+				patchMap = make(map[string]interface{})
+			}
+			specMap, ok := patchMap["spec"].(map[string]interface{})
+			if !ok {
+				specMap = make(map[string]interface{})
+				patchMap["spec"] = specMap
+			}
+			specMap["volumes"] = []interface{}{
+				map[string]interface{}{
+					"name": "mem-vol",
+					"emptyDir": map[string]interface{}{
+						"sizeLimit": desiredSizeLimit,
+					},
+				},
+			}
+
+			patchBytes, err := json.Marshal(patchMap)
+			framework.ExpectNoError(err, "failed to marshal combined patch")
+
+			patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+				types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "resize")
+			framework.ExpectNoError(pErr, "failed to patch pod spec")
+
+			ginkgo.By("waiting for resize actuation to complete")
+			expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, desiredContainers)
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod, expected)
+			podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+
+			desiredQty := resource.MustParse(desiredSizeLimit)
+
+			ginkgo.By("verifying new volume mount size via df inside the container")
+			stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, resizedPod.Name, "c1", "df", "-m", "/cache")
+			framework.ExpectNoError(err, "failed to run df inside container after resize")
+			desiredMB := desiredQty.Value() / (1024 * 1024)
+			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(desiredMB, 10)))
+
+			ginkgo.By("rolling back to original state")
+			rollbackContainerPatchBytes := podresize.MakeResizePatch(desiredContainers, originalContainers, nil, nil)
+			var rollbackPatchMap map[string]interface{}
+			err = json.Unmarshal(rollbackContainerPatchBytes, &rollbackPatchMap)
+			framework.ExpectNoError(err, "failed to unmarshal rollback container patch")
+
+			if rollbackPatchMap == nil {
+				rollbackPatchMap = make(map[string]interface{})
+			}
+			rollbackSpecMap, ok := rollbackPatchMap["spec"].(map[string]interface{})
+			if !ok {
+				rollbackSpecMap = make(map[string]interface{})
+				rollbackPatchMap["spec"] = rollbackSpecMap
+			}
+			rollbackSpecMap["volumes"] = []interface{}{
+				map[string]interface{}{
+					"name": "mem-vol",
+					"emptyDir": map[string]interface{}{
+						"sizeLimit": origSizeLimit,
+					},
+				},
+			}
+
+			rollbackPatchBytes, err := json.Marshal(rollbackPatchMap)
+			framework.ExpectNoError(err, "failed to marshal rollback patch")
+
+			rolledBackPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+				types.StrategicMergePatchType, rollbackPatchBytes, metav1.PatchOptions{}, "resize")
+			framework.ExpectNoError(pErr, "failed to patch pod for rollback")
+
+			expectedRollback := podresize.UpdateExpectedContainerRestarts(ctx, rolledBackPod, originalContainers)
+			finalPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, rolledBackPod, expectedRollback)
+			podresize.ExpectPodResized(ctx, f, finalPod, expectedRollback)
+
+			stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, finalPod.Name, "c1", "df", "-m", "/cache")
+			framework.ExpectNoError(err, "failed to run df after rollback")
+			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(origMB, 10)))
+
+			ginkgo.By("deleting pod")
+			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+		},
+		ginkgo.Entry("volume resize (upsize then downsize)",
+			originalCPU, originalCPU, "200Mi", "200Mi", "64Mi", "128Mi",
+		),
+		ginkgo.Entry("volume resize + container resize (upsize then downsize)",
+			originalCPU, increasedCPU, "200Mi", "250Mi", "64Mi", "128Mi",
+		),
+	)
+}
+
+func doPodResizeMemoryVolumeSizeLimitDecreaseTest(f *framework.Framework) {
+	// Tests the behavior when shrinking memory-backed emptyDir volume sizeLimit below active usage:
+	// 1. Create a pod with memory-backed emptyDir volume of size 128Mi.
+	// 2. Write 100Mi of data to the volume.
+	// 3. Resize the volume size limit down to 50Mi - should fail and report error in condition.
+	// 4. Verify volume mount size is not shrunk and container did not restart.
+	ginkgo.It("should fail to shrink sizeLimit of a memory-backed volume below active usage", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		original := []podresize.ResizableContainerInfo{{
+			Name: "c1",
+			Resources: &cgroups.ContainerResources{
+				CPUReq: originalCPU, CPULim: originalCPU,
+				MemReq: "200Mi", MemLim: "200Mi",
+			},
+		}}
+
+		ginkgo.By("creating and verifying pod with memory-backed emptyDir volume")
+		tStamp := strconv.Itoa(time.Now().Nanosecond())
+		qty50Mi := resource.MustParse("50Mi")
+		qty100Mi := resource.MustParse("100Mi")
+		qty128Mi := resource.MustParse("128Mi")
+		testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, original, nil)
+		testPod.GenerateName = "resize-memory-vol-fail-"
+		testPod.Spec.Volumes = []v1.Volume{
+			{
+				Name: "mem-vol",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    v1.StorageMediumMemory,
+						SizeLimit: &qty128Mi,
+					},
+				},
+			},
+		}
+		testPod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+			{
+				Name:      "mem-vol",
+				MountPath: "/cache",
+			},
+		}
+		testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+		newPod := podClient.CreateSync(ctx, testPod)
+		podresize.VerifyPodResources(newPod, original, nil)
+
+		ginkgo.By("verifying new volume mount size via df inside the container")
+		stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache")
+		framework.ExpectNoError(err, "failed to run df inside container")
+		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty128Mi.Value()/(1024*1024), 10)))
+
+		ginkgo.By(fmt.Sprintf("writing a %s file to the volume to ensure active usage", qty100Mi.String()))
+		_, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "dd", "if=/dev/zero", "of=/cache/largefile", "bs=1M", fmt.Sprintf("count=%d", qty100Mi.Value()/(1024*1024)))
+		framework.ExpectNoError(err, "failed to write large file inside container")
+
+		ginkgo.By(fmt.Sprintf("patching pod spec's emptyDir sizeLimit down to %s", qty50Mi.String()))
+		patchBytes := fmt.Appendf(nil, `{
+			"spec": {
+				"volumes": [
+					{
+						"name": "mem-vol",
+						"emptyDir": {
+							"sizeLimit": "%s"
+						}
+					}
+				]
+			}
+		}`, qty50Mi.String())
+		patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+			types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(pErr, "failed to patch emptyDir sizeLimit")
+
+		ginkgo.By("waiting for resize actuation to fail and report error in condition")
+		framework.ExpectNoError(framework.Gomega().
+			Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(patchedPod.Namespace).Get, patchedPod.Name, metav1.GetOptions{}))).
+			WithTimeout(f.Timeouts.PodStart).
+			Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+				var inProgressCondition *v1.PodCondition
+				for i, condition := range pod.Status.Conditions {
+					if condition.Type == v1.PodResizeInProgress {
+						inProgressCondition = &pod.Status.Conditions[i]
+						break
+					}
+				}
+				if inProgressCondition == nil {
+					return func() string { return "resize is not in progress" }, nil
+				}
+				if inProgressCondition.Reason != v1.PodReasonError {
+					return func() string {
+						return fmt.Sprintf("expected reason %s, got %s", v1.PodReasonError, inProgressCondition.Reason)
+					}, nil
+				}
+				if len(inProgressCondition.Message) == 0 {
+					return func() string { return "expected a non-empty error message in PodResizeInProgress condition" }, nil
+				}
+				return nil, nil
+			})),
+		)
+
+		ginkgo.By("verifying the volume still holds the original size and c1 didn't restart")
+		stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache")
+		framework.ExpectNoError(err, "failed to run df inside container")
+		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty128Mi.Value()/(1024*1024), 10)))
+
+		gotPod, getErr := podClient.Get(ctx, newPod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(getErr)
+		expected := podresize.UpdateExpectedContainerRestarts(ctx, gotPod, original)
+		gomega.Expect(gotPod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(expected[0].RestartCount))
+
+		ginkgo.By("deleting pod")
+		podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+	})
+}
+
 // NOTE: Pod resize scheduler, resource quota, limit ranger, deferred resize tests are out of scope in e2e_node tests,
 //
 //	because in e2e_node tests
@@ -825,6 +1131,35 @@ var _ = SIGDescribe("Pod InPlace Resize Container", func() {
 	doPodResizeMemoryLimitDecreaseTest(f)
 })
 
+var _ = SIGDescribe("Pod InPlace Resize Init Container", framework.WithSlow(), framework.WithNodeConformance(), framework.WithFeatureGate(features.InPlacePodVerticalScalingInitContainers), func() {
+	f := framework.NewDefaultFramework("pod-resize-tests")
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+		if framework.NodeOSDistroIs("windows") {
+			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
+		}
+	})
+
+	doPodResizeInitContainerResizeTest(f)
+})
+
+var _ = SIGDescribe("Pod InPlace Resize Memory-Backed Volume", framework.WithFeatureGate(features.InPlacePodVerticalScalingMemoryBackedVolumes), func() {
+	f := framework.NewDefaultFramework("pod-resize-memory-volumes")
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+		if framework.NodeOSDistroIs("windows") {
+			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
+		}
+	})
+
+	doPodResizeMemoryVolumeTests(f)
+	doPodResizeMemoryVolumeSizeLimitDecreaseTest(f)
+})
+
 func doPatchAndRollback(ctx context.Context, f *framework.Framework, originalContainers, expectedContainers []podresize.ResizableContainerInfo, originalPodResources, expectedPodResources *v1.ResourceRequirements, doRollback bool, mountPodCgroup bool) {
 	ginkgo.By("creating and verifying pod")
 	podClient := e2epod.NewPodClient(f)
@@ -844,6 +1179,30 @@ func doPatchAndRollback(ctx context.Context, f *framework.Framework, originalCon
 }
 
 func patchAndVerify(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, newPod *v1.Pod, originalContainers, expectedContainers []podresize.ResizableContainerInfo, originalPodResources, expectedPodResources *v1.ResourceRequirements, opStr string) {
+	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, newPod.Name, newPod.Spec.Containers[0].Name)
+	oldWeights := make(map[string]int64)
+	for _, ci := range originalContainers {
+		if ci.Resources != nil {
+			req := ci.Resources.ResourceRequirements()
+			if req != nil {
+				cpuReq := req.Requests.Cpu()
+				if cpuReq == nil || !cpuReq.IsZero() || newPod.Spec.Resources == nil {
+					w, err := cgroups.RetrieveContainerCPUWeight(ctx, f, newPod, ci.Name, onCgroupv2)
+					if err == nil {
+						oldWeights[ci.Name] = w
+					}
+				}
+			}
+		}
+	}
+	var oldPodWeight int64
+	if originalPodResources != nil {
+		w, err := cgroups.RetrievePodCPUWeight(ctx, f, newPod, onCgroupv2)
+		if err == nil {
+			oldPodWeight = w
+		}
+	}
+
 	patch := podresize.MakeResizePatch(originalContainers, expectedContainers, originalPodResources, expectedPodResources)
 	patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 		types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
@@ -857,6 +1216,45 @@ func patchAndVerify(ctx context.Context, f *framework.Framework, podClient *e2ep
 	podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 	if expectedPodResources != nil {
 		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, resizedPod))
+	}
+
+	// Verify CPU weight moved in the right direction
+	for i, ci := range expectedContainers {
+		oldW, ok := oldWeights[ci.Name]
+		if !ok {
+			continue
+		}
+		newW, err := cgroups.RetrieveContainerCPUWeight(ctx, f, resizedPod, ci.Name, onCgroupv2)
+		if err != nil {
+			continue
+		}
+
+		if originalContainers[i].Resources != nil && ci.Resources != nil {
+			oldReq := originalContainers[i].Resources.ResourceRequirements()
+			newReq := ci.Resources.ResourceRequirements()
+			if oldReq != nil && newReq != nil {
+				oldMilli := cgroups.GetEffectiveCPUMilli(oldReq.Requests, oldReq.Limits)
+				newMilli := cgroups.GetEffectiveCPUMilli(newReq.Requests, newReq.Limits)
+				if newMilli > oldMilli {
+					gomega.Expect(newW).To(gomega.BeNumerically(">=", oldW), fmt.Sprintf("cpu weight for %s should not decrease when requested CPU increases", ci.Name))
+				} else if newMilli < oldMilli {
+					gomega.Expect(newW).To(gomega.BeNumerically("<=", oldW), fmt.Sprintf("cpu weight for %s should not increase when requested CPU decreases", ci.Name))
+				}
+			}
+		}
+	}
+
+	if originalPodResources != nil && expectedPodResources != nil && oldPodWeight > 0 {
+		newPodW, err := cgroups.RetrievePodCPUWeight(ctx, f, resizedPod, onCgroupv2)
+		if err == nil {
+			oldMilli := cgroups.GetEffectiveCPUMilli(originalPodResources.Requests, originalPodResources.Limits)
+			newMilli := cgroups.GetEffectiveCPUMilli(expectedPodResources.Requests, expectedPodResources.Limits)
+			if newMilli > oldMilli {
+				gomega.Expect(newPodW).To(gomega.BeNumerically(">=", oldPodWeight), "pod cpu weight should not decrease when requested Pod CPU increases")
+			} else if newMilli < oldMilli {
+				gomega.Expect(newPodW).To(gomega.BeNumerically("<=", oldPodWeight), "pod cpu weight should not increase when requested Pod CPU decreases")
+			}
+		}
 	}
 }
 
@@ -874,8 +1272,8 @@ func createAndVerifyPod(ctx context.Context, f *framework.Framework, podClient *
 	}
 
 	newPod := podClient.CreateSync(ctx, testPod)
-	podresize.VerifyPodResources(newPod, originalContainers, podResources)
 
+	podresize.VerifyPodResources(newPod, originalContainers, podResources)
 	podresize.VerifyPodResizePolicy(newPod, originalContainers)
 	framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, originalContainers))
 	framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, originalContainers))
@@ -955,4 +1353,35 @@ func createRollbackContainers(originalContainers, expectedContainers []podresize
 		rollbackContainers[i].RestartCount = expectedContainers[i].RestartCount
 	}
 	return rollbackContainers
+}
+
+func verifyInitContainerResources(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedContainers []podresize.ResizableContainerInfo, expectedInitCtr v1.Container) {
+	ginkgo.GinkgoHelper()
+
+	podresize.VerifyPodResizePolicy(pod, expectedContainers)
+	podresize.VerifyPodResources(pod, expectedContainers, nil)
+
+	// Wait for the init container to display the expected resources in its status, and that
+	// the cgroups are as expected.
+	framework.ExpectNoError(framework.Gomega().
+		Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{}))).
+		WithTimeout(f.Timeouts.PodStart).
+		Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+			if pod == nil || len(pod.Status.InitContainerStatuses) == 0 || pod.Status.InitContainerStatuses[0].Resources == nil {
+				return func() string { return "pod or init container status is not available yet" }, nil
+			}
+			if err := podresize.VerifyPodContainersStatusResources(pod.Status.InitContainerStatuses, []v1.Container{expectedInitCtr}); err != nil {
+				return func() string {
+					return fmt.Sprintf("init container status resources don't match expected: %v", err)
+				}, nil
+			}
+			onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.InitContainers[0].Name)
+			if err := cgroups.VerifyContainerCgroupValues(ctx, f, pod, &expectedInitCtr, onCgroupv2); err != nil {
+				return func() string {
+					return fmt.Sprintf("cgroup values for init container don't match expected: %v", err)
+				}, nil
+			}
+			return nil, nil
+		})),
+	)
 }

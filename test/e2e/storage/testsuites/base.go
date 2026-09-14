@@ -19,6 +19,7 @@ package testsuites
 import (
 	"context"
 	"flag"
+	"fmt"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,6 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 )
 
@@ -69,6 +69,7 @@ var BaseSuites = []func() storageframework.TestSuite{
 	InitVolumeStressTestSuite,
 	InitFsGroupChangePolicyTestSuite,
 	InitVolumeGroupSnapshottableTestSuite,
+	InitVolumeGroupSnapshotClassTestSuite,
 	func() storageframework.TestSuite {
 		return InitCustomEphemeralTestSuite(GenericEphemeralTestPatterns())
 	},
@@ -82,6 +83,7 @@ var CSISuites = append(BaseSuites,
 		return InitCustomEphemeralTestSuite(CSIEphemeralTestPatterns())
 	},
 	InitSnapshottableTestSuite,
+	InitSnapshotMetadataTestSuite,
 	InitSnapshottableStressTestSuite,
 	InitVolumePerformanceTestSuite,
 	InitPvcDeletionPerformanceTestSuite,
@@ -89,6 +91,7 @@ var CSISuites = append(BaseSuites,
 	InitVolumeModifyTestSuite,
 	InitVolumeModifyStressTestSuite,
 	InitSELinuxMountTestSuite,
+	InitVolumeGroupSnapshottableStressTestSuite,
 )
 
 func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) opCounts {
@@ -251,9 +254,10 @@ func (moc *migrationOpCheck) validateMigrationVolumeOpCounts(ctx context.Context
 }
 
 // Skip skipVolTypes patterns if the driver supports dynamic provisioning
-func skipVolTypePatterns(pattern storageframework.TestPattern, driver storageframework.TestDriver, skipVolTypes map[storageframework.TestVolType]bool) {
+func checkVolTypePatterns(pattern storageframework.TestPattern, driver storageframework.TestDriver, skipVolTypes map[storageframework.TestVolType]bool) string {
 	_, supportsProvisioning := driver.(storageframework.DynamicPVTestDriver)
 	if supportsProvisioning && skipVolTypes[pattern.VolType] {
-		e2eskipper.Skipf("Driver supports dynamic provisioning, skipping %s pattern", pattern.VolType)
+		return fmt.Sprintf("Driver supports dynamic provisioning, skipping %s pattern", pattern.VolType)
 	}
+	return ""
 }

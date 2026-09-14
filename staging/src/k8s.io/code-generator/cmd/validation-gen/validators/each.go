@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	eachValTagName = "k8s:eachVal"
-	eachKeyTagName = "k8s:eachKey"
+	eachValTagName = "eachVal"
+	eachKeyTagName = "eachKey"
 )
 
 // We keep the eachVal and eachKey validators around because the main
@@ -51,11 +51,13 @@ func init() {
 
 type eachValTagValidator struct {
 	byPath    map[string]*listMetadata
-	validator Validator
+	validator TagValidationExtractor
+	prefix    string
 }
 
 func (evtv *eachValTagValidator) Init(cfg Config) {
-	evtv.validator = cfg.Validator
+	evtv.validator = cfg.TagValidator
+	evtv.prefix = cfg.TagPrefix
 }
 
 func (eachValTagValidator) TagName() string {
@@ -66,14 +68,11 @@ func (eachValTagValidator) ValidScopes() sets.Set[Scope] {
 	return listTagsValidScopes
 }
 
-// LateTagValidator indicates that this validator has to run AFTER the listType
-// and listMapKey tags.
-func (eachValTagValidator) LateTagValidator() {}
-
 var (
-	validateEachSliceVal   = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
-	validateEachMapVal     = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
-	validateDirectEqualPtr = types.Name{Package: libValidationPkg, Name: "DirectEqualPtr"}
+	validateEachValSliceVal = types.Name{Package: libValidationPkg, Name: "EachValSliceVal"}
+	validateEachPtrSliceVal = types.Name{Package: libValidationPkg, Name: "EachPtrSliceVal"}
+	validateEachMapVal      = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
+	validateEachPtrMapVal   = types.Name{Package: libValidationPkg, Name: "EachPtrMapVal"}
 )
 
 func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -88,10 +87,12 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 
 	elemContext := Context{
 		// Scope is initialized below.
-		Type:       nt.Elem,
-		Path:       context.Path.Key("(vals)"),
-		Member:     nil, // NA for list/map values
-		ParentPath: context.Path,
+		Type:           nt.Elem,
+		Path:           context.Path.Key("(vals)"),
+		Member:         nil, // NA for list/map values
+		ParentPath:     context.Path,
+		ParentType:     context.Type,
+		StabilityLevel: context.StabilityLevel,
 	}
 	switch nt.Kind {
 	case types.Slice, types.Array:
@@ -104,24 +105,56 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	if tag.ValueTag == nil {
 		return Validations{}, fmt.Errorf("missing validation tag")
 	}
-	if validations, err := evtv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
+
+	validations, err := evtv.validator.ExtractTagValidations(elemContext, *tag.ValueTag)
+	if err != nil {
 		return Validations{}, err
-	} else {
-		if validations.Empty() && !validations.OpaqueKeyType && !validations.OpaqueValType && !validations.OpaqueType {
-			return Validations{}, fmt.Errorf("no validation functions found")
-		}
-		if len(validations.Variables) > 0 {
-			return Validations{}, fmt.Errorf("variable generation is not supported")
-		}
-		// Pass the real (possibly alias) type.
-		return evtv.getValidations(context.Path, t, validations)
 	}
+
+	if len(validations.Variables) > 0 {
+		return Validations{}, fmt.Errorf("variable generation is not supported")
+	}
+
+	result := Validations{
+		OpaqueValType: validations.OpaqueType, // Map element opacity to collection value opacity
+	}
+	result.Comments = append(result.Comments, validations.Comments...)
+
+	if len(validations.Functions) > 0 {
+		// We defer this because we want listType and listMapKey to compute list keys first.
+		result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
+			return evtv.getValidations(context.Path, t, Validations{Functions: validations.Functions})
+		}))
+	}
+
+	if len(validations.Deferred) > 0 {
+		result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
+			resolved := Validations{}
+			for _, d := range validations.Deferred {
+				inner, err := d.Callback()
+				if err != nil {
+					return Validations{}, err
+				}
+				resolved.Add(inner)
+			}
+			return evtv.getValidations(context.Path, t, resolved)
+		}))
+	}
+
+	if result.Empty() {
+		return Validations{}, fmt.Errorf("no validation functions found")
+	}
+
+	return result, nil
 }
 
 // t is expected to be the top-most type of the list or map. For example, if
 // this is a typedef to a list, this is the alias type, not the underlying
 // type.
 func (evtv eachValTagValidator) getValidations(fldPath *field.Path, t *types.Type, validations Validations) (Validations, error) {
+	if err := checkNoNonError(evtv.prefix+eachValTagName, validations); err != nil {
+		return Validations{}, err
+	}
 	switch util.NativeType(t).Kind {
 	case types.Slice, types.Array:
 		return evtv.getListValidations(fldPath, t, validations)
@@ -142,11 +175,6 @@ func ForEachVal(fldPath *field.Path, t *types.Type, fn FunctionGen) (Validations
 // t is expected to be the top-most type of the list. For example, if this is a
 // typedef to a list, this is the alias type, not the underlying type.
 func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types.Type, validations Validations) (Validations, error) {
-	result := Validations{}
-	result.OpaqueValType = validations.OpaqueType
-
-	// This type is a "late" validator, so it runs after all the keys are
-	// registered.  See LateTagValidator() above.
 	listMetadata := evtv.byPath[fldPath.String()]
 	if listMetadata == nil {
 		// If we don't have metadata for this field, we might have it for the
@@ -177,14 +205,14 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 			if directComparable {
 				equivArg = Identifier(validateDirectEqual)
 			} else {
-				equivArg = Identifier(validateSemanticDeepEqual)
+				equivArg = DeepEqualFunc{}
 			}
 		case semanticSet:
 			// For listType=set, matchArg is the equivalence check, so equivArg is nil.
 			if directComparable {
 				matchArg = Identifier(validateDirectEqual)
 			} else {
-				matchArg = Identifier(validateSemanticDeepEqual)
+				matchArg = DeepEqualFunc{}
 			}
 		default:
 			// For non-map and non-set list, we don't lookup the correlated element in the old list.
@@ -192,42 +220,55 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		}
 	}
 
-	for _, vfn := range validations.Functions {
-		comm := vfn.Comments
-		vfn.Comments = nil
-		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{vfn, nt.Elem}).WithComments(comm...)
-		result.AddFunction(f)
+	validateFunc := validateEachValSliceVal
+	if nt.Elem.Kind == types.Pointer {
+		validateFunc = validateEachPtrSliceVal
 	}
 
-	return result, nil
+	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
+		comm := vfn.Comments
+		vfn.Comments = nil
+		return Function(eachValTagName, DefaultFlags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
+	})
+	// Only Functions/Deferred carry forward; element opacity becomes value opacity.
+	return Validations{
+		Functions:     wrapped.Functions,
+		Deferred:      wrapped.Deferred,
+		OpaqueValType: validations.OpaqueType,
+	}, nil
 }
 
 // t is expected to be the top-most type of the map. For example, if this is a
 // typedef to a map, this is the alias type, not the underlying type.
 func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Validations) (Validations, error) {
-	result := Validations{}
-	result.OpaqueValType = validations.OpaqueType
-
 	nt := util.NativeType(t)
-	equivArg := Identifier(validateSemanticDeepEqual)
+	var equivArg any = DeepEqualFunc{}
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(nt.Elem))) {
 		equivArg = Identifier(validateDirectEqual)
 	}
-	for _, vfn := range validations.Functions {
-		comm := vfn.Comments
-		vfn.Comments = nil
-		f := Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{vfn, nt.Elem}).WithComments(comm...)
-		result.AddFunction(f)
+
+	validateFunc := validateEachMapVal
+	if nt.Elem.Kind == types.Pointer {
+		validateFunc = validateEachPtrMapVal
 	}
 
-	return result, nil
+	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
+		comm := vfn.Comments
+		vfn.Comments = nil
+		return Function(eachValTagName, DefaultFlags, validateFunc, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
+	})
+	return Validations{
+		Functions:     wrapped.Functions,
+		Deferred:      wrapped.Deferred,
+		OpaqueValType: validations.OpaqueType,
+	}, nil
 }
 
 func (evtv eachValTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            evtv.TagName(),
-		StabilityLevel: Alpha,
-		Scopes:         evtv.ValidScopes().UnsortedList(),
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         sets.List(evtv.ValidScopes()),
 		Description:    "Declares a validation for each value in a map or list.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",
@@ -240,11 +281,13 @@ func (evtv eachValTagValidator) Docs() TagDoc {
 }
 
 type eachKeyTagValidator struct {
-	validator Validator
+	validator TagValidationExtractor
+	prefix    string
 }
 
 func (ektv *eachKeyTagValidator) Init(cfg Config) {
-	ektv.validator = cfg.Validator
+	ektv.validator = cfg.TagValidator
+	ektv.prefix = cfg.TagPrefix
 }
 
 func (eachKeyTagValidator) TagName() string {
@@ -268,35 +311,91 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 
 	elemContext := Context{
-		Scope:      ScopeMapKey,
-		Type:       nt.Elem,
-		Path:       context.Path.Key("(keys)"),
-		Member:     nil, // NA for map keys
-		ParentPath: context.Path,
+		Scope:          ScopeMapKey,
+		Type:           nt.Key,
+		Path:           context.Path.Key("(keys)"),
+		Member:         nil, // NA for map keys
+		ParentPath:     context.Path,
+		ParentType:     context.Type,
+		StabilityLevel: context.StabilityLevel,
 	}
 
-	if validations, err := ektv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
+	validations, err := ektv.validator.ExtractTagValidations(elemContext, *tag.ValueTag)
+	if err != nil {
 		return Validations{}, err
-	} else {
-		if len(validations.Variables) > 0 {
-			return Validations{}, fmt.Errorf("variable generation is not supported")
-		}
-
-		return ektv.getValidations(t, validations)
 	}
+
+	if len(validations.Variables) > 0 {
+		return Validations{}, fmt.Errorf("variable generation is not supported")
+	}
+
+	result := Validations{
+		OpaqueKeyType: validations.OpaqueType,
+	}
+	result.Comments = append(result.Comments, validations.Comments...)
+
+	if len(validations.Functions) > 0 {
+		innerVals, err := ektv.getValidations(t, Validations{Functions: validations.Functions})
+		if err != nil {
+			return Validations{}, err
+		}
+		result.Add(innerVals)
+	}
+
+	if len(validations.Deferred) > 0 {
+		result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
+			resolved := Validations{}
+			for _, d := range validations.Deferred {
+				inner, err := d.Callback()
+				if err != nil {
+					return Validations{}, err
+				}
+				resolved.Add(inner)
+			}
+			return ektv.getValidations(t, resolved)
+		}))
+	}
+
+	if result.Empty() {
+		return Validations{}, fmt.Errorf("no validation functions found")
+	}
+
+	return result, nil
 }
 
 func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Validations) (Validations, error) {
+	if err := checkNoNonError(ektv.prefix+eachKeyTagName, validations); err != nil {
+		return Validations{}, err
+	}
 	nt := util.NativeType(t)
-	result := Validations{}
-	result.OpaqueKeyType = validations.OpaqueType
-	for _, vfn := range validations.Functions {
+	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{vfn, nt.Key}).WithComments(comm...)
-		result.AddFunction(f)
+		return Function(eachKeyTagName, DefaultFlags, validateEachMapKey, WrapperFunction{Function: vfn, ObjType: nt.Key}).WithComments(comm...)
+	})
+	return Validations{
+		Functions:     wrapped.Functions,
+		Deferred:      wrapped.Deferred,
+		OpaqueKeyType: validations.OpaqueType,
+	}, nil
+}
+
+// checkNoNonError rejects validations that report no error of their own and
+// exist only to stop the validations after them, via ShortCircuit. Each
+// iteration tag runs as its own pass over the collection, so the later passes
+// run anyway and the internal stop signal surfaces as a spurious error.
+// Contrast the item tag, which emits a cohort per item, giving short-circuiting
+// somewhere to act.
+//
+// TODO: lift this by emitting all of a field's iteration tags as one pass,
+// whose per-element closure scopes short-circuiting to the element that failed.
+func checkNoNonError(iterTag string, validations Validations) error {
+	for _, fn := range validations.Functions {
+		if fn.Flags.IsSet(NonError) {
+			return fmt.Errorf("+%s does not support optional/non-error validations", iterTag)
+		}
 	}
-	return result, nil
+	return nil
 }
 
 // ForEachKey returns a validation that applies a function to each key of
@@ -308,9 +407,9 @@ func ForEachKey(_ *field.Path, t *types.Type, fn FunctionGen) (Validations, erro
 func (ektv eachKeyTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            ektv.TagName(),
-		Scopes:         ektv.ValidScopes().UnsortedList(),
-		StabilityLevel: Alpha,
-		Description:    "Declares a validation for each value in a map or list.",
+		Scopes:         sets.List(ektv.ValidScopes()),
+		StabilityLevel: TagStabilityLevelStable,
+		Description:    "Declares a validation for each key in a map.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",
 			Docs:        "The tag to evaluate for each key.",
@@ -319,4 +418,21 @@ func (ektv eachKeyTagValidator) Docs() TagDoc {
 		PayloadsRequired: true,
 	}
 	return doc
+}
+
+var (
+	validatePtrSliceNoNils = types.Name{Package: libValidationPkg, Name: "PtrSliceNoNils"}
+	validatePtrMapNoNils   = types.Name{Package: libValidationPkg, Name: "PtrMapNoNils"}
+)
+
+// PtrSliceNoNils returns a synthetic validation that rejects nil elements of a
+// pointer slice. It is not tag-driven; the generator injects it for []*T fields.
+func PtrSliceNoNils(elemType types.Name) FunctionGen {
+	return Function("PtrSliceNoNils", ShortCircuit, validatePtrSliceNoNils).WithTypeArgs(elemType)
+}
+
+// PtrMapNoNils returns a synthetic validation that rejects nil elements of a
+// pointer map. It is not tag-driven; the generator injects it for map[K]*V fields.
+func PtrMapNoNils(keyType, elemType types.Name) FunctionGen {
+	return Function("PtrMapNoNils", ShortCircuit, validatePtrMapNoNils).WithTypeArgs(keyType, elemType)
 }

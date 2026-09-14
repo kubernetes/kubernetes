@@ -27,14 +27,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // WaitForAPIServerSyncPeriod is the period between checks for the node list/watch initial sync
 const WaitForAPIServerSyncPeriod = 1 * time.Second
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
-func NewSourceApiserver(logger klog.Logger, c clientset.Interface, nodeName types.NodeName, nodeHasSynced func() bool, updates chan<- interface{}) {
+func NewSourceApiserver(logger klog.Logger, c clientset.Interface, nodeName types.NodeName, nodeHasSynced func() bool, updates chan<- sourceUpdate) {
 	lw := cache.NewListWatchFromClient(c.CoreV1().RESTClient(), "pods", metav1.NamespaceAll, fields.OneTermEqualSelector("spec.nodeName", string(nodeName)))
 
 	// The Reflector responsible for watching pods at the apiserver should be run only after
@@ -55,13 +54,13 @@ func NewSourceApiserver(logger klog.Logger, c clientset.Interface, nodeName type
 }
 
 // newSourceApiserverFromLW holds creates a config source that watches and pulls from the apiserver.
-func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}) {
+func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- sourceUpdate) {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
 			pods = append(pods, o.(*v1.Pod))
 		}
-		updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.ApiserverSource}
+		updates <- sourceUpdate{Pods: pods}
 	}
 	r := cache.NewReflector(lw, &v1.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0)
 	go r.Run(wait.NeverStop)

@@ -17,6 +17,9 @@ limitations under the License.
 package server
 
 import (
+	"context"
+
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/informers"
@@ -31,23 +34,31 @@ type clientGetter struct {
 }
 
 // genericTokenGetter returns a ServiceAccountTokenGetter that does not depend
-// on pods and nodes.
+// on pods, nodes, validatingWebhookConfigurations, or mutatingWebhookConfigurations.
 func genericTokenGetter(factory informers.SharedInformerFactory) serviceaccount.ServiceAccountTokenGetter {
 	return clientGetter{secretLister: factory.Core().V1().Secrets().Lister(), serviceAccountLister: factory.Core().V1().ServiceAccounts().Lister()}
 }
 
-func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
+func (c clientGetter) GetServiceAccount(ctx context.Context, namespace, name string) (*v1.ServiceAccount, error) {
 	return c.serviceAccountLister.ServiceAccounts(namespace).Get(name)
 }
 
-func (c clientGetter) GetPod(namespace, name string) (*v1.Pod, error) {
+func (c clientGetter) GetPod(ctx context.Context, namespace, name string) (*v1.Pod, error) {
 	return nil, apierrors.NewNotFound(v1.Resource("pods"), name)
 }
 
-func (c clientGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
+func (c clientGetter) GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	return c.secretLister.Secrets(namespace).Get(name)
 }
 
-func (c clientGetter) GetNode(name string) (*v1.Node, error) {
+func (c clientGetter) GetNode(ctx context.Context, name string) (*v1.Node, error) {
 	return nil, apierrors.NewNotFound(v1.Resource("nodes"), name)
+}
+
+func (c clientGetter) GetValidatingWebhookConfiguration(ctx context.Context, name string) (*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
+	return nil, apierrors.NewNotFound(admissionregistrationv1.Resource("validatingwebhookconfigurations"), name)
+}
+
+func (c clientGetter) GetMutatingWebhookConfiguration(ctx context.Context, name string) (*admissionregistrationv1.MutatingWebhookConfiguration, error) {
+	return nil, apierrors.NewNotFound(admissionregistrationv1.Resource("mutatingwebhookconfigurations"), name)
 }

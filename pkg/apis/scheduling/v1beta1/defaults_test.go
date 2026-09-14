@@ -23,7 +23,10 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/features"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -56,5 +59,66 @@ func TestSetDefaultPreempting(t *testing.T) {
 	output := roundTrip(t, runtime.Object(priorityClass)).(*v1beta1.PriorityClass)
 	if output.PreemptionPolicy == nil || *output.PreemptionPolicy != apiv1.PreemptLowerPriority {
 		t.Errorf("Expected PriorityClass.Preempting value: %+v\ngot: %+v\n", apiv1.PreemptLowerPriority, output.PreemptionPolicy)
+	}
+}
+
+func TestSetDefaultsPodGroup(t *testing.T) {
+	var (
+		preemptNever         = v1beta1.PreemptNever
+		preemptLowerPriority = v1beta1.PreemptLowerPriority
+	)
+
+	tests := []struct {
+		name                           string
+		enablePodGroupPreemptionPolicy bool
+		podGroup                       *v1beta1.PodGroup
+		expectedPolicy                 *v1beta1.PreemptionPolicy
+	}{
+		{
+			name:                           "feature gate disabled, policy is nil",
+			podGroup:                       &v1beta1.PodGroup{},
+			enablePodGroupPreemptionPolicy: false,
+			expectedPolicy:                 nil,
+		},
+		{
+			name: "feature gate disabled, policy is set",
+			podGroup: &v1beta1.PodGroup{
+				Spec: v1beta1.PodGroupSpec{
+					PreemptionPolicy: &preemptNever,
+				},
+			},
+			enablePodGroupPreemptionPolicy: false,
+			expectedPolicy:                 &preemptNever,
+		},
+		{
+			name:                           "feature gate enabled, policy is nil",
+			podGroup:                       &v1beta1.PodGroup{},
+			enablePodGroupPreemptionPolicy: true,
+			expectedPolicy:                 &preemptLowerPriority,
+		},
+		{
+			name: "feature gate enabled, policy is set",
+			podGroup: &v1beta1.PodGroup{
+				Spec: v1beta1.PodGroupSpec{
+					PreemptionPolicy: &preemptNever,
+				},
+			},
+			enablePodGroupPreemptionPolicy: true,
+			expectedPolicy:                 &preemptNever,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:          tc.enablePodGroupPreemptionPolicy,
+				features.PodGroupPreemptionPolicy: tc.enablePodGroupPreemptionPolicy,
+			})
+
+			output := roundTrip(t, runtime.Object(tc.podGroup)).(*v1beta1.PodGroup)
+			if !reflect.DeepEqual(output.Spec.PreemptionPolicy, tc.expectedPolicy) {
+				t.Errorf("Expected PreemptionPolicy: %v, got: %v", tc.expectedPolicy, output.Spec.PreemptionPolicy)
+			}
+		})
 	}
 }

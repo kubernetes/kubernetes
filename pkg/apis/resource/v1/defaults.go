@@ -27,7 +27,6 @@ import (
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
-
 func SetDefaults_ExactDeviceRequest(obj *resourceapi.ExactDeviceRequest) {
 	if obj.AllocationMode == "" {
 		obj.AllocationMode = resourceapi.DeviceAllocationModeExactCount
