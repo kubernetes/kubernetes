@@ -146,9 +146,11 @@ func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType],
 	case RequestTypeCreate:
 		obj := validPod(key.Namespace, key.Name)
 		return &correctness.Request{
-			Op:     correctness.OpCreate,
-			Key:    storageKey(key),
-			Object: obj,
+			Op:  correctness.OpCreate,
+			Key: storageKey(key),
+			Create: correctness.CreateRequest{
+				Object: obj,
+			},
 		}
 	case RequestTypeDelete:
 		return &correctness.Request{
@@ -165,16 +167,20 @@ func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType],
 		}
 		uid := accessor.GetUID()
 		return &correctness.Request{
-			Op:            correctness.OpDelete,
-			Key:           storageKey(key),
-			Preconditions: &storage.Preconditions{UID: &uid},
+			Op:  correctness.OpDelete,
+			Key: storageKey(key),
+			Delete: correctness.DeleteRequest{
+				Preconditions: &storage.Preconditions{UID: &uid},
+			},
 		}
 	case RequestTypeGet:
 		getOpts := storage.GetOptions{}
 		return &correctness.Request{
-			Op:         correctness.OpGet,
-			Key:        storageKey(key),
-			GetOptions: getOpts,
+			Op:  correctness.OpGet,
+			Key: storageKey(key),
+			Get: correctness.GetRequest{
+				Options: getOpts,
+			},
 		}
 	default:
 		panic(fmt.Sprintf("%v: unknown operation", selectedOp))
@@ -191,11 +197,11 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 	key := request.Key
 	switch request.Op {
 	case correctness.OpCreate:
-		err = store.Create(ctx, key, request.Object, out, 0)
+		err = store.Create(ctx, key, request.Create.Object, out, 0)
 	case correctness.OpDelete:
-		err = store.Delete(ctx, key, out, request.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+		err = store.Delete(ctx, key, out, request.Delete.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 	case correctness.OpGet:
-		err = store.Get(ctx, key, request.GetOptions, out)
+		err = store.Get(ctx, key, request.Get.Options, out)
 	default:
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}

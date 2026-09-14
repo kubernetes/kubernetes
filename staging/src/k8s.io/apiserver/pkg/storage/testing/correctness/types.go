@@ -37,10 +37,25 @@ type Operation struct {
 
 // Request represents an input invocation to the storage interface.
 type Request struct {
-	Op            OpType
-	Key           string
-	Object        runtime.Object
-	GetOptions    storage.GetOptions
+	Op     OpType
+	Key    string
+	Create CreateRequest
+	Get    GetRequest
+	Delete DeleteRequest
+}
+
+// CreateRequest contains parameters specific to Create operations.
+type CreateRequest struct {
+	Object runtime.Object
+}
+
+// GetRequest contains parameters specific to Get operations.
+type GetRequest struct {
+	Options storage.GetOptions
+}
+
+// DeleteRequest contains parameters specific to Delete operations.
+type DeleteRequest struct {
 	Preconditions *storage.Preconditions
 }
 
@@ -68,7 +83,7 @@ func (r Request) Describe(output Response) string {
 		case storage.IsCorruptObject(output.Err):
 			return fmt.Sprintf("%s(%s) -> Corrupt", r.Op, r.Key)
 		default:
-			return fmt.Sprintf("%s(%s) -> Unknown Error", r.Op, r.Key)
+			return fmt.Sprintf("%s(%s) -> %v", r.Op, r.Key, output.Err)
 		}
 	}
 	accessor, err := meta.Accessor(output.Object)
@@ -79,12 +94,12 @@ func (r Request) Describe(output Response) string {
 	case OpCreate:
 		return fmt.Sprintf("%s(%s) -> RV: %s, UID: %s", r.Op, r.Key, accessor.GetResourceVersion(), accessor.GetUID())
 	case OpDelete:
-		if r.Preconditions != nil {
-			if r.Preconditions.ResourceVersion != nil && *r.Preconditions.ResourceVersion != "" {
-				return fmt.Sprintf("%s(if RV(%s) ==%s) -> Deleted", r.Op, r.Key, *r.Preconditions.ResourceVersion)
+		if r.Delete.Preconditions != nil {
+			if r.Delete.Preconditions.ResourceVersion != nil && *r.Delete.Preconditions.ResourceVersion != "" {
+				return fmt.Sprintf("%s(if RV(%s) ==%s) -> Deleted", r.Op, r.Key, *r.Delete.Preconditions.ResourceVersion)
 			}
-			if r.Preconditions.UID != nil && *r.Preconditions.UID != "" {
-				return fmt.Sprintf("%s(if UID(%s) == %s) -> Deleted", r.Op, r.Key, *r.Preconditions.UID)
+			if r.Delete.Preconditions.UID != nil && *r.Delete.Preconditions.UID != "" {
+				return fmt.Sprintf("%s(if UID(%s) == %s) -> Deleted", r.Op, r.Key, *r.Delete.Preconditions.UID)
 			}
 		}
 		return fmt.Sprintf("%s(%s) -> Deleted", r.Op, r.Key)

@@ -51,9 +51,11 @@ func correctnessTestSteps() []testStep {
 		{
 			Name: "1. Create pod1 returns success RV=2",
 			Request: Request{
-				Op:     OpCreate,
-				Key:    pod1Key,
-				Object: pod1,
+				Op:  OpCreate,
+				Key: pod1Key,
+				Create: CreateRequest{
+					Object: pod1,
+				},
 			},
 			CorrectResponse: Response{
 				Object: withRV(pod1, "2"),
@@ -69,9 +71,11 @@ func correctnessTestSteps() []testStep {
 		{
 			Name: "2. Create pod1 duplicate returns key exists error",
 			Request: Request{
-				Op:     OpCreate,
-				Key:    pod1Key,
-				Object: pod1,
+				Op:  OpCreate,
+				Key: pod1Key,
+				Create: CreateRequest{
+					Object: pod1,
+				},
 			},
 			CorrectResponse: Response{
 				Object: nil,
@@ -104,9 +108,11 @@ func correctnessTestSteps() []testStep {
 		{
 			Name: "4. Create pod2 returns success RV=3",
 			Request: Request{
-				Op:     OpCreate,
-				Key:    pod2Key,
-				Object: pod2,
+				Op:  OpCreate,
+				Key: pod2Key,
+				Create: CreateRequest{
+					Object: pod2,
+				},
 			},
 			CorrectResponse: Response{
 				Object: withRV(pod2, "3"),
@@ -137,9 +143,9 @@ func correctnessTestSteps() []testStep {
 		{
 			Name: "6. Delete pod2 with mismatched UID precondition returns invalid obj error",
 			Request: Request{
-				Op:            OpDelete,
-				Key:           pod2Key,
-				Preconditions: &storage.Preconditions{UID: &wrongUID},
+				Op:     OpDelete,
+				Key:    pod2Key,
+				Delete: DeleteRequest{Preconditions: &storage.Preconditions{UID: &wrongUID}},
 			},
 			CorrectResponse: Response{
 				Object: nil,
@@ -154,9 +160,9 @@ func correctnessTestSteps() []testStep {
 		{
 			Name: "7. Delete pod2 with mismatched ResourceVersion precondition returns invalid obj error",
 			Request: Request{
-				Op:            OpDelete,
-				Key:           pod2Key,
-				Preconditions: &storage.Preconditions{ResourceVersion: &wrongRV},
+				Op:     OpDelete,
+				Key:    pod2Key,
+				Delete: DeleteRequest{Preconditions: &storage.Preconditions{ResourceVersion: &wrongRV}},
 			},
 			CorrectResponse: Response{
 				Object: nil,
@@ -171,9 +177,9 @@ func correctnessTestSteps() []testStep {
 		{
 			Name: "8. Delete pod1 with matching UID precondition returns success RV=4",
 			Request: Request{
-				Op:            OpDelete,
-				Key:           pod1Key,
-				Preconditions: &storage.Preconditions{UID: &pod1UID},
+				Op:     OpDelete,
+				Key:    pod1Key,
+				Delete: DeleteRequest{Preconditions: &storage.Preconditions{UID: &pod1UID}},
 			},
 			CorrectResponse: Response{
 				Object: withRV(pod1, "4"),
@@ -221,9 +227,9 @@ func correctnessTestSteps() []testStep {
 		{
 			Name: "11. Delete pod2 with matching UID and RV preconditions returns success RV=5",
 			Request: Request{
-				Op:            OpDelete,
-				Key:           pod2Key,
-				Preconditions: &storage.Preconditions{UID: &pod2UID, ResourceVersion: &pod2RV},
+				Op:     OpDelete,
+				Key:    pod2Key,
+				Delete: DeleteRequest{Preconditions: &storage.Preconditions{UID: &pod2UID, ResourceVersion: &pod2RV}},
 			},
 			CorrectResponse: Response{
 				Object: withRV(pod2, "5"),
@@ -265,11 +271,11 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 		var err error
 		switch step.Request.Op {
 		case OpCreate:
-			err = store.Create(ctx, step.Request.Key, step.Request.Object, out, 0)
+			err = store.Create(ctx, step.Request.Key, step.Request.Create.Object, out, 0)
 		case OpGet:
-			err = store.Get(ctx, step.Request.Key, step.Request.GetOptions, out)
+			err = store.Get(ctx, step.Request.Key, step.Request.Get.Options, out)
 		case OpDelete:
-			err = store.Delete(ctx, step.Request.Key, out, step.Request.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+			err = store.Delete(ctx, step.Request.Key, out, step.Request.Delete.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 		default:
 			t.Fatalf("unknown operation: %v", step.Request.Op)
 		}
