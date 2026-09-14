@@ -49,6 +49,12 @@ type JunitReportConfig struct {
 
 	// Enable OmitSuiteSetupNodes to prevent the creation of testcase entries for setup nodes
 	OmitSuiteSetupNodes bool
+
+	// Enable IncludeReportEntries to add report entries recorded via AddReportEntry
+	// to their corresponding testcase as <property> elements. Disabled by default because
+	// traditionally Ginkgo did not expose report entries this way and suites might not
+	// want to include them.
+	IncludeReportEntries bool
 }
 
 type JUnitTestSuites struct {
@@ -136,6 +142,8 @@ type JUnitTestCase struct {
 	SystemOut string `xml:"system-out,omitempty"`
 	//SystemOut maps onto any captured GinkgoWriter output - maps onto SpecReport.CapturedGinkgoWriterOutput
 	SystemErr string `xml:"system-err,omitempty"`
+	//Properties captures any ReportEntries attached to the spec via AddReportEntry, as key/value pairs
+	Properties *JUnitProperties `xml:"properties,omitempty"`
 }
 
 type JUnitSkipped struct {
@@ -240,6 +248,16 @@ func GenerateJUnitReportWithConfig(report types.Report, dst string, config Junit
 		}
 		if !config.OmitCapturedStdOutErr {
 			test.SystemOut = systemOutForUnstructuredReporters(spec)
+		}
+		if config.IncludeReportEntries && len(spec.ReportEntries) > 0 {
+			properties := JUnitProperties{}
+			for _, entry := range spec.ReportEntries {
+				properties.Properties = append(properties.Properties, JUnitProperty{
+					Name:  entry.Name,
+					Value: entry.StringRepresentation(),
+				})
+			}
+			test.Properties = &properties
 		}
 		suite.Tests += 1
 

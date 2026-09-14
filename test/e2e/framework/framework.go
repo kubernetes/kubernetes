@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"os"
 	"path"
 	"reflect"
@@ -53,6 +54,10 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 const (
@@ -119,6 +124,15 @@ type Framework struct {
 	restMapper                       *restmapper.DeferredDiscoveryRESTMapper
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
+
+	// requestCounter tallies the total number of HTTP requests issued by
+	// ClientSet. InstrumentRoundTripperCounter requires a CounterVec (a
+	// plain Counter cannot be passed), so this uses one with zero labels.
+	requestCounter *prometheus.CounterVec
+
+	// requestCounterResetTime records when requestCounter was last reset,
+	// used to turn the accumulated count into a rate for reporting.
+	requestCounterResetTime time.Time
 
 	DynamicClient dynamic.Interface
 
@@ -333,6 +347,15 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 	if TestContext.KubeAPIContentType != "" {
 		config.ContentType = TestContext.KubeAPIContentType
 	}
+
+	f.requestCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "e2e_test_http_requests_total",
+		Help: "Number of HTTP requests issued by this test's client.",
+	}, []string{})
+	config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		return promhttp.InstrumentRoundTripperCounter(f.requestCounter, rt)
+	})
+
 	f.clientConfig = rest.CopyConfig(config)
 	clientSet, err := clientset.NewForConfig(config)
 	ExpectNoError(err)
@@ -391,6 +414,12 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 	}
 
 	f.flakeReport = NewFlakeReport()
+
+	// Only count HTTP requests made by the test itself, not the ones
+	// needed to set up the framework (client creation, namespace
+	// creation, etc.).
+	f.requestCounter.Reset()
+	f.requestCounterResetTime = time.Now()
 }
 
 func (f *Framework) dumpNamespaceInfo(ctx context.Context) {
@@ -456,6 +485,20 @@ func (f *Framework) AfterEach(ctx context.Context) {
 	if f.ClientSet == nil {
 		Failf("The framework ClientSet must not be nil at this point")
 	}
+
+	// Not shown in Ginkgo output. If we want that, we could log it ourselves.
+	// Note that Ginkgo seems have a bug where it emits the report unconditionally
+	// as part of a timeline:
+	// https://github.com/onsi/ginkgo/blob/f2d0f65b6d1e99c58d1f9a31b41c53a2754a6c2c/reporters/default_reporter.go#L440-L476
+	// vs.
+	// https://github.com/onsi/ginkgo/blob/f2d0f65b6d1e99c58d1f9a31b41c53a2754a6c2c/reporters/default_reporter.go#L645-L650
+	requestCount := testutil.ToFloat64(f.requestCounter.With(prometheus.Labels{}))
+	elapsed := time.Since(f.requestCounterResetTime).Seconds()
+	var requestsPerSecond float64
+	if elapsed > 0 {
+		requestsPerSecond = requestCount / elapsed
+	}
+	ginkgo.AddReportEntry("client-http-requests-per-second", requestsPerSecond, ginkgo.ReportEntryVisibilityNever, ginkgotypes.NewCustomCodeLocation("E2E framework"))
 
 	// DeleteNamespace at the very end in defer, to avoid any
 	// expectation failures preventing deleting the namespace.
