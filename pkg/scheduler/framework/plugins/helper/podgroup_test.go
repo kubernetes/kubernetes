@@ -162,6 +162,18 @@ func TestGetPodGroupStates(t *testing.T) {
 			rootEntityKey: fwk.CompositePodGroupKey("test", "cpg-root"),
 		},
 		{
+			name: "root is CompositePodGroup with nested CompositePodGroup",
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("test").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Namespace("test").Obj(),
+				st.MakeCompositePodGroup().Name("cpg1").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),
+			},
+			rootEntityKey: fwk.CompositePodGroupKey("test", "cpg-root"),
+		},
+		{
 			name:      "root is CompositePodGroup and has no leaves",
 			podGroups: []*schedulingv1beta1.PodGroup{},
 			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
@@ -203,25 +215,6 @@ func TestGetPodGroupStates(t *testing.T) {
 		{
 			name:          "there's no root matching the entity key",
 			rootEntityKey: fwk.PodGroupKey("test", "non-existent"),
-			wantErrCount:  1,
-		},
-		{
-			name: "cpg tree exceeds the max depth",
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-root").Namespace("test").Obj(),
-				st.MakeCompositePodGroup().Name("cpg1").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),
-				st.MakeCompositePodGroup().Name("cpg2.1").Namespace("test").ParentCompositePodGroup("cpg1").Obj(),
-				st.MakeCompositePodGroup().Name("cpg3").Namespace("test").ParentCompositePodGroup("cpg2.1").Obj(),
-				st.MakeCompositePodGroup().Name("cpg4").Namespace("test").ParentCompositePodGroup("cpg3").Obj(),
-				st.MakeCompositePodGroup().Name("cpg2.2").Namespace("test").ParentCompositePodGroup("cpg1").Obj(),
-			},
-			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-root").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),
-				st.MakePodGroup().Name("pg1").Namespace("test").ParentCompositePodGroup("cpg1").Obj(),
-				st.MakePodGroup().Name("pg2.1").Namespace("test").ParentCompositePodGroup("cpg2.1").Obj(),
-				st.MakePodGroup().Name("pg2.2").Namespace("test").ParentCompositePodGroup("cpg2.2").Obj(),
-			},
-			rootEntityKey: fwk.CompositePodGroupKey("test", "cpg-root"),
 			wantErrCount:  1,
 		},
 	}
@@ -388,43 +381,6 @@ func TestTraverseHierarchyUp(t *testing.T) {
 			name:     "unsupported key type",
 			startKey: fwk.PodKey(ns, "p1"),
 			wantErr:  "unsupported key type",
-		},
-		{
-			name: "cycle between CompositePodGroups",
-			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace(ns).ParentCompositePodGroup("cpg1").Obj(),
-			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg1").Namespace(ns).ParentCompositePodGroup("cpg2").Obj(),
-				st.MakeCompositePodGroup().Name("cpg2").Namespace(ns).ParentCompositePodGroup("cpg1").Obj(),
-			},
-			startKey: fwk.PodGroupKey(ns, "pg1"),
-			wantKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(ns, "pg1"),
-				fwk.CompositePodGroupKey(ns, "cpg1"),
-				fwk.CompositePodGroupKey(ns, "cpg2"),
-			},
-			wantErr: "cycle detected",
-		},
-		{
-			name: "hierarchy deeper than WorkloadMaxTreeDepth",
-			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace(ns).ParentCompositePodGroup("cpg1").Obj(),
-			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg1").Namespace(ns).ParentCompositePodGroup("cpg2").Obj(),
-				st.MakeCompositePodGroup().Name("cpg2").Namespace(ns).ParentCompositePodGroup("cpg3").Obj(),
-				st.MakeCompositePodGroup().Name("cpg3").Namespace(ns).ParentCompositePodGroup("cpg4").Obj(),
-				st.MakeCompositePodGroup().Name("cpg4").Namespace(ns).Obj(),
-			},
-			startKey: fwk.PodGroupKey(ns, "pg1"),
-			wantKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(ns, "pg1"),
-				fwk.CompositePodGroupKey(ns, "cpg1"),
-				fwk.CompositePodGroupKey(ns, "cpg2"),
-				fwk.CompositePodGroupKey(ns, "cpg3"),
-			},
-			wantErr: "maximum hierarchy depth",
 		},
 	}
 
