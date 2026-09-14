@@ -346,8 +346,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Prepare prefs to generate Aliases Command Group
 	prefs, err := pref.Read(o.Arguments, o.IOStreams.ErrOut)
 	if err != nil {
-		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
-		os.Exit(1)
+		warningHandler.HandleWarningHeader(299, "", fmt.Sprintf("occurred while reading preferences: '%v'", err))
 	}
 
 	// Add alias command group to the list of command groups.
