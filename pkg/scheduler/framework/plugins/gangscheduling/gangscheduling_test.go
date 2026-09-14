@@ -672,6 +672,13 @@ func TestPreEnqueue(t *testing.T) {
 	p1_2BasicCPG := st.MakePod().Namespace("ns1").Name("p1_2").UID("p1_2").PodGroupName("pg-basic-1").Obj()
 	p2_1BasicCPG := st.MakePod().Namespace("ns1").Name("p2_1").UID("p2_1").PodGroupName("pg-basic-2").Obj()
 
+	cpgDeep1 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-1").MinGroupCount(1).Obj()
+	cpgDeep2 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-2").ParentCompositePodGroup("cpg-deep-1").MinGroupCount(1).Obj()
+	cpgDeep3 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-3").ParentCompositePodGroup("cpg-deep-2").MinGroupCount(1).Obj()
+	cpgDeep4 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-4").ParentCompositePodGroup("cpg-deep-3").MinGroupCount(1).Obj()
+	pgDeep := st.MakePodGroup().Namespace("ns1").Name("pg-deep").ParentCompositePodGroup("cpg-deep-4").MinCount(1).Obj()
+	pDeep := st.MakePod().Namespace("ns1").Name("p-deep").UID("p-deep").PodGroupName("pg-deep").Obj()
+
 	type testCase struct {
 		name                       string
 		pod                        *v1.Pod
@@ -799,6 +806,14 @@ func TestPreEnqueue(t *testing.T) {
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1CPG, pgBasic2CPG},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
+		},
+		{
+			name:                       "CPG hierarchy with a pod group one level below the maximum tree depth",
+			isCompositePodGroupEnabled: []bool{true},
+			pod:                        pDeep,
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgDeep},
+			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgDeep1, cpgDeep2, cpgDeep3, cpgDeep4},
+			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "failed to build hierarchy snapshot: hierarchy exceeded maximum tree depth at compositepodgroup/ns1/cpg-deep-1, possibly caused by cycle or deep hierarchy"),
 		},
 	}
 
@@ -1103,7 +1118,7 @@ type mockPodGroupManager struct {
 
 func (m *mockPodGroupManager) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
 	currentKey := key
-	for {
+	for range schedulingv1alpha3.WorkloadMaxTreeDepth {
 		switch currentKey.Type {
 		case fwk.PodKeyType:
 			return currentKey, true, nil
@@ -1129,4 +1144,5 @@ func (m *mockPodGroupManager) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityK
 			return currentKey, true, nil
 		}
 	}
+	return fwk.EntityKey{}, false, fmt.Errorf("hierarchy exceeded maximum tree depth at %s, possibly caused by cycle or deep hierarchy", currentKey.String())
 }

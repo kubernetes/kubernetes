@@ -21,10 +21,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -120,13 +119,7 @@ func traverseHierarchyUp(
 ) iter.Seq[*fwk.GenericPodGroup] {
 	return func(yield func(*fwk.GenericPodGroup) bool) {
 		currentKey := startKey
-		visited := sets.New[fwk.EntityKey]()
-		for range schedulingv1beta1.WorkloadMaxTreeDepth {
-			if visited.Has(currentKey) {
-				break
-			}
-			visited.Insert(currentKey)
-
+		for range schedulingv1alpha3.WorkloadMaxTreeDepth {
 			var gpg *fwk.GenericPodGroup
 			switch currentKey.Type {
 			case fwk.PodGroupKeyType:
