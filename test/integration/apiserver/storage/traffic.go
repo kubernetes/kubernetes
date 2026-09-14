@@ -38,10 +38,14 @@ import (
 type RequestType string
 
 const (
-	RequestTypeCreate                RequestType = "Create"
-	RequestTypeDelete                RequestType = "Delete"
-	RequestTypeDeleteUIDPrecondition RequestType = "DeleteUIDPrecondition"
-	RequestTypeGet                   RequestType = "Get"
+	RequestTypeCreate                 RequestType = "Create"
+	RequestTypeDelete                 RequestType = "Delete"
+	RequestTypeDeleteUIDPrecondition  RequestType = "DeleteUIDPrecondition"
+	RequestTypeGet                    RequestType = "Get"
+	RequestTypeUpdate                 RequestType = "Update"
+	RequestTypeUpdateUIDPrecondition  RequestType = "UpdateUIDPrecondition"
+	RequestTypeUpdateNoOp             RequestType = "UpdateNoOp"
+	RequestTypeUpdateWithCachedObject RequestType = "UpdateWithCachedObject"
 )
 
 type TraffiConfig struct {
@@ -182,6 +186,81 @@ func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType],
 				Options: getOpts,
 			},
 		}
+	case RequestTypeUpdate:
+		version := fmt.Sprintf("%d", rand.Intn(10000))
+		return &correctness.Request{
+			Op:  correctness.OpUpdate,
+			Key: storageKey(key),
+			Update: correctness.UpdateRequest{
+				IgnoreNotFound: false,
+				UpdateFunc: storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+					pod := obj.(*api.Pod).DeepCopy()
+					if pod.Annotations == nil {
+						pod.Annotations = make(map[string]string)
+					}
+					pod.Annotations["version"] = version
+					return pod, nil
+				}),
+			},
+		}
+	case RequestTypeUpdateUIDPrecondition:
+		if cached == nil {
+			return nil
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		uid := accessor.GetUID()
+		version := fmt.Sprintf("%d", rand.Intn(10000))
+		return &correctness.Request{
+			Op:  correctness.OpUpdate,
+			Key: storageKey(key),
+			Update: correctness.UpdateRequest{
+				IgnoreNotFound: false,
+				Preconditions:  &storage.Preconditions{UID: &uid},
+				UpdateFunc: storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+					pod := obj.(*api.Pod).DeepCopy()
+					if pod.Annotations == nil {
+						pod.Annotations = make(map[string]string)
+					}
+					pod.Annotations["version"] = version
+					return pod, nil
+				}),
+			},
+		}
+	case RequestTypeUpdateNoOp:
+		return &correctness.Request{
+			Op:  correctness.OpUpdate,
+			Key: storageKey(key),
+			Update: correctness.UpdateRequest{
+				IgnoreNotFound: false,
+				UpdateFunc: storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+					return obj.(*api.Pod).DeepCopy(), nil
+				}),
+			},
+		}
+	case RequestTypeUpdateWithCachedObject:
+		if cached == nil {
+			return nil
+		}
+		version := fmt.Sprintf("%d", rand.Intn(10000))
+		return &correctness.Request{
+			Op:  correctness.OpUpdate,
+			Key: storageKey(key),
+			Update: correctness.UpdateRequest{
+				IgnoreNotFound:       false,
+				CachedExistingObject: cached.DeepCopyObject(),
+				UpdateFunc: storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+					pod := obj.(*api.Pod).DeepCopy()
+					if pod.Annotations == nil {
+						pod.Annotations = make(map[string]string)
+					}
+					pod.Annotations["version"] = version
+					return pod, nil
+				}),
+			},
+		}
 	default:
 		panic(fmt.Sprintf("%v: unknown operation", selectedOp))
 	}
@@ -202,6 +281,8 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		err = store.Delete(ctx, key, out, request.Delete.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 	case correctness.OpGet:
 		err = store.Get(ctx, key, request.Get.Options, out)
+	case correctness.OpUpdate:
+		err = store.GuaranteedUpdate(ctx, key, out, request.Update.IgnoreNotFound, request.Update.Preconditions, request.Update.UpdateFunc, request.Update.CachedExistingObject)
 	default:
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}

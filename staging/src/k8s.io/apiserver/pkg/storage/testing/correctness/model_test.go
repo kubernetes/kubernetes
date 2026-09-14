@@ -20,10 +20,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/apis/example"
 )
 
 func TestCorrectness(t *testing.T) {
-	model := NewEmptyModel("")
+	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} })
 
 	for _, step := range correctnessTestSteps() {
 		t.Run(step.Name, func(t *testing.T) {

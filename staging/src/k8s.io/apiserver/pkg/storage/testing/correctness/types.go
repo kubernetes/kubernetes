@@ -42,6 +42,7 @@ type Request struct {
 	Create CreateRequest
 	Get    GetRequest
 	Delete DeleteRequest
+	Update UpdateRequest
 }
 
 // CreateRequest contains parameters specific to Create operations.
@@ -57,6 +58,14 @@ type GetRequest struct {
 // DeleteRequest contains parameters specific to Delete operations.
 type DeleteRequest struct {
 	Preconditions *storage.Preconditions
+}
+
+// UpdateRequest contains parameters specific to Update / GuaranteedUpdate operations.
+type UpdateRequest struct {
+	UpdateFunc           storage.UpdateFunc
+	IgnoreNotFound       bool
+	Preconditions        *storage.Preconditions
+	CachedExistingObject runtime.Object
 }
 
 // Describe formats the operation for debugging and visualization.
@@ -105,6 +114,8 @@ func (r Request) Describe(output Response) string {
 		return fmt.Sprintf("%s(%s) -> Deleted", r.Op, r.Key)
 	case OpGet:
 		return fmt.Sprintf("%s(%s) -> RV: %s, UID: %s", r.Op, r.Key, accessor.GetResourceVersion(), accessor.GetUID())
+	case OpUpdate:
+		return fmt.Sprintf("%s(%s) -> RV: %s, UID: %s", r.Op, r.Key, accessor.GetResourceVersion(), accessor.GetUID())
 	default:
 		return fmt.Sprintf("%s(%s) -> RV: %s", r.Op, r.Key, accessor.GetResourceVersion())
 	}
@@ -117,6 +128,7 @@ const (
 	OpCreate OpType = "Create"
 	OpDelete OpType = "Delete"
 	OpGet    OpType = "Get"
+	OpUpdate OpType = "Update"
 )
 
 // Response represents the output/result from the storage interface invocation.
