@@ -239,6 +239,17 @@ type Issuer struct {
 	Audiences            []string
 	AudienceMatchPolicy  AudienceMatchPolicyType
 	EgressSelectorType   EgressSelectorType
+	// jwksRefreshOnUnknownKeyID, if true, causes the JSON Web Key Set (JWKS) to be
+	// refetched from the issuer whenever a presented JWT is signed with a key ID (kid)
+	// that is not present in the currently cached JWKS, before failing authentication.
+	// This handles the case where the identity provider has rotated its signing keys
+	// but the locally cached JWKS has not yet expired.
+	//
+	// If unset or false, the JWKS is only refetched once the entire cached key set is
+	// close to expiring: a token signed with a newly rotated key may be rejected until
+	// the local cache naturally expires.
+	// +optional
+	JWKSRefreshOnUnknownKeyID bool
 }
 
 // AudienceMatchPolicyType is a set of valid values for Issuer.AudienceMatchPolicy

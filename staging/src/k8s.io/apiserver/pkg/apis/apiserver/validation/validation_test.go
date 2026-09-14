@@ -2562,3 +2562,42 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateIssuerJWKSRefreshOnUnknownKeyID confirms that
+// Issuer.JWKSRefreshOnUnknownKeyID is a plain opt-in boolean that never fails
+// validation, regardless of its value.
+func TestValidateIssuerJWKSRefreshOnUnknownKeyID(t *testing.T) {
+	testCases := []struct {
+		name                      string
+		jwksRefreshOnUnknownKeyID bool
+	}{
+		{name: "false (default when unset)", jwksRefreshOnUnknownKeyID: false},
+		{name: "true", jwksRefreshOnUnknownKeyID: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:                       "https://issuer-url",
+							Audiences:                 []string{"audience"},
+							JWKSRefreshOnUnknownKeyID: tc.jwksRefreshOnUnknownKeyID,
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: ptr.To("prefix"),
+							},
+						},
+					},
+				},
+			}
+
+			if errs := ValidateAuthenticationConfiguration(authenticationcel.NewDefaultCompiler(), in, nil); len(errs) != 0 {
+				t.Fatalf("expected no validation errors for jwksRefreshOnUnknownKeyID=%v, got: %v", tc.jwksRefreshOnUnknownKeyID, errs.ToAggregate())
+			}
+		})
+	}
+}
