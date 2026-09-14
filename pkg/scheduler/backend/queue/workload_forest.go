@@ -129,16 +129,8 @@ func (wf *workloadForest) getRootLookupInfo(gpg *fwk.GenericPodGroup) (*framewor
 // It should be called only when the CompositePodGroup feature gate is enabled.
 func (wf *workloadForest) getRootLookupInfoForParentCPG(parentName, namespace string) (*framework.QueuedPodGroupInfo, bool) {
 	currParentName := parentName
-	visited := sets.New[fwk.EntityKey]()
-	for {
+	for range schedulingv1beta1.WorkloadMaxTreeDepth {
 		cpgKey := fwk.CompositePodGroupKey(namespace, currParentName)
-		if visited.Has(cpgKey) {
-			// TODO(jdzikowski): propagate logger to the getPod method in the scheduling queue.
-			utilruntime.HandleError(fmt.Errorf("cycle detected in composite pod group hierarchy when getting root info: %s/%s", parentName, namespace))
-			return nil, false
-		}
-		visited.Insert(cpgKey)
-
 		cpg, exists := wf.podGroups[cpgKey]
 		if !exists {
 			return nil, false
@@ -149,6 +141,8 @@ func (wf *workloadForest) getRootLookupInfoForParentCPG(parentName, namespace st
 		}
 		currParentName = *cpg.GetParentCompositePodGroupName()
 	}
+	utilruntime.HandleError(fmt.Errorf("hierarchy exceeded maximum tree depth when getting root info: %s/%s", parentName, namespace))
+	return nil, false
 }
 
 // getLeafPodGroups returns all PodGroups that are leaf nodes in the subtree rooted at the given rootLookupInfo.
@@ -163,22 +157,16 @@ func (wf *workloadForest) getLeafPodGroups(logger klog.Logger, rootLookupInfo *f
 	}
 
 	var pgs []*schedulingv1beta1.PodGroup
-	queue := []fwk.EntityKey{key}
-	visited := sets.New[fwk.EntityKey]()
-
-	for len(queue) > 0 {
-		currKey := queue[0]
-		queue = queue[1:]
-
-		if visited.Has(currKey) {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Cycle detected in composite pod group hierarchy when getting leaf PodGroups", "compositePodGroup", klog.KObj(rootLookupInfo))
-			return pgs
+	var collectLeaves func(currKey fwk.EntityKey, depth int)
+	collectLeaves = func(currKey fwk.EntityKey, depth int) {
+		if depth >= schedulingv1beta1.WorkloadMaxTreeDepth {
+			utilruntime.HandleErrorWithLogger(logger, nil, "Hierarchy exceeded maximum tree depth when getting leaf PodGroups", "compositePodGroup", klog.KObj(rootLookupInfo))
+			return
 		}
-		visited.Insert(currKey)
 
 		children, exists := wf.children[currKey]
 		if !exists {
-			continue
+			return
 		}
 
 		for childKey := range children {
@@ -189,36 +177,35 @@ func (wf *workloadForest) getLeafPodGroups(logger klog.Logger, rootLookupInfo *f
 			if gpg.PodGroup != nil {
 				pgs = append(pgs, gpg.PodGroup)
 			} else if gpg.CompositePodGroup != nil {
-				queue = append(queue, childKey)
+				collectLeaves(childKey, depth+1)
 			}
 		}
 	}
-
+	collectLeaves(key, 0)
 	return pgs
 }
 
 // buildPodGroupInfo recursively constructs a PodGroupInfo representation for a given GenericPodGroup
-// and all its children, using the provided visited set to detect cycles in the hierarchy.
-func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *fwk.GenericPodGroup, visited sets.Set[fwk.EntityKey]) *framework.PodGroupInfo {
-	key := gpg.GetKey()
-	if visited.Has(key) {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cycle detected in composite pod group hierarchy when building PodGroupInfo", "groupType", gpg.GetType(), "group", klog.KObj(gpg))
+// and all its children up to WorkloadMaxTreeDepth.
+func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *fwk.GenericPodGroup, depth int) *framework.PodGroupInfo {
+	if depth >= schedulingv1beta1.WorkloadMaxTreeDepth {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Hierarchy exceeded maximum tree depth when building PodGroupInfo", "groupType", gpg.GetType(), "group", klog.KObj(gpg))
 		return nil
 	}
-	visited.Insert(key)
 
 	pgi := &framework.PodGroupInfo{
 		GenericPodGroup: gpg,
 		Children:        make([]*framework.PodGroupInfo, 0),
 	}
 
+	key := gpg.GetKey()
 	childrenSet, ok := wf.children[key]
 	if !ok {
 		return pgi
 	}
 	for childKey := range childrenSet {
 		if childGPG, ok := wf.podGroups[childKey]; ok {
-			if childInfo := wf.buildPodGroupInfo(logger, childGPG, visited); childInfo != nil {
+			if childInfo := wf.buildPodGroupInfo(logger, childGPG, depth+1); childInfo != nil {
 				pgi.Children = append(pgi.Children, childInfo)
 			}
 		}
@@ -235,6 +222,6 @@ func (wf *workloadForest) buildQueuedPodGroupInfo(logger klog.Logger, rootLookup
 		return nil
 	}
 	return &framework.QueuedPodGroupInfo{
-		PodGroupInfo: wf.buildPodGroupInfo(logger, gpg, sets.New[fwk.EntityKey]()),
+		PodGroupInfo: wf.buildPodGroupInfo(logger, gpg, 0),
 	}
 }

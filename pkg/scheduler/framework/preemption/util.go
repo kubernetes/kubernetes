@@ -23,7 +23,6 @@ import (
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kube-scheduler/util"
@@ -123,13 +122,7 @@ func TraverseHierarchyUp(
 		return
 	}
 	currentKey := startKey
-	visited := sets.New[fwk.EntityKey]()
 	for range schedulingv1beta1.WorkloadMaxTreeDepth {
-		if visited.Has(currentKey) {
-			break
-		}
-		visited.Insert(currentKey)
-
 		switch currentKey.Type {
 		case fwk.PodGroupKeyType:
 			pg, err := pgLister.Get(namespace, currentKey.Name)

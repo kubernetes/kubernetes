@@ -934,13 +934,7 @@ func removeNodeInfoFromList(logger klog.Logger, list []fwk.NodeInfo, nodeInfoToR
 // The key must be of PodGroupKey or CompositePodGroupKey type.
 func (s *Snapshot) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
 	currentKey := key
-	visited := sets.New[fwk.EntityKey]()
-	for {
-		if visited.Has(currentKey) {
-			return fwk.EntityKey{}, false, fmt.Errorf("cycle detected in the hierarchy: %v", visited.UnsortedList())
-		}
-		visited.Insert(currentKey)
-
+	for range schedulingv1alpha3.WorkloadMaxTreeDepth {
 		switch currentKey.Type {
 		case fwk.PodGroupKeyType:
 			pgs, ok := s.podGroupStates[currentKey]
@@ -972,6 +966,7 @@ func (s *Snapshot) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, e
 			return fwk.EntityKey{}, false, fmt.Errorf("pod key type not supported in snapshot GetRootKeyForGroup for %s", currentKey.String())
 		}
 	}
+	return fwk.EntityKey{}, false, fmt.Errorf("hierarchy exceeded maximum tree depth at %s, possibly caused by cycle or deep hierarchy", currentKey.String())
 }
 
 func (s *Snapshot) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error) {
