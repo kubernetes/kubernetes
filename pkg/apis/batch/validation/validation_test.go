@@ -3336,6 +3336,57 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
+		"spec.jobTemplate.spec.backoffLimit:must be greater than or equal to 0": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						BackoffLimit: &negative,
+						Template:     validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.backoffLimitPerIndex:must be greater than or equal to 0": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						BackoffLimitPerIndex: &negative,
+						Template:             validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.maxFailedIndexes:must be greater than or equal to 0": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						MaxFailedIndexes: &negative,
+						Template:         validPodTemplateSpec,
+					},
+				},
+			},
+		},
 	}
 
 	for k, v := range errorCases {
