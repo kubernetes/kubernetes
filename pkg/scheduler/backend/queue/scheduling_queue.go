@@ -1600,7 +1600,10 @@ func (p *PriorityQueue) AddGenericPodGroup(logger klog.Logger, gpg *fwk.GenericP
 		// This can only happen when the root is a CompositePodGroup.
 		// It's not possible for regular PodGroup to be present in the queue as a root, when the Add event comes.
 		rootInfo := entity.(*framework.QueuedPodGroupInfo)
-		subtree := p.workloadForest.buildPodGroupInfo(logger, gpg, sets.New[fwk.EntityKey]())
+		subtree := p.workloadForest.buildPodGroupInfo(logger, gpg, 0)
+		if subtree == nil {
+			return
+		}
 		rootInfo.AddSubtree(subtree)
 		logger.V(5).Info("New group added to the existing root group", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "groupType", gpg.GetType(), "group", klog.KObj(gpg))
 	})
