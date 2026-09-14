@@ -397,6 +397,14 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 			if !podutils.IsPodReady(pod) {
 				return func() string { return "pod is not ready" }, nil
 			}
+			if errs := CheckPodResized(ctx, f, pod, expectedContainers); len(errs) != 0 {
+				return func() string {
+					// Suppress managed fields to keep the failure log legible.
+					podCopy := pod.DeepCopy()
+					podCopy.ManagedFields = nil
+					return fmt.Sprintf("%s\nPod:\n%s", formatErrors(utilerrors.NewAggregate(errs)).Error(), framework.PrettyPrintJSON(podCopy))
+				}, nil
+			}
 			return nil, nil
 		})),
 	)
@@ -406,7 +414,7 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 	return resizedPod
 }
 
-func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v1.Pod, expectedContainers []ResizableContainerInfo) {
+func CheckPodResized(ctx context.Context, f *framework.Framework, resizedPod *v1.Pod, expectedContainers []ResizableContainerInfo) []error {
 	ginkgo.GinkgoHelper()
 
 	// Verify Pod Containers Cgroup Values
@@ -454,11 +462,7 @@ func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v
 		}
 	}
 
-	if len(errs) > 0 {
-		resizedPod.ManagedFields = nil // Suppress managed fields in error output.
-		framework.ExpectNoError(formatErrors(utilerrors.NewAggregate(errs)),
-			"Verifying pod resources resize state. Pod: %s", framework.PrettyPrintJSON(resizedPod))
-	}
+	return errs
 }
 
 func MakeResizePatch(originalContainers, desiredContainers []ResizableContainerInfo, originPodResources, desiredPodResources *v1.ResourceRequirements) []byte {
