@@ -98,12 +98,12 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model) {
 	switch input.Op {
 	case OpCreate:
 		next = s.Clone()
-		expected = next.create(input.Key, input.Object)
+		expected = next.create(input.Key, input.Create.Object)
 	case OpDelete:
 		next = s.Clone()
-		expected = next.delete(context.Background(), input.Key, input.Preconditions, nil)
+		expected = next.delete(context.Background(), input.Key, input.Delete.Preconditions, nil)
 	case OpGet:
-		expected = s.get(input.Key, input.GetOptions)
+		expected = s.get(input.Key, input.Get.Options)
 	}
 	if !reflect.DeepEqual(expected, output) {
 		return false, s
