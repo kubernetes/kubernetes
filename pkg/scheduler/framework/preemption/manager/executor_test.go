@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package preemption
+package manager
 
 import (
 	"context"
@@ -63,6 +63,41 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
+
+const (
+	lowPriority  = int32(10)
+	midPriority  = int32(100)
+	highPriority = int32(1000)
+)
+
+type candidate struct {
+	victims                *extenderv1.Victims
+	name                   string
+	numPodGroupDisruptions int
+}
+
+var _ fwk.Candidate = &candidate{}
+
+func (s *candidate) Victims() *extenderv1.Victims {
+	return s.victims
+}
+
+func (s *candidate) Name() string {
+	return s.name
+}
+
+func (s *candidate) NumPodGroupDisruptions() int {
+	return s.numPodGroupDisruptions
+}
+
+var veryLargeRes = map[v1.ResourceName]string{
+	v1.ResourceCPU:    "500m",
+	v1.ResourceMemory: "500",
+}
+
+func init() {
+	metrics.Register()
+}
 
 type fakeHandleForLister struct {
 	fwk.Handle
@@ -318,7 +353,7 @@ func TestPrepareCandidate(t *testing.T) {
 	tests := []struct {
 		name                       string
 		nodeNames                  []string
-		candidate                  Candidate
+		candidate                  fwk.Candidate
 		preemptor                  *v1.Pod
 		preemptorPodGroup          *schedulingv1beta1.PodGroup
 		preemptorCompositePodGroup *schedulingv1alpha3.CompositePodGroup
@@ -909,7 +944,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		candidate  Candidate
+		candidate  fwk.Candidate
 		lastVictim *v1.Pod
 		preemptor  *v1.Pod
 	}{
@@ -984,7 +1019,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 						defer apiDispatcher.Close()
 					}
 
-					fwk, err := tf.NewFramework(
+					f, err := tf.NewFramework(
 						ctx,
 						registeredPlugins, "",
 						frameworkruntime.WithClientSet(cs),
@@ -1003,10 +1038,10 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					informerFactory.Start(ctx.Done())
 					if asyncAPICallsEnabled {
 						cache := internalcache.New(ctx, apiDispatcher, false, false)
-						fwk.SetAPICacher(apicache.New(nil, cache))
+						f.SetAPICacher(apicache.New(nil, cache))
 					}
 
-					executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: true})
+					executor := NewExecutor(f, feature.Features{EnableAsyncPreemption: true})
 
 					expectedPreemptorUID := tt.preemptor.UID
 					switch preemptorType {
@@ -1018,7 +1053,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					// preemptPodCallsCounter helps verify if the last victim pod gets preempted after other victims.
 					preemptPodCallsCounter := 0
 					preemptFunc := executor.PreemptPod
-					executor.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
+					executor.PreemptPod = func(ctx context.Context, c fwk.Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 						// Verify contents of the sets: preempting and lastVictimsPendingPreemption before preemption of subsequent pods.
 						executor.mu.RLock()
 						preemptPodCallsCounter++
@@ -1679,7 +1714,7 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
 
-			fwk, err := tf.NewFramework(
+			f, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
@@ -1700,17 +1735,17 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			var cancelVictim context.CancelCauseFunc
 			if tt.addVictimToPrebind {
 				victimCtx, cancelVictim = context.WithCancelCause(context.Background())
-				fwk.AddPodInPreBind(tt.inMemoryVictim.UID, cancelVictim)
+				f.AddPodInPreBind(tt.inMemoryVictim.UID, cancelVictim)
 			}
 			if tt.addVictimToWaiting {
-				pluginsWaitTime, status := fwk.RunPermitPlugins(ctx, framework.NewCycleState(), tt.inMemoryVictim, "node1")
+				pluginsWaitTime, status := f.RunPermitPlugins(ctx, framework.NewCycleState(), tt.inMemoryVictim, "node1")
 				if !status.IsWait() {
 					t.Fatalf("Failed to add a pod to waiting list")
 				}
-				fwk.AddWaitingPod(tt.inMemoryVictim, pluginsWaitTime)
+				f.AddWaitingPod(tt.inMemoryVictim, pluginsWaitTime)
 			}
 
-			executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: true})
+			executor := NewExecutor(f, feature.Features{EnableAsyncPreemption: true})
 			fakeActivator.isPreempting = func() bool {
 				executor.mu.RLock()
 				defer executor.mu.RUnlock()
@@ -1718,10 +1753,10 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			}
 			if tt.addVictimToPrebindOnPreempt {
 				preemptFunc := executor.PreemptPod
-				executor.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
+				executor.PreemptPod = func(ctx context.Context, c fwk.Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 					if victim.UID == tt.inMemoryVictim.UID {
 						victimCtx, cancelVictim = context.WithCancelCause(context.Background())
-						fwk.AddPodInPreBind(victim.UID, cancelVictim)
+						f.AddPodInPreBind(victim.UID, cancelVictim)
 					}
 					return preemptFunc(ctx, c, preemptor, victim, pluginName)
 				}
@@ -1995,7 +2030,7 @@ func capturePreemptionMetricsState(g componentmetrics.Gatherer, preemptorType st
 	}
 }
 
-func verifyPreemptionMetricsDelta(t *testing.T, reg componentmetrics.KubeRegistry, preemptor ExecutorPreemptor, c Candidate, before preemptionMetricsState) {
+func verifyPreemptionMetricsDelta(t *testing.T, reg componentmetrics.KubeRegistry, preemptor ExecutorPreemptor, c fwk.Candidate, before preemptionMetricsState) {
 	t.Helper()
 	after := capturePreemptionMetricsState(reg, preemptor.Type())
 

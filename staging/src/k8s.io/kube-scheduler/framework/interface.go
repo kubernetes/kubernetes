@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 )
 
 // Code is the Status code/type which is returned from plugins.
@@ -962,6 +963,53 @@ type Handle interface {
 
 	// SignPod creates a PodSignature for a pod.
 	SignPod(ctx context.Context, pod *v1.Pod) PodSignature
+
+	// PreemptionManager returns PreemptionManager that can be used to customize preemption logic.
+	PreemptionManager() PreemptionManager
+}
+
+// PreemptionManager is an interface that allows customization of the preemption logic.
+type PreemptionManager interface {
+	// GenerateVictims generates candidate victims for the PodGroup preemption.
+	GenerateVictims(ctx context.Context, pgInfo PodGroupInfo) ([]Victim, error)
+	// Executor returns a PreemptionExecutor that can be used to actuate preemption or check preemption status.
+	Executor() PreemptionExecutor
+}
+
+// Victim represents a preemption unit that abstracts individual Pods and PodGroups,
+// ensuring that atomic entities are treated as a single unit during eviction.
+type Victim interface {
+	// Pods returns the list of all Pods that belong to this preemption unit.
+	// Evicting this unit implies evicting all Pods in this list.
+	Pods() []PodInfo
+
+	// NumPDBViolations returns the number of PDB violations that evicting this victim would cause.
+	// This value is used for metrics and doesn't impact victim's selection.
+	NumPDBViolations() int
+}
+
+// PreemptionExecutor is an interface that provides preemption actuation and tracking operations.
+type PreemptionExecutor interface {
+	// IsPodRunningPreemption returns true if the pod is currently triggering preemption asynchronously.
+	IsPodRunningPreemption(podUID types.UID) bool
+	// IsPodGroupRunningPreemption returns true if the pod group is currently triggering preemption asynchronously.
+	IsPodGroupRunningPreemption(podGroupUID types.UID) bool
+	// ActuatePodPreemption actuates preemption for a single pod given the selected candidate.
+	ActuatePodPreemption(ctx context.Context, candidate Candidate, pod *v1.Pod, pluginName string) *Status
+	// ActuatePodGroupPreemption actuates preemption for a pod group given the selected candidate.
+	ActuatePodGroupPreemption(ctx context.Context, candidate Candidate, pgInfo PodGroupInfo, pluginName string) *Status
+}
+
+// Candidate represents a nominated node on which the preemptor can be scheduled,
+// along with the list of victims that should be evicted for the preemptor to fit the node.
+type Candidate interface {
+	// Victims wraps a list of to-be-preempted Pods and the number of PDB violation.
+	Victims() *extenderv1.Victims
+	// Name returns the target node name (or "cluster" for pod group preemption) where the preemptor gets nominated to run.
+	Name() string
+	// NumPodGroupDisruptions returns the number of preemption units that affect pod groups.
+	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
+	NumPodGroupDisruptions() int
 }
 
 // Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.

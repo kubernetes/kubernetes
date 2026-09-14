@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
+	preemptionmanager "k8s.io/kubernetes/pkg/scheduler/framework/preemption/manager"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
@@ -491,8 +491,12 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 							return nil, fmt.Errorf("unexpected plugin type %T", p)
 						}
 
-						preemptPodFn := preemptionPlugin.Executor.PreemptPod
-						preemptionPlugin.Executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
+						executor, ok := preemptionPlugin.Executor.(*preemptionmanager.Executor)
+						if !ok {
+							return nil, fmt.Errorf("unexpected executor type %T", preemptionPlugin.Executor)
+						}
+						preemptPodFn := executor.PreemptPod
+						executor.PreemptPod = func(ctx context.Context, c fwk.Candidate, preemptor preemptionmanager.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 							// block the preemption goroutine to complete until the test case allows it to proceed.
 							lock.Lock()
 							ch, ok := preemptionDoneChannels[preemptor.GetName()]

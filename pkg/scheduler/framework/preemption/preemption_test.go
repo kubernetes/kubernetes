@@ -37,6 +37,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	componentmetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -83,7 +84,7 @@ func (pl *FakePostFilterPlugin) GetOffsetAndNumCandidates(nodes int32) (int32, i
 	return 0, nodes
 }
 
-func (pl *FakePostFilterPlugin) CandidatesToVictimsMap(candidates []Candidate) map[string]*extenderv1.Victims {
+func (pl *FakePostFilterPlugin) CandidatesToVictimsMap(candidates []fwk.Candidate) map[string]*extenderv1.Victims {
 	return nil
 }
 
@@ -110,7 +111,7 @@ func (pl *FakePreemptionScorePostFilterPlugin) GetOffsetAndNumCandidates(nodes i
 	return 0, nodes
 }
 
-func (pl *FakePreemptionScorePostFilterPlugin) CandidatesToVictimsMap(candidates []Candidate) map[string]*extenderv1.Victims {
+func (pl *FakePreemptionScorePostFilterPlugin) CandidatesToVictimsMap(candidates []fwk.Candidate) map[string]*extenderv1.Victims {
 	m := make(map[string]*extenderv1.Victims, len(candidates))
 	for _, c := range candidates {
 		m[c.Name()] = c.Victims()
@@ -146,7 +147,7 @@ func TestDryRunPreemption(t *testing.T) {
 		preemptors         []*v1.Pod
 		initPods           []*v1.Pod
 		numViolatingVictim int
-		expected           [][]Candidate
+		expected           [][]fwk.Candidate
 	}{
 		{
 			name: "no pdb violation",
@@ -161,7 +162,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj(),
 			},
-			expected: [][]Candidate{
+			expected: [][]fwk.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -192,7 +193,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj(),
 			},
 			numViolatingVictim: 1,
-			expected: [][]Candidate{
+			expected: [][]fwk.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -266,7 +267,7 @@ func TestDryRunPreemption(t *testing.T) {
 					PluginName: "FakePostFilter",
 					Handler:    fwk,
 					Interface:  fakePostPlugin,
-					executor:   NewExecutor(fwk, feature.Features{}),
+					executor:   nil,
 				}
 				got, _, _ := pe.DryRunPreemption(ctx, state, preemptor, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
@@ -369,7 +370,7 @@ func TestSelectCandidate(t *testing.T) {
 					PluginName: "FakePreemptionScorePostFilter",
 					Handler:    fwk,
 					Interface:  fakePreemptionScorePostFilterPlugin,
-					executor:   NewExecutor(fwk, feature.Features{}),
+					executor:   nil,
 				}
 				candidates, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				s := pe.SelectCandidate(ctx, candidates)
@@ -488,8 +489,8 @@ func TestCallExtenders(t *testing.T) {
 			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 			Obj()
-		makeCandidates = func(nodeName string, pods ...*v1.Pod) []Candidate {
-			return []Candidate{
+		makeCandidates = func(nodeName string, pods ...*v1.Pod) []fwk.Candidate {
+			return []fwk.Candidate{
 				&candidate{
 					name: nodeName,
 					victims: &extenderv1.Victims{
@@ -502,9 +503,9 @@ func TestCallExtenders(t *testing.T) {
 	tests := []struct {
 		name           string
 		extenders      []fwk.Extender
-		candidates     []Candidate
+		candidates     []fwk.Candidate
 		wantStatus     *fwk.Status
-		wantCandidates []Candidate
+		wantCandidates []fwk.Candidate
 	}{
 		{
 			name:           "no extenders",
@@ -529,7 +530,7 @@ func TestCallExtenders(t *testing.T) {
 			},
 			candidates:     makeCandidates(node1Name, victim),
 			wantStatus:     fwk.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", node1Name)),
-			wantCandidates: []Candidate{},
+			wantCandidates: []fwk.Candidate{},
 		},
 		{
 			name: "one extender does not support preemption",
@@ -548,7 +549,7 @@ func TestCallExtenders(t *testing.T) {
 			},
 			candidates:     makeCandidates(node1Name, victim),
 			wantStatus:     nil,
-			wantCandidates: []Candidate{},
+			wantCandidates: []fwk.Candidate{},
 		},
 		{
 			name: "one extender returns error and is ignorable",
@@ -575,9 +576,9 @@ func TestCallExtenders(t *testing.T) {
 			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true),
 			},
-			candidates:     []Candidate{},
+			candidates:     []fwk.Candidate{},
 			wantStatus:     nil,
-			wantCandidates: []Candidate{},
+			wantCandidates: []fwk.Candidate{},
 		},
 	}
 
@@ -1012,10 +1013,12 @@ func TestGetVictimsOnNode(t *testing.T) {
 			if tt.enableCompositePodGroup {
 				cpgSnapshot = fw.MutableSnapshotSharedLister().CompositePodGroups()
 			}
+			fts := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
 			pe := Evaluator{
 				PluginName:                "TestPlugin",
 				Handler:                   fw,
-				executor:                  NewExecutor(fw, feature.Features{EnableGenericWorkload: tt.enableGenericWorkload, EnableCompositePodGroup: tt.enableCompositePodGroup}),
+				executor:                  nil,
+				fts:                       fts,
 				podGroupSnapshot:          fw.MutableSnapshotSharedLister().PodGroups(),
 				compositePodGroupSnapshot: cpgSnapshot,
 			}
@@ -1043,7 +1046,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 				}
 				sort.Strings(podNames)
 				var nodes []string
-				for n := range v.affectedNodes {
+				for n := range v.AffectedNodes() {
 					nodes = append(nodes, n)
 				}
 				sort.Strings(nodes)
@@ -1073,6 +1076,14 @@ func TestGetVictimsOnNode(t *testing.T) {
 
 type evaluationDurationMetricState struct {
 	count uint64
+}
+
+func getHistogramFromGatherer(g componentmetrics.Gatherer, name string, labels map[string]string) (count uint64, sum float64, err error) {
+	hist, err := testutil.GetHistogramVecFromGatherer(g, name, labels)
+	if err != nil {
+		return 0, 0, err
+	}
+	return hist.GetAggregatedSampleCount(), hist.GetAggregatedSampleSum(), nil
 }
 
 func captureEvaluationDurationMetric(g componentmetrics.Gatherer, preemptorType string, status string) evaluationDurationMetricState {
@@ -1146,7 +1157,7 @@ func TestPreemptionEvaluationDurationMetric(t *testing.T) {
 				podEligible: tt.podEligible,
 			}
 
-			pe := NewEvaluator("FakePostFilter", fh, customInterface, NewExecutor(fh, feature.Features{}))
+			pe := NewEvaluator("FakePostFilter", fh, customInterface, nil, feature.Features{})
 
 			state := framework.NewCycleState()
 			m := framework.NewNodeToStatus(
