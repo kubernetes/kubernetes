@@ -1683,6 +1683,72 @@ func TestNegateRoundTrip(t *testing.T) {
 	}
 }
 
+func TestQuantityAsInt64(t *testing.T) {
+	negatedMostNegative := *NewQuantity(math.MinInt64, DecimalSI)
+	negatedMostNegative.Neg()
+
+	table := []struct {
+		name  string
+		in    Quantity
+		value int64
+		ok    bool
+	}{
+		{"zero", Quantity{Format: DecimalSI}, 0, true},
+		{"small integer", MustParse("5"), 5, true},
+		{"scaled integer", MustParse("50k"), 50000, true},
+		{"max int64", MustParse("9223372036854775807"), math.MaxInt64, true},
+		{"min int64", MustParse("-9223372036854775808"), math.MinInt64, true},
+
+		// Fractional digits are reported as a failed conversion even when the
+		// value is an exact integer.
+		{"integral but fractionally scaled", MustParse("1000m"), 0, false},
+		{"fractional", MustParse("1500m"), 0, false},
+		{"fractional decimal", MustParse("1.5"), 0, false},
+
+		{"overflows positive", MustParse("100E"), math.MaxInt64, false},
+		{"overflows negative", MustParse("-100E"), math.MinInt64, false},
+		{"overflows by exponent", MustParse("1e30"), math.MaxInt64, false},
+		{"overflows after negation", negatedMostNegative, math.MaxInt64, false},
+
+		// The binary suffixes cap at the int64 rails while parsing, so the
+		// stored value is exact and converts.
+		{"binary cap", MustParse("8Ei"), math.MaxInt64, true},
+		{"negative binary cap", MustParse("-8Ei"), -math.MaxInt64, true},
+		{"binary cap past 8Ei", MustParse("9Ei"), math.MaxInt64, true},
+		{"binary cap far past 8Ei", MustParse("100Ei"), math.MaxInt64, true},
+		{"binary cap from Ti", MustParse("8388608Ti"), math.MaxInt64, true},
+		{"binary cap from Ki", MustParse("9223372036854775807Ki"), math.MaxInt64, true},
+
+		// Decimal parsing rounds to nano instead, leaving fractional digits.
+		{"overflows and parses to nano scale", MustParse("9223372036854775808"), 0, false},
+	}
+
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			in := item.in.DeepCopy()
+			value, ok := in.AsInt64()
+			if value != item.value || ok != item.ok {
+				t.Errorf("AsInt64() = (%d, %t), want (%d, %t)", value, ok, item.value, item.ok)
+			}
+
+			for _, promote := range []struct {
+				name string
+				fn   func(*Quantity)
+			}{
+				{"ToDec", func(q *Quantity) { q.ToDec() }},
+				{"AsDec", func(q *Quantity) { q.AsDec() }},
+			} {
+				promoted := item.in.DeepCopy()
+				promote.fn(&promoted)
+				got, gotOK := promoted.AsInt64()
+				if got != value || gotOK != ok {
+					t.Errorf("after %s(): AsInt64() = (%d, %t), want the int64 backend's (%d, %t)", promote.name, got, gotOK, value, ok)
+				}
+			}
+		})
+	}
+}
+
 func TestQuantityAsApproximateFloat64(t *testing.T) {
 	// NOTE: this table should be kept in sync with TestQuantityAsFloat64Slow
 	table := []struct {
