@@ -1194,5 +1194,5 @@ func TestNoEventIfResultDoesNotChange(t *testing.T) {
 
 	_ = w.doProbe(ctx)
 
-	require.Len(t, recorder.Events, 0)
+	require.Empty(t, recorder.Events)
 }
