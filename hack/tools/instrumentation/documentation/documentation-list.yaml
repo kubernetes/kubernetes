@@ -3028,12 +3028,14 @@
   - component: kube-apiserver
     endpoint: /metrics
 - name: etcd_request_errors_total
-  help: Etcd failed request counts for each operation and object type.
+  help: Etcd failed request counts for each operation and object type. Reason response
+    to grpc status, or transaction conflict.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - group
   - operation
+  - reason
   - resource
   componentEndpoints:
   - component: kube-apiserver

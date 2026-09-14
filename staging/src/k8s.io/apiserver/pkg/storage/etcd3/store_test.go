@@ -525,6 +525,101 @@ apiserver_storage_list_total{group="",index="",resource="pods",storage="etcd"} 1
 	}
 }
 
+func TestMutationMetrics(t *testing.T) {
+	metrics.Register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	ctx, store, _ := testSetup(t)
+
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns"}}
+	created := &example.Pod{}
+	if err := store.Create(ctx, computePodKey(pod), pod, created, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	// Non-mutating Get -> 1 get.
+	fetched := &example.Pod{}
+	if err := store.Get(ctx, computePodKey(pod), storage.GetOptions{}, fetched); err != nil {
+		t.Fatal(err)
+	}
+
+	// Canceled Get -> 1 get, 1 Canceled error.
+	canceledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	if err := store.Get(canceledCtx, computePodKey(pod), storage.GetOptions{}, fetched); err == nil {
+		t.Fatal("expected error from canceled context")
+	}
+
+	// 1. Update with up-to-date cachedExistingObject -> 0 updateGet, 1 update.
+	updated := &example.Pod{}
+	err := store.GuaranteedUpdate(ctx, computePodKey(pod), updated, false, nil, func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		obj := input.(*example.Pod).DeepCopy()
+		obj.Labels = map[string]string{"v": "1"}
+		return obj, nil, nil
+	}, created)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. Update with stale cachedExistingObject (created) -> 0 updateGet, 2 update, 1 conflict error.
+	err = store.GuaranteedUpdate(ctx, computePodKey(pod), updated, false, nil, func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		obj := input.(*example.Pod).DeepCopy()
+		obj.Labels = map[string]string{"v": "2"}
+		return obj, nil, nil
+	}, created)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. Update without cachedExistingObject -> 1 updateGet, 1 update.
+	err = store.GuaranteedUpdate(ctx, computePodKey(pod), updated, false, nil, func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		obj := input.(*example.Pod).DeepCopy()
+		obj.Labels = map[string]string{"v": "3"}
+		return obj, nil, nil
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 4. Delete with stale cachedExistingObject (created) -> 0 deleteGet, 2 delete, 1 conflict error.
+	deleted := &example.Pod{}
+	err = store.Delete(ctx, computePodKey(pod), deleted, nil, storage.ValidateAllObjectFunc, created, storage.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 5. Recreate and Delete without cachedExistingObject -> 1 deleteGet, 1 delete.
+	if err := store.Create(ctx, computePodKey(pod), pod, created, 0); err != nil {
+		t.Fatal(err)
+	}
+	err = store.Delete(ctx, computePodKey(pod), deleted, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := `# HELP etcd_request_errors_total [ALPHA] Etcd failed request counts for each operation and object type. Reason response to grpc status, or transaction conflict.
+# TYPE etcd_request_errors_total counter
+etcd_request_errors_total{group="",operation="delete",reason="Conflict",resource="pods"} 1
+etcd_request_errors_total{group="",operation="get",reason="Canceled",resource="pods"} 1
+etcd_request_errors_total{group="",operation="update",reason="Conflict",resource="pods"} 1
+# HELP etcd_requests_total [ALPHA] Etcd request counts for each operation and object type.
+# TYPE etcd_requests_total counter
+etcd_requests_total{group="",operation="create",resource="pods"} 2
+etcd_requests_total{group="",operation="delete",resource="pods"} 3
+etcd_requests_total{group="",operation="deleteGet",resource="pods"} 1
+etcd_requests_total{group="",operation="get",resource="pods"} 2
+etcd_requests_total{group="",operation="update",resource="pods"} 4
+etcd_requests_total{group="",operation="updateGet",resource="pods"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+		"etcd_requests_total",
+		"etcd_request_errors_total",
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestConsistentList(t *testing.T) {
 	for _, rangeStream := range []bool{false, true} {
 		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {
