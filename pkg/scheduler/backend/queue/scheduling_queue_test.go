@@ -2870,15 +2870,15 @@ func TestPriorityQueue_NominatedPodsForNode(t *testing.T) {
 		t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
 	}
 	expectedList := []fwk.PodInfo{medPriorityPodInfo, unschedulablePodInfo}
-	podInfos := q.NominatedPodsForNode("node1")
+	podInfos := q.NominatedPodsForNode(logger, "node1")
 	if diff := cmp.Diff(expectedList, podInfos, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 		t.Errorf("Unexpected list of nominated Pods for node: (-want, +got):\n%s", diff)
 	}
 	podInfos[0].GetPod().Name = "not mpp"
-	if diff := cmp.Diff(podInfos, q.NominatedPodsForNode("node1"), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff == "" {
+	if diff := cmp.Diff(podInfos, q.NominatedPodsForNode(logger, "node1"), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff == "" {
 		t.Error("Expected list of nominated Pods for node2 is different from podInfos")
 	}
-	if len(q.NominatedPodsForNode("node2")) != 0 {
+	if len(q.NominatedPodsForNode(logger, "node2")) != 0 {
 		t.Error("Expected list of nominated Pods for node2 to be empty.")
 	}
 }
@@ -2929,7 +2929,7 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 
 			q.AddNominatedPod(logger, tt.podInfo, nil)
 
-			if got := len(q.NominatedPodsForNode(tt.podInfo.Pod.Status.NominatedNodeName)); got != tt.wantLen {
+			if got := len(q.NominatedPodsForNode(logger, tt.podInfo.Pod.Status.NominatedNodeName)); got != tt.wantLen {
 				t.Errorf("Expected %v nominated pods for node, but got %v", tt.wantLen, got)
 			}
 		})
@@ -3664,7 +3664,7 @@ func TestFlushUnschedulablePodsLeftoverSetsFlag_GatedPod(t *testing.T) {
 			if queueSizes[tt.wantQ] == 0 {
 				t.Errorf("Pod not found in %s", tt.wantQ)
 			}
-			actualPod, ok := q.GetPod(podInfo.Pod.Name, podInfo.Pod.Namespace, nil)
+			actualPod, ok := q.GetPod(ctx, podInfo.Pod.Name, podInfo.Pod.Namespace, nil)
 			if !ok {
 				t.Fatalf("Pod not found in scheduling queue")
 			}
@@ -6626,7 +6626,7 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pInfo, ok := q.GetPod(tt.podName, tt.namespace, nil)
+			pInfo, ok := q.GetPod(ctx, tt.podName, tt.namespace, nil)
 			if ok != tt.expectedOK {
 				t.Errorf("Expected ok=%v, but got ok=%v", tt.expectedOK, ok)
 			}
@@ -6922,7 +6922,7 @@ func TestPriorityQueue_AddComputesSignature(t *testing.T) {
 	pod := st.MakePod().Name("pod1").SchedulerName("default-scheduler").Label("key", "value1").Obj()
 	q.Add(tCtx, pod)
 
-	pInfo, exists := q.GetPod(pod.Name, pod.Namespace, nil)
+	pInfo, exists := q.GetPod(tCtx, pod.Name, pod.Namespace, nil)
 	if !exists {
 		t.Fatal("Pod not found in queue after Add")
 	}
@@ -6990,7 +6990,7 @@ func TestPriorityQueue_UpdateRecomputesSignature(t *testing.T) {
 			q.Update(tCtx, pod1, pod2)
 
 			// Check signature was recomputed
-			pInfo, exists := q.GetPod(pod2.Name, pod2.Namespace, nil)
+			pInfo, exists := q.GetPod(tCtx, pod2.Name, pod2.Namespace, nil)
 			if !exists {
 				t.Fatal("Pod not found in queue after update")
 			}
@@ -7025,9 +7025,9 @@ func TestPriorityQueue_MultipleProfiles(t *testing.T) {
 	q.Add(ctx, pod2)
 	q.Add(ctx, pod3)
 
-	pInfo1, _ := q.GetPod(pod1.Name, pod1.Namespace, nil)
-	pInfo2, _ := q.GetPod(pod2.Name, pod2.Namespace, nil)
-	pInfo3, _ := q.GetPod(pod3.Name, pod3.Namespace, nil)
+	pInfo1, _ := q.GetPod(ctx, pod1.Name, pod1.Namespace, nil)
+	pInfo2, _ := q.GetPod(ctx, pod2.Name, pod2.Namespace, nil)
+	pInfo3, _ := q.GetPod(ctx, pod3.Name, pod3.Namespace, nil)
 
 	if !bytes.Equal(pInfo1.PodSignature, fwk.PodSignature("sig-scheduler-1")) {
 		t.Errorf("Pod1: expected 'sig-scheduler-1', got '%s'", string(pInfo1.PodSignature))

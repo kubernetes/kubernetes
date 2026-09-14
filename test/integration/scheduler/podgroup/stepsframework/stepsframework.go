@@ -274,7 +274,7 @@ func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod, prese
 		if preserveOrder {
 			podSchedulingAttemptedFn := podSchedulingAttempted(cs, ns, p.Name)
 			err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-				_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
+				_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(ctx, p.Name, p.Namespace, p.Spec.SchedulingGroup)
 				if ok {
 					return true, nil
 				}
@@ -693,7 +693,7 @@ func verifyAssignedInOneDomain(testCtx *testutils.TestContext, ns string, verify
 func verifyPodSchedulingAttempts(testCtx *testutils.TestContext, ns string, check *VerifyPodsSchedulingAttempts) error {
 	podGroupName := check.PodGroupName
 	for _, podName := range check.PodNames {
-		pInfo, ok := testCtx.Scheduler.SchedulingQueue.GetPod(podName, ns, &v1.PodSchedulingGroup{
+		pInfo, ok := testCtx.Scheduler.SchedulingQueue.GetPod(testCtx.Ctx, podName, ns, &v1.PodSchedulingGroup{
 			PodGroupName: &podGroupName,
 		})
 		if !ok {
