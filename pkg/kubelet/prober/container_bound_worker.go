@@ -57,12 +57,15 @@ type containerBoundWorkerOptions struct {
 	adopted bool
 
 	onExit             func(*containerBoundWorker)
+	mutable            bool
 	onStartupSucceeded func(*containerBoundWorker)
 }
 
 // containerBoundWorker periodically probes a single container instance for its lifetime.
 // A restarted container is assigned a new worker instance.
 type containerBoundWorker struct {
+	mutable *mutableProbeState
+
 	probeTarget
 	probeType kubecontainer.ProbeType
 
@@ -129,12 +132,19 @@ func newContainerBoundWorker(ctx context.Context, opts containerBoundWorkerOptio
 
 	w.proberDurationMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 
+	if opts.mutable {
+		w.initMutable()
+	}
 	return w
 }
 
 // run probes the container until the worker is stopped or a probe result
 // terminates it. It is expected to be called in its own goroutine.
 func (w *containerBoundWorker) run() {
+	if w.mutable != nil {
+		w.runMutable()
+		return
+	}
 	defer func() {
 		w.cancel()
 		if w.onExit != nil {

@@ -2577,7 +2577,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	MutableCSINodeAllocatableCount: {},
 
-	MutableContainerProbes: {},
+	MutableContainerProbes: {ContainerScopedProbes},
 
 	MutablePVNodeAffinity: {},
 

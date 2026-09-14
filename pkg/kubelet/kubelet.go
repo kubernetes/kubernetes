@@ -2168,7 +2168,9 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			// false until live probes establish the state of each container.
 		}
 		// Seed adopted containers before status generation to preserve Started and Ready.
-		kl.probeManager.EnsureProbes(ctx, probePod, podStatus)
+		if !utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) || !kl.podWorkers.IsPodTerminationRequested(pod.UID) {
+			kl.probeManager.EnsureProbes(ctx, probePod, podStatus)
+		}
 	}
 
 	// Generate final API pod status with pod and status manager status
@@ -2884,10 +2886,16 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		logger.V(4).Info("SyncLoop (SYNC) pods", "total", len(podsToSync), "pods", klog.KObjSlice(podsToSync))
 		handler.HandlePodSyncs(ctx, podsToSync)
 	case update := <-kl.livenessManager.Updates():
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) && !kl.livenessManager.IsCurrent(update) {
+			break
+		}
 		if update.Result == proberesults.Failure {
 			handleProbeSync(ctx, kl, update, handler, "liveness", "unhealthy")
 		}
 	case update := <-kl.readinessManager.Updates():
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) && !kl.readinessManager.IsCurrent(update) {
+			break
+		}
 		ready := update.Result == proberesults.Success
 		kl.statusManager.SetContainerReadiness(logger, update.PodUID, update.ContainerID, ready)
 
@@ -2897,6 +2905,9 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		}
 		handleProbeSync(ctx, kl, update, handler, "readiness", status)
 	case update := <-kl.startupManager.Updates():
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) && !kl.startupManager.IsCurrent(update) {
+			break
+		}
 		started := update.Result == proberesults.Success
 		kl.statusManager.SetContainerStartup(logger, update.PodUID, update.ContainerID, started)
 
