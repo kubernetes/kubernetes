@@ -588,6 +588,10 @@ func GetAliasesCommandGroup(kubectl *cobra.Command, kuberc *config.Preference) t
 // registerAliasCommand allows adding Cobra command to the command tree or extracting them for usage in
 // e.g. the help function or for registering the completion function
 func registerAliasCommands(kubectl *cobra.Command, kuberc *config.Preference) (cmds []*cobra.Command) {
+	if kuberc == nil {
+		return []*cobra.Command{}
+	}
+
 	userDefinedCommands := []*cobra.Command{}
 	for _, alias := range kuberc.Aliases {
 		_, err := BuildAliasCommand(kubectl, alias)

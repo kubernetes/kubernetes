@@ -3341,7 +3341,11 @@ func TestRegisterAliasCommands(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 
-			group := GetAliasesCommandGroup(rootCmd, pref, test.args)
+			prefs, err := pref.Read(test.args, io.Discard)
+			if err != nil {
+				t.Fatalf("error occurred while reading preferences %v\n", err)
+			}
+			group := GetAliasesCommandGroup(rootCmd, prefs)
 
 			if len(group.Commands) != test.expectedCmdCount {
 				t.Fatalf("expected %d command(s), got %d", test.expectedCmdCount, len(group.Commands))
