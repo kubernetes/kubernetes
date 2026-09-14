@@ -36,7 +36,7 @@ type StatefulSetSpecApplyConfiguration struct {
 	// TODO: Consider a rename of this field.
 	Replicas *int32 `json:"replicas,omitempty"`
 	// selector is a label query over pods that should match the replica count.
-	// If empty, defaulted to labels on the pod template.
+	// It must match the pod template's labels.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	Selector *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
 	// template is the object that describes the pod that will be created if
@@ -78,8 +78,8 @@ type StatefulSetSpecApplyConfiguration struct {
 	// consists of all revisions not represented by a currently applied
 	// StatefulSetSpec version. The default value is 10.
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
-	// minReadySeconds is the minimum number of seconds for which a newly created pod should be ready
-	// without any of its container crashing for it to be considered available.
+	// minReadySeconds is the minimum number of seconds for which a newly created pod should
+	// be ready without any of its container crashing for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
 	// persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent

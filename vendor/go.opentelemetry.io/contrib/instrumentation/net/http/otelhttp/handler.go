@@ -35,10 +35,6 @@ type middleware struct {
 	semconv semconv.HTTPServer
 }
 
-func defaultHandlerFormatter(operation string, _ *http.Request) string {
-	return operation
-}
-
 // NewHandler wraps the passed handler in a span named after the operation and
 // enriches it with metrics.
 func NewHandler(handler http.Handler, operation string, opts ...Option) http.Handler {
@@ -55,11 +51,16 @@ func NewMiddleware(operation string, opts ...Option) func(http.Handler) http.Han
 
 	defaultOpts := []Option{
 		WithSpanOptions(trace.WithSpanKind(trace.SpanKindServer)),
-		WithSpanNameFormatter(defaultHandlerFormatter),
 	}
 
 	c := newConfig(append(defaultOpts, opts...)...)
 	h.configure(c)
+
+	if h.spanNameFormatter == nil {
+		h.spanNameFormatter = func(_ string, r *http.Request) string {
+			return h.semconv.SpanName(r)
+		}
+	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +139,13 @@ func (h *middleware) serveHTTP(w http.ResponseWriter, r *http.Request, next http
 	// ReadCloser fulfills a certain interface and it is indeed nil or NoBody.
 	bw := request.NewBodyWrapper(r.Body, readRecordFunc)
 	if r.Body != nil && r.Body != http.NoBody {
+		origReq := r
+		prevBody := r.Body
 		r.Body = bw
+
+		// Restore the original body after the request is processed to avoid issues
+		// with extra wrapper since `http/server.go` later checks type of `r.Body`.
+		defer func() { origReq.Body = prevBody }()
 	}
 
 	writeRecordFunc := func(int64) {}
@@ -184,30 +191,26 @@ func (h *middleware) serveHTTP(w http.ResponseWriter, r *http.Request, next http
 	statusCode := rww.StatusCode()
 	bytesWritten := rww.BytesWritten()
 	span.SetStatus(h.semconv.Status(statusCode))
+	bytesRead := bw.BytesRead()
 	span.SetAttributes(h.semconv.ResponseTraceAttrs(semconv.ResponseTelemetry{
 		StatusCode: statusCode,
-		ReadBytes:  bw.BytesRead(),
+		ReadBytes:  bytesRead,
 		ReadError:  bw.Error(),
 		WriteBytes: bytesWritten,
 		WriteError: rww.Error(),
 	})...)
 
-	// Use floating point division here for higher precision (instead of Millisecond method).
-	elapsedTime := float64(time.Since(requestStartTime)) / float64(time.Millisecond)
-
-	metricAttributes := semconv.MetricAttributes{
-		Req:                  r,
-		StatusCode:           statusCode,
-		AdditionalAttributes: append(labeler.Get(), h.metricAttributesFromRequest(r)...),
-	}
-
 	h.semconv.RecordMetrics(ctx, semconv.ServerMetricData{
-		ServerName:       h.server,
-		ResponseSize:     bytesWritten,
-		MetricAttributes: metricAttributes,
+		ServerName:   h.server,
+		ResponseSize: bytesWritten,
+		MetricAttributes: semconv.MetricAttributes{
+			Req:                  r,
+			StatusCode:           statusCode,
+			AdditionalAttributes: append(labeler.Get(), h.metricAttributesFromRequest(r)...),
+		},
 		MetricData: semconv.MetricData{
-			RequestSize: bw.BytesRead(),
-			ElapsedTime: elapsedTime,
+			RequestSize:     bytesRead,
+			RequestDuration: time.Since(requestStartTime),
 		},
 	})
 }

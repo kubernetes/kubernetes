@@ -221,22 +221,12 @@ var (
 	)
 )
 
+// init installs the adapter pointers (RequestLatency,
+// ClientCertExpiry, etc.) into client-go/tools/metrics and supplies
+// a RegisterFn callback that performs the legacyregistry.MustRegister calls.
+// The callback fires from metrics.EnsureRegistered which rest.RESTClientForConfigAndClient
+// invokes at first rest client construction.
 func init() {
-
-	legacyregistry.MustRegister(requestLatency)
-	legacyregistry.MustRegister(requestSize)
-	legacyregistry.MustRegister(responseSize)
-	legacyregistry.MustRegister(rateLimiterLatency)
-	legacyregistry.MustRegister(requestResult)
-	legacyregistry.MustRegister(requestRetry)
-	legacyregistry.RawMustRegister(execPluginCertTTL)
-	legacyregistry.MustRegister(execPluginCertRotation)
-	legacyregistry.MustRegister(execPluginCalls)
-	legacyregistry.MustRegister(transportCacheEntries)
-	legacyregistry.MustRegister(transportCacheCalls)
-	legacyregistry.MustRegister(transportCAReloads)
-	legacyregistry.MustRegister(transportCertRotationGCCalls)
-	legacyregistry.MustRegister(transportCacheGCCalls)
 	metrics.Register(metrics.RegisterOpts{
 		ClientCertExpiry:             execPluginCertTTLAdapter,
 		ClientCertRotationAge:        &rotationAdapter{m: execPluginCertRotation},
@@ -254,6 +244,22 @@ func init() {
 		TransportCAReloads:           &transportCAReloadsAdapter{m: transportCAReloads},
 		TransportCertRotationGCCalls: &transportCertRotationGCCallsAdapter{m: transportCertRotationGCCalls},
 		TransportCacheGCCalls:        &transportCacheGCCallsAdapter{m: transportCacheGCCalls},
+		RegisterFn: func() {
+			legacyregistry.MustRegister(requestLatency)
+			legacyregistry.MustRegister(requestSize)
+			legacyregistry.MustRegister(responseSize)
+			legacyregistry.MustRegister(rateLimiterLatency)
+			legacyregistry.MustRegister(requestResult)
+			legacyregistry.MustRegister(requestRetry)
+			legacyregistry.RawMustRegister(execPluginCertTTL)
+			legacyregistry.MustRegister(execPluginCertRotation)
+			legacyregistry.MustRegister(execPluginCalls)
+			legacyregistry.MustRegister(transportCacheEntries)
+			legacyregistry.MustRegister(transportCacheCalls)
+			legacyregistry.MustRegister(transportCAReloads)
+			legacyregistry.MustRegister(transportCertRotationGCCalls)
+			legacyregistry.MustRegister(transportCacheGCCalls)
+		},
 	})
 }
 
@@ -262,6 +268,7 @@ type latencyAdapter struct {
 }
 
 func (l *latencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
+	metrics.EnsureRegistered()
 	l.m.WithContext(ctx).WithLabelValues(verb, u.Host).Observe(latency.Seconds())
 }
 
@@ -270,6 +277,7 @@ type resolverLatencyAdapter struct {
 }
 
 func (l *resolverLatencyAdapter) Observe(ctx context.Context, host string, latency time.Duration) {
+	metrics.EnsureRegistered()
 	l.m.WithContext(ctx).WithLabelValues(host).Observe(latency.Seconds())
 }
 
@@ -278,6 +286,7 @@ type sizeAdapter struct {
 }
 
 func (s *sizeAdapter) Observe(ctx context.Context, verb string, host string, size float64) {
+	metrics.EnsureRegistered()
 	s.m.WithContext(ctx).WithLabelValues(verb, host).Observe(size)
 }
 
@@ -286,6 +295,7 @@ type resultAdapter struct {
 }
 
 func (r *resultAdapter) Increment(ctx context.Context, code, method, host string) {
+	metrics.EnsureRegistered()
 	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
 }
 
@@ -294,6 +304,7 @@ type expiryToTTLAdapter struct {
 }
 
 func (e *expiryToTTLAdapter) Set(expiry *time.Time) {
+	metrics.EnsureRegistered()
 	e.e = expiry
 }
 
@@ -302,6 +313,7 @@ type rotationAdapter struct {
 }
 
 func (r *rotationAdapter) Observe(d time.Duration) {
+	metrics.EnsureRegistered()
 	r.m.Observe(d.Seconds())
 }
 
@@ -310,6 +322,7 @@ type callsAdapter struct {
 }
 
 func (r *callsAdapter) Increment(code int, callStatus string) {
+	metrics.EnsureRegistered()
 	r.m.WithLabelValues(fmt.Sprintf("%d", code), callStatus).Inc()
 }
 
@@ -318,6 +331,7 @@ type policyAdapter struct {
 }
 
 func (r *policyAdapter) Increment(status string) {
+	metrics.EnsureRegistered()
 	r.m.WithLabelValues(status).Inc()
 }
 
@@ -326,6 +340,7 @@ type retryAdapter struct {
 }
 
 func (r *retryAdapter) IncrementRetry(ctx context.Context, code, method, host string) {
+	metrics.EnsureRegistered()
 	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
 }
 
@@ -334,6 +349,7 @@ type transportCacheAdapter struct {
 }
 
 func (t *transportCacheAdapter) Observe(value int) {
+	metrics.EnsureRegistered()
 	t.m.Set(float64(value))
 }
 
@@ -342,6 +358,7 @@ type transportCacheCallsAdapter struct {
 }
 
 func (t *transportCacheCallsAdapter) Increment(result string) {
+	metrics.EnsureRegistered()
 	t.m.WithLabelValues(result).Inc()
 }
 
@@ -350,6 +367,7 @@ type transportCAReloadsAdapter struct {
 }
 
 func (t *transportCAReloadsAdapter) Increment(result, reason string) {
+	metrics.EnsureRegistered()
 	t.m.WithLabelValues(result, reason).Inc()
 }
 
@@ -358,6 +376,7 @@ type transportCertRotationGCCallsAdapter struct {
 }
 
 func (t *transportCertRotationGCCallsAdapter) Increment() {
+	metrics.EnsureRegistered()
 	t.m.Inc()
 }
 
@@ -366,5 +385,6 @@ type transportCacheGCCallsAdapter struct {
 }
 
 func (t *transportCacheGCCallsAdapter) Increment(result string) {
+	metrics.EnsureRegistered()
 	t.m.WithLabelValues(result).Inc()
 }

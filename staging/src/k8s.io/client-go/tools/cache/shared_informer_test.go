@@ -1385,3 +1385,221 @@ func numOccurrences(hay, needle string) int {
 		hay = hay[index+len(needle):]
 	}
 }
+
+func TestRemoveEventHandler_AsynchronousPanic(t *testing.T) {
+	source := newFakeControllerSource(t)
+	informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
+
+	stop := make(chan struct{})
+	var wg wait.Group
+	wg.StartWithChannel(stop, informer.Run)
+	defer func() {
+		close(stop)
+		wg.Wait()
+	}()
+
+	scheduledPods := make(chan *v1.Pod, 1)
+	blockChan := make(chan struct{})
+	handlerStarted := make(chan struct{})
+	handlerFinished := make(chan struct{})
+	var panicVal any
+	var panicked bool
+
+	handler := ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			close(handlerStarted)
+			<-blockChan
+			defer close(handlerFinished)
+			defer func() {
+				if r := recover(); r != nil {
+					panicVal = r
+					panicked = true
+				}
+			}()
+			scheduledPods <- obj.(*v1.Pod)
+		},
+	}
+
+	handle, err := informer.AddEventHandler(handler)
+	if err != nil {
+		t.Fatalf("Failed to add event handler: %v", err)
+	}
+
+	// Trigger the event
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+
+	// Wait for handler to start and block
+	<-handlerStarted
+
+	// Now remove the handler. This should return immediately.
+	err = informer.RemoveEventHandler(handle)
+	if err != nil {
+		t.Fatalf("Failed to remove event handler: %v", err)
+	}
+
+	// Close the channel that the handler writes to
+	close(scheduledPods)
+
+	// Unblock the handler
+	close(blockChan)
+
+	// Wait for handler to finish
+	<-handlerFinished
+
+	if !panicked {
+		t.Fatalf("Expected handler to panic (send on closed channel), but it did not")
+	}
+	t.Logf("Caught expected panic: %v", panicVal)
+}
+
+func TestRemoveEventHandler_SynchronousShutdown(t *testing.T) {
+	source := newFakeControllerSource(t)
+	informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
+
+	stop := make(chan struct{})
+	var wg wait.Group
+	wg.StartWithChannel(stop, informer.Run)
+	defer func() {
+		close(stop)
+		wg.Wait()
+	}()
+
+	scheduledPods := make(chan *v1.Pod, 1)
+	blockChan := make(chan struct{})
+	handlerStarted := make(chan struct{})
+	handlerFinished := make(chan struct{})
+	var panicVal any
+	var panicked bool
+
+	handler := ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			close(handlerStarted)
+			<-blockChan
+			defer close(handlerFinished)
+			defer func() {
+				if r := recover(); r != nil {
+					panicVal = r
+					panicked = true
+				}
+			}()
+			scheduledPods <- obj.(*v1.Pod)
+		},
+	}
+
+	handle, err := informer.AddEventHandler(handler)
+	if err != nil {
+		t.Fatalf("Failed to add event handler: %v", err)
+	}
+
+	// Trigger the event
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+
+	// Wait for handler to start and block
+	<-handlerStarted
+
+	// Unblock the handler so it can run and exit
+	close(blockChan)
+
+	// Now remove the handler and wait for it to fully stop.
+	err = ShutDownEventHandler(informer, handle)
+	if err != nil {
+		t.Fatalf("Failed to shutdown event handler: %v", err)
+	}
+
+	// NOW it is safe to close the channel
+	close(scheduledPods)
+
+	// Wait for handler function to finish (should already be done)
+	<-handlerFinished
+
+	if panicked {
+		t.Fatalf("Handler panicked unexpectedly: %v", panicVal)
+	}
+}
+
+func TestShutDownEventHandler_Lifecycles(t *testing.T) {
+	t.Run("InformerNeverStarted", func(t *testing.T) {
+		source := newFakeControllerSource(t)
+		informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
+
+		handler := ResourceEventHandlerFuncs{
+			AddFunc: func(obj any) {},
+		}
+		handle, err := informer.AddEventHandler(handler)
+		if err != nil {
+			t.Fatalf("Failed to add event handler: %v", err)
+		}
+
+		// Shutdown should return immediately because the informer was never started.
+		err = ShutDownEventHandler(informer, handle)
+		if err != nil {
+			t.Fatalf("Failed to shutdown event handler: %v", err)
+		}
+	})
+
+	t.Run("StartedThenAddedThenShutDown", func(t *testing.T) {
+		source := newFakeControllerSource(t)
+		informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
+
+		stop := make(chan struct{})
+		var wg wait.Group
+		wg.StartWithChannel(stop, informer.Run)
+		defer func() {
+			close(stop)
+			wg.Wait()
+		}()
+
+		// Wait deterministically for the informer to sync (proving it has started)
+		syncCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if !WaitFor(syncCtx, "informer sync", informer.HasSyncedChecker()) {
+			t.Fatalf("Informer did not sync")
+		}
+
+		handler := ResourceEventHandlerFuncs{
+			AddFunc: func(obj any) {},
+		}
+		handle, err := informer.AddEventHandler(handler)
+		if err != nil {
+			t.Fatalf("Failed to add event handler: %v", err)
+		}
+
+		err = ShutDownEventHandler(informer, handle)
+		if err != nil {
+			t.Fatalf("Failed to shutdown event handler: %v", err)
+		}
+	})
+
+	t.Run("AddedThenStartedThenShutDown", func(t *testing.T) {
+		source := newFakeControllerSource(t)
+		informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
+
+		handler := ResourceEventHandlerFuncs{
+			AddFunc: func(obj any) {},
+		}
+		handle, err := informer.AddEventHandler(handler)
+		if err != nil {
+			t.Fatalf("Failed to add event handler: %v", err)
+		}
+
+		stop := make(chan struct{})
+		var wg wait.Group
+		wg.StartWithChannel(stop, informer.Run)
+		defer func() {
+			close(stop)
+			wg.Wait()
+		}()
+
+		// Wait deterministically for the informer to sync (proving it has started)
+		syncCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if !WaitFor(syncCtx, "informer sync", informer.HasSyncedChecker()) {
+			t.Fatalf("Informer did not sync")
+		}
+
+		err = ShutDownEventHandler(informer, handle)
+		if err != nil {
+			t.Fatalf("Failed to shutdown event handler: %v", err)
+		}
+	})
+}

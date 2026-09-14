@@ -19,12 +19,15 @@ package v1
 import (
 	"fmt"
 
+	certificatesv1 "k8s.io/api/certificates/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add field conversion funcs.
-	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("CertificateSigningRequest"),
+	err := scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("CertificateSigningRequest"),
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -35,4 +38,42 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 			}
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("while adding CertificateSigningRequest field label conversion func: %w", err)
+	}
+
+	err = scheme.AddFieldLabelConversionFunc(
+		SchemeGroupVersion.WithKind("ClusterTrustBundle"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name", "spec.signerName":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("while adding ClusterTrustBundle field label conversion func: %w", err)
+	}
+
+	err = scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("PodCertificateRequest"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name", "spec.signerName", "spec.podName", "spec.nodeName":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("while adding PodCertificateRequest field label conversion func: %w", err)
+	}
+
+	return nil
+}
+
+func Convert_certificates_PodCertificateRequestSpec_To_v1_PodCertificateRequestSpec(in *certificates.PodCertificateRequestSpec, out *certificatesv1.PodCertificateRequestSpec, s conversion.Scope) error {
+	return autoConvert_certificates_PodCertificateRequestSpec_To_v1_PodCertificateRequestSpec(in, out, s)
 }

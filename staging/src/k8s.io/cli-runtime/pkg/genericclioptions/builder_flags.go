@@ -56,10 +56,11 @@ func NewResourceBuilderFlags() *ResourceBuilderFlags {
 // WithFile sets the FileNameFlags.
 // If recurse is set, it will process directory recursively. Useful when you want to manage related manifests
 // organized within the same directory.
-func (o *ResourceBuilderFlags) WithFile(recurse bool, files ...string) *ResourceBuilderFlags {
+func (o *ResourceBuilderFlags) WithFile(recurse bool, kustomize *string, files ...string) *ResourceBuilderFlags {
 	o.FileNameFlags = &FileNameFlags{
 		Usage:     "identifying the resource.",
 		Filenames: &files,
+		Kustomize: kustomize,
 		Recursive: ptr.To(recurse),
 	}
 

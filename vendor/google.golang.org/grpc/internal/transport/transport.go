@@ -31,9 +31,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/http2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/internal/channelz"
+	"google.golang.org/grpc/internal/transport/internal"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/mem"
 	"google.golang.org/grpc/metadata"
@@ -44,6 +46,10 @@ import (
 )
 
 const logLevel = 2
+
+func init() {
+	internal.TimeNowFunc = func() int64 { return time.Now().UnixNano() }
+}
 
 // recvMsg represents the received msg from the transport. All transport
 // protocol specific info has been removed.
@@ -741,6 +747,22 @@ const (
 	// "too_many_pings".
 	GoAwayTooManyPings GoAwayReason = 2
 )
+
+// GoAwayInfo contains metadata about why a connection was closed.
+type GoAwayInfo struct {
+	// Reason is the parsed reason for an HTTP/2 GOAWAY frame.
+	Reason GoAwayReason
+	// GoAwayCode is the raw HTTP/2 error code received in a GOAWAY frame.
+	GoAwayCode http2.ErrCode
+	// Err is the underlying error that caused the connection to close. It is
+	// populated if the connection was closed due to a socket error or context
+	// cancellation without receiving a GOAWAY frame. If the connection was
+	// closed due to a GOAWAY frame, this field will be nil.
+	Err error
+}
+
+// OnCloseFunc is a callback invoked when a ClientTransport closes.
+type OnCloseFunc func(GoAwayInfo)
 
 // ContextErr converts the error from context package into a status error.
 func ContextErr(err error) error {

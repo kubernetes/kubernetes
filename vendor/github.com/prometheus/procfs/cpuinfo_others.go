@@ -12,7 +12,6 @@
 // limitations under the License.
 
 //go:build linux && !386 && !amd64 && !arm && !arm64 && !loong64 && !mips && !mips64 && !mips64le && !mipsle && !ppc64 && !ppc64le && !riscv64 && !s390x
-// +build linux,!386,!amd64,!arm,!arm64,!loong64,!mips,!mips64,!mips64le,!mipsle,!ppc64,!ppc64le,!riscv64,!s390x
 
 package procfs
 

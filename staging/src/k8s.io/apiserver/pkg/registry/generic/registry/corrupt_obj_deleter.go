@@ -19,17 +19,16 @@ package registry
 import (
 	"context"
 	"errors"
-	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
+	"k8s.io/apiserver/pkg/util/dryrun"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -38,13 +37,12 @@ import (
 // the corrupt object deleter has the same interface as rest.GracefulDeleter
 var _ rest.GracefulDeleter = &corruptObjectDeleter{}
 
-// NewCorruptObjectDeleter returns a deleter that can perform unsafe deletion
-// of corrupt objects, it makes an attempt to perform a normal deletion flow
-// first, and if the normal deletion flow fails with a corrupt object error
-// then it performs the unsafe delete of the object.
+// NewCorruptObjectDeleter returns a deleter that can perform unsafe deletion of corrupt
+// objects. The deletion will be rejected if the object turns out to be decodable (i.e. not actually
+// corrupt).
 //
-// NOTE: it skips precondition checks, finalizer constraints, and any
-// post deletion hook defined in 'AfterDelete' of the registry.
+// NOTE: it skips precondition checks, finalizer constraints, and any post deletion hook defined in
+// 'AfterDelete' of the registry.
 //
 // WARNING: This may break the cluster if the resource being deleted has dependencies.
 func NewCorruptObjectDeleter(store *Store) rest.GracefulDeleter {
@@ -55,6 +53,28 @@ func NewCorruptObjectDeleter(store *Store) rest.GracefulDeleter {
 type corruptObjectDeleter struct {
 	store *Store
 }
+
+// errUnsafeDeleteDryRun is a sentinel error returned by the deletion validator
+// on dry run requests. Calling the validation function before the delete
+// transaction is a system-wide invariant: it is how delete admission runs for
+// every delete in Kubernetes. No storage implementation can skip it.
+//
+//	getState(key, expectTransformOrDecodeError=true)
+//	    key not found          -> KeyNotFoundError, validator never runs
+//	    decodes cleanly        -> InvalidObjError, validator never runs
+//	    transform/decode fails -> validateDeletion, then OptimisticDelete
+//
+// Getting this error back means the object is corrupt at the latest revision
+// and the delete would have gone through.
+var errUnsafeDeleteDryRun = errors.New("aborting unsafe delete, dry run requested")
+
+// errUnsafeDeleteDryRunBypassed indicates the storage deleted the object
+// without calling the deletion validator on a dry run request. This MUST
+// NEVER happen with ANY storage.Interface implementation. The validator is
+// the same parameter that carries delete admission for regular deletion
+// requests, see Store.Delete. A backend that triggers this error has a bug
+// that allows object deletion without running delete admission.
+var errUnsafeDeleteDryRunBypassed = errors.New("storage deleted the object despite the dry run request")
 
 // Delete performs an unsafe deletion of the given resource from the storage.
 //
@@ -72,41 +92,18 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 	if err != nil {
 		return nil, false, err
 	}
-	obj := d.store.NewFunc()
 	qualifiedResource := d.store.qualifiedResourceFromContext(ctx)
-	// use the storage implementation directly, bypass the dryRun layer
+	// Bypass the DryRunnableStorage layer as it was never designed to
+	// deal with corrupt objects (its dry run simulation is Get + decode).
+	// The call below must always land in the etcd3 store, see Delete in
+	// https://github.com/kubernetes/kubernetes/blob/6a5cc912a3c2a2c241fe05abea563079bf574abd/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go#L336-L354
 	storageBackend := d.store.Storage.Storage
-	// we leave ResourceVersion as empty in the GetOptions so the
-	// object is retrieved from the underlying storage directly
-	err = storageBackend.Get(ctx, key, storage.GetOptions{}, obj)
-	if err == nil || !storage.IsCorruptObject(err) {
-		// TODO: The Invalid error should have a field for Resource.
-		// After that field is added, we should fill the Resource and
-		// leave the Kind field empty. See the discussion in #18526.
-		qualifiedKind := schema.GroupKind{Group: qualifiedResource.Group, Kind: qualifiedResource.Resource}
-		fieldErrList := field.ErrorList{
-			field.Invalid(field.NewPath("ignoreStoreReadErrorWithClusterBreakingPotential"), true, "is exclusively used to delete corrupt object(s), try again by removing this option"),
-		}
-		return nil, false, apierrors.NewInvalid(qualifiedKind, name, fieldErrList)
-	}
-
-	// try normal deletion anyway, it is expected to fail
-	obj, deleted, err := d.store.Delete(ctx, name, deleteValidation, opts)
-	if err == nil {
-		return obj, deleted, err
-	}
-	// TODO: unfortunately we can't do storage.IsCorruptObject(err),
-	// conversion to API error drops the inner error chain
-	if !strings.Contains(err.Error(), "corrupt object") {
-		return obj, deleted, err
-	}
-
-	// TODO: at this instant, some actor may have a) managed to recreate this
-	// object by doing a delete+create, or b) the underlying error has resolved
-	// since the last time we checked, and the object is readable now.
 	klog.FromContext(ctx).V(1).Info("Going to perform unsafe object deletion", "object", klog.KRef(genericapirequest.NamespaceValue(ctx), name))
 	out := d.store.NewFunc()
-	storageOpts := storage.DeleteOptions{IgnoreStoreReadError: true}
+	// ExpectTransformOrDecodeError forces a live read from etcd and makes
+	// the delete fail unless the object is corrupt: not found and
+	// decodable objects return errors.
+	storageOpts := storage.DeleteOptions{ExpectTransformOrDecodeError: true}
 	// we don't have the old object in the cache, neither can it be
 	// retrieved from the storage and decoded into an object
 	// successfully, so we do the following:
@@ -114,15 +111,30 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 	//  b) skip admission validation, rest.ValidateAllObjectFunc will "admit everything"
 	var nilPreconditions *storage.Preconditions = nil
 	var nilCachedExistingObject runtime.Object = nil
-	if err := storageBackend.Delete(ctx, key, out, nilPreconditions, rest.ValidateAllObjectFunc, nilCachedExistingObject, storageOpts); err != nil {
-		if storage.IsNotFound(err) {
-			// the DELETE succeeded, but we don't have the object since it's
-			// not retrievable from the storage, so we send a nil object
-			return nil, false, nil
+	if dryrun.IsDryRun(opts.DryRun) {
+		err := storageBackend.Delete(
+			ctx, key, out, nilPreconditions,
+			func(context.Context, runtime.Object) error { return errUnsafeDeleteDryRun },
+			nilCachedExistingObject, storageOpts,
+		)
+		switch {
+		case errors.Is(err, errUnsafeDeleteDryRun):
+			// the object is corrupt at the latest revision, the
+			// delete would have proceeded
+			return nil, true, nil
+		case err == nil:
+			// Should never happen. Indicates a critical bug in the
+			// storage.Interface implementation, see errUnsafeDeleteDryRunBypassed
+			utilruntime.HandleErrorWithContext(ctx, errUnsafeDeleteDryRunBypassed, "The storage bypassed delete admission on a dry run request", "object", klog.KRef(genericapirequest.NamespaceValue(ctx), name))
+			return nil, false, apierrors.NewInternalError(errUnsafeDeleteDryRunBypassed)
+		default:
+			return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 		}
+	}
+	if err := storageBackend.Delete(ctx, key, out, nilPreconditions, rest.ValidateAllObjectFunc, nilCachedExistingObject, storageOpts); err != nil {
 		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
-	// the DELETE succeeded, but we don't have the object sine it's
-	// not retrievable from the storage, so we send a nil objct
+	// the DELETE succeeded, but we don't have the object since it's
+	// not retrievable from the storage, so we send a nil object
 	return nil, true, nil
 }

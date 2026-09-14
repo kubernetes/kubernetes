@@ -22,6 +22,7 @@ limitations under the License.
 package v1
 
 import (
+	certificatesv1 "k8s.io/api/certificates/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -29,5 +30,25 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&certificatesv1.PodCertificateRequest{}, func(obj interface{}) {
+		SetObjectDefaults_PodCertificateRequest(obj.(*certificatesv1.PodCertificateRequest))
+	})
+	scheme.AddTypeDefaultingFunc(&certificatesv1.PodCertificateRequestList{}, func(obj interface{}) {
+		SetObjectDefaults_PodCertificateRequestList(obj.(*certificatesv1.PodCertificateRequestList))
+	})
 	return nil
+}
+
+func SetObjectDefaults_PodCertificateRequest(in *certificatesv1.PodCertificateRequest) {
+	if in.Spec.MaxExpirationSeconds == nil {
+		var ptrVar1 int32 = 86400
+		in.Spec.MaxExpirationSeconds = &ptrVar1
+	}
+}
+
+func SetObjectDefaults_PodCertificateRequestList(in *certificatesv1.PodCertificateRequestList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_PodCertificateRequest(a)
+	}
 }

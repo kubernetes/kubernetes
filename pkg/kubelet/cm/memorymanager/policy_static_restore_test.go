@@ -17,9 +17,10 @@ limitations under the License.
 package memorymanager
 
 import (
-	"context"
 	"runtime"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -30,6 +31,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -40,6 +42,8 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 		t.Skip("Memory Manager static policy is not available on Windows")
 	}
 
+	tCtx := ktesting.Init(t)
+
 	testCases := []struct {
 		description                     string
 		podLevelResourcesEnabled        bool
@@ -47,6 +51,8 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 		podMemoryRequest                string
 		containers                      []containerSpec
 		expectPodBlocks                 bool
+		allocationAffinity              []int
+		expectedAffinity                []int
 	}{
 		{
 			description:                     "PodLevelResources and PodLevelResourceManagers enabled",
@@ -56,7 +62,32 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			containers: []containerSpec{
 				{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
 			},
-			expectPodBlocks: true,
+			expectPodBlocks:  true,
+			expectedAffinity: []int{0},
+		},
+		{
+			description:                     "Pod topology hint is restored from a non-zero NUMA node",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			podMemoryRequest:                "128Mi",
+			containers: []containerSpec{
+				{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
+			},
+			expectPodBlocks:    true,
+			allocationAffinity: []int{1},
+			expectedAffinity:   []int{1},
+		},
+		{
+			description:                     "Pod topology hint is restored from a multi-container pod allocation",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			podMemoryRequest:                "128Mi",
+			containers: []containerSpec{
+				{name: "container1", memRequest: "50Mi", memLimit: "50Mi"},
+				{name: "container2", memRequest: "50Mi", memLimit: "50Mi"},
+			},
+			expectPodBlocks:  true,
+			expectedAffinity: []int{0},
 		},
 		{
 			description:                     "PodLevelResources enabled, PodLevelResourceManagers disabled",
@@ -77,7 +108,8 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
 				{name: "container2", memRequest: "100Mi", memLimit: "100Mi"},
 			},
-			expectPodBlocks: false,
+			expectPodBlocks:  false,
+			expectedAffinity: []int{0},
 		},
 		{
 			description:                     "Container-level pod, features disabled",
@@ -88,7 +120,8 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
 				{name: "container2", memRequest: "100Mi", memLimit: "100Mi"},
 			},
-			expectPodBlocks: false,
+			expectPodBlocks:  false,
+			expectedAffinity: []int{0},
 		},
 	}
 
@@ -97,7 +130,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			machineInfo := returnMachineInfo()
 			nodeAllocatableReservation := v1.ResourceList{
 				v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI),
@@ -116,7 +149,13 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 					},
 				},
 			}
-			affinity := topologymanager.NewFakeManager()
+			affinity := topologymanager.NewFakeManager(logger)
+			if tc.allocationAffinity != nil {
+				affinity = topologymanager.NewFakeManagerWithHint(logger, &topologymanager.TopologyHint{
+					NUMANodeAffinity: newNUMAAffinity(tc.allocationAffinity...),
+					Preferred:        true,
+				})
+			}
 
 			// Create new manager
 			sDir := t.TempDir()
@@ -129,14 +168,14 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			pod := getPodWithContainersAndPodLevelResources("pod1", tc.podMemoryRequest, tc.podMemoryRequest, nil, tc.containers)
 
 			// Start manager to initialize state
-			err = mgr.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager: %v", err)
 			}
 
 			// Allocate resources
 			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
-				err = mgr.AllocatePod(pod)
+				err = mgr.AllocatePod(logger, pod, lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("could not allocate pod: %v", err)
 				}
@@ -144,7 +183,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				// Add containers (allocates exclusive resources from the pod pool)
 				for i := range pod.Spec.Containers {
 					container := &pod.Spec.Containers[i]
-					err = mgr.Allocate(pod, container)
+					err = mgr.Allocate(ctx, pod, container, lifecycle.AddOperation)
 					if err != nil {
 						t.Fatalf("could not allocate container %s: %v", container.Name, err)
 					}
@@ -153,6 +192,9 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			}
 
 			// Verify state before restart
+			podMemoryAssignments := mgr.State().GetPodMemoryAssignments()
+			memoryAssignments := mgr.State().GetMemoryAssignments()
+			machineState := mgr.State().GetMachineState()
 			podBlocks := mgr.State().GetPodMemoryBlocks(string(pod.UID))
 			if tc.expectPodBlocks && len(podBlocks) == 0 {
 				t.Errorf("expected pod memory blocks to be present")
@@ -161,12 +203,13 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			}
 
 			// Re-create manager to simulate restart
-			mgr2, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
+			restoredAffinity := topologymanager.NewFakeManager(logger)
+			mgr2, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, restoredAffinity)
 			if err != nil {
 				t.Fatalf("could not create manager 2: %v", err)
 			}
 
-			err = mgr2.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr2.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager 2: %v", err)
 			}
@@ -184,6 +227,25 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				t.Errorf("expected no pod memory blocks after restore, but got some")
 			}
 
+			hints := mgr2.GetPodTopologyHints(logger, pod, lifecycle.AddOperation)
+			memoryHints := hints[string(v1.ResourceMemory)]
+			if tc.expectedAffinity == nil {
+				if len(memoryHints) != 0 {
+					t.Fatalf("expected no restored memory hint, got %v", memoryHints)
+				}
+			} else {
+				if len(memoryHints) != 1 {
+					t.Fatalf("expected one restored memory hint, got %v", memoryHints)
+				}
+				if !memoryHints[0].Preferred {
+					t.Error("expected restored memory hint to be preferred")
+				}
+				expectedAffinity := newNUMAAffinity(tc.expectedAffinity...)
+				if !memoryHints[0].NUMANodeAffinity.IsEqual(expectedAffinity) {
+					t.Errorf("expected restored memory hint affinity %v, got %v", expectedAffinity, memoryHints[0].NUMANodeAffinity)
+				}
+			}
+
 			// Verify containers restored
 			for _, container := range pod.Spec.Containers {
 				containerBlocksRestored := mgr2.State().GetMemoryBlocks(string(pod.UID), container.Name)
@@ -196,6 +258,22 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 					if len(containerBlocksRestored) == 0 {
 						t.Errorf("expected container memory blocks to be present after restore for %s", container.Name)
 					}
+				}
+			}
+
+			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
+				if err := mgr2.AllocatePod(logger, pod, lifecycle.AddOperation); err != nil {
+					t.Fatalf("could not allocate restored pod: %v", err)
+				}
+
+				if diff := cmp.Diff(podMemoryAssignments, mgr2.State().GetPodMemoryAssignments()); diff != "" {
+					t.Errorf("pod memory assignments changed after allocating restored pod (-want +got):\n%s", diff)
+				}
+				if diff := cmp.Diff(memoryAssignments, mgr2.State().GetMemoryAssignments()); diff != "" {
+					t.Errorf("container memory assignments changed after allocating restored pod (-want +got):\n%s", diff)
+				}
+				if diff := cmp.Diff(machineState, mgr2.State().GetMachineState()); diff != "" {
+					t.Errorf("machine state changed after allocating restored pod (-want +got):\n%s", diff)
 				}
 			}
 		})

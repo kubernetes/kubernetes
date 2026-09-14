@@ -29,7 +29,7 @@ package v1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_Lease = map[string]string{
 	"":         "Lease defines a lease concept.",
-	"metadata": "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
@@ -54,8 +54,8 @@ var map_LeaseSpec = map[string]string{
 	"acquireTime":          "acquireTime is a time when the current lease was acquired.",
 	"renewTime":            "renewTime is a time when the current holder of a lease has last updated the lease.",
 	"leaseTransitions":     "leaseTransitions is the number of transitions of a lease between holders.",
-	"strategy":             "Strategy indicates the strategy for picking the leader for coordinated leader election. If the field is not specified, there is no active coordination for this lease. (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
-	"preferredHolder":      "PreferredHolder signals to a lease holder that the lease has a more optimal holder and should be given up. This field can only be set if Strategy is also set.",
+	"strategy":             "strategy indicates the strategy for picking the leader for coordinated leader election. If the field is not specified, there is no active coordination for this lease. (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
+	"preferredHolder":      "preferredHolder signals to a lease holder that the lease has a more optimal holder and should be given up. This field can only be set if Strategy is also set.",
 }
 
 func (LeaseSpec) SwaggerDoc() map[string]string {

@@ -25,9 +25,18 @@ import (
 func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
+	// opts declares all options this type references, enabling the named ones.
+	opts := func(enabled ...string) map[string]bool {
+		m := map[string]bool{"FeatureA": false, "FeatureB": false, "FeatureC": false, "FeatureD": false}
+		for _, e := range enabled {
+			m[e] = true
+		}
+		return m
+	}
+
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "",
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts()).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum(""), []ConditionalEnum{ConditionalA, ConditionalC, ConditionalD}),
 	})
 
@@ -35,163 +44,163 @@ func Test(t *testing.T) {
 	// Valid values: A, C, D
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "B",
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts()).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("B"), []ConditionalEnum{ConditionalA, ConditionalC, ConditionalD}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "E",
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts()).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("E"), []ConditionalEnum{ConditionalA, ConditionalC, ConditionalD}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "F",
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts()).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("F"), []ConditionalEnum{ConditionalA, ConditionalC, ConditionalD}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "A",
-	}).ExpectValid()
+	}).Opts(opts()).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "C",
-	}).ExpectValid()
+	}).Opts(opts()).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "D",
-	}).ExpectValid()
+	}).Opts(opts()).ExpectValid()
 
 	// Scenario 2: FeatureA enabled
 	// Valid values: C
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "A",
-	}).Opts([]string{"FeatureA"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureA")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("A"), []ConditionalEnum{ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "B",
-	}).Opts([]string{"FeatureA"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureA")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("B"), []ConditionalEnum{ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "D",
-	}).Opts([]string{"FeatureA"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureA")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("D"), []ConditionalEnum{ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "E",
-	}).Opts([]string{"FeatureA"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureA")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("E"), []ConditionalEnum{ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "F",
-	}).Opts([]string{"FeatureA"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureA")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("F"), []ConditionalEnum{ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "C",
-	}).Opts([]string{"FeatureA"}).ExpectValid()
+	}).Opts(opts("FeatureA")).ExpectValid()
 
 	// Scenario 3: FeatureB enabled
 	// Valid values: A, B, C
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "D",
-	}).Opts([]string{"FeatureB"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureB")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("D"), []ConditionalEnum{ConditionalA, ConditionalB, ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "E",
-	}).Opts([]string{"FeatureB"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureB")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("E"), []ConditionalEnum{ConditionalA, ConditionalB, ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "F",
-	}).Opts([]string{"FeatureB"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureB")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("F"), []ConditionalEnum{ConditionalA, ConditionalB, ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "A",
-	}).Opts([]string{"FeatureB"}).ExpectValid()
+	}).Opts(opts("FeatureB")).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "B",
-	}).Opts([]string{"FeatureB"}).ExpectValid()
+	}).Opts(opts("FeatureB")).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "C",
-	}).Opts([]string{"FeatureB"}).ExpectValid()
+	}).Opts(opts("FeatureB")).ExpectValid()
 
 	// Scenario 4: FeatureA and FeatureB enabled
 	// Valid values: B, C
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "A",
-	}).Opts([]string{"FeatureA", "FeatureB"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureA", "FeatureB")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("A"), []ConditionalEnum{ConditionalB, ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "D",
-	}).Opts([]string{"FeatureA", "FeatureB"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureA", "FeatureB")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("D"), []ConditionalEnum{ConditionalB, ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "E",
-	}).Opts([]string{"FeatureA", "FeatureB"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureA", "FeatureB")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("E"), []ConditionalEnum{ConditionalB, ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "F",
-	}).Opts([]string{"FeatureA", "FeatureB"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureA", "FeatureB")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("F"), []ConditionalEnum{ConditionalB, ConditionalC}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "B",
-	}).Opts([]string{"FeatureA", "FeatureB"}).ExpectValid()
+	}).Opts(opts("FeatureA", "FeatureB")).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "C",
-	}).Opts([]string{"FeatureA", "FeatureB"}).ExpectValid()
+	}).Opts(opts("FeatureA", "FeatureB")).ExpectValid()
 
 	// Scenario 5: FeatureC and FeatureD enabled
 	// Valid values: A, C, D, E
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "B",
-	}).Opts([]string{"FeatureC", "FeatureD"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureC", "FeatureD")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("B"), []ConditionalEnum{ConditionalA, ConditionalC, ConditionalD, ConditionalE}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "F",
-	}).Opts([]string{"FeatureC", "FeatureD"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureC", "FeatureD")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("F"), []ConditionalEnum{ConditionalA, ConditionalC, ConditionalD, ConditionalE}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "A",
-	}).Opts([]string{"FeatureC", "FeatureD"}).ExpectValid()
+	}).Opts(opts("FeatureC", "FeatureD")).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "C",
-	}).Opts([]string{"FeatureC", "FeatureD"}).ExpectValid()
+	}).Opts(opts("FeatureC", "FeatureD")).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "D",
-	}).Opts([]string{"FeatureC", "FeatureD"}).ExpectValid()
+	}).Opts(opts("FeatureC", "FeatureD")).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "E",
-	}).Opts([]string{"FeatureC", "FeatureD"}).ExpectValid()
+	}).Opts(opts("FeatureC", "FeatureD")).ExpectValid()
 
 	// Scenario 6: FeatureB and FeatureC enabled
 	// Valid values: A, B, C, F
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "D",
-	}).Opts([]string{"FeatureB", "FeatureC"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureB", "FeatureC")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("D"), []ConditionalEnum{ConditionalA, ConditionalB, ConditionalC, ConditionalF}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "E",
-	}).Opts([]string{"FeatureB", "FeatureC"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	}).Opts(opts("FeatureB", "FeatureC")).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("conditionalEnumField"), ConditionalEnum("E"), []ConditionalEnum{ConditionalA, ConditionalB, ConditionalC, ConditionalF}),
 	})
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "A",
-	}).Opts([]string{"FeatureB", "FeatureC"}).ExpectValid()
+	}).Opts(opts("FeatureB", "FeatureC")).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "B",
-	}).Opts([]string{"FeatureB", "FeatureC"}).ExpectValid()
+	}).Opts(opts("FeatureB", "FeatureC")).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "C",
-	}).Opts([]string{"FeatureB", "FeatureC"}).ExpectValid()
+	}).Opts(opts("FeatureB", "FeatureC")).ExpectValid()
 	st.Value(&ConditionalStruct{
 		ConditionalEnumField: "F",
-	}).Opts([]string{"FeatureB", "FeatureC"}).ExpectValid()
+	}).Opts(opts("FeatureB", "FeatureC")).ExpectValid()
 }

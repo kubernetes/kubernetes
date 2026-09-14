@@ -45,6 +45,7 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	appsconversion "k8s.io/kubernetes/pkg/apis/apps/v1"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -58,7 +59,7 @@ type informerAdapter struct {
 }
 
 func (i informerAdapter) Informer() cache.SharedIndexInformer {
-	return conversionInformer{i.rcInformer.Informer()}
+	return conversionInformer{SharedIndexInformer: i.rcInformer.Informer(), logger: klog.Background()}
 }
 
 func (i informerAdapter) Lister() appslisters.ReplicaSetLister {
@@ -67,14 +68,22 @@ func (i informerAdapter) Lister() appslisters.ReplicaSetLister {
 
 type conversionInformer struct {
 	cache.SharedIndexInformer
+	logger klog.Logger
+}
+
+func (i conversionInformer) AddEventHandlerWithOptions(handler cache.ResourceEventHandler, options cache.HandlerOptions) (cache.ResourceEventHandlerRegistration, error) {
+	if options.Logger == nil {
+		options.Logger = &i.logger
+	}
+	return i.SharedIndexInformer.AddEventHandlerWithOptions(conversionEventHandler{handler}, options)
 }
 
 func (i conversionInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
-	return i.SharedIndexInformer.AddEventHandler(conversionEventHandler{handler})
+	return i.AddEventHandlerWithOptions(handler, cache.HandlerOptions{Logger: &i.logger})
 }
 
 func (i conversionInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) (cache.ResourceEventHandlerRegistration, error) {
-	return i.SharedIndexInformer.AddEventHandlerWithResyncPeriod(conversionEventHandler{handler}, resyncPeriod)
+	return i.AddEventHandlerWithOptions(handler, cache.HandlerOptions{Logger: &i.logger, ResyncPeriod: &resyncPeriod})
 }
 
 type conversionLister struct {

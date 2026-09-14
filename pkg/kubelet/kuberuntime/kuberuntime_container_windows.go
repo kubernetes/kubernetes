@@ -195,3 +195,10 @@ func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, contai
 func initSwapControllerAvailabilityCheck(ctx context.Context) func() bool {
 	return func() bool { return false }
 }
+
+func (m *kubeGenericRuntimeManager) isMemoryQoSEnforced() bool {
+	return false
+}
+
+func (m *kubeGenericRuntimeManager) applyPodLevelMemoryHigh(_ *v1.Pod, _ *cm.ResourceConfig) {
+}

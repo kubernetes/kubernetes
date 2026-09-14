@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -43,13 +44,13 @@ import (
 // this interface satisfies what setupGRPCServerWithFake needs
 type fakeGRPCServerInterface interface {
 	drapbv1.DRAPluginServer
-	drahealthv1alpha1.DRAResourceHealthServer
+	drahealthv1.DRAResourceHealthServer
 	drapbv1.UnsafeDRAPluginServer
 }
 
 type fakeGRPCServer struct {
 	drapbv1beta1.UnimplementedDRAPluginServer
-	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
+	drahealthv1.UnimplementedDRAResourceHealthServer
 	drapbv1.UnsafeDRAPluginServer
 }
 
@@ -72,15 +73,15 @@ func (f *fakeGRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1
 	return &drapbv1.NodeUnprepareResourcesResponse{}, nil
 }
 
-func (f *fakeGRPCServer) NodeWatchResources(in *drahealthv1alpha1.NodeWatchResourcesRequest, srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
-	resp := &drahealthv1alpha1.NodeWatchResourcesResponse{
-		Devices: []*drahealthv1alpha1.DeviceHealth{
+func (f *fakeGRPCServer) NodeWatchResources(in *drahealthv1.NodeWatchResourcesRequest, srv drahealthv1.DRAResourceHealth_NodeWatchResourcesServer) error {
+	resp := &drahealthv1.NodeWatchResourcesResponse{
+		Devices: []*drahealthv1.DeviceHealth{
 			{
-				Device: &drahealthv1alpha1.DeviceIdentifier{
+				Device: &drahealthv1.DeviceIdentifier{
 					PoolName:   "pool1",
 					DeviceName: "dev1",
 				},
-				Health: drahealthv1alpha1.HealthStatus_HEALTHY,
+				Health: drahealthv1.HealthStatus_HEALTHY,
 			},
 		},
 	}
@@ -109,13 +110,13 @@ func setupGRPCServerWithFake(ctx context.Context, service, addr string, fakeGRPC
 		drapbv1.RegisterDRAPluginServer(s, fakeGRPCServer)
 	case drapbv1beta1.DRAPluginService:
 		drapbv1beta1.RegisterDRAPluginServer(s, drapbv1beta1.V1ServerWrapper{DRAPluginServer: fakeGRPCServer})
-	case drahealthv1alpha1.DRAResourceHealth_ServiceDesc.ServiceName:
-		drahealthv1alpha1.RegisterDRAResourceHealthServer(s, fakeGRPCServer)
+	case drahealthv1.DRAResourceHealthService:
+		drahealthv1.RegisterDRAResourceHealthServer(s, fakeGRPCServer)
 	default:
 		if service == "" {
 			drapbv1.RegisterDRAPluginServer(s, fakeGRPCServer)
 			drapbv1beta1.RegisterDRAPluginServer(s, drapbv1beta1.V1ServerWrapper{DRAPluginServer: fakeGRPCServer})
-			drahealthv1alpha1.RegisterDRAResourceHealthServer(s, fakeGRPCServer)
+			drahealthv1.RegisterDRAResourceHealthServer(s, fakeGRPCServer)
 		} else {
 			cancel()
 			return nil, err
@@ -164,7 +165,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
-	tCtx.ExpectNoError(draPlugins.add(driverName, addr, drapbv1.DRAPluginService, defaultClientCallTimeout), "add plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, addr, drapbv1.DRAPluginService, drahealthv1.DRAResourceHealthService, defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get plugin")
 	conn := plugin.conn
@@ -224,7 +225,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 		require.Len(tCtx, resp.Devices, 1)
 		assert.Equal(tCtx, "pool1", resp.Devices[0].GetDevice().GetPoolName())
 		assert.Equal(tCtx, "dev1", resp.Devices[0].GetDevice().GetDeviceName())
-		assert.Equal(tCtx, drahealthv1alpha1.HealthStatus_HEALTHY, resp.Devices[0].GetHealth())
+		assert.Equal(tCtx, drahealthv1.HealthStatus_HEALTHY, resp.Devices[0].GetHealth())
 
 		require.Equal(tCtx, originalConn, plugin.conn, "Connection should remain unchanged after health operations")
 
@@ -276,7 +277,7 @@ func TestGRPCConnUsableAfterIdle(t *testing.T) {
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 	draPlugins.withIdleTimeout = 5 * time.Second
-	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, "", defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get plugin")
 
@@ -320,7 +321,7 @@ func TestGetDRAPlugin(t *testing.T) {
 		{
 			description: "plugin exists",
 			setup: func(draPlugins *DRAPluginManager) error {
-				return draPlugins.add("dummy-driver", "/tmp/dra.sock", "", defaultClientCallTimeout)
+				return draPlugins.add("dummy-driver", "/tmp/dra.sock", "", "", defaultClientCallTimeout)
 			},
 			driverName: "dummy-driver",
 		},
@@ -386,7 +387,7 @@ func TestGRPCMethods(t *testing.T) {
 
 			driverName := "dummy-driver"
 			draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
-			tCtx.ExpectNoError(draPlugins.add(driverName, addr, test.chosenService, defaultClientCallTimeout))
+			tCtx.ExpectNoError(draPlugins.add(driverName, addr, test.chosenService, "", defaultClientCallTimeout))
 
 			plugin, err := draPlugins.GetPlugin(driverName)
 			if err != nil {
@@ -425,7 +426,7 @@ func TestGRPCWithTimeoutEnforced(t *testing.T) {
 	driverName := "dummy-driver"
 	timeout := time.Second
 	manager := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
-	err = manager.add(driverName, addr, service, timeout)
+	err = manager.add(driverName, addr, service, "", timeout)
 	require.NoError(t, err, "unexpected error while adding the plugin")
 
 	plugin, err := manager.GetPlugin(driverName)
@@ -537,7 +538,7 @@ func TestPlugin_WatchResources(t *testing.T) {
 	defer teardown()
 
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
-	err = draPlugins.add(driverName, addr, drapbv1beta1.DRAPluginService, 5*time.Second)
+	err = draPlugins.add(driverName, addr, drapbv1beta1.DRAPluginService, drahealthv1.DRAResourceHealthService, 5*time.Second)
 	require.NoError(t, err)
 	defer draPlugins.remove(driverName, addr)
 
@@ -554,10 +555,84 @@ func TestPlugin_WatchResources(t *testing.T) {
 	require.NotNil(t, resp)
 	require.Len(t, resp.Devices, 1)
 	assert.Equal(t, "pool1", resp.Devices[0].GetDevice().GetPoolName())
-	assert.Equal(t, drahealthv1alpha1.HealthStatus_HEALTHY, resp.Devices[0].GetHealth())
+	assert.Equal(t, drahealthv1.HealthStatus_HEALTHY, resp.Devices[0].GetHealth())
 
 	// 2. The second receive should fail with io.EOF because the server
 	//    closed the stream by returning nil. This confirms the stream ended cleanly.
 	_, err = stream.Recv()
 	require.ErrorIs(t, err, io.EOF, "The second Recv() should return an io.EOF error to signal a clean stream closure")
+}
+
+// fakeV1Alpha1HealthServer implements only the v1alpha1 DRAResourceHealth
+// service, like a driver which shipped before the v1 API existed.
+type fakeV1Alpha1HealthServer struct {
+	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
+}
+
+func (f *fakeV1Alpha1HealthServer) NodeWatchResources(in *drahealthv1alpha1.NodeWatchResourcesRequest, srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
+	resp := &drahealthv1alpha1.NodeWatchResourcesResponse{
+		Devices: []*drahealthv1alpha1.DeviceHealth{
+			{
+				Device: &drahealthv1alpha1.DeviceIdentifier{
+					PoolName:   "pool1",
+					DeviceName: "dev1",
+				},
+				Health:  drahealthv1alpha1.HealthStatus_UNHEALTHY,
+				Message: "degraded",
+			},
+		},
+	}
+	return srv.Send(resp)
+}
+
+// TestPlugin_WatchResources_V1Alpha1 verifies the backward compatibility path:
+// when a plugin only provides the v1alpha1 health service, the kubelet
+// negotiates v1alpha1 and transparently converts the stream to v1.
+//
+// TODO(harche): remove in 1.40 together with the kubelet's v1alpha1 client
+// support.
+func TestPlugin_WatchResources_V1Alpha1(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+
+	driverName := "test-driver"
+	addr := path.Join(t.TempDir(), "dra.sock")
+
+	listener, err := net.Listen("unix", addr)
+	require.NoError(t, err)
+	s := grpc.NewServer()
+	drahealthv1alpha1.RegisterDRAResourceHealthServer(s, &fakeV1Alpha1HealthServer{})
+	go func() {
+		if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			panic(err)
+		}
+	}()
+	defer s.Stop()
+
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	err = draPlugins.add(driverName, addr, "", drahealthv1alpha1.DRAResourceHealthService, 5*time.Second)
+	require.NoError(t, err)
+	defer draPlugins.remove(driverName, addr)
+
+	p, err := draPlugins.GetPlugin(driverName)
+	require.NoError(t, err)
+
+	stream, err := p.NodeWatchResources(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+
+	// The v1alpha1 message from the server must arrive as a converted
+	// v1 message.
+	resp, err := stream.Recv()
+	require.NoError(t, err, "The first Recv() should succeed with the converted message from the v1alpha1 server")
+	require.NotNil(t, resp)
+	require.Len(t, resp.Devices, 1)
+	assert.Equal(t, "pool1", resp.Devices[0].GetDevice().GetPoolName())
+	assert.Equal(t, "dev1", resp.Devices[0].GetDevice().GetDeviceName())
+	assert.Equal(t, drahealthv1.HealthStatus_UNHEALTHY, resp.Devices[0].GetHealth())
+	assert.Equal(t, "degraded", resp.Devices[0].GetMessage())
+
+	_, err = stream.Recv()
+	require.ErrorIs(t, err, io.EOF, "The second Recv() should return io.EOF after the server closed the stream")
 }

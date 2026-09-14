@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
+
+	"k8s.io/code-generator/pkg/apidefinitions"
 )
 
 // Args is used by the gengo framework to pass args specific to this generator.
@@ -35,6 +37,8 @@ type Args struct {
 	// PluralExceptions define a list of pluralizer exceptions in Type:PluralType format.
 	// The default list is "Endpoints:Endpoints"
 	PluralExceptions []string
+
+	apidefinitions.LintArgs
 }
 
 // New returns default arguments for the generator.
@@ -62,6 +66,7 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"if true, omit the intermediate \"internalversion\" and \"externalversions\" subdirectories")
 	fs.StringSliceVar(&args.PluralExceptions, "plural-exceptions", args.PluralExceptions,
 		"list of comma separated plural exception definitions in Type:PluralizedType format")
+	apidefinitions.AddFlags(&args.LintArgs, fs)
 }
 
 // Validate checks the given arguments.
@@ -77,6 +82,9 @@ func (args *Args) Validate() error {
 	}
 	if len(args.ListersPackage) == 0 {
 		return fmt.Errorf("--listers-package must be specified")
+	}
+	if err := apidefinitions.ValidateFlags(args.LintRules); err != nil {
+		return err
 	}
 	return nil
 }

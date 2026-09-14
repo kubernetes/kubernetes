@@ -20,12 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +41,8 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
+var maxPodStartTime = metav1.NewTime(time.Unix(0, math.MaxInt64).UTC())
+
 // GetPodFullName returns a name that uniquely identifies a pod.
 func GetPodFullName(pod *v1.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
@@ -47,14 +50,16 @@ func GetPodFullName(pod *v1.Pod) string {
 	return pod.Name + "_" + pod.Namespace
 }
 
-// GetPodStartTime returns start time of the given pod or current timestamp
+// GetPodStartTime returns start time of the given pod or a stable maximum timestamp
 // if it hasn't started yet.
 func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 	if pod.Status.StartTime != nil {
 		return pod.Status.StartTime
 	}
 	// Assumed pods and bound pods that haven't started don't have a StartTime yet.
-	return &metav1.Time{Time: time.Now()}
+	// Treat them as newer than started pods without generating a timestamp during
+	// sorting, which would break sort's strict weak ordering.
+	return &maxPodStartTime
 }
 
 // GetEarliestPodStartTime returns the earliest start time of all pods that
@@ -98,7 +103,21 @@ func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
 // Retriable defines the retriable errors during a scheduling cycle.
 func Retriable(err error) bool {
 	return apierrors.IsInternalError(err) || apierrors.IsServiceUnavailable(err) ||
-		apierrors.IsConflict(err) || net.IsConnectionRefused(err)
+		net.IsConnectionRefused(err)
+}
+
+// RetriableWithConflict defines the retriable errors during a scheduling cycle, including conflicts.
+func RetriableWithConflict(err error) bool {
+	return Retriable(err) || apierrors.IsConflict(err)
+}
+
+// BindPod binds a pod to a node with retry.
+func BindPod(ctx context.Context, cs kubernetes.Interface, binding *v1.Binding) error {
+	bindFn := func() error {
+		return cs.CoreV1().Pods(binding.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
+	}
+
+	return retry.OnError(retry.DefaultBackoff, Retriable, bindFn)
 }
 
 // PatchPodStatus calculates the delta bytes change from <old.Status> to <newStatus>,
@@ -135,32 +154,32 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, n
 		return err
 	}
 
-	return retry.OnError(retry.DefaultBackoff, Retriable, patchFn)
+	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
 }
 
 // PatchPodGroupStatus calculates the delta bytes change from <old.Status> to <newStatus>,
 // and then submits a request to API server to patch the PodGroup status changes.
 func PatchPodGroupStatus(ctx context.Context, cs kubernetes.Interface, name string,
-	namespace string, oldStatus *schedulingv1alpha2.PodGroupStatus,
-	newStatus *schedulingv1alpha2.PodGroupStatus) error {
+	namespace string, oldStatus *schedulingv1beta1.PodGroupStatus,
+	newStatus *schedulingv1beta1.PodGroupStatus) error {
 	if newStatus == nil {
 		return nil
 	}
 
 	if oldStatus == nil {
-		oldStatus = &schedulingv1alpha2.PodGroupStatus{}
+		oldStatus = &schedulingv1beta1.PodGroupStatus{}
 	}
 
-	oldData, err := json.Marshal(schedulingv1alpha2.PodGroup{Status: *oldStatus})
+	oldData, err := json.Marshal(schedulingv1beta1.PodGroup{Status: *oldStatus})
 	if err != nil {
 		return err
 	}
 
-	newData, err := json.Marshal(schedulingv1alpha2.PodGroup{Status: *newStatus})
+	newData, err := json.Marshal(schedulingv1beta1.PodGroup{Status: *newStatus})
 	if err != nil {
 		return err
 	}
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1alpha2.PodGroup{})
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1beta1.PodGroup{})
 	if err != nil {
 		return fmt.Errorf("failed to create merge patch for podgroup %q/%q: %w", namespace, name, err)
 	}
@@ -170,11 +189,11 @@ func PatchPodGroupStatus(ctx context.Context, cs kubernetes.Interface, name stri
 	}
 
 	patchFn := func() error {
-		_, err := cs.SchedulingV1alpha2().PodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+		_, err := cs.SchedulingV1beta1().PodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 		return err
 	}
 
-	return retry.OnError(retry.DefaultBackoff, Retriable, patchFn)
+	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
 }
 
 // DeletePod deletes the given <pod> from API server
@@ -256,16 +275,4 @@ func GetHostPorts(pod *v1.Pod) []v1.ContainerPort {
 		}
 	}
 	return ports
-}
-
-// PodGroupPriority returns priority of a given pod group.
-func PodGroupPriority(pg *schedulingv1alpha2.PodGroup) int32 {
-	if pg.Spec.Priority != nil {
-		return *pg.Spec.Priority
-	}
-	// When priority of a pod group is nil, it means it was created at a time
-	// that there was no global default priority class and the priority class
-	// name of the pod group was empty (or when the WorkloadAwarePreemption
-	// feature gate was disabled). So, we resolve to the static default priority.
-	return 0
 }

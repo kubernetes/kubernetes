@@ -1,6 +1,23 @@
 {
   "spec": {
-    "pinnedModules": {},
+    "pinnedModules": {
+      "github.com/fsnotify/fsnotify": {
+        "version": "v1.9.0",
+        "reason": "pin to v1.9.0 until we figure out what the future of fsnotify library is, see #138812"
+      },
+      "github.com/google/cel-go": {
+        "version": "v0.29.2",
+        "reason": "pin to v0.29.2 until the CEL runtime cost changes in newer releases are handled, see #141056"
+      },
+      "github.com/grpc-ecosystem/grpc-gateway/v2": {
+        "version": "v2.29.0",
+        "reason": "pin to v2.29.0 until grpc-gateway drops go-openapi, see grpc-ecosystem/grpc-gateway#7343 and #7325; v2.30.0 pulls in go-openapi analysis, spec, strfmt and validate"
+      },
+      "google.golang.org/grpc": {
+        "version": "v1.82.2",
+        "reason": "pin to v1.82.2 until grpc-go drops cloud.google.com/go/auth, see grpc/grpc-go#9320 and grpc/grpc-go#9385; v1.83.0+ pulls in s2a-go, enterprise-certificate-proxy and gax-go/v2, see #142005"
+      }
+    },
     "unwantedModules": {
       "cloud.google.com/go": "cloud dependency",
       "cloud.google.com/go/bigquery": "cloud dependency",
@@ -15,6 +32,7 @@
       "github.com/bketelsen/crypt": "unused, crypto",
       "github.com/containerd/cgroups": "standardize on single cgroups library from runc, refer #128157",
       "github.com/davecgh/go-spew": "refer to #103942",
+      "github.com/envoyproxy/protoc-gen-validate": "unmaintained, archive mode, refer to #139389",
       "github.com/evanphx/json-patch/v5": "refer to https://github.com/kubernetes/kubernetes/pull/91622#issuecomment-637087847",
       "github.com/flynn/go-shlex": "unmaintained, archive mode",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
@@ -31,6 +49,7 @@
       "github.com/golang/protobuf": "replace with google.golang.org/protobuf",
       "github.com/golang/groupcache": "unmaintained",
       "github.com/google/btree": "unmaintained, archive mode",
+      "github.com/google/cadvisor": "the kubelet depends only on the lean github.com/google/cadvisor/lib module; the full module (standalone binary + v1/v2 REST API) must not be vendored",
       "github.com/google/gofuzz": "unmaintained, use sigs.k8s.io/randfill",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
@@ -96,17 +115,11 @@
       "github.com/davecgh/go-spew": [
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
         "github.com/go-task/slim-sprig/v3",
-        "github.com/google/cadvisor",
+        "github.com/google/cadvisor/lib",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
-        "github.com/json-iterator/go",
         "github.com/prometheus/common",
-        "github.com/sirupsen/logrus",
-        "github.com/stretchr/objx",
-        "github.com/stretchr/testify",
         "go.etcd.io/bbolt",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/pkg/v3",
@@ -133,72 +146,40 @@
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
       ],
+      "github.com/envoyproxy/protoc-gen-validate": [
+        "google.golang.org/grpc"
+      ],
       "github.com/flynn/go-shlex": [
         "github.com/coredns/caddy"
       ],
       "github.com/gogo/protobuf": [
-        "github.com/containerd/containerd/api",
-        "github.com/containerd/errdefs/pkg",
-        "github.com/containerd/ttrpc",
-        "github.com/containerd/typeurl/v2",
-        "github.com/google/cadvisor",
-        "go.etcd.io/etcd/api/v3",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/server/v3",
-        "go.etcd.io/raft/v3",
         "k8s.io/code-generator"
       ],
-      "github.com/golang/groupcache": [
-        "go.etcd.io/etcd/server/v3"
-      ],
       "github.com/golang/protobuf": [
-        "github.com/container-storage-interface/spec",
-        "github.com/containerd/containerd/api",
         "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3",
-        "go.etcd.io/raft/v3",
         "google.golang.org/grpc",
-        "google.golang.org/protobuf",
-        "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
-      ],
-      "github.com/google/btree": [
-        "go.etcd.io/etcd/server/v3"
-      ],
-      "github.com/google/gofuzz": [
-        "github.com/json-iterator/go"
+        "google.golang.org/protobuf"
       ],
       "github.com/json-iterator/go": [
-        "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
-        "sigs.k8s.io/structured-merge-diff/v6"
+        "github.com/prometheus/client_golang"
       ],
       "github.com/klauspost/compress": [
-        "github.com/prometheus/client_golang",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/server/v3"
+        "github.com/prometheus/client_golang"
       ],
       "github.com/mailru/easyjson": [
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
       ],
       "github.com/modern-go/concurrent": [
-        "github.com/json-iterator/go",
-        "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
-        "sigs.k8s.io/structured-merge-diff/v6"
+        "github.com/prometheus/client_golang"
       ],
       "github.com/modern-go/reflect2": [
-        "github.com/json-iterator/go",
-        "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
-        "sigs.k8s.io/structured-merge-diff/v6"
+        "github.com/prometheus/client_golang"
       ],
       "github.com/planetscale/vtprotobuf": [
         "google.golang.org/grpc"
@@ -209,20 +190,14 @@
         "github.com/grpc-ecosystem/go-grpc-middleware/v2"
       ],
       "gopkg.in/yaml.v3": [
-        "github.com/containerd/containerd/api",
         "github.com/coreos/go-semver",
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
         "github.com/go-task/slim-sprig/v3",
-        "github.com/google/cadvisor",
-        "github.com/google/cel-go",
+        "github.com/google/cadvisor/lib",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "github.com/prometheus/common",
-        "github.com/stretchr/objx",
-        "github.com/stretchr/testify",
         "go.etcd.io/bbolt",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/pkg/v3",
@@ -254,12 +229,7 @@
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
       "github.com/google/btree",
-      "github.com/json-iterator/go",
-      "github.com/mailru/easyjson",
-      "github.com/modern-go/concurrent",
-      "github.com/modern-go/reflect2",
-      "golang.org/x/exp",
-      "gopkg.in/yaml.v3"
+      "golang.org/x/exp"
     ]
   }
 }

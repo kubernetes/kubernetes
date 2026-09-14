@@ -1,5 +1,5 @@
 kind: ResourceSlice
-apiVersion: resource.k8s.io/v1beta2
+apiVersion: resource.k8s.io/v1
 metadata:
   name: resourceslice-{{.Index}}
 spec:
@@ -8,20 +8,57 @@ spec:
     generation: 1
     resourceSliceCount: 1
   driver: test-driver.cdi.k8s.io
-  nodeSelector:
-    nodeSelectorTerms:
-    - matchExpressions:
-      - key: node-with-dra
-        operator: In
-        values:
-        - "true"
+  nodeName: scheduler-perf-dra-{{.Index}}
   devices:
-  - name: shareable-device
+  - name: shareable-device-0
     allowMultipleAllocations: true
+    attributes:
+      dra.example.com/index:
+        int: 0
     capacity:
-      memory:
-        value: 80Gi
+      bandwidth:
         requestPolicy:
-          default: 1Gi
+          default: 1M
           validRange:
-            min: 1Gi
+            min: 1M
+            step: 8
+        value: 10G
+  - name: shareable-device-1
+    allowMultipleAllocations: true
+    attributes:
+      dra.example.com/index:
+        int: 1
+    capacity:
+      bandwidth:
+        requestPolicy:
+          default: 1M
+          validRange:
+            min: 1M
+            step: 8
+        value: 10G
+  - name: shareable-device-2
+    allowMultipleAllocations: true
+    attributes:
+      dra.example.com/index:
+        int: 2
+    capacity:
+      bandwidth:
+        requestPolicy:
+          default: 1M
+          validRange:
+            min: 1M
+            step: 8
+        value: 10Gi
+  - name: shareable-device-3
+    allowMultipleAllocations: true
+    attributes:
+      dra.example.com/index:
+        int: 3
+    capacity:
+      bandwidth:
+        requestPolicy:
+          default: 1M
+          validRange:
+            min: 1M
+            step: 8
+        value: 10G

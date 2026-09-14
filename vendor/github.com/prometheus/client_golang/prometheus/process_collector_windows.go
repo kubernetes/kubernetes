@@ -30,6 +30,10 @@ var (
 
 	procGetProcessMemoryInfo  = modpsapi.NewProc("GetProcessMemoryInfo")
 	procGetProcessHandleCount = modkernel32.NewProc("GetProcessHandleCount")
+
+	openProcess     = windows.OpenProcess
+	closeHandle     = windows.CloseHandle
+	getProcessTimes = windows.GetProcessTimes
 )
 
 type processMemoryCounters struct {
@@ -79,10 +83,21 @@ func getProcessHandleCount(handle windows.Handle) (uint32, error) {
 }
 
 func (c *processCollector) processCollect(ch chan<- Metric) {
-	h := windows.CurrentProcess()
+	pid, err := c.pidFn()
+	if err != nil {
+		c.reportError(ch, nil, err)
+		return
+	}
+
+	h, err := openProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, uint32(pid))
+	if err != nil {
+		c.reportError(ch, nil, err)
+		return
+	}
+	defer closeHandle(h)
 
 	var startTime, exitTime, kernelTime, userTime windows.Filetime
-	err := windows.GetProcessTimes(h, &startTime, &exitTime, &kernelTime, &userTime)
+	err = getProcessTimes(h, &startTime, &exitTime, &kernelTime, &userTime)
 	if err != nil {
 		c.reportError(ch, nil, err)
 		return

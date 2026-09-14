@@ -45,19 +45,15 @@ func (s *serverVersionAdapter) UpdateClusterVersion(version string) {
 	s.GoAttach(func() { s.updateClusterVersionV3(version) })
 }
 
-func (s *serverVersionAdapter) LinearizableReadNotify(ctx context.Context) error {
-	return s.linearizableReadNotify(ctx)
-}
-
 func (s *serverVersionAdapter) DowngradeEnable(ctx context.Context, targetVersion *semver.Version) error {
 	raftRequest := membershippb.DowngradeInfoSetRequest{Enabled: true, Ver: targetVersion.String()}
-	_, err := s.raftRequest(ctx, pb.InternalRaftRequest{DowngradeInfoSet: &raftRequest})
+	_, err := s.raftRequest(ctx, &pb.InternalRaftRequest{DowngradeInfoSet: &raftRequest})
 	return err
 }
 
 func (s *serverVersionAdapter) DowngradeCancel(ctx context.Context) error {
 	raftRequest := membershippb.DowngradeInfoSetRequest{Enabled: false}
-	_, err := s.raftRequest(ctx, pb.InternalRaftRequest{DowngradeInfoSet: &raftRequest})
+	_, err := s.raftRequest(ctx, &pb.InternalRaftRequest{DowngradeInfoSet: &raftRequest})
 	return err
 }
 

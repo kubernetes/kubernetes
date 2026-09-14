@@ -19,8 +19,8 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"unicode"
 
-	"github.com/stoewer/go-strcase"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
@@ -156,6 +156,9 @@ func (m *baseMap) Contains(index ref.Val) ref.Val {
 func (m *baseMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	// If the map is already assignable to the desired type return it, e.g. interfaces and
 	// maps with the same key value types.
+	if typeDesc == reflect.TypeFor[any]() {
+		typeDesc = reflect.TypeFor[map[any]any]()
+	}
 	if reflect.TypeOf(m.value).AssignableTo(typeDesc) {
 		return m.value, nil
 	}
@@ -164,19 +167,19 @@ func (m *baseMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	}
 	switch typeDesc {
 	case anyValueType:
-		json, err := m.ConvertToNative(jsonStructType)
+		json, err := m.ConvertToNative(JSONStructType)
 		if err != nil {
 			return nil, err
 		}
 		return anypb.New(json.(proto.Message))
-	case jsonValueType, jsonStructType:
+	case JSONValueType, JSONStructType:
 		jsonEntries, err :=
 			m.ConvertToNative(reflect.TypeOf(map[string]*structpb.Value{}))
 		if err != nil {
 			return nil, err
 		}
 		jsonMap := &structpb.Struct{Fields: jsonEntries.(map[string]*structpb.Value)}
-		if typeDesc == jsonStructType {
+		if typeDesc == JSONStructType {
 			return jsonMap, nil
 		}
 		return structpb.NewStructValue(jsonMap), nil
@@ -226,7 +229,7 @@ func (m *baseMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 				return nil, fieldName.(*Err)
 			}
 			name := string(fieldName.(String))
-			name = strcase.UpperCamelCase(name)
+			name = upperCamelCase(name)
 			fieldRef := nativeStruct.FieldByName(name)
 			if !fieldRef.IsValid() {
 				return nil, fmt.Errorf("type conversion error, no such field '%s' in type '%v'", name, typeDesc)
@@ -703,12 +706,12 @@ func (m *protoMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	// maps with the same key value types.
 	switch typeDesc {
 	case anyValueType:
-		json, err := m.ConvertToNative(jsonStructType)
+		json, err := m.ConvertToNative(JSONStructType)
 		if err != nil {
 			return nil, err
 		}
 		return anypb.New(json.(proto.Message))
-	case jsonValueType, jsonStructType:
+	case JSONValueType, JSONStructType:
 		jsonEntries, err :=
 			m.ConvertToNative(reflect.TypeOf(map[string]*structpb.Value{}))
 		if err != nil {
@@ -716,7 +719,7 @@ func (m *protoMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		}
 		jsonMap := &structpb.Struct{
 			Fields: jsonEntries.(map[string]*structpb.Value)}
-		if typeDesc == jsonStructType {
+		if typeDesc == JSONStructType {
 			return jsonMap, nil
 		}
 		return structpb.NewStructValue(jsonMap), nil
@@ -1035,4 +1038,33 @@ func InsertMapKeyValue(m traits.Mapper, k, v ref.Val) ref.Val {
 		return DefaultTypeAdapter.NativeToValue(copy)
 	}
 	return NewErr("insert failed: key %v already exists", k)
+}
+
+func upperCamelCase(s string) string {
+	var newStr strings.Builder
+	s = strings.TrimSpace(s)
+	var prev rune
+	for _, curr := range s {
+		if prev == 0 || isDelim(prev) {
+			if !isDelim(curr) {
+				newStr.WriteRune(unicode.ToUpper(curr))
+			}
+		} else if !isDelim(curr) {
+			if isLower(prev) {
+				newStr.WriteRune(curr)
+			} else {
+				newStr.WriteRune(unicode.ToLower(curr))
+			}
+		}
+		prev = curr
+	}
+	return newStr.String()
+}
+
+func isDelim(r rune) bool {
+	return r == '_' || r == '-'
+}
+
+func isLower(r rune) bool {
+	return r >= 'a' && r <= 'z'
 }

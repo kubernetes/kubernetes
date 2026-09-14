@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	yaml "go.yaml.in/yaml/v2"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -71,6 +73,59 @@ func TestValueOfAllocatableResources(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestParseResourceList(t *testing.T) {
+	testCases := []struct {
+		input    map[string]string
+		expected string
+		name     string
+	}{
+		{
+			input:    map[string]string{"cpu": "200m"},
+			expected: "200m",
+			name:     "whole millicores",
+		},
+		{
+			input:    map[string]string{"cpu": "200.5m"},
+			expected: "201m",
+			name:     "decimal millicores rounded up",
+		},
+		{
+			input:    map[string]string{"cpu": "200.4m"},
+			expected: "200m",
+			name:     "decimal millicores rounded down",
+		},
+	}
+
+	for _, test := range testCases {
+		rl, err := parseResourceList(test.input)
+		require.NoError(t, err, test.name)
+		q := rl[v1.ResourceCPU]
+		require.Equal(t, test.expected, q.String(), test.name)
+	}
+}
+
+func TestParseResourceListCPUOverflowsMicro(t *testing.T) {
+	// The old rounding read the quantity through a wrapping micro projection, so
+	// a reservation past that range was stored as a negative number of cores.
+	for _, v := range []string{"1e30", "10000000000000", "9223372036854775808u"} {
+		rl, err := parseResourceList(map[string]string{"cpu": v})
+		require.NoError(t, err, v)
+		q := rl[v1.ResourceCPU]
+		require.Equal(t, 1, q.Sign(), v)
+		require.Zero(t, q.Cmp(resource.MustParse(v)), "%s: kept unrounded, got %s", v, q.String())
+	}
+
+	// The largest micro value that fits, where adding 500 before dividing does not.
+	rl, err := parseResourceList(map[string]string{"cpu": "9223372036854775807u"})
+	require.NoError(t, err)
+	q := rl[v1.ResourceCPU]
+	require.Equal(t, int64(9223372036854776), q.MilliValue())
+
+	// Rounding stops at the cutoff rather than continuing past it, so the largest
+	// rounded value sits above the smallest kept one.
+	require.Equal(t, 1, q.Cmp(resource.MustParse("9223372036854775808u")))
 }
 
 func TestMergeKubeletConfigurations(t *testing.T) {
@@ -520,4 +575,38 @@ readOnlyPort: 9999
 			}
 		})
 	}
+}
+
+func TestMarshalKubeletConfigForLog(t *testing.T) {
+	kc := &kubeletconfiginternal.KubeletConfiguration{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "KubeletConfiguration",
+			APIVersion: "kubelet.config.k8s.io/v1beta1",
+		},
+		// Non-default values that must round-trip into the marshaled output.
+		FailSwapOn:   false,
+		EvictionHard: map[string]string{"memory.available": "200Mi"},
+		// Sensitive field that must be masked.
+		StaticPodURLHeader: map[string][]string{
+			"Authorization": {"Bearer super-secret-token"},
+		},
+	}
+
+	out, err := marshalKubeletConfigForLog(kc)
+	require.NoError(t, err)
+
+	// (2) The output carries the external GroupVersionKind, mirroring /configz.
+	require.Contains(t, out, "apiVersion: kubelet.config.k8s.io/v1beta1")
+	require.Contains(t, out, "kind: KubeletConfiguration")
+
+	// (1) Non-default effective values are present.
+	require.Contains(t, out, "failSwapOn: false")
+	require.Contains(t, out, "memory.available: 200Mi")
+
+	// (3) Sensitive StaticPodURLHeader values are masked, never leaked.
+	require.Contains(t, out, "<masked>")
+	require.NotContains(t, out, "super-secret-token")
+
+	// The helper must not mutate the caller's config when masking.
+	require.Equal(t, []string{"Bearer super-secret-token"}, kc.StaticPodURLHeader["Authorization"])
 }

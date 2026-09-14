@@ -896,41 +896,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 	f.Context("Resource Health", framework.WithFeatureGate(features.ResourceHealthStatus), f.WithSerial(), func() {
 
-		// Verifies that device health transitions (Healthy -> Unhealthy -> Healthy)
-		// reported by a DRA plugin are correctly reflected in the Pod's status.
-		ginkgo.It("should reflect device health changes in the Pod's status", func(ctx context.Context) {
-			ginkgo.By("Starting the test driver with channel-based control")
-			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, f.Namespace.Name, getNodeName(ctx, f), driverName)
-
-			pod, claimName, poolNameForTest, deviceNameForTest := setupAndVerifyHealthyPod(
-				ctx, f, kubeletPlugin, driverName,
-				"health-test-class", "health-test-claim", "health-test-pod", "pool-a", "dev-0",
-			)
-
-			ginkgo.By("Setting device health to Unhealthy via control channel")
-			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
-				PoolName:   poolNameForTest,
-				DeviceName: deviceNameForTest,
-				Health:     "Unhealthy",
-			}
-
-			ginkgo.By("Verifying device health is now Unhealthy")
-			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
-				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
-			}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Unhealthy"), "Device health should update to Unhealthy")
-
-			ginkgo.By("Setting device health back to Healthy via control channel")
-			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
-				PoolName:   poolNameForTest,
-				DeviceName: deviceNameForTest,
-				Health:     "Healthy",
-			}
-
-			ginkgo.By("Verifying device health has recovered to Healthy")
-			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
-				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
-			}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"), "Device health should recover and update to Healthy")
-		})
+		// The device health transition tests, including negotiation of the
+		// DRAResourceHealth API version, are in test/e2e/dra.
 
 		// This test verifies that the Kubelet establishes only a single gRPC connection
 		// with the DRA plugin throughout the plugin lifecycle.
@@ -1403,7 +1370,10 @@ func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName,
 	ctx = klog.NewContext(ctx, logger)
 
 	allOpts := []any{
-		testdriver.Options{EnableHealthService: false},
+		// In split deployments the registrar's registration is what the
+		// kubelet negotiates the health service from, so it must advertise
+		// health even though a separate service instance serves it.
+		testdriver.Options{EnableHealthService: true},
 		kubeletplugin.DRAService(false),
 	}
 

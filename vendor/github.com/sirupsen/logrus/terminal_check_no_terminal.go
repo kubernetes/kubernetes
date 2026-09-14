@@ -1,11 +1,7 @@
-// +build js nacl plan9
+//go:build js || nacl || plan9 || wasi || wasip1 || tinygo
 
 package logrus
 
-import (
-	"io"
-)
-
-func checkIfTerminal(w io.Writer) bool {
+func checkIfTerminal(_ any) bool {
 	return false
 }

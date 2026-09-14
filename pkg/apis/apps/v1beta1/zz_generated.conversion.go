@@ -25,8 +25,8 @@ import (
 	unsafe "unsafe"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apicorev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
@@ -355,12 +355,7 @@ func Convert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *app
 }
 
 func autoConvert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(in *appsv1beta1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
-	out.Type = apps.DeploymentConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
-	out.LastUpdateTime = in.LastUpdateTime
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*apps.DeploymentCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -370,12 +365,7 @@ func Convert_v1beta1_DeploymentCondition_To_apps_DeploymentCondition(in *appsv1b
 }
 
 func autoConvert_apps_DeploymentCondition_To_v1beta1_DeploymentCondition(in *apps.DeploymentCondition, out *appsv1beta1.DeploymentCondition, s conversion.Scope) error {
-	out.Type = appsv1beta1.DeploymentConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
-	out.LastUpdateTime = in.LastUpdateTime
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*appsv1beta1.DeploymentCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -455,10 +445,10 @@ func Convert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(in *apps.Depl
 }
 
 func autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1beta1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
-	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -479,10 +469,10 @@ func Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1beta1.Deplo
 }
 
 func autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.DeploymentSpec, out *appsv1beta1.DeploymentSpec, s conversion.Scope) error {
-	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -503,15 +493,7 @@ func Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.DeploymentSp
 }
 
 func autoConvert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in *appsv1beta1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
-	out.Replicas = in.Replicas
-	out.UpdatedReplicas = in.UpdatedReplicas
-	out.ReadyReplicas = in.ReadyReplicas
-	out.AvailableReplicas = in.AvailableReplicas
-	out.UnavailableReplicas = in.UnavailableReplicas
-	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
-	out.Conditions = *(*[]apps.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
-	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
+	*out = *(*apps.DeploymentStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -521,15 +503,7 @@ func Convert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in *appsv1beta1.D
 }
 
 func autoConvert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(in *apps.DeploymentStatus, out *appsv1beta1.DeploymentStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
-	out.Replicas = in.Replicas
-	out.UpdatedReplicas = in.UpdatedReplicas
-	out.ReadyReplicas = in.ReadyReplicas
-	out.AvailableReplicas = in.AvailableReplicas
-	out.UnavailableReplicas = in.UnavailableReplicas
-	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
-	out.Conditions = *(*[]appsv1beta1.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
-	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
+	*out = *(*appsv1beta1.DeploymentStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -577,7 +551,7 @@ func Convert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *apps.Depl
 }
 
 func autoConvert_v1beta1_RollbackConfig_To_apps_RollbackConfig(in *appsv1beta1.RollbackConfig, out *apps.RollbackConfig, s conversion.Scope) error {
-	out.Revision = in.Revision
+	*out = *(*apps.RollbackConfig)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -587,7 +561,7 @@ func Convert_v1beta1_RollbackConfig_To_apps_RollbackConfig(in *appsv1beta1.Rollb
 }
 
 func autoConvert_apps_RollbackConfig_To_v1beta1_RollbackConfig(in *apps.RollbackConfig, out *appsv1beta1.RollbackConfig, s conversion.Scope) error {
-	out.Revision = in.Revision
+	*out = *(*appsv1beta1.RollbackConfig)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -597,10 +571,10 @@ func Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig(in *apps.RollbackConf
 }
 
 func autoConvert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *appsv1beta1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
-	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+	if err := v1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
+	if err := v1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
 		return err
 	}
 	return nil
@@ -612,10 +586,10 @@ func Convert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in 
 }
 
 func autoConvert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *appsv1beta1.RollingUpdateDeployment, s conversion.Scope) error {
-	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+	if err := v1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
+	if err := v1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
 		return err
 	}
 	return nil
@@ -627,7 +601,7 @@ func Convert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in 
 }
 
 func autoConvert_v1beta1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(in *appsv1beta1.RollingUpdateStatefulSetStrategy, out *apps.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
-	if err := metav1.Convert_Pointer_int32_To_int32(&in.Partition, &out.Partition, s); err != nil {
+	if err := v1.Convert_Pointer_int32_To_int32(&in.Partition, &out.Partition, s); err != nil {
 		return err
 	}
 	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
@@ -640,7 +614,7 @@ func Convert_v1beta1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateState
 }
 
 func autoConvert_apps_RollingUpdateStatefulSetStrategy_To_v1beta1_RollingUpdateStatefulSetStrategy(in *apps.RollingUpdateStatefulSetStrategy, out *appsv1beta1.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
-	if err := metav1.Convert_int32_To_Pointer_int32(&in.Partition, &out.Partition, s); err != nil {
+	if err := v1.Convert_int32_To_Pointer_int32(&in.Partition, &out.Partition, s); err != nil {
 		return err
 	}
 	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
@@ -685,7 +659,7 @@ func Convert_autoscaling_Scale_To_v1beta1_Scale(in *autoscaling.Scale, out *apps
 }
 
 func autoConvert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(in *appsv1beta1.ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
-	out.Replicas = in.Replicas
+	*out = *(*autoscaling.ScaleSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -695,7 +669,7 @@ func Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(in *appsv1beta1.ScaleSpe
 }
 
 func autoConvert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(in *autoscaling.ScaleSpec, out *appsv1beta1.ScaleSpec, s conversion.Scope) error {
-	out.Replicas = in.Replicas
+	*out = *(*appsv1beta1.ScaleSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -750,11 +724,7 @@ func Convert_apps_StatefulSet_To_v1beta1_StatefulSet(in *apps.StatefulSet, out *
 }
 
 func autoConvert_v1beta1_StatefulSetCondition_To_apps_StatefulSetCondition(in *appsv1beta1.StatefulSetCondition, out *apps.StatefulSetCondition, s conversion.Scope) error {
-	out.Type = apps.StatefulSetConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*apps.StatefulSetCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -764,11 +734,7 @@ func Convert_v1beta1_StatefulSetCondition_To_apps_StatefulSetCondition(in *appsv
 }
 
 func autoConvert_apps_StatefulSetCondition_To_v1beta1_StatefulSetCondition(in *apps.StatefulSetCondition, out *appsv1beta1.StatefulSetCondition, s conversion.Scope) error {
-	out.Type = appsv1beta1.StatefulSetConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*appsv1beta1.StatefulSetCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -820,7 +786,7 @@ func Convert_apps_StatefulSetList_To_v1beta1_StatefulSetList(in *apps.StatefulSe
 }
 
 func autoConvert_v1beta1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(in *appsv1beta1.StatefulSetOrdinals, out *apps.StatefulSetOrdinals, s conversion.Scope) error {
-	out.Start = in.Start
+	*out = *(*apps.StatefulSetOrdinals)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -830,7 +796,7 @@ func Convert_v1beta1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(in *appsv1b
 }
 
 func autoConvert_apps_StatefulSetOrdinals_To_v1beta1_StatefulSetOrdinals(in *apps.StatefulSetOrdinals, out *appsv1beta1.StatefulSetOrdinals, s conversion.Scope) error {
-	out.Start = in.Start
+	*out = *(*appsv1beta1.StatefulSetOrdinals)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -840,8 +806,7 @@ func Convert_apps_StatefulSetOrdinals_To_v1beta1_StatefulSetOrdinals(in *apps.St
 }
 
 func autoConvert_v1beta1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_StatefulSetPersistentVolumeClaimRetentionPolicy(in *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy, out *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
-	out.WhenDeleted = apps.PersistentVolumeClaimRetentionPolicyType(in.WhenDeleted)
-	out.WhenScaled = apps.PersistentVolumeClaimRetentionPolicyType(in.WhenScaled)
+	*out = *(*apps.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -851,8 +816,7 @@ func Convert_v1beta1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_Sta
 }
 
 func autoConvert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1beta1_StatefulSetPersistentVolumeClaimRetentionPolicy(in *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, out *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
-	out.WhenDeleted = appsv1beta1.PersistentVolumeClaimRetentionPolicyType(in.WhenDeleted)
-	out.WhenScaled = appsv1beta1.PersistentVolumeClaimRetentionPolicyType(in.WhenScaled)
+	*out = *(*appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -862,10 +826,10 @@ func Convert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1beta1_Sta
 }
 
 func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
-	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -883,14 +847,14 @@ func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta1
 }
 
 func autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSetSpec, out *appsv1beta1.StatefulSetSpec, s conversion.Scope) error {
-	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	out.VolumeClaimTemplates = *(*[]v1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
+	out.VolumeClaimTemplates = *(*[]apicorev1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
 	out.ServiceName = in.ServiceName
 	out.PodManagementPolicy = appsv1beta1.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -904,16 +868,7 @@ func autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.Statef
 }
 
 func autoConvert_v1beta1_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1beta1.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
-	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.Replicas = in.Replicas
-	out.ReadyReplicas = in.ReadyReplicas
-	out.CurrentReplicas = in.CurrentReplicas
-	out.UpdatedReplicas = in.UpdatedReplicas
-	out.CurrentRevision = in.CurrentRevision
-	out.UpdateRevision = in.UpdateRevision
-	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
-	out.Conditions = *(*[]apps.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
-	out.AvailableReplicas = in.AvailableReplicas
+	*out = *(*apps.StatefulSetStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -923,16 +878,7 @@ func Convert_v1beta1_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1beta1
 }
 
 func autoConvert_apps_StatefulSetStatus_To_v1beta1_StatefulSetStatus(in *apps.StatefulSetStatus, out *appsv1beta1.StatefulSetStatus, s conversion.Scope) error {
-	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.Replicas = in.Replicas
-	out.ReadyReplicas = in.ReadyReplicas
-	out.CurrentReplicas = in.CurrentReplicas
-	out.UpdatedReplicas = in.UpdatedReplicas
-	out.CurrentRevision = in.CurrentRevision
-	out.UpdateRevision = in.UpdateRevision
-	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
-	out.Conditions = *(*[]appsv1beta1.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
-	out.AvailableReplicas = in.AvailableReplicas
+	*out = *(*appsv1beta1.StatefulSetStatus)(unsafe.Pointer(in))
 	return nil
 }
 

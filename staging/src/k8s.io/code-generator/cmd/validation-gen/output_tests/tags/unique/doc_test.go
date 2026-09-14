@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestUnique(t *testing.T) {
@@ -47,16 +46,21 @@ func TestUnique(t *testing.T) {
 		CustomUniqueListWithTypeSet: []string{"a", "b", "a"},
 		CustomUniqueListWithTypeMap: []Item{{Key: "a"}, {Key: "b"}, {Key: "a"}},
 		SliceMapFieldWithPtrKey: []PtrKeyStruct{
-			{Key: ptr.To("a"), Data: "first"},
-			{Key: ptr.To("b"), Data: "second"},
+			{Key: new("a"), Data: "first"},
+			{Key: new("b"), Data: "second"},
 		},
 		SliceMapFieldWithMixedKeys: []ItemWithMixedKeys{
-			{Key1: ptr.To("a"), Key2: "x", Data: "first"},
-			{Key1: ptr.To("a"), Key2: "y", Data: "second"},
+			{Key1: new("a"), Key2: "x", Data: "first"},
+			{Key1: new("a"), Key2: "y", Data: "second"},
 		},
 		SliceMapFieldWithMultiplePtrKeys: []ItemWithMultiplePtrKeys{
-			{Key1: ptr.To("a"), Key2: ptr.To("x"), Data: "first"},
-			{Key1: ptr.To("a"), Key2: ptr.To("y"), Data: "second"},
+			{Key1: new("a"), Key2: new("x"), Data: "first"},
+			{Key1: new("a"), Key2: new("y"), Data: "second"},
+		},
+		PrimitivePointerListUniqueSet: []*string{new("aaa"), new("bbb")},
+		PointerListUniqueMap: []*Item{
+			{Key: "key1", Data: "one"},
+			{Key: "key2", Data: "two"},
 		},
 	}).ExpectValid()
 
@@ -70,6 +74,8 @@ func TestUnique(t *testing.T) {
 		CustomUniqueListWithTypeMap:      []Item{},
 		SliceMapFieldWithMixedKeys:       []ItemWithMixedKeys{},
 		SliceMapFieldWithMultiplePtrKeys: []ItemWithMultiplePtrKeys{},
+		PrimitivePointerListUniqueSet:    []*string{},
+		PointerListUniqueMap:             []*Item{},
 	}).ExpectValid()
 
 	// Test single element lists
@@ -80,8 +86,10 @@ func TestUnique(t *testing.T) {
 		AtomicListUniqueMap:              []Item{{Key: "single", Data: "one"}},
 		CustomUniqueListWithTypeSet:      []string{"single"},
 		CustomUniqueListWithTypeMap:      []Item{{Key: "single"}},
-		SliceMapFieldWithMixedKeys:       []ItemWithMixedKeys{{Key1: ptr.To("a"), Key2: "b", Data: "one"}},
-		SliceMapFieldWithMultiplePtrKeys: []ItemWithMultiplePtrKeys{{Key1: ptr.To("a"), Key2: ptr.To("b"), Data: "one"}},
+		SliceMapFieldWithMixedKeys:       []ItemWithMixedKeys{{Key1: new("a"), Key2: "b", Data: "one"}},
+		SliceMapFieldWithMultiplePtrKeys: []ItemWithMultiplePtrKeys{{Key1: new("a"), Key2: new("b"), Data: "one"}},
+		PrimitivePointerListUniqueSet:    []*string{new("single")},
+		PointerListUniqueMap:             []*Item{{Key: "single", Data: "one"}},
 	}).ExpectValid()
 
 	// Test duplicate values (should fail validation)
@@ -105,19 +113,25 @@ func TestUnique(t *testing.T) {
 		CustomUniqueListWithTypeSet: []string{"a", "b", "a"},
 		CustomUniqueListWithTypeMap: []Item{{Key: "a"}, {Key: "b"}, {Key: "a"}},
 		SliceMapFieldWithPtrKey: []PtrKeyStruct{
-			{Key: ptr.To("a"), Data: "first"},
-			{Key: ptr.To("b"), Data: "second"},
-			{Key: ptr.To("a"), Data: "third"},
+			{Key: new("a"), Data: "first"},
+			{Key: new("b"), Data: "second"},
+			{Key: new("a"), Data: "third"},
 		},
 		SliceMapFieldWithMixedKeys: []ItemWithMixedKeys{
-			{Key1: ptr.To("a"), Key2: "x", Data: "first"},
-			{Key1: ptr.To("a"), Key2: "y", Data: "second"},
-			{Key1: ptr.To("a"), Key2: "x", Data: "third"},
+			{Key1: new("a"), Key2: "x", Data: "first"},
+			{Key1: new("a"), Key2: "y", Data: "second"},
+			{Key1: new("a"), Key2: "x", Data: "third"},
 		},
 		SliceMapFieldWithMultiplePtrKeys: []ItemWithMultiplePtrKeys{
-			{Key1: ptr.To("a"), Key2: ptr.To("x"), Data: "first"},
-			{Key1: ptr.To("a"), Key2: ptr.To("y"), Data: "second"},
-			{Key1: ptr.To("a"), Key2: ptr.To("x"), Data: "third"},
+			{Key1: new("a"), Key2: new("x"), Data: "first"},
+			{Key1: new("a"), Key2: new("y"), Data: "second"},
+			{Key1: new("a"), Key2: new("x"), Data: "third"},
+		},
+		PrimitivePointerListUniqueSet: []*string{new("aaa"), new("bbb"), new("aaa")},
+		PointerListUniqueMap: []*Item{
+			{Key: "key1", Data: "one"},
+			{Key: "key2", Data: "two"},
+			{Key: "key1", Data: "three"},
 		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Duplicate(field.NewPath("primitiveListUniqueSet").Index(3), nil),
@@ -129,6 +143,8 @@ func TestUnique(t *testing.T) {
 		field.Duplicate(field.NewPath("sliceMapFieldWithPtrKey").Index(2), nil),
 		field.Duplicate(field.NewPath("sliceMapFieldWithMixedKeys").Index(2), nil),
 		field.Duplicate(field.NewPath("sliceMapFieldWithMultiplePtrKeys").Index(2), nil),
+		field.Duplicate(field.NewPath("primitivePointerListUniqueSet").Index(2), nil),
+		field.Duplicate(field.NewPath("pointerListUniqueMap").Index(2), nil),
 	})
 
 	// Test with zero values and empty strings
@@ -144,6 +160,15 @@ func TestUnique(t *testing.T) {
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Duplicate(field.NewPath("primitiveListUniqueSet").Index(2), nil),
 		field.Duplicate(field.NewPath("atomicListUniqueMap").Index(2), nil),
+	})
+
+	// Test nil elements in pointer lists (should trigger Required errors)
+	st.Value(&Struct{
+		PrimitivePointerListUniqueSet: []*string{new("a"), nil, new("b")},
+		PointerListUniqueMap:          []*Item{{Key: "key1"}, nil},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Required(field.NewPath("primitivePointerListUniqueSet").Index(1), ""),
+		field.Required(field.NewPath("pointerListUniqueMap").Index(1), ""),
 	})
 }
 
@@ -167,16 +192,21 @@ func TestRatcheting(t *testing.T) {
 		CustomUniqueListWithTypeSet: []string{"a", "b", "a"},
 		CustomUniqueListWithTypeMap: []Item{{Key: "a"}, {Key: "b"}, {Key: "a"}},
 		SliceMapFieldWithPtrKey: []PtrKeyStruct{
-			{Key: ptr.To("a"), Data: "first"},
-			{Key: ptr.To("b"), Data: "second"},
+			{Key: new("a"), Data: "first"},
+			{Key: new("b"), Data: "second"},
 		},
 		SliceMapFieldWithMixedKeys: []ItemWithMixedKeys{
-			{Key1: ptr.To("a"), Key2: "x", Data: "first"},
-			{Key1: ptr.To("a"), Key2: "y", Data: "second"},
+			{Key1: new("a"), Key2: "x", Data: "first"},
+			{Key1: new("a"), Key2: "y", Data: "second"},
 		},
 		SliceMapFieldWithMultiplePtrKeys: []ItemWithMultiplePtrKeys{
-			{Key1: ptr.To("a"), Key2: ptr.To("x"), Data: "first"},
-			{Key1: ptr.To("a"), Key2: ptr.To("y"), Data: "second"},
+			{Key1: new("a"), Key2: new("x"), Data: "first"},
+			{Key1: new("a"), Key2: new("y"), Data: "second"},
+		},
+		PrimitivePointerListUniqueSet: []*string{new("aaa"), new("bbb")},
+		PointerListUniqueMap: []*Item{
+			{Key: "key1", Data: "one"},
+			{Key: "key2", Data: "two"},
 		},
 	}
 
@@ -198,16 +228,21 @@ func TestRatcheting(t *testing.T) {
 		CustomUniqueListWithTypeSet: []string{"a", "a", "b"},
 		CustomUniqueListWithTypeMap: []Item{{Key: "a"}, {Key: "a"}, {Key: "b"}},
 		SliceMapFieldWithPtrKey: []PtrKeyStruct{
-			{Key: ptr.To("b"), Data: "second"},
-			{Key: ptr.To("a"), Data: "first"},
+			{Key: new("b"), Data: "second"},
+			{Key: new("a"), Data: "first"},
 		},
 		SliceMapFieldWithMixedKeys: []ItemWithMixedKeys{
-			{Key1: ptr.To("a"), Key2: "y", Data: "second"},
-			{Key1: ptr.To("a"), Key2: "x", Data: "first"},
+			{Key1: new("a"), Key2: "y", Data: "second"},
+			{Key1: new("a"), Key2: "x", Data: "first"},
 		},
 		SliceMapFieldWithMultiplePtrKeys: []ItemWithMultiplePtrKeys{
-			{Key1: ptr.To("a"), Key2: ptr.To("y"), Data: "second"},
-			{Key1: ptr.To("a"), Key2: ptr.To("x"), Data: "first"},
+			{Key1: new("a"), Key2: new("y"), Data: "second"},
+			{Key1: new("a"), Key2: new("x"), Data: "first"},
+		},
+		PrimitivePointerListUniqueSet: []*string{new("bbb"), new("aaa")},
+		PointerListUniqueMap: []*Item{
+			{Key: "key2", Data: "two"},
+			{Key: "key1", Data: "one"},
 		},
 	}
 

@@ -167,7 +167,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	proxyRoundTripper = transport.NewAuthProxyRoundTripper(user.GetName(), userUID, user.GetGroups(), user.GetExtra(), proxyRoundTripper)
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) && !upgrade {
+	if !upgrade {
 		tracingWrapper := tracing.WrapperFor(r.tracerProvider)
 		proxyRoundTripper = tracingWrapper(proxyRoundTripper)
 	}

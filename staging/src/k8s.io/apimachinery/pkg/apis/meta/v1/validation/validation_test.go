@@ -129,7 +129,6 @@ func TestInvalidDryRun(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
@@ -180,7 +179,6 @@ func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
 				Preconditions:      &metav1.Preconditions{},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(fieldPath, true, "cannot be set together with .dryRun"),
 				field.Invalid(fieldPath, true, "cannot be set together with .propagationPolicy"),
 				field.Invalid(fieldPath, true, "cannot be set together with .gracePeriodSeconds"),
 				field.Invalid(fieldPath, true, "cannot be set together with .preconditions"),
@@ -197,7 +195,6 @@ func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
 				Preconditions:      &metav1.Preconditions{},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(fieldPath, true, "cannot be set together with .dryRun"),
 				field.Invalid(fieldPath, true, "cannot be set together with .orphanDependents"),
 				field.Invalid(fieldPath, true, "cannot be set together with .gracePeriodSeconds"),
 				field.Invalid(fieldPath, true, "cannot be set together with .preconditions"),
@@ -209,6 +206,24 @@ func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
 				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](false),
 			},
 			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "option is true, dry-run is set (should be allowed)",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: new(true),
+				DryRun: []string{"All"},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "option is true, dry-run is set to an invalid value",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: new(true),
+				DryRun: []string{"Invalid"},
+			},
+			expectedErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("dryRun"), []string{"Invalid"}, []string{"All"}),
+			},
 		},
 	}
 
@@ -375,6 +390,10 @@ func TestValidateManagedFieldsInvalid(t *testing.T) {
 			if len(errs) == 0 {
 				t.Errorf("Validation should have failed")
 			}
+			errs = ValidateManagedFields([]metav1.ManagedFieldsEntry{test}, field.NewPath("managedFields"), CoveredByDeclarative)
+			if len(errs) == 0 {
+				t.Errorf("Validation with CoveredByDeclarative should have failed")
+			}
 		})
 	}
 }
@@ -405,6 +424,10 @@ func TestValidateMangedFieldsValid(t *testing.T) {
 			err := ValidateManagedFields([]metav1.ManagedFieldsEntry{test}, field.NewPath("managedFields"))
 			if err != nil {
 				t.Errorf("Validation failed: %v", err)
+			}
+			err = ValidateManagedFields([]metav1.ManagedFieldsEntry{test}, field.NewPath("managedFields"), CoveredByDeclarative)
+			if err != nil {
+				t.Errorf("Validation with CoveredByDeclarative failed: %v", err)
 			}
 		})
 	}
@@ -457,7 +480,7 @@ func TestValidateConditions(t *testing.T) {
 			Type: "First",
 		}},
 		validateErrs: func(t *testing.T, errs field.ErrorList) {
-			needle := `status.conditions[2].type: Duplicate value: "First"`
+			needle := `status.conditions[2]: Duplicate value: "First"`
 			if !hasError(errs, needle) {
 				t.Errorf("missing %q in\n%v", needle, errorsAsString(errs))
 			}

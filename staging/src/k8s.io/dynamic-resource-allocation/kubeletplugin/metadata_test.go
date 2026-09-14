@@ -26,6 +26,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	cdispec "tags.cncf.io/container-device-interface/specs-go"
+
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,10 +40,12 @@ import (
 )
 
 const (
-	testDriverName            = "example.com"
-	testClaimName             = "my-claim"
-	testClaimNS               = "default"
-	testClaimUID              = types.UID("claim-uid-1234")
+	testDriverName = "example.com"
+	testClaimName  = "my-claim"
+	testClaimNS    = "default"
+	// Starts with a digit so CDI MinimumRequiredVersion yields 0.5.0,
+	// matching real claim UIDs (UUIDs) that may start with a digit.
+	testClaimUID              = types.UID("1234-claim-uid")
 	testRequest               = "gpu-request"
 	testRequestWithSubrequest = "gpu-request/high-memory"
 )
@@ -86,7 +90,7 @@ func TestNewMetadataWriterVersionValidation(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			_, err := newMetadataWriter(testDriverName, t.TempDir(), t.TempDir(), tc.versions)
+			_, err := newMetadataWriter(testDriverName, t.TempDir(), t.TempDir(), tc.versions, defaultMetadataFileOperations(MetadataFileOperations{}))
 			if tc.expectErr && err == nil {
 				t.Fatal("expected error but got nil")
 			}
@@ -101,7 +105,7 @@ func newTestWriter(t *testing.T) (*metadataWriter, string, string) {
 	t.Helper()
 	pluginDir := t.TempDir()
 	cdiDir := t.TempDir()
-	w, err := newMetadataWriter(testDriverName, pluginDir, cdiDir, []schema.GroupVersion{v1alpha1.SchemeGroupVersion})
+	w, err := newMetadataWriter(testDriverName, pluginDir, cdiDir, []schema.GroupVersion{v1alpha1.SchemeGroupVersion}, defaultMetadataFileOperations(MetadataFileOperations{}))
 	if err != nil {
 		t.Fatalf("newMetadataWriter: %v", err)
 	}
@@ -181,14 +185,13 @@ func expectedRequestMetadata(reqName string, devs []Device) *v1alpha1.DeviceMeta
 
 // expectedCDISpec returns the expected CDI spec for a single request.
 // containerPath is the full expected path inside the container.
-func expectedCDISpec(reqName, metadataHostPath, containerPath string) cdiSpec {
-	return cdiSpec{
-		Version: cdiVersionStr,
-		Kind:    testDriverName + "/metadata",
-		Devices: []cdiDevice{{
+func expectedCDISpec(reqName, metadataHostPath, containerPath string) cdispec.Spec {
+	spec := cdispec.Spec{
+		Kind: testDriverName + "/metadata",
+		Devices: []cdispec.Device{{
 			Name: string(testClaimUID) + "_" + reqName,
-			ContainerEdits: cdiContainerEdits{
-				Mounts: []cdiMount{{
+			ContainerEdits: cdispec.ContainerEdits{
+				Mounts: []*cdispec.Mount{{
 					HostPath:      metadataHostPath,
 					ContainerPath: containerPath,
 					Options:       []string{"ro", "bind"},
@@ -196,6 +199,9 @@ func expectedCDISpec(reqName, metadataHostPath, containerPath string) cdiSpec {
 			},
 		}},
 	}
+	v, _ := cdispec.MinimumRequiredVersion(&spec)
+	spec.Version = v
+	return spec
 }
 
 type expectedRequestPaths struct {
@@ -343,7 +349,7 @@ func TestProcessPreparedClaim(t *testing.T) {
 				if err != nil {
 					t.Fatalf("read CDI spec %s: %v", cdiPath, err)
 				}
-				var gotCDISpec cdiSpec
+				var gotCDISpec cdispec.Spec
 				if err := json.Unmarshal(cdiData, &gotCDISpec); err != nil {
 					t.Fatalf("unmarshal CDI spec: %v", err)
 				}

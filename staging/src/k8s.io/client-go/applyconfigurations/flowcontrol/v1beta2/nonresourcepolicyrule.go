@@ -25,11 +25,11 @@ package v1beta2
 // target non-resource URL. A NonResourcePolicyRule matches a request if and only if both (a) at least one member
 // of verbs matches the request and (b) at least one member of nonResourceURLs matches the request.
 type NonResourcePolicyRuleApplyConfiguration struct {
-	// `verbs` is a list of matching verbs and may not be empty.
+	// verbs is a list of matching verbs and may not be empty.
 	// "*" matches all verbs. If it is present, it must be the only entry.
 	// Required.
 	Verbs []string `json:"verbs,omitempty"`
-	// `nonResourceURLs` is a set of url prefixes that a user should have access to and may not be empty.
+	// nonResourceURLs is a set of url prefixes that a user should have access to and may not be empty.
 	// For example:
 	// - "/healthz" is legal
 	// - "/hea*" is illegal

@@ -41,6 +41,7 @@ type ExampleInterface interface {
 	Create(ctx context.Context, example *crv1.Example, opts metav1.CreateOptions) (*crv1.Example, error)
 	Update(ctx context.Context, example *crv1.Example, opts metav1.UpdateOptions) (*crv1.Example, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*crv1.Example, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*crv1.ExampleList, error)

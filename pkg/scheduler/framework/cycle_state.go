@@ -46,6 +46,10 @@ type CycleState struct {
 	// or doesn't belong to any pod group.
 	// This field can only be non-nil when GenericWorkload feature flag is enabled.
 	podGroupCycleState fwk.PodGroupCycleState
+	// placementCycleState contains the CycleState for the current Placement being evaluated.
+	// If set to nil, it means this pod is not being scheduled within a placement context.
+	// This field can only be non-nil when GenericWorkload feature flag is enabled.
+	placementCycleState fwk.PlacementCycleState
 }
 
 // NewCycleState initializes a new CycleState and returns its pointer.
@@ -105,12 +109,27 @@ func (c *CycleState) IsPodGroupSchedulingCycle() bool {
 	return c.podGroupCycleState != nil
 }
 
-func (c *CycleState) SetPodGroupSchedulingCycle(podGroupCycleState fwk.PodGroupCycleState) {
+func (c *CycleState) SetPodGroupCycleState(podGroupCycleState fwk.PodGroupCycleState) {
 	c.podGroupCycleState = podGroupCycleState
 }
 
-func (c *CycleState) GetPodGroupSchedulingCycle() fwk.PodGroupCycleState {
+func (c *CycleState) GetPodGroupCycleState() fwk.PodGroupCycleState {
 	return c.podGroupCycleState
+}
+
+func (c *CycleState) GetPlacementCycleState() fwk.PlacementCycleState {
+	return c.placementCycleState
+}
+
+// GetParentPlacementCycleState implements [fwk.PodGroupCycleState.GetParentPlacementCycleState].
+// We can reuse the same placementCycleState field as GetPlacementCycleState, as it implements a different interface
+// and the two are mutually exclusive.
+func (c *CycleState) GetParentPlacementCycleState() fwk.PlacementCycleState {
+	return c.placementCycleState
+}
+
+func (c *CycleState) SetPlacementCycleState(placementCycleState fwk.PlacementCycleState) {
+	c.placementCycleState = placementCycleState
 }
 
 func (c *CycleState) SetSkipAllPostFilterPlugins(flag bool) {
@@ -140,6 +159,7 @@ func (c *CycleState) Clone() fwk.CycleState {
 	copy.skipPreBindPlugins = c.skipPreBindPlugins
 	copy.parallelPreBindPlugins = c.parallelPreBindPlugins
 	copy.podGroupCycleState = c.podGroupCycleState
+	copy.placementCycleState = c.placementCycleState
 	copy.skipAllPostFilterPlugins = c.skipAllPostFilterPlugins
 
 	return copy

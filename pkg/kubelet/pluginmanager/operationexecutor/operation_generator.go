@@ -111,7 +111,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		if infoResp.Endpoint == "" {
 			infoResp.Endpoint = socketPath
 		}
-		if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
+		if err := handler.ValidatePlugin(ctx, infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 			if err = og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- plugin validation failed with err: %v", err)); err != nil {
 				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
 			}
@@ -129,7 +129,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		if err != nil {
 			logger.Error(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
 		}
-		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil); err != nil {
+		if err := handler.RegisterPlugin(ctx, infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil); err != nil {
 			actualStateOfWorldUpdater.RemovePlugin(socketPath)
 			return og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
 		}
@@ -137,7 +137,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		// Notify is called after register to guarantee that even if notify throws an error Register will always be called after validate
 		if err := og.notifyPlugin(ctx, client, true, ""); err != nil {
 			actualStateOfWorldUpdater.RemovePlugin(socketPath)
-			handler.DeRegisterPlugin(infoResp.Name, infoResp.Endpoint)
+			handler.DeRegisterPlugin(ctx, infoResp.Name, infoResp.Endpoint)
 			return fmt.Errorf("RegisterPlugin error -- failed to send registration status at socket %s, err: %v", socketPath, err)
 		}
 		return nil
@@ -160,7 +160,7 @@ func (og *operationGenerator) GenerateUnregisterPluginFunc(
 		// so that if we receive a register event during Register Plugin, we can process it as a Register call.
 		actualStateOfWorldUpdater.RemovePlugin(pluginInfo.SocketPath)
 
-		pluginInfo.Handler.DeRegisterPlugin(pluginInfo.Name, pluginInfo.Endpoint)
+		pluginInfo.Handler.DeRegisterPlugin(ctx, pluginInfo.Name, pluginInfo.Endpoint)
 
 		logger.V(4).Info("DeRegisterPlugin called", "pluginName", pluginInfo.Name, "pluginHandler", pluginInfo.Handler)
 		return nil

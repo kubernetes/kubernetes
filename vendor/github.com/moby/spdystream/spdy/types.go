@@ -1,22 +1,8 @@
-/*
-   Copyright 2014-2021 Docker Inc.
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-*/
-
 // Copyright 2011 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+
+// Modifications Copyright 2014-2021 Docker Inc.
 
 // Package spdy implements the SPDY protocol (currently SPDY/3), described in
 // http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft3.
@@ -63,7 +49,19 @@ const (
 )
 
 // MaxDataLength is the maximum number of bytes that can be stored in one frame.
+//
+// SPDY frame headers encode the payload length using a 24-bit field,
+// so the maximum representable size for both data and control frames
+// is 2^24-1 bytes.
+//
+// See the SPDY/3 specification, "Frame Format":
+// https://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft3-1/
 const MaxDataLength = 1<<24 - 1
+
+const (
+	defaultMaxHeaderFieldSize uint32 = 1 << 20
+	defaultMaxHeaderCount     uint32 = 1000
+)
 
 // headerValueSepator separates multiple header values.
 const headerValueSeparator = "\x00"
@@ -269,6 +267,10 @@ type Framer struct {
 	r                         io.Reader
 	headerReader              io.LimitedReader
 	headerDecompressor        io.ReadCloser
+
+	maxFrameLength       uint32 // overrides the default frame payload length limit.
+	maxHeaderFieldSize   uint32 // overrides the default per-header name/value length limit.
+	maxHeaderCount       uint32 // overrides the default header count limit.
 }
 
 // NewFramer allocates a new Framer for a given SPDY connection, represented by
@@ -276,6 +278,16 @@ type Framer struct {
 // from/to the Reader and Writer, so the caller should pass in an appropriately
 // buffered implementation to optimize performance.
 func NewFramer(w io.Writer, r io.Reader) (*Framer, error) {
+	return newFramer(w, r)
+}
+
+// NewFramerWithOptions allocates a new Framer for a given SPDY connection and
+// applies frame parsing limits via options.
+func NewFramerWithOptions(w io.Writer, r io.Reader, opts ...FramerOption) (*Framer, error) {
+	return newFramer(w, r, opts...)
+}
+
+func newFramer(w io.Writer, r io.Reader, opts ...FramerOption) (*Framer, error) {
 	compressBuf := new(bytes.Buffer)
 	compressor, err := zlib.NewWriterLevelDict(compressBuf, zlib.BestCompression, []byte(headerDictionary))
 	if err != nil {
@@ -286,6 +298,11 @@ func NewFramer(w io.Writer, r io.Reader) (*Framer, error) {
 		headerBuf:        compressBuf,
 		headerCompressor: compressor,
 		r:                r,
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(framer)
+		}
 	}
 	return framer, nil
 }

@@ -23,6 +23,12 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
+)
+
+const (
+	// tlsHandshakeTimeout bounds how long a single TLS handshake may block.
+	tlsHandshakeTimeout = 10 * time.Second
 )
 
 // tlsListener overrides a TLS listener so it will reject client
@@ -143,6 +149,7 @@ func (l *tlsListener) acceptLoop() {
 			}()
 
 			tlsConn := conn.(*tls.Conn)
+			_ = tlsConn.SetDeadline(time.Now().Add(tlsHandshakeTimeout))
 			herr := tlsConn.Handshake()
 			pendingMu.Lock()
 			delete(pending, conn)
@@ -152,6 +159,7 @@ func (l *tlsListener) acceptLoop() {
 				l.handshakeFailure(tlsConn, herr)
 				return
 			}
+			_ = tlsConn.SetDeadline(time.Time{})
 			if err := l.check(ctx, tlsConn); err != nil {
 				l.handshakeFailure(tlsConn, err)
 				return
@@ -163,6 +171,29 @@ func (l *tlsListener) acceptLoop() {
 			case <-ctx.Done():
 			}
 		}()
+	}
+}
+
+// ConfigureCRLVerification appends a VerifyConnection hook to cfg that
+// rejects any peer certificate whose serial number appears in the CRL file
+// configured on info. It is a no-op when CRLFile is empty. Any existing
+// VerifyConnection hook is called first and its error short-circuits.
+func (info TLSInfo) ConfigureCRLVerification(cfg *tls.Config) {
+	if len(info.CRLFile) == 0 {
+		return
+	}
+	crlFile := info.CRLFile
+	prev := cfg.VerifyConnection
+	cfg.VerifyConnection = func(cs tls.ConnectionState) error {
+		if prev != nil {
+			if err := prev(cs); err != nil {
+				return err
+			}
+		}
+		if len(cs.PeerCertificates) == 0 {
+			return nil
+		}
+		return checkCRL(crlFile, cs.PeerCertificates)
 	}
 }
 

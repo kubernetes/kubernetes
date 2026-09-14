@@ -33,15 +33,18 @@ option go_package = "k8s.io/api/certificates/v1beta1";
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/approval"
 message CertificateSigningRequest {
+  // metadata is the standard object's metadata.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec contains the certificate request, and is immutable after creation.
   // Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
   // Other fields are derived by Kubernetes and cannot be modified by users.
+  // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
   optional CertificateSigningRequestSpec spec = 2;
 
-  // Derived information about the request.
+  // status is the derived information about the request.
   // +optional
   optional CertificateSigningRequestStatus status = 3;
 }
@@ -50,22 +53,22 @@ message CertificateSigningRequestCondition {
   // type of the condition. Known conditions include "Approved", "Denied", and "Failed".
   optional string type = 1;
 
-  // Status of the condition, one of True, False, Unknown.
+  // status is the status of the condition, one of True, False, Unknown.
   // Approved, Denied, and Failed conditions may not be "False" or "Unknown".
   // Defaults to "True".
   // If unset, should be treated as "True".
   // +optional
   optional string status = 6;
 
-  // brief reason for the request state
+  // reason is a brief reason for the request state
   // +optional
   optional string reason = 2;
 
-  // human readable message with details about the request state
+  // message is a human readable message with details about the request state
   // +optional
   optional string message = 3;
 
-  // timestamp for the last update to this condition
+  // lastUpdateTime is the timestamp for the last update to this condition
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 4;
 
@@ -85,10 +88,10 @@ message CertificateSigningRequestList {
 
 // CertificateSigningRequestSpec contains the certificate request.
 message CertificateSigningRequestSpec {
-  // Base64-encoded PKCS#10 CSR data
+  // request is Base64-encoded PKCS#10 CSR data
   optional bytes request = 1;
 
-  // Requested signer for the request. It is a qualified name in the form:
+  // signerName is the requested signer for the request. It is a qualified name in the form:
   // `scope-hostname.io/name`.
   // If empty, it will be defaulted:
   //  1. If it's a kubelet client certificate, it is assigned
@@ -123,7 +126,7 @@ message CertificateSigningRequestSpec {
   // +optional
   optional int32 expirationSeconds = 8;
 
-  // allowedUsages specifies a set of usage contexts the key will be
+  // usages specifies a set of usage contexts the key will be
   // valid for.
   // See:
   // 	https://tools.ietf.org/html/rfc5280#section-4.2.1.3
@@ -154,25 +157,28 @@ message CertificateSigningRequestSpec {
   //  "microsoft sgc",
   //  "netscape sgc"
   // +listType=atomic
+  // +k8s:alpha(since: "1.38")=+k8s:listType=atomic
+  // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
   repeated string usages = 5;
 
-  // Information about the requesting user.
+  // username is the information about the requesting user.
   // See user.Info interface for details.
   // +optional
   optional string username = 2;
 
-  // UID information about the requesting user.
+  // uid is the UID information about the requesting user.
   // See user.Info interface for details.
   // +optional
   optional string uid = 3;
 
-  // Group information about the requesting user.
+  // groups is the Group information about the requesting user.
   // See user.Info interface for details.
   // +listType=atomic
   // +optional
   repeated string groups = 4;
 
-  // Extra information about the requesting user.
+  // extra information about the requesting user.
   // See user.Info interface for details.
   // +optional
   map<string, ExtraValue> extra = 6;
@@ -183,12 +189,12 @@ message CertificateSigningRequestStatus {
   // +listType=map
   // +listMapKey=type
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:listType=map
-  // +k8s:alpha(since: "1.36")=+k8s:listMapKey=type
-  // +k8s:alpha(since: "1.36")=+k8s:customUnique
-  // +k8s:alpha(since: "1.36")=+k8s:optional
-  // +k8s:alpha(since: "1.36")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
-  // +k8s:alpha(since: "1.36")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
+  // +k8s:beta(since: "1.37")=+k8s:listType=map
+  // +k8s:beta(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:beta(since: "1.37")=+k8s:customUnique
+  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
+  // +k8s:beta(since: "1.37")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
   repeated CertificateSigningRequestCondition conditions = 1;
 
   // If request was approved, the controller will place the issued certificate here.
@@ -206,7 +212,7 @@ message CertificateSigningRequestStatus {
 // to a cluster can read ClusterTrustBundles by impersonating a serviceaccount
 // that they have access to.
 //
-// It can be optionally associated with a particular assigner, in which case it
+// It can be optionally associated with a particular signer, in which case it
 // contains one valid set of trust anchors for that signer. Signers may have
 // multiple associated ClusterTrustBundles; each is an independent set of trust
 // anchors for that signer. Admission control is used to enforce that only users
@@ -253,6 +259,8 @@ message ClusterTrustBundleSpec {
   // using a `spec.signerName=NAME` field selector.
   //
   // +optional
+  // +k8s:alpha(since:"1.37")=+k8s:optional
+  // +k8s:alpha(since:"1.37")=+k8s:immutable
   optional string signerName = 1;
 
   // trustBundle contains the individual X.509 trust anchors for this
@@ -282,6 +290,7 @@ message ExtraValue {
 // signer.
 //
 // Kubelets use this API to implement podCertificate projected volumes
+// +k8s:supportsSubresource="/status"
 message PodCertificateRequest {
   // metadata contains the object metadata.
   //
@@ -370,7 +379,7 @@ message PodCertificateRequestSpec {
   // +default=86400
   optional int32 maxExpirationSeconds = 8;
 
-  // The PKIX-serialized public key the signer will issue the certificate to.
+  // pkixPublicKey is the PKIX-serialized public key the signer will issue the certificate to.
   //
   // The key must be one of RSA3072, RSA4096, ECDSAP256, ECDSAP384, ECDSAP521,
   // or ED25519. Note that this list may be expanded in the future.
@@ -390,7 +399,7 @@ message PodCertificateRequestSpec {
   // +optional
   optional bytes pkixPublicKey = 9;
 
-  // A proof that the requesting kubelet holds the private key corresponding
+  // proofOfPossession is a proof that the requesting kubelet holds the private key corresponding
   // to pkixPublicKey.
   //
   // It is contructed by signing the ASCII bytes of the pod's UID using
@@ -417,7 +426,7 @@ message PodCertificateRequestSpec {
   // +optional
   optional bytes proofOfPossession = 10;
 
-  // A PKCS#10 certificate signing request (DER-serialized) generated by
+  // stubPKCS10Request is a PKCS#10 certificate signing request (DER-serialized) generated by
   // Kubelet using the subject private key.
   //
   // Most signer implementations will ignore the contents of the CSR except to
@@ -467,6 +476,9 @@ message PodCertificateRequestStatus {
   // +listType=map
   // +listMapKey=type
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:listType=map
+  // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 
   // certificateChain is populated with an issued certificate by the signer.

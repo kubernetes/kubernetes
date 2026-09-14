@@ -70,7 +70,7 @@ func (m *mux) ChannelWithContext(ctx context.Context, source string) chan source
 	newChannel := make(chan sourceUpdate)
 	m.sources[source] = newChannel
 
-	go wait.Until(func() { m.listen(ctx, source, newChannel) }, 0, ctx.Done())
+	go wait.UntilWithContext(ctx, func(ctx context.Context) { m.listen(ctx, source, newChannel) }, 0)
 	return newChannel
 }
 

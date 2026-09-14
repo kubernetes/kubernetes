@@ -88,7 +88,8 @@ func fieldsHaveProtobufTags(obj reflect.Type) error {
 				// TypeMeta is not included in external protobuf because we use an envelope type with TypeMeta
 				continue
 			}
-			if len(f.Tag.Get("json")) > 0 && len(f.Tag.Get("protobuf")) == 0 {
+			_, jsonTagExists := f.Tag.Lookup("json")
+			if jsonTagExists && len(f.Tag.Get("protobuf")) == 0 {
 				return fmt.Errorf("field %s in %s has a 'json' tag but no protobuf tag", f.Name, obj)
 			}
 		}

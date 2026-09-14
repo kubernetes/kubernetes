@@ -35,16 +35,16 @@ import (
 //
 // VolumeAttachment objects are non-namespaced.
 type VolumeAttachment struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
-	// Standard object metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec represents specification of the desired attach/detach volume behavior.
 	// Populated by the Kubernetes system.
-	// +k8s:alpha(since: "1.36")=+k8s:immutable
+	// +k8s:beta(since: "1.37")=+k8s:immutable
 	// +required
 	Spec VolumeAttachmentSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
@@ -62,7 +62,7 @@ type VolumeAttachment struct {
 
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
 type VolumeAttachmentList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -78,15 +78,17 @@ type VolumeAttachmentSpec struct {
 	// attacher indicates the name of the volume driver that MUST handle this
 	// request. This is the name returned by GetPluginName().
 	// +required
-	// +k8s:alpha(since: "1.36")=+k8s:required
-	// +k8s:alpha(since: "1.36")=+k8s:format="k8s-long-name-caseless"
-	// +k8s:alpha(since: "1.36")=+k8s:maxLength=63
+	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:format="k8s-long-name-caseless"
+	// +k8s:beta(since: "1.37")=+k8s:maxLength=63
 	Attacher string `json:"attacher" protobuf:"bytes,1,opt,name=attacher"`
 
 	// source represents the volume that should be attached.
+	// +required
 	Source VolumeAttachmentSource `json:"source" protobuf:"bytes,2,opt,name=source"`
 
 	// nodeName represents the node that the volume should be attached to.
+	// +required
 	NodeName string `json:"nodeName" protobuf:"bytes,3,opt,name=nodeName"`
 }
 
@@ -114,6 +116,7 @@ type VolumeAttachmentStatus struct {
 	// attached indicates the volume is successfully attached.
 	// This field must only be set by the entity completing the attach
 	// operation, i.e. the external-attacher.
+	// +optional
 	Attached bool `json:"attached" protobuf:"varint,1,opt,name=attached"`
 
 	// attachmentMetadata is populated with any
@@ -189,9 +192,9 @@ type VolumeError struct {
 // the scheduler assumes that capacity is insufficient and tries some other
 // node.
 type CSIStorageCapacity struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata. The name has no particular meaning. It must be
+	// metadata is the standard object metadata. The name has no particular meaning. It must be
 	// be a DNS subdomain (dots allowed, 253 characters). To ensure that
 	// there are no conflicts with other CSI drivers on the cluster, the recommendation
 	// is to use csisc-<uuid>, a generated name, or a reverse-domain name which ends
@@ -218,6 +221,7 @@ type CSIStorageCapacity struct {
 	// the CSIStorageCapacity object is obsolete and should be removed by its
 	// creator.
 	// This field is immutable.
+	// +required
 	StorageClassName string `json:"storageClassName" protobuf:"bytes,3,name=storageClassName"`
 
 	// capacity is the value reported by the CSI driver in its GetCapacityResponse
@@ -254,7 +258,7 @@ type CSIStorageCapacity struct {
 
 // CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
 type CSIStorageCapacityList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -276,15 +280,16 @@ type CSIStorageCapacityList struct {
 // defined by the CSI driver. The class can be specified during dynamic provisioning
 // of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.
 type VolumeAttributesClass struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Name of the CSI driver
+	// driverName is the name of the CSI driver
 	// This field is immutable.
+	// +required
 	DriverName string `json:"driverName" protobuf:"bytes,2,opt,name=driverName"`
 
 	// parameters hold volume attributes defined by the CSI driver. These values
@@ -300,6 +305,7 @@ type VolumeAttributesClass struct {
 	// a cumulative max size of 256K. If the CSI driver rejects invalid parameters,
 	// the target PersistentVolumeClaim will be set to an "Infeasible" state in the
 	// modifyVolumeStatus field.
+	// +required
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 }
 
@@ -310,7 +316,7 @@ type VolumeAttributesClass struct {
 
 // VolumeAttributesClassList is a collection of VolumeAttributesClass objects.
 type VolumeAttributesClassList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

@@ -38,7 +38,7 @@ type REST struct {
 var groupResource = admissionregistration.Resource("mutatingadmissionpolicies")
 
 // NewREST returns the RESTStorage objects that will work against MutatingAdmissionPolicy.
-func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) (*REST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.UnconditionalAuthorizer, resourceResolver resolver.ResourceResolver) (*REST, error) {
 	r := &REST{}
 	strategy := mutatingadmissionpolicy.NewStrategy(authorizer, resourceResolver)
 	store := &genericregistry.Store{

@@ -21,21 +21,22 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
 const (
 	// These tags return a fixed pass/fail state.
-	validateTrueTagName  = "k8s:validateTrue"
-	validateFalseTagName = "k8s:validateFalse"
+	validateTrueTagName  = "validateTrue"
+	validateFalseTagName = "validateFalse"
 
 	// This tag always returns an error from ExtractValidations.
-	validateErrorTagName = "k8s:validateError"
+	validateErrorTagName = "validateError"
 
 	// validate true alpha/beta  test tags.
-	validateAlphaTagName = "k8s:validateTrueAlpha"
-	validateBetaTagName  = "k8s:validateTrueBeta"
+	validateAlphaTagName = "validateTrueAlpha"
+	validateBetaTagName  = "validateTrueBeta"
 )
 
 func init() {
@@ -87,7 +88,11 @@ func (frtv fixedResultTagValidator) GetValidations(context Context, tag codetags
 	if err != nil {
 		return result, fmt.Errorf("can't decode tag payload: %w", err)
 	}
-	fn := Function(frtv.TagName(), args.flags, fixedResultValidator, frtv.result, args.msg).WithTypeArgs(args.typeArgs...)
+	fn := Function(frtv.TagName(), args.flags, fixedResultValidator, frtv.result, args.msg).
+		WithTypeArgs(args.typeArgs...)
+	if !frtv.result {
+		fn = fn.WithEmits(Emission{field.ErrorTypeInvalid, "validateFalse", ""})
+	}
 	fn.Cohort = args.cohort
 	result.AddFunction(fn)
 

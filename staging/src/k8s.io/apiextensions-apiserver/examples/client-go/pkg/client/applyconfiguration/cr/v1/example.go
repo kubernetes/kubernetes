@@ -29,7 +29,7 @@ import (
 //
 // Example is a specification for an Example resource
 type ExampleApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                                 *ExampleSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                               *ExampleStatusApplyConfiguration `json:"status,omitempty"`

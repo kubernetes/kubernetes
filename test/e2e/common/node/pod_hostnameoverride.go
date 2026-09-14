@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -52,7 +51,7 @@ func newTestPod(namespace string) *v1.Pod {
 	}
 }
 
-var _ = SIGDescribe("Override hostname of Pod", framework.WithNodeConformance(), framework.WithFeatureGate(features.HostnameOverride), func() {
+var _ = SIGDescribe("Override hostname of Pod", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("hostfqdn")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

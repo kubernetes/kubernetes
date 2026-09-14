@@ -47,6 +47,11 @@ func (fakeTestDeps) ImportPath() string {
 }
 
 //nolint:unused // U1000 see comment above, we know it's unused normally.
+func (fakeTestDeps) ModulePath() string {
+	return ""
+}
+
+//nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) MatchString(pat, str string) (bool, error) {
 	return false, nil
 }

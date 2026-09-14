@@ -96,9 +96,6 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 			ginkgo.By("restart kubelet")
 			startKubelet := mustStopKubelet(ctx, f)
 			startKubelet(ctx)
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(g gomega.Gomega) {
@@ -172,9 +169,6 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 
 			ginkgo.By("start kubelet")
 			startKubelet(ctx)
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(g gomega.Gomega) {

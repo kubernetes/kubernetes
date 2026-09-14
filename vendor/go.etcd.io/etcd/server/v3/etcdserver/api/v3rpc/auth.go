@@ -24,6 +24,8 @@ import (
 
 type AuthServer struct {
 	authenticator etcdserver.Authenticator
+	// we want compile errors if new methods are added
+	pb.UnsafeAuthServer
 }
 
 func NewAuthServer(s *etcdserver.EtcdServer) *AuthServer {
@@ -184,4 +186,20 @@ func (aa *AuthAdmin) isPermitted(ctx context.Context) error {
 	}
 
 	return aa.ag.AuthStore().IsAdminPermitted(authInfo)
+}
+
+func (aa *AuthAdmin) requireAuthInfo(ctx context.Context) error {
+	if !aa.ag.AuthStore().IsAuthEnabled() {
+		return nil
+	}
+
+	authInfo, err := aa.ag.AuthInfoFromCtx(ctx)
+	if err != nil {
+		return err
+	}
+
+	if authInfo == nil {
+		return auth.ErrUserEmpty
+	}
+	return nil
 }

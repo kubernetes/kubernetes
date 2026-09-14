@@ -26,6 +26,7 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/version"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -55,9 +56,10 @@ func (s *preFilterState) Clone() fwk.StateData {
 
 // NodeDeclaredFeatures is a plugin that checks if a node has all the features required by a pod.
 type NodeDeclaredFeatures struct {
-	ndfFramework *ndf.Framework
-	version      *versionutil.Version
-	enabled      bool
+	ndfFramework                                       *ndf.Framework
+	version                                            *versionutil.Version
+	enabled                                            bool
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
 }
 
 var _ fwk.PreFilterPlugin = &NodeDeclaredFeatures{}
@@ -81,11 +83,14 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse version: %w", err)
 	}
-	return &NodeDeclaredFeatures{ndfFramework: ndfFramework, version: ver, enabled: true}, nil
+	return &NodeDeclaredFeatures{ndfFramework: ndfFramework, version: ver, enabled: true, enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption}, nil
 }
 
 // PreFilter checks if the pod has any feature requirements.
 func (pl *NodeDeclaredFeatures) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
 	if !pl.enabled {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
@@ -109,6 +114,9 @@ func (pl *NodeDeclaredFeatures) PreFilterExtensions() fwk.PreFilterExtensions {
 
 // Filter checks if the node has the required features.
 func (pl *NodeDeclaredFeatures) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil
+	}
 	if !pl.enabled {
 		return nil
 	}
@@ -149,8 +157,8 @@ func (pl *NodeDeclaredFeatures) EventsToRegister(_ context.Context) ([]fwk.Clust
 			QueueingHintFn: pl.isSchedulableAfterNodeChange,
 		},
 		{
-			Event:          fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Update},
-			QueueingHintFn: pl.isSchedulableAfterPodUpdate,
+			Event:          fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update},
+			QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate,
 		},
 	}, nil
 }
@@ -167,16 +175,12 @@ func getPreFilterState(cycleState fwk.CycleState) (*preFilterState, error) {
 	return s, nil
 }
 
-func (pl *NodeDeclaredFeatures) isSchedulableAfterPodUpdate(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+func (pl *NodeDeclaredFeatures) isSchedulableAfterTargetPodUpdate(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	oldPod, newPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
-	// If the pod that was updated is not the target pod, then we don't need to re-evaluate it.
-	if pod.UID != newPod.UID {
-		logger.V(5).Info("the update event is not for targetPod, skipping queueing", "pod", klog.KObj(newPod))
-		return fwk.QueueSkip, nil
-	}
+
 	oldPodInfo := &ndf.PodInfo{Spec: &oldPod.Spec}
 	newPodInfo := &ndf.PodInfo{Spec: &newPod.Spec}
 	oldReqs, err := pl.ndfFramework.InferForPodScheduling(oldPodInfo, pl.version)

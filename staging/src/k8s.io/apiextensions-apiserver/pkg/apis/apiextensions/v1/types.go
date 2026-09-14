@@ -204,7 +204,6 @@ type CustomResourceDefinitionVersion struct {
 	// A maximum of 8 selectable fields are allowed.
 	// See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
 	//
-	// +featureGate=CustomResourceFieldSelectors
 	// +optional
 	// +listType=atomic
 	SelectableFields []SelectableField `json:"selectableFields,omitempty" protobuf:"bytes,9,rep,name=selectableFields"`
@@ -402,7 +401,7 @@ const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.
 // CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
 type CustomResourceDefinition struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -420,7 +419,7 @@ type CustomResourceDefinition struct {
 
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 type CustomResourceDefinitionList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -489,7 +488,7 @@ type CustomResourceSubresourceScale struct {
 
 // ConversionReview describes a conversion request/response.
 type ConversionReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// request describes the attributes for the conversion request.
 	// +optional
 	Request *ConversionRequest `json:"request,omitempty" protobuf:"bytes,1,opt,name=request"`

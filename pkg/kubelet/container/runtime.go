@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -150,7 +151,10 @@ type Runtime interface {
 	// (allocated resources != actuated resources).
 	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
 	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
-	UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error
+	UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error
+	// InitializeActuatedPod initializes actuated container resources and emptyDir volume size limits for the given pod,
+	// if they are not already set.
+	InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod)
 }
 
 var (
@@ -249,12 +253,9 @@ func BuildContainerID(typ, ID string) ContainerID {
 }
 
 // ParseContainerID is a convenience method for creating a ContainerID from an ID string.
-func ParseContainerID(containerID string) ContainerID {
+func ParseContainerID(logger klog.Logger, containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		// Use klog.TODO() because we currently do not have a proper logger to pass in.
-		// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
-		logger := klog.TODO()
 		logger.Error(err, "Parsing containerID failed")
 	}
 	return id
@@ -448,6 +449,17 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Sta
 	return nil
 }
 
+// FindActiveContainerStatusByName returns active container status in the pod status with the given name.
+// When there are multiple containers' statuses with the same name, the first match will be returned.
+func (podStatus *PodStatus) FindActiveContainerStatusByName(containerName string) *Status {
+	for _, containerStatus := range podStatus.ActiveContainerStatuses {
+		if containerStatus.Name == containerName {
+			return containerStatus
+		}
+	}
+	return nil
+}
+
 // GetRunningContainerStatuses returns container status of all the running containers in a pod
 func (podStatus *PodStatus) GetRunningContainerStatuses() []*Status {
 	runningContainerStatuses := []*Status{}
@@ -478,7 +490,7 @@ type Image struct {
 // EnvVar represents the environment variable.
 type EnvVar struct {
 	Name  string
-	Value string
+	Value string // TODO: switch to []byte
 }
 
 // Annotation represents an annotation.
@@ -511,6 +523,9 @@ type Mount struct {
 	// ImageSubPath is set if an image volume sub path should get mounted. This
 	// field is only required if the above Image is set.
 	ImageSubPath string
+	// BindMountOptions are additional bind mount options (noexec, nodev, nosuid)
+	// to apply when mounting this volume into the container.
+	BindMountOptions []string
 }
 
 // ImageVolumes is a map of image specs by volume name.
@@ -670,6 +685,7 @@ func (c *RuntimeCondition) String() string {
 type RuntimeFeatures struct {
 	SupplementalGroupsPolicy  bool
 	UserNamespacesHostNetwork bool
+	MountOptions              bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -677,7 +693,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v MountOptions: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork, f.MountOptions)
 }
 
 // Pods represents the list of pods
@@ -818,3 +834,22 @@ const (
 	// log output that the termination message can contain.
 	MaxContainerTerminationMessageLogLines = 80
 )
+
+type commandRunner struct {
+	runtimeService internalapi.RuntimeService
+}
+
+var _ CommandRunner = &commandRunner{}
+
+// NewCommandRunner creates a new CommandRunner that uses the CRI RuntimeService.
+func NewCommandRunner(runtimeService internalapi.RuntimeService) CommandRunner {
+	return &commandRunner{runtimeService: runtimeService}
+}
+
+func (r *commandRunner) RunInContainer(ctx context.Context, id ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+	stdout, stderr, err := r.runtimeService.ExecSync(ctx, id.ID, cmd, timeout)
+	// NOTE(tallclair): This does not correctly interleave stdout & stderr, but should be sufficient
+	// for logging purposes. A combined output option will need to be added to the ExecSyncRequest
+	// if more precise output ordering is ever required.
+	return append(stdout, stderr...), err
+}

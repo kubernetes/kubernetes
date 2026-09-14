@@ -1357,7 +1357,7 @@ func TestValidatePlugin(t *testing.T) {
 
 	for _, tc := range testCases {
 		// Arrange & Act
-		err := PluginHandler.ValidatePlugin(tc.pluginName, tc.endpoint, tc.versions)
+		err := PluginHandler.ValidatePlugin(t.Context(), tc.pluginName, tc.endpoint, tc.versions)
 
 		// Assert
 		if tc.shouldFail && err == nil {
@@ -1422,7 +1422,7 @@ func TestValidatePluginExistingDriver(t *testing.T) {
 		})
 
 		// Arrange & Act
-		err = PluginHandler.ValidatePlugin(tc.pluginName2, tc.endpoint2, tc.versions2)
+		err = PluginHandler.ValidatePlugin(t.Context(), tc.pluginName2, tc.endpoint2, tc.versions2)
 
 		// Assert
 		if tc.shouldFail && err == nil {

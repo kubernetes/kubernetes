@@ -41,6 +41,7 @@ type CSIDriverInterface interface {
 	Create(ctx context.Context, cSIDriver *storagev1beta1.CSIDriver, opts v1.CreateOptions) (*storagev1beta1.CSIDriver, error)
 	Update(ctx context.Context, cSIDriver *storagev1beta1.CSIDriver, opts v1.UpdateOptions) (*storagev1beta1.CSIDriver, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*storagev1beta1.CSIDriver, error)
 	List(ctx context.Context, opts v1.ListOptions) (*storagev1beta1.CSIDriverList, error)

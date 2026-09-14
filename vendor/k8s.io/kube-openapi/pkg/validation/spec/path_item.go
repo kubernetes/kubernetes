@@ -15,11 +15,10 @@
 package spec
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // PathItemProps the path item specific properties
@@ -48,26 +47,16 @@ type PathItem struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (p *PathItem) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, p)
-	}
-
-	if err := json.Unmarshal(data, &p.Refable); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &p.VendorExtensible); err != nil {
-		return err
-	}
-	return json.Unmarshal(data, &p.PathItemProps)
+	return jsonv2.Unmarshal(data, p)
 }
 
-func (p *PathItem) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (p *PathItem) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		Extensions
+		Extensions Extensions `json:",embed"`
 		PathItemProps
 	}
 
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	if err := p.Refable.Ref.fromMap(x.Extensions); err != nil {
@@ -81,33 +70,17 @@ func (p *PathItem) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.D
 
 // MarshalJSON converts this items object to JSON
 func (p PathItem) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(p)
-	}
-	b3, err := json.Marshal(p.Refable)
-	if err != nil {
-		return nil, err
-	}
-	b4, err := json.Marshal(p.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	b5, err := json.Marshal(p.PathItemProps)
-	if err != nil {
-		return nil, err
-	}
-	concated := swag.ConcatJSON(b3, b4, b5)
-	return concated, nil
+	return internal.DeterministicMarshal(p)
 }
 
-func (p PathItem) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (p PathItem) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		Ref string `json:"$ref,omitempty"`
-		Extensions
+		Ref        string     `json:"$ref,omitempty"`
+		Extensions Extensions `json:",embed"`
 		PathItemProps
 	}
 	x.Ref = p.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(p.Extensions)
 	x.PathItemProps = p.PathItemProps
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }

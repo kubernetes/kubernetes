@@ -45,7 +45,7 @@ type nominator struct {
 	podLister listersv1.PodLister
 	// nominatedPods is a map keyed by a node name and the value is a list of
 	// pods which are nominated to run on the node. These are pods which can be in
-	// the activeQ or unschedulablePods.
+	// the activeQ or unschedulableEntities.
 	nominatedPods map[string][]podRef
 	// nominatedPodToNode is map keyed by a Pod UID to the node name where it is
 	// nominated.
@@ -79,10 +79,12 @@ func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi fwk.PodInfo
 	if nominatingInfo.Mode() == fwk.ModeOverride {
 		nodeName = nominatingInfo.NominatedNodeName
 	} else if nominatingInfo.Mode() == fwk.ModeNoop {
-		if pi.GetPod().Status.NominatedNodeName == "" {
-			return
-		}
 		nodeName = pi.GetPod().Status.NominatedNodeName
+	}
+
+	// Empty nodeName clears nomination; do not key nominatedPods by "".
+	if nodeName == "" {
+		return
 	}
 
 	if npm.podLister != nil {
@@ -171,16 +173,18 @@ func nominatedNodeName(pod *v1.Pod) string {
 }
 
 type podRef struct {
-	name      string
-	namespace string
-	uid       types.UID
+	name            string
+	namespace       string
+	uid             types.UID
+	schedulingGroup *v1.PodSchedulingGroup
 }
 
 func podToRef(pod *v1.Pod) podRef {
 	return podRef{
-		name:      pod.Name,
-		namespace: pod.Namespace,
-		uid:       pod.UID,
+		name:            pod.Name,
+		namespace:       pod.Namespace,
+		uid:             pod.UID,
+		schedulingGroup: pod.Spec.SchedulingGroup,
 	}
 }
 
@@ -190,6 +194,9 @@ func (np podRef) toPod() *v1.Pod {
 			Name:      np.name,
 			Namespace: np.namespace,
 			UID:       np.uid,
+		},
+		Spec: v1.PodSpec{
+			SchedulingGroup: np.schedulingGroup,
 		},
 	}
 }

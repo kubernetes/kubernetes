@@ -60,6 +60,7 @@ func CreateTestClient(logger klog.Logger) *fake.Clientset {
 	var volumeAttachments *storagev1.VolumeAttachmentList
 	var pvs *v1.PersistentVolumeList
 	var nodes *v1.NodeList
+	var csidrivers *storagev1.CSIDriverList
 
 	fakeClient := &fake.Clientset{}
 
@@ -193,11 +194,34 @@ func CreateTestClient(logger klog.Logger) *fake.Clientset {
 		pvs.Items = append(pvs.Items, *pv)
 		return true, createAction.GetObject(), nil
 	})
-
+	csidrivers = &storagev1.CSIDriverList{}
+	fakeClient.AddReactor("list", "csidrivers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &storagev1.CSIDriverList{}
+		obj.Items = append(obj.Items, csidrivers.Items...)
+		return true, obj, nil
+	})
+	fakeClient.AddReactor("create", "csidrivers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		createAction := action.(core.CreateAction)
+		csidriver := createAction.GetObject().(*storagev1.CSIDriver)
+		csidrivers.Items = append(csidrivers.Items, *csidriver)
+		return true, createAction.GetObject(), nil
+	})
 	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	return fakeClient
+}
+
+func NewCSIDriver(uid, name string, attachable bool) *storagev1.CSIDriver {
+	return &storagev1.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  types.UID(uid),
+			Name: name,
+		},
+		Spec: storagev1.CSIDriverSpec{
+			AttachRequired: &attachable,
+		},
+	}
 }
 
 // NewPod returns a test pod object
@@ -286,6 +310,27 @@ func NewPV(pvName, volumeName string) *v1.PersistentVolume {
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 					PDName: volumeName,
+				},
+			},
+		},
+	}
+}
+
+// Returns a persistentVolume object
+func NewCSIPV(pvName string) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  types.UID(pvName),
+			Name: pvName,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:           "csi-driver1",
+					VolumeHandle:     "vol-handle1",
+					FSType:           "ext4",
+					ReadOnly:         false,
+					VolumeAttributes: map[string]string{"partition": ""},
 				},
 			},
 		},

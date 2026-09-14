@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -31,7 +31,6 @@ import (
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +46,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/jsonpath"
 )
 
@@ -93,9 +91,7 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 		celValidator:     celValidator,
 		kind:             kind,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) {
-		strategy.selectableFieldSet = prepareSelectableFields(selectableFields)
-	}
+	strategy.selectableFieldSet = prepareSelectableFields(selectableFields)
 	return strategy
 }
 
@@ -208,7 +204,7 @@ func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object
 	errs = append(errs, a.validator.Validate(ctx, u, a.scale)...)
 
 	// validate embedded resources
-	errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.structuralSchema, false)...)
+	errs = append(errs, schemaobjectmeta.Validate(ctx, nil, u.Object, a.structuralSchema, false)...)
 
 	// validate x-kubernetes-list-type "map" and "set" invariant
 	errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, u.Object)...)
@@ -261,12 +257,12 @@ func (customResourceStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for CustomResources; this means a POST is
 // needed to create one.
-func (customResourceStrategy) AllowCreateOnUpdate() bool {
+func (customResourceStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
 // AllowUnconditionalUpdate is the default update policy for CustomResource objects.
-func (customResourceStrategy) AllowUnconditionalUpdate() bool {
+func (customResourceStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -283,18 +279,15 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 
 	var options []validation.ValidationOption
 	var celOptions []cel.Option
-	var correlatedObject *common.CorrelatedObject
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-		correlatedObject = common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
-		options = append(options, validation.WithRatcheting(correlatedObject))
-		celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
-	}
+	correlatedObject := common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
+	options = append(options, validation.WithRatcheting(correlatedObject))
+	celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
 
 	var errs field.ErrorList
 	errs = append(errs, a.validator.ValidateUpdate(ctx, uNew, uOld, a.scale, options...)...)
 
 	// Checks the embedded objects. We don't make a difference between update and create for those.
-	errs = append(errs, schemaobjectmeta.Validate(nil, uNew.Object, a.structuralSchema, false)...)
+	errs = append(errs, schemaobjectmeta.Validate(ctx, nil, uNew.Object, a.structuralSchema, false)...)
 
 	// ratcheting validation of x-kubernetes-list-type value map and set
 	if oldErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, uOld.Object); len(oldErrs) == 0 {
@@ -312,9 +305,7 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	}
 
 	// No-op if not attached to context
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-		validation.Metrics.ObserveRatchetingTime(*correlatedObject.Duration)
-	}
+	validation.Metrics.ObserveRatchetingTime(*correlatedObject.Duration)
 	return errs
 }
 
@@ -342,7 +333,7 @@ func (a customResourceStrategy) selectableFields(obj runtime.Object, objectMeta 
 	objectMetaFields := objectMetaFieldsSet(objectMeta, a.namespaceScoped)
 	var selectableFieldsSet fields.Set
 
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && len(a.selectableFieldSet) > 0 {
+	if len(a.selectableFieldSet) > 0 {
 		us, ok := obj.(runtime.Unstructured)
 		if !ok {
 			return nil, fmt.Errorf("unexpected error casting a custom resource to unstructured")

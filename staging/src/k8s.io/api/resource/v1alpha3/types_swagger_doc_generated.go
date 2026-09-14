@@ -29,7 +29,7 @@ package v1alpha3
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_CELDeviceSelector = map[string]string{
 	"":           "CELDeviceSelector contains a CEL expression for selecting a device.",
-	"expression": "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
+	"expression": "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\").\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nCommon errors: - \"no such key\": Use optional chaining (.? followed by orValue())\n  or guarding the check with has() for optional fields.\n  See CEL Optional Types for details:\n  https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes\n\nFor more CEL expression syntax and examples, see: https://kubernetes.io/docs/reference/using-api/cel/\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
 }
 
 func (CELDeviceSelector) SwaggerDoc() map[string]string {
@@ -108,6 +108,18 @@ func (DeviceTaintSelector) SwaggerDoc() map[string]string {
 	return map_DeviceTaintSelector
 }
 
+var map_PartitionTypeStatus = map[string]string{
+	"":            "PartitionTypeStatus reports allocatability for a single partition type, identified by the value of a grouping attribute.",
+	"attribute":   "Attribute is the fully qualified name of the device attribute whose value groups this entry. It is the PartitionTypeAttribute declared by the devices' own slice, or the default named in the request when their slice declares none.",
+	"type":        "Type is the partition type value (e.g. \"Full\" or \"Half\").",
+	"total":       "Total is the number of devices of this partition type in the pool.",
+	"allocatable": "Allocatable is the number of additional devices of this partition type that could still be allocated given current shared-counter consumption.",
+}
+
+func (PartitionTypeStatus) SwaggerDoc() map[string]string {
+	return map_PartitionTypeStatus
+}
+
 var map_PoolStatus = map[string]string{
 	"":                   "PoolStatus contains status information for a single resource pool.",
 	"driver":             "Driver is the DRA driver name for this pool. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
@@ -120,6 +132,8 @@ var map_PoolStatus = map[string]string{
 	"unavailableDevices": "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated. A value of 0 means all unallocated devices are available. May be unset when validationError is set.",
 	"nodeName":           "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node. Must be a valid DNS subdomain name (RFC1123).",
 	"validationError":    "ValidationError is set when the pool's data could not be fully validated (e.g., incomplete slice publication). When set, device count fields and ResourceSliceCount may be unset.",
+	"partitionSummary":   "PartitionSummary reports allocatability per (attribute, partition type) for a partitionable pool that publishes SharedCounters. Each entry names the grouping attribute it was resolved from: the PartitionTypeAttribute declared by a device's own slice, or for devices whose slice declares none, the default named in the request. A pool that mixes partitions declared under different attributes reports each independently. When no slice declares an attribute and the request names no default, the pool reports no partition summary.",
+	"shareableSummary":   "ShareableSummary reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations. It is populated only when at least one device in the pool is shareable.",
 }
 
 func (PoolStatus) SwaggerDoc() map[string]string {
@@ -148,10 +162,11 @@ func (ResourcePoolStatusRequestList) SwaggerDoc() map[string]string {
 }
 
 var map_ResourcePoolStatusRequestSpec = map[string]string{
-	"":         "ResourcePoolStatusRequestSpec defines the filters for the pool status request.",
-	"driver":   "Driver specifies the DRA driver name to filter pools. Only pools from ResourceSlices with this driver will be included. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
-	"poolName": "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",
-	"limit":    "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated (i.e., len(status.pools) < status.poolCount).\n\nDefault: 100 Minimum: 1 Maximum: 1000",
+	"":                              "ResourcePoolStatusRequestSpec defines the filters for the pool status request.",
+	"driver":                        "Driver specifies the DRA driver name to filter pools. Only pools from ResourceSlices with this driver will be included. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
+	"poolName":                      "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",
+	"limit":                         "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated (i.e., len(status.pools) < status.poolCount).\n\nDefault: 100 Minimum: 1 Maximum: 1000",
+	"defaultPartitionTypeAttribute": "DefaultPartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for partitionable devices whose slice has not declared one themselves.\n\nA slice's own PartitionTypeAttribute always takes precedence. This default applies only to devices whose slice does not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the slice nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
 }
 
 func (ResourcePoolStatusRequestSpec) SwaggerDoc() map[string]string {
@@ -167,6 +182,29 @@ var map_ResourcePoolStatusRequestStatus = map[string]string{
 
 func (ResourcePoolStatusRequestStatus) SwaggerDoc() map[string]string {
 	return map_ResourcePoolStatusRequestStatus
+}
+
+var map_ShareableCapacityStatus = map[string]string{
+	"":          "ShareableCapacityStatus reports aggregate amounts for a single shareable capacity key.",
+	"name":      "Name is the capacity name.",
+	"total":     "Total is the sum of this capacity across shareable devices in the pool.",
+	"consumed":  "Consumed is the amount drawn by current allocations.",
+	"available": "Available is Total minus Consumed, never negative.",
+}
+
+func (ShareableCapacityStatus) SwaggerDoc() map[string]string {
+	return map_ShareableCapacityStatus
+}
+
+var map_ShareableSummaryStatus = map[string]string{
+	"":                          "ShareableSummaryStatus reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations.",
+	"fullyAvailableDevices":     "FullyAvailableDevices is the number of shareable devices with no capacity consumed.",
+	"partiallyAvailableDevices": "PartiallyAvailableDevices is the number of shareable devices with some but not all capacity consumed.",
+	"capacity":                  "Capacity reports aggregate total, consumed, and available amounts per shareable capacity key across the pool.",
+}
+
+func (ShareableSummaryStatus) SwaggerDoc() map[string]string {
+	return map_ShareableSummaryStatus
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

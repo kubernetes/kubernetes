@@ -201,6 +201,7 @@ type HPAScaleTest struct {
 	secondScale      int32
 	resourceType     v1.ResourceName
 	metricTargetType autoscalingv2.MetricTargetType
+	perPodCPULoad    bool
 }
 
 // run is a method which runs an HPA lifecycle, from a starting state, to an expected
@@ -217,17 +218,32 @@ func (st *HPAScaleTest) run(ctx context.Context, name string, kind schema.GroupV
 	case memResource:
 		initMemTotal = st.initMemTotal
 	}
-	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perPodCPURequest, st.perPodMemRequest, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle, nil)
+	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, 0, initMemTotal, 0, st.perPodCPURequest, st.perPodMemRequest, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle, nil)
 	ginkgo.DeferCleanup(rc.CleanUp)
 	hpa := e2eautoscaling.CreateResourceHorizontalPodAutoscaler(ctx, rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
 	ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
+
+	// TODO: the nested ifs to choose the consume mechanism should be refactored in a more generic way
+	// it should be passed as a parameter in e2eautoscaling.NewDynamicResourceConsumer()
+
+	// Pick the CPU load helper. perPodCPULoad addresses each pod
+	// directly via pod proxy (total/N millicores per pod), bypassing the
+	// random kube-proxy LB used by ConsumeCPU.
+	consumeCPU := rc.ConsumeCPU
+	if st.perPodCPULoad {
+		consumeCPU = rc.ConsumeCPUPerPod
+	}
+
+	if initCPUTotal > 0 {
+		consumeCPU(initCPUTotal)
+	}
 
 	rc.WaitForReplicas(ctx, st.firstScale, timeToWait)
 	if st.firstScaleStasis > 0 {
 		rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, st.firstScale+1, st.firstScaleStasis, hpa.Name)
 	}
 	if st.resourceType == cpuResource && st.cpuBurst > 0 && st.secondScale > 0 {
-		rc.ConsumeCPU(st.cpuBurst)
+		consumeCPU(st.cpuBurst)
 		rc.WaitForReplicas(ctx, int(st.secondScale), timeToWait)
 	}
 	if st.resourceType == memResource && st.memBurst > 0 && st.secondScale > 0 {
@@ -253,6 +269,7 @@ func scaleUp(ctx context.Context, name string, kind schema.GroupVersionKind, res
 		secondScale:      5,
 		resourceType:     resourceType,
 		metricTargetType: metricTargetType,
+		perPodCPULoad:    checkStability,
 	}
 	if resourceType == cpuResource {
 		st.initCPUTotal = 250
@@ -283,6 +300,7 @@ func scaleDown(ctx context.Context, name string, kind schema.GroupVersionKind, r
 		secondScale:      1,
 		resourceType:     resourceType,
 		metricTargetType: metricTargetType,
+		perPodCPULoad:    checkStability,
 	}
 	if resourceType == cpuResource {
 		st.initCPUTotal = 325

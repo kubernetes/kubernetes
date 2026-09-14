@@ -25,6 +25,7 @@ import (
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type optionAvailTest struct {
@@ -139,6 +140,7 @@ func TestPolicyOptionsAlwaysAvailableOnceGA(t *testing.T) {
 }
 
 func TestValidateStaticPolicyOptions(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		description   string
 		policyOption  map[string]string
@@ -195,7 +197,7 @@ func TestValidateStaticPolicyOptions(t *testing.T) {
 			if testCase.topoMgrPolicy == topologymanager.PolicySingleNumaNode {
 				topoMgrPolicy = topologymanager.NewSingleNumaNodePolicy(&topologymanager.NUMAInfo{}, topologymanager.PolicyOptions{})
 			}
-			topoMgrStore := topologymanager.NewFakeManagerWithPolicy(topoMgrPolicy)
+			topoMgrStore := topologymanager.NewFakeManagerWithPolicy(logger, topoMgrPolicy)
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 			policyOpt, _ := NewStaticPolicyOptions(testCase.policyOption)

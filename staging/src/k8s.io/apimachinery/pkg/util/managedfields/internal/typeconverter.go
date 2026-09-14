@@ -19,14 +19,15 @@ package internal
 import (
 	"fmt"
 
+	smdschema "sigs.k8s.io/structured-merge-diff/v7/schema"
+	"sigs.k8s.io/structured-merge-diff/v7/typed"
+	"sigs.k8s.io/structured-merge-diff/v7/value"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/schemaconv"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	smdschema "sigs.k8s.io/structured-merge-diff/v6/schema"
-	"sigs.k8s.io/structured-merge-diff/v6/typed"
-	"sigs.k8s.io/structured-merge-diff/v6/value"
 )
 
 // TypeConverter allows you to convert from runtime.Object to
@@ -107,6 +108,24 @@ func valueToObject(val value.Value) (runtime.Object, error) {
 	default:
 		return nil, fmt.Errorf("failed to convert value to unstructured for type %T", vu)
 	}
+}
+
+// GroupVersionOfTypedValue returns the extracted GroupVersion from the TypeMeta
+// fields of a TypedValue, or return false if no TypeMeta fields are found.
+func GroupVersionOfTypedValue(object *typed.TypedValue) (schema.GroupVersion, bool) {
+	val := object.AsValue()
+	if val == nil || !val.IsMap() {
+		return schema.GroupVersion{}, false
+	}
+	apiVersion, ok := val.AsMap().Get("apiVersion")
+	if !ok || !apiVersion.IsString() {
+		return schema.GroupVersion{}, false
+	}
+	groupVersion, err := schema.ParseGroupVersion(apiVersion.AsString())
+	if err != nil {
+		return schema.GroupVersion{}, false
+	}
+	return groupVersion, true
 }
 
 func indexModels(

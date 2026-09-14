@@ -95,6 +95,12 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	// This field is populated only for devices that allow multiple allocations.
 	// All capacity entries are included, even if the consumed amount is zero.
 	ConsumedCapacity map[resourcev1beta1.QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty"`
+	// SkipNodeOperations lists node-local resource operations (gRPC calls)
+	// that will be skipped for this allocated device when determining whether
+	// operations are necessary on the node. If all allocated devices for a driver in
+	// a claim skip an operation, that gRPC call will be skipped. It is a copy of
+	// the ResourceSlice.spec.skipNodeOperations value at the time when the device was allocated.
+	SkipNodeOperations []resourcev1beta1.SkipNodeOperation `json:"skipNodeOperations,omitempty"`
 }
 
 // DeviceRequestAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceRequestAllocationResult type for use with
@@ -194,6 +200,16 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithConsumedCapacity(e
 	}
 	for k, v := range entries {
 		b.ConsumedCapacity[k] = v
+	}
+	return b
+}
+
+// WithSkipNodeOperations adds the given value to the SkipNodeOperations field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the SkipNodeOperations field.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithSkipNodeOperations(values ...resourcev1beta1.SkipNodeOperation) *DeviceRequestAllocationResultApplyConfiguration {
+	for i := range values {
+		b.SkipNodeOperations = append(b.SkipNodeOperations, values[i])
 	}
 	return b
 }

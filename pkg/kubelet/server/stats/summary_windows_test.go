@@ -19,7 +19,6 @@ limitations under the License.
 package stats
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -35,7 +34,7 @@ import (
 
 func TestSummaryProvider(t *testing.T) {
 	var (
-		ctx            = context.Background()
+		ctx            = t.Context()
 		podStats       = []statsapi.PodStats{*getPodStats()}
 		imageFsStats   = getFsStats()
 		rootFsStats    = getFsStats()
@@ -62,7 +61,7 @@ func TestSummaryProvider(t *testing.T) {
 	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil).Maybe()
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil).Maybe()
 	mockStatsProvider.EXPECT().RlimitStats().Return(nil, nil).Maybe()
-	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).Maybe()
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).Maybe()
 
 	kubeletCreationTime := metav1.Now()
 	systemBootTime := metav1.Now()

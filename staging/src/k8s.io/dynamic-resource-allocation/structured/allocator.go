@@ -260,32 +260,7 @@ func NodeMatches(features Features, node *v1.Node, nodeNameToMatch string, allNo
 	return false, fmt.Errorf("internal error: no NodeMatches implementation available for feature set %v", features)
 }
 
-// IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices
-// and partially consumed devices when consumable capacity is enabled.
+// IsDeviceAllocated checks if a device has committed allocation state.
 func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
-	// Check if device is fully allocated (traditional case)
-	if allocatedState.AllocatedDevices.Has(deviceID) {
-		return true
-	}
-
-	// Check if device is partially consumed via shared allocations (consumable capacity case).
-	// We need to check if any shared device ID corresponds to our device.
-	for sharedDeviceID := range allocatedState.AllocatedSharedDeviceIDs {
-		// Extract the base device ID from the shared device ID by recreating it
-		baseDeviceID := MakeDeviceID(
-			sharedDeviceID.Driver.String(),
-			sharedDeviceID.Pool.String(),
-			sharedDeviceID.Device.String(),
-		)
-		if baseDeviceID == deviceID {
-			return true
-		}
-	}
-
-	// Check if device has consumed capacity tracked (consumable capacity case)
-	if _, hasConsumedCapacity := allocatedState.AggregatedCapacity[deviceID]; hasConsumedCapacity {
-		return true
-	}
-
-	return false
+	return internal.IsDeviceAllocated(deviceID, allocatedState)
 }

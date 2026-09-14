@@ -22,8 +22,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -59,13 +57,11 @@ func SetDefaults_Job(obj *batchv1.Job) {
 	if obj.Spec.Suspend == nil {
 		obj.Spec.Suspend = ptr.To(false)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-		if obj.Spec.PodReplacementPolicy == nil {
-			if obj.Spec.PodFailurePolicy != nil {
-				obj.Spec.PodReplacementPolicy = ptr.To(batchv1.Failed)
-			} else {
-				obj.Spec.PodReplacementPolicy = ptr.To(batchv1.TerminatingOrFailed)
-			}
+	if obj.Spec.PodReplacementPolicy == nil {
+		if obj.Spec.PodFailurePolicy != nil {
+			obj.Spec.PodReplacementPolicy = ptr.To(batchv1.Failed)
+		} else {
+			obj.Spec.PodReplacementPolicy = ptr.To(batchv1.TerminatingOrFailed)
 		}
 	}
 	if obj.Spec.ManualSelector == nil {

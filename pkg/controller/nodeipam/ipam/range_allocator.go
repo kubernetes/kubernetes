@@ -59,7 +59,7 @@ type rangeAllocator struct {
 
 	// queues are where incoming work is placed to de-dup and to allow "easy"
 	// rate limited requeues on errors
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 var _ CIDRAllocator = &rangeAllocator{}
@@ -98,7 +98,13 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 		nodesSynced:  nodeInformer.Informer().HasSynced,
 		broadcaster:  eventBroadcaster,
 		recorder:     recorder,
-		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cidrallocator_node"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "cidrallocator_node",
+			},
+		),
 	}
 
 	if allocatorParams.ServiceCIDR != nil {
@@ -130,7 +136,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 		}
 	}
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
@@ -163,7 +169,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 				utilruntime.HandleErrorWithContext(ctx, err, "Error while processing CIDR Release")
 			}
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
 	return ra, nil
 }
@@ -210,35 +216,20 @@ func (r *rangeAllocator) runWorker(ctx context.Context) {
 // processNextWorkItem will read a single work item off the queue and
 // attempt to process it, by calling the syncHandler.
 func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
-	obj, shutdown := r.queue.Get()
+	key, shutdown := r.queue.Get()
 	if shutdown {
 		return false
 	}
 
 	// We wrap this block in a func so we can defer r.queue.Done.
-	err := func(logger klog.Logger, obj interface{}) error {
+	err := func(logger klog.Logger, key string) error {
 		// We call Done here so the workNodeQueue knows we have finished
 		// processing this item. We also must remember to call Forget if we
 		// do not want this work item being re-queued. For example, we do
 		// not call Forget if a transient error occurs, instead the item is
 		// put back on the queue and attempted again after a back-off
 		// period.
-		defer r.queue.Done(obj)
-		var key string
-		var ok bool
-		// We expect strings to come off the workNodeQueue. These are of the
-		// form namespace/name. We do this as the delayed nature of the
-		// workNodeQueue means the items in the informer cache may actually be
-		// more up to date that when the item was initially put onto the
-		// workNodeQueue.
-		if key, ok = obj.(string); !ok {
-			// As the item in the workNodeQueue is actually invalid, we call
-			// Forget here else we'd go into a loop of attempting to
-			// process a work item that is invalid.
-			r.queue.Forget(obj)
-			utilruntime.HandleErrorWithContext(ctx, nil, "Expected string but got unexpected type in work node queue", "type", fmt.Sprintf("%T", obj))
-			return nil
-		}
+		defer r.queue.Done(key)
 		// Run the syncHandler, passing it the namespace/name string of the
 		// Foo resource to be synced.
 		if err := r.syncNode(ctx, key); err != nil {
@@ -248,10 +239,10 @@ func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 		}
 		// Finally, if no error occurs we Forget this item so it does not
 		// get queue again until another change happens.
-		r.queue.Forget(obj)
+		r.queue.Forget(key)
 		logger.V(4).Info("Successfully synced", "key", key)
 		return nil
-	}(klog.FromContext(ctx), obj)
+	}(klog.FromContext(ctx), key)
 
 	if err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Error processing node work item")

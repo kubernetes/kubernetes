@@ -35,6 +35,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -46,6 +47,7 @@ import (
 // For example, in scheduler integration tests, recreating apiserver is performance consuming,
 // then shutdown the scheduler and recreate it between each test case is a better approach.
 func InitTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestContext, nodeCount int, runScheduler bool, opts ...scheduler.Option) (*testutils.TestContext, testutils.ShutdownFunc) {
+	tCtx := ktesting.Init(t)
 	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0, opts...)
 	testutils.SyncSchedulerInformerFactory(testCtx)
 	if runScheduler {
@@ -55,7 +57,7 @@ func InitTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 	if nodeCount > 0 {
 		if _, err := testutils.CreateAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode(), nodeCount); err != nil {
 			// Make sure to cleanup the resources when initializing error.
-			testutils.CleanupTest(t, testCtx)
+			testutils.CleanupTest(tCtx, testCtx)
 			t.Fatal(err)
 		}
 	}

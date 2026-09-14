@@ -18,12 +18,11 @@ package store
 
 import (
 	"fmt"
+	"iter"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -70,19 +69,68 @@ type Indexer interface {
 	GetByKey(key string) (item interface{}, exists bool, err error)
 	Replace([]interface{}, string) error
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
+	Clone() Snapshot
+	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
 
-type OrderedLister interface {
-	ListPrefix(prefix, continueKey string) []interface{}
-	Count(prefix, continueKey string) (count int)
-	Clone() OrderedLister
+// Snapshot is an immutable point-in-time view of the store.
+type Snapshot interface {
+	GetByKey(key string) (item interface{}, exists bool, err error)
+	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
+	RangePrefix(prefix, continueKey string) Range
+}
+
+// Range is the elements of a Snapshot with a given key prefix, in key
+// order, starting from continueKey.
+type Range interface {
+	All() iter.Seq2[*Element, error]
+	Count() int
+}
+
+func SingleElementRange(elem *Element) Range {
+	return elements{elem}
+}
+
+func EmptyRange() Range {
+	return elements(nil)
+}
+
+type elements []*Element
+
+func (e elements) All() iter.Seq2[*Element, error] {
+	return func(yield func(*Element, error) bool) {
+		for _, elem := range e {
+			if !yield(elem, nil) {
+				return
+			}
+		}
+	}
+}
+
+func (e elements) Count() int {
+	return len(e)
+}
+
+type prefixRanger interface {
+	rangePrefix(prefix, continueKey string) iter.Seq2[*Element, error]
+	countPrefix(prefix, continueKey string) int
+}
+
+type prefixRange struct {
+	snapshot            prefixRanger
+	prefix, continueKey string
+}
+
+func (r prefixRange) All() iter.Seq2[*Element, error] {
+	return r.snapshot.rangePrefix(r.prefix, r.continueKey)
+}
+
+func (r prefixRange) Count() int {
+	return r.snapshot.countPrefix(r.prefix, r.continueKey)
 }
 
 func NewIndexer(indexers *cache.Indexers) Indexer {
-	if utilfeature.DefaultFeatureGate.Enabled(features.BtreeWatchCache) {
-		return newThreadedBtreeStoreIndexer(ElementIndexers(indexers), btreeDegree)
-	}
-	return cache.NewIndexer(ElementKey, ElementIndexers(indexers))
+	return newThreadedBtreeStoreIndexer(ElementIndexers(indexers), btreeDegree)
 }
 
 // Computing a key of an object is generally non-trivial (it performs

@@ -29,7 +29,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 func testExtendedResource(tCtx ktesting.TContext, enabled, explicit bool) {
@@ -83,7 +83,7 @@ func testExtendedResource(tCtx ktesting.TContext, enabled, explicit bool) {
 				"Type":    gomega.Equal(v1.PodScheduled),
 				"Status":  gomega.Equal(v1.ConditionFalse),
 				"Reason":  gomega.Equal("Unschedulable"),
-				"Message": gomega.Equal(fmt.Sprintf("0/8 nodes are available: 8 Insufficient %s. no new claims to deallocate, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling.", resourceName)),
+				"Message": gomega.Equal(fmt.Sprintf("0/8 nodes are available: 8 Insufficient %s. preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling.", resourceName)),
 			}),
 		))
 	}

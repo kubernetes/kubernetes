@@ -68,6 +68,7 @@ type WebhookHandler struct {
 }
 
 func NewWebhookHandlers(webhookConfigs map[string]WebhookConfig, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) map[string]WebhookHandler {
+	RegisterMetrics()
 	webhookHandlers := make(map[string]WebhookHandler)
 	for name, config := range webhookConfigs {
 		if !genericcontrollermanager.IsControllerEnabled(name, WebhooksDisabledByDefault, completedConfig.ComponentConfig.Webhook.Webhooks) {

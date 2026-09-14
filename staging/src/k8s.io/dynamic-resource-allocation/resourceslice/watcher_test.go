@@ -34,7 +34,7 @@ func TestFilterSliceWatchByPoolName_FiltersByPoolName(t *testing.T) {
 func testFilterSliceWatchByPoolNameFiltersByPoolName(t *testing.T) {
 	poolName := "pool-a"
 
-	source := watch.NewFakeWithOptions(watch.FakeOptions{ChannelSize: 3})
+	source := watch.NewFakeWithOptions(watch.FakeOptions{ChannelSize: 5})
 	defer source.Stop()
 
 	wrapped := filterSliceWatchByPoolName(t.Context(), source, poolName)
@@ -43,6 +43,8 @@ func testFilterSliceWatchByPoolNameFiltersByPoolName(t *testing.T) {
 	source.Add(resourceSliceForPool("pool-a", "slice-a"))
 	source.Add(resourceSliceForPool("pool-b", "slice-b"))
 	source.Add(resourceSliceForPool("pool-a", "slice-a2"))
+	source.Action(watch.Bookmark, &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}})
+	source.Error(&metav1.Status{Status: metav1.StatusFailure})
 
 	event1 := <-wrapped.ResultChan()
 	require.Equal(t, watch.Added, event1.Type)
@@ -52,6 +54,12 @@ func testFilterSliceWatchByPoolNameFiltersByPoolName(t *testing.T) {
 	event2 := <-wrapped.ResultChan()
 	require.Equal(t, watch.Added, event2.Type)
 	require.Equal(t, "slice-a2", event2.Object.(*resourceapi.ResourceSlice).Name)
+
+	bookmark := <-wrapped.ResultChan()
+	require.Equal(t, watch.Bookmark, bookmark.Type)
+
+	errEvent := <-wrapped.ResultChan()
+	require.Equal(t, watch.Error, errEvent.Type)
 }
 
 func TestWrapWatcher_NilMatchPassesAll(t *testing.T) {

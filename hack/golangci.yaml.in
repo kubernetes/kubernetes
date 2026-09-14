@@ -68,17 +68,6 @@ linters:
         text: comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|exported (.+) should have comment( \(or a comment on this block\))? or be unexported|package comment should be of the form "(.+)...|comment on exported (.+) should be of the form "(.+)...|should have a package comment
         path-except: cmd/kubeadm
 
-      # The unused linter that comes from staticcheck currently does not handle types which implement
-      # a generic interface. The linter incorrectly reports the implementations of unexported
-      # interface methods as unused. See https://github.com/dominikh/go-tools/issues/1294.
-      # Rather than exporting the interface methods, which makes the error go away but changes the
-      # semantics of the code, we ignore this error for affected files.
-      # This can be removed when the staticcheck implementation of this rule is fixed, which may
-      # depend on https://github.com/golang/go/issues/63982.
-      - linters:
-          - unused
-        path: staging/src/k8s.io/client-go/util/workqueue/metrics.go
-
       # SSA Extract calls are allowed in tests.
       - linters:
           - forbidigo
@@ -93,14 +82,14 @@ linters:
 
       # The Kubernetes naming convention for conversion functions uses underscores
       # and intentionally deviates from normal Go conventions to make those function
-      # names more readable. Same for SetDefaults_*.
+      # names more readable. Same for SetDefaults_* and ValidateCustom_*.
       #
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
       - linters:
           - staticcheck
           - revive
-        text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
+        text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_|ValidateCustom_)|exported: exported function (Convert|SetDefaults|ValidateCustom)_.* should be of the form)"
 
       # The generated swagger docs also don't follow the naming convention.
       - linters:
@@ -186,22 +175,23 @@ linters:
   settings: # please keep this alphabetized
     custom:
       logcheck:
-        # Installed there by hack/verify-golangci-lint.sh.
-        path: _output/local/bin/logcheck.so
+        # hack/tools/golangci-lint/main.go compiles this linter into golangci-lint.
+        type: module
         description: structured logging checker
         original-url: k8s.io/logtools/logcheck
         settings:
           config: |
             {{include "hack/logcheck.conf" | indent 12 | trim}}
       sorted:
-        # Installed there by hack/verify-golangci-lint.sh.
-        path: _output/local/bin/sorted.so
+        # hack/tools/golangci-lint/main.go compiles this linter into golangci-lint.
+        type: module
         description: check if feature gates are sorted
         original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sorted
         settings:
           {{include "hack/tools/golangci-lint/sorted/config.yaml" | indent 10 | trim}}
       kubeapilinter:
-        path: _output/local/bin/kube-api-linter.so
+        # hack/tools/golangci-lint/main.go compiles this linter into golangci-lint.
+        type: module
         description: kube-api-linter and lints Kube like APIs based on API conventions and best practices.
         original-url: sigs.k8s.io/kube-api-linter
         settings:
@@ -229,6 +219,9 @@ linters:
     forbidigo:
       analyze-types: true
       forbid:
+        - pattern: \.AnnotatedEventf$
+          # https://github.com/kubernetes/kubernetes/pull/137270
+          msg: "Do not use AnnotatedEventf. Events are fire-and-forget and aggressively throttled; do not rely on them to pass state or metadata for programmatic triggers."
         - pattern: md5\.*
           # https://github.com/kubernetes/kubernetes/issues/129652
           msg: md5 is oudated, insecure, prefer a secure hash (such as sha256) or a non-cryptographic hash
@@ -282,6 +275,16 @@ linters:
       # Analyzers which are kept enabled are not
       # called out here, see https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/modernize#section-documentation
       # for the full list.
+      #
+      # We don't pro-actively modernize existing code, so checks need to be disabled
+      # for the base config unless we happen to pass the check already.
+      # For new language features (identified with e.g. "go 1.27" for a feature added in 1.27)
+      # we hold back enabling as hint to reduce the risk that usage of the feature makes
+      # backporting harder. Waiting until all supported releases support the feature is safe,
+      # but it's also okay to go faster because backports to very old releases become less
+      # likely over time and some features might be worth a hint sooner - use common sense.
+      #
+      # Please keep sorted alphabetically.
       disable:
         # Replace interface{} with any.
         #
@@ -291,12 +294,17 @@ linters:
         # and it's just syntactic sugar.
         - any
         {{- if .Base }}
-        # Replace []byte(fmt.Sprintf) with fmt.Appendf.
-        #
-        # A useful hint for new code, but
-        # should only be updated in old code
-        # where it really matters.
-        - fmtappendf
+        # go 1.19: can simplify atomic int assignment/access
+        - atomictypes
+        {{- end }}
+        # go 1.27: can declare embedded fields inline
+        # TODO Kubernetes 1.39: limit to base config
+        - embedlit
+        {{- if .Base }}
+        # go 1.26: can simplify with errors.AsType
+        - errorsastype
+        {{- end }}
+        {{- if .Base }}
         # Replace explicit loops over maps with calls to maps package.
         #
         # Completely disabled because the benefit
@@ -306,15 +314,22 @@ linters:
         #
         # A useful hint for new code.
         - minmax
-        {{- end }}
-        # simplify code by using go1.26's new(expr)
-        # should only be updated in old code where it really matters (= always disable in base)
-        # and needs to remain disabled as hint until Go 1.26 is also available for backported code (https://github.com/kubernetes/kubernetes/issues/137595)
+        # go 1.26: can simplify with new(expr)
         - newexpr
-        {{- if .Base }}
-        # use iterators instead of Len/At-style APIs
-        # should only be updated in old code where it really matters.
+        # Replace 3-clause for loops with for-range over integers.
+        #
+        # A useful hint for new code (makes it shorter).
+        - rangeint
+        # go 1.26: can use iterators instead of Len/At-style APIs
         - stditerators
+        # go 1.25: can simplify with reflect.TypeAssert
+        - reflecttypeassert
+        # Replace reflect.TypeOf(x) with TypeFor[T]().
+        #
+        # A useful hint for new code, it could be more efficient.
+        - reflecttypefor
+        # go 1.23: can simplify with slices.Backward
+        - slicesbackward
         {{- end }}
         # Suggest replacing omitempty with omitzero for struct fields.
         #
@@ -322,14 +337,6 @@ linters:
         # with encoding of API structs.
         - omitzero
         {{- if .Base }}
-        # Replace 3-clause for loops with for-range over integers.
-        #
-        # A useful hint for new code (makes it shorter).
-        - rangeint
-        # Replace reflect.TypeOf(x) with TypeFor[T]().
-        #
-        # A useful hint for new code, it could be more efficient.
-        - reflecttypefor
         # Replace loops with slices.Contains or slices.ContainsFunc.
         #
         # A useful hint because it can make code more obvious
@@ -361,15 +368,13 @@ linters:
         # context cancellation and also
         # addresses other pain points.
         - testingcontext
+        {{- if .Base }}
         # Replace wg.Add(1)/go/wg.Done() with wg.Go.
         #
         # A useful hint leading to shorter code.
         # Makes wait.Group obsolete.
-        {{- if .Hints }}
-        # Please enable when all supported Kubernetes versions
-        # are on GoLang 1.25+
+        - waitgroupgo
         {{- end }}
-        - waitgroup
 
     revive:
       # Only these rules are enabled.

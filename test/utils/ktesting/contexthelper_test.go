@@ -19,13 +19,76 @@ package ktesting
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/assert"
 )
+
+// cleanupDrivenContextTB embeds *testing.T for all the boilerplate TB
+// methods, but reimplements Cleanup and Context to mimic Ginkgo's testing
+// proxy: Context() creates a context and registers its own cancel func via
+// Cleanup instead of canceling it independently when the test is done.
+// Cleanup callbacks run in LIFO order, exactly like both "testing" and
+// Ginkgo do it.
+type cleanupDrivenContextTB struct {
+	*testing.T
+
+	mu       sync.Mutex
+	cleanups []func()
+}
+
+func (tb *cleanupDrivenContextTB) Cleanup(f func()) {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+	tb.cleanups = append(tb.cleanups, f)
+}
+
+// runCleanups simulates the end of the test: all callbacks registered via
+// Cleanup run now, in LIFO order.
+func (tb *cleanupDrivenContextTB) runCleanups() {
+	for {
+		tb.mu.Lock()
+		if len(tb.cleanups) == 0 {
+			tb.mu.Unlock()
+			return
+		}
+		f := tb.cleanups[len(tb.cleanups)-1]
+		tb.cleanups = tb.cleanups[:len(tb.cleanups)-1]
+		tb.mu.Unlock()
+		f()
+	}
+}
+
+func (tb *cleanupDrivenContextTB) Context() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	tb.Cleanup(cancel)
+	return ctx
+}
+
+// TestRunWhenDoneCleanupDrivenContext ensures that there's no deadlock
+// with TB implementations (like Ginkgo's) which cancel their Context() from
+// their own Cleanup instead of independently, which runs after (LIFO order)
+// runWhenDone's own Cleanup and thus could have blocked it forever.
+func TestRunWhenDoneCleanupDrivenContext(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		fake := &cleanupDrivenContextTB{T: t}
+
+		var called bool
+		runWhenDone(fake, func() {
+			called = true
+		})
+
+		// If this deadlocks, synctest reports it as a test failure.
+		fake.runCleanups()
+
+		if !called {
+			t.Error("runWhenDone's callback was not invoked")
+		}
+	})
+}
 
 func TestCleanupErr(t *testing.T) {
 	actual := cleanupErr(t.Name())
@@ -36,6 +99,8 @@ func TestCleanupErr(t *testing.T) {
 
 func TestCause(t *testing.T) {
 	timeoutCause := canceledError("I timed out")
+	cancelText := "I got canceled"
+	var cancelCause error = canceledError(cancelText)
 	parentCause := errors.New("parent canceled")
 
 	contextBackground := func(t *testing.T) context.Context {
@@ -46,7 +111,8 @@ func TestCause(t *testing.T) {
 		parentCtx              func(t *testing.T) context.Context
 		timeout                time.Duration
 		sleep                  time.Duration
-		cancelCause            string
+		cancelCause            *error
+		cancelText             *string
 		expectErr, expectCause error
 		expectDeadline         time.Duration
 	}{
@@ -107,17 +173,52 @@ func TestCause(t *testing.T) {
 			timeout:        time.Minute,
 			expectDeadline: time.Minute,
 		},
+		"cancelCause": {
+			parentCtx:   contextBackground,
+			cancelCause: &cancelCause,
+			expectErr:   context.Canceled,
+			expectCause: cancelCause,
+		},
+		"cancelText": {
+			parentCtx:   contextBackground,
+			cancelText:  &cancelText,
+			expectErr:   context.Canceled,
+			expectCause: cancelCause,
+		},
+		"cancelEmptyText": {
+			// Canceling with an empty string must preserve the standard
+			// context.Canceled cause, just like context.CancelFunc does.
+			parentCtx:   contextBackground,
+			cancelText:  new(string),
+			expectErr:   context.Canceled,
+			expectCause: context.Canceled,
+		},
+		"cancelBecauseNil": {
+			// CancelBecause is a transparent pass-through to
+			// context.CancelCauseFunc, so nil must also result in the
+			// standard context.Canceled cause.
+			parentCtx:   contextBackground,
+			cancelCause: new(error),
+			expectErr:   context.Canceled,
+			expectCause: context.Canceled,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				ctx, cancel := withTimeout(tt.parentCtx(t), t, tt.timeout, timeoutCause.Error())
-				if tt.cancelCause != "" {
-					cancel(tt.cancelCause)
+				tCtx := Init(t)
+				tCtx = tCtx.WithContext(tt.parentCtx(t)).WithTimeout(tt.timeout, timeoutCause.Error())
+				if tt.cancelCause != nil {
+					tCtx.CancelBecause(*tt.cancelCause)
+				}
+				if tt.cancelText != nil {
+					tCtx.Cancel(*tt.cancelText)
 				}
 				if tt.expectDeadline != 0 {
-					actualDeadline, ok := ctx.Deadline()
-					if assert.True(t, ok, "should have had a deadline") {
-						assert.Equal(t, tt.expectDeadline, time.Until(actualDeadline), "remaining time till Deadline()")
+					actualDeadline, ok := tCtx.Deadline()
+					if !ok {
+						tCtx.Error("should have a deadline and hasn't")
+					} else {
+						tCtx.Assert(time.Until(actualDeadline)).To(gomega.Equal(tt.expectDeadline), "remaining time till Deadline()")
 					}
 				}
 				// Unblock background goroutines.
@@ -125,10 +226,18 @@ func TestCause(t *testing.T) {
 				// Wait for them to do their work.
 				synctest.Wait()
 				// Now check.
-				actualErr := ctx.Err()
-				actualCause := context.Cause(ctx)
-				assert.Equal(t, tt.expectErr, actualErr, "ctx.Err()")
-				assert.Equal(t, tt.expectCause, actualCause, "context.Cause()")
+				actualErr := tCtx.Err()
+				actualCause := context.Cause(tCtx)
+				if tt.expectErr == nil {
+					tCtx.Assert(actualErr).To(gomega.Succeed(), "ctx.Err()")
+				} else {
+					tCtx.Assert(actualErr).To(gomega.MatchError(tt.expectErr), "ctx.Err()")
+				}
+				if tt.expectCause == nil {
+					tCtx.Assert(actualCause).To(gomega.Succeed(), "context.Cause()")
+				} else {
+					tCtx.Assert(actualCause).To(gomega.MatchError(tt.expectCause), "context.Cause()")
+				}
 			})
 		})
 	}

@@ -34,7 +34,7 @@ const (
 )
 
 func TestCompact(t *testing.T) {
-	client := testserver.RunEtcd(t, nil).Client
+	client := testserver.RunEtcd(t).Client
 	ctx := context.Background()
 	clock := testingclock.NewFakeClock(time.Now())
 	c := NewCompactor(client, time.Minute, clock, nil)
@@ -111,7 +111,7 @@ func assertNotCompacted(t *testing.T, ctx context.Context, client *clientv3.Clie
 }
 
 func TestCompactIntervalZero(t *testing.T) {
-	client := testserver.RunEtcd(t, nil).Client
+	client := testserver.RunEtcd(t).Client
 	clock := testingclock.NewFakeClock(time.Now())
 	c := NewCompactor(client, 0, clock, nil)
 	t.Cleanup(c.Stop)
@@ -152,7 +152,7 @@ func clockNoWaiters(t *testing.T, clock *testingclock.FakeClock) {
 // - C2 compacts on time 0. It will fail as this time was compacted. But it will get latest logical time, which should be larger by one.
 // - C3 compacts on time 1. It will succeed.
 func TestCompactConflict(t *testing.T) {
-	client := testserver.RunEtcd(t, nil).Client
+	client := testserver.RunEtcd(t).Client
 	ctx := context.Background()
 
 	putResp, err := client.Put(ctx, "/somekey", "data")

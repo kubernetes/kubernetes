@@ -34,11 +34,39 @@ import (
 )
 
 // ValidatingAdmissionPolicyInformer provides access to a shared informer and lister for
-// ValidatingAdmissionPolicies.
+// ValidatingAdmissionPolicies. Prefer using the type-safe variant (see [TypedValidatingAdmissionPolicyInformer]).
 type ValidatingAdmissionPolicyInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() admissionregistrationv1alpha1.ValidatingAdmissionPolicyLister
 }
+
+// TypedValidatingAdmissionPolicyInformer provides access to a shared informer and lister for
+// ValidatingAdmissionPolicies, including the type-safe TypedInformer variant.
+// It is a superset of ValidatingAdmissionPolicyInformer.
+type TypedValidatingAdmissionPolicyInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ValidatingAdmissionPolicyIndexInformer
+	Lister() admissionregistrationv1alpha1.ValidatingAdmissionPolicyLister
+}
+
+// ValidatingAdmissionPolicyIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ValidatingAdmissionPolicyIndexInformer cache.TypedSharedIndexInformer[*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy]
+
+// ValidatingAdmissionPolicyHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for ValidatingAdmissionPolicy.
+type ValidatingAdmissionPolicyHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy]
+
+// ValidatingAdmissionPolicyDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for ValidatingAdmissionPolicy.
+type ValidatingAdmissionPolicyDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy]
+
+// ValidatingAdmissionPolicyFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for ValidatingAdmissionPolicy.
+type ValidatingAdmissionPolicyFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy]
+
+// ValidatingAdmissionPolicyIndexers is a specialization of [cache.TypedIndexers] for ValidatingAdmissionPolicy.
+type ValidatingAdmissionPolicyIndexers = cache.TypedIndexers[*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy]
+
+// DeletedValidatingAdmissionPolicy is a specialization of [cache.DeletedObject] for ValidatingAdmissionPolicy.
+type DeletedValidatingAdmissionPolicy = cache.DeletedObject[*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy]
 
 type validatingAdmissionPolicyInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type validatingAdmissionPolicyInformer struct {
 // NewValidatingAdmissionPolicyInformer constructs a new informer for ValidatingAdmissionPolicy type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedValidatingAdmissionPolicyInformer]).
 func NewValidatingAdmissionPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewValidatingAdmissionPolicyInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedValidatingAdmissionPolicyInformer constructs a new informer for ValidatingAdmissionPolicy type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedValidatingAdmissionPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers ValidatingAdmissionPolicyIndexers) ValidatingAdmissionPolicyIndexInformer {
+	return NewTypedValidatingAdmissionPolicyInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredValidatingAdmissionPolicyInformer constructs a new informer for ValidatingAdmissionPolicy type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredValidatingAdmissionPolicyInformer]).
 func NewFilteredValidatingAdmissionPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewValidatingAdmissionPolicyInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedValidatingAdmissionPolicyInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredValidatingAdmissionPolicyInformer constructs a new informer for ValidatingAdmissionPolicy type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredValidatingAdmissionPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers ValidatingAdmissionPolicyIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ValidatingAdmissionPolicyIndexInformer {
+	return NewTypedValidatingAdmissionPolicyInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewValidatingAdmissionPolicyInformerWithOptions constructs a new informer for ValidatingAdmissionPolicy type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedValidatingAdmissionPolicyInformerWithOptions]).
 func NewValidatingAdmissionPolicyInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedValidatingAdmissionPolicyInformerWithOptions(client, options)
+}
+
+// NewTypedValidatingAdmissionPolicyInformerWithOptions constructs a new informer for ValidatingAdmissionPolicy type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedValidatingAdmissionPolicyInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) ValidatingAdmissionPolicyIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Resource: "validatingadmissionpolicys"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewValidatingAdmissionPolicyInformerWithOptions(client kubernetes.Interface
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *validatingAdmissionPolicyInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewValidatingAdmissionPolicyInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedValidatingAdmissionPolicyInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *validatingAdmissionPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *validatingAdmissionPolicyInformer) TypedInformer() ValidatingAdmissionPolicyIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy](f.factory.InformerFor(&apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy{}, f.defaultInformer))
 }
 
 func (f *validatingAdmissionPolicyInformer) Lister() admissionregistrationv1alpha1.ValidatingAdmissionPolicyLister {
 	return admissionregistrationv1alpha1.NewValidatingAdmissionPolicyLister(f.Informer().GetIndexer())
+}
+
+// ToTypedValidatingAdmissionPolicyInformer converts an untyped informer into a TypedValidatingAdmissionPolicyInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ValidatingAdmissionPolicy. If that is not the case, calling type-safe methods of the returned
+// TypedValidatingAdmissionPolicyInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedValidatingAdmissionPolicyInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedValidatingAdmissionPolicyInformer(informer ValidatingAdmissionPolicyInformer) TypedValidatingAdmissionPolicyInformer {
+	if informer, ok := informer.(TypedValidatingAdmissionPolicyInformer); ok {
+		return informer
+	}
+	return &validatingAdmissionPolicyTypedInformerAdapter{informer}
+}
+
+type validatingAdmissionPolicyTypedInformerAdapter struct {
+	ValidatingAdmissionPolicyInformer
+}
+
+func (a *validatingAdmissionPolicyTypedInformerAdapter) TypedInformer() ValidatingAdmissionPolicyIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy](a.Informer())
+}
+
+// ToValidatingAdmissionPolicyIndexInformer converts an untyped informer into a ValidatingAdmissionPolicyIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ValidatingAdmissionPolicy. If that is not the case, calling type-safe methods of the returned
+// ValidatingAdmissionPolicyIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a ValidatingAdmissionPolicyIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToValidatingAdmissionPolicyIndexInformer(informer cache.SharedIndexInformer) ValidatingAdmissionPolicyIndexInformer {
+	if informer, ok := informer.(ValidatingAdmissionPolicyIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicy](informer)
 }

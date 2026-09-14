@@ -38,7 +38,7 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -229,14 +229,14 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// Simulate one existing plugin A.
-			err = draPlugins.RegisterPlugin(pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
+			err = draPlugins.RegisterPlugin(tCtx, pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				tCtx.Logf("Removing plugin %s", pluginA)
-				draPlugins.DeRegisterPlugin(pluginA, endpointA)
+				draPlugins.DeRegisterPlugin(tCtx, pluginA, endpointA)
 			})
 
-			err = draPlugins.ValidatePlugin(test.driverName, endpoint, test.supportedServices)
+			err = draPlugins.ValidatePlugin(tCtx, test.driverName, endpoint, test.supportedServices)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -250,7 +250,7 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// Add plugin for the first time.
-			err = draPlugins.RegisterPlugin(test.driverName, endpoint, test.supportedServices, nil)
+			err = draPlugins.RegisterPlugin(tCtx, test.driverName, endpoint, test.supportedServices, nil)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -258,7 +258,12 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 			plugin := draPlugins.get(test.driverName)
 			require.NotNil(t, plugin, "plugin should be registered")
-			t.Cleanup(func() {
+			// This runs as a defer instead of a t.Cleanup/tCtx.Cleanup callback
+			// because it depends on tCtx and draPlugins' background wiping
+			// (which uses tCtx as its context) still being active. By the time
+			// Cleanup callbacks run, tCtx is already canceled; a defer in the
+			// test function itself still executes beforehand.
+			defer func() {
 				if client != nil {
 					// Create the slice as if the plugin had done that while it runs.
 					_, err := client.ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
@@ -266,13 +271,13 @@ func TestRegistrationHandler(t *testing.T) {
 				}
 
 				tCtx.Logf("Removing plugin %s", test.driverName)
-				draPlugins.DeRegisterPlugin(test.driverName, endpoint)
+				draPlugins.DeRegisterPlugin(tCtx, test.driverName, endpoint)
 				// Nop.
-				draPlugins.DeRegisterPlugin(test.driverName, endpoint)
+				draPlugins.DeRegisterPlugin(tCtx, test.driverName, endpoint)
 				if test.withClient {
 					requireNoSlices(tCtx)
 				}
-			})
+			}()
 			// Which plugin was chosen is random in this test: it depends on which plugin was detected as connected,
 			// which can be both, one, or none at this point. Some attributes are common to both.
 			assert.Equal(t, test.driverName, plugin.driverName, "DRA driver driver name")
@@ -320,7 +325,7 @@ func TestConnectionHandling(t *testing.T) {
 			require.NoError(t, err)
 			defer teardown()
 
-			err = draPlugins.RegisterPlugin(driverName, endpoint, []string{service}, nil)
+			err = draPlugins.RegisterPlugin(tCtx, driverName, endpoint, []string{service}, nil)
 			require.NoError(t, err)
 
 			plugin := draPlugins.get(driverName)

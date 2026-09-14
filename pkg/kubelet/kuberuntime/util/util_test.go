@@ -29,6 +29,7 @@ import (
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -39,6 +40,7 @@ func TestPodSandboxChanged(t *testing.T) {
 		expectedChanged   bool
 		expectedAttempt   uint32
 		expectedSandboxID string
+		expectedReason    string
 	}{
 		"Pod with no existing sandboxes": {
 			pod:               &v1.Pod{},
@@ -46,6 +48,7 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   true,
 			expectedAttempt:   0,
 			expectedSandboxID: "",
+			expectedReason:    kubetypes.PodSandboxNotReadyMsgNoPodSandbox,
 		},
 		"Pod with multiple ready sandbox statuses": {
 			pod: &v1.Pod{},
@@ -66,6 +69,7 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   true,
 			expectedAttempt:   2,
 			expectedSandboxID: "sandboxID2",
+			expectedReason:    kubetypes.PodSandboxNotReadyMsgMultipleSandboxes,
 		},
 		"Pod with no ready sandbox statuses": {
 			pod: &v1.Pod{},
@@ -86,6 +90,7 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   true,
 			expectedAttempt:   2,
 			expectedSandboxID: "sandboxID2",
+			expectedReason:    kubetypes.PodSandboxNotReadyMsgSandboxNotReady,
 		},
 		"Pod with ready sandbox status but network namespace mismatch": {
 			pod: &v1.Pod{
@@ -112,6 +117,7 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   true,
 			expectedAttempt:   1,
 			expectedSandboxID: "",
+			expectedReason:    kubetypes.PodSandboxNotReadyMsgNetworkNamespaceMode,
 		},
 		"Pod with ready sandbox status but no IP": {
 			pod: &v1.Pod{
@@ -134,6 +140,7 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   true,
 			expectedAttempt:   1,
 			expectedSandboxID: "sandboxID1",
+			expectedReason:    kubetypes.PodSandboxNotReadyMsgNoIPAddress,
 		},
 		"Pod with ready sandbox status with IP": {
 			pod: &v1.Pod{
@@ -156,13 +163,15 @@ func TestPodSandboxChanged(t *testing.T) {
 			expectedChanged:   false,
 			expectedAttempt:   0,
 			expectedSandboxID: "sandboxID1",
+			expectedReason:    "",
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			changed, attempt, id := PodSandboxChanged(test.pod, test.status)
+			changed, attempt, id, reason := PodSandboxChanged(test.pod, test.status)
 			require.Equal(t, test.expectedChanged, changed)
 			require.Equal(t, test.expectedAttempt, attempt)
 			require.Equal(t, test.expectedSandboxID, id)
+			require.Equal(t, test.expectedReason, reason)
 		})
 	}
 }

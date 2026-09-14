@@ -34,6 +34,14 @@ linters:
       capital: true
     misspell:
       locale: US
+    revive:
+      rules:
+        - name: var-naming
+          # TODO(SuperQ): See: https://github.com/prometheus/prometheus/issues/17766
+          arguments:
+            - []
+            - []
+            - - skip-package-name-checks: true
   exclusions:
     presets:
       - comments

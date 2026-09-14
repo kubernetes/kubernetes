@@ -63,6 +63,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	apisv1beta1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/exclusion"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -160,6 +161,10 @@ var (
 		gvr("admissionregistration.k8s.io", "v1", "mutatingadmissionpolicies"):                true,
 		gvr("admissionregistration.k8s.io", "v1", "mutatingadmissionpolicybindings"):          true,
 	}
+
+	// webhookExcludedResources are the virtual resources admission webhooks skip when
+	// ExcludeAdmissionWebhookVirtualResources is enabled (the same set as VAP/MAP).
+	webhookExcludedResources = sets.New(exclusion.Excluded()...)
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{
 		gvr("extensions", "v1beta1", "replicationcontrollers/scale"): gvr("", "v1", "replicationcontrollers"),
@@ -361,7 +366,13 @@ func (h *holder) verifyRequest(webhookOptions webhookOptions, request *admission
 	converted := webhookOptions.converted
 
 	// Check if current resource should be exempted from Admission processing
-	if admissionExemptResources[gvr(h.recordGVR.Group, h.recordGVR.Version, h.recordGVR.Resource)] {
+	gvrKey := gvr(h.recordGVR.Group, h.recordGVR.Version, h.recordGVR.Resource)
+	isExempt := admissionExemptResources[gvrKey]
+	if !isExempt && utilfeature.DefaultFeatureGate.Enabled(features.ExcludeAdmissionWebhookVirtualResources) &&
+		webhookExcludedResources.Has(gvrKey.GroupResource()) {
+		isExempt = true
+	}
+	if isExempt {
 		if request == nil {
 			return nil
 		}

@@ -27,6 +27,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
@@ -53,22 +54,83 @@ type remoteImageService struct {
 	useStreaming atomic.Bool
 }
 
-// NewRemoteImageService creates a new internalapi.ImageManagerService.
-// If useStreaming is true, streaming RPCs will be used for list operations
-// instead of unary RPCs. If the runtime returns an Unimplemented error,
-// the client automatically falls back to unary RPCs.
-// NOTE: useStreaming is supposed to be gated by the CRIListStreaming feature
-// gate and is expected to default to true once the feature graduates to GA,
-// at which point this parameter may be removed.
-func NewRemoteImageService(ctx context.Context, endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider, useStreaming bool) (internalapi.ImageManagerService, error) {
+// RemoteImageServiceBuilder builds a new internalapi.ImageManagerService.
+//
+// Construct a builder with NewRemoteImageServiceBuilder, then chain With*
+// methods to set non-default options before calling Build. Adding new options
+// here is preferred over adding parameters to NewRemoteImageService so that
+// default values can be changed in a single place without having to update
+// every callsite.
+type RemoteImageServiceBuilder struct {
+	endpoint          string
+	connectionTimeout time.Duration
+	tracerProvider    trace.TracerProvider
+	// tracerProviderSet tracks whether WithTracerProvider was called, so that
+	// an explicit nil can be distinguished from the unset default and used to
+	// opt out of installing the otelgrpc stats handler entirely.
+	tracerProviderSet bool
+	// useStreaming indicates whether to use streaming RPCs for list operations
+	// when the CRIListStreaming feature gate is enabled. It is expected to
+	// default to true once the feature graduates to GA.
+	useStreaming bool
+}
+
+// NewRemoteImageServiceBuilder returns a builder with default options for
+// constructing a remote image service.
+func NewRemoteImageServiceBuilder() *RemoteImageServiceBuilder {
+	return &RemoteImageServiceBuilder{}
+}
+
+// WithEndpoint sets the gRPC endpoint of the remote image service.
+func (b *RemoteImageServiceBuilder) WithEndpoint(endpoint string) *RemoteImageServiceBuilder {
+	b.endpoint = endpoint
+	return b
+}
+
+// WithConnectionTimeout sets the timeout used when connecting to the remote
+// image service.
+func (b *RemoteImageServiceBuilder) WithConnectionTimeout(connectionTimeout time.Duration) *RemoteImageServiceBuilder {
+	b.connectionTimeout = connectionTimeout
+	return b
+}
+
+// WithTracerProvider sets the OpenTelemetry tracer provider used to
+// instrument the gRPC client. If WithTracerProvider is not called, the
+// otelgrpc stats handler is installed with a noop tracer provider, so no
+// traces are produced but gRPC context propagation still works. Passing a nil
+// provider explicitly opts out of installing the stats handler entirely,
+// disabling both tracing and context propagation.
+func (b *RemoteImageServiceBuilder) WithTracerProvider(tp trace.TracerProvider) *RemoteImageServiceBuilder {
+	b.tracerProvider = tp
+	b.tracerProviderSet = true
+	return b
+}
+
+// WithUseStreaming controls whether streaming RPCs are used for list
+// operations. If the runtime returns an Unimplemented error, the client
+// automatically falls back to the corresponding unary RPC.
+func (b *RemoteImageServiceBuilder) WithUseStreaming(useStreaming bool) *RemoteImageServiceBuilder {
+	b.useStreaming = useStreaming
+	return b
+}
+
+// Build creates a new internalapi.ImageManagerService using the configured
+// options.
+func (b *RemoteImageServiceBuilder) Build(ctx context.Context) (internalapi.ImageManagerService, error) {
+	if b.endpoint == "" {
+		return nil, errors.New("endpoint is required")
+	}
+	if b.connectionTimeout <= 0 {
+		return nil, errors.New("connectionTimeout must be positive")
+	}
 	logger := klog.FromContext(ctx)
-	logger.V(3).Info("Connecting to image service", "endpoint", endpoint)
-	addr, dialer, err := util.GetAddressAndDialer(endpoint)
+	logger.V(3).Info("Connecting to image service", "endpoint", b.endpoint)
+	addr, dialer, err := util.GetAddressAndDialer(b.endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, connectionTimeout)
+	ctx, cancel := context.WithTimeout(ctx, b.connectionTimeout)
 	defer cancel()
 
 	var dialOpts []grpc.DialOption
@@ -77,14 +139,20 @@ func NewRemoteImageService(ctx context.Context, endpoint string, connectionTimeo
 		grpc.WithAuthority("localhost"),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
-	if tp != nil {
+	// When no tracer provider was configured, fall back to a noop provider
+	// so context propagation still works without producing real traces.
+	// See https://github.com/open-telemetry/opentelemetry-go-contrib/tree/main/examples/passthrough
+	if !b.tracerProviderSet {
+		b.tracerProvider = noop.NewTracerProvider()
+	}
+	// Install the otelgrpc stats handler unless the caller explicitly opted
+	// out by calling WithTracerProvider(nil).
+	if b.tracerProvider != nil {
 		tracingOpts := []otelgrpc.Option{
 			otelgrpc.WithMessageEvents(otelgrpc.ReceivedEvents, otelgrpc.SentEvents),
 			otelgrpc.WithPropagators(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})),
-			otelgrpc.WithTracerProvider(tp),
+			otelgrpc.WithTracerProvider(b.tracerProvider),
 		}
-		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
-		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 		dialOpts = append(dialOpts,
 			grpc.WithStatsHandler(otelgrpc.NewClientHandler(tracingOpts...)))
 	}
@@ -106,17 +174,33 @@ func NewRemoteImageService(ctx context.Context, endpoint string, connectionTimeo
 	}
 
 	service := &remoteImageService{
-		timeout: connectionTimeout,
+		timeout: b.connectionTimeout,
 		conn:    conn,
 	}
-	service.useStreaming.Store(useStreaming)
+	service.useStreaming.Store(b.useStreaming)
 
-	if err := service.validateServiceConnection(ctx, conn, endpoint); err != nil {
+	if err := service.validateServiceConnection(ctx, conn, b.endpoint); err != nil {
 		return nil, fmt.Errorf("validate service connection: %w", err)
 	}
 
 	return service, nil
+}
 
+// NewRemoteImageService creates a new internalapi.ImageManagerService.
+// If useStreaming is true, streaming RPCs will be used for list operations
+// instead of unary RPCs. If the runtime returns an Unimplemented error,
+// the client automatically falls back to unary RPCs.
+//
+// Deprecated: Use NewRemoteImageServiceBuilder so that default values
+// (e.g. useStreaming) can be changed in a single place without updating
+// every callsite.
+func NewRemoteImageService(ctx context.Context, endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider, useStreaming bool) (internalapi.ImageManagerService, error) {
+	return NewRemoteImageServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(connectionTimeout).
+		WithTracerProvider(tp).
+		WithUseStreaming(useStreaming).
+		Build(ctx)
 }
 
 // Close will shutdown the internal gRPC client connection.

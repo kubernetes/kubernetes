@@ -27,6 +27,7 @@ THIS_PKG="k8s.io/sample-controller"
 
 kube::codegen::gen_helpers \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/pkg/apis"
 
 if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
@@ -52,8 +53,10 @@ kube::codegen::gen_client \
     --output-dir "${SCRIPT_ROOT}/pkg/generated" \
     --output-pkg "${THIS_PKG}/pkg/generated" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/pkg/apis"
 
 kube::codegen::gen_register \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/pkg/apis"

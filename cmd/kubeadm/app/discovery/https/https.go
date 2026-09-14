@@ -26,11 +26,16 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
-// RetrieveValidatedConfigInfo connects to the API Server and makes sure it can talk
-// securely to the API Server using the provided CA cert and
-// optionally refreshes the cluster-info information from the cluster-info ConfigMap
+// RetrieveValidatedConfigInfo downloads a discovery kubeconfig from the given
+// HTTPS URL and hands it to file.ValidateConfigInfo for the cluster-info
+// ConfigMap validation that completes discovery. The HTTPS connection itself
+// is verified only against the host's default TLS trust store; kubeadm does
+// not pin to a caller-supplied CA at this stage, so the kubeconfig payload is
+// retrieved from an effectively arbitrary location and only becomes trusted
+// after file.ValidateConfigInfo succeeds.
 func RetrieveValidatedConfigInfo(httpsURL string, discoveryTimeout time.Duration) (*clientcmdapi.Config, error) {
 	client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 	response, err := client.Get(httpsURL)
@@ -38,6 +43,10 @@ func RetrieveValidatedConfigInfo(httpsURL string, discoveryTimeout time.Duration
 		return nil, err
 	}
 	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, errors.Errorf("error trying to fetch discovery kubeconfig over HTTPS from %s, received status %d", httpsURL, response.StatusCode)
+	}
 
 	kubeconfig, err := io.ReadAll(response.Body)
 	if err != nil {

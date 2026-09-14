@@ -465,11 +465,29 @@ __EOF__
 
   set -o errexit
 
-  output_message=$(kubectl explain mock-resource)
-  kube::test::if_has_string "${output_message}" 'FIELDS:'
+  output_message=$(kubectl explain mock-resource --recursive --max-depth=1)
+  kube::test::if_has_string "${output_message}" 'spec'
+  kube::test::if_has_not_string "${output_message}" 'annotations'
+
+  output_message=$(kubectl explain mock-resource --recursive --max-depth=2)
+  kube::test::if_has_string "${output_message}" 'annotations'
+  kube::test::if_has_not_string "${output_message}" 'subresource'
 
   output_message=$(kubectl explain mock-resource --recursive)
-  kube::test::if_has_string "${output_message}" 'FIELDS:'
+  kube::test::if_has_string "${output_message}" 'subresource'
+  kube::test::if_has_string "${output_message}" 'map\[string\]\[\]string'
+
+  output_message=$(kubectl explain mock-resource --recursive --max-depth=1 -o plaintext-openapiv2)
+  kube::test::if_has_string "${output_message}" 'spec'
+  kube::test::if_has_not_string "${output_message}" 'annotations'
+
+  output_message=$(kubectl explain mock-resource --recursive --max-depth=2 -o plaintext-openapiv2)
+  kube::test::if_has_string "${output_message}" 'annotations'
+  kube::test::if_has_not_string "${output_message}" 'subresource'
+
+  output_message=$(kubectl explain mock-resource --recursive -o plaintext-openapiv2)
+  kube::test::if_has_string "${output_message}" 'subresource'
+  kube::test::if_has_string "${output_message}" 'map\[string\]\[\]string'
 
   # Cleanup
   kubectl delete crd mock-resources.test.com

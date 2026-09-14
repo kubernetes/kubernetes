@@ -188,6 +188,9 @@ func readIndexFrom(gomodcache string, r io.Reader) (*Index, error) {
 	)
 	for scan.Scan() {
 		v := scan.Text()
+		if len(v) < 2 {
+			return nil, fmt.Errorf("malformed line: %q, %d entries", v, len(entries))
+		}
 		if v[0] == ':' {
 			if curEntry != nil {
 				entries = append(entries, *curEntry)

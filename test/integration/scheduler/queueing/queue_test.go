@@ -19,6 +19,8 @@ package queueing
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -35,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -48,8 +52,8 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -210,6 +214,8 @@ func (f *fakeCRPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWi
 // TestCustomResourceEnqueue constructs a fake plugin that registers custom resources
 // to verify Pods failed by this plugin can be moved properly upon CR events.
 func TestCustomResourceEnqueue(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	// Start API Server with apiextensions supported.
 	server := apiservertesting.StartTestServerOrDie(
 		t, apiservertesting.NewDefaultTestServerOptions(),
@@ -301,10 +307,9 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	)
 	testutils.SyncSchedulerInformerFactory(testCtx)
 
-	defer testutils.CleanupTest(t, testCtx)
+	defer testutils.CleanupTest(tCtx, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
-	logger := klog.FromContext(ctx)
 	// Create one Node.
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
@@ -327,7 +332,8 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Pop fake-pod out. It should be unschedulable.
-	podInfo := testutils.NextPodOrDie(t, testCtx)
+	entity := testutils.NextEntityOrDie(t, testCtx)
+	podInfo := entity.(*framework.QueuedPodInfo)
 	schedFramework, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 	if !ok {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
@@ -340,12 +346,8 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 	testCtx.Scheduler.FailureHandler(ctx, schedFramework, podInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fitError), nil, time.Now())
 
-	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
-	// pass a number larger than 1 to move Pod to unschedulablePods.
-	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, 10)
-
 	// Trigger a Custom Resource event.
-	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.
+	// We expect this event to trigger moving the test Pod from unschedulableEntities to activeQ.
 	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 	crClient := dynamicClient.Resource(crdGVR).Namespace(ns)
 	if _, err := crClient.Create(ctx, &unstructured.Unstructured{
@@ -359,9 +361,9 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Now we should be able to pop the Pod from activeQ again.
-	podInfo = testutils.NextPodOrDie(t, testCtx)
-	if podInfo.Attempts != 2 {
-		t.Errorf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
+	entity = testutils.NextEntityOrDie(t, testCtx)
+	if attempts := entity.GetAttempts(); attempts != 2 {
+		t.Errorf("Expected the Pod to be attempted 2 times, but got %v", attempts)
 	}
 }
 
@@ -457,16 +459,16 @@ func (p *firstFailBindPlugin) Bind(ctx context.Context, state fwk.CycleState, po
 }
 
 // TestRequeueByPermitRejection verify Pods failed by permit plugins in the binding cycle are
-// put back to the queue, according to the correct scheduling cycle number.
+// put back to the queue
 func TestRequeueByPermitRejection(t *testing.T) {
-	queueingHintCalledCounter := 0
+	var queueingHintCalledCounter atomic.Int32
 	fakePermit := &fakePermitPlugin{}
 	registry := frameworkruntime.Registry{
 		fakePermitPluginName: func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 			fakePermit = &fakePermitPlugin{
 				frameworkHandler: fh,
 				schedulingHint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-					queueingHintCalledCounter++
+					queueingHintCalledCounter.Add(1)
 					return fwk.Queue, nil
 				},
 			}
@@ -510,59 +512,93 @@ func TestRequeueByPermitRejection(t *testing.T) {
 		t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
 	}
 
+	// Wait for pod-1 to reach the Permit extension point before triggering the NodeUpdate event.
+	// The scheduling queue only records cluster events as in-flight while at least one Pod is
+	// in-flight, and a Pod is in-flight only after it has been popped off the activeQ. If the
+	// NodeUpdate event below were handled before pod-1 got popped, the queue would drop it, and the
+	// Permit rejection would then leave pod-1 in the unschedulable pod pool forever because no
+	// further event would requeue it.
+	waitForPodAtPermit(ctx, t, fakePermit, "pod-1")
+
+	// Snapshot how many NodeUpdate events the scheduler has handled so far. The metrics registry is
+	// global and shared with the other tests in this package, so the count isn't necessarily zero.
+	nodeLabelUpdate := fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}
+	handledEventsBefore := eventHandlingSampleCount(nodeLabelUpdate)
+
 	// update node label. (causes the NodeUpdate event)
 	node.Labels = map[string]string{"updated": ""}
 	if _, err := cs.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to add labels to the node: %v", err)
 	}
 
-	// create a pod to increment the scheduling cycle number in the scheduling queue.
-	// We can make sure NodeUpdate event, that has happened in the previous scheduling cycle, makes Pod to be enqueued to activeQ via the scheduling queue.
-	pod = st.MakePod().Namespace(ns).Name("pod-2").Container(imageutils.GetPauseImageName()).Obj()
-	if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
+	// Wait until the scheduler has finished handling the NodeUpdate event, which is when the event
+	// gets recorded as in-flight for pod-1. Rejecting pod-1 before that happens would make the queue
+	// observe no cluster event for pod-1 and keep it unschedulable.
+	if err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		return eventHandlingSampleCount(nodeLabelUpdate) > handledEventsBefore, nil
+	}); err != nil {
+		t.Fatalf("Expect the scheduler to handle the %s event: %v", nodeLabelUpdate.Label(), err)
 	}
 
-	// reject pod-1 to simulate the failure in Permit plugins.
-	// This pod-1 should be enqueued to activeQ because the NodeUpdate event has happened.
+	// Reject pod-1 to simulate a rejection by a Permit plugin. Because the NodeUpdate event above was
+	// recorded while pod-1 was in-flight, the queueing hint has to be consulted for that event and
+	// move pod-1 back to the activeQ.
 	fakePermit.frameworkHandler.IterateOverWaitingPods(func(wp fwk.WaitingPod) {
 		if wp.GetPod().Name == "pod-1" {
 			wp.Reject(fakePermitPluginName, "fakePermitPlugin rejects the Pod")
-			return
 		}
 	})
 
-	// Wait for pod-2 to be scheduled.
-	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
-		fakePermit.frameworkHandler.IterateOverWaitingPods(func(wp fwk.WaitingPod) {
-			if wp.GetPod().Name == "pod-2" {
-				wp.Allow(fakePermitPluginName)
-			}
-		})
-
-		return testutils.PodScheduled(cs, ns, "pod-2")(ctx)
-	})
-	if err != nil {
-		t.Fatalf("Expect pod-2 to be scheduled")
-	}
-
-	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
-		pod1Found := false
+	// Wait for pod-1 to be scheduled, which can only happen once the rejection above requeued it and
+	// it reached Permit a second time.
+	if err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		fakePermit.frameworkHandler.IterateOverWaitingPods(func(wp fwk.WaitingPod) {
 			if wp.GetPod().Name == "pod-1" {
-				pod1Found = true
 				wp.Allow(fakePermitPluginName)
 			}
 		})
-		return pod1Found, nil
-	})
-	if err != nil {
-		t.Fatal("Expect pod-1 to be scheduled again")
+		return testutils.PodScheduled(cs, ns, "pod-1")(ctx)
+	}); err != nil {
+		t.Fatalf("Expect pod-1 to be scheduled again: %v", err)
 	}
 
-	if queueingHintCalledCounter != 1 {
-		t.Fatalf("Expected the scheduling hint to be called 1 time, but %v", queueingHintCalledCounter)
+	if got := queueingHintCalledCounter.Load(); got != 1 {
+		t.Fatalf("Expected the scheduling hint to be called 1 time, but %v", got)
 	}
+}
+
+// waitForPodAtPermit waits until the Pod named podName is waiting at the Permit extension point.
+// Reaching Permit implies the Pod has already been popped off the activeQ, and hence that the
+// scheduling queue tracks it as in-flight and records the cluster events happening from now on for
+// it.
+func waitForPodAtPermit(ctx context.Context, t *testing.T, plugin *fakePermitPlugin, podName string) {
+	t.Helper()
+
+	if err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		found := false
+		plugin.frameworkHandler.IterateOverWaitingPods(func(wp fwk.WaitingPod) {
+			if wp.GetPod().Name == podName {
+				found = true
+			}
+		})
+		return found, nil
+	}); err != nil {
+		t.Fatalf("Expect Pod %q to be waiting at the Permit extension point: %v", podName, err)
+	}
+}
+
+// eventHandlingSampleCount returns the number of times the scheduler has finished handling the given
+// cluster event. The scheduler observes this metric after the event has been fully processed by the
+// scheduling queue, which makes it a reliable signal that the event is visible to the queue.
+func eventHandlingSampleCount(event fwk.ClusterEvent) uint64 {
+	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, "scheduler_event_handling_duration_seconds", map[string]string{
+		"event": event.Label(),
+	})
+	if err != nil {
+		// The metric isn't reported at all until the scheduler handles such an event for the first time.
+		return 0
+	}
+	return vec.GetAggregatedSampleCount()
 }
 
 type fakePermitPlugin struct {
@@ -618,5 +654,15 @@ func TestPopFromBackoffQWhenActiveQEmpty(t *testing.T) {
 	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
 	if err != nil {
 		t.Fatalf("Expected pod to be scheduled: %v", err)
+	}
+}
+
+// TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
+// moved properly upon their registered events.
+func TestCoreResourceEnqueue(t *testing.T) {
+	for _, tt := range CoreResourceEnqueueTestCases {
+		t.Run(strings.Join(append(tt.EnablePlugins, tt.Name), "/"), func(t *testing.T) {
+			RunTestCoreResourceEnqueue(t, tt)
+		})
 	}
 }

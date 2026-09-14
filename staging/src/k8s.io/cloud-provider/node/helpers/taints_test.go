@@ -137,10 +137,7 @@ func TestRemoveTaint(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		newNode, result, err := removeTaint(c.node, c.taintToRemove)
-		if err != nil {
-			t.Errorf("[%s] should not raise error but got: %v", c.name, err)
-		}
+		newNode, result := removeTaint(c.node, c.taintToRemove)
 		if result != c.expectedResult {
 			t.Errorf("[%s] should return %t, but got: %t", c.name, c.expectedResult, result)
 		}

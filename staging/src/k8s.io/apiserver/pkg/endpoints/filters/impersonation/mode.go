@@ -57,7 +57,7 @@ type impersonationMode interface {
 // supports the requestor impersonating the wantedUser.  It serves as a sudo authorization check for the mode.
 type constrainedImpersonationModeFilter func(wantedUser *user.DefaultInfo, requestor user.Info) bool
 
-func allImpersonationModes(a authorizer.Authorizer) []impersonationMode {
+func allImpersonationModes(a authorizer.UnconditionalAuthorizer) []impersonationMode {
 	return []impersonationMode{
 		associatedNodeImpersonationMode(a),
 		arbitraryNodeImpersonationMode(a),
@@ -72,7 +72,7 @@ func allImpersonationModes(a authorizer.Authorizer) []impersonationMode {
 // impersonation attempts in a way that results in a high cache hit ratio even when the same service account
 // is used across different pods running on different nodes (i.e. a node agent running as a daemonset).
 // only the username can be specified by the requester.  all other fields in user.Info are controlled by the API server.
-func associatedNodeImpersonationMode(a authorizer.Authorizer) impersonationMode {
+func associatedNodeImpersonationMode(a authorizer.UnconditionalAuthorizer) impersonationMode {
 	// we wrap the authorizer so that we can override the requestor service account's extra values
 	// and the node name used in the authorization check.  this makes our authorization checks match
 	// the exact semantics of our cache key which prevents unexpected privilege escalation on a cache
@@ -174,7 +174,7 @@ func (a *associatedNodeImpersonationWantedUserInfo) GetName() string {
 
 // arbitraryNodeImpersonationMode implements constrained impersonation for nodes.
 // Only the username can be specified by the requester.  All other fields in user.Info are controlled by the API server.
-func arbitraryNodeImpersonationMode(a authorizer.Authorizer) impersonationMode {
+func arbitraryNodeImpersonationMode(a authorizer.UnconditionalAuthorizer) impersonationMode {
 	return newConstrainedImpersonationMode(a, "arbitrary-node",
 		func(wantedUser *user.DefaultInfo, _ user.Info) bool {
 			if !onlyUsernameSet(wantedUser) {
@@ -188,7 +188,7 @@ func arbitraryNodeImpersonationMode(a authorizer.Authorizer) impersonationMode {
 
 // serviceAccountImpersonationMode implements constrained impersonation for service accounts.
 // Only the username can be specified by the requester.  All other fields in user.Info are controlled by the API server.
-func serviceAccountImpersonationMode(a authorizer.Authorizer) impersonationMode {
+func serviceAccountImpersonationMode(a authorizer.UnconditionalAuthorizer) impersonationMode {
 	return newConstrainedImpersonationMode(a, "serviceaccount",
 		func(wantedUser *user.DefaultInfo, _ user.Info) bool {
 			if !onlyUsernameSet(wantedUser) {
@@ -202,7 +202,7 @@ func serviceAccountImpersonationMode(a authorizer.Authorizer) impersonationMode 
 
 // userInfoImpersonationMode implements constrained impersonation for non-node and non-service account users.
 // Unlike the other constrained impersonation modes, it supports impersonating all fields of user.Info.
-func userInfoImpersonationMode(a authorizer.Authorizer) impersonationMode {
+func userInfoImpersonationMode(a authorizer.UnconditionalAuthorizer) impersonationMode {
 	return newConstrainedImpersonationMode(a, "user-info",
 		func(wantedUser *user.DefaultInfo, _ user.Info) bool {
 			// nodes and service accounts cannot be impersonated in this mode.
@@ -221,7 +221,7 @@ func userInfoImpersonationMode(a authorizer.Authorizer) impersonationMode {
 
 // legacyImpersonationMode is a complete reimplementation of the original impersonation mode that has
 // existed in kube since v1.3.  The behavior is expected to be identical to the original implementation.
-func legacyImpersonationMode(a authorizer.Authorizer) impersonationMode {
+func legacyImpersonationMode(a authorizer.UnconditionalAuthorizer) impersonationMode {
 	return &legacyImpersonationCheck{m: newImpersonationModeState(a, "impersonate", false)}
 }
 
@@ -244,7 +244,7 @@ func (l *legacyImpersonationCheck) cachesForTests() (*impersonationCache, *imper
 	return newImpersonationCache(false), l.m.cache
 }
 
-func newConstrainedImpersonationMode(a authorizer.Authorizer, mode string, filter constrainedImpersonationModeFilter) impersonationMode {
+func newConstrainedImpersonationMode(a authorizer.UnconditionalAuthorizer, mode string, filter constrainedImpersonationModeFilter) impersonationMode {
 	return &constrainedImpersonationModeState{
 		state:      newImpersonationModeState(a, "impersonate:"+mode, true),
 		cache:      newImpersonationCache(false),
@@ -264,7 +264,7 @@ type constrainedImpersonationModeState struct {
 	// skipAttributes is false, i.e. this cache depends on the request being made, not just the user being impersonated by the requestor
 	// it is expected to have a low hit ratio because the requestor is unlikely to make the same request multiple times in a short period
 	cache      *impersonationCache
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
 	mode       string
 	filter     constrainedImpersonationModeFilter
 }
@@ -305,7 +305,7 @@ func (c *constrainedImpersonationModeState) cachesForTests() (*impersonationCach
 // impersonation and the impersonate verb for legacy impersonation.  each field that is set in the wantedUser
 // results in one or more authorization checks to determine if the requestor has access to impersonate that value.
 type impersonationModeState struct {
-	authorizer                 authorizer.Authorizer
+	authorizer                 authorizer.UnconditionalAuthorizer
 	verb                       string
 	isConstrainedImpersonation bool
 
@@ -318,7 +318,7 @@ type impersonationModeState struct {
 	cache *impersonationCache
 }
 
-func newImpersonationModeState(a authorizer.Authorizer, verb string, isConstrainedImpersonation bool) *impersonationModeState {
+func newImpersonationModeState(a authorizer.UnconditionalAuthorizer, verb string, isConstrainedImpersonation bool) *impersonationModeState {
 	usernameAndGroupGV := authenticationv1.SchemeGroupVersion
 	constraint := verb
 	if !isConstrainedImpersonation {
@@ -556,7 +556,7 @@ func (i *impersonateOnAttributes) GetVerb() string {
 	return "impersonate-on:" + i.mode + ":" + i.Attributes.GetVerb()
 }
 
-func checkAuthorization(ctx context.Context, a authorizer.Authorizer, attributes authorizer.Attributes) error {
+func checkAuthorization(ctx context.Context, a authorizer.UnconditionalAuthorizer, attributes authorizer.Attributes) error {
 	authorized, reason, err := a.Authorize(ctx, attributes)
 
 	// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.

@@ -24,7 +24,7 @@ import (
 // Flagz is the structured response for the /flagz endpoint.
 type Flagz struct {
 	// TypeMeta is the type metadata for the object.
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`

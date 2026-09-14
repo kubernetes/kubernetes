@@ -34,11 +34,39 @@ import (
 )
 
 // DeviceClassInformer provides access to a shared informer and lister for
-// DeviceClasses.
+// DeviceClasses. Prefer using the type-safe variant (see [TypedDeviceClassInformer]).
 type DeviceClassInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() resourcev1.DeviceClassLister
 }
+
+// TypedDeviceClassInformer provides access to a shared informer and lister for
+// DeviceClasses, including the type-safe TypedInformer variant.
+// It is a superset of DeviceClassInformer.
+type TypedDeviceClassInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() DeviceClassIndexInformer
+	Lister() resourcev1.DeviceClassLister
+}
+
+// DeviceClassIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type DeviceClassIndexInformer cache.TypedSharedIndexInformer[*apiresourcev1.DeviceClass]
+
+// DeviceClassHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for DeviceClass.
+type DeviceClassHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiresourcev1.DeviceClass]
+
+// DeviceClassDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for DeviceClass.
+type DeviceClassDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiresourcev1.DeviceClass]
+
+// DeviceClassFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for DeviceClass.
+type DeviceClassFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiresourcev1.DeviceClass]
+
+// DeviceClassIndexers is a specialization of [cache.TypedIndexers] for DeviceClass.
+type DeviceClassIndexers = cache.TypedIndexers[*apiresourcev1.DeviceClass]
+
+// DeletedDeviceClass is a specialization of [cache.DeletedObject] for DeviceClass.
+type DeletedDeviceClass = cache.DeletedObject[*apiresourcev1.DeviceClass]
 
 type deviceClassInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type deviceClassInformer struct {
 // NewDeviceClassInformer constructs a new informer for DeviceClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedDeviceClassInformer]).
 func NewDeviceClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewDeviceClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedDeviceClassInformer constructs a new informer for DeviceClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedDeviceClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers DeviceClassIndexers) DeviceClassIndexInformer {
+	return NewTypedDeviceClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredDeviceClassInformer constructs a new informer for DeviceClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredDeviceClassInformer]).
 func NewFilteredDeviceClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewDeviceClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedDeviceClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredDeviceClassInformer constructs a new informer for DeviceClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredDeviceClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers DeviceClassIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) DeviceClassIndexInformer {
+	return NewTypedDeviceClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewDeviceClassInformerWithOptions constructs a new informer for DeviceClass type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedDeviceClassInformerWithOptions]).
 func NewDeviceClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedDeviceClassInformerWithOptions(client, options)
+}
+
+// NewTypedDeviceClassInformerWithOptions constructs a new informer for DeviceClass type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedDeviceClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) DeviceClassIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1", Resource: "deviceclasss"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1.DeviceClass](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewDeviceClassInformerWithOptions(client kubernetes.Interface, options inte
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *deviceClassInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewDeviceClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedDeviceClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *deviceClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiresourcev1.DeviceClass{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *deviceClassInformer) TypedInformer() DeviceClassIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1.DeviceClass](f.factory.InformerFor(&apiresourcev1.DeviceClass{}, f.defaultInformer))
 }
 
 func (f *deviceClassInformer) Lister() resourcev1.DeviceClassLister {
 	return resourcev1.NewDeviceClassLister(f.Informer().GetIndexer())
+}
+
+// ToTypedDeviceClassInformer converts an untyped informer into a TypedDeviceClassInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *DeviceClass. If that is not the case, calling type-safe methods of the returned
+// TypedDeviceClassInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedDeviceClassInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedDeviceClassInformer(informer DeviceClassInformer) TypedDeviceClassInformer {
+	if informer, ok := informer.(TypedDeviceClassInformer); ok {
+		return informer
+	}
+	return &deviceClassTypedInformerAdapter{informer}
+}
+
+type deviceClassTypedInformerAdapter struct {
+	DeviceClassInformer
+}
+
+func (a *deviceClassTypedInformerAdapter) TypedInformer() DeviceClassIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1.DeviceClass](a.Informer())
+}
+
+// ToDeviceClassIndexInformer converts an untyped informer into a DeviceClassIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *DeviceClass. If that is not the case, calling type-safe methods of the returned
+// DeviceClassIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a DeviceClassIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToDeviceClassIndexInformer(informer cache.SharedIndexInformer) DeviceClassIndexInformer {
+	if informer, ok := informer.(DeviceClassIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1.DeviceClass](informer)
 }

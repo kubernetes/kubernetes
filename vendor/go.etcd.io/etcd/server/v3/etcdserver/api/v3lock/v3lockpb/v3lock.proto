@@ -1,16 +1,12 @@
 syntax = "proto3";
 package v3lockpb;
 
-import "gogoproto/gogo.proto";
 import "etcd/api/etcdserverpb/rpc.proto";
 
 // for grpc-gateway
 import "google/api/annotations.proto";
 
 option go_package = "go.etcd.io/etcd/server/v3/etcdserver/api/v3lock/v3lockpb";
-
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.unmarshaler_all) = true;
 
 // The lock service exposes client-side locking facilities as a gRPC interface.
 service Lock {

@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +36,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
@@ -46,7 +49,6 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/deployment"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // DeploymentStorage includes dummy storage for Deployments and for Scale subresource.
@@ -321,7 +323,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	obj, _, err := r.store.Update(
 		ctx,
 		name,
-		&scaleUpdatedObjectInfo{name, objInfo},
+		&scaleUpdatedObjectInfo{name, objInfo, r},
 		toScaleCreateValidation(createValidation),
 		toScaleUpdateValidation(updateValidation),
 		false,
@@ -394,8 +396,9 @@ func scaleFromDeployment(deployment *apps.Deployment) (*autoscaling.Scale, error
 
 // scaleUpdatedObjectInfo transforms existing deployment -> existing scale -> new scale -> new deployment
 type scaleUpdatedObjectInfo struct {
-	name       string
-	reqObjInfo rest.UpdatedObjectInfo
+	name           string
+	reqObjInfo     rest.UpdatedObjectInfo
+	scaleGVKMapper rest.GroupVersionKindProvider
 }
 
 func (i *scaleUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
@@ -453,7 +456,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	}
 
 	// validate
-	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
+	if errs := autoscalingvalidation.ValidateScaleUpdate(ctx, scale, oldScale, legacyscheme.Scheme, i.scaleGVKMapper); len(errs) > 0 {
 		return nil, errors.NewInvalid(autoscaling.Kind("Scale"), deployment.Name, errs)
 	}
 

@@ -20,13 +20,14 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
 const (
-	formatTagName = "k8s:format"
+	formatTagName = "format"
 )
 
 func init() {
@@ -58,6 +59,7 @@ var (
 	longNameCaselessValidator           = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
 	longNameValidator                   = types.Name{Package: libValidationPkg, Name: "LongName"}
 	pathSegmentValidator                = types.Name{Package: libValidationPkg, Name: "PathSegmentName"}
+	prefixedLabelKeyValidator           = types.Name{Package: libValidationPkg, Name: "PrefixedLabelKey"}
 	resourceFullyQualifiedNameValidator = types.Name{Package: libValidationPkg, Name: "ResourceFullyQualifiedName"}
 	resourcePoolNameValidator           = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
 	shortNameValidator                  = types.Name{Package: libValidationPkg, Name: "ShortName"}
@@ -89,31 +91,52 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 	switch format {
 	// Keep this sequence alphabetized.
 	case "k8s-extended-resource-name":
-		return Function(formatTagName, DefaultFlags, extendedResourceNameValidator), nil
-	// TODO: uncomment the following when we've done the homework
-	// to be sure it works the current state of IP manual-ratcheting
+		return Function(formatTagName, DefaultFlags, extendedResourceNameValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-extended-resource-name", ""}), nil
+	// TODO: uncomment the following (and the docs for it) when we've done the
+	// homework to be sure it works the current state of IP manual-ratcheting
 	/*
 		case "k8s-ip":
 			return Function(formatTagName, DefaultFlags, ipSloppyValidator), nil
 	*/
 	case "k8s-label-key":
-		return Function(formatTagName, DefaultFlags, labelKeyValidator), nil
+		return Function(formatTagName, DefaultFlags, labelKeyValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-label-key", ""}), nil
 	case "k8s-label-value":
-		return Function(formatTagName, DefaultFlags, labelValueValidator), nil
+		return Function(formatTagName, DefaultFlags, labelValueValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-label-value", ""}), nil
 	case "k8s-long-name":
-		return Function(formatTagName, DefaultFlags, longNameValidator), nil
+		return Function(formatTagName, DefaultFlags, longNameValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-long-name", ""}), nil
 	case "k8s-long-name-caseless":
-		return Function(formatTagName, DefaultFlags, longNameCaselessValidator), nil
+		return Function(formatTagName, DefaultFlags, longNameCaselessValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-long-name-caseless", ""}), nil
 	case "k8s-path-segment-name":
-		return Function(formatTagName, DefaultFlags, pathSegmentValidator), nil
+		return Function(formatTagName, DefaultFlags, pathSegmentValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-path-segment-name", ""}), nil
+	case "k8s-prefixed-label-key":
+		return Function(formatTagName, DefaultFlags, prefixedLabelKeyValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-prefixed-label-key", ""}), nil
 	case "k8s-resource-fully-qualified-name":
-		return Function(formatTagName, DefaultFlags, resourceFullyQualifiedNameValidator), nil
+		return Function(formatTagName, DefaultFlags, resourceFullyQualifiedNameValidator).
+			WithEmits(
+				Emission{field.ErrorTypeInvalid, "format=k8s-resource-fully-qualified-name", ""},
+				// The domain and name parts carry their own length limits.
+				Emission{field.ErrorTypeTooLong, "format=k8s-resource-fully-qualified-name", ""},
+			), nil
 	case "k8s-resource-pool-name":
-		return Function(formatTagName, DefaultFlags, resourcePoolNameValidator), nil
+		return Function(formatTagName, DefaultFlags, resourcePoolNameValidator).
+			WithEmits(
+				Emission{field.ErrorTypeInvalid, "format=k8s-resource-pool-name", ""},
+				// The name as a whole is limited to 253 characters.
+				Emission{field.ErrorTypeTooLong, "format=k8s-resource-pool-name", ""},
+			), nil
 	case "k8s-short-name":
-		return Function(formatTagName, DefaultFlags, shortNameValidator), nil
+		return Function(formatTagName, DefaultFlags, shortNameValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-short-name", ""}), nil
 	case "k8s-uuid":
-		return Function(formatTagName, DefaultFlags, uuidValidator), nil
+		return Function(formatTagName, DefaultFlags, uuidValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-uuid", ""}), nil
 	}
 	// TODO: Flesh out the list of validation functions
 
@@ -130,9 +153,12 @@ func (ftv formatTagValidator) Docs() TagDoc {
 			Description: "k8s-extended-resource-name",
 			Docs:        "This field holds a Kubernetes extended resource name. This is a domain-prefixed name that must not have a `kubernetes.io` or `requests.` prefix. When `requests.` is prepended, the result must be a valid label key, as used by quota.",
 		}, {
-			Description: "k8s-ip",
-			Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
-		}, {
+			// TODO: uncomment the following (and the code for it) when we've done the
+			// homework to be sure it works the current state of IP manual-ratcheting
+			/*
+				Description: "k8s-ip",
+				Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
+			}, {*/
 			Description: "k8s-label-key",
 			Docs:        "This field holds a Kubernetes label key.",
 		}, {
@@ -147,6 +173,9 @@ func (ftv formatTagValidator) Docs() TagDoc {
 		}, {
 			Description: "k8s-path-segment-name",
 			Docs:        "This field holds a Kubernetes \"path segment name\" value.",
+		}, {
+			Description: "k8s-prefixed-label-key",
+			Docs:        "This field holds a Kubernetes label key, with the prefix required.",
 		}, {
 			Description: "k8s-resource-fully-qualified-name",
 			Docs:        "This field holds a Kubernetes resource \"fully qualified name\" value. A fully qualified name must not be empty and must be composed of a prefix and a name, separated by a slash (e.g., \"prefix/name\"). The prefix must be a DNS subdomain, and the name part must be a C identifier with no more than 32 characters.",

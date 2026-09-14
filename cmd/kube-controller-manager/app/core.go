@@ -34,7 +34,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
-	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
@@ -77,19 +76,6 @@ const (
 	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr
 	defaultNodeMaskCIDRIPv6 = 64
 )
-
-func newServiceLBControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:    cpnames.ServiceLBController,
-		aliases: []string{"service"},
-		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-			logger := klog.FromContext(ctx)
-			logger.Info("Warning: service-controller is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure service controller.")
-			return nil, nil
-		},
-		isCloudProviderController: true,
-	}
-}
 
 func newNodeIpamControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
@@ -197,7 +183,7 @@ func newNodeLifecycleController(ctx context.Context, controllerContext Controlle
 		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
 		// node lifecycle controller uses existing cluster role from node-controller
 		client,
-		controllerContext.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
+		controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorPeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorGracePeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeEvictionRate,
@@ -245,32 +231,6 @@ func newTaintEvictionController(ctx context.Context, controllerContext Controlle
 	return newControllerLoop(tec.Run, controllerName), nil
 }
 
-func newCloudNodeLifecycleControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:    cpnames.CloudNodeLifecycleController,
-		aliases: []string{"cloud-node-lifecycle"},
-		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-			logger := klog.FromContext(ctx)
-			logger.Info("Warning: node-controller is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure node lifecyle controller.")
-			return nil, nil
-		},
-		isCloudProviderController: true,
-	}
-}
-
-func newNodeRouteControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:    cpnames.NodeRouteController,
-		aliases: []string{"route"},
-		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-			logger := klog.FromContext(ctx)
-			logger.Info("Warning: configure-cloud-routes is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure cloud provider routes.")
-			return nil, nil
-		},
-		isCloudProviderController: true,
-	}
-}
-
 func newPersistentVolumeBinderControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.PersistentVolumeBinderController,
@@ -286,6 +246,11 @@ func newPersistentVolumeBinderController(ctx context.Context, controllerContext 
 		return nil, fmt.Errorf("failed to probe volume plugins when starting persistentvolume controller: %w", err)
 	}
 
+	metricsPlugins, err := ProbePersistentVolumePlugins(logger, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to probe metrics volume plugins when starting persistentvolume controller: %w", err)
+	}
+
 	client, err := controllerContext.NewClient("persistent-volume-binder")
 	if err != nil {
 		return nil, err
@@ -295,6 +260,7 @@ func newPersistentVolumeBinderController(ctx context.Context, controllerContext 
 		KubeClient:                client,
 		SyncPeriod:                controllerContext.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod.Duration,
 		VolumePlugins:             plugins,
+		MetricsVolumePlugins:      metricsPlugins,
 		VolumeInformer:            controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             controllerContext.InformerFactory.Storage().V1().StorageClasses(),
@@ -619,10 +585,9 @@ func newServiceAccountController(ctx context.Context, controllerContext Controll
 	if err != nil {
 		return nil, err
 	}
-	logger := klog.FromContext(ctx)
 
 	sac, err := serviceaccountcontroller.NewServiceAccountsController(
-		logger,
+		ctx,
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
 		client,
@@ -761,7 +726,7 @@ func newPersistentVolumeClaimProtectionController(ctx context.Context, controlle
 	}
 
 	pvcProtectionController, err := pvcprotection.NewPVCProtectionController(
-		klog.FromContext(ctx),
+		ctx,
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		client,
@@ -789,11 +754,14 @@ func newPersistentVolumeProtectionController(ctx context.Context, controllerCont
 		return nil, err
 	}
 
-	pvpc := pvprotection.NewPVProtectionController(
-		klog.FromContext(ctx),
+	pvpc, err := pvprotection.NewPVProtectionController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		client,
 	)
+	if err != nil {
+		return nil, err
+	}
 	return newControllerLoop(func(ctx context.Context) {
 		pvpc.Run(ctx, 1)
 	}, controllerName), nil
@@ -816,7 +784,7 @@ func newVolumeAttributesClassProtectionController(ctx context.Context, controlle
 	}
 
 	vacProtectionController, err := vacprotection.NewVACProtectionController(
-		klog.FromContext(ctx),
+		ctx,
 		client,
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),

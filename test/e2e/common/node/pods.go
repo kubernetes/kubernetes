@@ -656,28 +656,34 @@ var _ = SIGDescribe("Pods", func() {
 
 		url := req.URL()
 
-		ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"binary.k8s.io"})
-		if err != nil {
-			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
-		}
-		defer ws.Close()
-		buf := &bytes.Buffer{}
-		for {
-			var msg []byte
-			if err := websocket.Message.Receive(ws, &msg); err != nil {
-				if err == io.EOF {
-					break
+		// Poll for the expected log content. The container may report Running before
+		// its first stdout line ("container is alive") has been flushed, especially on
+		// runtimes with slower container startup (e.g. VM-isolated containers). Retry
+		// the websocket read until we observe the expected output or the timeout
+		// elapses.
+		gomega.Eventually(ctx, func() (string, error) {
+			ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"binary.k8s.io"})
+			if err != nil {
+				return "", fmt.Errorf("failed to open websocket to %s: %w", url.String(), err)
+			}
+			defer ws.Close()
+			buf := &bytes.Buffer{}
+			for {
+				var msg []byte
+				if err := websocket.Message.Receive(ws, &msg); err != nil {
+					if err == io.EOF {
+						break
+					}
+					return "", fmt.Errorf("failed to read completely from websocket %s: %w", url.String(), err)
 				}
-				framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
+				if len(strings.TrimSpace(string(msg))) == 0 {
+					continue
+				}
+				buf.Write(msg)
 			}
-			if len(strings.TrimSpace(string(msg))) == 0 {
-				continue
-			}
-			buf.Write(msg)
-		}
-		if buf.String() != "container is alive\n" {
-			framework.Failf("Unexpected websocket logs:\n%s", buf.String())
-		}
+			return buf.String(), nil
+		}, f.Timeouts.PodStartShort, framework.PollInterval()).Should(gomega.Equal("container is alive\n"),
+			"Unexpected websocket logs from pod %q", pod.Name)
 	})
 
 	// Slow (~7 mins)

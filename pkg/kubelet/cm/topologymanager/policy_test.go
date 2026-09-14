@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -31,7 +32,7 @@ type policyMergeTestCase struct {
 	expected TopologyHint
 }
 
-func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
+func commonPolicyMergeTestCases(_ []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
 			name: "Two providers, 1 hint each, same mask, both preferred 1/2",
@@ -752,7 +753,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 	}
 }
 
-func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMergeTestCase {
+func (p *bestEffortPolicy) mergeTestCasesNoPolicies(_ []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
 			name: "bestNonPreferredAffinityCount (5)",
@@ -839,7 +840,7 @@ func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMer
 	}
 }
 
-func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMergeTestCase {
+func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(_ []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
 			name: "Two providers, 2 hints each, same mask (some with different bits), same preferred",
@@ -1000,7 +1001,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 	}
 }
 
-func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase {
+func (p *singleNumaNodePolicy) mergeTestCases(_ []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
 			name: "TopologyHint not set",
@@ -1279,7 +1280,7 @@ func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) 
 	for _, tc := range tcases {
 		var providersHints []map[string][]TopologyHint
 		for _, provider := range tc.hp {
-			hints := provider.GetTopologyHints(&v1.Pod{}, &v1.Container{})
+			hints := provider.GetTopologyHints(logger, &v1.Pod{}, &v1.Container{}, lifecycle.AddOperation)
 			providersHints = append(providersHints, hints)
 		}
 

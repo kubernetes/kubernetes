@@ -98,6 +98,7 @@ func New(authenticator authenticator.Token, cacheErrs bool, successTTL, failureT
 }
 
 func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration, clock clock.Clock) authenticator.Token {
+	registerMetrics()
 	randomCacheKey := make([]byte, 32)
 	if _, err := rand.Read(randomCacheKey); err != nil {
 		panic(err) // rand should never fail

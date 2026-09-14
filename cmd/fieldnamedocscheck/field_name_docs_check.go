@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	flag "github.com/spf13/pflag"
+
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -43,7 +44,11 @@ func main() {
 		klog.Fatalf("Please define -s flag as it is the api type file")
 	}
 
-	docsForTypes := kruntime.ParseDocumentationFrom(*typeSrc)
+	docsForTypes, err := kruntime.ParseDocumentationFrom(*typeSrc)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 	rc := false
 
 	for _, ks := range docsForTypes {

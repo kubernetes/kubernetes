@@ -28,7 +28,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/mail"
-	"strconv"
 	"strings"
 	"time"
 
@@ -188,12 +187,12 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 		allErrs = append(allErrs, field.Invalid(specPath.Child("request"), csr.Spec.Request, fmt.Sprintf("%v", err)))
 	}
 	if len(csr.Spec.Usages) == 0 {
-		allErrs = append(allErrs, field.Required(specPath.Child("usages"), ""))
+		allErrs = append(allErrs, field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative())
 	}
 	if !opts.allowUnknownUsages {
 		for i, usage := range csr.Spec.Usages {
 			if !allValidUsages.Has(string(usage)) {
-				allErrs = append(allErrs, field.NotSupported(specPath.Child("usages").Index(i), usage, allValidUsages.List()))
+				allErrs = append(allErrs, field.NotSupported(specPath.Child("usages").Index(i), usage, allValidUsages.List()).MarkCoveredByDeclarative())
 			}
 		}
 	}
@@ -512,7 +511,7 @@ func ValidateClusterTrustBundleUpdate(newBundle, oldBundle *certificates.Cluster
 	var allErrors field.ErrorList
 	allErrors = append(allErrors, ValidateClusterTrustBundle(newBundle, opts)...)
 	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newBundle.ObjectMeta, &oldBundle.ObjectMeta, field.NewPath("metadata"))...)
-	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newBundle.Spec.SignerName, oldBundle.Spec.SignerName, field.NewPath("spec", "signerName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newBundle.Spec.SignerName, oldBundle.Spec.SignerName, field.NewPath("spec", "signerName")).WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()...)
 	return allErrors
 }
 
@@ -825,13 +824,13 @@ func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodC
 		case certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed:
 			numKnownConditions++
 			if numKnownConditions > 1 {
-				allErrors = append(allErrors, field.Invalid(field.NewPath("status", "conditions", formatIndex(i), "type"), cond.Type, `There may be at most one condition with type "Issued", "Denied", or "Failed"`))
+				allErrors = append(allErrors, field.Invalid(field.NewPath("status", "conditions").Index(i).Child("type"), cond.Type, `There may be at most one condition with type "Issued", "Denied", or "Failed"`))
 			}
 			if cond.Status != metav1.ConditionTrue {
-				allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions", formatIndex(i), "status"), cond.Status, []metav1.ConditionStatus{metav1.ConditionTrue}))
+				allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions").Index(i).Child("status"), cond.Status, []metav1.ConditionStatus{metav1.ConditionTrue}))
 			}
 		default:
-			allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions", formatIndex(i), "type"), cond.Type, []string{certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed}))
+			allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions").Index(i).Child("type"), cond.Type, []string{certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed}))
 		}
 	}
 
@@ -1046,10 +1045,6 @@ func pcrIsFailed(pcr *certificates.PodCertificateRequest) bool {
 		}
 	}
 	return false
-}
-
-func formatIndex(i int) string {
-	return "[" + strconv.Itoa(i) + "]"
 }
 
 // Similar to apivalidation.ValidateImmutableField but we can supply our own detail string.

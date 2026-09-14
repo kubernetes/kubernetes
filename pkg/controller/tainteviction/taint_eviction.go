@@ -222,7 +222,7 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 	}
 	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, tm.name))
 
-	_, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*v1.Pod)
 			tm.PodUpdated(nil, pod)
@@ -249,12 +249,12 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 			}
 			tm.PodUpdated(pod, nil)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, fmt.Errorf("unable to add pod event handler: %w", err)
 	}
 
-	_, err = nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
 			tm.NodeUpdated(nil, node)
 			return nil
@@ -267,7 +267,7 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 			tm.NodeUpdated(node, nil)
 			return nil
 		}),
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, fmt.Errorf("unable to add node event handler: %w", err)
 	}
@@ -277,7 +277,7 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 
 // Run starts the controller which will run in loop until `stopCh` is closed.
 func (tc *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", tc.name)

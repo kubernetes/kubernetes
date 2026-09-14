@@ -24,7 +24,7 @@ import (
 
 // Preference stores elements of KubeRC configuration file
 type Preference struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// defaults allow changing default option values of commands.
 	// This is especially useful, when user doesn't want to explicitly

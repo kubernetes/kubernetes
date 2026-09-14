@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
+	klogtesting "k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init" // activate ktesting command line flags
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -60,13 +61,31 @@ type fakeDbus struct {
 
 	didInhibitShutdown      bool
 	didOverrideInhibitDelay bool
+	closed                  bool
+	onCloseChan             chan struct{} // if set, receives a signal when Close() is called
+
+	currentInhibitDelayErr error
 }
 
 func (f *fakeDbus) CurrentInhibitDelay() (time.Duration, error) {
+	if f.currentInhibitDelayErr != nil {
+		return 0, f.currentInhibitDelayErr
+	}
 	if f.didOverrideInhibitDelay {
 		return f.overrideSystemInhibitDelay, nil
 	}
 	return f.currentInhibitDelay, nil
+}
+
+func (f *fakeDbus) Close() error {
+	f.closed = true
+	if f.onCloseChan != nil {
+		select {
+		case f.onCloseChan <- struct{}{}:
+		default:
+		}
+	}
+	return nil
 }
 
 func (f *fakeDbus) InhibitShutdown() (systemd.InhibitLock, error) {
@@ -92,6 +111,7 @@ func (f *fakeDbus) OverrideInhibitDelay(inhibitDelayMax time.Duration) error {
 }
 
 func TestManager(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	systemDbusTmp := systemDbus
 	defer func() {
 		systemDbus = systemDbusTmp
@@ -302,8 +322,10 @@ func TestManager(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.desc, func(t *testing.T) {
-			logger, tCtx := ktesting.NewTestContext(t)
+		tCtx.SyncTest(tc.desc, func(tCtx ktesting.TContext) {
+			defer tCtx.Cancel("test completed")
+			t := tCtx.TB()
+			logger := tCtx.Logger()
 
 			activePodsFunc := func() []*v1.Pod {
 				return tc.activePods
@@ -364,7 +386,7 @@ func TestManager(t *testing.T) {
 				assert.NoError(t, err, "expected manager.Start() to not return error")
 				assert.True(t, fakeDbus.didInhibitShutdown, "expected that manager inhibited shutdown")
 				assert.NoError(t, manager.ShutdownStatus(), "expected that manager does not return error since shutdown is not active")
-				assert.True(t, manager.Admit(nil).Admit)
+				assert.True(t, manager.Admit(tCtx, nil).Admit)
 
 				// Send fake shutdown event
 				select {
@@ -386,7 +408,7 @@ func TestManager(t *testing.T) {
 				}
 
 				assert.Error(t, manager.ShutdownStatus(), "expected that manager returns error since shutdown is active")
-				assert.False(t, manager.Admit(nil).Admit)
+				assert.False(t, manager.Admit(tCtx, nil).Admit)
 				assert.Equal(t, tc.expectedPodToGracePeriodOverride, killedPodsToGracePeriods)
 				assert.Equal(t, tc.expectedDidOverrideInhibitDelay, fakeDbus.didOverrideInhibitDelay, "override system inhibit delay differs")
 				if tc.expectedPodStatuses != nil {
@@ -460,7 +482,13 @@ func TestFeatureEnabled(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	ktesting.Init(t).SyncTest("", testRestart)
+}
+
+func testRestart(tCtx ktesting.TContext) {
+	defer tCtx.Cancel("test completed")
+	logger := tCtx.Logger()
+	t := tCtx.TB()
 	systemDbusTmp := systemDbus
 	defer func() {
 		systemDbus = systemDbusTmp
@@ -531,7 +559,76 @@ func TestRestart(t *testing.T) {
 	}
 }
 
+func TestStartDoesNotReconnectAfterContextCancel(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testStartDoesNotReconnectAfterContextCancel)
+}
+
+func testStartDoesNotReconnectAfterContextCancel(tCtx ktesting.TContext) {
+	defer tCtx.Cancel("test completed")
+	logger := tCtx.Logger()
+	t := tCtx.TB()
+
+	systemDbusTmp := systemDbus
+	defer func() {
+		systemDbus = systemDbusTmp
+	}()
+
+	shutdownGracePeriodRequested := 30 * time.Second
+	shutdownGracePeriodCriticalPods := 10 * time.Second
+	systemInhibitDelay := 40 * time.Second
+	overrideSystemInhibitDelay := 40 * time.Second
+
+	shutdownChans := make(chan chan bool, 2)
+
+	lock.Lock()
+	systemDbus = func() (dbusInhibiter, error) {
+		ch := make(chan bool)
+		shutdownChans <- ch
+		return &fakeDbus{
+			currentInhibitDelay:        systemInhibitDelay,
+			shutdownChan:               ch,
+			overrideSystemInhibitDelay: overrideSystemInhibitDelay,
+		}, nil
+	}
+
+	manager := NewManager(&Config{
+		Logger:                          logger,
+		VolumeManager:                   volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false),
+		Recorder:                        &record.FakeRecorder{},
+		NodeRef:                         &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""},
+		GetPodsFunc:                     func() []*v1.Pod { return nil },
+		KillPodFunc:                     func(*v1.Pod, bool, *int64, func(*v1.PodStatus)) error { return nil },
+		SyncNodeStatusFunc:              func(context.Context) {},
+		ShutdownGracePeriodRequested:    shutdownGracePeriodRequested,
+		ShutdownGracePeriodCriticalPods: shutdownGracePeriodCriticalPods,
+		StateDirectory:                  os.TempDir(),
+	})
+
+	ctx, cancel := context.WithCancel(tCtx.Context)
+	err := manager.Start(ctx)
+	lock.Unlock()
+	require.NoError(t, err)
+
+	var shutdownChan chan bool
+	select {
+	case shutdownChan = <-shutdownChans:
+	case <-time.After(dbusReconnectPeriod):
+		t.Fatal("timed out waiting for initial dbus watch")
+	}
+
+	cancel()
+	close(shutdownChan)
+
+	select {
+	case <-shutdownChans:
+		t.Fatal("shutdown manager reconnected after context cancellation")
+	case <-time.After(dbusReconnectPeriod * 5):
+	}
+}
+
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	var (
 		fakeRecorder      = &record.FakeRecorder{}
 		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
@@ -596,9 +693,9 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := ktesting.NewLogger(t,
-				ktesting.NewConfig(
-					ktesting.BufferLogs(true),
+			logger := klogtesting.NewLogger(t,
+				klogtesting.NewConfig(
+					klogtesting.BufferLogs(true),
 				),
 			)
 			m := &managerImpl{
@@ -619,11 +716,14 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 					clock:                            tt.fields.clock,
 				},
 			}
-			if err := m.processShutdownEvent(); (err != nil) != tt.wantErr {
-				t.Errorf("managerImpl.processShutdownEvent() error = %v, wantErr %v", err, tt.wantErr)
+			err := m.processShutdownEvent(tCtx)
+			if tt.wantErr {
+				require.Error(t, err, "managerImpl.processShutdownEvent() should return an error")
+			} else {
+				require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")
 			}
 
-			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			underlier, ok := logger.GetSink().(klogtesting.Underlier)
 			if !ok {
 				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
 			}
@@ -639,6 +739,11 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 }
 
 func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testProcessShutdownEventVolumeUnmountTimeout)
+}
+
+func testProcessShutdownEventVolumeUnmountTimeout(tCtx ktesting.TContext) {
+	t := tCtx.TB()
 	var (
 		fakeRecorder               = &record.FakeRecorder{}
 		syncNodeStatus             = func(context.Context) {}
@@ -653,7 +758,8 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 		// for volume unmount operations that take longer than the allowed grace period.
 		fmt.Errorf("unmount timeout"), false,
 	)
-	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+	// Use a buffered logger because this test asserts log output.
+	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true)))
 	m := &managerImpl{
 		logger:   logger,
 		recorder: fakeRecorder,
@@ -682,7 +788,7 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	}
 
 	start := fakeclock.Now()
-	err := m.processShutdownEvent()
+	err := m.processShutdownEvent(tCtx)
 	end := fakeclock.Now()
 
 	require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")
@@ -691,7 +797,7 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	actualDuration := int(end.Sub(start).Seconds())
 	assert.LessOrEqual(t, actualDuration, shutdownGracePeriodSeconds, "processShutdownEvent took too long")
 
-	underlier, ok := logger.GetSink().(ktesting.Underlier)
+	underlier, ok := logger.GetSink().(klogtesting.Underlier)
 	if !ok {
 		t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
 	}
@@ -699,4 +805,130 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	log := underlier.GetBuffer().String()
 	expectedLogMessage := "Failed while waiting for all the volumes belonging to Pods in this group to unmount"
 	assert.Contains(t, log, expectedLogMessage, "Expected log message not found")
+}
+
+// TestStartDbusConnectionClosedOnError verifies that when start() fails after
+// creating a dbus connection, the connection is properly closed to avoid
+// leaking goroutines and file descriptors. See #120613.
+func TestStartDbusConnectionClosedOnError(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	systemDbusTmp := systemDbus
+	defer func() {
+		systemDbus = systemDbusTmp
+	}()
+
+	connErr := fmt.Errorf("simulated CurrentInhibitDelay error")
+	var createdConnections []*fakeDbus
+
+	lock.Lock()
+	systemDbus = func() (dbusInhibiter, error) {
+		fd := &fakeDbus{
+			currentInhibitDelayErr: connErr,
+			shutdownChan:           make(chan bool),
+		}
+		createdConnections = append(createdConnections, fd)
+		return fd, nil
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
+
+	fakeRecorder := &record.FakeRecorder{}
+	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	manager := NewManager(&Config{
+		Logger:        logger,
+		VolumeManager: fakeVolumeManager,
+		Recorder:      fakeRecorder,
+		NodeRef:       nodeRef,
+		GetPodsFunc:   func() []*v1.Pod { return nil },
+		KillPodFunc: func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
+			return nil
+		},
+		SyncNodeStatusFunc:              func(context.Context) {},
+		ShutdownGracePeriodRequested:    30 * time.Second,
+		ShutdownGracePeriodCriticalPods: 10 * time.Second,
+		StateDirectory:                  os.TempDir(),
+	})
+
+	err := manager.Start(tCtx)
+	lock.Unlock()
+
+	require.Error(t, err, "expected start to fail due to CurrentInhibitDelay error")
+	require.Len(t, createdConnections, 1, "expected exactly one connection to be created")
+	assert.True(t, createdConnections[0].closed, "expected the dbus connection to be closed after start() failure")
+}
+
+// TestRestartClosesOldConnection verifies that when the retry loop in Start()
+// reconnects, the old dbus connection is closed before a new one is created.
+// See #120613.
+func TestRestartClosesOldConnection(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testRestartClosesOldConnection)
+}
+
+func testRestartClosesOldConnection(tCtx ktesting.TContext) {
+	defer tCtx.Cancel("test completed")
+	logger := tCtx.Logger()
+	t := tCtx.TB()
+
+	systemDbusTmp := systemDbus
+	defer func() {
+		systemDbus = systemDbusTmp
+	}()
+
+	// Use onCloseChan to get a reliable signal when Close() is called on
+	// the first connection. This avoids races with leaked goroutines from
+	// prior tests that share the global systemDbus.
+	firstConnClosedChan := make(chan struct{}, 1)
+	var firstConn *fakeDbus
+
+	lock.Lock()
+	systemDbus = func() (dbusInhibiter, error) {
+		ch := make(chan bool)
+		fd := &fakeDbus{
+			currentInhibitDelay:        40 * time.Second,
+			overrideSystemInhibitDelay: 40 * time.Second,
+			shutdownChan:               ch,
+		}
+		return fd, nil
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
+
+	fakeRecorder := &record.FakeRecorder{}
+	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	manager := NewManager(&Config{
+		Logger:        logger,
+		VolumeManager: fakeVolumeManager,
+		Recorder:      fakeRecorder,
+		NodeRef:       nodeRef,
+		GetPodsFunc:   func() []*v1.Pod { return nil },
+		KillPodFunc: func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
+			return nil
+		},
+		SyncNodeStatusFunc:              func(context.Context) {},
+		ShutdownGracePeriodRequested:    30 * time.Second,
+		ShutdownGracePeriodCriticalPods: 10 * time.Second,
+		StateDirectory:                  os.TempDir(),
+	})
+
+	err := manager.Start(tCtx)
+
+	// Grab a reference to the first connection and arm its close notification.
+	m := manager.(*managerImpl)
+	firstConn = m.dbusCon.(*fakeDbus)
+	firstConn.onCloseChan = firstConnClosedChan
+	lock.Unlock()
+
+	require.NoError(t, err)
+
+	// Trigger reconnect by closing the shutdown channel (simulates dbus disconnect).
+	close(firstConn.shutdownChan)
+
+	// Wait for Close() to be called on the first connection by start().
+	select {
+	case <-firstConnClosedChan:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for first connection to be closed on reconnect")
+	}
+
+	assert.True(t, firstConn.closed, "expected the first dbus connection to be closed after reconnect")
 }

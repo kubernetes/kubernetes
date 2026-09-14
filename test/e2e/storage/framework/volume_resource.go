@@ -99,7 +99,7 @@ func CreateVolumeResourceWithAccessModes(ctx context.Context, driver TestDriver,
 			driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 			claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 			framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
-			framework.Logf("Using claimSize:%s, test suite supported size:%v, driver(%s) supported size:%v ", claimSize, testVolumeSizeRange, dDriver.GetDriverInfo().Name, testVolumeSizeRange)
+			framework.Logf("Using claimSize:%s, test suite supported size:%v, driver(%s) supported size:%v ", claimSize, testVolumeSizeRange, dDriver.GetDriverInfo().Name, driverVolumeSizeRange)
 			r.Sc = dDriver.GetDynamicProvisionStorageClass(ctx, r.Config, pattern.FsType)
 
 			if pattern.BindingMode != "" {

@@ -1109,6 +1109,36 @@ func TestReconcile(t *testing.T) {
 	}
 }
 
+func TestFinalizeIgnoresNotFoundWhenDeletingEndpointSlice(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	r := newReconciler(tCtx, newClientset(), defaultMaxEndpointsPerSubset)
+	//nolint:staticcheck // EndpointSlice mirroring reconciles legacy Endpoints objects.
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: "test"},
+	}
+	slices := slicesByAction{
+		toDelete: []*discovery.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{Name: "already-deleted", Namespace: endpoints.Namespace},
+		}},
+	}
+
+	if err := r.finalize(tCtx, endpoints, slices); err != nil {
+		t.Fatalf("Expected NotFound error to be ignored, got %v", err)
+	}
+}
+
+func TestDeleteEndpointsIgnoresNotFound(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	r := newReconciler(tCtx, newClientset(), defaultMaxEndpointsPerSubset)
+	endpointSlices := []*discovery.EndpointSlice{{
+		ObjectMeta: metav1.ObjectMeta{Name: "already-deleted", Namespace: "test"},
+	}}
+
+	if err := r.deleteEndpoints(tCtx, "test", "test-ep", endpointSlices); err != nil {
+		t.Fatalf("Expected NotFound error to be ignored, got %v", err)
+	}
+}
+
 // Test Helpers
 
 func newReconciler(ctx context.Context, client *fake.Clientset, maxEndpointsPerSubset int32) *reconciler {

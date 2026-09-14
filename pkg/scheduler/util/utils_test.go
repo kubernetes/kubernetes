@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -89,7 +90,8 @@ func TestGetEarliestPodStartTime(t *testing.T) {
 				newPriorityPodWithStartTime("pod1", 1, currentTime.Add(-time.Second)),
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod2",
+						Name:              "pod2",
+						CreationTimestamp: metav1.NewTime(currentTime),
 					},
 					Spec: v1.PodSpec{
 						Priority: &priority,
@@ -162,6 +164,85 @@ func TestMoreImportantPod(t *testing.T) {
 				t.Errorf("expected %t but got %t", v.expected, got)
 			}
 		})
+	}
+}
+
+func TestMoreImportantPodWithoutStartTime(t *testing.T) {
+	var priority int32 = 1
+	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	newPod := func(name string, creationTimestamp time.Time, startTime *metav1.Time) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              name,
+				CreationTimestamp: metav1.NewTime(creationTimestamp),
+			},
+			Spec: v1.PodSpec{
+				Priority: &priority,
+			},
+			Status: v1.PodStatus{StartTime: startTime},
+		}
+	}
+
+	startedAt := metav1.NewTime(baseTime.Add(time.Hour))
+	startedPod := newPod("started-pod", baseTime.Add(time.Hour), &startedAt)
+	unstartedOlderPod := newPod("unstarted-older-pod", baseTime, nil)
+	unstartedNewerPod := newPod("unstarted-newer-pod", baseTime.Add(2*time.Hour), nil)
+
+	tests := []struct {
+		name     string
+		pod1     *v1.Pod
+		pod2     *v1.Pod
+		expected bool
+	}{
+		{
+			name:     "started pod is more important than unstarted pod",
+			pod1:     startedPod,
+			pod2:     unstartedOlderPod,
+			expected: true,
+		},
+		{
+			name:     "unstarted pod is less important than started pod",
+			pod1:     unstartedOlderPod,
+			pod2:     startedPod,
+			expected: false,
+		},
+		{
+			name:     "creation timestamp does not order unstarted pods",
+			pod1:     unstartedOlderPod,
+			pod2:     unstartedNewerPod,
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := MoreImportantPod(test.pod1, test.pod2)
+			if got != test.expected {
+				t.Errorf("expected %t but got %t", test.expected, got)
+			}
+		})
+	}
+}
+
+func BenchmarkMoreImportantPodWithoutStartTime(b *testing.B) {
+	var priority int32 = 1
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
+		Spec: v1.PodSpec{
+			Priority: &priority,
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod2"},
+		Spec: v1.PodSpec{
+			Priority: &priority,
+		},
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		MoreImportantPod(pod1, pod2)
 	}
 }
 
@@ -367,27 +448,27 @@ func TestPatchPodGroupStatus(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		podGroup schedulingv1alpha2.PodGroup
+		podGroup schedulingv1beta1.PodGroup
 		client   *clientsetfake.Clientset
 		// validateErr checks if error returned from PatchPodGroupStatus is expected one or not.
 		// (true means error is expected one.)
 		validateErr    func(goterr error) bool
-		statusToUpdate *schedulingv1alpha2.PodGroupStatus
+		statusToUpdate *schedulingv1beta1.PodGroupStatus
 		nilOldStatus   bool
 	}{
 		{
 			name:   "Should update podgroup conditions successfully",
 			client: clientsetfake.NewClientset(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
 			},
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1beta1.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity for the gang",
@@ -399,15 +480,15 @@ func TestPatchPodGroupStatus(t *testing.T) {
 		{
 			name:   "no-op when status is unchanged",
 			client: clientsetfake.NewClientset(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
-				Status: schedulingv1alpha2.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:               schedulingapi.PodGroupScheduled,
+							Type:               schedulingapi.PodGroupInitiallyScheduled,
 							Status:             metav1.ConditionFalse,
 							Reason:             schedulingapi.PodGroupReasonUnschedulable,
 							Message:            "not enough capacity",
@@ -416,10 +497,10 @@ func TestPatchPodGroupStatus(t *testing.T) {
 					},
 				},
 			},
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1beta1.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity",
@@ -431,7 +512,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 		{
 			name:   "nil newStatus returns nil",
 			client: clientsetfake.NewClientset(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
@@ -448,26 +529,26 @@ func TestPatchPodGroupStatus(t *testing.T) {
 				client.PrependReactor("patch", "podgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
 					defer func() { reqcount++ }()
 					if reqcount == 0 {
-						return true, &schedulingv1alpha2.PodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+						return true, &schedulingv1beta1.PodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
 					}
 					if reqcount == 1 {
-						return false, &schedulingv1alpha2.PodGroup{}, nil
+						return false, &schedulingv1beta1.PodGroup{}, nil
 					}
 					return true, nil, errors.New("requests comes in more than three times.")
 				})
 
 				return client
 			}(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
 			},
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1beta1.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity for the gang",
@@ -487,22 +568,22 @@ func TestPatchPodGroupStatus(t *testing.T) {
 					if reqcount >= 4 {
 						return true, nil, errors.New("requests comes in more than four times.")
 					}
-					return true, &schedulingv1alpha2.PodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+					return true, &schedulingv1beta1.PodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
 				})
 
 				return client
 			}(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
 			},
 			validateErr: net.IsConnectionRefused,
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1beta1.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity for the gang",
@@ -520,29 +601,29 @@ func TestPatchPodGroupStatus(t *testing.T) {
 				client.PrependReactor("patch", "podgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
 					defer func() { reqcount++ }()
 					if reqcount == 0 {
-						return true, &schedulingv1alpha2.PodGroup{},
+						return true, &schedulingv1beta1.PodGroup{},
 							apierrors.NewConflict(schema.GroupResource{
 								Resource: "podgroups"}, "pg1",
 								errors.New("the object has been modified"))
 					}
 					if reqcount == 1 {
-						return false, &schedulingv1alpha2.PodGroup{}, nil
+						return false, &schedulingv1beta1.PodGroup{}, nil
 					}
 					return true, nil, errors.New("requests comes in more than three times.")
 				})
 
 				return client
 			}(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
 			},
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1beta1.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity for the gang",
@@ -554,16 +635,16 @@ func TestPatchPodGroupStatus(t *testing.T) {
 		{
 			name:   "nil oldStatus patches successfully",
 			client: clientsetfake.NewClientset(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
 			},
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1beta1.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity for the gang",
@@ -582,7 +663,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			defer cancel()
 
 			client := tc.client
-			_, err := client.SchedulingV1alpha2().PodGroups(tc.podGroup.Namespace).Create(ctx, &tc.podGroup, metav1.CreateOptions{})
+			_, err := client.SchedulingV1beta1().PodGroups(tc.podGroup.Namespace).Create(ctx, &tc.podGroup, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -602,7 +683,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 				return
 			}
 
-			retrievedPG, err := client.SchedulingV1alpha2().PodGroups(tc.podGroup.Namespace).Get(ctx, tc.podGroup.Name, metav1.GetOptions{})
+			retrievedPG, err := client.SchedulingV1beta1().PodGroups(tc.podGroup.Namespace).Get(ctx, tc.podGroup.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -613,6 +694,123 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			}
 			if diff := cmp.Diff(wantStatus, retrievedPG.Status); diff != "" {
 				t.Errorf("unexpected podgroup status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestBindPod(t *testing.T) {
+	binding := &v1.Binding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod",
+			Namespace: "ns",
+		},
+		Target: v1.ObjectReference{
+			Name: "node",
+		},
+	}
+
+	validateNoErr := func(err error) bool { return err == nil }
+
+	tests := []struct {
+		name          string
+		errFunc       func() error
+		failCalls     int
+		expectedCalls int
+		validateErr   func(error) bool
+	}{
+		{
+			name:          "successful",
+			failCalls:     0,
+			expectedCalls: 1,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "no retry on conflict",
+			errFunc: func() error {
+				return apierrors.NewConflict(v1.Resource("pods"), "pod", errors.New("conflict"))
+			},
+			failCalls:     1,
+			expectedCalls: 1,
+			validateErr:   apierrors.IsConflict,
+		},
+		{
+			name: "retry on internal error and succeed",
+			errFunc: func() error {
+				return apierrors.NewInternalError(errors.New("internal"))
+			},
+			failCalls:     1,
+			expectedCalls: 2,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "retry on service unavailable and succeed",
+			errFunc: func() error {
+				return apierrors.NewServiceUnavailable("service unavailable")
+			},
+			failCalls:     1,
+			expectedCalls: 2,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "retry on connection refused and succeed",
+			errFunc: func() error {
+				return fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+			},
+			failCalls:     1,
+			expectedCalls: 2,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "no retry on not found",
+			errFunc: func() error {
+				return apierrors.NewNotFound(v1.Resource("pods"), "pod")
+			},
+			failCalls:     1,
+			expectedCalls: 1,
+			validateErr:   apierrors.IsNotFound,
+		},
+		{
+			name: "persistent internal error fails after retries",
+			errFunc: func() error {
+				return apierrors.NewInternalError(errors.New("internal"))
+			},
+			failCalls:     retry.DefaultBackoff.Steps,
+			expectedCalls: retry.DefaultBackoff.Steps,
+			validateErr:   apierrors.IsInternalError,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			client := clientsetfake.NewClientset()
+			calls := 0
+			client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				createAction := action.(clienttesting.CreateActionImpl)
+				if createAction.Subresource != "binding" {
+					return false, nil, nil
+				}
+				calls++
+
+				if calls <= tc.failCalls {
+					return true, nil, tc.errFunc()
+				}
+
+				return true, nil, nil
+			})
+
+			err := BindPod(ctx, client, binding)
+
+			if !tc.validateErr(err) {
+				t.Errorf("BindPod() returned unexpected error: %v", err)
+			}
+
+			if calls != tc.expectedCalls {
+				t.Errorf("Expected %d calls to binding API, got %d", tc.expectedCalls, calls)
 			}
 		})
 	}

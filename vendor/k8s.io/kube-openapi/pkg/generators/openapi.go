@@ -100,7 +100,7 @@ func isOptional(m *types.Member) (bool, error) {
 
 	// If neither +optional nor +required is present in the comments,
 	// infer optional from the json tags.
-	return strings.Contains(reflect.StructTag(m.Tags).Get("json"), "omitempty"), nil
+	return hasOmitemptyTag(m), nil
 }
 
 func apiTypeFilterFunc(c *generator.Context, t *types.Type) bool {
@@ -222,9 +222,14 @@ func getReferableName(m *types.Member) string {
 	}
 }
 
+func hasOmitemptyTag(m *types.Member) bool {
+	jsonTag, _ := reflect.StructTag(m.Tags).Lookup("json")
+	return strings.HasSuffix(jsonTag, ",omitempty") || strings.Contains(jsonTag, ",omitempty,")
+}
+
 func shouldInlineMembers(m *types.Member) bool {
-	jsonTags := getJsonTags(m)
-	return len(jsonTags) > 1 && jsonTags[1] == "inline"
+	jsonTag, jsonTagExists := reflect.StructTag(m.Tags).Lookup("json")
+	return m.Embedded && jsonTagExists && (jsonTag == "" || strings.HasPrefix(jsonTag, ","))
 }
 
 type openAPITypeWriter struct {
@@ -1032,7 +1037,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 		g.Do("},\n},\n", nil)
 		return nil
 	}
-	omitEmpty := strings.Contains(reflect.StructTag(m.Tags).Get("json"), "omitempty")
+	omitEmpty := hasOmitemptyTag(m)
 	if err := g.generateDefault(m.CommentLines, m.Type, omitEmpty, parent); err != nil {
 		return fmt.Errorf("failed to generate default in %v: %v: %v", parent, m.Name, err)
 	}
@@ -1124,9 +1129,6 @@ func (g openAPITypeWriter) generateMapProperty(t *types.Type) error {
 
 	g.Do("Type: []string{\"object\"},\n", nil)
 	g.Do("AdditionalProperties: &spec.SchemaOrBool{\nAllows: true,\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-	if err := g.generateDefault(t.Elem.CommentLines, t.Elem, false, t.Elem); err != nil {
-		return err
-	}
 	typeString, format := openapi.OpenAPITypeFormat(elemType.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
@@ -1161,9 +1163,6 @@ func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 	elemType := resolveAliasAndPtrType(t.Elem)
 	g.Do("Type: []string{\"array\"},\n", nil)
 	g.Do("Items: &spec.SchemaOrArray{\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-	if err := g.generateDefault(t.Elem.CommentLines, t.Elem, false, t.Elem); err != nil {
-		return err
-	}
 	typeString, format := openapi.OpenAPITypeFormat(elemType.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)

@@ -17,6 +17,8 @@ limitations under the License.
 package workqueue
 
 import (
+	"sync"
+
 	"k8s.io/client-go/util/workqueue"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -96,42 +98,64 @@ var (
 	metrics = []k8smetrics.Registerable{
 		depth, adds, latency, workDuration, unfinished, longestRunningProcessor, retries,
 	}
+
+	registerOnce sync.Once
 )
 
 type prometheusMetricsProvider struct {
 }
 
+// init only installs the provider with workqueue. The actual metric
+// registration with legacyregistry is deferred until the first factory
+// method is called (which happens at runtime when the first workqueue is
+// constructed). This ensures Create() - and therefore the read of the
+// feature gate - runs after ApplyFeatureGates has propagated the gate state.
 func init() {
-	for _, m := range metrics {
-		legacyregistry.MustRegister(m)
-	}
 	workqueue.SetProvider(prometheusMetricsProvider{})
 }
 
+// register registers all workqueue metrics with the legacy registry. It is
+// invoked from each provider factory method via registerOnce so that the
+// registration (and thus Create()) happens at runtime, post-ApplyFeatureGates.
+func register() {
+	registerOnce.Do(func() {
+		for _, m := range metrics {
+			legacyregistry.MustRegister(m)
+		}
+	})
+}
+
 func (prometheusMetricsProvider) NewDepthMetric(name string) workqueue.GaugeMetric {
+	register()
 	return depth.WithLabelValues(name)
 }
 
 func (prometheusMetricsProvider) NewAddsMetric(name string) workqueue.CounterMetric {
+	register()
 	return adds.WithLabelValues(name)
 }
 
 func (prometheusMetricsProvider) NewLatencyMetric(name string) workqueue.HistogramMetric {
+	register()
 	return latency.WithLabelValues(name)
 }
 
 func (prometheusMetricsProvider) NewWorkDurationMetric(name string) workqueue.HistogramMetric {
+	register()
 	return workDuration.WithLabelValues(name)
 }
 
 func (prometheusMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) workqueue.SettableGaugeMetric {
+	register()
 	return unfinished.WithLabelValues(name)
 }
 
 func (prometheusMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) workqueue.SettableGaugeMetric {
+	register()
 	return longestRunningProcessor.WithLabelValues(name)
 }
 
 func (prometheusMetricsProvider) NewRetriesMetric(name string) workqueue.CounterMetric {
+	register()
 	return retries.WithLabelValues(name)
 }

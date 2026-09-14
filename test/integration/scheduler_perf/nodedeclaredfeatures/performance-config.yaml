@@ -42,28 +42,31 @@
         numNodeDeclaredFeatures: 5
     - name: 5000Nodes20DeclaredFeatures
       labels: [performance]
+      threshold: 890
       featureGates:
         NodeDeclaredFeatures: true
       params:
         nodes: 5000
         initPods: 5000
-        measurePods: 5000
+        measurePods: 50000
         numNodeDeclaredFeatures: 20
     - name: 5000Nodes40DeclaredFeatures
       labels: [performance]
+      threshold: 890
       featureGates:
         NodeDeclaredFeatures: true
       params:
         nodes: 5000
         initPods: 5000
-        measurePods: 5000
+        measurePods: 50000
         numNodeDeclaredFeatures: 40
     - name: 5000Nodes100DeclaredFeatures
       labels: [performance]
+      threshold: 890
       featureGates:
         NodeDeclaredFeatures: true
       params:
         nodes: 5000
         initPods: 5000
-        measurePods: 5000
+        measurePods: 50000
         numNodeDeclaredFeatures: 100

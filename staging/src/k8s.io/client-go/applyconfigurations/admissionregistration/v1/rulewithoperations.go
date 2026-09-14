@@ -35,7 +35,7 @@ type RuleWithOperationsApplyConfiguration struct {
 	Operations []admissionregistrationv1.OperationType `json:"operations,omitempty"`
 	// Rule is embedded, it describes other criteria of the rule, like
 	// APIGroups, APIVersions, Resources, etc.
-	RuleApplyConfiguration `json:",inline"`
+	RuleApplyConfiguration `json:""`
 }
 
 // RuleWithOperationsApplyConfiguration constructs a declarative configuration of the RuleWithOperations type for use with

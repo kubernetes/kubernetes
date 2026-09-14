@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"google.golang.org/grpc"
@@ -59,6 +60,8 @@ const (
 	UpdateRuntimeConfig       = "UpdateRuntimeConfig"
 	Status                    = "Status"
 	CheckpointContainer       = "CheckpointContainer"
+	CheckpointPod             = "CheckpointPod"
+	RestorePod                = "RestorePod"
 	GetContainerEvents        = "GetContainerEvents"
 	ListMetricDescriptors     = "ListMetricDescriptors"
 	ListPodSandboxMetrics     = "ListPodSandboxMetrics"
@@ -480,25 +483,59 @@ func (p *RemoteRuntime) CheckpointContainer(ctx context.Context, req *runtimeapi
 	return &runtimeapi.CheckpointContainerResponse{}, nil
 }
 
+// CheckpointPod checkpoints the given pod sandbox.
+func (p *RemoteRuntime) CheckpointPod(ctx context.Context, req *runtimeapi.CheckpointPodRequest) (*runtimeapi.CheckpointPodResponse, error) {
+	if err := p.runInjectors(CheckpointPod); err != nil {
+		return nil, err
+	}
+
+	err := p.runtimeService.CheckpointPod(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeapi.CheckpointPodResponse{}, nil
+}
+
+// RestorePod restores a pod sandbox from a checkpoint.
+func (p *RemoteRuntime) RestorePod(ctx context.Context, req *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
+	if err := p.runInjectors(RestorePod); err != nil {
+		return nil, err
+	}
+
+	response, err := p.runtimeService.RestorePod(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 func (p *RemoteRuntime) GetContainerEvents(req *runtimeapi.GetEventsRequest, ces runtimeapi.RuntimeService_GetContainerEventsServer) error {
 	if err := p.runInjectors(GetContainerEvents); err != nil {
 		return err
 	}
 
+	ctx, cancel := context.WithCancel(ces.Context())
+	defer cancel()
+
 	// Capacity of the channel for receiving pod lifecycle events. This number
 	// is a bit arbitrary and may be adjusted in the future.
 	plegChannelCapacity := 1000
 	containerEventsResponseCh := make(chan *runtimeapi.ContainerEventResponse, plegChannelCapacity)
-	defer close(containerEventsResponseCh)
-
-	if err := p.runtimeService.GetContainerEvents(context.Background(), containerEventsResponseCh, nil); err != nil {
-		return err
-	}
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(containerEventsResponseCh)
+		errCh <- p.runtimeService.GetContainerEvents(ctx, containerEventsResponseCh, nil)
+	}()
 
 	for event := range containerEventsResponseCh {
 		if err := ces.Send(event); err != nil {
+			cancel()
 			return status.Errorf(codes.Unknown, "Failed to send event: %v", err)
 		}
+	}
+
+	if err := <-errCh; err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
+		return err
 	}
 
 	return nil

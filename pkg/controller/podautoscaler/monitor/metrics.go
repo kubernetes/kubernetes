@@ -76,6 +76,18 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"namespace", "hpa_name"})
 
+	// HPARequeueSkips track the number of hpa syncs skipped due to a stale
+	// watch cache.
+	HPARequeueSkips = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      hpaControllerSubsystem,
+			Name:           "stale_sync_skips_total",
+			Help:           "Total number of HPA syncs skipped due to a stale watch cache.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
 	metricsList = []metrics.Registerable{
 		ReconciliationsTotal,
 		ReconciliationsDuration,
@@ -83,6 +95,7 @@ var (
 		MetricComputationDuration,
 		NumHorizontalPodAutoscalers,
 		DesiredReplicasCount,
+		HPARequeueSkips,
 	}
 )
 

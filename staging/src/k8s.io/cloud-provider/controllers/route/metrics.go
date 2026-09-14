@@ -26,21 +26,38 @@ import (
 const (
 	// subsystem is the name of this subsystem used for prometheus metrics.
 	subsystem = "route_controller"
+
+	// outcome label values for route_sync_total.
+	outcomeChanged = "changed"
+	outcomeNoop    = "noop"
+	outcomeError   = "error"
 )
 
 var registration sync.Once
 
-var (
-	routeSyncCount = metrics.NewCounter(&metrics.CounterOpts{
-		Name:           "route_sync_total",
-		Subsystem:      subsystem,
-		Help:           "A metric counting the amount of times routes have been synced with the cloud provider.",
-		StabilityLevel: metrics.ALPHA,
-	})
-)
+var routeSyncCount = metrics.NewCounterVec(&metrics.CounterOpts{
+	Name:           "route_sync_total",
+	Subsystem:      subsystem,
+	Help:           "A metric counting the number of route reconciles with the cloud provider, labeled by the trigger (periodic or node_change) and the outcome (error if the reconcile failed, changed if at least one route was created or deleted, otherwise noop).",
+	StabilityLevel: metrics.ALPHA,
+}, []string{"outcome", "trigger"})
 
 func registerMetrics() {
 	registration.Do(func() {
 		legacyregistry.MustRegister(routeSyncCount)
 	})
+}
+
+// recordRouteSync increments route_sync_total for a completed reconcile,
+// deriving the outcome label from the reconcile error and whether any route
+// was created or deleted.
+func recordRouteSync(routesChanged bool, err error, trigger string) {
+	outcome := outcomeNoop
+	switch {
+	case err != nil:
+		outcome = outcomeError
+	case routesChanged:
+		outcome = outcomeChanged
+	}
+	routeSyncCount.WithLabelValues(outcome, trigger).Inc()
 }

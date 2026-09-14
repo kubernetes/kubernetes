@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0
 /*
  * libpathrs: safe path resolution on Linux
- * Copyright (C) 2019-2025 Aleksa Sarai <cyphar@cyphar.com>
  * Copyright (C) 2019-2025 SUSE LLC
+ * Copyright (C) 2026 Aleksa Sarai <cyphar@cyphar.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -16,6 +16,8 @@ package pathrs
 import (
 	"fmt"
 	"os"
+
+	"golang.org/x/sys/unix"
 
 	"cyphar.com/go-pathrs/internal/fdutils"
 	"cyphar.com/go-pathrs/internal/libpathrs"
@@ -56,11 +58,11 @@ func HandleFromFile(file *os.File) (*Handle, error) {
 // and can be opened multiple times.
 //
 // The handle returned is only usable for reading, and this is method is
-// shorthand for [Handle.OpenFile] with os.O_RDONLY.
+// shorthand for [Handle.OpenFile] with [unix.O_RDONLY].
 //
 // TODO: Rename these to "Reopen" or something.
 func (h *Handle) Open() (*os.File, error) {
-	return h.OpenFile(os.O_RDONLY)
+	return h.OpenFile(unix.O_RDONLY)
 }
 
 // OpenFile creates an "upgraded" file handle to the file referenced by the
@@ -71,7 +73,7 @@ func (h *Handle) Open() (*os.File, error) {
 // handle.
 //
 // TODO: Rename these to "Reopen" or something.
-func (h *Handle) OpenFile(flags int) (*os.File, error) {
+func (h *Handle) OpenFile(flags uint64) (*os.File, error) {
 	return fdutils.WithFileFd(h.inner, func(fd uintptr) (*os.File, error) {
 		newFd, err := libpathrs.Reopen(fd, flags)
 		if err != nil {

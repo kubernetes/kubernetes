@@ -66,7 +66,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	mockdriver "k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/driver"
 	mockservice "k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/service"
@@ -164,6 +163,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapReadWriteOncePod:               true,
 		storageframework.CapMultiplePVsSameID:              true,
 		storageframework.CapFSResizeFromSourceNotSupported: true,
+		storageframework.CapVolumeGroupSnapshot:            true,
 		// There are extensive tests that NodeStage / NodePublish are called with -o context in csimock/csi_selinux_mount.go,
 		// but the csi-driver-hostpath can't physically make -o context to appear in the mount table that the CapSELinuxMount tests expect.
 		storageframework.CapSELinuxMount: false,
@@ -173,10 +173,6 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		// test. --maxvolumespernode=10 gets
 		// added when patching the deployment.
 		storageframework.CapVolumeLimits: true,
-	}
-	// TODO: It can be removed after the VolumeGroupSnapshot feature is default enabled
-	if os.Getenv("CSI_PROW_ENABLE_GROUP_SNAPSHOT") == "true" {
-		capabilities[storageframework.CapVolumeGroupSnapshot] = true
 	}
 	if os.Getenv("CSI_PROW_ENABLE_SNAPSHOT_METADATA") == "true" {
 		capabilities[storageframework.CapSnapshotMetadata] = true
@@ -203,10 +199,11 @@ func (h *hostpathCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &h.driverInfo
 }
 
-func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
 	if pattern.VolType == storageframework.CSIInlineVolume && len(h.volumeAttributes) == 0 {
-		e2eskipper.Skipf("%s has no volume attributes defined, doesn't support ephemeral inline volumes", h.driverInfo.Name)
+		return fmt.Sprintf("%s has no volume attributes defined, doesn't support ephemeral inline volumes", h.driverInfo.Name)
 	}
+	return ""
 }
 
 func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -305,14 +302,13 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		DriverContainerArguments: []string{"--feature-gates=VolumeAttributesClass=true"},
 	})
 
-	// VGS E2E FeatureGate patches
-	// TODO: These can be removed after the VolumeGroupSnapshot feature is default enabled
-	if os.Getenv("CSI_PROW_ENABLE_GROUP_SNAPSHOT") == "true" {
-		patches = append(patches, utils.PatchCSIOptions{
-			DriverContainerName:      "csi-snapshotter",
-			DriverContainerArguments: []string{"--feature-gates=CSIVolumeGroupSnapshot=true"},
-		})
-	}
+	// VolumeGroupSnapshot feature E2E patches
+	// It is GA in Kubernetes, just the feature gate is erroneously disabled by default.
+	// TODO: remove this after the feature gate is enabled by default.
+	patches = append(patches, utils.PatchCSIOptions{
+		DriverContainerName:      "csi-snapshotter",
+		DriverContainerArguments: []string{"--feature-gates=CSIVolumeGroupSnapshot=true"},
+	})
 
 	// SnapshotMetadata feature E2E patches
 	// TODO: These can be removed after the SnapshotMetadata feature is default enabled
@@ -403,6 +399,7 @@ type mockCSIDriver struct {
 	fsGroupPolicy                        *storagev1.FSGroupPolicy
 	enableVolumeMountGroup               bool
 	enableNodeVolumeCondition            bool
+	enableNodeStorageHealth              bool
 	embedded                             bool
 	calls                                MockCSICalls
 	embeddedCSIDriver                    *mockdriver.CSIDriver
@@ -454,6 +451,7 @@ type CSIMockDriverOpts struct {
 	EnableSnapshot                       bool
 	EnableVolumeMountGroup               bool
 	EnableNodeVolumeCondition            bool
+	EnableNodeStorageHealth              bool
 	TokenRequests                        []storagev1.TokenRequest
 	ServiceAccountTokenInSecrets         *bool
 	RequiresRepublish                    *bool
@@ -609,6 +607,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		attachLimit:                          driverOpts.AttachLimit,
 		enableNodeExpansion:                  driverOpts.EnableNodeExpansion,
 		enableNodeVolumeCondition:            driverOpts.EnableNodeVolumeCondition,
+		enableNodeStorageHealth:              driverOpts.EnableNodeStorageHealth,
 		disableControllerExpansion:           driverOpts.DisableControllerExpansion,
 		tokenRequests:                        driverOpts.TokenRequests,
 		requiresRepublish:                    driverOpts.RequiresRepublish,
@@ -626,7 +625,8 @@ func (m *mockCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &m.driverInfo
 }
 
-func (m *mockCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (m *mockCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (m *mockCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -689,6 +689,7 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 			NodeExpansionRequired:       m.enableNodeExpansion,
 			DisableControllerExpansion:  m.disableControllerExpansion,
 			NodeVolumeConditionRequired: m.enableNodeVolumeCondition,
+			NodeStorageHealthRequired:   m.enableNodeStorageHealth,
 			VolumeMountGroupRequired:    m.enableVolumeMountGroup,
 			EnableTopology:              m.enableTopology,
 			IO: proxy.PodDirIO{
@@ -777,6 +778,9 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 	}
 	if m.enableMutableCSINodeAllocatableCount {
 		o.Features["csi-attacher"] = []string{"MutableCSINodeAllocatableCount=true"}
+	}
+	if m.enableNodeExpansion {
+		o.Features["csi-resizer"] = []string{"AnnotateFsResize=true"}
 	}
 
 	err = utils.CreateFromManifests(ctx, f, m.driverNamespace, func(item interface{}) error {
@@ -900,7 +904,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 	return &gcePDCSIDriver{
 		driverInfo: storageframework.DriverInfo{
 			Name:        GCEPDCSIDriverName,
-			TestTags:    []interface{}{framework.WithSerial()},
+			TestTags:    []interface{}{framework.WithSerial(), framework.WithProvider("gce")},
 			MaxFileSize: storageframework.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
@@ -954,16 +958,19 @@ func (g *gcePDCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("gce")
+func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
 	if pattern.FsType == "xfs" {
-		e2eskipper.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
+		if !framework.NodeOSDistroIs("ubuntu", "custom") {
+			return "unsupported node OS"
+		}
+
 	}
 	for _, tag := range pattern.TestTags {
-		if framework.TagsEqual(tag, feature.Windows) {
-			e2eskipper.Skipf("Skipping tests for windows since CSI does not support it yet")
+		if tag == feature.Windows {
+			return "Skipping tests for windows since CSI does not support it yet"
 		}
 	}
+	return ""
 }
 
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {

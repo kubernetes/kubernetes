@@ -23,7 +23,7 @@ package v1beta1
 //
 // LoadBalancerStatus represents the status of a load-balancer.
 type IngressLoadBalancerStatusApplyConfiguration struct {
-	// Ingress is a list containing ingress points for the load-balancer.
+	// ingress is a list containing ingress points for the load-balancer.
 	Ingress []IngressLoadBalancerIngressApplyConfiguration `json:"ingress,omitempty"`
 }
 

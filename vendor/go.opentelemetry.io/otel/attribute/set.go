@@ -401,7 +401,7 @@ func computeDataFixed(kvs []KeyValue) any {
 func computeDataReflect(kvs []KeyValue) any {
 	at := reflect.New(reflect.ArrayOf(len(kvs), keyValueType)).Elem()
 	for i, keyValue := range kvs {
-		*(at.Index(i).Addr().Interface().(*KeyValue)) = keyValue
+		*at.Index(i).Addr().Interface().(*KeyValue) = keyValue
 	}
 	return at.Interface()
 }
@@ -415,7 +415,7 @@ func (l *Set) MarshalJSON() ([]byte, error) {
 func (l Set) MarshalLog() any {
 	kvs := make(map[string]string)
 	for _, kv := range l.ToSlice() {
-		kvs[string(kv.Key)] = kv.Value.Emit()
+		kvs[string(kv.Key)] = kv.Value.String()
 	}
 	return kvs
 }

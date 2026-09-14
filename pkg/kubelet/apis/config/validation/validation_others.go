@@ -34,5 +34,9 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 		return fmt.Errorf("invalid configuration: userNamespaces is only supported on linux")
 	}
 
+	if len(kc.DefaultPodSysctls) > 0 {
+		return fmt.Errorf("invalid configuration: defaultPodSysctls is only supported on linux")
+	}
+
 	return nil
 }

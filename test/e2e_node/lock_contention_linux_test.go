@@ -28,6 +28,7 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 const contentionLockFile = "/var/run/kubelet.lock"
@@ -43,7 +44,7 @@ var _ = SIGDescribe("Lock contention", framework.WithSlow(), framework.WithDisru
 
 		ginkgo.By("perform kubelet health check to check if kubelet is healthy and running.")
 		// Precautionary check that kubelet is healthy before running the test.
-		gomega.Expect(kubeletHealthCheck(kubeletHealthCheckURL)).To(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
+		gomega.Expect(e2enode.HealthCheck(kubeletHealthCheckURL)).To(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 		ginkgo.By("acquiring the lock on lock file i.e /var/run/kubelet.lock")
 		// Open the file with the intention to acquire the lock, this would imitate the behaviour
@@ -70,7 +71,7 @@ var _ = SIGDescribe("Lock contention", framework.WithSlow(), framework.WithDisru
 		// Once the lock is acquired, check if the kubelet is in healthy state or not.
 		// It should not be as the lock contention forces the kubelet to stop.
 		gomega.Eventually(ctx, func() bool {
-			return kubeletHealthCheck(kubeletHealthCheckURL)
+			return e2enode.HealthCheck(kubeletHealthCheckURL)
 		}, 10*time.Second, time.Second).Should(gomega.BeFalseBecause("expected kubelet to not be in healthy state"))
 	})
 })

@@ -26,7 +26,7 @@ package v1
 // - How are requests for this priority level limited?
 // - What should be done with requests that exceed the limit?
 type LimitedPriorityLevelConfigurationApplyConfiguration struct {
-	// `nominalConcurrencyShares` (NCS) contributes to the computation of the
+	// nominalConcurrencyShares (NCS) contributes to the computation of the
 	// NominalConcurrencyLimit (NominalCL) of this level.
 	// This is the number of execution seats available at this priority level.
 	// This is used both for requests dispatched from this priority level
@@ -46,9 +46,9 @@ type LimitedPriorityLevelConfigurationApplyConfiguration struct {
 	// Setting this field to zero supports the construction of a
 	// "jail" for this priority level that is used to hold some request(s)
 	NominalConcurrencyShares *int32 `json:"nominalConcurrencyShares,omitempty"`
-	// `limitResponse` indicates what to do with requests that can not be executed right now
+	// limitResponse indicates what to do with requests that can not be executed right now
 	LimitResponse *LimitResponseApplyConfiguration `json:"limitResponse,omitempty"`
-	// `lendablePercent` prescribes the fraction of the level's NominalCL that
+	// lendablePercent prescribes the fraction of the level's NominalCL that
 	// can be borrowed by other priority levels. The value of this
 	// field must be between 0 and 100, inclusive, and it defaults to 0.
 	// The number of seats that other levels can borrow from this level, known
@@ -56,8 +56,8 @@ type LimitedPriorityLevelConfigurationApplyConfiguration struct {
 	//
 	// LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
 	LendablePercent *int32 `json:"lendablePercent,omitempty"`
-	// `borrowingLimitPercent`, if present, configures a limit on how many
-	// seats this priority level can borrow from other priority levels.
+	// borrowingLimitPercent configures a limit on how many
+	// seats this priority level can borrow from other priority levels, if present.
 	// The limit is known as this level's BorrowingConcurrencyLimit
 	// (BorrowingCL) and is a limit on the total number of seats that this
 	// level may borrow at any one time.

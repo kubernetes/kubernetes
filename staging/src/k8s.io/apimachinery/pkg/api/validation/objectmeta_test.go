@@ -17,13 +17,18 @@ limitations under the License.
 package validation
 
 import (
+	"context"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/validate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -210,6 +215,45 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 			},
 			expectError:          true,
 			expectedErrorMessage: "is disallowed from being an owner",
+		},
+		{
+			description: "simple failures - invalid apiVersion with too many slashes",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "a/b/c",
+					Kind:       "Pod",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expectError:          true,
+			expectedErrorMessage: "must be <group>/<version> or <version>",
+		},
+		{
+			description: "simple failures - invalid apiVersion with empty version",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "foo/",
+					Kind:       "Pod",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expectError:          true,
+			expectedErrorMessage: "must be <group>/<version> or <version>",
+		},
+		{
+			description: "simple success - apiVersion with no slashes (legacy core group)",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expectError:          false,
+			expectedErrorMessage: "",
 		},
 		{
 			description: "simple controller ref success - one reference with Controller set",
@@ -580,4 +624,376 @@ func TestValidateAnnotations(t *testing.T) {
 			t.Errorf("case[%d] expected failure", i)
 		}
 	}
+}
+
+func TestValidateObjectMetaDeclaratively(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("metadata")
+	now := metav1.NewTime(time.Unix(1000, 0).UTC())
+	later := metav1.NewTime(time.Unix(2000, 0).UTC())
+	gracePeriod30 := int64(30)
+	gracePeriod40 := int64(40)
+
+	createCases := []struct {
+		name              string
+		obj               *metav1.ObjectMeta
+		requiresNamespace bool
+		expectedErrs      field.ErrorList
+	}{
+		{
+			name:              "valid metadata",
+			obj:               mkMeta(),
+			requiresNamespace: true,
+			expectedErrs:      nil,
+		},
+		{
+			name:              "invalid name format",
+			obj:               mkMeta(tweakName("invalid_name")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("name"), "invalid_name", "").MarkFromImperative(),
+			},
+		},
+		{
+			name:              "missing required namespace",
+			obj:               mkMeta(tweakNamespace("")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("namespace"), "").MarkFromImperative(),
+			},
+		},
+		{
+			name:              "negative generation",
+			obj:               mkMeta(tweakGeneration(-1)),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("generation"), int64(-1), "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		{
+			name:              "managedFields empty operation",
+			obj:               mkMeta(tweakManagedFields(metav1.ManagedFieldsEntry{FieldsType: "FieldsV1"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("managedFields").Index(0).Child("operation"), "").MarkAlpha(),
+			},
+		},
+		{
+			name:              "ownerReferences empty apiVersion",
+			obj:               mkMeta(tweakOwnerRefs(mkOwnerRef(tweakRefAPIVersion("")))),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "").MarkAlpha(),
+			},
+		},
+		{
+			name:              "ownerReferences empty kind",
+			obj:               mkMeta(tweakOwnerRefs(mkOwnerRef(tweakRefKind("")))),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "").MarkAlpha(),
+			},
+		},
+		{
+			name:              "ownerReferences empty name",
+			obj:               mkMeta(tweakOwnerRefs(mkOwnerRef(tweakRefName("")))),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "").MarkAlpha(),
+			},
+		},
+		{
+			name:              "ownerReferences empty uid",
+			obj:               mkMeta(tweakOwnerRefs(mkOwnerRef(tweakRefUID("")))),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "").MarkAlpha(),
+			},
+		},
+		{
+			name:              "ownerReferences event is disallowed",
+			obj:               mkMeta(tweakOwnerRefs(mkOwnerRef(tweakRefKind("Event")))),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("ownerReferences").Index(0), metav1.OwnerReference{APIVersion: "v1", Kind: "Event", Name: "name", UID: "uid-1"}, "").MarkFromImperative(),
+			},
+		},
+		{
+			name:              "invalid annotation key",
+			obj:               mkMeta(tweakAnnotations(map[string]string{"-invalid": "val"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("annotations"), "-invalid", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+			},
+		},
+		{
+			name:              "annotations size limit exceeded",
+			obj:               mkMeta(tweakAnnotations(map[string]string{"a": strings.Repeat("b", TotalAnnotationSizeLimitB)})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.TooLong(fldPath.Child("annotations"), "", TotalAnnotationSizeLimitB).MarkFromImperative(),
+			},
+		},
+	}
+
+	matcher := field.ErrorMatcher{}.ByField().ByType().BySource().ByOrigin()
+
+	toExpectedErrs := func(allDeclarativeEnforced bool, betaEnabled bool, errs field.ErrorList) field.ErrorList {
+		expected := make(field.ErrorList, 0, len(errs))
+		for _, err := range errs {
+			e := *err
+			if !allDeclarativeEnforced && (e.IsAlpha() || (!betaEnabled && e.IsBeta())) {
+				_ = e.MarkFromImperative()
+				e.ValidationStabilityLevel = 0
+			}
+			expected = append(expected, &e)
+		}
+		return expected
+	}
+
+	for _, tc := range createCases {
+		for _, betaEnabled := range []bool{true, false} {
+			for _, allDeclarativeEnforced := range []bool{true, false} {
+				t.Run(fmt.Sprintf("Create: %s (betaEnabled=%v, allDeclarativeEnforced=%v)", tc.name, betaEnabled, allDeclarativeEnforced), func(t *testing.T) {
+					testCtx := ctx
+					if allDeclarativeEnforced {
+						testCtx = validate.WithAllDeclarativeEnforcedForTest(ctx)
+					}
+					errs := ValidateObjectMetaDeclaratively(testCtx, operation.Create, tc.obj, nil, tc.requiresNamespace, NameIsDNSSubdomain, fldPath, betaEnabled)
+					matcher.Test(t, toExpectedErrs(allDeclarativeEnforced, betaEnabled, tc.expectedErrs), errs)
+				})
+			}
+		}
+	}
+
+	updateCases := []struct {
+		name              string
+		obj               *metav1.ObjectMeta
+		oldObj            *metav1.ObjectMeta
+		requiresNamespace bool
+		expectedErrs      field.ErrorList
+	}{
+		{
+			name:              "valid update",
+			obj:               mkMeta(tweakResourceVersion("2")),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs:      nil,
+		},
+		{
+			name:              "valid generation zero on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakGeneration(0)),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakGeneration(0)),
+			requiresNamespace: true,
+			expectedErrs:      nil,
+		},
+		{
+			name:              "decremented generation to zero on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakGeneration(0)),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakGeneration(1)),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("generation"), int64(0), "must not be decremented").MarkFromImperative(),
+			},
+		},
+		{
+			name:              "negative generation on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakGeneration(-1)),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakGeneration(0)),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("generation"), int64(-1), "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(fldPath.Child("generation"), int64(-1), "must not be decremented").MarkFromImperative(),
+			},
+		},
+		{
+			name:              "immutable namespace",
+			obj:               mkMeta(tweakNamespace("new-ns"), tweakResourceVersion("2")),
+			oldObj:            mkMeta(tweakNamespace("old-ns"), tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("namespace"), "new-ns", "").MarkFromImperative(),
+			},
+		},
+		{
+			name:              "ownerReferences empty apiVersion on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakOwnerRefs(mkOwnerRef(tweakRefAPIVersion("")))),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "").MarkAlpha(),
+			},
+		},
+		{
+			name:              "ownerReferences empty kind on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakOwnerRefs(mkOwnerRef(tweakRefKind("")))),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "").MarkAlpha(),
+			},
+		},
+		{
+			name:              "ownerReferences empty name on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakOwnerRefs(mkOwnerRef(tweakRefName("")))),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "").MarkAlpha(),
+			},
+		},
+		{
+			name:              "ownerReferences empty uid on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakOwnerRefs(mkOwnerRef(tweakRefUID("")))),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "").MarkAlpha(),
+			},
+		},
+		{
+			name:              "invalid annotation key on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakAnnotations(map[string]string{"-invalid": "val"})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("annotations"), "-invalid", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+			},
+		},
+		{
+			name:              "immutable uid on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakUID("uid-new")),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakUID("uid-old")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("uid"), types.UID("uid-new"), "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		{
+			name:              "immutable creationTimestamp on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakCreationTimestamp(later)),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakCreationTimestamp(now)),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("creationTimestamp"), later, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		{
+			name:              "immutable deletionTimestamp on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakDeletionTimestamp(&later)),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakDeletionTimestamp(&now)),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("deletionTimestamp"), &later, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		{
+			name:              "immutable deletionGracePeriodSeconds on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakDeletionGracePeriodSeconds(&gracePeriod40)),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakDeletionGracePeriodSeconds(&gracePeriod30)),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), &gracePeriod40, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+	}
+
+	for _, tc := range updateCases {
+		for _, betaEnabled := range []bool{true, false} {
+			for _, allDeclarativeEnforced := range []bool{true, false} {
+				t.Run(fmt.Sprintf("Update: %s (betaEnabled=%v, allDeclarativeEnforced=%v)", tc.name, betaEnabled, allDeclarativeEnforced), func(t *testing.T) {
+					testCtx := ctx
+					if allDeclarativeEnforced {
+						testCtx = validate.WithAllDeclarativeEnforcedForTest(ctx)
+					}
+					errs := ValidateObjectMetaDeclaratively(testCtx, operation.Update, tc.obj, tc.oldObj, tc.requiresNamespace, NameIsDNSSubdomain, fldPath, betaEnabled)
+					matcher.Test(t, toExpectedErrs(allDeclarativeEnforced, betaEnabled, tc.expectedErrs), errs)
+				})
+			}
+		}
+	}
+}
+
+func mkMeta(tweaks ...func(*metav1.ObjectMeta)) *metav1.ObjectMeta {
+	obj := &metav1.ObjectMeta{
+		Name:      "valid-name",
+		Namespace: "valid-ns",
+	}
+	for _, tweak := range tweaks {
+		tweak(obj)
+	}
+	return obj
+}
+
+func tweakName(n string) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.Name = n }
+}
+
+func tweakNamespace(ns string) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.Namespace = ns }
+}
+
+func tweakResourceVersion(rv string) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.ResourceVersion = rv }
+}
+
+func tweakGeneration(g int64) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.Generation = g }
+}
+
+func tweakAnnotations(ann map[string]string) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.Annotations = ann }
+}
+
+func tweakManagedFields(entries ...metav1.ManagedFieldsEntry) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.ManagedFields = entries }
+}
+
+func tweakUID(u string) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.UID = types.UID(u) }
+}
+
+func tweakCreationTimestamp(t metav1.Time) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.CreationTimestamp = t }
+}
+
+func tweakDeletionTimestamp(t *metav1.Time) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.DeletionTimestamp = t }
+}
+
+func tweakDeletionGracePeriodSeconds(gps *int64) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.DeletionGracePeriodSeconds = gps }
+}
+
+func tweakRefAPIVersion(v string) func(*metav1.OwnerReference) {
+	return func(r *metav1.OwnerReference) { r.APIVersion = v }
+}
+
+func tweakRefKind(k string) func(*metav1.OwnerReference) {
+	return func(r *metav1.OwnerReference) { r.Kind = k }
+}
+
+func tweakRefName(n string) func(*metav1.OwnerReference) {
+	return func(r *metav1.OwnerReference) { r.Name = n }
+}
+
+func tweakRefUID(u string) func(*metav1.OwnerReference) {
+	return func(r *metav1.OwnerReference) { r.UID = types.UID(u) }
+}
+
+func tweakOwnerRefs(refs ...metav1.OwnerReference) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.OwnerReferences = refs }
+}
+
+func mkOwnerRef(tweaks ...func(*metav1.OwnerReference)) metav1.OwnerReference {
+	r := &metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Name:       "name",
+		UID:        "uid-1",
+	}
+	for _, tweak := range tweaks {
+		tweak(r)
+	}
+	return *r
 }

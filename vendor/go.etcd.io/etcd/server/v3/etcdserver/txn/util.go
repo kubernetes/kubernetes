@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 )
@@ -72,7 +72,7 @@ func WarnOfExpensiveReadOnlyTxnRequest(lg *zap.Logger, warningApplyDuration time
 				// only range responses should be in a read only txn request
 			}
 		}
-		resp = fmt.Sprintf("responses:<%s> size:%d", strings.Join(resps, " "), txnResponse.Size())
+		resp = fmt.Sprintf("responses:<%s> size:%d", strings.Join(resps, " "), proto.Size(txnResponse))
 	}
 	warnOfExpensiveGenericRequest(lg, warningApplyDuration, now, reqStringer, "read-only txn ", resp, err)
 }
@@ -83,7 +83,7 @@ func WarnOfExpensiveReadOnlyRangeRequest(lg *zap.Logger, warningApplyDuration ti
 	}
 	var resp string
 	if !isNil(rangeResponse) {
-		resp = fmt.Sprintf("range_response_count:%d size:%d", len(rangeResponse.Kvs), rangeResponse.Size())
+		resp = fmt.Sprintf("range_response_count:%d size:%d", len(rangeResponse.Kvs), proto.Size(rangeResponse))
 	}
 	warnOfExpensiveGenericRequest(lg, warningApplyDuration, now, reqStringer, "read-only range ", resp, err)
 }

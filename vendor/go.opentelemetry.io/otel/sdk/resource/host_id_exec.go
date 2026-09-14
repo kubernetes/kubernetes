@@ -5,10 +5,13 @@
 
 package resource // import "go.opentelemetry.io/otel/sdk/resource"
 
-import "os/exec"
+import (
+	"context"
+	"os/exec"
+)
 
 func execCommand(name string, arg ...string) (string, error) {
-	cmd := exec.Command(name, arg...)
+	cmd := exec.CommandContext(context.Background(), name, arg...)
 	b, err := cmd.Output()
 	if err != nil {
 		return "", err

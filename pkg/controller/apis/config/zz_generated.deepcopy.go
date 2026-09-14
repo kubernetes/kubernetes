@@ -52,6 +52,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.CSRSigningController = in.CSRSigningController
 	out.DaemonSetController = in.DaemonSetController
 	out.DeploymentController = in.DeploymentController
+	out.DisruptionController = in.DisruptionController
 	out.DeviceTaintEvictionController = in.DeviceTaintEvictionController
 	out.DeprecatedController = in.DeprecatedController
 	out.EndpointController = in.EndpointController

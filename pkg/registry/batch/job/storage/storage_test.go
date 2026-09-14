@@ -197,7 +197,6 @@ func TestJobDeletion(t *testing.T) {
 	orphanDeletionPropagation := metav1.DeletePropagationOrphan
 	backgroundDeletionPropagation := metav1.DeletePropagationBackground
 	job := validNewV1Job()
-	ctx := genericapirequest.NewDefaultContext()
 	key := "/jobs/" + metav1.NamespaceDefault + "/foo"
 	tests := []struct {
 		description   string
@@ -291,7 +290,9 @@ func TestJobDeletion(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Job.Store.DestroyFunc()
 			dc := dummyRecorder{agent: "", text: ""}
-			ctx = genericapirequest.WithRequestInfo(ctx, test.requestInfo)
+			ctx := genericapirequest.WithRequestInfo(
+				genericregistrytest.NewNamespaceScopeContext(storage.Job.Store, metav1.NamespaceDefault),
+				test.requestInfo)
 			ctxWithRecorder := warning.WithWarningRecorder(ctx, &dc)
 			// Create the object
 			if err := storage.Job.Storage.Create(ctxWithRecorder, key, job, nil, 0, false); err != nil {

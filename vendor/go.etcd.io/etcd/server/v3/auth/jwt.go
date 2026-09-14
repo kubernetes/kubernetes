@@ -121,7 +121,7 @@ func (t *tokenJWT) assign(ctx context.Context, username string, revision uint64)
 			zap.Uint64("revision", revision),
 			zap.String("token-fingerprint", tokenFingerprint))
 	}
-	return token, err
+	return token, nil
 }
 
 func newTokenProviderJWT(lg *zap.Logger, optMap map[string]string) (*tokenJWT, error) {

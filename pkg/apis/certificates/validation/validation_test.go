@@ -59,8 +59,8 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 	// maxLengthSignerName is a signerName that is of maximum length, utilising
 	// the max length specifications defined in validation.go.
 	// It is of the form <fqdn(253)>/<resource-namespace(63)>.<resource-name(253)>
-	maxLengthFQDN := fmt.Sprintf("%s.%s.%s.%s", repeatString("a", 63), repeatString("a", 63), repeatString("a", 63), repeatString("a", 61))
-	maxLengthSignerName := fmt.Sprintf("%s/%s.%s", maxLengthFQDN, repeatString("a", 63), repeatString("a", 253))
+	maxLengthFQDN := fmt.Sprintf("%s.%s.%s.%s", strings.Repeat("a", 63), strings.Repeat("a", 63), strings.Repeat("a", 63), strings.Repeat("a", 61))
+	maxLengthSignerName := fmt.Sprintf("%s/%s.%s", maxLengthFQDN, strings.Repeat("a", 63), strings.Repeat("a", 253))
 	tests := map[string]struct {
 		csr  capi.CertificateSigningRequest
 		errs field.ErrorList
@@ -99,7 +99,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("usages"), ""),
+				field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative(),
 			},
 		},
 		"CSR with no signerName set should fail": {
@@ -236,7 +236,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				Spec: capi.CertificateSigningRequestSpec{
 					Usages:     validUsages,
 					Request:    newCSRPEM(t),
-					SignerName: fmt.Sprintf("abc.io/%s.%s", repeatString("a", 253), repeatString("a", 253)),
+					SignerName: fmt.Sprintf("abc.io/%s.%s", strings.Repeat("a", 253), strings.Repeat("a", 253)),
 				},
 			},
 		},
@@ -246,11 +246,11 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				Spec: capi.CertificateSigningRequestSpec{
 					Usages:     validUsages,
 					Request:    newCSRPEM(t),
-					SignerName: fmt.Sprintf("%s.example.io/valid-path", repeatString("a", 66)),
+					SignerName: fmt.Sprintf("%s.example.io/valid-path", strings.Repeat("a", 66)),
 				},
 			},
 			errs: field.ErrorList{
-				field.Invalid(specPath.Child("signerName"), fmt.Sprintf("%s.example.io", repeatString("a", 66)), fmt.Sprintf(`validating label "%s": must be no more than 63 characters`, repeatString("a", 66))),
+				field.Invalid(specPath.Child("signerName"), fmt.Sprintf("%s.example.io", strings.Repeat("a", 66)), fmt.Sprintf(`validating label "%s": must be no more than 63 characters`, strings.Repeat("a", 66))),
 			},
 		},
 		"signerName of max length in format <fully-qualified-domain-name>/<resource-namespace>.<resource-name> is valid": {
@@ -347,7 +347,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("usages"), ""),
+				field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative(),
 			},
 		},
 		"unknown and duplicate usages": {
@@ -360,8 +360,8 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.NotSupported(specPath.Child("usages").Index(0), capi.KeyUsage("unknown"), allValidUsages.List()),
-				field.NotSupported(specPath.Child("usages").Index(1), capi.KeyUsage("unknown"), allValidUsages.List()),
+				field.NotSupported(specPath.Child("usages").Index(0), capi.KeyUsage("unknown"), allValidUsages.List()).MarkCoveredByDeclarative(),
+				field.NotSupported(specPath.Child("usages").Index(1), capi.KeyUsage("unknown"), allValidUsages.List()).MarkCoveredByDeclarative(),
 				field.Duplicate(specPath.Child("usages").Index(1), capi.KeyUsage("unknown")),
 			},
 		},
@@ -439,14 +439,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func repeatString(s string, num int) string {
-	l := make([]string, num)
-	for i := 0; i < num; i++ {
-		l[i] = s
-	}
-	return strings.Join(l, "")
 }
 
 func newCSRPEM(t *testing.T) []byte {
@@ -1526,7 +1518,7 @@ func TestValidateClusterTrustBundleUpdate(t *testing.T) {
 		},
 		wantErrors: field.ErrorList{
 			field.Invalid(field.NewPath("metadata", "name"), "k8s.io:foo:bar", "ClusterTrustBundle for signerName k8s.io/bar must be named with prefix k8s.io:bar:"),
-			field.Invalid(field.NewPath("spec", "signerName"), "k8s.io/bar", "field is immutable"),
+			field.Invalid(field.NewPath("spec", "signerName"), "k8s.io/bar", "field is immutable").WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative(),
 		},
 	}, {
 		description: "adding certificate allowed",
@@ -2550,7 +2542,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "type"), "Unknown", []string{capi.PodCertificateRequestConditionTypeIssued, capi.PodCertificateRequestConditionTypeDenied, capi.PodCertificateRequestConditionTypeFailed}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("type"), "Unknown", []string{capi.PodCertificateRequestConditionTypeIssued, capi.PodCertificateRequestConditionTypeDenied, capi.PodCertificateRequestConditionTypeFailed}),
 			},
 		},
 		{
@@ -2603,7 +2595,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
 			},
 		},
 		{
@@ -2656,7 +2648,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
 			},
 		},
 		{
@@ -2709,7 +2701,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
 			},
 		},
 		{
@@ -3165,7 +3157,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+				field.Invalid(field.NewPath("status", "conditions").Index(1).Child("type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
 			},
 		},
 		{
@@ -3229,7 +3221,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Denied", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+				field.Invalid(field.NewPath("status", "conditions").Index(1).Child("type"), "Denied", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
 			},
 		},
 		{
@@ -3293,7 +3285,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+				field.Invalid(field.NewPath("status", "conditions").Index(1).Child("type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
 			},
 		},
 		{

@@ -3988,6 +3988,159 @@ func TestApplyFormerlyAtomicFields(t *testing.T) {
 	}
 }
 
+func TestApplyEventSeriesGranularToAtomic(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	event := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Event",
+		"metadata": {
+			"name": "test-event",
+			"namespace": "default"
+		},
+		"involvedObject": {
+			"kind": "Pod",
+			"name": "test-pod",
+			"namespace": "default"
+		},
+		"reason": "TestReason",
+		"message": "TestMessage",
+		"type": "Normal",
+		"series": {
+			"count": 2,
+			"lastObservedTime": "2023-01-01T00:00:00.000000Z"
+		}
+	}`)
+
+	managedFieldsUpdate := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Event",
+		"metadata": {
+			"name": "test-event",
+			"namespace": "default",
+			"managedFields": [
+				{
+					"apiVersion": "v1",
+					"fieldsType": "FieldsV1",
+					"fieldsV1": {
+						"f:involvedObject": {},
+						"f:message": {},
+						"f:reason": {},
+						"f:series": {
+							".": {},
+							"f:count": {},
+							"f:lastObservedTime": {}
+						},
+						"f:type": {}
+					},
+					"manager": "recorder",
+					"operation": "Update",
+					"time": "2023-01-01T00:00:00.000000Z"
+				}
+			]
+		}
+	}`)
+
+	applyEvent := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Event",
+		"metadata": {
+			"name": "test-event",
+			"namespace": "default"
+		},
+		"series": {
+			"count": 3,
+			"lastObservedTime": "2023-01-01T00:01:00.000000Z"
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().
+		Post().
+		Param("fieldManager", "recorder").
+		Resource("events").
+		Namespace("default").
+		Body(event).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	// Set managed fields to object
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.StrategicMergePatchType).
+		Name("test-event").
+		Namespace("default").
+		Param("fieldManager", "recorder").
+		Resource("events").
+		Body(managedFieldsUpdate).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to set managed fields: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Name("test-event").
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("events").
+		Body(applyEvent).
+		Do(context.TODO()).
+		Get()
+	if !apierrors.IsConflict(err) {
+		t.Fatalf("expected conflict on series, got: %v", err)
+	}
+	if cause, ok := apierrors.StatusCause(err, metav1.CauseTypeFieldManagerConflict); !ok || cause.Field != ".series" {
+		t.Fatalf("expected conflict on .series, got: %v", err)
+	}
+
+	newObj, err := client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Name("test-event").
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Param("force", "true").
+		Resource("events").
+		Body(applyEvent).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply object: %v", err)
+	}
+
+	var expectedManagedFields []metav1.ManagedFieldsEntry
+	expectedManagedFieldsString := []byte(`[
+		{
+			"apiVersion": "v1",
+			"fieldsType": "FieldsV1",
+			"fieldsV1": {"f:series":{}},
+			"manager": "apply_test",
+			"operation": "Apply"
+		},
+		{
+			"apiVersion": "v1",
+			"fieldsType": "FieldsV1",
+			"fieldsV1": {"f:involvedObject":{},"f:message":{},"f:reason":{},"f:type":{}},
+			"manager": "recorder",
+			"operation": "Update"
+		}
+	]`)
+	if err := json.Unmarshal(expectedManagedFieldsString, &expectedManagedFields); err != nil {
+		t.Fatalf("unexpectedly failed to decode expected managed fields: %v", err)
+	}
+
+	managedFields := newObj.(*v1.Event).ManagedFields
+	for i := range managedFields {
+		managedFields[i].Time = nil
+	}
+	if !reflect.DeepEqual(expectedManagedFields, managedFields) {
+		t.Fatalf("unexpected managed fields: %v", cmp.Diff(expectedManagedFields, managedFields))
+	}
+}
+
 func TestDuplicatesInAssociativeLists(t *testing.T) {
 	client, closeFn := setup(t)
 	defer closeFn()

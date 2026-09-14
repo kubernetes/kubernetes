@@ -47,13 +47,12 @@ var _ = SIGDescribe("client-go should negotiate", func() {
 	f := framework.NewDefaultFramework("protocol")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	for _, s := range []string{
+	for _, accept := range []string{
 		"application/json",
 		"application/vnd.kubernetes.protobuf",
 		"application/vnd.kubernetes.protobuf,application/json",
 		"application/json,application/vnd.kubernetes.protobuf",
 	} {
-		accept := s
 		g.It(fmt.Sprintf("watch and report errors with accept %q", accept), func() {
 			g.By("creating an object for which we will watch")
 			ns := f.Namespace.Name

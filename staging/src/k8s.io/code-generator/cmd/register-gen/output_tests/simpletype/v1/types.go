@@ -21,5 +21,5 @@ import (
 )
 
 type SimpleType struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 }

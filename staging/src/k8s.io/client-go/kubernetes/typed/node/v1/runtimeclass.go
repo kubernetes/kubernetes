@@ -41,6 +41,7 @@ type RuntimeClassInterface interface {
 	Create(ctx context.Context, runtimeClass *nodev1.RuntimeClass, opts metav1.CreateOptions) (*nodev1.RuntimeClass, error)
 	Update(ctx context.Context, runtimeClass *nodev1.RuntimeClass, opts metav1.UpdateOptions) (*nodev1.RuntimeClass, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*nodev1.RuntimeClass, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*nodev1.RuntimeClassList, error)

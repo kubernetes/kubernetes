@@ -23,9 +23,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -103,6 +106,9 @@ func TestHandleAdmissionFailure(t *testing.T) {
 		expectErr            bool
 		expectedOutput       []*v1.Pod
 		expectReasons        []lifecycle.PredicateFailureReason
+
+		featureGateEnabled bool
+		operation          lifecycle.Operation
 	}
 	allPods := getTestPods()
 	runs := []testRun{
@@ -180,16 +186,41 @@ func TestHandleAdmissionFailure(t *testing.T) {
 			expectedOutput:       nil,
 			expectReasons:        getPredicateFailureReasons(0, 0, 0, true),
 		},
+		{
+			testName:             "critical pod resize, feature gate enabled -> bypass preemption (no pods evicted, reasons returned)",
+			isPodKillerWithError: false,
+			inputPods:            []*v1.Pod{allPods[highRequestBurstable]},
+			admitPodType:         clusterCritical,
+			failReasons:          getPredicateFailureReasons(0, 100, 0, false),
+			expectErr:            false,
+			expectedOutput:       nil,
+			expectReasons:        getPredicateFailureReasons(0, 100, 0, false),
+			featureGateEnabled:   true,
+			operation:            lifecycle.ResizeOperation,
+		},
+		{
+			testName:             "critical pod resize, feature gate disabled -> perform preemption (evicts best effort pod)",
+			isPodKillerWithError: false,
+			inputPods:            []*v1.Pod{allPods[highRequestBurstable]},
+			admitPodType:         clusterCritical,
+			failReasons:          getPredicateFailureReasons(0, 100, 0, false),
+			expectErr:            false,
+			expectedOutput:       []*v1.Pod{allPods[highRequestBurstable]},
+			expectReasons:        getPredicateFailureReasons(0, 0, 0, false),
+			featureGateEnabled:   false,
+			operation:            lifecycle.ResizeOperation,
+		},
 	}
 	for _, r := range runs {
 		t.Run(r.testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, r.featureGateEnabled)
 			podProvider := newFakePodProvider()
 			podKiller := newFakePodKiller(r.isPodKillerWithError)
 			defer podKiller.clear()
 			criticalPodAdmissionHandler := getTestCriticalPodAdmissionHandler(podProvider, podKiller)
 			podProvider.setPods(r.inputPods)
 			admitPodRef := allPods[r.admitPodType]
-			filteredReason, outErr := criticalPodAdmissionHandler.HandleAdmissionFailure(tCtx, admitPodRef, r.failReasons)
+			filteredReason, outErr := criticalPodAdmissionHandler.HandleAdmissionFailure(tCtx, admitPodRef, r.failReasons, r.operation)
 			outputPods := podKiller.getKilledPods()
 			if !r.expectErr && outErr != nil {
 				t.Errorf("HandleAdmissionFailure returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)

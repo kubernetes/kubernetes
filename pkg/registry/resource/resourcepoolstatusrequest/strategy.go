@@ -19,26 +19,28 @@ package resourcepoolstatusrequest
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/operation"
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // resourcePoolStatusRequestStrategy implements behavior for ResourcePoolStatusRequest objects
 type resourcePoolStatusRequestStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 var (
-	Strategy       = &resourcePoolStatusRequestStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+	Strategy       = &resourcePoolStatusRequestStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 	StatusStrategy = &resourcePoolStatusRequestStatusStrategy{resourcePoolStatusRequestStrategy: Strategy}
 )
 
@@ -63,12 +65,31 @@ func (*resourcePoolStatusRequestStrategy) PrepareForCreate(ctx context.Context, 
 	request := obj.(*resource.ResourcePoolStatusRequest)
 	// Status must not be set by user on create.
 	request.Status = nil
+	dropDisabledDRAPartitionableDevicesTypeFields(request, nil)
+}
+
+// dropDisabledDRAPartitionableDevicesTypeFields removes the partition type
+// default when the feature is disabled, unless the old request already set it.
+func dropDisabledDRAPartitionableDevicesTypeFields(request, oldRequest *resource.ResourcePoolStatusRequest) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType) ||
+		(oldRequest != nil && oldRequest.Spec.DefaultPartitionTypeAttribute != nil) {
+		return
+	}
+
+	request.Spec.DefaultPartitionTypeAttribute = nil
 }
 
 func (*resourcePoolStatusRequestStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	request := obj.(*resource.ResourcePoolStatusRequest)
-	allErrs := validation.ValidateResourcePoolStatusRequest(request)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create, rest.WithDeclarativeEnforcement())
+	return validation.ValidateResourcePoolStatusRequest(request)
+}
+
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (*resourcePoolStatusRequestStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.DRAPartitionableDevicesType): utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType),
+	}}
 }
 
 func (*resourcePoolStatusRequestStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -78,7 +99,7 @@ func (*resourcePoolStatusRequestStrategy) WarningsOnCreate(ctx context.Context, 
 func (*resourcePoolStatusRequestStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (*resourcePoolStatusRequestStrategy) AllowCreateOnUpdate() bool {
+func (*resourcePoolStatusRequestStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -87,18 +108,18 @@ func (*resourcePoolStatusRequestStrategy) PrepareForUpdate(ctx context.Context, 
 	oldRequest := old.(*resource.ResourcePoolStatusRequest)
 	// Status is not updated via the main resource endpoint
 	request.Status = oldRequest.Status
+	dropDisabledDRAPartitionableDevicesTypeFields(request, oldRequest)
 }
 
 func (*resourcePoolStatusRequestStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	allErrs := validation.ValidateResourcePoolStatusRequestUpdate(obj.(*resource.ResourcePoolStatusRequest), old.(*resource.ResourcePoolStatusRequest))
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update, rest.WithDeclarativeEnforcement())
+	return validation.ValidateResourcePoolStatusRequestUpdate(obj.(*resource.ResourcePoolStatusRequest), old.(*resource.ResourcePoolStatusRequest))
 }
 
 func (*resourcePoolStatusRequestStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
 
-func (*resourcePoolStatusRequestStrategy) AllowUnconditionalUpdate() bool {
+func (*resourcePoolStatusRequestStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -129,8 +150,7 @@ func (*resourcePoolStatusRequestStatusStrategy) PrepareForUpdate(ctx context.Con
 func (r *resourcePoolStatusRequestStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newRequest := obj.(*resource.ResourcePoolStatusRequest)
 	oldRequest := old.(*resource.ResourcePoolStatusRequest)
-	allErrs := validation.ValidateResourcePoolStatusRequestStatusUpdate(newRequest, oldRequest)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update, rest.WithDeclarativeEnforcement())
+	return validation.ValidateResourcePoolStatusRequestStatusUpdate(newRequest, oldRequest)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

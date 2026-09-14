@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -509,6 +510,204 @@ func TestCheckForRecoveryFromExpansion(t *testing.T) {
 			assert.Equal(t, test.expectedRecoveryCheck, result, "unexpected recovery check result for test: %s", test.name)
 		})
 	}
+}
+
+func TestGenerateMountVolumeFunc_AttemptTrackingRespectsFeatureGate(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+
+	tests := []struct {
+		name                  string
+		featureGateEnabled    bool
+		expectedAttemptedCall int
+	}{
+		{
+			name:                  "feature gate disabled",
+			featureGateEnabled:    false,
+			expectedAttemptedCall: 0,
+		},
+		{
+			name:                  "feature gate enabled",
+			featureGateEnabled:    true,
+			expectedAttemptedCall: 2,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, test.featureGateEnabled)
+
+			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+			fakePlugin.DisableNodeExpansion = true
+			og := getTestOperationGenerator(volumePluginMgr)
+
+			pv := getTestPV("test-vol0", "1G")
+			pod := getTestPod("test-pod", "claim01")
+			asow := &attemptTrackingTestASW{}
+			volumeToMount := VolumeToMount{
+				VolumeName: v1.UniqueVolumeName(pv.Name),
+				PodName:    volumetypes.UniquePodName(pod.UID),
+				VolumeSpec: volume.NewSpecFromPersistentVolume(pv, false),
+				Pod:        pod,
+			}
+
+			ops := og.GenerateMountVolumeFunc(time.Second, volumeToMount, asow, false)
+			eventErr, detailedErr := ops.Run()
+			if eventErr != nil || detailedErr != nil {
+				t.Fatalf("GenerateMountVolumeFunc returned unexpected errors: event=%v detailed=%v", eventErr, detailedErr)
+			}
+
+			if asow.mountAttemptedCalls != test.expectedAttemptedCall {
+				t.Fatalf("expected MarkVolumeAsMountAttempted to be called %d times, got %d", test.expectedAttemptedCall, asow.mountAttemptedCalls)
+			}
+		})
+	}
+}
+
+func TestGenerateMapVolumeFunc_AttemptTrackingRespectsFeatureGate(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+
+	tests := []struct {
+		name                  string
+		featureGateEnabled    bool
+		expectedAttemptedCall int
+	}{
+		{
+			name:                  "feature gate disabled",
+			featureGateEnabled:    false,
+			expectedAttemptedCall: 0,
+		},
+		{
+			name:               "feature gate enabled",
+			featureGateEnabled: true,
+			// MapVolume marks once before SetUpDevice (unlike MountVolume which marks
+			// before both MountDevice and SetUp).
+			expectedAttemptedCall: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, test.featureGateEnabled)
+
+			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+			fakePlugin.DisableNodeExpansion = true
+			og := getTestOperationGenerator(volumePluginMgr)
+
+			pv := getTestPV("test-vol0", "1G")
+			blockMode := v1.PersistentVolumeBlock
+			pv.Spec.VolumeMode = &blockMode
+
+			pod := getTestPod("test-pod", "claim01")
+			asow := &attemptTrackingTestASW{}
+			volumeToMount := VolumeToMount{
+				VolumeName: v1.UniqueVolumeName(pv.Name),
+				PodName:    volumetypes.UniquePodName(pod.UID),
+				VolumeSpec: volume.NewSpecFromPersistentVolume(pv, false),
+				Pod:        pod,
+			}
+
+			ops, err := og.GenerateMapVolumeFunc(time.Second, volumeToMount, asow)
+			if err != nil {
+				t.Fatalf("GenerateMapVolumeFunc returned unexpected error: %v", err)
+			}
+
+			eventErr, detailedErr := ops.Run()
+			if eventErr != nil || detailedErr != nil {
+				t.Fatalf("GenerateMapVolumeFunc returned unexpected errors: event=%v detailed=%v", eventErr, detailedErr)
+			}
+
+			if asow.mountAttemptedCalls != test.expectedAttemptedCall {
+				t.Fatalf("expected MarkVolumeAsMountAttempted to be called %d times, got %d", test.expectedAttemptedCall, asow.mountAttemptedCalls)
+			}
+		})
+	}
+}
+
+type attemptTrackingTestASW struct {
+	deviceMountState    DeviceMountState
+	mountAttemptedCalls int
+	lastAttemptedPod    volumetypes.UniquePodName
+	lastAttemptedVolume v1.UniqueVolumeName
+}
+
+func (a *attemptTrackingTestASW) MarkVolumeAsMounted(markVolumeOpts MarkVolumeOpts) error {
+	return nil
+}
+
+func (a *attemptTrackingTestASW) MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error {
+	return nil
+}
+
+func (a *attemptTrackingTestASW) MarkVolumeMountAsUncertain(markVolumeOpts MarkVolumeOpts) error {
+	return nil
+}
+
+func (a *attemptTrackingTestASW) MarkDeviceAsMounted(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath, seLinuxMountContext string) error {
+	a.deviceMountState = DeviceGloballyMounted
+	return nil
+}
+
+func (a *attemptTrackingTestASW) MarkDeviceAsUncertain(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath, seLinuxMountContext string) error {
+	return nil
+}
+
+func (a *attemptTrackingTestASW) MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error {
+	a.deviceMountState = DeviceNotMounted
+	return nil
+}
+
+func (a *attemptTrackingTestASW) MarkVolumeAsResized(volumeName v1.UniqueVolumeName, claimSize resource.Quantity) bool {
+	return true
+}
+
+func (a *attemptTrackingTestASW) GetDeviceMountState(volumeName v1.UniqueVolumeName) DeviceMountState {
+	return a.deviceMountState
+}
+
+func (a *attemptTrackingTestASW) GetVolumeMountState(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) VolumeMountState {
+	return VolumeNotMounted
+}
+
+func (a *attemptTrackingTestASW) IsVolumeMountedElsewhere(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
+	return false
+}
+
+func (a *attemptTrackingTestASW) MarkForInUseExpansionError(volumeName v1.UniqueVolumeName) {}
+
+func (a *attemptTrackingTestASW) CheckAndMarkVolumeAsUncertainViaReconstruction(opts MarkVolumeOpts) (bool, error) {
+	return false, nil
+}
+
+func (a *attemptTrackingTestASW) CheckAndMarkDeviceUncertainViaReconstruction(volumeName v1.UniqueVolumeName, deviceMountPath string) bool {
+	return false
+}
+
+func (a *attemptTrackingTestASW) IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
+	return false
+}
+
+func (a *attemptTrackingTestASW) IsVolumeDeviceReconstructed(volumeName v1.UniqueVolumeName) bool {
+	return false
+}
+
+func (a *attemptTrackingTestASW) MarkVolumeExpansionFailedWithFinalError(volumeName v1.UniqueVolumeName) {
+}
+
+func (a *attemptTrackingTestASW) RemoveVolumeFromFailedWithFinalErrors(volumeName v1.UniqueVolumeName) {
+}
+
+func (a *attemptTrackingTestASW) CheckVolumeInFailedExpansionWithFinalErrors(volumeName v1.UniqueVolumeName) bool {
+	return false
+}
+
+func (a *attemptTrackingTestASW) MarkVolumeAsMountAttempted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) {
+	a.mountAttemptedCalls++
+	a.lastAttemptedPod = podName
+	a.lastAttemptedVolume = volumeName
+}
+
+func (a *attemptTrackingTestASW) IsVolumeMountAttempted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) bool {
+	return a.mountAttemptedCalls > 0 && a.lastAttemptedPod == podName && a.lastAttemptedVolume == volumeName
 }
 
 func getTestPod(podName, pvcName string) *v1.Pod {

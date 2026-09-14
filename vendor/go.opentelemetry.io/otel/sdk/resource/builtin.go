@@ -13,7 +13,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk"
-	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 )
 
 type (
@@ -79,7 +79,7 @@ func (sd stringDetector) Detect(context.Context) (*Resource, error) {
 	}
 	a := sd.K.String(value)
 	if !a.Valid() {
-		return nil, fmt.Errorf("invalid attribute: %q -> %q", a.Key, a.Value.Emit())
+		return nil, fmt.Errorf("invalid attribute: %q -> %q", a.Key, a.Value.String())
 	}
 	return NewWithAttributes(sd.schemaURL, sd.K.String(value)), nil
 }

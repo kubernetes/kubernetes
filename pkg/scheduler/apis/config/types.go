@@ -182,6 +182,13 @@ type Plugins struct {
 
 	// PlacementScore is a list of plugins that should be invoked during workload scheduling cycle when ranking pod group assignments.
 	PlacementScore PluginSet
+
+	// PlacementFeasible is a list of plugins that should be invoked when evaluating if a placement is feasible for a pod group.
+	PlacementFeasible PluginSet
+
+	// PodGroupPostFilter is a list of plugins that are invoked after the workload scheduling phase,
+	// but only when the PodGroup cannot be scheduled (equivalent to PostFilter for single pods).
+	PodGroupPostFilter PluginSet
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
@@ -238,6 +245,7 @@ func (p *Plugins) Names() []string {
 		return nil
 	}
 	extensions := []PluginSet{
+		p.MultiPoint,
 		p.PreEnqueue,
 		p.PreFilter,
 		p.Filter,
@@ -252,6 +260,8 @@ func (p *Plugins) Names() []string {
 		p.QueueSort,
 		p.PlacementGenerate,
 		p.PlacementScore,
+		p.PlacementFeasible,
+		p.PodGroupPostFilter,
 	}
 	n := sets.New[string]()
 	for _, e := range extensions {

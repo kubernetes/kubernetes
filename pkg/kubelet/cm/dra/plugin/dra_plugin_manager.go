@@ -20,28 +20,37 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"slices"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	grpcstats "google.golang.org/grpc/stats"
+	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction" // TODO (?): move this common helper somewhere else?
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/utils/ptr"
 )
+
+// unixPathMax is the maximum length of an AF_UNIX socket path on Linux.
+const unixPathMax = 108
 
 // DRAPluginManager keeps track of how to reach plugins registered for DRA drivers.
 // Each plugin has a gRPC endpoint. There may be more than one plugin per driver.
@@ -99,14 +108,14 @@ type monitoredPlugin struct {
 
 var _ grpcstats.Handler = &monitoredPlugin{}
 
-func (m *monitoredPlugin) TagRPC(ctx context.Context, info *grpcstats.RPCTagInfo) context.Context {
+func (m *monitoredPlugin) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Context {
 	return ctx
 }
 
 func (m *monitoredPlugin) HandleRPC(context.Context, grpcstats.RPCStats) {
 }
 
-func (m *monitoredPlugin) TagConn(ctx context.Context, info *grpcstats.ConnTagInfo) context.Context {
+func (m *monitoredPlugin) TagConn(ctx context.Context, _ *grpcstats.ConnTagInfo) context.Context {
 	return ctx
 }
 
@@ -321,17 +330,30 @@ func (pm *DRAPluginManager) get(driverName string) *DRAPlugin {
 // name>" format (e.g. "v1beta1.DRAPlugin"). This allows kubelet to determine
 // in advance which version to use resp. which optional services the plugin
 // supports.
-func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
+func (pm *DRAPluginManager) RegisterPlugin(_ context.Context, driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
+	if err := validateDriverName(driverName); err != nil {
+		return err
+	}
+
+	if err := validateEndpoint(endpoint); err != nil {
+		return err
+	}
+
 	chosenService, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
 	}
 
+	// The DRAResourceHealth service is optional. Pick the most recent version
+	// that both the plugin and the kubelet support, or "" if the plugin does
+	// not advertise it.
+	chosenHealthService := pickHealthService(supportedServices)
+
 	timeout := ptr.Deref(pluginClientTimeout, defaultClientCallTimeout)
 
 	// Storing endpoint of newly registered DRA DRAPlugin into the map, where the DRA driver name will be the key
 	// under which the manager will be able to get a plugin when it needs to call it.
-	if err := pm.add(driverName, endpoint, chosenService, timeout); err != nil {
+	if err := pm.add(driverName, endpoint, chosenService, chosenHealthService, timeout); err != nil {
 		// No wrapping, the error already contains details.
 		return err
 	}
@@ -339,16 +361,29 @@ func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, s
 	return nil
 }
 
-func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenService string, clientCallTimeout time.Duration) error {
+// pickHealthService returns the most recent DRAResourceHealth gRPC service that
+// is supported by both the plugin and the kubelet, or "" if the plugin does not
+// advertise the optional health service.
+func pickHealthService(supportedServices []string) string {
+	for _, service := range healthServicesSupportedByKubelet {
+		if slices.Contains(supportedServices, service) {
+			return service
+		}
+	}
+	return ""
+}
+
+func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenService string, chosenHealthService string, clientCallTimeout time.Duration) error {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
 	p := &DRAPlugin{
-		driverName:        driverName,
-		endpoint:          endpoint,
-		chosenService:     chosenService,
-		clientCallTimeout: clientCallTimeout,
-		backgroundCtx:     pm.backgroundCtx,
+		driverName:          driverName,
+		endpoint:            endpoint,
+		chosenService:       chosenService,
+		chosenHealthService: chosenHealthService,
+		clientCallTimeout:   clientCallTimeout,
+		backgroundCtx:       pm.backgroundCtx,
 	}
 	if pm.store == nil {
 		pm.store = make(map[string][]*monitoredPlugin)
@@ -384,7 +419,7 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 	}
 	p.conn = conn
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) && pm.streamHandler != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) && pm.streamHandler != nil && p.chosenHealthService != "" {
 		pm.wg.Add(1)
 		go func() {
 			defer pm.wg.Done()
@@ -403,7 +438,13 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 
 				err = pm.streamHandler.HandleWatchResourcesStream(ctx, stream, driverName)
 				logger.V(2).Info("WatchResources health stream has ended", "error", err)
-
+				if status.Code(err) == codes.Unimplemented {
+					// The driver advertises the health service but does not
+					// support health reporting. Stop watching instead of
+					// retrying; a driver which gains support re-registers.
+					logger.V(2).Info("Driver does not support WatchResources health stream, stopping")
+					streamCancel()
+				}
 			}, 5*time.Second)
 		}()
 	}
@@ -425,7 +466,7 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 // The plugin manager calls it after it has detected that
 // the plugin removed its registration socket,
 // signaling that it is no longer available.
-func (pm *DRAPluginManager) DeRegisterPlugin(driverName, endpoint string) {
+func (pm *DRAPluginManager) DeRegisterPlugin(_ context.Context, driverName, endpoint string) {
 	// remove could be removed (no pun intended) but is kept for the sake of symmetry.
 	pm.remove(driverName, endpoint)
 }
@@ -526,7 +567,14 @@ func (pm *DRAPluginManager) usable(driverName string) bool {
 //
 // The plugin manager calls it upon detection of a new registration socket
 // opened by DRA plugin.
-func (pm *DRAPluginManager) ValidatePlugin(driverName string, endpoint string, supportedServices []string) error {
+func (pm *DRAPluginManager) ValidatePlugin(_ context.Context, driverName string, endpoint string, supportedServices []string) error {
+	if err := validateDriverName(driverName); err != nil {
+		return err
+	}
+
+	if err := validateEndpoint(endpoint); err != nil {
+		return err
+	}
 	_, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
@@ -539,7 +587,7 @@ func (pm *DRAPluginManager) ValidatePlugin(driverName string, endpoint string, s
 // NodePrepareResources and NodeUnprepareResources and returns its name
 // (e.g. [drapbv1beta1.DRAPluginService]). An error is returned if the plugin
 // is unusable.
-func (pm *DRAPluginManager) validateSupportedServices(driverName string, supportedServices []string) (string, error) {
+func (pm *DRAPluginManager) validateSupportedServices(_ string, supportedServices []string) (string, error) {
 	if len(supportedServices) == 0 {
 		return "", errors.New("empty list of supported gRPC services (aka supported versions)")
 	}
@@ -560,4 +608,58 @@ func (pm *DRAPluginManager) validateSupportedServices(driverName string, support
 	}
 
 	return chosenService, nil
+}
+
+// validateEndpoint returns an error if driver endpoint
+// advertised by a plugin during registration is not acceptable.
+func validateEndpoint(endpoint string) error {
+	if endpoint == "" {
+		return errors.New("empty DRA plugin endpoint")
+	}
+	// Relative endpoints are rejected outright. gRPC would resolve them
+	// against kubelet's current working directory (via "unix:" + endpoint),
+	// which is unspecified — it depends on how kubelet was started and can
+	// be changed at runtime — so accepting one would mean validating a
+	// different path than gRPC ultimately dials.
+	if !filepath.IsAbs(endpoint) {
+		return fmt.Errorf("DRA plugin endpoint %q must be an absolute path", endpoint)
+	}
+	if len(endpoint) >= unixPathMax {
+		return fmt.Errorf("DRA plugin endpoint %q must not be longer than %d bytes", endpoint, unixPathMax)
+	}
+
+	// gRPC dials "unix:"+endpoint via url.Parse, so we validate against
+	// the same parser to keep what we check in sync with what gRPC
+	// resolves. This closes a percent-encoding bypass: url.Parse decodes
+	// "%2e%2e" to ".." in u.Path, so an endpoint like
+	// "/plugins/%2e%2e/run/evil.sock" would decode past the intended
+	// directory at dial time.
+	//
+	// Mirror the resolver's Path||Opaque fallback (see
+	// google.golang.org/grpc/internal/resolver/unix/unix.go), so
+	// Windows-native paths ("C:\\...") — which url.Parse puts in Opaque
+	// rather than Path — still validate against the exact string gRPC
+	// would dial.
+	u, err := url.Parse("unix:" + endpoint)
+	if err != nil || u.Host != "" || u.RawQuery != "" || u.Fragment != "" {
+		return fmt.Errorf("DRA plugin endpoint %q must be a plain path", endpoint)
+	}
+	resolved := u.Path
+	if resolved == "" {
+		resolved = u.Opaque
+	}
+	if resolved != endpoint {
+		return fmt.Errorf("DRA plugin endpoint %q must be a plain path", endpoint)
+	}
+	return nil
+}
+
+// validateDriverName returns an error if a driver name advertised by a
+// plugin during registration is unacceptable.
+// Reuses CSI driver name validation to be consistent with pkg/apis/resource/validation.
+func validateDriverName(driverName string) error {
+	if errs := corevalidation.ValidateCSIDriverName(driverName, field.NewPath("driverName")); len(errs) > 0 {
+		return fmt.Errorf("invalid DRA driver name: %w", errs.ToAggregate())
+	}
+	return nil
 }

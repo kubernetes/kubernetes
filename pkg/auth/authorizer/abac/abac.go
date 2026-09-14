@@ -33,7 +33,7 @@ import (
 
 	// Import latest API for init/side-effects
 	_ "k8s.io/kubernetes/pkg/apis/abac/latest"
-	"k8s.io/kubernetes/pkg/apis/abac/v0"
+	v0 "k8s.io/kubernetes/pkg/apis/abac/v0"
 )
 
 type policyLoadError struct {
@@ -49,6 +49,9 @@ func (p policyLoadError) Error() string {
 	}
 	return fmt.Sprintf("error reading policy file %s: %v", p.path, p.err)
 }
+
+var _ = authorizer.Authorizer(PolicyList{})
+var _ = authorizer.RuleResolver(PolicyList{})
 
 // PolicyList is simply a slice of Policy structs.
 type PolicyList []*abac.Policy
@@ -236,6 +239,16 @@ func (pl PolicyList) Authorize(ctx context.Context, a authorizer.Attributes) (au
 	// TODO: Benchmark how much time policy matching takes with a medium size
 	// policy file, compared to other steps such as encoding/decoding.
 	// Then, add Caching only if needed.
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (pl PolicyList) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(pl.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (PolicyList) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 // RulesFor returns rules for the given user and namespace.

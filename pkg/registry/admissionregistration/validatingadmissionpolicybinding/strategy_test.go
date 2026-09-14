@@ -17,6 +17,7 @@ limitations under the License.
 package validatingadmissionpolicybinding
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,7 @@ func TestPolicyBindingStrategy(t *testing.T) {
 	if strategy.NamespaceScoped() {
 		t.Error("PolicyBinding strategy must be cluster scoped")
 	}
-	if strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("PolicyBinding should not allow create on update")
 	}
 

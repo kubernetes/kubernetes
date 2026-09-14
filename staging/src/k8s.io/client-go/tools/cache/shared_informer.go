@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -177,6 +178,15 @@ type SharedInformer interface {
 	// RemoveEventHandler removes a formerly added event handler given by
 	// its registration handle.
 	// This function is guaranteed to be idempotent, and thread-safe.
+	//
+	// Note: RemoveEventHandler is asynchronous. It stops queueing new events
+	// but does not wait for already-queued events to finish executing.
+	// Goroutines processing the remaining events may still be running and
+	// invoking callbacks after this function returns.
+	//
+	// If the caller needs to wait for all handlers to finish executing (for
+	// example, to safely close channels or release resources used by the handler),
+	// they should use [ShutDownEventHandler].
 	RemoveEventHandler(handle ResourceEventHandlerRegistration) error
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
@@ -285,6 +295,118 @@ type SharedIndexInformer interface {
 	SharedInformer
 	AddIndexers(indexers Indexers) error
 	GetIndexer() Indexer
+}
+
+// TypedSharedIndexInformer adds type-safe variants for non-type-safe methods
+// in SharedIndexInformer. No type casts are needed when using those variants.
+type TypedSharedIndexInformer[T Object] interface {
+	SharedIndexInformer
+
+	// AddTypedEventHandler is a type-safe replacement for
+	// SharedIndexInformer.AddEventHandlerWithOptions
+	// and SharedIndexInformer.AddEventHandler.
+	//
+	// Without options, it uses the same defaults as AddEventHandler
+	// or AddEventHandlerWithOptions with empty HandlerOptions.
+	// Passing one instance corresponds to AddEventHandlerWithOptions.
+	// Passing more than one is invalid and returns an error.
+	AddTypedEventHandler(handler TypedResourceEventHandler[T], options ...HandlerOptions) (ResourceEventHandlerRegistration, error)
+	AddTypedIndexers(indexers TypedIndexers[T]) error
+	GetTypedIndexer() TypedIndexer[T]
+}
+
+func NewTypedSharedIndexInformer[T Object](informer SharedIndexInformer) TypedSharedIndexInformer[T] {
+	return &typedSharedIndexInformer[T]{SharedIndexInformer: informer}
+}
+
+type typedSharedIndexInformer[T Object] struct {
+	SharedIndexInformer
+}
+
+func (s typedSharedIndexInformer[T]) AddTypedEventHandler(handler TypedResourceEventHandler[T], options ...HandlerOptions) (ResourceEventHandlerRegistration, error) {
+	var o HandlerOptions
+	switch len(options) {
+	case 0:
+	case 1:
+		o = options[0]
+	default:
+		return nil, fmt.Errorf("at most one HandlerOptions may be passed, got %d", len(options))
+	}
+	return s.AddEventHandlerWithOptions(&typedResourceEventHandler[T]{handler}, o)
+}
+
+func (s typedSharedIndexInformer[T]) AddTypedIndexers(indexers TypedIndexers[T]) error {
+	return s.AddIndexers(TypedIndexersToIndexers(indexers))
+}
+
+func (s typedSharedIndexInformer[T]) GetTypedIndexer() TypedIndexer[T] {
+	return &typedIndexer[T]{s.GetIndexer()}
+}
+
+// typedResourceEventHandler implements the untyped ResourceEventHandler interface
+// by invoking the methods of a TypedResourceEventHandler instance.
+type typedResourceEventHandler[T Object] struct {
+	handler TypedResourceEventHandler[T]
+}
+
+var _ ResourceEventHandler = &typedResourceEventHandler[*metav1.ObjectMeta]{}
+
+func (h *typedResourceEventHandler[T]) OnAdd(obj any, isInitialList bool) {
+	h.handler.OnAdd(obj.(T), isInitialList)
+}
+
+func (h *typedResourceEventHandler[T]) OnUpdate(oldObj, newObj any) {
+	h.handler.OnUpdate(oldObj.(T), newObj.(T))
+}
+
+func (h *typedResourceEventHandler[T]) OnDelete(obj any) {
+	if tomb, ok := obj.(DeletedFinalStateUnknown); ok {
+		if tomb.Obj == nil {
+			h.handler.OnDelete(DeletedObject[T]{FinalStateUnknown: &tomb})
+			return
+		}
+		h.handler.OnDelete(DeletedObject[T]{OptionalObj: tomb.Obj.(T), FinalStateUnknown: &tomb})
+		return
+	}
+	h.handler.OnDelete(DeletedObject[T]{OptionalObj: obj.(T)})
+}
+
+type typedIndexer[T any] struct {
+	Indexer
+}
+
+func (i typedIndexer[T]) TypedIndex(indexName string, obj T) ([]T, error) {
+	untyped, err := i.Index(indexName, obj)
+	if err != nil {
+		return nil, err
+	}
+	typed := make([]T, len(untyped))
+	for i, obj := range untyped {
+		typed[i] = obj.(T)
+	}
+	return typed, nil
+}
+
+func (i typedIndexer[T]) ByTypedIndex(indexName, indexedValue string) ([]T, error) {
+	untyped, err := i.ByIndex(indexName, indexedValue)
+	if err != nil {
+		return nil, err
+	}
+	typed := make([]T, len(untyped))
+	for i, obj := range untyped {
+		typed[i] = obj.(T)
+	}
+	return typed, nil
+}
+
+func (i typedIndexer[T]) AddTypedIndexers(newIndexers TypedIndexers[T]) error {
+	untyped := make(Indexers, len(newIndexers))
+	for i, indexer := range newIndexers {
+		untyped[i] = func(obj any) ([]string, error) {
+			return indexer(obj.(T))
+		}
+	}
+	return i.AddIndexers(untyped)
 }
 
 // NewSharedInformer creates a new instance for the ListerWatcher. See NewSharedIndexInformerWithOptions for full details.
@@ -1014,6 +1136,24 @@ func (s *sharedIndexInformer) RemoveEventHandler(handle ResourceEventHandlerRegi
 	return s.processor.removeListener(handle)
 }
 
+// ShutDownEventHandler removes the event handler and blocks until it has fully
+// stopped processing events.
+//
+// Like RemoveEventHandler, it is idempotent and thread-safe. However, it MUST NOT
+// be called from within the event handler's own callbacks, as that will result
+// in a deadlock.
+func ShutDownEventHandler(informer SharedInformer, handle ResourceEventHandlerRegistration) error {
+	if err := informer.RemoveEventHandler(handle); err != nil {
+		return err
+	}
+	if s, ok := handle.(interface{ ShutdownChan() <-chan struct{} }); ok {
+		<-s.ShutdownChan()
+	} else {
+		return fmt.Errorf("handle does not support ShutdownChan()")
+	}
+	return nil
+}
+
 // sharedProcessor has a collection of processorListener and can
 // distribute a notification object to its listeners.  There are two
 // kinds of distribute operations.  The sync distributions go to a
@@ -1086,6 +1226,8 @@ func (p *sharedProcessor) removeListener(handle ResourceEventHandlerRegistration
 
 	if p.listenersStarted {
 		close(listener.addCh)
+	} else {
+		close(listener.runFinished)
 	}
 
 	return nil
@@ -1209,10 +1351,11 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(logger klog.Logger, resyncChe
 // processorListener also keeps track of the adjusted requested resync
 // period of the listener.
 type processorListener struct {
-	logger klog.Logger
-	nextCh chan interface{}
-	addCh  chan interface{}
-	done   chan struct{}
+	logger      klog.Logger
+	nextCh      chan interface{}
+	addCh       chan interface{}
+	done        chan struct{}
+	runFinished chan struct{}
 
 	handler     ResourceEventHandler
 	handlerName string
@@ -1265,6 +1408,10 @@ func (p *processorListener) HasSyncedChecker() DoneChecker {
 	return p.syncTracker
 }
 
+func (p *processorListener) ShutdownChan() <-chan struct{} {
+	return p.runFinished
+}
+
 func newProcessListener(logger klog.Logger, handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced DoneChecker) *processorListener {
 	handlerName := nameForHandler(handler)
 	ret := &processorListener{
@@ -1272,6 +1419,7 @@ func newProcessListener(logger klog.Logger, handler ResourceEventHandler, reques
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
 		done:                  make(chan struct{}),
+		runFinished:           make(chan struct{}),
 		upstreamHasSynced:     hasSynced,
 		handler:               handler,
 		handlerName:           handlerName,
@@ -1328,6 +1476,7 @@ func (p *processorListener) pop() {
 }
 
 func (p *processorListener) run() {
+	defer close(p.runFinished)
 	// this call blocks until the channel is closed.  When a panic happens during the notification
 	// we will catch it, **the offending item will be skipped!**, and after a short delay (one second)
 	// the next notification will be attempted. This is usually better than the alternative of never

@@ -69,8 +69,13 @@ type Cache interface {
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	AssumePod(logger klog.Logger, pod *v1.Pod) error
 
-	// ForgetPod removes an assumed pod from cache.
+	// ForgetPod forgets an assumed pod from the cache. It should be called when the pod
+	// still exists, as an undo operation for AssumePod.
 	ForgetPod(logger klog.Logger, pod *v1.Pod) error
+
+	// RemoveAssumedPod removes an assumed pod from the cache. It should be called when the assumed
+	// pod was removed from the cluster to correctly clean up internal state.
+	RemoveAssumedPod(logger klog.Logger, pod *v1.Pod) error
 
 	// AddPod confirms an assumed pod, or adds a newly assigned pod to the cache.
 	AddPod(logger klog.Logger, pod *v1.Pod) error
@@ -89,12 +94,10 @@ type Cache interface {
 	IsAssumedPod(pod *v1.Pod) (bool, error)
 
 	// AddNode adds overall information about node.
-	// It returns a clone of added NodeInfo object.
-	AddNode(logger klog.Logger, node *v1.Node) *framework.NodeInfo
+	AddNode(logger klog.Logger, node *v1.Node)
 
 	// UpdateNode updates overall information about node.
-	// It returns a clone of updated NodeInfo object.
-	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo
+	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node)
 
 	// RemoveNode removes overall information about node.
 	RemoveNode(logger klog.Logger, node *v1.Node) error
@@ -116,6 +119,15 @@ type Cache interface {
 	// PodGroupStates returns a PodGroupStateLister.
 	PodGroupStates() fwk.PodGroupStateLister
 
+	// PodGroups returns a PodGroupLister used to access the cached PodGroup objects.
+	PodGroups() fwk.PodGroupLister
+
+	// CompositePodGroupStates returns a CompositePodGroupStateLister.
+	CompositePodGroupStates() fwk.CompositePodGroupStateLister
+
+	// CompositePodGroups returns a CompositePodGroupLister used to access the cached CompositePodGroup objects.
+	CompositePodGroups() fwk.CompositePodGroupLister
+
 	// AddPodGroupMember adds not assigned and not assumed pod to its pod group state.
 	AddPodGroupMember(pod *v1.Pod)
 
@@ -124,6 +136,21 @@ type Cache interface {
 
 	// RemovePodGroupMember removes a pod from its pod group state.
 	RemovePodGroupMember(pod *v1.Pod)
+
+	// AddGenericPodGroup adds a generic pod group object to the cache.
+	AddGenericPodGroup(gpg *fwk.GenericPodGroup)
+
+	// UpdateGenericPodGroup updates a generic pod group object in the cache.
+	UpdateGenericPodGroup(logger klog.Logger, gpg *fwk.GenericPodGroup)
+
+	// RemoveGenericPodGroup removes a generic pod group object from the cache.
+	RemoveGenericPodGroup(logger klog.Logger, gpg *fwk.GenericPodGroup)
+
+	// BuildHierarchySnapshotFromPod returns a snapshot of the pod group hierarchy for the given pod.
+	BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error)
+
+	// GetRootKeyForGroup returns the root key of the given EntityKey.
+	GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error)
 }
 
 // Dump is a dump of the cache state.

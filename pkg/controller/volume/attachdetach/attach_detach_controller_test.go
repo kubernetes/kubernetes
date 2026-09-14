@@ -100,8 +100,8 @@ func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, plugins)
 
 	// Act
-	informerFactory.Start(tCtx.Done())
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	err := adc.populateActualStateOfWorld(logger)
 	if err != nil {
@@ -209,8 +209,8 @@ func BenchmarkPopulateActualStateOfWorld(b *testing.B) {
 	adc := createADC(b, tCtx, fakeKubeClient, informerFactory, nil)
 
 	// Act
-	informerFactory.Start(tCtx.Done())
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -229,8 +229,8 @@ func BenchmarkNodeUpdate(b *testing.B) {
 	logger := tCtx.Logger()
 	adc := createADC(b, tCtx, fakeKubeClient, informerFactory, nil)
 
-	informerFactory.Start(tCtx.Done())
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	err := adc.populateActualStateOfWorld(logger.V(2))
 	if err != nil {
@@ -331,8 +331,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	}
 
 	for _, pod := range pods.Items {
-		podToAdd := pod
-		podInformer.GetIndexer().Add(&podToAdd)
+		_ = podInformer.GetIndexer().Add(&pod)
 		podsNum++
 	}
 	nodes, err := fakeKubeClient.CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
@@ -340,8 +339,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	for _, node := range nodes.Items {
-		nodeToAdd := node
-		nodeInformer.GetIndexer().Add(&nodeToAdd)
+		_ = nodeInformer.GetIndexer().Add(&node)
 		nodesNum++
 	}
 
@@ -350,11 +348,10 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	for _, csiNode := range csiNodes.Items {
-		csiNodeToAdd := csiNode
-		csiNodeInformer.GetIndexer().Add(&csiNodeToAdd)
+		_ = csiNodeInformer.GetIndexer().Add(&csiNode)
 	}
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 
 	if !kcache.WaitForNamedCacheSyncWithContext(tCtx,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
@@ -485,6 +482,7 @@ type vaTest struct {
 	vaNodeName             string
 	vaAttachStatus         bool
 	csiMigration           bool
+	csiPlugin              bool
 	expected_attaches      map[string][]string
 	expected_detaches      map[string][]string
 	expectedASWAttachState cache.AttachState
@@ -533,6 +531,18 @@ func Test_ADC_VolumeAttachmentRecovery(t *testing.T) {
 			csiMigration:           true,
 			expectedASWAttachState: cache.AttachStateUncertain,
 		},
+		{ // pod is scheduled, volume changes from attachable to non-attachable, attach status:false, verify volume is marked as uncertain
+			testName:               "Scheduled Pod with non-attachable PV",
+			volName:                "csi-driver1^vol-handle1",
+			podNodeName:            "mynode-1",
+			pvName:                 "pv1",
+			vaName:                 "va1",
+			vaNodeName:             "mynode-1",
+			vaAttachStatus:         false,
+			csiMigration:           false,
+			csiPlugin:              true,
+			expectedASWAttachState: cache.AttachStateUncertain,
+		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
 			volumeAttachmentRecoveryTestCase(t, tc)
@@ -555,6 +565,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	podInformer := informerFactory.Core().V1().Pods().Informer()
 	pvInformer := informerFactory.Core().V1().PersistentVolumes().Informer()
 	vaInformer := informerFactory.Storage().V1().VolumeAttachments().Informer()
+	csiDriverInformer := informerFactory.Storage().V1().CSIDrivers().Informer()
 
 	// Create the controller
 	var wg sync.WaitGroup
@@ -569,16 +580,14 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	for _, pod := range pods.Items {
-		podToAdd := pod
-		podInformer.GetIndexer().Add(&podToAdd)
+		_ = podInformer.GetIndexer().Add(&pod)
 	}
 	nodes, err := fakeKubeClient.CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	for _, node := range nodes.Items {
-		nodeToAdd := node
-		nodeInformer.GetIndexer().Add(&nodeToAdd)
+		_ = nodeInformer.GetIndexer().Add(&node)
 	}
 
 	if tc.csiMigration {
@@ -607,6 +616,14 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		}
 		nodeInformer.GetIndexer().Add(&newNode)
 	}
+	if tc.csiPlugin {
+		newCsiDriver := controllervolumetesting.NewCSIDriver("csi-driver1", "csi-driver1", false)
+		_, err = adc.kubeClient.StorageV1().CSIDrivers().Create(tCtx, newCsiDriver, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Run failed with error. Failed to create a new csidriver: <%v>", err)
+		}
+		_ = csiDriverInformer.GetIndexer().Add(newCsiDriver)
+	}
 	// Create and add objects requested by the test
 	if tc.podName != "" {
 		newPod := controllervolumetesting.NewPodWithVolume(tc.podName, tc.volName, tc.podNodeName)
@@ -616,11 +633,14 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		}
 		podInformer.GetIndexer().Add(newPod)
 	}
+
 	if tc.pvName != "" {
 		var newPv *v1.PersistentVolume
 		if tc.csiMigration {
 			// NewPV returns a GCEPersistentDisk volume, which is migrated.
 			newPv = controllervolumetesting.NewPV(tc.pvName, tc.volName)
+		} else if tc.csiPlugin {
+			newPv = controllervolumetesting.NewCSIPV(tc.pvName)
 		} else {
 			// Otherwise use NFS, which is not subject to migration.
 			newPv = controllervolumetesting.NewNFSPV(tc.pvName, tc.volName)
@@ -641,13 +661,14 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	}
 
 	// Makesure the informer cache is synced
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 
 	if !kcache.WaitForNamedCacheSyncWithContext(tCtx,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 		informerFactory.Core().V1().Nodes().Informer().HasSynced,
 		informerFactory.Core().V1().PersistentVolumes().Informer().HasSynced,
-		informerFactory.Storage().V1().VolumeAttachments().Informer().HasSynced) {
+		informerFactory.Storage().V1().VolumeAttachments().Informer().HasSynced,
+		informerFactory.Storage().V1().CSIDrivers().Informer().HasSynced) {
 		t.Fatalf("Error waiting for the informer caches to sync")
 	}
 
@@ -671,6 +692,12 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	})
 	if tc.csiMigration {
 		verifyExpectedVolumeState(t, adc, tc)
+	} else if tc.csiPlugin {
+		attachedState := adc.actualStateOfWorld.GetAttachState(
+			v1.UniqueVolumeName(csi.CSIPluginName+"/"+tc.volName), types.NodeName(tc.vaNodeName))
+		if attachedState != tc.expectedASWAttachState {
+			t.Fatalf("Expected attachedState %v, but it is %v", tc.expectedASWAttachState, attachedState)
+		}
 	} else {
 		// Verify if expected attaches and detaches have happened
 		testPlugin := plugins[0].(*controllervolumetesting.TestPlugin)

@@ -23,10 +23,10 @@ package withktesting
 // the tests and check the output, use "go test -tags example ."
 
 import (
-	"context"
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -41,21 +41,17 @@ func TestTimeout(t *testing.T) {
 		t.Logf("Will fail shortly before the test suite deadline at %s.", deadline)
 	}
 
-	// This is how Ginkgo and ktesting communicate to Gomega how to
-	// provide a progress report when stuck in e.g. gomega.Eventually.
-	// Here we use this to provide some additional output when
-	// this example is sent a SIGUSR1.
-	remove := tCtx.Value("GINKGO_SPEC_CONTEXT").(interface {
-		AttachProgressReporter(func() string) func()
-	}).AttachProgressReporter(func() string { return "waiting for timeout or interrupt" })
-	defer remove()
+	tCtx.Run("heating", func(tCtx ktesting.TContext) {
+		tCtx.Parallel()
+		tCtx.Eventually(func(tCtx ktesting.TContext) (int, error) {
+			return 1, nil
+		}).WithTimeout(time.Minute).Should(gomega.Equal(2), "waiting for oven to reach baking temperature")
+	})
 
-	select {
-	case <-time.After(1000 * time.Hour):
-		// This should not be reached.
-		tCtx.Log("Huh?! I shouldn't be that old.")
-	case <-tCtx.Done():
-		// But this will before the test suite timeout.
-		tCtx.Errorf("need to stop: %v", context.Cause(tCtx))
-	}
+	tCtx.Run("baking", func(tCtx ktesting.TContext) {
+		tCtx.Parallel()
+		tCtx.Eventually(func(tCtx ktesting.TContext) (int, error) {
+			return 1, nil
+		}).WithTimeout(time.Minute).Should(gomega.Equal(2), "waiting for cake to be done")
+	})
 }

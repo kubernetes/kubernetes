@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -32,18 +34,17 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // deploymentStrategy implements behavior for Deployments.
 type deploymentStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Deployment
 // objects via the REST API.
-var Strategy = deploymentStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = deploymentStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Make sure we correctly implement the interface.
 var _ = rest.GarbageCollectionDeleteStrategy(Strategy)
@@ -102,7 +103,7 @@ func (deploymentStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for deployments.
-func (deploymentStrategy) AllowCreateOnUpdate() bool {
+func (deploymentStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -145,7 +146,7 @@ func (deploymentStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime
 	return warnings
 }
 
-func (deploymentStrategy) AllowUnconditionalUpdate() bool {
+func (deploymentStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

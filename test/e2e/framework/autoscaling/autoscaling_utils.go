@@ -638,28 +638,27 @@ func (rc *ResourceConsumer) makeConsumeCPUPerPodRequests(ctx context.Context) {
 // sendConsumeCPUPerPodRequest distributes CPU load evenly across all running
 // pods by sending requests directly via the Kubernetes pod proxy API. This
 // bypasses kube-proxy load balancing, guaranteeing each pod receives exactly
-// its share. Falls back to sendConsumeCPURequest if pod listing fails.
+// its share.
 func (rc *ResourceConsumer) sendConsumeCPUPerPodRequest(ctx context.Context, millicoresTotal int) {
-	pods, err := rc.clientSet.CoreV1().Pods(rc.nsName).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("name=%s", rc.name),
-	})
-	if err != nil {
-		framework.Logf("ConsumeCPUPerPod: failed to list pods: %v, falling back to service proxy", err)
-		rc.sendConsumeCPURequest(ctx, millicoresTotal)
-		return
-	}
-
 	var readyPods []string
-	for i := range pods.Items {
-		if pods.Items[i].Status.Phase == v1.PodRunning {
-			readyPods = append(readyPods, pods.Items[i].Name)
+	err := framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+		pods, err := rc.clientSet.CoreV1().Pods(rc.nsName).List(ctx, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("name=%s", rc.name),
+		})
+		if err != nil {
+			return err
 		}
-	}
-	if len(readyPods) == 0 {
-		framework.Logf("ConsumeCPUPerPod: no running pods, falling back to service proxy")
-		rc.sendConsumeCPURequest(ctx, millicoresTotal)
-		return
-	}
+		for i := range pods.Items {
+			if pods.Items[i].Status.Phase == v1.PodRunning {
+				readyPods = append(readyPods, pods.Items[i].Name)
+			}
+		}
+		if len(readyPods) == 0 {
+			return fmt.Errorf("ConsumeCPUPerPod: no running pods labeled name=%s", rc.name)
+		}
+		return nil
+	}).WithTimeout(serviceInitializationTimeout).WithPolling(serviceInitializationInterval).Should(gomega.Succeed())
+	framework.ExpectNoError(err)
 
 	perPodMillicores := millicoresTotal / len(readyPods)
 	if perPodMillicores == 0 {

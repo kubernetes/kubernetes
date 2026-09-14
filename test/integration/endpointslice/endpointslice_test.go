@@ -54,6 +54,7 @@ func TestEndpointsControllersLabelSemantics(t *testing.T) {
 	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
 
 	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
 	epController := endpoint.NewEndpointController(
 		tCtx,
 		informers.Core().V1().Pods(),
@@ -130,6 +131,7 @@ func TestEndpointsHeadlessLabel(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
+	defer tCtx.Cancel("test has completed")
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
@@ -297,5 +299,113 @@ func validateLabelsOnEndpointAndEndpointSlice(t *testing.T, tCtx context.Context
 	})
 	if err != nil {
 		t.Fatalf("Timed out waiting for EndpointSlice labels: %v", err)
+	}
+}
+
+// TestServiceRecreationEndpointSlices tests that rapidly deleting and recreating
+// a Service with the same name correctly reconciles and creates EndpointSlices for
+// the new Service instance without getting stuck on stale tracker cache.
+func TestServiceRecreationEndpointSlices(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	resyncPeriod := 12 * time.Hour
+	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
+
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+
+	epsController := endpointslice.NewController(
+		tCtx,
+		informers.Core().V1().Pods(),
+		informers.Core().V1().Services(),
+		informers.Core().V1().Nodes(),
+		informers.Discovery().V1().EndpointSlices(),
+		int32(100),
+		client,
+		0)
+
+	informers.Start(tCtx.Done())
+	go epsController.Run(tCtx, 1)
+
+	ns := framework.CreateNamespaceOrDie(client, "test-service-recreate", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	svcName := "test-svc-recreate"
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: svcName,
+			Labels: map[string]string{
+				"app": "test",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{"app": "test"},
+			Ports: []corev1.ServicePort{{
+				Port:       80,
+				TargetPort: intstr.FromInt(8080),
+			}},
+		},
+	}
+
+	// 1. Create first Service
+	createdSvc1, err := client.CoreV1().Services(ns.Name).Create(tCtx, svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating service: %v", err)
+	}
+
+	// 2. Wait for EndpointSlice for first Service to be created
+	err = wait.PollUntilContextTimeout(tCtx, 200*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		lSelector := discovery.LabelServiceName + "=" + svcName
+		esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: lSelector})
+		if err != nil {
+			return false, err
+		}
+		if len(esList.Items) == 1 && len(esList.Items[0].OwnerReferences) > 0 && esList.Items[0].OwnerReferences[0].UID == createdSvc1.UID {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for initial EndpointSlice: %v", err)
+	}
+
+	svcCopy := svc.DeepCopy()
+	// 3. Delete the first Service (do not manually delete the EndpointSlice)
+	err = client.CoreV1().Services(ns.Name).Delete(tCtx, svcName, metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("Error deleting service: %v", err)
+	}
+
+	// 4. Immediately recreate the Service with same name
+	createdSvc2, err := client.CoreV1().Services(ns.Name).Create(tCtx, svcCopy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error recreating service: %v", err)
+	}
+	if createdSvc2.UID == createdSvc1.UID {
+		t.Fatalf("Expected new service to have different UID, got same UID: %s", createdSvc2.UID)
+	}
+
+	// 5. Verify that EndpointSlices are reconciled for createdSvc2 (old slice deleted, new slice owned by createdSvc2 exists)
+	err = wait.PollUntilContextTimeout(tCtx, 200*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		lSelector := discovery.LabelServiceName + "=" + svcName
+		esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: lSelector})
+		if err != nil {
+			return false, err
+		}
+		for _, es := range esList.Items {
+			if len(es.OwnerReferences) > 0 && es.OwnerReferences[0].UID == createdSvc2.UID {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for EndpointSlice for recreated Service: %v", err)
 	}
 }

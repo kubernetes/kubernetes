@@ -18,9 +18,11 @@ package metrics
 
 import (
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -30,6 +32,59 @@ const (
 	namespace = "apiserver"
 	subsystem = "watch_cache"
 )
+
+// DispatchPoint identifies a point in a watch event's dispatch lifecycle. The
+// duration between two points forms a labeled "stage" of the dispatch_duration
+// metric.
+type DispatchPoint int
+
+const (
+	// PointStorageDecoded: the event was decoded from the storage backend (etcd).
+	PointStorageDecoded DispatchPoint = iota
+	// PointCacheReceived: the event was first processed by the cacher's reflector loop.
+	PointCacheReceived
+	// PointDispatchStarted: the event was dequeued from cacher.incoming and dispatching began.
+	PointDispatchStarted
+	// PointWatcherEnqueued: the event was enqueued to the watcher's input channel.
+	PointWatcherEnqueued
+	// PointWatcherDequeued: the event was dequeued from the watcher's input channel.
+	PointWatcherDequeued
+	// PointEventBuilt: the outgoing watch.Event was built (filter + convert).
+	PointEventBuilt
+	// PointSentToClient: the watch.Event was written to the watcher's result channel.
+	PointSentToClient
+
+	numDispatchPoints
+)
+
+// DispatchTimeline records the timestamp at which each DispatchPoint was reached
+// for a single event delivery. Points that occur before fan-out are shared and
+// carried on the event; per-watcher points are filled in on delivery.
+//
+// Because DispatchTimeline is an array value, callers sharing a timeline across
+// goroutines (such as during watch event fan-out) should copy it by value
+// (e.g. tl := event.timeline) before calling MarkAt to avoid data races on
+// shared event state.
+type DispatchTimeline [numDispatchPoints]time.Time
+
+// MarkAt records a (previously captured) timestamp for the given point. Callers
+// pass their own time source so that the injectable clock and cross-goroutine
+// timestamps are respected.
+func (tl *DispatchTimeline) MarkAt(p DispatchPoint, t time.Time) { tl[p] = t }
+
+// dispatchStages declares the labeled intervals emitted from a DispatchTimeline.
+// Adding a stage is a single entry here; "total" spans the whole delivery. The
+// additive stages need not partition "total" (only a subset of points may be set).
+var dispatchStages = []struct {
+	label    string
+	from, to DispatchPoint
+}{
+	{"storage_to_cache", PointStorageDecoded, PointCacheReceived},
+	{"cacher_queue_latency", PointCacheReceived, PointDispatchStarted},
+	{"watcher_queue_latency", PointWatcherEnqueued, PointWatcherDequeued},
+	{"watcher_to_client_handler", PointEventBuilt, PointSentToClient},
+	{"total", PointStorageDecoded, PointSentToClient},
+}
 
 /*
  * By default, all the following metrics are defined as falling under
@@ -42,28 +97,31 @@ const (
 var (
 	listCacheCount = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Name:           "cache_list_total",
-			Help:           "Number of LIST requests served from watch cache",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Namespace:         namespace,
+			Name:              "cache_list_total",
+			Help:              "Number of LIST requests served from watch cache",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource", "index"},
 	)
 	listCacheNumFetched = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Name:           "cache_list_fetched_objects_total",
-			Help:           "Number of objects read from watch cache in the course of serving a LIST request",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Namespace:         namespace,
+			Name:              "cache_list_fetched_objects_total",
+			Help:              "Number of objects read from watch cache in the course of serving a LIST request",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource", "index"},
 	)
 	listCacheNumReturned = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Name:           "cache_list_returned_objects_total",
-			Help:           "Number of objects returned for a LIST request from watch cache",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Namespace:         namespace,
+			Name:              "cache_list_returned_objects_total",
+			Help:              "Number of objects returned for a LIST request from watch cache",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource"},
 	)
@@ -161,6 +219,29 @@ var (
 		[]string{"group", "resource"},
 	)
 
+	WatchCacheInitializationErrors = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "initialization_errors_total",
+			Help:           "Counter of watch cache initialization errors broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatchCacheInitializationDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "initialization_duration_seconds",
+			Help:           "Histogram of watch cache initialization duration in seconds, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 180, 600},
+		},
+		[]string{"group", "resource"},
+	)
+
 	WatchCacheReadWait = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
@@ -207,6 +288,16 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+
+	DispatchStageDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      "watch_events",
+			Name:           "dispatch_duration_seconds",
+			Help:           "Histogram of watch event dispatch latency broken by resource type and pipeline stage. The 'total' stage is the end-to-end latency of a delivered event.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
+		}, []string{"group", "resource", "stage"})
 )
 
 var registerMetrics sync.Once
@@ -227,6 +318,8 @@ func Register() {
 		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 		legacyregistry.MustRegister(WatchCacheCapacity)
 		legacyregistry.MustRegister(WatchCacheInitializations)
+		legacyregistry.MustRegister(WatchCacheInitializationErrors)
+		legacyregistry.MustRegister(WatchCacheInitializationDuration)
 		legacyregistry.MustRegister(WatchCacheReadWait)
 		legacyregistry.MustRegister(ConsistentReadTotal)
 		legacyregistry.MustRegister(StorageConsistencyCheckTotal)
@@ -234,6 +327,7 @@ func Register() {
 			legacyregistry.MustRegister(WatchShardsTotal)
 			legacyregistry.MustRegister(WatchFilteredEventsTotal)
 		}
+		legacyregistry.MustRegister(DispatchStageDuration)
 	})
 }
 
@@ -242,6 +336,7 @@ func RecordListCacheMetrics(groupResource schema.GroupResource, indexName string
 	listCacheCount.WithLabelValues(groupResource.Group, groupResource.Resource, indexName).Inc()
 	listCacheNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource, indexName).Add(float64(numFetched))
 	listCacheNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
+	storagemetrics.RecordStorageListMetrics(groupResource, storagemetrics.StorageBackendWatchCache, indexName, numFetched, 0, numReturned)
 }
 
 // RecordResourceVersion sets the current resource version for a given resource type.
@@ -274,4 +369,54 @@ func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, ne
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+// WatcherMetricsObservers holds pre-resolved (group, resource) observers for
+// every dispatch stage, so the hot path never touches the label map.
+type WatcherMetricsObservers struct {
+	// stageDurations is indexed by position in dispatchStages.
+	stageDurations []compbasemetrics.ObserverMetric
+}
+
+// NewWatcherMetricsObservers creates a pre-resolved metrics observer for watch connections.
+func NewWatcherMetricsObservers(groupResource schema.GroupResource) *WatcherMetricsObservers {
+	o := &WatcherMetricsObservers{stageDurations: make([]compbasemetrics.ObserverMetric, len(dispatchStages))}
+	for i, s := range dispatchStages {
+		o.stageDurations[i] = DispatchStageDuration.WithLabelValues(groupResource.Group, groupResource.Resource, s.label)
+	}
+	return o
+}
+
+// ObserveTimeline emits the duration of every dispatch stage whose two endpoints
+// are both set on the timeline; stages with a missing endpoint are skipped.
+func (d *WatcherMetricsObservers) ObserveTimeline(tl *DispatchTimeline) {
+	for i, stage := range dispatchStages {
+		from, to := tl[stage.from], tl[stage.to]
+		if from.IsZero() || to.IsZero() {
+			continue
+		}
+		observe(d.stageDurations[i], to.Sub(from))
+	}
+}
+
+func observe(m compbasemetrics.ObserverMetric, duration time.Duration) {
+	if duration < 0 {
+		duration = 0
+	}
+	m.Observe(duration.Seconds())
+}
+
+type noopObserver struct{}
+
+func (noopObserver) Observe(float64) {}
+
+var noopObs noopObserver
+
+// NewNoopWatcherMetricsObservers returns a metrics observers struct that does nothing.
+func NewNoopWatcherMetricsObservers() *WatcherMetricsObservers {
+	o := &WatcherMetricsObservers{stageDurations: make([]compbasemetrics.ObserverMetric, len(dispatchStages))}
+	for i := range o.stageDurations {
+		o.stageDurations[i] = noopObs
+	}
+	return o
 }

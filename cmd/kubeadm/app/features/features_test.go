@@ -225,6 +225,9 @@ func TestCheckDeprecatedFlags(t *testing.T) {
 }
 
 func TestSupports(t *testing.T) {
+	var someFeatures = FeatureList{
+		"feature1": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
+	}
 	tests := []struct {
 		name        string
 		featureName string
@@ -237,13 +240,13 @@ func TestSupports(t *testing.T) {
 		},
 		{
 			name:        "the feature is supported",
-			featureName: PublicKeysECDSA,
+			featureName: "feature1",
 			want:        true,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := Supports(InitFeatureGates, test.featureName); got != test.want {
+			if got := Supports(someFeatures, test.featureName); got != test.want {
 				t.Errorf("Supports() = %v, want %v", got, test.want)
 			}
 		})

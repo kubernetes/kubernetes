@@ -25,13 +25,11 @@ import (
 	unsafe "unsafe"
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
-	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func init() {
@@ -197,12 +195,7 @@ func Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSignin
 }
 
 func autoConvert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(in *certificatesv1beta1.CertificateSigningRequestCondition, out *certificates.CertificateSigningRequestCondition, s conversion.Scope) error {
-	out.Type = certificates.RequestConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
-	out.Reason = in.Reason
-	out.Message = in.Message
-	out.LastUpdateTime = in.LastUpdateTime
-	out.LastTransitionTime = in.LastTransitionTime
+	*out = *(*certificates.CertificateSigningRequestCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -212,12 +205,7 @@ func Convert_v1beta1_CertificateSigningRequestCondition_To_certificates_Certific
 }
 
 func autoConvert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition(in *certificates.CertificateSigningRequestCondition, out *certificatesv1beta1.CertificateSigningRequestCondition, s conversion.Scope) error {
-	out.Type = certificatesv1beta1.RequestConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
-	out.Reason = in.Reason
-	out.Message = in.Message
-	out.LastUpdateTime = in.LastUpdateTime
-	out.LastTransitionTime = in.LastTransitionTime
+	*out = *(*certificatesv1beta1.CertificateSigningRequestCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -270,7 +258,7 @@ func Convert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSi
 
 func autoConvert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(in *certificatesv1beta1.CertificateSigningRequestSpec, out *certificates.CertificateSigningRequestSpec, s conversion.Scope) error {
 	out.Request = *(*[]byte)(unsafe.Pointer(&in.Request))
-	if err := metav1.Convert_Pointer_string_To_string(&in.SignerName, &out.SignerName, s); err != nil {
+	if err := v1.Convert_Pointer_string_To_string(&in.SignerName, &out.SignerName, s); err != nil {
 		return err
 	}
 	out.ExpirationSeconds = (*int32)(unsafe.Pointer(in.ExpirationSeconds))
@@ -289,7 +277,7 @@ func Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSi
 
 func autoConvert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(in *certificates.CertificateSigningRequestSpec, out *certificatesv1beta1.CertificateSigningRequestSpec, s conversion.Scope) error {
 	out.Request = *(*[]byte)(unsafe.Pointer(&in.Request))
-	if err := metav1.Convert_string_To_Pointer_string(&in.SignerName, &out.SignerName, s); err != nil {
+	if err := v1.Convert_string_To_Pointer_string(&in.SignerName, &out.SignerName, s); err != nil {
 		return err
 	}
 	out.ExpirationSeconds = (*int32)(unsafe.Pointer(in.ExpirationSeconds))
@@ -377,8 +365,7 @@ func Convert_certificates_ClusterTrustBundleList_To_v1beta1_ClusterTrustBundleLi
 }
 
 func autoConvert_v1beta1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec(in *certificatesv1beta1.ClusterTrustBundleSpec, out *certificates.ClusterTrustBundleSpec, s conversion.Scope) error {
-	out.SignerName = in.SignerName
-	out.TrustBundle = in.TrustBundle
+	*out = *(*certificates.ClusterTrustBundleSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -388,8 +375,7 @@ func Convert_v1beta1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSp
 }
 
 func autoConvert_certificates_ClusterTrustBundleSpec_To_v1beta1_ClusterTrustBundleSpec(in *certificates.ClusterTrustBundleSpec, out *certificatesv1beta1.ClusterTrustBundleSpec, s conversion.Scope) error {
-	out.SignerName = in.SignerName
-	out.TrustBundle = in.TrustBundle
+	*out = *(*certificatesv1beta1.ClusterTrustBundleSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -495,11 +481,7 @@ func Convert_certificates_PodCertificateRequestSpec_To_v1beta1_PodCertificateReq
 }
 
 func autoConvert_v1beta1_PodCertificateRequestStatus_To_certificates_PodCertificateRequestStatus(in *certificatesv1beta1.PodCertificateRequestStatus, out *certificates.PodCertificateRequestStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
-	out.CertificateChain = in.CertificateChain
-	out.NotBefore = (*metav1.Time)(unsafe.Pointer(in.NotBefore))
-	out.BeginRefreshAt = (*metav1.Time)(unsafe.Pointer(in.BeginRefreshAt))
-	out.NotAfter = (*metav1.Time)(unsafe.Pointer(in.NotAfter))
+	*out = *(*certificates.PodCertificateRequestStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -509,11 +491,7 @@ func Convert_v1beta1_PodCertificateRequestStatus_To_certificates_PodCertificateR
 }
 
 func autoConvert_certificates_PodCertificateRequestStatus_To_v1beta1_PodCertificateRequestStatus(in *certificates.PodCertificateRequestStatus, out *certificatesv1beta1.PodCertificateRequestStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
-	out.CertificateChain = in.CertificateChain
-	out.NotBefore = (*metav1.Time)(unsafe.Pointer(in.NotBefore))
-	out.BeginRefreshAt = (*metav1.Time)(unsafe.Pointer(in.BeginRefreshAt))
-	out.NotAfter = (*metav1.Time)(unsafe.Pointer(in.NotAfter))
+	*out = *(*certificatesv1beta1.PodCertificateRequestStatus)(unsafe.Pointer(in))
 	return nil
 }
 

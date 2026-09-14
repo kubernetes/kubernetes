@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
@@ -864,6 +864,26 @@ func TestCPUDetailsKeepOnly(t *testing.T) {
 		name: "cpus is not in CPUDetails.",
 		cpus: cpuset.New(3),
 		want: CPUDetails{},
+	}, {
+		name: "empty cpus set.",
+		cpus: cpuset.New(),
+		want: CPUDetails{},
+	}, {
+		name: "cpus equals all CPUDetails.",
+		cpus: cpuset.New(0, 1, 2),
+		want: map[int]CPUInfo{
+			0: {},
+			1: {},
+			2: {},
+		},
+	}, {
+		name: "cpus is superset of CPUDetails.",
+		cpus: cpuset.New(0, 1, 2, 3, 4, 5),
+		want: map[int]CPUInfo{
+			0: {},
+			1: {},
+			2: {},
+		},
 	}}
 
 	for _, tt := range tests {
@@ -1242,6 +1262,70 @@ func TestCPUDetailsCPUsInCores(t *testing.T) {
 	}
 }
 
+func TestCPUDetailsAreNUMANodesInSameSocket(t *testing.T) {
+
+	details := CPUDetails{
+		0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+		4: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+		1: {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+		5: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+		2: {CoreID: 2, SocketID: 0, NUMANodeID: 2},
+		6: {CoreID: 6, SocketID: 0, NUMANodeID: 2},
+		3: {CoreID: 3, SocketID: 1, NUMANodeID: 3},
+		7: {CoreID: 7, SocketID: 1, NUMANodeID: 3},
+	}
+
+	tests := []struct {
+		name      string
+		NUMANodes []int
+		want      bool
+	}{
+		{
+			name:      "empty NUMANodes in same socket",
+			NUMANodes: []int{},
+			want:      true,
+		},
+		{
+			name:      "1 NUMANode in same socket",
+			NUMANodes: []int{3},
+			want:      true,
+		},
+		{
+			name:      "same NUMANodes in same socket",
+			NUMANodes: []int{2, 2},
+			want:      true,
+		},
+		{
+			name:      "two NUMANodes in same socket",
+			NUMANodes: []int{0, 2},
+			want:      true,
+		},
+		{
+			name:      "two NUMANodes not in same socket",
+			NUMANodes: []int{0, 1},
+			want:      false,
+		},
+		{
+			name:      "all NUMANodes not in same socket",
+			NUMANodes: []int{0, 1, 2, 3},
+			want:      false,
+		},
+		{
+			name:      "NUMANodes out of range not in same socket",
+			NUMANodes: []int{0, 2, 5},
+			want:      false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := details.AreNUMANodesInSameSocket(tt.NUMANodes)
+			if got != tt.want {
+				t.Errorf("AreNUMANodesInSameSocket() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCPUCoreID(t *testing.T) {
 	topoDualSocketHT := &CPUTopology{
 		NumCPUs:    12,
@@ -1550,47 +1634,6 @@ func TestUncoreCaches(t *testing.T) {
 	}
 }
 
-func TestCPUsPerUncore(t *testing.T) {
-	tests := []struct {
-		name string
-		topo *CPUTopology
-		want int
-	}{
-		{
-			name: "Zero Number of UncoreCache",
-			topo: &CPUTopology{
-				NumCPUs:        8,
-				NumUncoreCache: 0,
-			},
-			want: 0,
-		},
-		{
-			name: "Normal case",
-			topo: &CPUTopology{
-				NumCPUs:        16,
-				NumUncoreCache: 2,
-			},
-			want: 8,
-		},
-		{
-			name: "Single shared UncoreCache",
-			topo: &CPUTopology{
-				NumCPUs:        8,
-				NumUncoreCache: 1,
-			},
-			want: 8,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.topo.CPUsPerUncore()
-			if got != tt.want {
-				t.Errorf("CPUsPerUncore() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-
-}
 func Test_getUncoreCacheID(t *testing.T) {
 	tests := []struct {
 		name string

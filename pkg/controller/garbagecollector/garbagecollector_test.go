@@ -77,6 +77,7 @@ type testRESTMapper struct {
 }
 
 func (m *testRESTMapper) Reset() {
+	//nolint:logcheck // Context-awareness not important for existing tests.
 	meta.MaybeResetRESTMapper(m.RESTMapper)
 }
 
@@ -229,7 +230,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 		t.Fatal(err)
 	}
 	stop := make(chan struct{})
-	sharedInformers.Start(stop)
+	sharedInformers.StartWithContext(ctx)
 	return garbageCollector{gc, stop}
 }
 
@@ -540,12 +541,12 @@ func TestProcessEvent(t *testing.T) {
 
 		dependencyGraphBuilder := &GraphBuilder{
 			informersStarted: alwaysStarted,
-			graphChanges:     workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*event]()),
+			graphChanges:     workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*event]()), //nolint:logcheck // Intentionally testing old API here.
 			uidToNode: &concurrentUIDToNode{
 				uidToNodeLock: sync.RWMutex{},
 				uidToNode:     make(map[types.UID]*node),
 			},
-			attemptToDelete:  workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*node]()),
+			attemptToDelete:  workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*node]()), //nolint:logcheck // Intentionally testing old API here.
 			absentOwnerCache: NewReferenceCache(2),
 		}
 		for i := 0; i < len(scenario.events); i++ {
@@ -922,14 +923,14 @@ func TestGetDeletableResources(t *testing.T) {
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	for name, test := range tests {
 		t.Logf("testing %q", name)
 		client := &fakeServerResources{
 			PreferredResources: test.serverResources,
 			Error:              test.err,
 		}
-		actual, actualErr := GetDeletableResources(logger, client)
+		actual, actualErr := GetDeletableResources(ctx, discovery.ToServerResourcesInterfaceWithContext(client))
 		if !reflect.DeepEqual(test.deletableResources, actual) {
 			t.Errorf("expected resources:\n%v\ngot:\n%v", test.deletableResources, actual)
 		}

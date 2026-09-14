@@ -40,6 +40,19 @@ type ResourcePoolStatusRequestSpecApplyConfiguration struct {
 	// Minimum: 1
 	// Maximum: 1000
 	Limit *int32 `json:"limit,omitempty"`
+	// DefaultPartitionTypeAttribute optionally names a device attribute (by its
+	// fully qualified name, e.g. "gpu.example.com/profile") to use as the default
+	// grouping attribute for partitionable devices whose slice has not declared
+	// one themselves.
+	//
+	// A slice's own PartitionTypeAttribute always takes precedence. This default
+	// applies only to devices whose slice does not declare one, so that a request
+	// can still get an accurate partitionSummary from a driver that has not
+	// been updated to declare it. When neither the slice nor this default names
+	// an attribute, a partitionable pool reports no partitionSummary.
+	//
+	// Must include the domain qualifier.
+	DefaultPartitionTypeAttribute *string `json:"defaultPartitionTypeAttribute,omitempty"`
 }
 
 // ResourcePoolStatusRequestSpecApplyConfiguration constructs a declarative configuration of the ResourcePoolStatusRequestSpec type for use with
@@ -69,5 +82,13 @@ func (b *ResourcePoolStatusRequestSpecApplyConfiguration) WithPoolName(value str
 // If called multiple times, the Limit field is set to the value of the last call.
 func (b *ResourcePoolStatusRequestSpecApplyConfiguration) WithLimit(value int32) *ResourcePoolStatusRequestSpecApplyConfiguration {
 	b.Limit = &value
+	return b
+}
+
+// WithDefaultPartitionTypeAttribute sets the DefaultPartitionTypeAttribute field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DefaultPartitionTypeAttribute field is set to the value of the last call.
+func (b *ResourcePoolStatusRequestSpecApplyConfiguration) WithDefaultPartitionTypeAttribute(value string) *ResourcePoolStatusRequestSpecApplyConfiguration {
+	b.DefaultPartitionTypeAttribute = &value
 	return b
 }

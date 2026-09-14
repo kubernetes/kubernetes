@@ -39,7 +39,6 @@ var flagSet types.GinkgoFlagSet
 var deprecationTracker = types.NewDeprecationTracker()
 var suiteConfig = types.NewDefaultSuiteConfig()
 var reporterConfig = types.NewDefaultReporterConfig()
-var suiteDidRun = false
 var outputInterceptor internal.OutputInterceptor
 var client parallel_support.Client
 
@@ -259,10 +258,10 @@ for more on how specs are parallelized in Ginkgo.
 You can also pass suite-level Label() decorators to RunSpecs.  The passed-in labels will apply to all specs in the suite.
 */
 func RunSpecs(t GinkgoTestingT, description string, args ...any) bool {
-	if suiteDidRun {
+	if global.SuiteDidRun {
 		exitIfErr(types.GinkgoErrors.RerunningSuite())
 	}
-	suiteDidRun = true
+	global.SuiteDidRun = true
 	err := global.PushClone()
 	if err != nil {
 		exitIfErr(err)

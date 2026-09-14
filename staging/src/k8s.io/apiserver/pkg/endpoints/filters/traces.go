@@ -21,7 +21,6 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -55,7 +54,7 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 		// Workaround for https://github.com/open-telemetry/opentelemetry-go-contrib/issues/3743
 		span := trace.SpanFromContext(r.Context())
 		if r.URL != nil {
-			span.SetAttributes(semconv.HTTPTarget(r.URL.RequestURI()))
+			span.SetAttributes(attribute.Key("http.target").String(r.URL.RequestURI()))
 		}
 		// Add auditID attribute if available. This helps us connect traces to audit log entries
 		span.SetAttributes(attribute.String("audit-id", audit.GetAuditIDTruncated(r.Context())))

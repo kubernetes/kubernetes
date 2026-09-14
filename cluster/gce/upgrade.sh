@@ -114,11 +114,6 @@ function upgrade-master() {
 
 function upgrade-master-env() {
   echo "== Upgrading master environment variables. =="
-  # Generate the node problem detector token if it isn't present on the original
-  # master.
- if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
-    NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  fi
 }
 
 function wait-for-master() {
@@ -193,7 +188,6 @@ function get-node-os() {
 #
 # Vars set:
 #   KUBE_PROXY_TOKEN
-#   NODE_PROBLEM_DETECTOR_TOKEN
 #   CA_CERT_BASE64
 #   EXTRA_DOCKER_OPTS
 #   KUBELET_CERT_BASE64
@@ -232,7 +226,6 @@ function setup-base-image() {
 #   SANITIZED_VERSION
 #   INSTANCE_GROUPS
 #   KUBE_PROXY_TOKEN
-#   NODE_PROBLEM_DETECTOR_TOKEN
 #   CA_CERT_BASE64
 #   EXTRA_DOCKER_OPTS
 #   KUBELET_CERT_BASE64
@@ -257,8 +250,6 @@ function prepare-node-upgrade() {
   node_env=$(get-node-env)
   KUBE_PROXY_TOKEN=$(get-env-val "${node_env}" "KUBE_PROXY_TOKEN")
   export KUBE_PROXY_TOKEN
-  NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${node_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
-  export NODE_PROBLEM_DETECTOR_TOKEN
   CA_CERT_BASE64=$(get-env-val "${node_env}" "CA_CERT")
   export CA_CERT_BASE64
   EXTRA_DOCKER_OPTS=$(get-env-val "${node_env}" "EXTRA_DOCKER_OPTS")
@@ -286,14 +277,6 @@ function prepare-node-upgrade() {
 
 function upgrade-node-env() {
   echo "== Upgrading node environment variables. =="
-  # Get the node problem detector token from master if it isn't present on
-  # the original node.
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
-    detect-master
-    local master_env
-    master_env=$(get-master-env)
-    NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${master_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
-  fi
 }
 
 # Upgrades a single node.

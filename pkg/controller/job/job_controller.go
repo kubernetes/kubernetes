@@ -29,7 +29,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,13 +42,13 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	batchinformers "k8s.io/client-go/informers/batch/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -94,7 +94,6 @@ type Controller struct {
 
 	// To allow injection of the following for testing.
 	updateStatusHandler func(ctx context.Context, job *batch.Job) (*batch.Job, error)
-	patchJobHandler     func(ctx context.Context, job *batch.Job, patch []byte) error
 	syncHandler         func(ctx context.Context, jobKey string) error
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
@@ -174,7 +173,7 @@ type syncJobCtx struct {
 
 	// Set only when the Job is eligible for workload integration, as
 	// determined by shouldManageWorkloadForJob function.
-	podGroup *schedulingv1alpha2.PodGroup
+	podGroup *schedulingv1beta1.PodGroup
 }
 
 type orphanPodKeyKind int
@@ -258,10 +257,18 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 			OnWrite:    podWriteCallback,
 		},
-		expectations:            controller.NewControllerExpectations(),
-		finalizerExpectations:   newUIDTrackingExpectations(),
-		queue:                   workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[string](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[string]{Name: "job", Clock: clock}),
-		orphanQueue:             workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[orphanPodKey](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[orphanPodKey]{Name: "job_orphan_pod", Clock: clock}),
+		expectations:          controller.NewControllerExpectations(),
+		finalizerExpectations: newUIDTrackingExpectations(),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[string](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[string]{
+			Logger: new(klog.FromContext(ctx)),
+			Name:   "job",
+			Clock:  clock,
+		}),
+		orphanQueue: workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[orphanPodKey](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[orphanPodKey]{
+			Logger: new(klog.FromContext(ctx)),
+			Name:   "job_orphan_pod",
+			Clock:  clock,
+		}),
 		broadcaster:             eventBroadcaster,
 		recorder:                eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		clock:                   clock,
@@ -270,7 +277,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 		consistencyStore:        consistencyStore,
 	}
 
-	if _, err := jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := jobInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			jm.addJob(logger, obj)
 		},
@@ -280,13 +287,13 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 		DeleteFunc: func(obj interface{}) {
 			jm.deleteJob(logger, obj)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, fmt.Errorf("adding Job event handler: %w", err)
 	}
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
 
-	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			jm.addPod(logger, obj)
 		},
@@ -296,7 +303,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 		DeleteFunc: func(obj interface{}) {
 			jm.deletePod(logger, obj, true)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, fmt.Errorf("adding Pod event handler: %w", err)
 	}
 	jm.podStore = podInformer.Lister()
@@ -309,7 +316,6 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 	jm.podIndexer = podInformer.Informer().GetIndexer()
 
 	jm.updateStatusHandler = jm.updateJobStatus
-	jm.patchJobHandler = jm.patchJob
 	jm.syncHandler = jm.syncJob
 
 	if feature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
@@ -325,7 +331,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	jm.broadcaster.StartStructuredLogging(3)
@@ -430,7 +436,7 @@ func (jm *Controller) addPod(logger klog.Logger, obj interface{}) {
 	// Otherwise, it's an orphan.
 	// Clean the finalizer.
 	if hasJobTrackingFinalizer(pod) {
-		jm.enqueueOrphanPod(pod)
+		jm.enqueueOrphanPod(pod, false)
 	}
 	// Get a list of all matching controllers and sync
 	// them to see if anyone wants to adopt it.
@@ -503,7 +509,7 @@ func (jm *Controller) updatePod(logger klog.Logger, old, cur interface{}) {
 	// Otherwise, it's an orphan.
 	// Clean the finalizer.
 	if hasJobTrackingFinalizer(curPod) {
-		jm.enqueueOrphanPod(curPod)
+		jm.enqueueOrphanPod(curPod, false)
 	}
 	// If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
@@ -546,7 +552,7 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 		// No controller should care about orphans being deleted.
 		// But this pod might have belonged to a Job and the GC removed the reference.
 		if hasFinalizer {
-			jm.enqueueOrphanPod(pod)
+			jm.enqueueOrphanPod(pod, false)
 		}
 		return
 	}
@@ -554,7 +560,7 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 	if job == nil || util.IsJobFinished(job) {
 		// syncJob will not remove this finalizer.
 		if hasFinalizer {
-			jm.enqueueOrphanPod(pod)
+			jm.enqueueOrphanPod(pod, false)
 		}
 		return
 	}
@@ -717,13 +723,17 @@ func (jm *Controller) enqueueSyncJobInternal(logger klog.Logger, obj interface{}
 	jm.queue.AddAfter(key, delay)
 }
 
-func (jm *Controller) enqueueOrphanPod(obj *v1.Pod) {
+func (jm *Controller) enqueueOrphanPod(obj *v1.Pod, backoff bool) {
 	orphanPodKey := orphanPodKey{
 		kind:      OrphanPodKeyKindName,
 		namespace: obj.Namespace,
 		value:     obj.Name,
 	}
-	jm.orphanQueue.Add(orphanPodKey)
+	if backoff {
+		jm.orphanQueue.AddRateLimited(orphanPodKey)
+	} else {
+		jm.orphanQueue.Add(orphanPodKey)
+	}
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -818,6 +828,7 @@ func (jm *Controller) syncOrphanPodsBySelector(ctx context.Context, namespace st
 	for _, pod := range pods {
 		if err := jm.handleSingleOrphanPod(ctx, pod); err != nil {
 			logger.Error(err, "syncing orphan pod failed", "pod", klog.KObj(pod))
+			jm.enqueueOrphanPod(pod, true)
 		}
 	}
 	return nil
@@ -1021,7 +1032,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 
 	// ensure Workload and PodGroup exist for eligible Jobs.
 	// This must happen before pod management so that pods can reference the PodGroup.
-	var podGroup *schedulingv1alpha2.PodGroup
+	var podGroup *schedulingv1beta1.PodGroup
 	if shouldManageWorkloadForJob(&job) {
 		_, podGroup, err = jm.ensureWorkloadAndPodGroup(ctx, &job, pods)
 		if err != nil {
@@ -1038,9 +1049,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		uncounted:            newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods),
 		expectedRmFinalizers: jm.finalizerExpectations.getExpectedUIDs(key),
 		podGroup:             podGroup,
-	}
-	if trackTerminatingPods(&job) {
-		jobCtx.terminating = ptr.To(controller.CountTerminatingPods(pods))
+		terminating:          ptr.To(controller.CountTerminatingPods(pods)),
 	}
 	active := int32(len(jobCtx.activePods))
 	newSucceededPods, newFailedPods := getNewFinishedPods(jobCtx)
@@ -1128,9 +1137,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			jobCtx.finishedCondition = nil
 		}
 		active -= deleted
-		if trackTerminatingPods(jobCtx.job) {
-			*jobCtx.terminating += deleted
-		}
+		*jobCtx.terminating += deleted
 		jobCtx.ready -= deletedReady
 		manageJobErr = err
 	} else {
@@ -1193,15 +1200,11 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		}
 	}
 
-	var terminating *int32
-	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-		terminating = jobCtx.terminating
-	}
 	needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !ptr.Equal(&jobCtx.ready, job.Status.Ready)
-	needsStatusUpdate = needsStatusUpdate || !ptr.Equal(job.Status.Terminating, terminating)
+	needsStatusUpdate = needsStatusUpdate || !ptr.Equal(job.Status.Terminating, jobCtx.terminating)
 	job.Status.Active = active
 	job.Status.Ready = &jobCtx.ready
-	job.Status.Terminating = terminating
+	job.Status.Terminating = jobCtx.terminating
 	err = jm.trackJobStatusAndRemoveFinalizers(ctx, jobCtx, needsStatusUpdate)
 	if err != nil {
 		return fmt.Errorf("tracking status: %w", err)
@@ -1211,29 +1214,12 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 }
 
 func (jm *Controller) newFailureCondition(reason, message string) *batch.JobCondition {
-	cType := batch.JobFailed
-	if delayTerminalCondition() {
-		cType = batch.JobFailureTarget
-	}
-	return newCondition(cType, v1.ConditionTrue, reason, message, jm.clock.Now())
+	return newCondition(batch.JobFailureTarget, v1.ConditionTrue, reason, message, jm.clock.Now())
 }
 
 func (jm *Controller) newSuccessCondition() *batch.JobCondition {
-	cType := batch.JobComplete
-	if delayTerminalCondition() {
-		cType = batch.JobSuccessCriteriaMet
-	}
-	var reason, message string
-	if feature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) {
-		reason = batch.JobReasonCompletionsReached
-		message = "Reached expected number of succeeded pods"
-	}
-	return newCondition(cType, v1.ConditionTrue, reason, message, jm.clock.Now())
-}
-
-func delayTerminalCondition() bool {
-	return feature.DefaultFeatureGate.Enabled(features.JobManagedBy) ||
-		feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy)
+	return newCondition(batch.JobSuccessCriteriaMet, v1.ConditionTrue, batch.JobReasonCompletionsReached,
+		"Reached expected number of succeeded pods", jm.clock.Now())
 }
 
 // deleteActivePods issues deletion for active Pods, preserving finalizers.
@@ -1639,11 +1625,9 @@ func (jm *Controller) enactJobFinished(logger klog.Logger, jobCtx *syncJobCtx) b
 			return false
 		}
 	}
-	if delayTerminalCondition() {
-		if *jobCtx.terminating > 0 {
-			logger.V(4).Info("Delaying marking the Job as finished, because there are still terminating pod(s)", "job", klog.KObj(job), "condition", jobCtx.finishedCondition.Type, "count", *jobCtx.terminating)
-			return false
-		}
+	if *jobCtx.terminating > 0 {
+		logger.V(4).Info("Delaying marking the Job as finished, because there are still terminating pod(s)", "job", klog.KObj(job), "condition", jobCtx.finishedCondition.Type, "count", *jobCtx.terminating)
+		return false
 	}
 	finishedCond := jobCtx.finishedCondition
 	job.Status.Conditions, _ = ensureJobConditionStatus(job.Status.Conditions, finishedCond.Type, finishedCond.Status, finishedCond.Reason, finishedCond.Message, jm.clock.Now())
@@ -1788,9 +1772,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		jm.expectations.ExpectDeletions(logger, jobKey, len(podsToDelete))
 		removedReady, removed, err := jm.deleteJobPods(ctx, job, jobKey, podsToDelete)
 		active -= removed
-		if trackTerminatingPods(job) {
-			*jobCtx.terminating += removed
-		}
+		*jobCtx.terminating += removed
 		jobCtx.ready -= removedReady
 		return active, metrics.JobSyncActionPodsDeleted, err
 	}
@@ -1830,9 +1812,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		logger.V(4).Info("Too many pods running for job", "job", klog.KObj(job), "deleted", len(podsToDelete), "target", wantActive)
 		removedReady, removed, err := jm.deleteJobPods(ctx, job, jobKey, podsToDelete)
 		active -= removed
-		if trackTerminatingPods(job) {
-			*jobCtx.terminating += removed
-		}
+		*jobCtx.terminating += removed
 		jobCtx.ready -= removedReady
 		// While it is possible for a Job to require both pod creations and
 		// deletions at the same time (e.g. indexed Jobs with repeated indexes), we
@@ -1843,8 +1823,6 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 
 	var terminating int32 = 0
 	if onlyReplaceFailedPods(jobCtx.job) {
-		// When onlyReplaceFailedPods=true, then also trackTerminatingPods=true,
-		// and so we can use the value.
 		terminating = *jobCtx.terminating
 	}
 	if diff := wantActive - terminating - active; diff > 0 {
@@ -1855,7 +1833,12 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 		if remainingTime > 0 {
 			jm.enqueueSyncJobWithDelay(logger, job, remainingTime)
-			return 0, metrics.JobSyncActionPodsCreated, nil
+			// No pods were created or deleted, so return the current active
+			// count rather than 0. Returning 0 here would cause the status
+			// update to set Active=0 while Ready still reflects the running
+			// pods, which the API server rejects ("cannot set more ready pods
+			// than active"), blocking finalizer removal and status flushing.
+			return active, metrics.JobSyncActionPodsCreated, nil
 		}
 		if diff > int32(MaxPodCreateDeletePerSync) {
 			diff = int32(MaxPodCreateDeletePerSync)
@@ -1868,7 +1851,9 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 				indexesToAdd, remainingTime = jm.getPodCreationInfoForIndependentIndexes(logger, indexesToAdd, jobCtx.podsWithDelayedDeletionPerIndex)
 				if remainingTime > 0 {
 					jm.enqueueSyncJobWithDelay(logger, job, remainingTime)
-					return 0, metrics.JobSyncActionPodsCreated, nil
+					// No pods were created or deleted, so return the current
+					// active count rather than 0 (see comment above).
+					return active, metrics.JobSyncActionPodsCreated, nil
 				}
 			}
 			diff = int32(len(indexesToAdd))
@@ -1900,7 +1885,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 				// PodGroup deletion is not blocked by surviving pods, because
 				// the Job's cascading GC already ensures proper cleanup ordering.
 				metav1.OwnerReference{
-					APIVersion: schedulingv1alpha2.SchemeGroupVersion.String(),
+					APIVersion: schedulingv1beta1.SchemeGroupVersion.String(),
 					Kind:       "PodGroup",
 					Name:       pg.Name,
 					UID:        pg.UID,
@@ -2041,21 +2026,6 @@ func (jm *Controller) updateJobStatus(ctx context.Context, job *batch.Job) (*bat
 		job.ResourceVersion,
 	)
 	return job, err
-}
-
-func (jm *Controller) patchJob(ctx context.Context, job *batch.Job, data []byte) error {
-	job, err := jm.kubeClient.BatchV1().Jobs(job.Namespace).Patch(
-		ctx, job.Name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
-	if err != nil {
-		return err
-	}
-	jm.consistencyStore.WroteAt(
-		types.NamespacedName{Name: job.Name, Namespace: job.Namespace},
-		job.UID,
-		jobGroupResource,
-		job.ResourceVersion,
-	)
-	return err
 }
 
 // getValidPodsWithFilter returns the valid pods that pass the filter.
@@ -2248,43 +2218,19 @@ func countReadyPods(pods []*v1.Pod) int32 {
 	return cnt
 }
 
-// trackTerminatingPods checks if the count of terminating pods is tracked.
-// They are tracked when any the following is true:
-//   - JobPodReplacementPolicy is enabled to be returned in the status field;
-//     and to delay setting the Job terminal condition,
-//   - JobManagedBy is enabled to delay setting Job terminal condition,
-//   - only failed pods are replaced, because pod failure policy is used
-func trackTerminatingPods(job *batch.Job) bool {
-	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-		return true
-	}
-	if feature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
-		return true
-	}
-	return job.Spec.PodFailurePolicy != nil
-}
-
 // This checks if we should apply PodReplacementPolicy.
 // PodReplacementPolicy controls when we recreate pods if they are marked as terminating
 // Failed means that we recreate only once the pod has terminated.
 func onlyReplaceFailedPods(job *batch.Job) bool {
-	// We check both PodReplacementPolicy for nil and failed
-	// because it is possible that  `PodReplacementPolicy` is not defaulted,
-	// when the `JobPodReplacementPolicy` feature gate is disabled for API server.
-	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) && job.Spec.PodReplacementPolicy != nil && *job.Spec.PodReplacementPolicy == batch.Failed {
-		return true
-	}
-	return job.Spec.PodFailurePolicy != nil
+	return job.Spec.PodReplacementPolicy != nil && *job.Spec.PodReplacementPolicy == batch.Failed
 }
 
 func recordJobPodsCreationTotal(job *batch.Job, jobCtx *syncJobCtx, succeeded, failed int32) {
 	reason := metrics.PodCreateNew
-	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-		if ptr.Deref(job.Spec.PodReplacementPolicy, batch.TerminatingOrFailed) == batch.Failed && jobCtx.failed > 0 {
-			reason = metrics.PodRecreateFailed
-		} else if jobCtx.failed > 0 || ptr.Deref(jobCtx.terminating, 0) > 0 {
-			reason = metrics.PodRecreateTerminatingOrFailed
-		}
+	if ptr.Deref(job.Spec.PodReplacementPolicy, batch.TerminatingOrFailed) == batch.Failed && jobCtx.failed > 0 {
+		reason = metrics.PodRecreateFailed
+	} else if jobCtx.failed > 0 || ptr.Deref(jobCtx.terminating, 0) > 0 {
+		reason = metrics.PodRecreateTerminatingOrFailed
 	}
 	if succeeded > 0 {
 		metrics.JobPodsCreationTotal.WithLabelValues(reason, metrics.Succeeded).Add(float64(succeeded))
@@ -2295,10 +2241,8 @@ func recordJobPodsCreationTotal(job *batch.Job, jobCtx *syncJobCtx, succeeded, f
 }
 
 func managedByExternalController(jobObj *batch.Job) *string {
-	if feature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
-		if controllerName := jobObj.Spec.ManagedBy; controllerName != nil && *controllerName != batch.JobControllerName {
-			return controllerName
-		}
+	if controllerName := jobObj.Spec.ManagedBy; controllerName != nil && *controllerName != batch.JobControllerName {
+		return controllerName
 	}
 	return nil
 }

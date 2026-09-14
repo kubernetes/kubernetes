@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -79,16 +77,16 @@ func TestInterPodAffinity(t *testing.T) {
 	defaultNS := "ns1"
 
 	tests := []struct {
-		name                           string
-		pod                            *v1.Pod
-		pods                           []*v1.Pod
-		fits                           bool
-		enableMatchLabelKeysInAffinity bool
-		errorType                      string
+		name        string
+		incomingPod *v1.Pod
+		nextPod     *v1.Pod
+		pods        []*v1.Pod
+		fits        bool
+		errorType   string
 	}{
 		{
-			name: "validates that a pod with an invalid podAffinity is rejected because of the LabelSelectorRequirement is invalid",
-			pod: &v1.Pod{
+			name: "incomingPod with invalid podAffinity is rejected because LabelSelectorRequirement is invalid",
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel2,
@@ -119,7 +117,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "validates that Inter-pod-Affinity is respected if not matching",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel2,
@@ -149,8 +147,8 @@ func TestInterPodAffinity(t *testing.T) {
 			fits: false,
 		},
 		{
-			name: "validates that InterPodAffinity is respected if matching. requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using In operator that matches the existing pod",
-			pod: &v1.Pod{
+			name: "InterPodAffinity is respected if matching. requiredDuringSchedulingIgnoredDuringExecution with In operator matches existing pod",
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel2,
@@ -191,8 +189,8 @@ func TestInterPodAffinity(t *testing.T) {
 			fits: true,
 		},
 		{
-			name: "validates that InterPodAffinity is respected if matching. requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using not in operator in labelSelector that matches the existing pod",
-			pod: &v1.Pod{
+			name: "PodAffinity is respected if matching. requiredDuringSchedulingIgnoredDuringExecution with NOT IN operator matches existing pod",
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel2,
@@ -229,7 +227,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "validates that inter-pod-affinity is respected when pods have different Namespaces",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel2,
@@ -267,7 +265,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "Doesn't satisfy the PodAffinity because of unmatching labelSelector with the existing pod",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel,
@@ -303,7 +301,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "validates that InterPodAffinity is respected if matching with multiple affinities in multiple RequiredDuringSchedulingIgnoredDuringExecution ",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel2,
@@ -356,7 +354,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node because one of the matchExpression items doesn't match.",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel2,
 					Name:   "fakename",
@@ -409,7 +407,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "validates that InterPod Affinity and AntiAffinity is respected if matching",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel2,
@@ -461,7 +459,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "satisfies the PodAffinity and PodAntiAffinity and PodAntiAffinity symmetry with the existing pod",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel2,
@@ -537,7 +535,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel2,
@@ -589,7 +587,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfies PodAntiAffinity symmetry with the existing pod",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel,
@@ -665,7 +663,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel,
@@ -701,7 +699,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "Verify that PodAntiAffinity of an existing pod is respected when PodAntiAffinity symmetry is not satisfied with the existing pod",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel,
@@ -740,7 +738,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "Verify that PodAntiAffinity from existing pod is respected when pod statisfies PodAntiAffinity symmetry with the existing pod",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fake-name",
 					Labels: podLabel,
@@ -778,8 +776,8 @@ func TestInterPodAffinity(t *testing.T) {
 			fits: true,
 		},
 		{
-			name: "nodes[0] and nodes[1] have same topologyKey and label value. nodes[0] has an existing pod that matches the inter pod affinity rule. The new pod can not be scheduled onto either of the two nodes.",
-			pod: &v1.Pod{
+			name: "same topology label, existing pod matches affinity, fits=false",
+			incomingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "fake-name2"},
 				Spec: v1.PodSpec{
 					Containers:   []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
@@ -813,7 +811,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			name: "anti affinity: matchLabelKeys is merged into LabelSelector with In operator (feature flag: enabled)",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
 					Affinity: &v1.Affinity{
@@ -860,12 +858,11 @@ func TestInterPodAffinity(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: map[string]string{"foo": "", "bar": "hoge"}},
 				},
 			},
-			enableMatchLabelKeysInAffinity: true,
-			fits:                           true,
+			fits: true,
 		},
 		{
 			name: "anti affinity: mismatchLabelKeys is merged into LabelSelector with NotIn operator (feature flag: enabled)",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
 					Affinity: &v1.Affinity{
@@ -912,12 +909,11 @@ func TestInterPodAffinity(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: map[string]string{"foo": "", "bar": "a"}},
 				},
 			},
-			enableMatchLabelKeysInAffinity: true,
-			fits:                           true,
+			fits: true,
 		},
 		{
 			name: "affinity: matchLabelKeys is merged into LabelSelector with In operator (feature flag: enabled)",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
@@ -991,12 +987,11 @@ func TestInterPodAffinity(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod3", Labels: map[string]string{"foo": "", "bar": "fuga"}},
 				},
 			},
-			enableMatchLabelKeysInAffinity: true,
-			fits:                           false,
+			fits: false,
 		},
 		{
 			name: "affinity: mismatchLabelKeys is merged into LabelSelector with NotIn operator (feature flag: enabled)",
-			pod: &v1.Pod{
+			incomingPod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
@@ -1070,102 +1065,144 @@ func TestInterPodAffinity(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod3", Labels: map[string]string{"foo": "", "bar": "a"}},
 				},
 			},
-			enableMatchLabelKeysInAffinity: true,
-			fits:                           false,
+			fits: false,
+		},
+		{
+			name:        "validates that InterPodAffinity is respected for self affinity",
+			incomingPod: st.MakePod().Name("pod1").Priority(0).Label("service", "securityscan").Container("pause").PodAffinityIn("service", v1.LabelHostname, []string{"securityscan"}, st.PodAffinityWithRequiredReq).Obj(),
+			nextPod:     st.MakePod().Name("pod2").Priority(0).Label("service", "securityscan").Container("pause").PodAffinityIn("service", v1.LabelHostname, []string{"securityscan"}, st.PodAffinityWithRequiredReq).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("existing-pod1").Node("testnode-0").Priority(0).Label("security", "S1").Container("pause").Obj(),
+				st.MakePod().Name("existing-pod2").Node("testnode-1").Priority(0).Label("security", "S1").Container("pause").Obj(),
+			},
+			fits: true,
+		},
+		{
+			name:        "validates that InterPodAffinity is respected with hostname topology key (fast path)",
+			incomingPod: st.MakePod().Name("fakename").Priority(0).Label("security", "S1").Container("pause").PodAffinityIn("service", v1.LabelHostname, []string{"securityscan"}, st.PodAffinityWithRequiredReq).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("fakename2").Node("testnode-0").Priority(0).Label("service", "securityscan").Container("pause").Obj(),
+			},
+			fits: true,
+		},
+		{
+			name:        "validates that InterPodAntiAffinity is respected with hostname topology key (fast path)",
+			incomingPod: st.MakePod().Name("fakename").Priority(0).Label("security", "S1").Container("pause").PodAntiAffinityIn("service", v1.LabelHostname, []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("fakename2").Node("testnode-0").Priority(0).Label("service", "securityscan").Container("pause").Obj(),
+				st.MakePod().Name("fakename3").Node("anothernode-0").Priority(0).Label("service", "securityscan").Container("pause").Obj(),
+			},
+			fits: false,
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if !test.enableMatchLabelKeysInAffinity {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
-			}
-			testCtx := initTest(t, "")
-			cs := testCtx.ClientSet
+	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+		for _, test := range tests {
+			t.Run(fmt.Sprintf("%s/InterPodAffinityHostnameFastPath=%v", test.name, interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
 
-			if _, err := createNode(cs, st.MakeNode().Name("testnode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n1").Capacity(
-				map[v1.ResourceName]string{
-					v1.ResourceMemory: "1G",
-				},
-			).Obj()); err != nil {
-				t.Fatalf("failed to create node: %v", err)
-			}
+				testCtx := initTest(t, "")
+				cs := testCtx.ClientSet
 
-			// another test node has the same "region" and "zone" labels as testnode, but has a different "node" label.
-			if _, err := createNode(cs, st.MakeNode().Name("anothernode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n2").Capacity(
-				map[v1.ResourceName]string{
-					v1.ResourceMemory: "1G",
-				},
-			).Obj()); err != nil {
-				t.Fatalf("failed to create node: %v", err)
-			}
-
-			if err := createNamespacesWithLabels(cs, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
-				t.Fatal(err)
-			}
-			if err := createNamespacesWithLabels(cs, []string{"ns3"}, map[string]string{"team": "team2"}); err != nil {
-				t.Fatal(err)
-			}
-
-			for _, pod := range test.pods {
-				if pod.Namespace == "" {
-					pod.Namespace = defaultNS
+				if _, err := createNode(cs, st.MakeNode().Name("testnode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n1").Label(v1.LabelHostname, "testnode-0").Capacity(
+					map[v1.ResourceName]string{
+						v1.ResourceMemory: "1G",
+					},
+				).Obj()); err != nil {
+					t.Fatalf("failed to create node: %v", err)
 				}
-				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+
+				// another test node has the same "region" and "zone" labels as testnode, but has a different "node" label.
+				if _, err := createNode(cs, st.MakeNode().Name("anothernode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n2").Label(v1.LabelHostname, "anothernode-0").Capacity(
+					map[v1.ResourceName]string{
+						v1.ResourceMemory: "1G",
+					},
+				).Obj()); err != nil {
+					t.Fatalf("failed to create node: %v", err)
+				}
+
+				if err := createNamespacesWithLabels(cs, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
+					t.Fatal(err)
+				}
+				if err := createNamespacesWithLabels(cs, []string{"ns3"}, map[string]string{"team": "team2"}); err != nil {
+					t.Fatal(err)
+				}
+
+				var allPods []*v1.Pod
+				for _, pod := range test.pods {
+					if pod.Namespace == "" {
+						pod.Namespace = defaultNS
+					}
+					allPods = append(allPods, pod)
+					createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+					if err != nil {
+						t.Fatalf("Error while creating pod: %v", err)
+					}
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+						testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+					if err != nil {
+						t.Errorf("Error while creating pod: %v", err)
+					}
+				}
+				if test.incomingPod.Namespace == "" {
+					test.incomingPod.Namespace = defaultNS
+				}
+				allPods = append(allPods, test.incomingPod)
+				if test.nextPod != nil {
+					if test.nextPod.Namespace == "" {
+						test.nextPod.Namespace = defaultNS
+					}
+					allPods = append(allPods, test.nextPod)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, allPods)
+
+				testPod, err := cs.CoreV1().Pods(test.incomingPod.Namespace).Create(testCtx.Ctx, test.incomingPod, metav1.CreateOptions{})
 				if err != nil {
-					t.Fatalf("Error while creating pod: %v", err)
+					if test.errorType != "invalidPod" || !apierrors.IsInvalid(err) {
+						t.Fatalf("Error while creating pod: %v", err)
+					}
 				}
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
-				if err != nil {
-					t.Errorf("Error while creating pod: %v", err)
-				}
-			}
-			if test.pod.Namespace == "" {
-				test.pod.Namespace = defaultNS
-			}
 
-			testPod, err := cs.CoreV1().Pods(test.pod.Namespace).Create(testCtx.Ctx, test.pod, metav1.CreateOptions{})
-			if err != nil {
-				if !(test.errorType == "invalidPod" && apierrors.IsInvalid(err)) {
-					t.Fatalf("Error while creating pod: %v", err)
+				if test.fits {
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+						testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
+				} else {
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+						podUnschedulable(cs, testPod.Namespace, testPod.Name))
 				}
-			}
-
-			if test.fits {
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
-			} else {
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					podUnschedulable(cs, testPod.Namespace, testPod.Name))
-			}
-			if err != nil {
-				t.Errorf("Error while trying to fit a pod: %v", err)
-				return
-			}
-
-			err = cs.CoreV1().Pods(test.pod.Namespace).Delete(testCtx.Ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
-			if err != nil {
-				t.Errorf("Error while deleting pod: %v", err)
-			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
-				testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, test.pod.Name))
-			if err != nil {
-				t.Errorf("Error while waiting for pod to get deleted: %v", err)
-			}
-			for _, pod := range test.pods {
-				err = cs.CoreV1().Pods(pod.Namespace).Delete(testCtx.Ctx, pod.Name, *metav1.NewDeleteOptions(0))
 				if err != nil {
-					t.Errorf("Error while deleting pod: %v", err)
+					t.Errorf("Error while trying to fit a pod: %v", err)
+					return
 				}
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
-					testutils.PodDeleted(testCtx.Ctx, cs, pod.Namespace, pod.Name))
-				if err != nil {
-					t.Errorf("Error while waiting for pod to get deleted: %v", err)
+
+				if test.nextPod != nil {
+					testNextPod, err := cs.CoreV1().Pods(test.nextPod.Namespace).Create(testCtx.Ctx, test.nextPod, metav1.CreateOptions{})
+					if err != nil {
+						t.Fatalf("Error while creating nextPod: %v", err)
+					}
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+						testutils.PodScheduled(cs, testNextPod.Namespace, testNextPod.Name))
+					if err != nil {
+						t.Errorf("Error while trying to fit nextPod: %v", err)
+						return
+					}
+
+					// Ensure pod and nextPod are scheduled on the same node
+					scheduledPod1, err := cs.CoreV1().Pods(testPod.Namespace).Get(testCtx.Ctx, testPod.Name, metav1.GetOptions{})
+					if err != nil {
+						t.Fatalf("Error getting scheduled pod1: %v", err)
+					}
+					scheduledNextPod, err := cs.CoreV1().Pods(testNextPod.Namespace).Get(testCtx.Ctx, testNextPod.Name, metav1.GetOptions{})
+					if err != nil {
+						t.Fatalf("Error getting scheduled nextPod: %v", err)
+					}
+					if scheduledPod1.Spec.NodeName != scheduledNextPod.Spec.NodeName {
+						t.Errorf("Expected nextPod to be scheduled on the same node as incomingPod (%s), but got %s", scheduledPod1.Spec.NodeName, scheduledNextPod.Spec.NodeName)
+					}
 				}
-			}
-		})
+			})
+		}
+
 	}
 }
 
@@ -1281,73 +1318,86 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			testCtx := initTest(t, "")
-
-			// Add a few nodes with labels
-			nodes, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Label("region", "r1").Label("zone", "z11"), 2)
-			if err != nil {
-				t.Fatal(err)
-			}
-			test.existingPod.Spec.NodeName = nodes[0].Name
-
-			cs := testCtx.ClientSet
-
-			if err := createNamespacesWithLabels(cs, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
-				t.Fatal(err)
-			}
-			if err := createNamespacesWithLabels(cs, []string{"ns3"}, map[string]string{"team": "team2"}); err != nil {
-				t.Fatal(err)
-			}
-			defaultNS := "ns1"
-
-			createdPod, err := cs.CoreV1().Pods(test.existingPod.Namespace).Create(testCtx.Ctx, test.existingPod, metav1.CreateOptions{})
-			if err != nil {
-				t.Fatalf("Error while creating pod: %v", err)
-			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-				testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
-			if err != nil {
-				t.Errorf("Error while creating pod: %v", err)
+			configs := []struct {
+				name                                    string
+				interPodAffinityHostnameFastPathEnabled bool
+			}{
+				{name: "fastPathEnabled=true", interPodAffinityHostnameFastPathEnabled: true},
+				{name: "fastPathEnabled=false", interPodAffinityHostnameFastPathEnabled: false},
 			}
 
-			if test.pod.Namespace == "" {
-				test.pod.Namespace = defaultNS
-			}
+			for _, cfg := range configs {
+				t.Run(cfg.name, func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, cfg.interPodAffinityHostnameFastPathEnabled)
+					testCtx := initTest(t, "")
 
-			testPod, err := cs.CoreV1().Pods(test.pod.Namespace).Create(testCtx.Ctx, test.pod, metav1.CreateOptions{})
-			if err != nil {
-				if !(test.errorType == "invalidPod" && apierrors.IsInvalid(err)) {
-					t.Fatalf("Error while creating pod: %v", err)
-				}
-			}
+					// Add a few nodes with labels
+					nodes, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Label("region", "r1").Label("zone", "z11"), 2)
+					if err != nil {
+						t.Fatal(err)
+					}
+					test.existingPod.Spec.NodeName = nodes[0].Name
 
-			if test.fits {
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
-			} else {
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					podUnschedulable(cs, testPod.Namespace, testPod.Name))
-			}
-			if err != nil {
-				t.Errorf("Error while trying to fit a pod: %v", err)
-			}
-			err = cs.CoreV1().Pods(test.pod.Namespace).Delete(testCtx.Ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
-			if err != nil {
-				t.Errorf("Error while deleting pod: %v", err)
-			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
-				testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, test.pod.Name))
-			if err != nil {
-				t.Errorf("Error while waiting for pod to get deleted: %v", err)
-			}
-			err = cs.CoreV1().Pods(test.existingPod.Namespace).Delete(testCtx.Ctx, test.existingPod.Name, *metav1.NewDeleteOptions(0))
-			if err != nil {
-				t.Errorf("Error while deleting pod: %v", err)
-			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
-				testutils.PodDeleted(testCtx.Ctx, cs, test.existingPod.Namespace, test.existingPod.Name))
-			if err != nil {
-				t.Errorf("Error while waiting for pod to get deleted: %v", err)
+					cs := testCtx.ClientSet
+
+					if err := createNamespacesWithLabels(cs, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
+						t.Fatal(err)
+					}
+					if err := createNamespacesWithLabels(cs, []string{"ns3"}, map[string]string{"team": "team2"}); err != nil {
+						t.Fatal(err)
+					}
+					defaultNS := "ns1"
+
+					createdPod, err := cs.CoreV1().Pods(test.existingPod.Namespace).Create(testCtx.Ctx, test.existingPod, metav1.CreateOptions{})
+					if err != nil {
+						t.Fatalf("Error while creating pod: %v", err)
+					}
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+						testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+					if err != nil {
+						t.Errorf("Error while creating pod: %v", err)
+					}
+
+					if test.pod.Namespace == "" {
+						test.pod.Namespace = defaultNS
+					}
+
+					testPod, err := cs.CoreV1().Pods(test.pod.Namespace).Create(testCtx.Ctx, test.pod, metav1.CreateOptions{})
+					if err != nil {
+						if test.errorType != "invalidPod" || !apierrors.IsInvalid(err) {
+							t.Fatalf("Error while creating pod: %v", err)
+						}
+					}
+
+					if test.fits {
+						err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+							testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
+					} else {
+						err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+							podUnschedulable(cs, testPod.Namespace, testPod.Name))
+					}
+					if err != nil {
+						t.Errorf("Error while trying to fit a pod: %v", err)
+					}
+					err = cs.CoreV1().Pods(test.pod.Namespace).Delete(testCtx.Ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
+					if err != nil {
+						t.Errorf("Error while deleting pod: %v", err)
+					}
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
+						testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, test.pod.Name))
+					if err != nil {
+						t.Errorf("Error while waiting for pod to get deleted: %v", err)
+					}
+					err = cs.CoreV1().Pods(test.existingPod.Namespace).Delete(testCtx.Ctx, test.existingPod.Name, *metav1.NewDeleteOptions(0))
+					if err != nil {
+						t.Errorf("Error while deleting pod: %v", err)
+					}
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
+						testutils.PodDeleted(testCtx.Ctx, cs, test.existingPod.Namespace, test.existingPod.Name))
+					if err != nil {
+						t.Errorf("Error while waiting for pod to get deleted: %v", err)
+					}
+				})
 			}
 		})
 	}
@@ -1773,14 +1823,13 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                      string
-		incomingPod               *v1.Pod
-		existingPods              []*v1.Pod
-		fits                      bool
-		nodes                     []*v1.Node
-		candidateNodes            []string // nodes expected to schedule onto
-		enableNodeInclusionPolicy bool
-		enableMatchLabelKeys      bool
+		name                 string
+		incomingPod          *v1.Pod
+		existingPods         []*v1.Pod
+		fits                 bool
+		nodes                []*v1.Node
+		candidateNodes       []string // nodes expected to schedule onto
+		enableMatchLabelKeys bool
 	}{
 		// note: naming starts at index 0
 		{
@@ -1991,8 +2040,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-4"}, // node-3 is filtered out by NodeAffinity plugin
-			enableNodeInclusionPolicy: true,
+			candidateNodes: []string{"node-4"}, // node-3 is filtered out by NodeAffinity plugin
 		},
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity, pods spread across zone as 1/~2~",
@@ -2012,8 +2060,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-1", "node-2"},
-			enableNodeInclusionPolicy: true,
+			candidateNodes: []string{"node-1", "node-2"},
 		},
 		{
 			name: "NodeTaintsPolicy honored, pods spread across zone as 2/1",
@@ -2033,8 +2080,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Taints(taints).Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-4"}, // node-3 is filtered out by TaintToleration plugin
-			enableNodeInclusionPolicy: true,
+			candidateNodes: []string{"node-4"}, // node-3 is filtered out by TaintToleration plugin
 		},
 		{
 			name: "NodeTaintsPolicy ignored, pods spread across zone as 2/2",
@@ -2054,8 +2100,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Taints(taints).Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-1", "node-2", "node-4"}, // node-3 is filtered out by TaintToleration plugin
-			enableNodeInclusionPolicy: true,
+			candidateNodes: []string{"node-1", "node-2", "node-4"}, // node-3 is filtered out by TaintToleration plugin
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as 2/1
@@ -2080,34 +2125,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-4"},
-			enableNodeInclusionPolicy: true,
-		},
-		{
-			// 1. to fulfil "zone" constraint, pods spread across zones as 2/1
-			// 2. to fulfil "node" constraint, pods spread across zones as 1/1/~0~/1
-			// intersection of (1) and (2) returns node-4 as node-3 is filtered out by NodeAffinity plugin
-			name: "feature gate disabled, two node inclusion Constraints, zone: honor/ignore, node: honor/ignore",
-			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
-				NodeSelector(map[string]string{"foo": ""}).
-				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, nil).
-				SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, nil).
-				Obj(),
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Name("p3a").Node("node-3").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Name("p4a").Node("node-4").Label("foo", "").Container(pause).Obj(),
-			},
-			fits: true,
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node-1").Label("node", "node-1").Label("zone", "zone-1").Label("foo", "").Obj(),
-				st.MakeNode().Name("node-2").Label("node", "node-2").Label("zone", "zone-1").Label("foo", "").Taints(taints).Obj(),
-				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
-				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
-			},
-			candidateNodes:            []string{"node-4"},
-			enableNodeInclusionPolicy: false,
+			candidateNodes: []string{"node-4"},
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as 2/2
@@ -2132,8 +2150,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:            []string{"node-1", "node-4"},
-			enableNodeInclusionPolicy: true,
+			candidateNodes: []string{"node-1", "node-4"},
 		},
 		{
 			name: "matchLabelKeys ignored when feature gate disabled, pods spread across zone as 2/1",
@@ -2183,11 +2200,6 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !tt.enableNodeInclusionPolicy {
-				// TODO: this will be removed in 1.36
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)
-			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)
 
 			testCtx := initTest(t, "pts-predicate")
@@ -2717,145 +2729,6 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 	}
 }
 
-// TestPodAffinityMatchLabelKeyEnablement tests the Pod is correctly mutated by MatchLabelKeysInPodAffinity feature,
-// even if turing the feature gate enabled or disabled.
-func TestPodAffinityMatchLabelKeyEnablement(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-
-	testCtx := initTest(t, "matchlabelkey")
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "test",
-			Namespace:    testCtx.NS.Name,
-			Labels:       map[string]string{"foo": "", "bar": "a"},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "container",
-					Image: imageutils.GetPauseImageName(),
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceMemory: resource.MustParse("1G"),
-						},
-					},
-				},
-			},
-			Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							TopologyKey: "node",
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
-									},
-								},
-							},
-							MatchLabelKeys: []string{"bar"},
-						},
-					},
-				},
-			},
-		},
-	}
-	expectedLabelSelector := &metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{
-				Key:      "foo",
-				Operator: metav1.LabelSelectorOpExists,
-			},
-			{
-				Key:      "bar",
-				Operator: metav1.LabelSelectorOpIn,
-				Values:   []string{"a"},
-			},
-		},
-	}
-
-	p1, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error while creating pod during test: %v", err)
-	}
-
-	// check the pod has the expected label selector.
-	gotpod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p1.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error while getting pod during test: %v", err)
-	}
-
-	// the label selector should be changed from the original one because the feature gate is enabled.
-	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
-		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
-	}
-
-	// disable the feature gate.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
-
-	p2, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error while creating pod during test: %v", err)
-	}
-
-	// check the pod has the expected label selector.
-	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p2.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error while getting pod during test: %v", err)
-	}
-
-	// the label selector should be the same as the original one because the feature gate is disabled.
-	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector); d != "" {
-		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p2.Name, d)
-	}
-
-	// check the pod, which was created when the feature gate is enabled, still has the expected label selector.
-	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p1.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error while getting pod during test: %v", err)
-	}
-
-	// the label selector should be changed from the original one because the feature gate is enabled.
-	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
-		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
-	}
-
-	// Again, enable the feature gate.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, true)
-
-	p3, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error while creating pod during test: %v", err)
-	}
-
-	// check the pod has the expected label selector.
-	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p3.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error while getting pod during test: %v", err)
-	}
-
-	// the label selector should be changed from the original one because the feature gate is enabled.
-	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
-		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
-	}
-
-	// check the pod has the expected label selector.
-	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p2.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error while getting pod during test: %v", err)
-	}
-
-	// the label selector shouldn't get changed because the feature gate was disabled at its creation.
-	// Even if the feature gate is enabled now, matchLabelKeys don't get applied to the pod.
-	// (it's only handled when the pod is created)
-	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector); d != "" {
-		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p2.Name, d)
-	}
-
-}
-
 func TestNodeResourcesFilter(t *testing.T) {
 	pause := imageutils.GetPauseImageName()
 	tests := []struct {
@@ -3252,7 +3125,10 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.featureEnabled)
+			if !tt.featureEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+			}
 			testCtx := testutils.InitTestSchedulerWithNS(t, "node-features-filter")
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name

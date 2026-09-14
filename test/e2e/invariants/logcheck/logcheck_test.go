@@ -17,15 +17,20 @@ limitations under the License.
 package logcheck
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"regexp"
 	"strings"
 	"testing"
 	"testing/synctest"
+	"time"
 
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -34,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/storage/podlogs"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -315,9 +321,9 @@ Goroutine created at:
 `,
 			},
 			check: logCheck{dataRaces: true, namespaces: nothing},
-			expectStdout: `<log header>] "Watching" node="worker0"
-<log header>] "Watching" node="worker1"
-<log header>] "Watching" node="worker2"
+			expectStdout: `<log header>] "Watching" node="worker0" startDelay="0s"
+<log header>] "Watching" node="worker1" startDelay="1m40s"
+<log header>] "Watching" node="worker2" startDelay="3m20s"
 <log header>] "Started new data race" container="kubelet/worker2" count=1
 <log header>] "Completed data race" container="kubelet/worker2" count=1 dataRace=<
 	Write at ...
@@ -651,9 +657,9 @@ Goroutine 537 (running) created at:
 `,
 			},
 			check: logCheck{dataRaces: true, namespaces: nothing},
-			expectStdout: `<log header>] "Watching" node="worker0"
-<log header>] "Watching" node="worker1"
-<log header>] "Watching" node="worker2"
+			expectStdout: `<log header>] "Watching" node="worker0" startDelay="0s"
+<log header>] "Watching" node="worker1" startDelay="1m40s"
+<log header>] "Watching" node="worker2" startDelay="3m20s"
 <log header>] "Started new data race" container="kubelet/worker2" count=1
 <log header>] "Completed data race" container="kubelet/worker2" count=1 dataRace=<
 	Write at 0x00c0010def18 by goroutine 285:
@@ -1066,7 +1072,7 @@ DATA RACE:
 
 				return nil
 			}
-			startNodeLog := func(ctx context.Context, cs kubernetes.Interface, wg *waitGroup, nodeName string) io.Reader {
+			startNodeLog := func(ctx context.Context, cs kubernetes.Interface, wg *waitGroup, nodeName string, startDelay time.Duration, record func(nodeName string, numBytes int)) io.Reader {
 				return strings.NewReader(tc.kubeletLogs[nodeName])
 			}
 			lc.start(ctx, startPodLogs, startNodeLog)
@@ -1076,13 +1082,108 @@ DATA RACE:
 			// with adding more background goroutines.
 			synctest.Wait()
 
-			actualFailure, actualStdout := lc.stop(tCtx.Logger())
+			actualFailure, actualStdout, _ := lc.stop(tCtx.Logger())
 			actualStdout = logHeaderRE.ReplaceAllString(actualStdout, "$1<log header>]")
 			assert.Equal(tCtx, tc.expectStdout, actualStdout, "report")
 			actualFailure = logHeaderRE.ReplaceAllString(actualFailure, "$1<log header>]")
 			assert.Equal(tCtx, tc.expectFailure, actualFailure, "failure message")
 		})
 	}
+}
+
+// TestKubeletLogQuery exercises the real kubeletLogQuery, in particular its
+// switch from the initial startDelay timer to the regular
+// nodeLogQueryInterval ticker, and the statistics it reports through record.
+// A fake "kubelet" on the other end of an in-memory connection responds to
+// each query so that we can record when queries actually happened and how
+// much data they returned.
+func TestKubeletLogQuery(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testKubeletLogQuery)
+}
+
+func testKubeletLogQuery(tCtx ktesting.TContext) {
+	const (
+		startDelay = 10 * time.Second
+		interval   = nodeLogQueryInterval
+		body       = "some log output\n"
+	)
+
+	srvConn, cliConn := net.Pipe()
+	tCtx.Cleanup(func() {
+		_ = srvConn.Close()
+		_ = cliConn.Close()
+	})
+
+	// Fake kubelet: answers every request with a bit of log output.
+	go func() {
+		for {
+			req, err := http.ReadRequest(bufio.NewReader(srvConn))
+			if err != nil {
+				return
+			}
+			_, _ = io.Copy(io.Discard, req.Body)
+			_ = req.Body.Close()
+			resp := &http.Response{
+				StatusCode:    http.StatusOK,
+				Proto:         "HTTP/1.1",
+				ProtoMajor:    1,
+				ProtoMinor:    1,
+				Header:        make(http.Header),
+				Body:          io.NopCloser(strings.NewReader(body)),
+				ContentLength: int64(len(body)),
+			}
+			_ = resp.Write(srvConn)
+		}
+	}()
+
+	cs, err := kubernetes.NewForConfig(&rest.Config{
+		Host: "http://fake-node",
+		// A custom Transport instead of Dial is needed here so that we can
+		// disable the idle-connection timeout, which would otherwise close
+		// our in-memory connection between queries at the real interval.
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+				return cliConn, nil
+			},
+			IdleConnTimeout: 0,
+		},
+	})
+	tCtx.ExpectNoError(err, "create clientset")
+
+	// recordedQuery captures everything that record gets called with, plus
+	// the time relative to the start of the test, so that both the ticks
+	// and the reported statistics can be checked together.
+	type recordedQuery struct {
+		at    time.Duration
+		node  string
+		bytes int
+	}
+	var queries []recordedQuery
+	start := time.Now()
+	record := func(nodeName string, numBytes int) {
+		queries = append(queries, recordedQuery{at: time.Since(start), node: nodeName, bytes: numBytes})
+	}
+
+	wg := newWaitGroup()
+	reader := kubeletLogQuery(tCtx, cs, wg, "node0", startDelay, record)
+	wg.goIfNotShuttingDown(nil, func() {
+		_, _ = io.Copy(io.Discard, reader)
+	})
+
+	// Let four periodic queries happen (at startDelay, +interval, +2*interval, +3*interval),
+	// then cancel in the middle of waiting for the fifth to trigger the final,
+	// "one last time" query.
+	time.Sleep(startDelay + 3*interval + interval/2)
+	tCtx.Cancel("test is done")
+	wg.wait()
+
+	tCtx.Expect(queries).To(gomega.Equal([]recordedQuery{
+		{at: startDelay, node: "node0", bytes: len(body)},
+		{at: startDelay + interval, node: "node0", bytes: len(body)},
+		{at: startDelay + 2*interval, node: "node0", bytes: len(body)},
+		{at: startDelay + 3*interval, node: "node0", bytes: len(body)},
+		{at: startDelay + 3*interval + interval/2, node: "node0", bytes: len(body)},
+	}), "recorded queries relative to start")
 }
 
 var logHeaderRE = regexp.MustCompile(`(?m)^(\s*).*logcheck.go:[[:digit:]]+\]`)

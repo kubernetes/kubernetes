@@ -34,11 +34,39 @@ import (
 )
 
 // NodeInformer provides access to a shared informer and lister for
-// Nodes.
+// Nodes. Prefer using the type-safe variant (see [TypedNodeInformer]).
 type NodeInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.NodeLister
 }
+
+// TypedNodeInformer provides access to a shared informer and lister for
+// Nodes, including the type-safe TypedInformer variant.
+// It is a superset of NodeInformer.
+type TypedNodeInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() NodeIndexInformer
+	Lister() corev1.NodeLister
+}
+
+// NodeIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type NodeIndexInformer cache.TypedSharedIndexInformer[*apicorev1.Node]
+
+// NodeHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Node.
+type NodeHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apicorev1.Node]
+
+// NodeDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Node.
+type NodeDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apicorev1.Node]
+
+// NodeFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Node.
+type NodeFilteringHandler = cache.TypedFilteringResourceEventHandler[*apicorev1.Node]
+
+// NodeIndexers is a specialization of [cache.TypedIndexers] for Node.
+type NodeIndexers = cache.TypedIndexers[*apicorev1.Node]
+
+// DeletedNode is a specialization of [cache.DeletedObject] for Node.
+type DeletedNode = cache.DeletedObject[*apicorev1.Node]
 
 type nodeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type nodeInformer struct {
 // NewNodeInformer constructs a new informer for Node type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedNodeInformer]).
 func NewNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewNodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedNodeInformer constructs a new informer for Node type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers NodeIndexers) NodeIndexInformer {
+	return NewTypedNodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredNodeInformer constructs a new informer for Node type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredNodeInformer]).
 func NewFilteredNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewNodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedNodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredNodeInformer constructs a new informer for Node type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers NodeIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) NodeIndexInformer {
+	return NewTypedNodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewNodeInformerWithOptions constructs a new informer for Node type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedNodeInformerWithOptions]).
 func NewNodeInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedNodeInformerWithOptions(client, options)
+}
+
+// NewTypedNodeInformerWithOptions constructs a new informer for Node type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedNodeInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) NodeIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Node](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewNodeInformerWithOptions(client kubernetes.Interface, options internalint
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *nodeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewNodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedNodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *nodeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.Node{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *nodeInformer) TypedInformer() NodeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Node](f.factory.InformerFor(&apicorev1.Node{}, f.defaultInformer))
 }
 
 func (f *nodeInformer) Lister() corev1.NodeLister {
 	return corev1.NewNodeLister(f.Informer().GetIndexer())
+}
+
+// ToTypedNodeInformer converts an untyped informer into a TypedNodeInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Node. If that is not the case, calling type-safe methods of the returned
+// TypedNodeInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedNodeInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedNodeInformer(informer NodeInformer) TypedNodeInformer {
+	if informer, ok := informer.(TypedNodeInformer); ok {
+		return informer
+	}
+	return &nodeTypedInformerAdapter{informer}
+}
+
+type nodeTypedInformerAdapter struct {
+	NodeInformer
+}
+
+func (a *nodeTypedInformerAdapter) TypedInformer() NodeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Node](a.Informer())
+}
+
+// ToNodeIndexInformer converts an untyped informer into a NodeIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Node. If that is not the case, calling type-safe methods of the returned
+// NodeIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a NodeIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToNodeIndexInformer(informer cache.SharedIndexInformer) NodeIndexInformer {
+	if informer, ok := informer.(NodeIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Node](informer)
 }

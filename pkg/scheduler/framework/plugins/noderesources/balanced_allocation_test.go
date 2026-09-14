@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -317,6 +318,9 @@ func testNodeResourcesBalancedAllocation(tCtx ktesting.TContext) {
 
 	for _, test := range tests {
 		tCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
+			if test.draObjects == nil {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draObjects != nil)
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
@@ -438,7 +442,10 @@ func testBalancedAllocationSignPod(tCtx ktesting.TContext) {
 			if !test.disableDRAExtendedResource {
 				testDRAManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)
 				runOpts = append(runOpts, runtime.WithSharedDRAManager(testDRAManager))
+			} else {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
+
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
 			defer func() {
 				tCtx.Cancel("test has completed")

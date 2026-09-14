@@ -41,6 +41,7 @@ type LeaseInterface interface {
 	Create(ctx context.Context, lease *coordinationv1beta1.Lease, opts v1.CreateOptions) (*coordinationv1beta1.Lease, error)
 	Update(ctx context.Context, lease *coordinationv1beta1.Lease, opts v1.UpdateOptions) (*coordinationv1beta1.Lease, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*coordinationv1beta1.Lease, error)
 	List(ctx context.Context, opts v1.ListOptions) (*coordinationv1beta1.LeaseList, error)

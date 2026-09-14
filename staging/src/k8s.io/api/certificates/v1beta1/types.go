@@ -35,26 +35,29 @@ import (
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/approval"
 type CertificateSigningRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
+	// metadata is the standard object's metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec contains the certificate request, and is immutable after creation.
 	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
 	// Other fields are derived by Kubernetes and cannot be modified by users.
+	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
-	// Derived information about the request.
+	// status is the derived information about the request.
 	// +optional
 	Status CertificateSigningRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // CertificateSigningRequestSpec contains the certificate request.
 type CertificateSigningRequestSpec struct {
-	// Base64-encoded PKCS#10 CSR data
+	// request is Base64-encoded PKCS#10 CSR data
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
-	// Requested signer for the request. It is a qualified name in the form:
+	// signerName is the requested signer for the request. It is a qualified name in the form:
 	// `scope-hostname.io/name`.
 	// If empty, it will be defaulted:
 	//  1. If it's a kubelet client certificate, it is assigned
@@ -89,7 +92,7 @@ type CertificateSigningRequestSpec struct {
 	// +optional
 	ExpirationSeconds *int32 `json:"expirationSeconds,omitempty" protobuf:"varint,8,opt,name=expirationSeconds"`
 
-	// allowedUsages specifies a set of usage contexts the key will be
+	// usages specifies a set of usage contexts the key will be
 	// valid for.
 	// See:
 	//	https://tools.ietf.org/html/rfc5280#section-4.2.1.3
@@ -120,22 +123,25 @@ type CertificateSigningRequestSpec struct {
 	//  "microsoft sgc",
 	//  "netscape sgc"
 	// +listType=atomic
+	// +k8s:alpha(since: "1.38")=+k8s:listType=atomic
+	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
-	// Information about the requesting user.
+	// username is the information about the requesting user.
 	// See user.Info interface for details.
 	// +optional
 	Username string `json:"username,omitempty" protobuf:"bytes,2,opt,name=username"`
-	// UID information about the requesting user.
+	// uid is the UID information about the requesting user.
 	// See user.Info interface for details.
 	// +optional
 	UID string `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
-	// Group information about the requesting user.
+	// groups is the Group information about the requesting user.
 	// See user.Info interface for details.
 	// +listType=atomic
 	// +optional
 	Groups []string `json:"groups,omitempty" protobuf:"bytes,4,rep,name=groups"`
-	// Extra information about the requesting user.
+	// extra information about the requesting user.
 	// See user.Info interface for details.
 	// +optional
 	Extra map[string]ExtraValue `json:"extra,omitempty" protobuf:"bytes,6,rep,name=extra"`
@@ -177,12 +183,12 @@ type CertificateSigningRequestStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:listType=map
-	// +k8s:alpha(since: "1.36")=+k8s:listMapKey=type
-	// +k8s:alpha(since: "1.36")=+k8s:customUnique
-	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
-	// +k8s:alpha(since: "1.36")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
+	// +k8s:beta(since: "1.37")=+k8s:listType=map
+	// +k8s:beta(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.37")=+k8s:customUnique
+	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
+	// +k8s:beta(since: "1.37")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// If request was approved, the controller will place the issued certificate here.
@@ -202,19 +208,19 @@ const (
 type CertificateSigningRequestCondition struct {
 	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
 	Type RequestConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RequestConditionType"`
-	// Status of the condition, one of True, False, Unknown.
+	// status is the status of the condition, one of True, False, Unknown.
 	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
 	// Defaults to "True".
 	// If unset, should be treated as "True".
 	// +optional
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,6,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
-	// brief reason for the request state
+	// reason is a brief reason for the request state
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
-	// human readable message with details about the request state
+	// message is a human readable message with details about the request state
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
-	// timestamp for the last update to this condition
+	// lastUpdateTime is the timestamp for the last update to this condition
 	// +optional
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,4,opt,name=lastUpdateTime"`
 	// lastTransitionTime is the time the condition last transitioned from one status to another.
@@ -230,7 +236,7 @@ type CertificateSigningRequestCondition struct {
 // +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,CertificateSigningRequestList
 
 type CertificateSigningRequestList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -242,6 +248,8 @@ type CertificateSigningRequestList struct {
 //
 //	https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 //	https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+//
+// +k8s:alpha(since: "1.38")=+k8s:enum
 type KeyUsage string
 
 const (
@@ -274,6 +282,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:prerelease-lifecycle-gen:introduced=1.33
 // +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,ClusterTrustBundle
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors
@@ -286,13 +295,13 @@ const (
 // to a cluster can read ClusterTrustBundles by impersonating a serviceaccount
 // that they have access to.
 //
-// It can be optionally associated with a particular assigner, in which case it
+// It can be optionally associated with a particular signer, in which case it
 // contains one valid set of trust anchors for that signer. Signers may have
 // multiple associated ClusterTrustBundles; each is an independent set of trust
 // anchors for that signer. Admission control is used to enforce that only users
 // with permissions on the signer can create or modify the corresponding bundle.
 type ClusterTrustBundle struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the object metadata.
 	// +optional
@@ -324,6 +333,8 @@ type ClusterTrustBundleSpec struct {
 	// using a `spec.signerName=NAME` field selector.
 	//
 	// +optional
+	// +k8s:alpha(since:"1.37")=+k8s:optional
+	// +k8s:alpha(since:"1.37")=+k8s:immutable
 	SignerName string `json:"signerName,omitempty" protobuf:"bytes,1,opt,name=signerName"`
 
 	// trustBundle contains the individual X.509 trust anchors for this
@@ -342,11 +353,12 @@ type ClusterTrustBundleSpec struct {
 
 // +k8s:prerelease-lifecycle-gen:introduced=1.33
 // +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,ClusterTrustBundleList
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterTrustBundleList is a collection of ClusterTrustBundle objects
 type ClusterTrustBundleList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the list metadata.
 	//
@@ -359,14 +371,17 @@ type ClusterTrustBundleList struct {
 
 // +genclient
 // +k8s:prerelease-lifecycle-gen:introduced=1.35
+// +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,PodCertificateRequest
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodCertificateRequest encodes a pod requesting a certificate from a given
 // signer.
 //
 // Kubelets use this API to implement podCertificate projected volumes
+// +k8s:supportsSubresource="/status"
 type PodCertificateRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the object metadata.
 	//
@@ -441,7 +456,7 @@ type PodCertificateRequestSpec struct {
 	// +default=86400
 	MaxExpirationSeconds *int32 `json:"maxExpirationSeconds,omitempty" protobuf:"varint,8,opt,name=maxExpirationSeconds"`
 
-	// The PKIX-serialized public key the signer will issue the certificate to.
+	// pkixPublicKey is the PKIX-serialized public key the signer will issue the certificate to.
 	//
 	// The key must be one of RSA3072, RSA4096, ECDSAP256, ECDSAP384, ECDSAP521,
 	// or ED25519. Note that this list may be expanded in the future.
@@ -461,7 +476,7 @@ type PodCertificateRequestSpec struct {
 	// +optional
 	PKIXPublicKey []byte `json:"pkixPublicKey" protobuf:"bytes,9,opt,name=pkixPublicKey"`
 
-	// A proof that the requesting kubelet holds the private key corresponding
+	// proofOfPossession is a proof that the requesting kubelet holds the private key corresponding
 	// to pkixPublicKey.
 	//
 	// It is contructed by signing the ASCII bytes of the pod's UID using
@@ -488,7 +503,7 @@ type PodCertificateRequestSpec struct {
 	// +optional
 	ProofOfPossession []byte `json:"proofOfPossession" protobuf:"bytes,10,opt,name=proofOfPossession"`
 
-	// A PKCS#10 certificate signing request (DER-serialized) generated by
+	// stubPKCS10Request is a PKCS#10 certificate signing request (DER-serialized) generated by
 	// Kubelet using the subject private key.
 	//
 	// Most signer implementations will ignore the contents of the CSR except to
@@ -538,6 +553,9 @@ type PodCertificateRequestStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:listType=map
+	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// certificateChain is populated with an issued certificate by the signer.
@@ -618,10 +636,12 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.35
+// +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,PodCertificateRequestList
 
 // PodCertificateRequestList is a collection of PodCertificateRequest objects
 type PodCertificateRequestList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the list metadata.
 	//

@@ -42,12 +42,15 @@ type EndpointSliceTracker struct {
 	// generationsByService tracks the generations of EndpointSlices for each
 	// Service.
 	generationsByService map[types.NamespacedName]GenerationsBySlice
+	// servicesByUID tracks the UID of each Service being tracked.
+	servicesByUID map[types.NamespacedName]types.UID
 }
 
 // NewEndpointSliceTracker creates and initializes a new endpointSliceTracker.
 func NewEndpointSliceTracker() *EndpointSliceTracker {
 	return &EndpointSliceTracker{
 		generationsByService: map[types.NamespacedName]GenerationsBySlice{},
+		servicesByUID:        map[types.NamespacedName]types.UID{},
 	}
 }
 
@@ -80,17 +83,31 @@ func (est *EndpointSliceTracker) ShouldSync(endpointSlice *discovery.EndpointSli
 	return !ok || endpointSlice.Generation > g
 }
 
-// StaleSlices returns true if any of the following are true:
+// StaleSlices returns true if the informer cache appears to be lagging behind
+// recent writes made by the controller for this Service. Specifically, it returns
+// true if any of the following are true:
 //  1. One or more of the provided EndpointSlices have older generations than the
 //     corresponding tracked ones.
 //  2. The tracker is expecting one or more of the provided EndpointSlices to be
 //     deleted. (EndpointSlices that have already been marked for deletion are ignored here.)
 //  3. The tracker is tracking EndpointSlices that have not been provided.
+//
+// If the Service UID has changed (e.g. the Service was deleted and recreated),
+// tracked generations from the previous Service UID represent obsolete writes and
+// are cleared so they do not block reconciliation of the new Service.
 func (est *EndpointSliceTracker) StaleSlices(service *v1.Service, endpointSlices []*discovery.EndpointSlice) bool {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
 	nn := types.NamespacedName{Name: service.Name, Namespace: service.Namespace}
+	if est.servicesByUID == nil {
+		est.servicesByUID = map[types.NamespacedName]types.UID{}
+	}
+	if trackedUID, ok := est.servicesByUID[nn]; ok && trackedUID != "" && service.UID != "" && trackedUID != service.UID {
+		delete(est.generationsByService, nn)
+	}
+	est.servicesByUID[nn] = service.UID
+
 	gfs, ok := est.generationsByService[nn]
 	if !ok {
 		return false
@@ -137,6 +154,7 @@ func (est *EndpointSliceTracker) DeleteService(namespace, name string) {
 
 	serviceNN := types.NamespacedName{Name: name, Namespace: namespace}
 	delete(est.generationsByService, serviceNN)
+	delete(est.servicesByUID, serviceNN)
 }
 
 // ExpectDeletion sets the generation to deletionExpected in this

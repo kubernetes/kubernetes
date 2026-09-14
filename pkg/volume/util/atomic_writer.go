@@ -26,7 +26,9 @@ import (
 	"strings"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -190,7 +192,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 		// (5)
 		tsDir, err := w.newTimestampDir()
 		if err != nil {
-			klog.V(4).Infof("%s: error creating new ts data directory: %v", w.logContext, err)
+			klog.Errorf("%s: error creating new ts data directory: %v", w.logContext, err)
 			return err
 		}
 		tsDirName := filepath.Base(tsDir)
@@ -512,4 +514,17 @@ func (w *AtomicWriter) removeUserVisiblePaths(paths sets.Set[string]) error {
 	}
 
 	return lasterr
+}
+
+// ResolvesFsUser resolves file owner UID using a fallback mechanism described in KEP-5936.
+// Returns nil when the feature gate is disabled.
+func ResolvesFsUser(defaultUser, itemUser *int64) (fsUser *int64) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.AtomicWriteVolumeUserFields) {
+		if itemUser != nil {
+			fsUser = itemUser
+		} else {
+			fsUser = defaultUser
+		}
+	}
+	return
 }

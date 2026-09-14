@@ -301,7 +301,7 @@ func (d *driverDefinition) GetDriverInfo() *storageframework.DriverInfo {
 	return &d.DriverInfo
 }
 
-func (d *driverDefinition) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (d *driverDefinition) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
 	supported := false
 	// TODO (?): add support for more volume types
 	switch pattern.VolType {
@@ -315,9 +315,9 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern storageframework.TestPatt
 		supported = len(d.InlineVolumes) != 0
 	}
 	if !supported {
-		e2eskipper.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
+		return fmt.Sprintf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
 	}
-
+	return ""
 }
 
 func (d *driverDefinition) GetDynamicProvisionStorageClass(ctx context.Context, e2econfig *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {

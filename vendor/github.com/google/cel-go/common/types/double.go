@@ -89,7 +89,7 @@ func (d Double) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		case floatWrapperType:
 			// Convert to a wrapperspb.FloatValue (with truncation).
 			return wrapperspb.Float(float32(d)), nil
-		case jsonValueType:
+		case JSONValueType:
 			// Note, there are special cases for proto3 to json conversion that
 			// expect the floating point value to be converted to a NaN,
 			// Infinity, or -Infinity string values, but the jsonpb string

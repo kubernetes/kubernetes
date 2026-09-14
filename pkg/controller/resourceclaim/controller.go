@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -27,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,25 +36,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
-	schedulingapply "k8s.io/client-go/applyconfigurations/scheduling/v1alpha2"
+	schedulingapply "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -73,7 +77,7 @@ const (
 	podGroupResourceClaimTemplateIndex = "podGroupResourceClaimTemplate"
 
 	// claimPodOwnerIndex is used to find ResourceClaims which have
-	// a specific pod as owner. Values for this index are the pod UID.
+	// a specific pod as owner. Values for this index are the pod "namespace/UID".
 	claimPodOwnerIndex = "claimPodOwner"
 
 	// claimPodGroupOwnerIndex is used to find ResourceClaims which have a
@@ -83,6 +87,9 @@ const (
 
 	// podGroupMembersIndex is used to find Pods in a given PodGroup.
 	podGroupMembersIndex = "podGroupMembers"
+
+	// claimMutationCacheSize is the size of the LRU in the claim mutation cache.
+	claimMutationCacheSize = 1000
 
 	// Field manager used to update the pod status.
 	fieldManager = "ResourceClaimController"
@@ -95,7 +102,7 @@ const (
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
 type Controller struct {
 	// features defines the feature gates that are enabled.
-	features Features
+	features controllerFeatures
 
 	// kubeClient is the kube API client used to communicate with the API
 	// server.
@@ -138,7 +145,10 @@ type Controller struct {
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
 
-	queue workqueue.TypedRateLimitingInterface[string]
+	// syncHandlerFunc runs for each item in the workqueue. It is replaced in
+	// some tests that exercise the workqueue.
+	syncHandlerFunc func(context.Context, string) error
+	queue           workqueue.TypedRateLimitingInterface[string]
 
 	// The deletedObjects cache keeps track of Pods for which we know that
 	// they have existed and have been removed. For those we can be sure
@@ -152,22 +162,68 @@ const (
 	podGroupKeyPrefix = "podgroup:"
 )
 
-// Features defines which features should be enabled in the controller.
-type Features struct {
+// controllerFeatures defines which features should be enabled in the controller.
+type controllerFeatures struct {
 	AdminAccess            bool
+	GenericWorkload        bool
 	PrioritizedList        bool
 	WorkloadResourceClaims bool
+}
+
+// String describes the features suitably for unit test names.
+func (f controllerFeatures) String() string {
+	enabled := func(b bool) string {
+		if b {
+			return "enabled"
+		}
+		return "disabled"
+	}
+	return fmt.Sprintf(
+		"adminaccess-%s-genericworkload-%s-prioritizedlist-%s-workloadresourceclaims-%s",
+		enabled(f.AdminAccess),
+		enabled(f.GenericWorkload),
+		enabled(f.PrioritizedList),
+		enabled(f.WorkloadResourceClaims),
+	)
+}
+
+// nonRetryableError is an error for a key in the workqueue that will not be requeued.
+type nonRetryableError struct {
+	error
 }
 
 // NewController creates a ResourceClaim controller.
 func NewController(
 	logger klog.Logger,
-	features Features,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
 	podGroupInformer schedulinginformers.PodGroupInformer,
 	claimInformer resourceinformers.ResourceClaimInformer,
 	templateInformer resourceinformers.ResourceClaimTemplateInformer) (*Controller, error) {
+	return newControllerWithFeatures(
+		logger,
+		kubeClient,
+		podInformer,
+		podGroupInformer,
+		claimInformer,
+		templateInformer,
+		controllerFeatures{
+			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			GenericWorkload:        utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
+			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
+		},
+	)
+}
+
+func newControllerWithFeatures(
+	logger klog.Logger,
+	kubeClient clientset.Interface,
+	podInformer v1informers.PodInformer,
+	podGroupInformer schedulinginformers.PodGroupInformer,
+	claimInformer resourceinformers.ResourceClaimInformer,
+	templateInformer resourceinformers.ResourceClaimTemplateInformer,
+	features controllerFeatures) (*Controller, error) {
 
 	ec := &Controller{
 		features:        features,
@@ -181,36 +237,41 @@ func NewController(
 		templatesSynced: templateInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resource_claim"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "resource_claim",
+			},
 		),
 		deletedObjects: newUIDCache(maxUIDCacheEntries),
 	}
+	ec.syncHandlerFunc = ec.syncHandler
 
-	resourceclaimmetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
+	resourceclaimmetrics.RegisterMetrics()
+	controllermetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
 
 	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			ec.enqueuePod(logger, obj, false)
 		},
-		UpdateFunc: func(old, updated interface{}) {
+		UpdateFunc: func(old, updated any) {
 			ec.enqueuePod(logger, updated, false)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			ec.enqueuePod(logger, obj, true)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
 	if _, err := claimInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			logger.V(6).Info("New claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, nil, obj)
 		},
-		UpdateFunc: func(old, updated interface{}) {
+		UpdateFunc: func(old, updated any) {
 			logger.V(6).Info("Updated claim", "claimDump", updated)
 			ec.enqueueResourceClaim(logger, old, updated)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			logger.V(6).Info("Deleted claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, obj, nil)
 		},
@@ -218,15 +279,15 @@ func NewController(
 		return nil, err
 	}
 	if _, err := templateInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			logger.V(6).Info("New claim template", "claimTemplateDump", obj)
 			ec.enqueueResourceClaimTemplate(logger, obj)
 		},
-		UpdateFunc: func(old, updated interface{}) {
+		UpdateFunc: func(old, updated any) {
 			logger.V(6).Info("Updated claim template", "claimTemplateDump", updated)
 			ec.enqueueResourceClaimTemplate(logger, updated)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			logger.V(6).Info("Deleted claim template", "claimTemplateDump", obj)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
@@ -240,22 +301,24 @@ func NewController(
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
 
+	if features.GenericWorkload {
+		ec.podGroupLister = podGroupInformer.Lister()
+	}
 	ec.podGroupSynced = func() bool { return true }
 	if features.WorkloadResourceClaims {
-		ec.podGroupLister = podGroupInformer.Lister()
 		ec.podGroupSynced = podGroupInformer.Informer().HasSynced
 		ec.podGroupIndexer = podGroupInformer.Informer().GetIndexer()
 
 		if _, err := podGroupInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
+			AddFunc: func(obj any) {
 				logger.V(6).Info("New PodGroup", "podGroupDump", obj)
 				ec.enqueuePodGroup(logger, obj, false)
 			},
-			UpdateFunc: func(old, updated interface{}) {
+			UpdateFunc: func(old, updated any) {
 				logger.V(6).Info("Updated PodGroup", "podGroupDump", updated)
 				ec.enqueuePodGroup(logger, updated, false)
 			},
-			DeleteFunc: func(obj interface{}) {
+			DeleteFunc: func(obj any) {
 				logger.V(6).Info("Deleted PodGroup", "podGroupDump", obj)
 				ec.enqueuePodGroup(logger, obj, true)
 			},
@@ -290,21 +353,27 @@ func NewController(
 	if err := claimInformerCache.AddIndexers(cache.Indexers{claimPodOwnerIndex: claimPodOwnerIndexFunc}); err != nil {
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
-	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(logger, claimInformerCache, claimInformerCache,
+	ec.claimCache = cache.NewIntegerResourceVersionMutationCacheWithOptions(logger, claimInformerCache, cache.MutationCacheOptions{
+		Indexer: claimInformerCache,
 		// Very long time to live, unlikely to be needed because
 		// the informer cache should get updated soon.
-		time.Hour,
+		TTL: time.Hour,
 		// Allow storing objects not in the underlying cache - that's the point...
 		// It's safe because in case of a race (claim is in mutation cache, claim
 		// gets deleted, controller updates status based on mutation cache) the
 		// "bad" pod status will get detected and fixed when the informer catches up.
-		true,
+		IncludeAdds: true,
+		// Tracks more recently mutated objects than the default (100)
+		// so that lookups still succeed locally while the informer cache lags
+		// behind etcd, avoiding the fallback GET against the apiserver.
+		MaxCacheSize: claimMutationCacheSize,
+	},
 	)
 
 	return ec, nil
 }
 
-func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj interface{}) {
+func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj any) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -369,7 +438,7 @@ func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj inter
 	}
 }
 
-func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bool) {
+func (ec *Controller) enqueuePod(logger klog.Logger, obj any, deleted bool) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -534,7 +603,7 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 	return false, "nothing to do for any claim: " + strings.Join(doNothingReasons, ", ")
 }
 
-func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj interface{}, deleted bool) {
+func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj any, deleted bool) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -610,7 +679,7 @@ func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj interface{}, delet
 			runtime.HandleErrorWithLogger(logger, nil, "unexpected object in Pod indexer", "type", fmt.Sprintf("%T", object))
 			return
 		}
-		logger.V(4).Info(
+		logger.V(6).Info(
 			"Enqueuing Pod due to PodGroup change",
 			"podgroup", klog.KObj(podGroup),
 			"pod", klog.KObj(pod),
@@ -675,7 +744,7 @@ func (ec *Controller) podGroupNeedsWork(podGroup *schedulingapi.PodGroup) (bool,
 	return false, "nothing to do for any claim: " + strings.Join(doNothingReasons, ", ")
 }
 
-func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj interface{}) {
+func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj any) {
 	deleted := newObj == nil
 	if d, ok := oldObj.(cache.DeletedFinalStateUnknown); ok {
 		oldObj = d.Obj
@@ -763,7 +832,7 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 		return
 	}
 
-	for i := 0; i < workers; i++ {
+	for range workers {
 		wg.Go(func() {
 			wait.UntilWithContext(ctx, ec.runWorker, time.Second)
 		})
@@ -783,8 +852,12 @@ func (ec *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer ec.queue.Done(key)
 
-	err := ec.syncHandler(ctx, key)
-	if err == nil {
+	err := ec.syncHandlerFunc(ctx, key)
+	_, nonRetryable := errors.AsType[nonRetryableError](err)
+	if nonRetryable {
+		runtime.HandleErrorWithContext(ctx, err, "Work item failed, will not retry", "item", key)
+	}
+	if err == nil || nonRetryable {
 		ec.queue.Forget(key)
 		return true
 	}
@@ -861,10 +934,25 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 	if newPodClaims != nil {
 		// Patch the pod status with the new information about
 		// generated ResourceClaims.
-		statuses := make([]*corev1apply.PodResourceClaimStatusApplyConfiguration, 0, len(newPodClaims))
-		for podClaimName, resourceClaimName := range newPodClaims {
-			statuses = append(statuses, corev1apply.PodResourceClaimStatus().WithName(podClaimName).WithResourceClaimName(resourceClaimName))
+		mergedStatuses := make(map[string]string)
+		for _, status := range pod.Status.ResourceClaimStatuses {
+			if status.ResourceClaimName != nil {
+				mergedStatuses[status.Name] = *status.ResourceClaimName
+			}
 		}
+		maps.Copy(mergedStatuses, newPodClaims)
+
+		names := make([]string, 0, len(mergedStatuses))
+		for name := range mergedStatuses {
+			names = append(names, name)
+		}
+		slices.Sort(names)
+
+		statuses := make([]*corev1apply.PodResourceClaimStatusApplyConfiguration, 0, len(names))
+		for _, name := range names {
+			statuses = append(statuses, corev1apply.PodResourceClaimStatus().WithName(name).WithResourceClaimName(mergedStatuses[name]))
+		}
+
 		podApply := corev1apply.Pod(name, namespace).WithStatus(corev1apply.PodStatus().WithResourceClaimStatuses(statuses...))
 		if _, err := ec.kubeClient.CoreV1().Pods(namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 			return fmt.Errorf("update pod %s/%s ResourceClaimStatuses: %v", namespace, name, err)
@@ -906,6 +994,15 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 			if err != nil {
 				return err
 			}
+			if isPodGroupClaim(bindTo) && !ec.features.WorkloadResourceClaims {
+				// It's not expected for ResourceClaims to remain allocated but
+				// unreserved for too long. This message is logged at a lower
+				// verbosity threshold so cluster admins can more easily
+				// identify when that happens because of this feature gate in
+				// normal production clusters.
+				logger.V(3).Info("Not reserving PodGroup ResourceClaim because feature is disabled", "feature", features.DRAWorkloadResourceClaims, "resourceClaim", klog.KObj(claim))
+				continue
+			}
 			logger.V(5).Info("Reserve claim", "resourceClaim", klog.KObj(claim), "reservedForResource", bindTo.Resource)
 			if err := ec.reserveFor(ctx, bindTo, claim); err != nil {
 				return err
@@ -940,21 +1037,26 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 		claimName := *claimName
 		// The ResourceClaim should exist because it is recorded in the pod.status.resourceClaimStatuses,
 		// but perhaps it was deleted accidentally. In that case we re-create it.
-		claim, err := ec.claimLister.ResourceClaims(pod.Namespace).Get(claimName)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if claim != nil {
-			var err error
+		checkClaimOwnedByPod := func(claim *resourceapi.ResourceClaim) bool {
 			if mustCheckOwner {
-				err = resourceclaim.IsForPod(pod, claim, ec.features.WorkloadResourceClaims)
+				if err := resourceclaim.IsForPod(pod, claim, ec.features.WorkloadResourceClaims); err != nil {
+					logger.Error(err, "Claim that was created for the pod is no longer owned by the pod, creating a new one",
+						"podClaim", podClaim.Name, "resourceClaim", claimName)
+					return false
+				}
 			}
-			if err == nil {
-				// Already created, nothing more to do.
-				logger.V(5).Info("Claim already created", "podClaim", podClaim.Name, "resourceClaim", claimName)
-				return nil
-			}
-			logger.Error(err, "Claim that was created for the pod is no longer owned by the pod, creating a new one", "podClaim", podClaim.Name, "resourceClaim", claimName)
+
+			return true
+		}
+
+		exists, err := ec.claimExists(ctx, pod.Namespace, claimName, checkClaimOwnedByPod)
+		if err != nil {
+			return fmt.Errorf("checking claim existence: %w", err)
+		}
+		if exists {
+			// Already created, nothing more to do.
+			logger.V(5).Info("Claim already created", "podClaim", podClaim.Name, "resourceClaim", claimName)
+			return nil
 		}
 	}
 
@@ -968,9 +1070,11 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 	if err != nil {
 		return err
 	}
-	isPodGroupClaim := bindTo.APIGroup == schedulingapi.GroupName && bindTo.Resource == "podgroups"
 	var claim *resourceapi.ResourceClaim
-	if isPodGroupClaim {
+	if isPodGroupClaim(bindTo) {
+		if !ec.features.WorkloadResourceClaims {
+			return nonRetryableError{fmt.Errorf("claim %s is a PodGroup claim but the %s feature is disabled", podClaim.Name, features.DRAWorkloadResourceClaims)}
+		}
 		claim, err = ec.findPodGroupResourceClaim(podGroup, schedulingapi.PodGroupResourceClaim{
 			Name: podClaim.Name,
 		})
@@ -1003,7 +1107,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 			// Create the ResourceClaim with pod as owner, with a generated name that uses
 			// <pod>-<claim name> as base.
 			isTrue := true
-			annotations := template.Spec.ObjectMeta.Annotations
+			annotations := maps.Clone(template.Spec.ObjectMeta.Annotations)
 			if annotations == nil {
 				annotations = make(map[string]string)
 			}
@@ -1037,14 +1141,14 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 				},
 				Spec: template.Spec.Spec,
 			}
-			metricLabel := getAdminAccessMetricLabel(claim)
+			getMetricLabels := getClaimCreateMetricLabels(claim)
 			claimName := claim.Name
 			claim, err = ec.kubeClient.ResourceV1().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 			if err != nil {
-				resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", metricLabel).Inc()
+				resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(getMetricLabels("failure")...).Inc()
 				return fmt.Errorf("create ResourceClaim %s: %w", claimName, err)
 			}
-			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", metricLabel).Inc()
+			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(getMetricLabels("success")...).Inc()
 			logger.V(4).Info("Created ResourceClaim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
 			ec.claimCache.Mutation(claim)
 		}
@@ -1084,7 +1188,7 @@ func hasPrioritizedList(claimTemplate *resourceapi.ResourceClaimTemplate) bool {
 // the pod).
 func (ec *Controller) findPodResourceClaim(pod *v1.Pod, podClaim v1.PodResourceClaim) (*resourceapi.ResourceClaim, error) {
 	// Only claims owned by the pod will get returned here.
-	claims, err := ec.claimCache.ByIndex(claimPodOwnerIndex, string(pod.UID))
+	claims, err := ec.claimCache.ByIndex(claimPodOwnerIndex, pod.Namespace+"/"+string(pod.UID))
 	if err != nil {
 		return nil, err
 	}
@@ -1159,7 +1263,7 @@ func (ec *Controller) syncPodGroup(ctx context.Context, namespace, name string) 
 			statuses = append(statuses, schedulingapply.PodGroupResourceClaimStatus().WithName(podGroupClaimName).WithResourceClaimName(resourceClaimName))
 		}
 		podGroupApply := schedulingapply.PodGroup(name, namespace).WithStatus(schedulingapply.PodGroupStatus().WithResourceClaimStatuses(statuses...))
-		if _, err := ec.kubeClient.SchedulingV1alpha2().PodGroups(namespace).ApplyStatus(ctx, podGroupApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
+		if _, err := ec.kubeClient.SchedulingV1beta1().PodGroups(namespace).ApplyStatus(ctx, podGroupApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 			return fmt.Errorf("update PodGroup %s/%s ResourceClaimStatuses: %w", namespace, name, err)
 		}
 	}
@@ -1191,21 +1295,26 @@ func (ec *Controller) handlePodGroupClaim(ctx context.Context, podGroup *schedul
 		claimName := *claimName
 		// The ResourceClaim should exist because it is recorded in the podgroup.status.resourceClaimStatuses,
 		// but perhaps it was deleted accidentally. In that case we re-create it.
-		claim, err := ec.claimLister.ResourceClaims(podGroup.Namespace).Get(claimName)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if claim != nil {
-			var err error
+		checkClaimOwnedByPodGroup := func(claim *resourceapi.ResourceClaim) bool {
 			if mustCheckOwner {
-				err = resourceclaim.IsForPodGroup(podGroup, claim)
+				if err := resourceclaim.IsForPodGroup(podGroup, claim); err != nil {
+					logger.Error(err, "Claim that was created for the PodGroup is no longer owned by the PodGroup, creating a new one",
+						"podGroupClaim", podGroupClaim.Name, "resourceClaim", claimName)
+					return false
+				}
 			}
-			if err == nil {
-				// Already created, nothing more to do.
-				logger.V(5).Info("Claim already created", "podGroupClaim", podGroupClaim.Name, "resourceClaim", claimName)
-				return nil
-			}
-			logger.Error(err, "Claim that was created for the PodGroup is no longer owned by the PodGroup, creating a new one", "podGroupClaim", podGroupClaim.Name, "resourceClaim", claimName)
+
+			return true
+		}
+
+		exists, err := ec.claimExists(ctx, podGroup.Namespace, claimName, checkClaimOwnedByPodGroup)
+		if err != nil {
+			return fmt.Errorf("checking claim existence: %w", err)
+		}
+		if exists {
+			// Already created, nothing more to do.
+			logger.V(5).Info("Claim already created", "podGroupClaim", podGroupClaim.Name, "resourceClaim", claimName)
+			return nil
 		}
 	}
 
@@ -1240,7 +1349,7 @@ func (ec *Controller) handlePodGroupClaim(ctx context.Context, podGroup *schedul
 		// Create the ResourceClaim with PodGroup as owner, with a generated name that uses
 		// <podgroup>-<claim name> as base.
 		isTrue := true
-		annotations := template.Spec.ObjectMeta.Annotations
+		annotations := maps.Clone(template.Spec.ObjectMeta.Annotations)
 		if annotations == nil {
 			annotations = make(map[string]string)
 		}
@@ -1274,14 +1383,14 @@ func (ec *Controller) handlePodGroupClaim(ctx context.Context, podGroup *schedul
 			},
 			Spec: template.Spec.Spec,
 		}
-		metricLabel := getAdminAccessMetricLabel(claim)
+		getMetricLabels := getClaimCreateMetricLabels(claim)
 		claimName := claim.Name
 		claim, err = ec.kubeClient.ResourceV1().ResourceClaims(podGroup.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 		if err != nil {
-			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", metricLabel).Inc()
+			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(getMetricLabels("failure")...).Inc()
 			return fmt.Errorf("create ResourceClaim %s: %w", claimName, err)
 		}
-		resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", metricLabel).Inc()
+		resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(getMetricLabels("success")...).Inc()
 		logger.V(4).Info("Created ResourceClaim", "claim", klog.KObj(claim), "podgroup", klog.KObj(podGroup))
 		ec.claimCache.Mutation(claim)
 	}
@@ -1293,6 +1402,42 @@ func (ec *Controller) handlePodGroupClaim(ctx context.Context, podGroup *schedul
 	(*newPodGroupClaims)[podGroupClaim.Name] = claim.Name
 
 	return nil
+}
+
+type checkClaimOwnerFunc func(claim *resourceapi.ResourceClaim) bool
+
+// claimExists reports whether the named ResourceClaim still exists and is owned by the expected object.
+// It looks in the mutation cache first and falls back to the apiserver if the claim is not found there.
+// A false result means the claim is gone (e.g. deleted by accident) and the caller should re-create it.
+func (ec *Controller) claimExists(ctx context.Context, namespace, claimName string, checkClaimOwner checkClaimOwnerFunc) (bool, error) {
+	key := cache.NewObjectName(namespace, claimName)
+
+	// This may incorrectly return a claim from the mutation cache that
+	// was already deleted again on the apiserver. The sync logic for the
+	// mutation cache (checking after TTL for created
+	// claims, reacting to informer events) will detect that eventually.
+	claim, exists, err := ec.claimCache.GetByKey(key.String())
+	if err != nil && !apierrors.IsNotFound(err) {
+		return false, err
+	}
+
+	if !exists {
+		// Missing from the mutation cache and informer (e.g. evicted): fall back to the apiserver.
+		claim, err = ec.kubeClient.ResourceV1().ResourceClaims(namespace).Get(ctx, claimName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+
+			return false, err
+		}
+	}
+
+	if !checkClaimOwner(claim.(*resourceapi.ResourceClaim)) {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // findPodGroupResourceClaim looks for an existing ResourceClaim with the right
@@ -1429,7 +1574,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 					// scheduling its Pods would be bad. We have to be
 					// absolutely sure and thus have to check with
 					// the API server.
-					podGroup, err := ec.kubeClient.SchedulingV1alpha2().PodGroups(claim.Namespace).Get(ctx, reservedFor.Name, metav1.GetOptions{})
+					podGroup, err := ec.kubeClient.SchedulingV1beta1().PodGroups(claim.Namespace).Get(ctx, reservedFor.Name, metav1.GetOptions{})
 					if err != nil && !apierrors.IsNotFound(err) {
 						return err
 					}
@@ -1567,10 +1712,13 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 }
 
 func (ec *Controller) getPodGroup(pod *v1.Pod) (*schedulingapi.PodGroup, error) {
-	if !ec.features.WorkloadResourceClaims ||
-		pod.Spec.SchedulingGroup == nil ||
+	if pod.Spec.SchedulingGroup == nil ||
 		pod.Spec.SchedulingGroup.PodGroupName == nil {
+		// Pod is not a member of a PodGroup.
 		return nil, nil
+	}
+	if !ec.features.GenericWorkload {
+		return nil, nonRetryableError{fmt.Errorf("Pod is a member of PodGroup %s but %s feature is disabled", *pod.Spec.SchedulingGroup.PodGroupName, features.GenericWorkload)}
 	}
 	return ec.podGroupLister.PodGroups(pod.Namespace).Get(*pod.Spec.SchedulingGroup.PodGroupName)
 }
@@ -1586,7 +1734,7 @@ func owningPod(claim *resourceapi.ResourceClaim) (string, types.UID) {
 	return "", ""
 }
 
-func podResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
+func podResourceClaimTemplateIndexFunc(obj any) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return nil, nil
@@ -1606,7 +1754,7 @@ func podResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
 
 // podResourceClaimIndexFunc is an index function that returns ResourceClaim keys (=
 // namespace/name) for ResourceClaim or ResourceClaimTemplates in a given pod.
-func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
+func podResourceClaimIndexFunc(obj any) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return nil, nil
@@ -1627,7 +1775,7 @@ func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 
 // podGroupMemberIndexFunc is an index function that returns PodGroup keys (=
 // namespace/name) for Pods in a given group.
-func podGroupMemberIndexFunc(obj interface{}) ([]string, error) {
+func podGroupMemberIndexFunc(obj any) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return nil, nil
@@ -1641,7 +1789,7 @@ func podGroupMemberIndexFunc(obj interface{}) ([]string, error) {
 
 // podGroupResourceClaimTemplateIndexFunc is an index function that returns
 // ResourceClaimTemplate keys (= namespace/name) for a given PodGroup.
-func podGroupResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
+func podGroupResourceClaimTemplateIndexFunc(obj any) ([]string, error) {
 	podGroup, ok := obj.(*schedulingapi.PodGroup)
 	if !ok {
 		return nil, nil
@@ -1662,7 +1810,7 @@ func podGroupResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
 // podGroupResourceClaimIndexFunc is an index function that returns
 // ResourceClaim keys (= namespace/name) for ResourceClaim or
 // ResourceClaimTemplates in a given PodGroup.
-func podGroupResourceClaimIndexFunc(obj interface{}) ([]string, error) {
+func podGroupResourceClaimIndexFunc(obj any) ([]string, error) {
 	podGroup, ok := obj.(*schedulingapi.PodGroup)
 	if !ok {
 		return nil, nil
@@ -1690,7 +1838,7 @@ func isPodDone(pod *v1.Pod) bool {
 
 // claimPodOwnerIndexFunc is an index function that returns the pod UIDs of
 // all pods which own the resource claim. Should only be one, though.
-func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
+func claimPodOwnerIndexFunc(obj any) ([]string, error) {
 	claim, ok := obj.(*resourceapi.ResourceClaim)
 	if !ok {
 		return nil, nil
@@ -1701,7 +1849,7 @@ func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
 			*owner.Controller &&
 			owner.APIVersion == "v1" &&
 			owner.Kind == "Pod" {
-			keys = append(keys, string(owner.UID))
+			keys = append(keys, claim.Namespace+"/"+string(owner.UID))
 		}
 	}
 	return keys, nil
@@ -1709,7 +1857,7 @@ func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
 
 // claimPodGroupOwnerIndexFunc is an index function that returns the PodGroup UIDs of
 // all PodGroups which own the resource claim. Should only be one, though.
-func claimPodGroupOwnerIndexFunc(obj interface{}) ([]string, error) {
+func claimPodGroupOwnerIndexFunc(obj any) ([]string, error) {
 	claim, ok := obj.(*resourceapi.ResourceClaim)
 	if !ok {
 		return nil, nil
@@ -1719,6 +1867,16 @@ func claimPodGroupOwnerIndexFunc(obj interface{}) ([]string, error) {
 		return nil, nil
 	}
 	return []string{claim.Namespace + "/" + string(controller.UID)}, nil
+}
+
+// getClaimCreateMetricLabels returns the labels for the
+// [resourceclaimmetrics.ResourceClaimCreate] metric.
+func getClaimCreateMetricLabels(claim *resourceapi.ResourceClaim) func(string) []string {
+	return func(status string) []string {
+		adminAccess := getAdminAccessMetricLabel(claim)
+		ownerGroup, ownerKind := getOwnerKindMetricLabels(claim)
+		return []string{status, adminAccess, ownerGroup, ownerKind}
+	}
 }
 
 func getAdminAccessMetricLabel(claim *resourceapi.ResourceClaim) string {
@@ -1732,6 +1890,22 @@ func getAdminAccessMetricLabel(claim *resourceapi.ResourceClaim) string {
 		}
 	}
 	return "false"
+}
+
+func getOwnerKindMetricLabels(claim *resourceapi.ResourceClaim) (group string, kind string) {
+	controller := metav1.GetControllerOfNoCopy(claim)
+	if controller == nil {
+		return
+	}
+	group, _, found := strings.Cut(controller.APIVersion, "/")
+	if !found {
+		group = ""
+	}
+	return group, controller.Kind
+}
+
+func isPodGroupClaim(bindTo resourceapi.ResourceClaimConsumerReference) bool {
+	return bindTo.APIGroup == schedulingapi.GroupName && bindTo.Resource == "podgroups"
 }
 
 func newCustomCollector(rcLister resourcelisters.ResourceClaimLister, adminAccessFunc func(*resourceapi.ResourceClaim) string, logger klog.Logger) metrics.StableCollector {
@@ -1752,11 +1926,11 @@ type customCollector struct {
 var _ metrics.StableCollector = &customCollector{}
 
 func (collector *customCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
-	ch <- resourceclaimmetrics.NumResourceClaimsDesc
+	ch <- controllermetrics.NumResourceClaimsDesc
 }
 
 func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	rcMetrics := make(map[resourceclaimmetrics.NumResourceClaimLabels]int)
+	rcMetrics := make(map[controllermetrics.NumResourceClaimLabels]int)
 	rcList, err := collector.rcLister.List(labels.Everything())
 	if err != nil {
 		collector.logger.Error(err, "failed to list resource claims for metrics collection")
@@ -1775,11 +1949,11 @@ func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric)
 		} else if val, ok := rc.Annotations[resourceapi.PodResourceClaimAnnotation]; ok && val != "" {
 			source = "resource_claim_template"
 		}
-		rcMetrics[resourceclaimmetrics.NumResourceClaimLabels{Allocated: allocated, AdminAccess: adminAccess, Source: source}]++
+		rcMetrics[controllermetrics.NumResourceClaimLabels{Allocated: allocated, AdminAccess: adminAccess, Source: source}]++
 	}
 	for rcLabels, count := range rcMetrics {
 		ch <- metrics.NewLazyConstMetric(
-			resourceclaimmetrics.NumResourceClaimsDesc,
+			controllermetrics.NumResourceClaimsDesc,
 			metrics.GaugeValue,
 			float64(count),
 			rcLabels.Allocated,

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
+	"k8s.io/code-generator/pkg/apidefinitions"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -43,6 +44,8 @@ type Args struct {
 	ExternalApplyConfigurations map[types.Name]string
 
 	OpenAPISchemaFilePath string
+
+	apidefinitions.LintArgs
 }
 
 // New returns default arguments for the generator.
@@ -74,6 +77,7 @@ func (args *Args) AddFlags(fs *pflag.FlagSet, inputBase string) {
 			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
 	fs.StringVar(&args.OpenAPISchemaFilePath, "openapi-schema", "",
 		"path to the openapi schema containing all the types that apply configurations will be generated for")
+	apidefinitions.AddFlags(&args.LintArgs, fs)
 }
 
 // Validate checks the given arguments.
@@ -83,6 +87,9 @@ func (args *Args) Validate() error {
 	}
 	if len(args.OutputPkg) == 0 {
 		return fmt.Errorf("--output-pkg must be specified")
+	}
+	if err := apidefinitions.ValidateFlags(args.LintRules); err != nil {
+		return err
 	}
 	return nil
 }

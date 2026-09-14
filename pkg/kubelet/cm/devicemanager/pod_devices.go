@@ -181,13 +181,15 @@ func (pdev *podDevices) devices() map[string]sets.Set[string] {
 	return ret
 }
 
-// Returns podUID and containerName for a device
-func (pdev *podDevices) getPodAndContainerForDevice(deviceID string) (string, string) {
+// Returns podUID and containerName for a device allocated under the given resource.
+// The lookup must be scoped by resourceName: device IDs are only unique within a
+// resource, so different plugins may expose devices with identical IDs.
+func (pdev *podDevices) getPodAndContainerForDevice(resourceName, deviceID string) (string, string) {
 	pdev.RLock()
 	defer pdev.RUnlock()
 	for podUID, containerDevices := range pdev.devs {
 		for containerName, resources := range containerDevices {
-			for _, devices := range resources {
+			if devices, ok := resources[resourceName]; ok {
 				if devices.deviceIds.Devices().Has(deviceID) {
 					return podUID, containerName
 				}

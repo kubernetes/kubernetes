@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -84,12 +83,13 @@ func (s *VolumeGroupSnapshotClassTestSuite) GetTestSuiteInfo() storageframework.
 }
 
 // SkipUnsupportedTests skips tests if the driver does not support group snapshots.
-func (s *VolumeGroupSnapshotClassTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (s *VolumeGroupSnapshotClassTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	dInfo := driver.GetDriverInfo()
 	_, ok := driver.(storageframework.VolumeGroupSnapshottableTestDriver)
 	if !dInfo.Capabilities[storageframework.CapVolumeGroupSnapshot] || !ok {
-		e2eskipper.Skipf("Driver %q does not support group snapshots - skipping", dInfo.Name)
+		return fmt.Sprintf("Driver %q does not support group snapshots", dInfo.Name)
 	}
+	return ""
 }
 
 // DefineTests defines the test cases for VolumeGroupSnapshotClass default class selection.

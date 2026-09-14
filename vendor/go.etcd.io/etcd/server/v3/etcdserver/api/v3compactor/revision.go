@@ -28,7 +28,7 @@ import (
 )
 
 // Revision compacts the log by purging revisions older than
-// the configured reivison number. Compaction happens every 5 minutes.
+// the configured revision number. Compaction happens every 5 minutes.
 type Revision struct {
 	lg *zap.Logger
 

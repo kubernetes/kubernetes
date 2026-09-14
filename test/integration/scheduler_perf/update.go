@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -125,7 +125,7 @@ func (c *updateAny) run(tCtx ktesting.TContext) {
 
 func (c *updateAny) update(tCtx ktesting.TContext, env map[string]any) error {
 	var obj *unstructured.Unstructured
-	if err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj); err != nil {
+	if _, err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj); err != nil {
 		return fmt.Errorf("%s: parsing failed: %w", c.TemplatePath, err)
 	}
 

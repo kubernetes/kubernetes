@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 // +k8s:validation-gen-test-fixture=validateFalse
 
@@ -30,8 +30,8 @@ type T1 struct {
 	TypeMeta int
 
 	// NOTE: It's weird to have IntField in both, but Go allows it.
-	T2  `json:",inline"`
-	*T3 `json:",inline"`
+	T2  `json:""`
+	*T3 `json:""`
 }
 
 type T2 struct {

@@ -24,8 +24,7 @@ import (
 	"time"
 	"unsafe"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	"k8s.io/klog/v2"
 )
@@ -36,10 +35,10 @@ var (
 
 // Client is an interface that is used to get stats information.
 type Client interface {
-	WinContainerInfos() (map[string]cadvisorapiv2.ContainerInfo, error)
+	WinContainerInfos() (map[string]cadvisorapi.ContainerInfo, error)
 	WinMachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error)
 	WinVersionInfo() (*cadvisorapi.VersionInfo, error)
-	GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error)
+	GetDirFsInfo(path string) (cadvisorapi.FsInfo, error)
 }
 
 // StatsClient is a client that implements the Client interface
@@ -92,8 +91,8 @@ func newClient(logger klog.Logger, statsNodeClient winNodeStatsClient) (Client, 
 
 // WinContainerInfos returns a map of container infos. The map contains node and
 // pod level stats. Analogous to cadvisor GetContainerInfoV2 method.
-func (c *StatsClient) WinContainerInfos() (map[string]cadvisorapiv2.ContainerInfo, error) {
-	infos := make(map[string]cadvisorapiv2.ContainerInfo)
+func (c *StatsClient) WinContainerInfos() (map[string]cadvisorapi.ContainerInfo, error) {
+	infos := make(map[string]cadvisorapi.ContainerInfo)
 	rootContainerInfo, err := c.createRootContainerInfo()
 	if err != nil {
 		return nil, err
@@ -116,22 +115,22 @@ func (c *StatsClient) WinVersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return c.client.getVersionInfo()
 }
 
-func (c *StatsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, error) {
+func (c *StatsClient) createRootContainerInfo() (*cadvisorapi.ContainerInfo, error) {
 	nodeMetrics, err := c.client.getNodeMetrics()
 	if err != nil {
 		return nil, err
 	}
 
-	var stats []*cadvisorapiv2.ContainerStats
-	stats = append(stats, &cadvisorapiv2.ContainerStats{
+	var stats []*cadvisorapi.ContainerStats
+	stats = append(stats, &cadvisorapi.ContainerStats{
 		Timestamp: nodeMetrics.timeStamp,
 		Cpu: &cadvisorapi.CpuStats{
 			Usage: cadvisorapi.CpuUsage{
 				Total: nodeMetrics.cpuUsageCoreNanoSeconds,
 			},
 		},
-		CpuInst: &cadvisorapiv2.CpuInstStats{
-			Usage: cadvisorapiv2.CpuInstUsage{
+		CpuInst: &cadvisorapi.CpuInstStats{
+			Usage: cadvisorapi.CpuInstUsage{
 				Total: nodeMetrics.cpuUsageNanoCores,
 			},
 		},
@@ -139,19 +138,19 @@ func (c *StatsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, e
 			WorkingSet: nodeMetrics.memoryPrivWorkingSetBytes,
 			Usage:      nodeMetrics.memoryCommittedBytes,
 		},
-		Network: &cadvisorapiv2.NetworkStats{
+		Network: &cadvisorapi.NetworkStats{
 			Interfaces: nodeMetrics.interfaceStats,
 		},
 	})
 
 	nodeInfo := c.client.getNodeInfo()
-	rootInfo := cadvisorapiv2.ContainerInfo{
-		Spec: cadvisorapiv2.ContainerSpec{
+	rootInfo := cadvisorapi.ContainerInfo{
+		Spec: cadvisorapi.ContainerSpec{
 			CreationTime: nodeInfo.startTime,
 			HasCpu:       true,
 			HasMemory:    true,
 			HasNetwork:   true,
-			Memory: cadvisorapiv2.MemorySpec{
+			Memory: cadvisorapi.MemorySpec{
 				Limit: nodeInfo.memoryPhysicalCapacityBytes,
 			},
 		},
@@ -162,7 +161,7 @@ func (c *StatsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, e
 }
 
 // GetDirFsInfo returns filesystem capacity and usage information.
-func (c *StatsClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
+func (c *StatsClient) GetDirFsInfo(path string) (cadvisorapi.FsInfo, error) {
 	var freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes int64
 	var err error
 
@@ -177,10 +176,10 @@ func (c *StatsClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 		0,
 	)
 	if ret == 0 {
-		return cadvisorapiv2.FsInfo{}, err
+		return cadvisorapi.FsInfo{}, err
 	}
 
-	return cadvisorapiv2.FsInfo{
+	return cadvisorapi.FsInfo{
 		Timestamp: time.Now(),
 		Capacity:  uint64(totalNumberOfBytes),
 		Available: uint64(freeBytesAvailable),

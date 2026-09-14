@@ -70,6 +70,15 @@ func MaxBytes[T ~string](_ context.Context, _ operation.Operation, fldPath *fiel
 	return nil
 }
 
+// MaxBytesSlice verifies that the specified byte slice is not longer than max
+// bytes.
+func MaxBytesSlice[T ~byte](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, max int) field.ErrorList {
+	if len(value) > max {
+		return field.ErrorList{field.TooLong(fldPath, "", max).WithOrigin("maxBytes")}
+	}
+	return nil
+}
+
 // MaxItems verifies that the specified slice is not longer than max items.
 func MaxItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, max int) field.ErrorList {
 	if len(value) > max {
@@ -78,10 +87,30 @@ func MaxItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Pa
 	return nil
 }
 
+// MaxProperties verifies that the specified map has no more than max keys.
+func MaxProperties[K comparable, V any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]V, max int) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+
+	if len(value) > max {
+		return field.ErrorList{field.TooMany(fldPath, len(value), max).WithOrigin("maxProperties")}
+	}
+	return nil
+}
+
 // MinItems verifies that the specified slice is not shorter than min items.
 func MinItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, min int) field.ErrorList {
 	if len(value) < min {
 		return field.ErrorList{field.TooFew(fldPath, len(value), min).WithOrigin("minItems")}
+	}
+	return nil
+}
+
+// MinProperties verifies that the specified map is not shorter than min properties.
+func MinProperties[K comparable, V any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]V, min int) field.ErrorList {
+	if len(value) < min {
+		return field.ErrorList{field.TooFew(fldPath, len(value), min).WithOrigin("minProperties")}
 	}
 	return nil
 }

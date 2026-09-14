@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM mcr.microsoft.com/windows/servercore:ltsc2019 as prep
+FROM mcr.microsoft.com/windows/servercore:ltsc2022 as prep
 
-ENV PS_VERSION=6.2.7
+ENV PS_VERSION=7.4.5
 ADD https://github.com/PowerShell/PowerShell/releases/download/v$PS_VERSION/PowerShell-$PS_VERSION-win-x64.zip /PowerShell/powershell.zip
 
 RUN cd C:\PowerShell &\
@@ -22,7 +22,7 @@ RUN cd C:\PowerShell &\
     del powershell.zip &\
     mklink powershell.exe pwsh.exe
 
-FROM mcr.microsoft.com/windows/nanoserver:1809
+FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
 
 COPY --from=prep /PowerShell /PowerShell
 

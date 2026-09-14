@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/format"
+	"k8s.io/kubernetes/test/utils/ktesting/format"
 )
 
 const (
@@ -638,7 +638,7 @@ func WaitTimeoutForPodReadyInNamespace(ctx context.Context, c clientset.Interfac
 	return WaitForPodCondition(ctx, c, namespace, podName, "running and ready", timeout, func(pod *v1.Pod) (bool, error) {
 		switch pod.Status.Phase {
 		case v1.PodFailed, v1.PodSucceeded:
-			return false, gomega.StopTrying(fmt.Sprintf("The phase of Pod %s is %s which is unexpected.", pod.Name, pod.Status.Phase))
+			return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q and be ready, got final phase %q instead:\n%s", v1.PodRunning, pod.Status.Phase, format.Object(pod, 1)))
 		case v1.PodRunning:
 			return podutils.IsPodReady(pod), nil
 		}

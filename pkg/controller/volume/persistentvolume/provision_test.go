@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2/ktesting"
 
 	v1 "k8s.io/api/core/v1"
@@ -627,7 +628,7 @@ func TestProvisionMultiSync(t *testing.T) {
 				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
 				if ctrl.operationTimestamps.Has("default/claim12-2") {
 					volume := newVolume("pvc-uid12-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal)
-					ctrl.volumes.store.Add(volume) // add the volume to controller
+					require.NoError(t, ctrl.volumes.Indexer().Add(volume)) // add the volume to controller
 					reactor.AddVolume(volume)
 				}
 			}),
@@ -666,7 +667,7 @@ func TestProvisionMultiSync(t *testing.T) {
 				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
 				if ctrl.operationTimestamps.Has("default/claim12-4") {
 					volume := newVolume("pvc-uid12-4", "1Gi", "uid12-4", "claim12-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, volume.AnnBoundByController)
-					ctrl.volumes.store.Add(volume) // add the volume to controller
+					require.NoError(t, ctrl.volumes.Indexer().Add(volume)) // add the volume to controller
 					reactor.AddVolume(volume)
 				}
 			}),

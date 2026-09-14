@@ -37,8 +37,7 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	gwebsocket "github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -96,15 +95,17 @@ const (
 )
 
 type fakeKubelet struct {
-	podByNameFunc       func(namespace, name string) (*v1.Pod, bool)
-	machineInfoFunc     func() (*cadvisorapi.MachineInfo, error)
-	podsFunc            func() []*v1.Pod
-	runningPodsFunc     func(ctx context.Context) ([]*v1.Pod, error)
-	logFunc             func(w http.ResponseWriter, req *http.Request)
-	runFunc             func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
-	getExecCheck        func(string, types.UID, string, []string, remotecommandserver.Options)
-	getAttachCheck      func(string, types.UID, string, remotecommandserver.Options)
-	getPortForwardCheck func(string, string, types.UID, portforward.V4Options)
+	podByNameFunc          func(namespace, name string) (*v1.Pod, bool)
+	machineInfoFunc        func() (*cadvisorapi.MachineInfo, error)
+	podsFunc               func() []*v1.Pod
+	runningPodsFunc        func(ctx context.Context) ([]*v1.Pod, error)
+	logFunc                func(w http.ResponseWriter, req *http.Request)
+	runFunc                func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
+	getExecCheck           func(string, types.UID, string, []string, remotecommandserver.Options)
+	getAttachCheck         func(string, types.UID, string, remotecommandserver.Options)
+	getPortForwardCheck    func(string, string, types.UID, portforward.V4Options)
+	allocatedPodsFunc      func() []*v1.Pod
+	allocatedPodByNameFunc func(namespace, name string) *v1.Pod
 
 	containerLogsFunc func(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	resyncInterval    time.Duration
@@ -121,7 +122,7 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return fk.podByNameFunc(namespace, name)
 }
 
-func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
 }
 
@@ -139,6 +140,20 @@ func (fk *fakeKubelet) GetPods() []*v1.Pod {
 
 func (fk *fakeKubelet) GetRunningPods(ctx context.Context) ([]*v1.Pod, error) {
 	return fk.runningPodsFunc(ctx)
+}
+
+func (fk *fakeKubelet) GetAllocatedPods() ([]*v1.Pod, error) {
+	if fk.allocatedPodsFunc != nil {
+		return fk.allocatedPodsFunc(), nil
+	}
+	return nil, nil
+}
+
+func (fk *fakeKubelet) GetAllocatedPodByName(namespace, name string) (*v1.Pod, error) {
+	if fk.allocatedPodByNameFunc != nil {
+		return fk.allocatedPodByNameFunc(namespace, name), nil
+	}
+	return nil, nil
 }
 
 func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
@@ -309,7 +324,7 @@ func (*fakeKubelet) ImageFsStats(context.Context) (*statsapi.FsStats, *statsapi.
 	return nil, nil, nil
 }
 func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error) { return nil, nil }
-func (*fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+func (*fakeKubelet) GetCgroupStats(context.Context, string, bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }
 func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
@@ -421,13 +436,11 @@ func TestServeLogs(t *testing.T) {
 	defer fw.testHTTPServer.Close()
 
 	content := string(`<pre><a href="kubelet.log">kubelet.log</a><a href="google.log">google.log</a></pre>`)
-
 	fw.fakeKubelet.logFunc = func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Add("Content-Type", "text/html")
 		w.Write([]byte(content))
 	}
-
 	resp, err := http.Get(fw.testHTTPServer.URL + "/logs/")
 	if err != nil {
 		t.Fatalf("Got error GETing: %v", err)
@@ -442,6 +455,38 @@ func TestServeLogs(t *testing.T) {
 	result := string(body)
 	if !strings.Contains(result, "kubelet.log") || !strings.Contains(result, "google.log") {
 		t.Errorf("Received wrong data: %s", result)
+	}
+
+}
+
+func TestGETOnlyEndpointsRejectPostWithAllowHeader(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "pods", path: "/pods/"},
+		{name: "containerLogs", path: "/containerLogs/default/mypod/mycontainer"},
+		{name: "runningpods", path: "/runningpods/"},
+		{name: "logs", path: "/logs/"},
+		{name: "pprof", path: "/debug/pprof/profile?seconds=1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, fw.testHTTPServer.URL+tt.path, nil)
+			require.NoError(t, err)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close() //nolint:errcheck
+
+			assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+			assert.Equal(t, http.MethodGet, resp.Header.Get("Allow"))
+		})
 	}
 }
 
@@ -1711,7 +1756,7 @@ func TestWebsocketExecAttach(t *testing.T) {
 
 	errorChan := make(chan error)
 	go func() {
-		errorChan <- exec.StreamWithContext(context.Background(), *options)
+		errorChan <- exec.StreamWithContext(tCtx, *options)
 	}()
 
 	select {
@@ -2507,4 +2552,178 @@ func TestKubeletNativeHistogramMetrics(t *testing.T) {
 	}
 
 	testutil.AssertHasNativeHistogram(t, mf, nil)
+}
+
+func TestGetAllocatedPods(t *testing.T) {
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod1",
+			Namespace: "ns1",
+			UID:       "uid1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "c1", Image: "img1"},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod2",
+			Namespace: "ns1",
+			UID:       "uid2",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "c2", Image: "img2"},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		path           string
+		allocatedPods  []*v1.Pod
+		allocatedPod   *v1.Pod
+		expectedStatus int
+		expectedPods   []v1.Pod
+		expectedPod    *v1.Pod
+	}{
+		{
+			name:           "feature disabled - list",
+			featureEnabled: false,
+			path:           "/allocatedPods",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "feature disabled - get",
+			featureEnabled: false,
+			path:           "/allocatedPods/ns1/pod1",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "feature enabled - list empty",
+			featureEnabled: true,
+			path:           "/allocatedPods",
+			allocatedPods:  []*v1.Pod{},
+			expectedStatus: http.StatusOK,
+			expectedPods:   []v1.Pod{},
+		},
+		{
+			name:           "feature enabled - list pods",
+			featureEnabled: true,
+			path:           "/allocatedPods",
+			allocatedPods:  []*v1.Pod{pod1, pod2},
+			expectedStatus: http.StatusOK,
+			expectedPods: []v1.Pod{
+				{
+					ObjectMeta: pod1.ObjectMeta,
+					Spec:       pod1.Spec,
+				},
+				{
+					ObjectMeta: pod2.ObjectMeta,
+					Spec:       pod2.Spec,
+				},
+			},
+		},
+		{
+			name:           "feature enabled - get pod found",
+			featureEnabled: true,
+			path:           "/allocatedPods/ns1/pod1",
+			allocatedPod:   pod1,
+			expectedStatus: http.StatusOK,
+			expectedPod: &v1.Pod{
+				ObjectMeta: pod1.ObjectMeta,
+				Spec:       pod1.Spec,
+			},
+		},
+		{
+			name:           "feature enabled - get pod not found",
+			featureEnabled: true,
+			path:           "/allocatedPods/ns1/pod3",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "feature enabled - get pod with matching UID",
+			featureEnabled: true,
+			path:           "/allocatedPods/ns1/pod1/uid1",
+			allocatedPod:   pod1,
+			expectedStatus: http.StatusOK,
+			expectedPod: &v1.Pod{
+				ObjectMeta: pod1.ObjectMeta,
+				Spec:       pod1.Spec,
+			},
+		},
+		{
+			name:           "feature enabled - get pod with mismatch UID",
+			featureEnabled: true,
+			path:           "/allocatedPods/ns1/pod1/wrong-uid",
+			allocatedPod:   pod1,
+			expectedStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletAllocatedPodsEndpoint, tt.featureEnabled)
+
+			tCtx := ktesting.Init(t)
+			fw := newServerTest(tCtx)
+			defer fw.testHTTPServer.Close()
+
+			fw.fakeKubelet.allocatedPodsFunc = func() []*v1.Pod {
+				return tt.allocatedPods
+			}
+			fw.fakeKubelet.allocatedPodByNameFunc = func(namespace, name string) *v1.Pod {
+				if tt.allocatedPod != nil && namespace == tt.allocatedPod.Namespace && name == tt.allocatedPod.Name {
+					return tt.allocatedPod
+				}
+				return nil
+			}
+
+			req, err := http.NewRequest(http.MethodGet, fw.testHTTPServer.URL+tt.path, nil)
+			require.NoError(t, err)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			if tt.expectedStatus != http.StatusOK {
+				return
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			if tt.expectedPods != nil {
+				var podList v1.PodList
+				err = json.Unmarshal(body, &podList)
+				require.NoError(t, err)
+				assert.Len(t, podList.Items, len(tt.expectedPods))
+				for i, expectedPod := range tt.expectedPods {
+					assert.Equal(t, expectedPod.Name, podList.Items[i].Name)
+					assert.Equal(t, expectedPod.Spec, podList.Items[i].Spec)
+					assert.Empty(t, podList.Items[i].Status)
+				}
+			}
+
+			if tt.expectedPod != nil {
+				var pod v1.Pod
+				err = json.Unmarshal(body, &pod)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedPod.Name, pod.Name)
+				assert.Equal(t, tt.expectedPod.Spec, pod.Spec)
+				assert.Empty(t, pod.Status)
+			}
+		})
+	}
 }

@@ -3,3 +3,5 @@ labels:
 approvers:
   - pohly
   - bart0sh
+reviewers:
+  - troychiu

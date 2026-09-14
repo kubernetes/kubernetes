@@ -1,0 +1,4 @@
+# ensure that line endings for Windows builds are properly formatted
+# see https://github.com/golangci/golangci-lint-action?tab=readme-ov-file#how-to-use
+# at "Multiple OS Example" section
+*.go text eol=lf

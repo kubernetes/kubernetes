@@ -53,5 +53,5 @@ func Reopen(file *os.File, flags int) (*os.File, error) {
 	}
 	defer handle.Close() //nolint:errcheck // close failures aren't critical here
 
-	return handle.OpenFile(flags)
+	return handle.OpenFile(uint64(flags))
 }

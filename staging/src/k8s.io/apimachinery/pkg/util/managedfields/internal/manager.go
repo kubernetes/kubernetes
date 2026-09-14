@@ -17,9 +17,10 @@ limitations under the License.
 package internal
 
 import (
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // Managed groups a fieldpath.ManagedFields together with the timestamps associated with each operation.

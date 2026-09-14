@@ -17,6 +17,7 @@ limitations under the License.
 package nodedeclaredfeatures
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -25,16 +26,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
-	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 )
 
 // createMockFeature is a helper function to create and configure a MockFeature.
@@ -249,8 +249,10 @@ func TestFilter(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Setting feature gate is still needed as we check for it in SetNode()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.pluginEnabled)
+			if !tc.pluginEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.pluginEnabled)
+			}
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(tc.node)
 
@@ -330,13 +332,12 @@ func TestEnqueueExtensionsNodeUpdate(t *testing.T) {
 	}
 }
 
-func TestEnqueueExtensionsPodUpdate(t *testing.T) {
+func TestIsSchedulableAfterTargetPodUpdate(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 
 	targetPodName := "test-pod"
 	targetPodUID := "123"
 
-	// Test isSchedulableAfterPodUpdate
 	testCases := []struct {
 		name              string
 		oldPod            *v1.Pod
@@ -408,18 +409,6 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 			expectedHint: fwk.QueueSkip,
 		},
 		{
-			name:              "Updated pod not the same as target pod",
-			oldPod:            st.MakePod().Name("another-test-pod").UID("456").Label("foo", "bar").Obj(),
-			newPod:            st.MakePod().Name("another-test-pod").UID("456").Obj(),
-			componenetVersion: version.MustParseSemantic("1.35.0"),
-			setupMock: func(m *ndftesting.MockFeature) {
-				m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool { return false })
-				m.SetName("TestFeature")
-				m.SetMaxVersion(nil)
-			},
-			expectedHint: fwk.QueueSkip,
-		},
-		{
 			name:              "Infer returns error",
 			oldPod:            st.MakePod().Name(targetPodName).UID(targetPodUID).Obj(),
 			newPod:            st.MakePod().Name(targetPodName).UID(targetPodUID).Label("foo", "bar").Obj(),
@@ -445,7 +434,7 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 				version:      tc.componenetVersion,
 				enabled:      true,
 			}
-			hint, err := plugin.isSchedulableAfterPodUpdate(logger, st.MakePod().Name(targetPodName).UID(targetPodUID).Obj(), tc.oldPod, tc.newPod)
+			hint, err := plugin.isSchedulableAfterTargetPodUpdate(logger, st.MakePod().Name(targetPodName).UID(targetPodUID).Obj(), tc.oldPod, tc.newPod)
 			if tc.expectedErr != "" {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tc.expectedErr)
@@ -460,5 +449,58 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 				t.Errorf("unexpected hint: want %v, got %v", tc.expectedHint, hint)
 			}
 		})
+	}
+}
+
+func TestEventsToRegister(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	tests := []struct {
+		name           string
+		enabled        bool
+		expectedLength int
+	}{
+		{
+			name:           "plugin disabled",
+			enabled:        false,
+			expectedLength: 0,
+		},
+		{
+			name:           "plugin enabled",
+			enabled:        true,
+			expectedLength: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plugin := &NodeDeclaredFeatures{
+				enabled: tt.enabled,
+			}
+			events, err := plugin.EventsToRegister(ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(events) != tt.expectedLength {
+				t.Errorf("expected %d events, got %d", tt.expectedLength, len(events))
+			}
+		})
+	}
+}
+
+func TestNodeDeclaredFeatures_DeferredResizeSkipped(t *testing.T) {
+	ctx := context.Background()
+	pod := st.MakePod().Name("p").UID("p").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(st.MakeNode().Name("node1").Obj())
+
+	pl := &NodeDeclaredFeatures{enabled: true, enableInPlacePodVerticalScalingSchedulerPreemption: true}
+
+	if preRes, preStatus := pl.PreFilter(ctx, nil, pod, nil); preStatus.Code() != fwk.Skip || preRes != nil {
+		t.Errorf("PreFilter: got (res: %v, status: %v), want (nil, Skip)", preRes, preStatus.Code())
+	}
+
+	if filterStatus := pl.Filter(ctx, nil, pod, nodeInfo); filterStatus.Code() != fwk.Success {
+		t.Errorf("Filter: got status %v, want Success (nil)", filterStatus.Code())
 	}
 }

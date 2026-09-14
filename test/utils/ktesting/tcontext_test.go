@@ -17,17 +17,15 @@ limitations under the License.
 package ktesting_test
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/assert"
 
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -59,11 +57,120 @@ func TestCancelAutomatic(t *testing.T) {
 	}()
 }
 
+func TestCancelBeforeCleanup(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Blocks until the context gets canceled automatically.
+		<-tCtx.Done()
+	}()
+
+	// This gets registered *after* Init and thus, due to the usual LIFO
+	// order of Cleanup callbacks, runs *before* ktesting's own internal
+	// callback which guarantees eventual cancellation as a fallback.
+	// Nonetheless, tCtx must already be canceled here: like
+	// [testing.T.Context], it gets derived from testing.T's own context,
+	// which the "testing" package cancels before any Cleanup-registered
+	// function runs, this one included.
+	t.Cleanup(func() {
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			// Propagating the test context cancellation is not immediate because
+			// context.AfterFunc runs our callback in a goroutine, therefore
+			// we need the additional 10 second grace period.
+			t.Fatal("tCtx should already have been canceled by the time this Cleanup function runs")
+		}
+
+		// The explanation must be more useful than the generic
+		// "context canceled" which a plain [testing.T.Context] would
+		// provide.
+		cause := context.Cause(tCtx)
+		if expected := fmt.Sprintf("test %s is cleaning up", t.Name()); cause == nil || cause.Error() != expected {
+			t.Errorf("expected cancellation cause %q, got: %v", expected, cause)
+		}
+	})
+}
+
+func TestRunCancelBeforeCleanup(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	tCtx.Run("sub", func(tCtx ktesting.TContext) {
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			// Blocks until the sub-test's context gets canceled automatically.
+			<-tCtx.Done()
+		}()
+
+		// See TestCancelBeforeCleanup: same reasoning applies to sub-tests.
+		tCtx.Cleanup(func() {
+			select {
+			case <-done:
+			case <-time.After(10 * time.Second):
+				t.Fatal("sub-test's TContext should already have been canceled by the time this Cleanup function runs")
+			}
+		})
+	})
+}
+
+func TestSyncTestAutoCancel(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	// Without synchronous cancellation before the callback returns, this
+	// goroutine would still be blocked and synctest would panic with
+	// "deadlock: main bubble goroutine has exited but blocked goroutines remain".
+	tCtx.SyncTest("sub", func(tCtx ktesting.TContext) {
+		go func() {
+			<-tCtx.Done()
+		}()
+	})
+}
+
+func TestNoDeadline(t *testing.T) {
+	mockT := &deadlineT{T: t, deadline: nil}
+	tCtx := ktesting.Init(mockT)
+	deadline, ok := tCtx.Deadline()
+	if ok {
+		tCtx.Errorf("Expected no deadline, got %s", deadline)
+	}
+}
+
+func TestDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Inside a synctest bubble this is always in the future.
+		mockDeadline := time.Date(2000, 01, 01, 0, 0, 0, 0, time.UTC)
+		mockT := &deadlineT{T: t, deadline: &mockDeadline}
+		tCtx := ktesting.Init(mockT)
+		actualDeadline, ok := tCtx.Deadline()
+		if ok {
+			expectDeadline := mockDeadline.Add(-ktesting.DefaultCleanupGracePeriod)
+			tCtx.Expect(actualDeadline).To(gomega.BeTemporally("==", expectDeadline), "deadline")
+		} else {
+			tCtx.Error("Expected a deadline, got none")
+		}
+	})
+}
+
+// deadlineT overrides Deadline, returning false if no
+// deadline is configured and the deadline otherwise.
+type deadlineT struct {
+	*testing.T
+	deadline *time.Time
+}
+
+func (t *deadlineT) Deadline() (time.Time, bool) {
+	if t.deadline == nil {
+		return time.Time{}, false
+	}
+	return *t.deadline, true
+}
+
 func TestCancelCtx(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	var discardLogger klog.Logger
 	tCtx = tCtx.WithLogger(discardLogger)
-	tCtx = tCtx.WithRESTConfig(new(rest.Config))
 	baseCtx := tCtx
 
 	tCtx.Cleanup(func() {
@@ -72,15 +179,8 @@ func TestCancelCtx(t *testing.T) {
 		}
 	})
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		if tCtx.Err() != nil {
-			t.Errorf("context should not be canceled but is: %v", tCtx.Err())
-		}
-		assert.Equal(t, baseCtx.Logger(), tCtx.Logger(), "Logger()")
-		assert.Equal(t, baseCtx.RESTConfig(), tCtx.RESTConfig(), "RESTConfig()")
-		assert.Equal(t, baseCtx.RESTMapper(), tCtx.RESTMapper(), "RESTMapper()")
-		assert.Equal(t, baseCtx.Client(), tCtx.Client(), "Client()")
-		assert.Equal(t, baseCtx.Dynamic(), tCtx.Dynamic(), "Dynamic()")
-		assert.Equal(t, baseCtx.APIExtensions(), tCtx.APIExtensions(), "APIExtensions()")
+		tCtx.Assert(tCtx.Err()).To(gomega.Succeed(), "context should not be canceled but is")
+		tCtx.Assert(tCtx.Logger()).To(gomega.Equal(baseCtx.Logger()), "Logger()")
 	})
 
 	// Cancel, then let testing.T invoke test cleanup.
@@ -107,19 +207,12 @@ func TestParallel(t *testing.T) {
 func TestRun(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	cfg := new(rest.Config)
-	mapper := new(restmapper.DeferredDiscoveryRESTMapper)
-	client := clientset.New(nil)
-	dynamic := dynamic.New(nil)
-	apiextensions := apiextensions.New(nil)
-	tCtx = tCtx.WithClients(cfg, mapper, client, dynamic, apiextensions)
+	key := 42
+	value := "fish"
+	tCtx = tCtx.WithValue(key, value)
 
 	tCtx.Run("sub", func(tCtx ktesting.TContext) {
-		assert.Equal(t, cfg, tCtx.RESTConfig(), "RESTConfig")
-		assert.Equal(t, mapper, tCtx.RESTMapper(), "RESTMapper")
-		assert.Equal(t, client, tCtx.Client(), "Client")
-		assert.Equal(t, dynamic, tCtx.Dynamic(), "Dynamic")
-		assert.Equal(t, apiextensions, tCtx.APIExtensions(), "APIExtensions")
+		tCtx.Assert(tCtx.Value(key)).To(gomega.Equal(value))
 
 		tCtx.Cancel("test is complete")
 		<-tCtx.Done()
@@ -135,4 +228,17 @@ func TestWithNamespace(t *testing.T) {
 	namespace := "foo"
 	tCtxWithNamespace := tCtx.WithNamespace(namespace)
 	tCtx.Expect(tCtxWithNamespace.Namespace()).To(gomega.Equal(namespace))
+}
+
+func TestWithContext(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tCtx.Cancel("done")
+	tCtx = tCtx.WithValue("foo", "bar")
+	deadline := time.Now().Add(-time.Minute)
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+	newCtx := tCtx.WithContext(ctx)
+	tCtx.Expect(context.Cause(tCtx)).To(gomega.MatchError(gomega.ContainSubstring("done")))
+	tCtx.Expect(newCtx.Err()).To(gomega.MatchError(context.DeadlineExceeded))
+	tCtx.Expect(newCtx.Value("foo")).To(gomega.Equal("bar"))
 }

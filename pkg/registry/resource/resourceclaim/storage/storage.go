@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -32,7 +34,6 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/resource/resourceclaim"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // REST implements a RESTStorage for ResourceClaims.
@@ -41,7 +42,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against ResourceClaims.
-func NewREST(optsGetter generic.RESTOptionsGetter, nsClient v1.NamespaceInterface, authorizer authorizer.Authorizer) (*REST, *StatusREST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, nsClient v1.NamespaceInterface, authorizer authorizer.UnconditionalAuthorizer) (*REST, *StatusREST, error) {
 	if nsClient == nil {
 		return nil, nil, fmt.Errorf("namespace client is required")
 	}

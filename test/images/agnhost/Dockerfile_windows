@@ -15,10 +15,12 @@
 ARG BASEIMAGE
 ARG REGISTRY
 ARG OS_VERSION
-ARG GOLANG_VERSION
 
-FROM --platform=linux/$BUILDARCH golang:$GOLANG_VERSION AS prepregistry
+# digest pinned in test/images/Makefile, GOTOOLCHAIN selects the go version
+ARG GOLANG_IMAGE=golang:latest
+FROM --platform=linux/$BUILDARCH ${GOLANG_IMAGE} AS prepregistry
 
+ARG GOTOOLCHAIN=auto
 RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
     apt-get update && apt-get install -y jq
 

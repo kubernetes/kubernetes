@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
-	svminformers "k8s.io/client-go/informers/storagemigration/v1beta1"
+	svminformers "k8s.io/client-go/informers/storagemigration/v1"
 	"k8s.io/client-go/kubernetes"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -74,6 +74,23 @@ func (m *mockResourceSyncer) LastSyncResourceVersion() string {
 	return m.lastSyncRV
 }
 
+type sortedStore struct {
+	cache.Store
+}
+
+func (s *sortedStore) List() []interface{} {
+	list := s.Store.List()
+	sort.Slice(list, func(i, j int) bool {
+		accI, _ := meta.Accessor(list[i])
+		accJ, _ := meta.Accessor(list[j])
+		if accI.GetNamespace() != accJ.GetNamespace() {
+			return accI.GetNamespace() < accJ.GetNamespace()
+		}
+		return accI.GetName() < accJ.GetName()
+	})
+	return list
+}
+
 func newMockMonitor(lastSyncRV string, items []runtime.Object) *mockMonitor {
 	store := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	for _, item := range items {
@@ -82,7 +99,7 @@ func newMockMonitor(lastSyncRV string, items []runtime.Object) *mockMonitor {
 
 	return &mockMonitor{
 		Monitor: garbagecollector.Monitor{
-			Store: store,
+			Store: &sortedStore{Store: store},
 			Controller: &mockResourceSyncer{
 				lastSyncRV: lastSyncRV,
 			},
@@ -110,26 +127,26 @@ func newTestSVMController(
 	}
 }
 
-func newSVM(name, resourceVersion string, conditions ...metav1.Condition) *svmv1beta1.StorageVersionMigration {
-	return &svmv1beta1.StorageVersionMigration{
+func newSVM(name, resourceVersion string, conditions ...metav1.Condition) *svmv1.StorageVersionMigration {
+	return &svmv1.StorageVersionMigration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			CreationTimestamp: metav1.Now(),
 		},
-		Spec: svmv1beta1.StorageVersionMigrationSpec{
+		Spec: svmv1.StorageVersionMigrationSpec{
 			Resource: metav1.GroupResource{
 				Group:    testGVR.Group,
 				Resource: testGVR.Resource,
 			},
 		},
-		Status: svmv1beta1.StorageVersionMigrationStatus{
+		Status: svmv1.StorageVersionMigrationStatus{
 			ResourceVersion: resourceVersion,
 			Conditions:      conditions,
 		},
 	}
 }
 
-func newSVMWithConditions(name, resourceVersion string, conditions []metav1.Condition) *svmv1beta1.StorageVersionMigration {
+func newSVMWithConditions(name, resourceVersion string, conditions []metav1.Condition) *svmv1.StorageVersionMigration {
 	svm := newSVM(name, resourceVersion)
 	svm.Status.Conditions = conditions
 	return svm
@@ -155,7 +172,7 @@ func TestSync(t *testing.T) {
 	testCases := []struct {
 		name                 string
 		key                  string
-		svm                  *svmv1beta1.StorageVersionMigration
+		svm                  *svmv1.StorageVersionMigration
 		graphBuilder         *mockGraphBuilder
 		expectErr            bool
 		expectKubeActions    []k8stesting.Action
@@ -165,7 +182,11 @@ func TestSync(t *testing.T) {
 		{
 			name: "Successful migration",
 			key:  "test-svm",
-			svm:  newSVM("test-svm", "100"),
+			svm: newSVM("test-svm", "100", metav1.Condition{
+				Type:   string(svmv1.MigrationRunning),
+				Status: metav1.ConditionTrue,
+				Reason: migrationRunningReason,
+			}),
 			graphBuilder: &mockGraphBuilder{
 				monitor: newMockMonitor("100", []runtime.Object{
 					newResource("res1", "ns1", "90", "uid1"),
@@ -176,24 +197,28 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationSucceeded),
+							Type:   string(svmv1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   string(svmv1.MigrationSucceeded),
 							Status: metav1.ConditionTrue,
 						},
 					}),
 				),
 			},
 			expectDynamicActions: []k8stesting.Action{
-				k8stesting.NewPatchAction(testGVR, "ns1", "res1", types.ApplyPatchType, mustMarshal(t, typeMetaUIDRV{
-					TypeMeta:           metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
-					objectMetaUIDandRV: objectMetaUIDandRV{UID: "uid1", ResourceVersion: "90"},
+				k8stesting.NewPatchAction(testGVR, "ns1", "res1", types.MergePatchType, mustMarshal(t, typeMetaUIDRV{
+					TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+					objectRV: objectRV{ResourceVersion: "90"},
 				})),
-				k8stesting.NewPatchAction(testGVR, "ns1", "res2", types.ApplyPatchType, mustMarshal(t, typeMetaUIDRV{
-					TypeMeta:           metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
-					objectMetaUIDandRV: objectMetaUIDandRV{UID: "uid2", ResourceVersion: "100"},
+				k8stesting.NewPatchAction(testGVR, "ns1", "res2", types.MergePatchType, mustMarshal(t, typeMetaUIDRV{
+					TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+					objectRV: objectRV{ResourceVersion: "100"},
 				})),
 			},
 		},
@@ -207,7 +232,7 @@ func TestSync(t *testing.T) {
 			name: "SVM already succeeded",
 			key:  "succeeded-svm",
 			svm: newSVM("succeeded-svm", "100", metav1.Condition{
-				Type:   string(svmv1beta1.MigrationSucceeded),
+				Type:   string(svmv1.MigrationSucceeded),
 				Status: metav1.ConditionTrue,
 			}),
 			expectErr: false,
@@ -224,7 +249,7 @@ func TestSync(t *testing.T) {
 		{
 			name: "Resource not in GC",
 			key:  "no-resource",
-			svm: func() *svmv1beta1.StorageVersionMigration {
+			svm: func() *svmv1.StorageVersionMigration {
 				s := newSVM("no-resource", "100")
 				s.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Minute))
 				return s
@@ -236,10 +261,10 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{{
-						Type:   string(svmv1beta1.MigrationFailed),
+						Type:   string(svmv1.MigrationFailed),
 						Status: metav1.ConditionTrue,
 					}}),
 				),
@@ -257,11 +282,15 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationFailed),
+							Type:   string(svmv1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   string(svmv1.MigrationFailed),
 							Status: metav1.ConditionTrue,
 						},
 					}),
@@ -284,24 +313,28 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationSucceeded),
+							Type:   string(svmv1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   string(svmv1.MigrationSucceeded),
 							Status: metav1.ConditionTrue,
 						},
 					}),
 				),
 			},
 			expectDynamicActions: []k8stesting.Action{
-				k8stesting.NewPatchAction(testGVR, "ns1", "res1", types.ApplyPatchType, mustMarshal(t, typeMetaUIDRV{
-					TypeMeta:           metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
-					objectMetaUIDandRV: objectMetaUIDandRV{UID: "uid1", ResourceVersion: "90"},
+				k8stesting.NewPatchAction(testGVR, "ns1", "res1", types.MergePatchType, mustMarshal(t, typeMetaUIDRV{
+					TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+					objectRV: objectRV{ResourceVersion: "90"},
 				})),
-				k8stesting.NewPatchAction(testGVR, "ns2", "res2", types.ApplyPatchType, mustMarshal(t, typeMetaUIDRV{
-					TypeMeta:           metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
-					objectMetaUIDandRV: objectMetaUIDandRV{UID: "uid2", ResourceVersion: "95"},
+				k8stesting.NewPatchAction(testGVR, "ns2", "res2", types.MergePatchType, mustMarshal(t, typeMetaUIDRV{
+					TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+					objectRV: objectRV{ResourceVersion: "95"},
 				})),
 			},
 			dynamicClientErrors: map[string]error{
@@ -322,16 +355,16 @@ func TestSync(t *testing.T) {
 			},
 			expectErr: true,
 			expectDynamicActions: []k8stesting.Action{
-				k8stesting.NewPatchAction(testGVR, "ns1", "res1", types.ApplyPatchType, mustMarshal(t, typeMetaUIDRV{
-					TypeMeta:           metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
-					objectMetaUIDandRV: objectMetaUIDandRV{UID: "uid1", ResourceVersion: "90"},
+				k8stesting.NewPatchAction(testGVR, "ns1", "res1", types.MergePatchType, mustMarshal(t, typeMetaUIDRV{
+					TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+					objectRV: objectRV{ResourceVersion: "90"},
 				})),
 			},
 		},
 		{
 			name: "Incomparable resource version for gc fails migration",
 			key:  "incomparable-resource",
-			svm: func() *svmv1beta1.StorageVersionMigration {
+			svm: func() *svmv1.StorageVersionMigration {
 				s := newSVM("incomparable-resource", "100")
 				s.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Minute))
 				return s
@@ -344,10 +377,10 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{{
-						Type:   string(svmv1beta1.MigrationFailed),
+						Type:   string(svmv1.MigrationFailed),
 						Status: metav1.ConditionTrue,
 					}}),
 				),
@@ -356,7 +389,7 @@ func TestSync(t *testing.T) {
 		{
 			name: "Incomparable resource version for object fails migration",
 			key:  "incomparable-resource-obj",
-			svm: func() *svmv1beta1.StorageVersionMigration {
+			svm: func() *svmv1.StorageVersionMigration {
 				s := newSVM("incomparable-resource-obj", "100")
 				s.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Minute))
 				return s
@@ -369,11 +402,11 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationFailed),
+							Type:   string(svmv1.MigrationFailed),
 							Status: metav1.ConditionTrue,
 						},
 					}),
@@ -391,7 +424,7 @@ func TestSync(t *testing.T) {
 			}
 			kubeClient := kubefake.NewClientset(initialSVMs...)
 			kubeInformerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
-			svmInformer := kubeInformerFactory.Storagemigration().V1beta1().StorageVersionMigrations()
+			svmInformer := kubeInformerFactory.Storagemigration().V1().StorageVersionMigrations()
 
 			if tc.svm != nil {
 				err := svmInformer.Informer().GetStore().Add(tc.svm)
@@ -427,8 +460,8 @@ func TestSync(t *testing.T) {
 					require.Equal(t, expected.GetVerb(), actual.GetVerb(), "kube action %d: verb mismatch", i)
 					require.Equal(t, expected.GetResource(), actual.GetResource(), "kube action %d: resource mismatch", i)
 
-					actualSvm := actual.(k8stesting.UpdateAction).GetObject().(*svmv1beta1.StorageVersionMigration)
-					expectedSvm := expected.(k8stesting.UpdateAction).GetObject().(*svmv1beta1.StorageVersionMigration)
+					actualSvm := actual.(k8stesting.UpdateAction).GetObject().(*svmv1.StorageVersionMigration)
+					expectedSvm := expected.(k8stesting.UpdateAction).GetObject().(*svmv1.StorageVersionMigration)
 					expectedConditions := expectedSvm.Status.Conditions
 					actualConditions := actualSvm.Status.Conditions
 					require.Len(t, expectedConditions, len(actualConditions), "kube action %d: conditions mismatch", i)
@@ -453,6 +486,7 @@ func TestSync(t *testing.T) {
 
 					if expectedPatch, ok := expected.(k8stesting.PatchAction); ok {
 						actualPatch := actual.(k8stesting.PatchAction)
+						require.Equal(t, expectedPatch.GetPatchType(), actualPatch.GetPatchType(), "dynamic action %d: patch type mismatch", i)
 						require.Equal(t, string(expectedPatch.GetPatch()), string(actualPatch.GetPatch()), "dynamic action %d: patch payload mismatch", i)
 					}
 				}
@@ -486,4 +520,149 @@ func sortPatchActions(actions []k8stesting.Action) {
 		}
 		return actionI.GetName() < actionJ.GetName()
 	})
+}
+
+func TestSVMConditions(t *testing.T) {
+	newResource := func(name, namespace, rv, uid string) *unstructured.Unstructured {
+		return &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "apps/v1",
+				"kind":       "Deployment",
+				"metadata": map[string]interface{}{
+					"name":            name,
+					"namespace":       namespace,
+					"resourceVersion": rv,
+					"uid":             uid,
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name                   string
+		items                  []runtime.Object
+		dynamicClientErrors    map[string]error
+		expectErr              bool
+		expectConditionType    svmv1.MigrationConditionType
+		expectConditionMessage string
+	}{
+		{
+			name: "Successful migration",
+			items: []runtime.Object{
+				newResource("res1", "ns1", "90", "uid1"),
+				newResource("res2", "ns1", "100", "uid2"),
+				newResource("res3", "ns2", "101", "uid3"), // Should be skipped
+			},
+			expectErr:              false,
+			expectConditionType:    svmv1.MigrationSucceeded,
+			expectConditionMessage: "Migration completed",
+		},
+		{
+			name: "Transient failure on second object",
+			items: []runtime.Object{
+				newResource("res1", "ns1", "90", "uid1"),
+				newResource("res2", "ns1", "100", "uid2"),
+			},
+			dynamicClientErrors: map[string]error{
+				"ns1/res2": apierrors.NewTooManyRequests("simulating throttling", 1),
+			},
+			expectErr:              true,
+			expectConditionType:    svmv1.MigrationRunning,
+			expectConditionMessage: "The migration is running, 1/2 objects not yet migrated; transient error: simulating throttling",
+		},
+		{
+			name: "Fatal failure on second object",
+			items: []runtime.Object{
+				newResource("res1", "ns1", "90", "uid1"),
+				newResource("res2", "ns1", "100", "uid2"),
+			},
+			dynamicClientErrors: map[string]error{
+				"ns1/res2": fmt.Errorf("fatal error"),
+			},
+			expectErr:              false, // sync returns nil when runMigration returns true for failed
+			expectConditionType:    svmv1.MigrationFailed,
+			expectConditionMessage: "1/2 not yet migrated. migration encountered unhandled error: fatal error",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			svm := newSVM("test-svm", "100")
+			kubeClient := kubefake.NewClientset(svm)
+			kubeInformerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+			svmInformer := kubeInformerFactory.Storagemigration().V1().StorageVersionMigrations()
+
+			err := svmInformer.Informer().GetStore().Add(svm)
+			require.NoError(t, err)
+
+			graphBuilder := &mockGraphBuilder{
+				monitor: newMockMonitor("100", tc.items),
+			}
+
+			controller := newTestSVMController(kubeClient, svmInformer, graphBuilder)
+
+			dynamicClient := controller.dynamicClient.(*dynamicfake.FakeDynamicClient)
+			dynamicClient.PrependReactor("patch", "*", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				patchAction := action.(k8stesting.PatchAction)
+				key := fmt.Sprintf("%s/%s", patchAction.GetNamespace(), patchAction.GetName())
+				if err, found := tc.dynamicClientErrors[key]; found {
+					return true, nil, err
+				}
+				return true, nil, nil
+			})
+
+			err = controller.sync(ctx, "test-svm")
+
+			if tc.expectErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			updatedSVM, err := kubeClient.StoragemigrationV1().StorageVersionMigrations().Get(ctx, "test-svm", metav1.GetOptions{})
+			require.NoError(t, err)
+
+			cond := meta.FindStatusCondition(updatedSVM.Status.Conditions, string(tc.expectConditionType))
+			require.NotNil(t, cond, "Condition %s not found", tc.expectConditionType)
+			require.Equal(t, metav1.ConditionTrue, cond.Status)
+			require.Contains(t, cond.Message, tc.expectConditionMessage)
+		})
+	}
+}
+
+// TestSyncDoesNotPanicWhenResourceNotInMapper is a regression test: an SVM
+// targeting a resource absent from the RESTMapper must not panic. Before the
+// fix, sync() dereferenced a nil *schema.GroupVersionResource via gvr.String()
+// (resourceFor returns (nil, false, nil) when the resource is unknown),
+// crashing the kube-controller-manager.
+func TestSyncDoesNotPanicWhenResourceNotInMapper(t *testing.T) {
+	ctx := context.Background()
+
+	// Non-terminal SVM with a resourceVersion set (passes the guards), targeting a
+	// resource that is NOT in the test RESTMapper (which only knows apps/deployments).
+	svm := newSVM("svm-nomap", "100")
+	svm.Spec.Resource = metav1.GroupResource{
+		Group:    "nonexistent.example.com",
+		Resource: "widgets",
+	}
+
+	kubeClient := kubefake.NewClientset(svm)
+	factory := informers.NewSharedInformerFactory(kubeClient, 0)
+	svmInformer := factory.Storagemigration().V1().StorageVersionMigrations()
+	require.NoError(t, svmInformer.Informer().GetStore().Add(svm))
+	ctrl := newTestSVMController(kubeClient, svmInformer, &mockGraphBuilder{})
+
+	// Before the fix this call panicked (nil pointer dereference on gvr.String()),
+	// which crashes the whole kube-controller-manager.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("sync panicked for a resource absent from the RESTMapper: %v", r)
+		}
+	}()
+
+	// CreationTimestamp is recent, so sync should requeue with an error (not panic).
+	err := ctrl.sync(ctx, "svm-nomap")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "resource does not exist in rest mapper")
 }

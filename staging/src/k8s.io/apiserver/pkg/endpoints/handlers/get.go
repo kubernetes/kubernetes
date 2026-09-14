@@ -256,9 +256,10 @@ func listOpts(req *http.Request, scope *RequestScope) (metainternalversion.ListO
 }
 
 func handleWatch(ctx context.Context, rw rest.Watcher, scope *RequestScope, req *http.Request, w http.ResponseWriter, opts metainternalversion.ListOptions, outputMediaType negotiation.MediaTypeOptions, minRequestTimeout time.Duration) error {
+	isWatchList := isListWatchRequest(opts)
 	var span *tracing.Span
 	var onWatchListComplete WatchListCompleteHook
-	if isListWatchRequest(opts) {
+	if isWatchList {
 		ctx, span = tracing.Start(ctx, "WatchList", traceFields(req)...)
 		onWatchListComplete = func() { span.End(500 * time.Millisecond) }
 		req = req.WithContext(ctx)
@@ -283,7 +284,7 @@ func handleWatch(ctx context.Context, rw rest.Watcher, scope *RequestScope, req 
 	if err != nil {
 		return err
 	}
-	handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts), onWatchListComplete)
+	handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts), isWatchList, onWatchListComplete)
 	if err != nil {
 		return err
 	}

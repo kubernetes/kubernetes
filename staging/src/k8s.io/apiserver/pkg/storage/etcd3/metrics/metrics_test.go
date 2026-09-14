@@ -440,3 +440,25 @@ func (m fakeEtcdMonitor) Monitor(_ context.Context) (StorageMetrics, error) {
 func (m fakeEtcdMonitor) Close() error {
 	return nil
 }
+func BenchmarkEtcdGetMetrics_Dynamic(b *testing.B) {
+	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
+	startTime := time.Now()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			RecordEtcdRequest("get", gr, nil, startTime)
+		}
+	})
+}
+
+func BenchmarkEtcdGetMetrics_Tracker(b *testing.B) {
+	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
+	tracker := NewEtcdMetricsTracker(gr)
+	startTime := time.Now()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			tracker.Get.Record(nil, startTime)
+		}
+	})
+}

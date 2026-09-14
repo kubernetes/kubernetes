@@ -589,6 +589,38 @@ func TestValidateCustomResource(t *testing.T) {
 				}},
 			},
 		},
+		{name: "minProperties",
+			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"fieldX": {
+						Type:          "object",
+						MinProperties: ptr.To[int64](1),
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"fieldX": map[string]interface{}{}}, expectErrs: []string{
+					`fieldX: Too few: 0: must have at least 1 item`,
+				}},
+			},
+		},
+		{name: "minItems",
+			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"fieldX": {
+						Type:     "array",
+						MinItems: ptr.To[int64](2),
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"fieldX": []interface{}{"a"}}, expectErrs: []string{
+					`fieldX: Too few: 1: must have at least 2 items`,
+				}},
+			},
+		},
 		{name: "maxLength",
 			schema: apiextensions.JSONSchemaProps{
 				Type: "object",

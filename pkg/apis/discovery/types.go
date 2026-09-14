@@ -17,6 +17,7 @@ limitations under the License.
 package discovery
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -166,7 +167,7 @@ type EndpointPort struct {
 	Name *string
 	// The IP protocol for this port.
 	// Must be UDP, TCP, or SCTP.
-	Protocol *api.Protocol
+	Protocol *corev1.Protocol
 	// The port number of the endpoint.
 	// If this is not specified, ports are not restricted and must be
 	// interpreted in the context of the specific consumer.

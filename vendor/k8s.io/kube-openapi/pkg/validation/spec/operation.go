@@ -16,10 +16,10 @@ package spec
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // OperationProps describes an operation
@@ -94,23 +94,16 @@ type Operation struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (o *Operation) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, o)
-	}
-
-	if err := json.Unmarshal(data, &o.OperationProps); err != nil {
-		return err
-	}
-	return json.Unmarshal(data, &o.VendorExtensible)
+	return jsonv2.Unmarshal(data, o)
 }
 
-func (o *Operation) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (o *Operation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	type OperationPropsNoMethods OperationProps // strip MarshalJSON method
 	var x struct {
-		Extensions
+		Extensions Extensions `json:",embed"`
 		OperationPropsNoMethods
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	o.Extensions = internal.SanitizeExtensions(x.Extensions)
@@ -120,27 +113,15 @@ func (o *Operation) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.
 
 // MarshalJSON converts this items object to JSON
 func (o Operation) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(o)
-	}
-	b1, err := json.Marshal(o.OperationProps)
-	if err != nil {
-		return nil, err
-	}
-	b2, err := json.Marshal(o.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	concated := swag.ConcatJSON(b1, b2)
-	return concated, nil
+	return internal.DeterministicMarshal(o)
 }
 
-func (o Operation) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (o Operation) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		Extensions
-		OperationProps operationPropsOmitZero `json:",inline"`
+		Extensions     Extensions             `json:",embed"`
+		OperationProps operationPropsOmitZero `json:",embed"`
 	}
 	x.Extensions = internal.SanitizeExtensions(o.Extensions)
 	x.OperationProps = operationPropsOmitZero(o.OperationProps)
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }

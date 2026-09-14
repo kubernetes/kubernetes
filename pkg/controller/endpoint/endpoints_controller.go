@@ -79,6 +79,7 @@ const (
 // NewEndpointController returns a new *Controller.
 func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
+	logger := klog.FromContext(ctx)
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: ControllerName})
 
@@ -87,34 +88,40 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "endpoint",
+				Logger: &logger,
+				Name:   "endpoint",
 			},
 		),
-		podQueue:         workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*endpointsliceutil.PodProjectionKey]()),
+		podQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[*endpointsliceutil.PodProjectionKey](),
+			workqueue.TypedRateLimitingQueueConfig[*endpointsliceutil.PodProjectionKey]{
+				Logger: &logger,
+			},
+		),
 		workerLoopPeriod: time.Second,
 	}
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = serviceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: e.onServiceUpdate,
 		UpdateFunc: func(old, cur interface{}) {
 			e.onServiceUpdate(cur)
 		},
 		DeleteFunc: e.onServiceDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	e.serviceLister = serviceInformer.Lister()
 	e.servicesSynced = serviceInformer.Informer().HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { e.onPodUpdate(nil, obj) },
 		UpdateFunc: e.onPodUpdate,
 		DeleteFunc: func(obj interface{}) { e.onPodUpdate(obj, nil) },
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	e.podLister = podInformer.Lister()
 	e.podsSynced = podInformer.Informer().HasSynced
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = endpointsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.onEndpointsDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
@@ -182,7 +189,7 @@ type Controller struct {
 // Run will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
 func (e *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	e.eventBroadcaster.StartStructuredLogging(3)
@@ -220,8 +227,22 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 
 func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointAddress, error) {
 	var endpointIP string
+	ipFamily := v1.IPv4Protocol
 
-	wantIPv6 := svc.Spec.IPFamilies[0] == v1.IPv6Protocol
+	// IPFamilies is expected to be populated by apiserver defaulting, but
+	// some services may reach this controller with an empty IPFamilies via
+	// watch events. Infer the family from ClusterIP or
+	// pod IP so we never panic on IPFamilies[0].
+	if len(svc.Spec.IPFamilies) > 0 {
+		ipFamily = svc.Spec.IPFamilies[0]
+	} else if len(svc.Spec.ClusterIP) > 0 && svc.Spec.ClusterIP != v1.ClusterIPNone {
+		if utilnet.IsIPv6String(svc.Spec.ClusterIP) {
+			ipFamily = v1.IPv6Protocol
+		}
+	} else if utilnet.IsIPv6String(pod.Status.PodIP) {
+		ipFamily = v1.IPv6Protocol
+	}
+	wantIPv6 := ipFamily == v1.IPv6Protocol
 
 	// Find an IP that matches the family. We parse and restringify the IP in case the
 	// value on the Pod is in an irregular format.
@@ -444,8 +465,9 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		}
 		currentEndpoints = &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   service.Name,
-				Labels: service.Labels,
+				Name:      service.Name,
+				Namespace: service.Namespace,
+				Labels:    service.Labels,
 			},
 		}
 	} else if e.staleEndpointsTracker.IsStale(currentEndpoints) {

@@ -81,6 +81,51 @@ var (
 		delete(paths, "/apis/batch/v1/namespaces/{namespace}/cronjobs/{name}")
 		return res
 	}()
+
+	nestedWidgetGVR = schema.GroupVersionResource{
+		Group:    "example.com",
+		Version:  "v1",
+		Resource: "widgets",
+	}
+
+	nestedWidgetOpenAPI map[string]interface{} = map[string]interface{}{
+		"paths": map[string]interface{}{
+			"/apis/example.com/v1/widgets": map[string]interface{}{
+				"get": map[string]interface{}{
+					"x-kubernetes-group-version-kind": map[string]interface{}{
+						"group":   "example.com",
+						"version": "v1",
+						"kind":    "Widget",
+					},
+				},
+			},
+		},
+		"components": map[string]interface{}{
+			"schemas": map[string]interface{}{
+				"com.example.v1.Widget": map[string]interface{}{
+					"type": "object",
+					"x-kubernetes-group-version-kind": []map[string]interface{}{
+						{"group": "example.com", "version": "v1", "kind": "Widget"},
+					},
+					"properties": map[string]interface{}{
+						"name": map[string]interface{}{"type": "string"},
+						"meta": map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"id": map[string]interface{}{"type": "string"},
+								"tags": map[string]interface{}{
+									"type": "object",
+									"properties": map[string]interface{}{
+										"key": map[string]interface{}{"type": "string"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 )
 
 type testCase struct {
@@ -636,7 +681,10 @@ func TestPlaintext(t *testing.T) {
 				"short": false,
 			},
 			Checks: []check{
-				checkEquals("thefield\t<string> -required-\n  a description that should be printed\n\n"),
+				checkEquals(`thefield	<string> -required-
+  a description that should be printed
+
+`),
 			},
 		},
 		{
@@ -745,7 +793,11 @@ func TestPlaintext(t *testing.T) {
 				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1\n    2\n    3"),
+				checkEquals(`ENUM:
+    0
+    1
+    2
+    3`),
 			},
 		},
 		{
@@ -762,7 +814,8 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("\n  enum: 0, 1, 2, 3"),
+				checkEquals(`
+  enum: 0, 1, 2, 3`),
 			},
 		},
 		{
@@ -780,7 +833,8 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("\n  enum: 0, 1, ...."),
+				checkEquals(`
+  enum: 0, 1, ....`),
 			},
 		},
 		{
@@ -798,7 +852,9 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1, ...."),
+				checkEquals(`ENUM:
+    0
+    1, ....`),
 			},
 		},
 		{
@@ -985,6 +1041,135 @@ func TestPlaintext(t *testing.T) {
 				checkContains("Widget naming conventions"),
 				checkContains("URL: https://example.com/docs/naming"),
 				checkContains("size of the widget"),
+			},
+		},
+		{
+			Name: "MaxDepthZeroIsUnlimited",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  0,
+			},
+			Checks: []check{
+				// Non-recursive field details separate descriptions with a blank line,
+				// and the root template emits the final trailing newline.
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    id	<string>
+    tags	<Object>
+      key	<string>
+  name	<string>
+
+`),
+			},
+		},
+		{
+			Name: "MaxDepthOneStopsAtTopLevelFields",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  1,
+			},
+			Checks: []check{
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+  name	<string>
+
+`),
+			},
+		},
+		{
+			Name: "MaxDepthTwoExpandsOneLevelDeeper",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  2,
+			},
+			Checks: []check{
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    id	<string>
+    tags	<Object>
+  name	<string>
+
+`),
+			},
+		},
+		{
+			Name: "MaxDepthLargerThanSchemaEqualsUnlimited",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  100,
+			},
+			Checks: []check{
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    id	<string>
+    tags	<Object>
+      key	<string>
+  name	<string>
+
+`),
+			},
+		},
+		{
+			Name: "MaxDepthIgnoredWhenRecursiveFalse",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: false,
+				MaxDepth:  5,
+			},
+			Checks: []check{
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    <no description>
+
+  name	<string>
+    <no description>
+
+
+`),
 			},
 		},
 	}

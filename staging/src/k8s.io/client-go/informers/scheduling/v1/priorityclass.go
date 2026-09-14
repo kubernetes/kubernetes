@@ -34,11 +34,39 @@ import (
 )
 
 // PriorityClassInformer provides access to a shared informer and lister for
-// PriorityClasses.
+// PriorityClasses. Prefer using the type-safe variant (see [TypedPriorityClassInformer]).
 type PriorityClassInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() schedulingv1.PriorityClassLister
 }
+
+// TypedPriorityClassInformer provides access to a shared informer and lister for
+// PriorityClasses, including the type-safe TypedInformer variant.
+// It is a superset of PriorityClassInformer.
+type TypedPriorityClassInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() PriorityClassIndexInformer
+	Lister() schedulingv1.PriorityClassLister
+}
+
+// PriorityClassIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type PriorityClassIndexInformer cache.TypedSharedIndexInformer[*apischedulingv1.PriorityClass]
+
+// PriorityClassHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for PriorityClass.
+type PriorityClassHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apischedulingv1.PriorityClass]
+
+// PriorityClassDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for PriorityClass.
+type PriorityClassDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apischedulingv1.PriorityClass]
+
+// PriorityClassFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for PriorityClass.
+type PriorityClassFilteringHandler = cache.TypedFilteringResourceEventHandler[*apischedulingv1.PriorityClass]
+
+// PriorityClassIndexers is a specialization of [cache.TypedIndexers] for PriorityClass.
+type PriorityClassIndexers = cache.TypedIndexers[*apischedulingv1.PriorityClass]
+
+// DeletedPriorityClass is a specialization of [cache.DeletedObject] for PriorityClass.
+type DeletedPriorityClass = cache.DeletedObject[*apischedulingv1.PriorityClass]
 
 type priorityClassInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type priorityClassInformer struct {
 // NewPriorityClassInformer constructs a new informer for PriorityClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPriorityClassInformer]).
 func NewPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewPriorityClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedPriorityClassInformer constructs a new informer for PriorityClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers PriorityClassIndexers) PriorityClassIndexInformer {
+	return NewTypedPriorityClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredPriorityClassInformer constructs a new informer for PriorityClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredPriorityClassInformer]).
 func NewFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewPriorityClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedPriorityClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredPriorityClassInformer constructs a new informer for PriorityClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers PriorityClassIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) PriorityClassIndexInformer {
+	return NewTypedPriorityClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewPriorityClassInformerWithOptions constructs a new informer for PriorityClass type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPriorityClassInformerWithOptions]).
 func NewPriorityClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedPriorityClassInformerWithOptions(client, options)
+}
+
+// NewTypedPriorityClassInformerWithOptions constructs a new informer for PriorityClass type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPriorityClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) PriorityClassIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "scheduling.k8s.io", Version: "v1", Resource: "priorityclasss"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apischedulingv1.PriorityClass](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewPriorityClassInformerWithOptions(client kubernetes.Interface, options in
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *priorityClassInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPriorityClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedPriorityClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *priorityClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apischedulingv1.PriorityClass{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *priorityClassInformer) TypedInformer() PriorityClassIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apischedulingv1.PriorityClass](f.factory.InformerFor(&apischedulingv1.PriorityClass{}, f.defaultInformer))
 }
 
 func (f *priorityClassInformer) Lister() schedulingv1.PriorityClassLister {
 	return schedulingv1.NewPriorityClassLister(f.Informer().GetIndexer())
+}
+
+// ToTypedPriorityClassInformer converts an untyped informer into a TypedPriorityClassInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *PriorityClass. If that is not the case, calling type-safe methods of the returned
+// TypedPriorityClassInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedPriorityClassInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedPriorityClassInformer(informer PriorityClassInformer) TypedPriorityClassInformer {
+	if informer, ok := informer.(TypedPriorityClassInformer); ok {
+		return informer
+	}
+	return &priorityClassTypedInformerAdapter{informer}
+}
+
+type priorityClassTypedInformerAdapter struct {
+	PriorityClassInformer
+}
+
+func (a *priorityClassTypedInformerAdapter) TypedInformer() PriorityClassIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apischedulingv1.PriorityClass](a.Informer())
+}
+
+// ToPriorityClassIndexInformer converts an untyped informer into a PriorityClassIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *PriorityClass. If that is not the case, calling type-safe methods of the returned
+// PriorityClassIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a PriorityClassIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToPriorityClassIndexInformer(informer cache.SharedIndexInformer) PriorityClassIndexInformer {
+	if informer, ok := informer.(PriorityClassIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apischedulingv1.PriorityClass](informer)
 }
