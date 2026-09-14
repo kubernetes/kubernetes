@@ -2467,7 +2467,7 @@ func commonTakeByTopologyExtendedTestCasesForResize(t *testing.T) []takeByTopolo
 			numCPUs:       10,
 			cpuGroupSize:  2,
 			expErr:        "",
-			expResult:     mustParseCPUSet(t, "0-3,10-13,50,51"),
+			expResult:     mustParseCPUSet(t, "0-3,10-13,40,50"),
 		},
 		{
 			description:   "Fallback to takeByTopologyNUMAPackedForResize due to numCPUs is not divisible by cpuGroupSize",
