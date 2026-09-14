@@ -22,6 +22,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -36,10 +38,12 @@ type Manager interface {
 	// Seed sets the cached result for the container with the given ID without
 	// sending anything on Updates(), for populating cache after Kubelet restart.
 	Seed(kubecontainer.ContainerID, Result)
+	// IsCurrent reports whether an update still represents the cached publication.
+	IsCurrent(Update) bool
 	// Remove clears the cached result for the container with the given ID.
 	Remove(kubecontainer.ContainerID)
-	// Updates creates a channel that receives an Update whenever its result changes (but not
-	// removed).
+	// Updates returns notifications of published results, excluding removals. With
+	// MutableContainerProbes enabled, notifications may be coalesced and require IsCurrent checks.
 	// NOTE: The current implementation only supports a single updates channel.
 	Updates() <-chan Update
 }
@@ -81,11 +85,12 @@ func (r Result) ToPrometheusType() float64 {
 	}
 }
 
-// Update is an enum of the types of updates sent over the Updates channel.
+// Update describes a probe result sent over the Updates channel.
 type Update struct {
 	ContainerID kubecontainer.ContainerID
 	Result      Result
 	PodUID      types.UID
+	Version     uint64
 }
 
 // Manager implementation.
@@ -102,6 +107,10 @@ var _ Manager = &manager{}
 
 // NewManager creates and returns an empty results manager.
 func NewManager() Manager {
+	if utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) {
+		return newMutableManager()
+	}
+
 	return &manager{
 		cache:   make(map[kubecontainer.ContainerID]Result),
 		updates: make(chan Update, 20),
@@ -118,7 +127,7 @@ func (m *manager) Get(id kubecontainer.ContainerID) (Result, bool) {
 func (m *manager) Set(ctx context.Context, id kubecontainer.ContainerID, result Result, pod *v1.Pod) {
 	if m.setInternal(id, result) {
 		select {
-		case m.updates <- Update{id, result, pod.UID}:
+		case m.updates <- Update{ContainerID: id, Result: result, PodUID: pod.UID}:
 		case <-ctx.Done():
 		}
 	}
@@ -149,3 +158,6 @@ func (m *manager) Remove(id kubecontainer.ContainerID) {
 func (m *manager) Updates() <-chan Update {
 	return m.updates
 }
+
+// Legacy consumers process every notification without publication version checks.
+func (m *manager) IsCurrent(Update) bool { return true }

@@ -24,10 +24,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
@@ -51,7 +53,11 @@ type probeMetricLabels struct {
 // containerBoundManager binds each worker to one container ID so stale lifecycle
 // events cannot affect a replacement container.
 type containerBoundManager struct {
-	// mu guards workers, containers, and probedMetrics.
+	mutable bool
+	// Track even containers without probes so adding startup cannot undo their started state.
+	targets map[containerKey]probeTarget
+
+	// mu guards workers, containers, targets, and probedMetrics.
 	mu sync.Mutex
 
 	// Workers can exit before the container, after a terminal probe result.
@@ -83,6 +89,8 @@ func NewContainerBoundManager(
 
 	return &containerBoundManager{
 		ctx:              ctx,
+		mutable:          utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes),
+		targets:          make(map[containerKey]probeTarget),
 		prober:           newProber(runner, recorder),
 		workers:          make(map[probeKey]*containerBoundWorker),
 		containers:       make(map[containerKey]kubecontainer.ContainerID),
@@ -103,7 +111,17 @@ func (m *containerBoundManager) SyncPod(ctx context.Context, pod *v1.Pod, podSta
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	containers := probedContainers(pod)
+	var containers []v1.Container
+	if m.mutable {
+		containers = append([]v1.Container{}, pod.Spec.Containers...)
+		for _, c := range pod.Spec.InitContainers {
+			if podutil.IsRestartableInitContainer(&c) {
+				containers = append(containers, c)
+			}
+		}
+	} else {
+		containers = probedContainers(pod)
+	}
 	wanted := sets.New[string]()
 	for _, container := range containers {
 		wanted.Insert(container.Name)
@@ -130,6 +148,9 @@ func (m *containerBoundManager) SyncPod(ctx context.Context, pod *v1.Pod, podSta
 		}
 
 		if m.tracksContainerLocked(pod.UID, container.Name, status.ID) {
+			if m.mutable {
+				m.reconcileProbesLocked(target)
+			}
 			m.startProbesLocked(ctx, target, false /* adopted */)
 			continue
 		}
@@ -183,10 +204,6 @@ func (m *containerBoundManager) tracksContainerLocked(podUID types.UID, containe
 // whichever instance they are bound to, and forgets their results.
 func (m *containerBoundManager) stopContainerWorkersLocked(ctx context.Context, podUID types.UID, containerName string) {
 	ck := containerKey{podUID: podUID, containerName: containerName}
-	if id, ok := m.containers[ck]; ok {
-		m.removeResults(id)
-		delete(m.containers, ck)
-	}
 
 	key := probeKey{podUID: podUID, containerName: containerName}
 	for probeType := kubecontainer.LivenessProbe; probeType <= kubecontainer.StartupProbe; probeType <<= 1 {
@@ -198,6 +215,11 @@ func (m *containerBoundManager) stopContainerWorkersLocked(ctx context.Context, 
 		klog.FromContext(ctx).V(4).Info("Stopping probe worker for a container that is no longer running",
 			"probeType", key.probeType, "podUID", podUID, "containerName", containerName, "containerID", w.containerID.String())
 		m.stopWorkerLocked(key, w)
+	}
+	if id, ok := m.containers[ck]; ok {
+		m.removeResults(id)
+		delete(m.containers, ck)
+		delete(m.targets, ck)
 	}
 }
 
@@ -215,17 +237,24 @@ func (m *containerBoundManager) StartProbes(ctx context.Context, pod *v1.Pod, co
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.mutable && m.tracksContainerLocked(pod.UID, container.Name, containerID) {
+		// A repeated runtime hook may carry an older spec than the last reconciliation.
+		return
+	}
 	m.startProbesLocked(ctx, target, false /* adopted */)
 }
 
 func (m *containerBoundManager) startProbesLocked(ctx context.Context, target probeTarget, adopted bool) {
 	ck := containerKey{podUID: target.pod.UID, containerName: target.container.Name}
+	m.evictStaleWorkersLocked(ctx, target.pod.UID, target.container.Name, target.containerID)
 	if oldID, ok := m.containers[ck]; ok && oldID != target.containerID {
 		m.removeResults(oldID)
 	}
-	m.evictStaleWorkersLocked(ctx, target.pod.UID, target.container.Name, target.containerID)
 
 	m.containers[ck] = target.containerID
+	if m.mutable {
+		m.targets[ck] = target
+	}
 	if target.container.StartupProbe != nil && !m.startupSucceeded(target.containerID) {
 		// Gate readiness and liveness workers on startup probe completion.
 		m.ensureWorkerLocked(ctx, kubecontainer.StartupProbe, target, adopted)
@@ -273,6 +302,7 @@ func (m *containerBoundManager) ensureWorkerLocked(ctx context.Context, probeTyp
 		resultsManager: resultsManager,
 		adopted:        adopted,
 		onExit:         m.onWorkerExit,
+		mutable:        m.mutable,
 	}
 	if probeType == kubecontainer.StartupProbe {
 		opts.onStartupSucceeded = m.onStartupSucceeded
@@ -320,8 +350,15 @@ func (m *containerBoundManager) onStartupSucceeded(w *containerBoundWorker) {
 		return
 	}
 
-	m.ensureWorkerLocked(m.ctx, kubecontainer.ReadinessProbe, w.probeTarget, w.adopted)
-	m.ensureWorkerLocked(m.ctx, kubecontainer.LivenessProbe, w.probeTarget, w.adopted)
+	target := w.probeTarget
+	if m.mutable {
+		if !m.startupSucceeded(w.containerID) {
+			return
+		}
+		target = m.targets[containerKey{w.pod.UID, w.container.Name}]
+	}
+	m.ensureWorkerLocked(m.ctx, kubecontainer.ReadinessProbe, target, w.adopted)
+	m.ensureWorkerLocked(m.ctx, kubecontainer.LivenessProbe, target, w.adopted)
 }
 
 // StopProbes stops the specified probe types bound to this container instance.
@@ -344,7 +381,7 @@ func (m *containerBoundManager) stopMatchingWorkersLocked(match func(probeKey, *
 }
 
 func (m *containerBoundManager) stopWorkerLocked(key probeKey, w *containerBoundWorker) {
-	w.cancel()
+	w.stopMutable()
 	delete(m.workers, key)
 }
 
@@ -374,7 +411,6 @@ func (m *containerBoundManager) onWorkerExit(w *containerBoundWorker) {
 func (m *containerBoundManager) StopLivenessAndStartup(pod *v1.Pod) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
 	m.stopMatchingWorkersLocked(func(key probeKey, w *containerBoundWorker) bool {
 		return key.podUID == pod.UID && key.probeType != kubecontainer.ReadinessProbe
 	})
@@ -406,6 +442,7 @@ func (m *containerBoundManager) removePodWorkers(match func(types.UID) bool) {
 		}
 		m.removeResults(id)
 		delete(m.containers, ck)
+		delete(m.targets, ck)
 	}
 
 	// Metric series are scoped by pod and container name rather than container instance.
@@ -623,5 +660,25 @@ func initialValue(probeType kubecontainer.ProbeType) results.Result {
 		return results.Success
 	default:
 		return results.Unknown
+	}
+}
+
+// Reconcile configuration in the existing worker so cancelled calls cannot overlap replacements.
+func (m *containerBoundManager) reconcileProbesLocked(target probeTarget) {
+	ck := containerKey{target.pod.UID, target.container.Name}
+	old := m.targets[ck]
+	for _, typ := range []kubecontainer.ProbeType{kubecontainer.StartupProbe, kubecontainer.ReadinessProbe, kubecontainer.LivenessProbe} {
+		spec := probeSpec(typ, &target.container)
+		previous := probeSpec(typ, &old.container)
+		// Disabled workers survive probe removal; re-adding startup must not gate a running container.
+		complete := typ == kubecontainer.StartupProbe && (previous == nil || m.startupSucceeded(target.containerID))
+		if w := m.workers[probeKey{target.pod.UID, target.container.Name, typ}]; w != nil {
+			w.updateMutable(target, complete)
+		} else if previous != nil && spec == nil {
+			m.resultsManager(typ).Remove(target.containerID)
+		}
+		if typ == kubecontainer.StartupProbe && spec != nil && previous == nil && m.workers[probeKey{target.pod.UID, target.container.Name, typ}] == nil {
+			m.startupManager.Seed(target.containerID, results.Success)
+		}
 	}
 }
