@@ -85,13 +85,14 @@ var SupportedFeatures = internal.Features{
 }
 
 type Allocator struct {
-	features       Features
-	allocatedState AllocatedState
-	classLister    DeviceClassLister
-	slicesOnNode   map[string][]*resourceapi.ResourceSlice
-	slicesShared   []*resourceapi.ResourceSlice
-	allSlices      []*resourceapi.ResourceSlice
-	celCache       *cel.Cache
+	features        Features
+	allocatedState  AllocatedState
+	classLister     DeviceClassLister
+	slicesOnNode    map[string][]*resourceapi.ResourceSlice
+	slicesShared    []*resourceapi.ResourceSlice
+	allSlices       []*resourceapi.ResourceSlice
+	celCache        *cel.Cache
+	poolGenerations poolGenerationIndex
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
 	// the available counters are needed for each pool. The information
@@ -142,6 +143,7 @@ func NewAllocator(ctx context.Context,
 		allSlices:         slices,
 		celCache:          celCache,
 		availableCounters: make(map[PoolID]counterSets),
+		poolGenerations:   analyzePoolGenerations(slices),
 	}, nil
 }
 
@@ -170,7 +172,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 	}()
 
 	// First determine all eligible pools.
-	pools, err := GatherPools(ctx, slicesForNode, node, a.features, alloc.allSlices)
+	pools, err := GatherPools(ctx, slicesForNode, node, a.features, alloc.allSlices, a.poolGenerations)
 	if err != nil {
 		return nil, fmt.Errorf("gather pool information: %w", err)
 	}
