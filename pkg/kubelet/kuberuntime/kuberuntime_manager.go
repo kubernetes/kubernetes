@@ -676,6 +676,19 @@ func shouldRestartOnFailure(pod *v1.Pod) bool {
 	return pod.Spec.RestartPolicy != v1.RestartPolicyNever
 }
 
+// anyContainerCreatedButNotStarted returns true if any init or regular
+// container has been created by the runtime but was never started, so it has
+// neither a start time nor an exit code.
+func anyContainerCreatedButNotStarted(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		status := podStatus.FindContainerStatusByName(c.Name)
+		if status != nil && status.State == kubecontainer.ContainerStateCreated {
+			return true
+		}
+	}
+	return false
+}
+
 func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) bool {
 	cStatus := podStatus.FindContainerStatusByName(c.Name)
 	if cStatus == nil {
@@ -1304,7 +1317,12 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	// If we need to (re-)create the pod sandbox, everything will need to be
 	// killed and recreated, and init containers should be purged.
 	if createPodSandbox {
-		if !shouldRestartOnFailure(pod) && attempt != 0 && len(podStatus.ContainerStatuses) != 0 {
+		// A container that the runtime created but never started also has a
+		// status, yet it has not run, so the early return below would leave the
+		// pod Pending forever with the sandbox never recreated. Exclude that
+		// case so the sandbox is retried.
+		if !shouldRestartOnFailure(pod) && attempt != 0 && len(podStatus.ContainerStatuses) != 0 &&
+			!anyContainerCreatedButNotStarted(pod, podStatus) {
 			// Should not restart the pod, just return.
 			// we should not create a sandbox, and just kill the pod if it is already done.
 			// if all containers are done and should not be started, there is no need to create a new sandbox.
@@ -1317,22 +1335,22 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			return changes
 		}
 
-		// Get the containers to start, excluding the ones that succeeded if RestartPolicy is OnFailure.
+		// Get the containers to start in the replacement sandbox, excluding the
+		// ones that must not run again.
 		var containersToStart []int
 		for idx, c := range pod.Spec.Containers {
-			runOnce := pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure
-			if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-				if c.RestartPolicy != nil {
-					runOnce = *c.RestartPolicy == v1.ContainerRestartPolicyOnFailure
-				}
-			}
-			if runOnce && containerSucceeded(&c, podStatus) {
+			// PodSandboxChanged also replaces a ready sandbox that lost its
+			// IP or changed network namespace, so a container can still be
+			// running here, and it has to come back up in the new sandbox.
+			if cStatus := podStatus.FindContainerStatusByName(c.Name); cStatus != nil && cStatus.State == kubecontainer.ContainerStateRunning {
+				containersToStart = append(containersToStart, idx)
 				continue
 			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-				if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyOnFailure && containerSucceeded(&c, podStatus) {
-					continue
-				}
+			// ShouldContainerBeRestarted covers the pod-level policy, the
+			// container-level policy and its restart rules, and the states
+			// that have not consumed a run yet.
+			if !kubecontainer.ShouldContainerBeRestarted(logger, &c, pod, podStatus) {
+				continue
 			}
 			containersToStart = append(containersToStart, idx)
 		}
@@ -1352,14 +1370,26 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			}
 		}
 
-		// If we are creating a pod sandbox, we should restart from the initial
-		// state.
-		if len(pod.Spec.InitContainers) != 0 {
-			// Pod has init containers, return the first one.
-			changes.InitContainersToStart = []int{0}
-
+		// Resume the init sequence at the first container that has not already
+		// completed successfully. Pods that restart, and restartable init
+		// containers, always run the whole sequence again in the new sandbox.
+		for i := range pod.Spec.InitContainers {
+			c := &pod.Spec.InitContainers[i]
+			mustRerun := shouldRestartOnFailure(pod) || podutil.IsRestartableInitContainer(c)
+			if !mustRerun && containerSucceeded(c, podStatus) {
+				continue
+			}
+			// Start it only if it never ran. If it ran and failed, a pod that
+			// does not restart is done and needs no new sandbox.
+			status := podStatus.FindContainerStatusByName(c.Name)
+			if mustRerun || status == nil || status.State == kubecontainer.ContainerStateCreated {
+				changes.InitContainersToStart = []int{i}
+			} else {
+				changes.CreateSandbox = false
+			}
 			return changes
 		}
+		// The pod has no init containers, or all of them already completed.
 		changes.ContainersToStart = containersToStart
 		return changes
 	}

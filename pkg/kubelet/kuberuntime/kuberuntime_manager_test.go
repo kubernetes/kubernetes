@@ -1480,6 +1480,83 @@ func TestComputePodActions(t *testing.T) {
 				ContainersToStart: []int{1},
 			},
 		},
+		"Restart running containers when a ready sandbox has to be replaced": {
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// PodSandboxChanged also asks for a new sandbox for a ready one
+				// that lost its IP, so containers still reported as running
+				// have to come back up in the replacement.
+				status.SandboxStatuses[0].Network.Ip = ""
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				Attempt:           uint32(1),
+				CreateSandbox:     true,
+				KillPod:           true,
+				ContainersToStart: []int{0, 1, 2},
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+			},
+		},
+		"Recreate the sandbox for a pod with RestartPolicy=Never whose container was created but never started": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The node restarted between CreateContainer and
+				// StartContainer, so the sandbox is dead and the only
+				// container that exists never ran.
+				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+				status.SandboxStatuses[0].Metadata.Attempt = uint32(2)
+				status.ContainerStatuses = status.ContainerStatuses[:1]
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateCreated
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				Attempt:           uint32(3),
+				CreateSandbox:     true,
+				KillPod:           true,
+				ContainersToStart: []int{0, 1, 2},
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+			},
+		},
+		"Recreate the sandbox but don't rerun exited containers for a pod with RestartPolicy=Never": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+				status.SandboxStatuses[0].Metadata.Attempt = uint32(2)
+				// foo1 succeeded and foo3 failed, so neither may run again.
+				// foo2 was created but never started, so it still owes a run.
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateCreated
+				status.ContainerStatuses[2].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[2].ExitCode = 111
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				Attempt:           uint32(3),
+				CreateSandbox:     true,
+				KillPod:           true,
+				ContainersToStart: []int{1},
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+			},
+		},
+		"Don't recreate the sandbox for a pod with RestartPolicy=Never whose containers have all exited": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+				status.SandboxStatuses[0].Metadata.Attempt = uint32(2)
+				for _, cs := range status.ContainerStatuses {
+					cs.State = kubecontainer.ContainerStateExited
+					cs.ExitCode = 0
+				}
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				Attempt:           uint32(3),
+				CreateSandbox:     false,
+				KillPod:           true,
+				ContainersToStart: []int{},
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+			},
+		},
 	} {
 		pod, status := makeBasePodAndStatus()
 		if test.mutatePodFn != nil {
@@ -2209,6 +2286,25 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 			},
 			skipWindows:          true, // Windows does not support resize.
 			disableIPPRInitCtrFG: true,
+		},
+		"Recreate the sandbox for a pod with RestartPolicy=Never without rerunning a completed init container": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The node restarted between CreateContainer and StartContainer
+				// for init2. init1 and init3 exited with code 0 in the base
+				// status, and init1 must not run a second time.
+				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateCreated
+			},
+			actions: podActions{
+				KillPod:               true,
+				CreateSandbox:         true,
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				Attempt:               uint32(1),
+				InitContainersToStart: []int{1},
+				ContainersToStart:     []int{},
+				ContainersToKill:      map[kubecontainer.ContainerID]containerToKillInfo{},
+			},
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
@@ -2998,6 +3094,48 @@ func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
 				status.ContainerStatuses[1].ExitCode = 111
 			},
 			actions: noAction,
+		},
+		"Restart a container with RestartPolicy=Never whose restart rules match its exit code when the sandbox is dead": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+				// foo1 opts out of restarts, but a rule asks for one on exit code 42.
+				pod.Spec.Containers[0].RestartPolicy = &containerRestartPolicyNever
+				pod.Spec.Containers[0].RestartPolicyRules = []v1.ContainerRestartRule{{
+					Action: v1.ContainerRestartRuleActionRestart,
+					ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+						Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+						Values:   []int32{42},
+					},
+				}}
+				// foo2 opts out and has no rules at all.
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyNever
+				// foo3 opts out and its rule does not match the code it exited with.
+				pod.Spec.Containers[2].RestartPolicy = &containerRestartPolicyNever
+				pod.Spec.Containers[2].RestartPolicyRules = []v1.ContainerRestartRule{{
+					Action: v1.ContainerRestartRuleActionRestart,
+					ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+						Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+						Values:   []int32{7},
+					},
+				}}
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 42
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[1].ExitCode = 0
+				status.ContainerStatuses[2].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[2].ExitCode = 42
+			},
+			actions: podActions{
+				KillPod:           true,
+				CreateSandbox:     true,
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				Attempt:           uint32(1),
+				ContainersToStart: []int{0},
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+			},
 		},
 		"Kill pod and recreate all containers (except for the succeeded one) if the pod sandbox is dead": {
 			mutatePodFn: func(pod *v1.Pod) {
