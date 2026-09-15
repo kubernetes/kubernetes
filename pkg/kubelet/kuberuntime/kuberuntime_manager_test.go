@@ -5152,6 +5152,86 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 	}
 }
 
+// TestComputeVolumeResizeActionCopiesVolumes verifies that the volumes recorded
+// in podActions do not alias the pod spec. They are handed to code that calls
+// resource.Quantity.String() on their SizeLimit - the podActions log line in
+// SyncPod, the emptyDir plugin and the actuated state - and String() writes the
+// quantity's cached string, which would be a data race against everything else
+// reading the pod.
+func TestComputeVolumeResizeActionCopiesVolumes(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// "128Mi" is not in the canonical form that ParseQuantity caches, so this
+	// quantity starts out with an empty string cache and String() will write to
+	// it.
+	sizeLimit := resource.MustParse("128Mi")
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "test-pod-uid"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{{
+				Name: "mem-vol",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    v1.StorageMediumMemory,
+						SizeLimit: &sizeLimit,
+					},
+				},
+			}},
+		},
+	}
+	require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "mem-vol", resource.NewQuantity(1, resource.BinarySI)))
+
+	var changes podActions
+	m.computeVolumeResizeAction(tCtx, pod, &changes)
+
+	require.Len(t, changes.VolumesToUpsize, 1)
+	upsize := changes.VolumesToUpsize[0]
+	assert.Equal(t, "mem-vol", upsize.Name)
+	require.NotNil(t, upsize.EmptyDir)
+	require.NotNil(t, upsize.EmptyDir.SizeLimit)
+	assert.Equal(t, sizeLimit.Value(), upsize.EmptyDir.SizeLimit.Value())
+
+	assert.NotSame(t, pod.Spec.Volumes[0].EmptyDir, upsize.EmptyDir,
+		"podActions must not alias the pod spec's EmptyDirVolumeSource")
+	assert.NotSame(t, pod.Spec.Volumes[0].EmptyDir.SizeLimit, upsize.EmptyDir.SizeLimit,
+		"podActions must not alias the pod spec's SizeLimit quantity")
+
+	// Reproduce the reported race: logging podActions while another goroutine
+	// reads the pod spec, as the volume manager's populator does. Formatting
+	// only ever reaches the copy, so -race stays quiet. Nothing may call
+	// String() before this point, or the first call - the one that writes the
+	// cached string - happens before the reader starts.
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		zero := resource.Quantity{}
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				// Mirrors updateEmptyDirVolumeLimitsFromAllocation: the
+				// dereference copies the whole quantity, cached string
+				// included.
+				zero.Cmp(*pod.Spec.Volumes[0].EmptyDir.SizeLimit)
+			}
+		}
+	}()
+	for range 1000 {
+		_ = changes.String()
+	}
+	close(stop)
+	<-done
+
+	assert.Contains(t, changes.String(), "mem-vol")
+	assert.Equal(t, sizeLimit.Value(), pod.Spec.Volumes[0].EmptyDir.SizeLimit.Value())
+}
+
 func TestDoPodResizeAction_Volumes(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("unsupported OS")
