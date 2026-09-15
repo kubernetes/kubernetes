@@ -60,6 +60,7 @@ func TestPolicySourceHasSyncedEmpty(t *testing.T) {
 		makeTestDispatcher,
 		nil,
 		nil,
+		nil,
 	)
 	require.NoError(t, err)
 	defer testCancel()
@@ -92,6 +93,7 @@ func TestPolicySourceHasSyncedInitialList(t *testing.T) {
 		func(fp *FakePolicy) generic.Evaluator { return nil },
 		makeTestDispatcher,
 		initialObjects,
+		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -162,6 +164,7 @@ func TestPolicySourceBindsToPolicies(t *testing.T) {
 		func(fp *FakePolicy) generic.Evaluator { return nil },
 		makeTestDispatcher,
 		initialObjects,
+		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -282,6 +285,7 @@ func TestCollectParamsHandlesCacheMiss(t *testing.T) {
 		makeTestDispatcher,
 		nil,
 		nil,
+		nil,
 	)
 	require.NoError(t, err)
 	defer testCancel()
@@ -387,6 +391,7 @@ func TestCollectParamsHandlesMissingCRD(t *testing.T) {
 		func(fb *FakeBinding) generic.BindingAccessor { return fb },
 		func(fp *FakePolicy) generic.Evaluator { return nil },
 		makeTestDispatcher,
+		nil,
 		nil,
 		nil,
 	)
