@@ -71,7 +71,9 @@ type StorageClass struct {
 	// +optional
 	VolumeBindingMode *VolumeBindingMode
 
-	// Restrict the node topologies where volumes can be dynamically provisioned.
+	// AllowedTopologies restricts the node topologies where volumes can be dynamically provisioned.
+	// A provisioner may create a volume accessible from one or more of these topologies,
+	// depending on its capabilities and the StorageClass parameters.
 	// Each volume plugin defines its own supported topology specifications.
 	// An empty TopologySelectorTerm list means there is no topology restriction.
 	// This field is only honored by servers that enable the VolumeScheduling feature.

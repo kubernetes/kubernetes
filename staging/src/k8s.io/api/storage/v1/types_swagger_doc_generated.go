@@ -149,7 +149,7 @@ var map_StorageClass = map[string]string{
 	"mountOptions":         "mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class. e.g. [\"ro\", \"soft\"]. Not validated - mount of the PVs will simply fail if one is invalid.",
 	"allowVolumeExpansion": "allowVolumeExpansion shows whether the storage class allow volume expand.",
 	"volumeBindingMode":    "volumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is only honored by servers that enable the VolumeScheduling feature.",
-	"allowedTopologies":    "allowedTopologies restrict the node topologies where volumes can be dynamically provisioned. Each volume plugin defines its own supported topology specifications. An empty TopologySelectorTerm list means there is no topology restriction. This field is only honored by servers that enable the VolumeScheduling feature.",
+	"allowedTopologies":    "allowedTopologies restrict the node topologies where volumes can be dynamically provisioned. A provisioner may create a volume accessible from one or more of these topologies, depending on its capabilities and the StorageClass parameters. Each volume plugin defines its own supported topology specifications. An empty TopologySelectorTerm list means there is no topology restriction. This field is only honored by servers that enable the VolumeScheduling feature.",
 }
 
 func (StorageClass) SwaggerDoc() map[string]string {
