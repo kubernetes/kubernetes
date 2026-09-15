@@ -60,6 +60,5 @@ func mostRequestedScore(requested, capacity int64) int64 {
 		// requests get minimum values.
 		requested = capacity
 	}
-
-	return (requested * fwk.MaxNodeScore) / capacity
+	return scaledUtilization(requested, capacity, fwk.MaxScore)
 }
