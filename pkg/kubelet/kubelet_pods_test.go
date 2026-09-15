@@ -4381,6 +4381,8 @@ func (r *imageRefSpy) GetImageRef(ctx context.Context, image kubecontainer.Image
 
 func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	// The metrics are lazily created and do not count until registered.
+	metrics.Register()
 	const (
 		imageVolumeName      = "image-volume"
 		imageVolumeMountPath = "/mock/path"
@@ -4437,6 +4439,7 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 		name                string
 		dnlevEnabled        bool
 		imageDigestDisabled bool
+		expectDigestMissing bool
 		initContainer       bool
 		actuatedMounts      []v1.VolumeMount
 		pod                 *v1.Pod
@@ -4550,6 +4553,14 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 			currentStatus:  runningStatus("containerA-id", runtimeMount(imageVolumeMountPath, "")),
 			previousStatus: previousRunning("containerA-id", mountStatus(imageVolumeMountPath, imageDigest)),
 			expected:       expectedRunning("containerA-id", mountStatus(imageVolumeMountPath, "")),
+		},
+		{
+			name:                "with image volume - should count a missing runtime digest in the digest missing metric",
+			pod:                 newPod(imageVolumeMountPath),
+			currentStatus:       runningStatus("containerA-id", runtimeMount(imageVolumeMountPath, "")),
+			previousStatus:      previousRunning("containerA-id", mountStatus(imageVolumeMountPath, imageDigest)),
+			expected:            expectedRunning("containerA-id", mountStatus(imageVolumeMountPath, "")),
+			expectDigestMissing: true,
 		},
 		{
 			name:           "with image volume - should omit a runtime digest longer than the API limit",
@@ -4678,6 +4689,9 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 				previousStatus[i] = *previousStatus[i].DeepCopy()
 			}
 
+			digestMissingBefore, err := testutil.GetCounterMetricValue(metrics.ImageVolumeDigestMissing)
+			require.NoError(t, err)
+
 			containerStatuses := kl.convertToAPIContainerStatuses(
 				tCtx,
 				test.pod,
@@ -4692,6 +4706,11 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 			require.Len(t, containerStatuses, len(test.expected), "[test %s]", test.name)
 			for i, status := range containerStatuses {
 				assert.Equal(t, test.expected[i], status, "[test %s]", test.name)
+			}
+			if test.expectDigestMissing {
+				digestMissingAfter, err := testutil.GetCounterMetricValue(metrics.ImageVolumeDigestMissing)
+				require.NoError(t, err)
+				assert.Equal(t, digestMissingBefore+1, digestMissingAfter, "[test %s] the image volume digest missing counter should be incremented", test.name)
 			}
 			assert.Zero(t, spy.getImageRefCalls, "GetImageRef must not be called")
 			assert.Equal(t, previousStatus, test.previousStatus, "previous status must not be mutated")

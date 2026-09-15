@@ -193,6 +193,7 @@ const (
 	AdmissionRejectionsTotalKey = "admission_rejections_total"
 
 	// Image Volume metrics
+	ImageVolumeDigestMissingKey       = "image_volume_digest_missing_total"
 	ImageVolumeRequestedTotalKey      = "image_volume_requested_total"
 	ImageVolumeMountedSucceedTotalKey = "image_volume_mounted_succeed_total"
 	ImageVolumeMountedErrorsTotalKey  = "image_volume_mounted_errors_total"
@@ -1291,6 +1292,17 @@ var (
 		[]string{"reason"},
 	)
 
+	// ImageVolumeDigestMissing tracks the number of image volumes for which the container runtime
+	// did not report an image reference when generating the pod status.
+	ImageVolumeDigestMissing = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImageVolumeDigestMissingKey,
+			Help:           "Total number of image volumes for which the container runtime did not report an image reference when generating the pod status.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// ImageVolumeRequestedTotal tracks the number of requested image volumes.
 	ImageVolumeRequestedTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -1549,6 +1561,7 @@ func Register() {
 		legacyregistry.MustRegister(ContainersPerPodCount)
 		legacyregistry.MustRegister(PLEGRelistDuration)
 		legacyregistry.MustRegister(PLEGDiscardEvents)
+		legacyregistry.MustRegister(ImageVolumeDigestMissing)
 		legacyregistry.MustRegister(PLEGRelistInterval)
 		legacyregistry.MustRegister(PLEGLastSeen)
 		legacyregistry.MustRegister(PLEGPodRelistDuration)

@@ -419,11 +419,7 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 			}
 		}
 
-		containerPath := mount.MountPath
-		// IsAbs returns false for UNC path/SMB shares/named pipes in Windows. So check for those specifically and skip MakeAbsolutePath
-		if !volumeutil.IsWindowsUNCPath(runtime.GOOS, containerPath) && !utilfs.IsAbs(containerPath) {
-			containerPath = volumeutil.MakeAbsolutePath(runtime.GOOS, containerPath)
-		}
+		containerPath := normalizeContainerPath(mount.MountPath)
 
 		propagation, err := translateMountPropagation(mount.MountPropagation)
 		if err != nil {
@@ -459,6 +455,15 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 		mounts = append(mounts, *hostsMount)
 	}
 	return mounts, cleanupAction, nil
+}
+
+// normalizeContainerPath returns the absolute form of a container mount path.
+// IsAbs returns false for UNC path/SMB shares/named pipes in Windows. So check for those specifically and skip MakeAbsolutePath
+func normalizeContainerPath(containerPath string) string {
+	if !volumeutil.IsWindowsUNCPath(runtime.GOOS, containerPath) && !utilfs.IsAbs(containerPath) {
+		return volumeutil.MakeAbsolutePath(runtime.GOOS, containerPath)
+	}
+	return containerPath
 }
 
 // translateMountPropagation transforms v1.MountPropagationMode to
@@ -2432,11 +2437,36 @@ func hasContainer(pod *v1.Pod, name string, mask podutil.ContainerType) bool {
 	return false
 }
 
+// maxImageVolumeImageRefLength is the maximum length of an image volume ImageRef accepted by the
+// API validation (see validateImageVolumeStatus in pkg/apis/core/validation). Reporting a longer
+// value would make every status update of the pod fail.
+const maxImageVolumeImageRefLength = 256
+
 // convertToAPIContainerStatuses converts the given internal container
 // statuses into API container statuses.
 func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers bool, containerType podutil.ContainerType, podRestarting bool) []v1.ContainerStatus {
 	logger := klog.FromContext(ctx)
 	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
+
+	copyVolumeMountStatuses := func(mounts []v1.VolumeMountStatus) []v1.VolumeMountStatus {
+		if mounts == nil {
+			return nil
+		}
+		copied := make([]v1.VolumeMountStatus, len(mounts))
+		for i := range mounts {
+			copied[i] = *mounts[i].DeepCopy()
+		}
+		return copied
+	}
+	clearImageVolumeStatus := func(mount *v1.VolumeMountStatus) {
+		if mount.VolumeStatus == nil {
+			return
+		}
+		mount.VolumeStatus.Image = nil
+		if *mount.VolumeStatus == (v1.VolumeStatus{}) {
+			mount.VolumeStatus = nil
+		}
+	}
 
 	convertContainerStatus := func(cs *kubecontainer.Status, oldStatus *v1.ContainerStatus) *v1.ContainerStatus {
 		cid := cs.ID.String()
@@ -2450,6 +2480,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			ImageID:     cs.ImageRef,
 			ContainerID: cid,
 		}
+		// Copy previous mount statuses before adding the current digest so the previous status remains immutable.
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
 			var actuatedVolumeMounts []v1.VolumeMount
 			if kl.actuatedState != nil {
@@ -2460,10 +2491,10 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			} else if oldStatus != nil && ((status.ContainerID != "" && oldStatus.ContainerID == status.ContainerID) || (oldStatus.ContainerID == "" && oldStatus.State.Waiting == nil)) {
 				// Preserve previously reported VolumeMounts for the same container instance if
 				// actuatedState does not have an entry (e.g., on the first sync after a kubelet upgrade).
-				status.VolumeMounts = oldStatus.VolumeMounts
+				status.VolumeMounts = copyVolumeMountStatuses(oldStatus.VolumeMounts)
 			}
 		} else if oldStatus != nil {
-			status.VolumeMounts = oldStatus.VolumeMounts // immutable
+			status.VolumeMounts = copyVolumeMountStatuses(oldStatus.VolumeMounts) // immutable
 		}
 		if oldStatus != nil {
 			if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
@@ -2482,31 +2513,30 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) && imageVolumeNames.Len() > 0 {
 			for i := range status.VolumeMounts {
-				volumeName := status.VolumeMounts[i].Name
-				if !imageVolumeNames.Has(volumeName) {
+				if !imageVolumeNames.Has(status.VolumeMounts[i].Name) {
 					continue
 				}
 
-				var imageSpec kubecontainer.ImageSpec
+				var imageRef string
+				containerPath := normalizeContainerPath(status.VolumeMounts[i].MountPath)
 				for _, curVolumeMount := range cs.Mounts {
-					if curVolumeMount.Image == nil || curVolumeMount.Name != volumeName {
+					if curVolumeMount.Image == nil || curVolumeMount.ContainerPath != containerPath {
 						continue
 					}
-					imageSpec = kuberuntime.ToKubeContainerImageSpec(&runtimeapi.Image{
-						Id:   curVolumeMount.Image.Image,
-						Spec: curVolumeMount.Image,
-					})
+					imageRef = curVolumeMount.Image.ImageRef
 					break
 				}
 
-				if imageSpec.Image == "" {
-					logger.Error(fmt.Errorf("image was not found"), "", "pod", pod.Name, "container", cs.Name, "volume", volumeName)
+				if imageRef == "" {
+					logger.V(4).Info("Image volume digest unavailable", "pod", klog.KObj(pod), "container", cs.Name, "volume", status.VolumeMounts[i].Name)
+					metrics.ImageVolumeDigestMissing.Inc()
+					clearImageVolumeStatus(&status.VolumeMounts[i])
 					continue
 				}
 
-				imageRef, err := kl.containerRuntime.GetImageRef(ctx, imageSpec)
-				if err != nil {
-					logger.Error(err, "error getting image volume digest", "volume", volumeName)
+				if len(imageRef) > maxImageVolumeImageRefLength {
+					logger.V(4).Info("Image volume digest exceeds the maximum length", "pod", klog.KObj(pod), "container", cs.Name, "volume", status.VolumeMounts[i].Name, "length", len(imageRef), "maxLength", maxImageVolumeImageRefLength)
+					clearImageVolumeStatus(&status.VolumeMounts[i])
 					continue
 				}
 				if status.VolumeMounts[i].VolumeStatus == nil {
@@ -2516,6 +2546,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 					status.VolumeMounts[i].VolumeStatus.Image = &v1.ImageVolumeStatus{}
 				}
 				status.VolumeMounts[i].VolumeStatus.Image.ImageRef = imageRef
+			}
+		} else if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) {
+			// Drop image volume digests carried over from the previous status while the feature is disabled.
+			for i := range status.VolumeMounts {
+				clearImageVolumeStatus(&status.VolumeMounts[i])
 			}
 		}
 

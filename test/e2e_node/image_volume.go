@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
@@ -328,12 +329,34 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 		framework.ExpectNoError(err, "Failed to await for the pod to be running: (%s/%s)", f.Namespace.Name, podName)
 
 		ginkgo.By(fmt.Sprintf("Getting the image ID of %s from the container runtime", volumeImage))
-		_, imageService, err := getCRIClient(ctx)
+		runtimeService, imageService, err := getCRIClient(ctx)
 		framework.ExpectNoError(err, "Failed to get CRI client")
 		imageStatus, err := imageService.ImageStatus(ctx, &runtimeapi.ImageSpec{Image: volumeImage}, false)
 		framework.ExpectNoError(err, "Failed to get image status: %s", volumeImage)
 		imageID := imageStatus.GetImage().GetId()
 		gomega.Expect(imageID).NotTo(gomega.BeEmpty(), "Failed to get image ID: %s", volumeImage)
+
+		ginkgo.By(fmt.Sprintf("Getting the image volume digest reported by the container runtime for the pod (%s/%s)", f.Namespace.Name, podName))
+		containers, err := runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{
+			LabelSelector: map[string]string{
+				types.KubernetesPodNameLabel:      podName,
+				types.KubernetesPodNamespaceLabel: f.Namespace.Name,
+			},
+		})
+		framework.ExpectNoError(err, "Failed to list the containers of the pod (%s/%s)", f.Namespace.Name, podName)
+		gomega.Expect(containers).NotTo(gomega.BeEmpty(), "Failed to list the containers of the pod (%s/%s)", f.Namespace.Name, podName)
+		containerStatus, err := runtimeService.ContainerStatus(ctx, containers[0].GetId(), false)
+		framework.ExpectNoError(err, "Failed to get the container status of the pod (%s/%s)", f.Namespace.Name, podName)
+		var runtimeImageRef string
+		for _, mount := range containerStatus.GetStatus().GetMounts() {
+			if mount.GetContainerPath() == volumePathPrefix {
+				runtimeImageRef = mount.GetImage().GetImageRef()
+				break
+			}
+		}
+		if runtimeImageRef == "" {
+			e2eskipper.Skipf("container runtime does not report ImageSpec.ImageRef for image volume mounts")
+		}
 
 		ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to report the image volume digest", f.Namespace.Name, podName))
 		var imageRef string
@@ -348,11 +371,9 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 				}
 			}
 			return imageRef, nil
-		}).WithPolling(5 * time.Second).WithTimeout(time.Minute).ShouldNot(gomega.BeEmpty())
-		if err != nil {
-			framework.Logf("Image volume digest was not reported: %v", err)
-			e2eskipper.Skipf("container runtime does not report ImageSpec.ImageRef for image volumes")
-		}
+		}).WithPolling(5 * time.Second).WithTimeout(time.Minute).Should(gomega.Equal(runtimeImageRef))
+		framework.ExpectNoError(err, "Failed to await the image volume digest in the pod status (%s/%s)", f.Namespace.Name, podName)
+
 		gomega.Expect(imageRef).To(gomega.Equal(imageID), "image volume digest should match the image ID reported by the container runtime")
 	})
 
