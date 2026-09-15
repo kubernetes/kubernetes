@@ -32,6 +32,10 @@ const (
 
 	// userKey is the context key for the request user.
 	userKey
+
+	// streamingCollectionEncodingKey is the context key for whether the response
+	// to this request will be encoded with a streaming collection encoder.
+	streamingCollectionEncodingKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -75,4 +79,16 @@ func WithUser(parent context.Context, user user.Info) context.Context {
 func UserFrom(ctx context.Context) (user.Info, bool) {
 	user, ok := ctx.Value(userKey).(user.Info)
 	return user, ok
+}
+
+// WithStreamingCollectionEncoding returns a copy of parent in which the
+// streaming collection encoding value is set
+func WithStreamingCollectionEncoding(parent context.Context, streaming bool) context.Context {
+	return WithValue(parent, streamingCollectionEncodingKey, streaming)
+}
+
+// StreamingCollectionEncodingFrom returns the value of the streaming collection encoding key on the ctx
+func StreamingCollectionEncodingFrom(ctx context.Context) bool {
+	streaming, _ := ctx.Value(streamingCollectionEncodingKey).(bool)
+	return streaming
 }
