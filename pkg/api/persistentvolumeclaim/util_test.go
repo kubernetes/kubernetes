@@ -743,6 +743,22 @@ func TestWarnings(t *testing.T) {
 			expected: nil,
 		},
 		{
+			name: "large integer no warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
 			name: "storageclass annotations warning",
 			template: &core.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
