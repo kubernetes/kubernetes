@@ -1318,10 +1318,10 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 			allErrs = append(allErrs, validateUserField(source.PodCertificate.User, projPath.Child("user"))...)
 
 			switch source.PodCertificate.KeyType {
-			case "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519":
+			case "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519", "MLDSA44", "MLDSA65", "MLDSA87":
 				// ok
 			default:
-				allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}))
+				allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519", "MLDSA44", "MLDSA65", "MLDSA87"}))
 			}
 
 			if source.PodCertificate.MaxExpirationSeconds != nil {
