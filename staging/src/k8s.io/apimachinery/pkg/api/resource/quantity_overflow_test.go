@@ -115,7 +115,7 @@ func quantityAccessorCases() []accessorCase {
 			wantValue:      math.MaxInt64,
 			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 9223372036854776,
-			wantAsInt64:    0, wantAsInt64OK: false,
+			wantAsInt64:    math.MaxInt64, wantAsInt64OK: true,
 			wantFloat:       9.223372036854776e+18,
 			wantString:      "9223372036854775807",
 			atInt64Boundary: true,
@@ -126,7 +126,7 @@ func quantityAccessorCases() []accessorCase {
 			wantValue:      -math.MaxInt64,
 			wantMilli:      math.MinInt64,
 			wantScaledKilo: -9223372036854776,
-			wantAsInt64:    0, wantAsInt64OK: false,
+			wantAsInt64:    -math.MaxInt64, wantAsInt64OK: true,
 			wantFloat:  -9.223372036854776e+18,
 			wantString: "-9223372036854775807",
 		},
@@ -136,7 +136,7 @@ func quantityAccessorCases() []accessorCase {
 			wantValue:      math.MaxInt64,
 			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 9223372036854776,
-			wantAsInt64:    0, wantAsInt64OK: false,
+			wantAsInt64:    math.MaxInt64, wantAsInt64OK: true,
 			wantFloat:       9.223372036854776e+18,
 			wantString:      "9223372036854775807",
 			atInt64Boundary: true,
@@ -147,7 +147,7 @@ func quantityAccessorCases() []accessorCase {
 			wantValue:      -math.MaxInt64,
 			wantMilli:      math.MinInt64,
 			wantScaledKilo: -9223372036854776,
-			wantAsInt64:    0, wantAsInt64OK: false,
+			wantAsInt64:    -math.MaxInt64, wantAsInt64OK: true,
 			wantFloat:  -9.223372036854776e+18,
 			wantString: "-9223372036854775807",
 		},
@@ -377,7 +377,7 @@ func quantityAccessorCases() []accessorCase {
 			wantValue:      0,
 			wantMilli:      0,
 			wantScaledKilo: 0,
-			wantAsInt64:    0, wantAsInt64OK: false,
+			wantAsInt64:    0, wantAsInt64OK: true,
 			wantFloat:  0,
 			wantString: "0",
 		},
@@ -493,8 +493,8 @@ func assertAccessors(t *testing.T, tc accessorCase) {
 		if ok != tc.wantAsInt64OK {
 			t.Errorf("AsInt64() ok = %t, want %t%s", ok, tc.wantAsInt64OK, todoSuffix(tc.asInt64TODO))
 		}
-		// ok=false means the fast int64 path declined (Dec-backed or inexact), not
-		// overflow, and leaves the returned int64 unspecified; pin it only when ok.
+		// ok=false covers both an inexact value and an overflow; only the ok case
+		// carries a value worth pinning here.
 		if ok && got != tc.wantAsInt64 {
 			t.Errorf("AsInt64() value = %d, want %d", got, tc.wantAsInt64)
 		}
