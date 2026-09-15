@@ -17,17 +17,22 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
+	smdschema "sigs.k8s.io/structured-merge-diff/v7/schema"
 	"sigs.k8s.io/structured-merge-diff/v7/typed"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/client-go/discovery"
-	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/client-go/openapi"
+	"k8s.io/kube-openapi/pkg/schemaconv"
+	"k8s.io/kube-openapi/pkg/spec3"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // openAPISchemaTTL is how frequently we need to check
@@ -41,50 +46,148 @@ type UnstructuredExtractor interface {
 	ExtractStatus(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error)
 }
 
-// gvkParserCache caches the GVKParser in order to prevent from having to repeatedly
-// parse the models from the open API schema when the schema itself changes infrequently.
-type gvkParserCache struct {
-	// discoveryClient is the client for retrieving the openAPI document and checking
-	// whether the document has changed recently
-	discoveryClient discovery.DiscoveryInterface
-	// mu protects the gvkParser
-	mu sync.Mutex
-	// gvkParser retrieves the objectType for a given gvk
-	gvkParser *managedfields.GvkParser
-	// lastChecked is the last time we checked if the openAPI doc has changed.
-	lastChecked time.Time
+// gvParser holds the parseable types of a single group-version, indexed by GVK.
+type gvParser struct {
+	types map[schema.GroupVersionKind]*typed.ParseableType
 }
 
-// regenerateGVKParser builds the parser from the raw OpenAPI schema.
-func regenerateGVKParser(dc discovery.DiscoveryInterface) (*managedfields.GvkParser, error) {
-	doc, err := dc.OpenAPISchema()
-	if err != nil {
-		return nil, err
+func (p *gvParser) typeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error) {
+	objectType, ok := p.types[gvk]
+	if !ok {
+		return nil, fmt.Errorf("no type found for %v", gvk)
 	}
+	return objectType, nil
+}
 
-	models, err := proto.NewOpenAPIData(doc)
-	if err != nil {
-		return nil, err
+// newGVParser builds a gvParser from the JSON-encoded OpenAPI v3 schema of a
+// single group-version, the same way managedfields.NewTypeConverter interprets
+// such schemas.
+func newGVParser(data []byte) (*gvParser, error) {
+	var doc spec3.OpenAPI
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("failed to parse openapi v3 schema: %w", err)
 	}
+	schemas := map[string]*spec.Schema{}
+	if doc.Components != nil {
+		schemas = doc.Components.Schemas
+	}
+	typeSchema, err := schemaconv.ToSchemaFromOpenAPI(schemas, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert openapi v3 schema models: %w", err)
+	}
+	parser := typed.Parser{Schema: smdschema.Schema{Types: typeSchema.Types}}
+	types := map[schema.GroupVersionKind]*typed.ParseableType{}
+	for name, model := range schemas {
+		for _, gvk := range parseGroupVersionKind(model.Extensions) {
+			if gvk.Kind == "" {
+				continue
+			}
+			parsedType := parser.Type(name)
+			types[gvk] = &parsedType
+		}
+	}
+	return &gvParser{types: types}, nil
+}
 
-	return managedfields.NewGVKParser(models, false)
+// parseGroupVersionKind extracts the "x-kubernetes-group-version-kind" entries
+// of a JSON-decoded schema extension map.
+func parseGroupVersionKind(extensions spec.Extensions) []schema.GroupVersionKind {
+	var result []schema.GroupVersionKind
+	gvkExtension, ok := extensions["x-kubernetes-group-version-kind"]
+	if !ok {
+		return nil
+	}
+	gvkList, ok := gvkExtension.([]interface{})
+	if !ok {
+		return nil
+	}
+	for _, gvk := range gvkList {
+		gvkMap, ok := gvk.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		group, ok := gvkMap["group"].(string)
+		if !ok {
+			continue
+		}
+		version, ok := gvkMap["version"].(string)
+		if !ok {
+			continue
+		}
+		kind, ok := gvkMap["kind"].(string)
+		if !ok {
+			continue
+		}
+		result = append(result, schema.GroupVersionKind{Group: group, Version: version, Kind: kind})
+	}
+	return result
+}
+
+// gvkParserCache caches one gvParser per group-version, built lazily from the
+// OpenAPI v3 schema of that group-version the first time an object of it is
+// extracted, to prevent from having to download and parse the models for
+// group-versions that are never extracted from.
+type gvkParserCache struct {
+	// client fetches the per-group-version OpenAPI v3 schemas
+	client openapi.Client
+	// mu protects the fields below
+	mu sync.Mutex
+	// paths is the cached OpenAPI v3 discovery listing
+	paths map[string]openapi.GroupVersion
+	// lastChecked is the last time paths was refreshed
+	lastChecked time.Time
+	// parsers hold one gvParser per downloaded group-version
+	parsers map[schema.GroupVersion]gvkParserCacheEntry
+}
+
+type gvkParserCacheEntry struct {
+	// serverRelativeURL is the URL the parser was built from; it embeds a
+	// content hash, so an unchanged URL means an unchanged schema
+	serverRelativeURL string
+	parser            *gvParser
+}
+
+// gvPathKey returns the key of gv in the OpenAPI v3 discovery listing,
+// e.g. "api/v1" or "apis/apps/v1".
+func gvPathKey(gv schema.GroupVersion) string {
+	if gv.Group == "" {
+		return "api/" + gv.Version
+	}
+	return "apis/" + gv.Group + "/" + gv.Version
 }
 
 // objectTypeForGVK retrieves the typed.ParseableType for a given gvk from the cache
 func (c *gvkParserCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// if the ttl on the openAPISchema has expired,
-	// regenerate the gvk parser
+	// if the ttl on the discovery listing has expired,
+	// regenerate it to observe schema updates
 	if time.Since(c.lastChecked) > openAPISchemaTTL {
-		c.lastChecked = time.Now()
-		parser, err := regenerateGVKParser(c.discoveryClient)
+		paths, err := c.client.Paths()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to list openapi v3 group versions: %w", err)
 		}
-		c.gvkParser = parser
+		c.paths = paths
+		c.lastChecked = time.Now()
 	}
-	return c.gvkParser.Type(gvk), nil
+	gv := gvk.GroupVersion()
+	gvPath, ok := c.paths[gvPathKey(gv)]
+	if !ok {
+		return nil, fmt.Errorf("no openapi v3 schema found for %v", gv)
+	}
+	if entry, ok := c.parsers[gv]; ok && entry.serverRelativeURL == gvPath.ServerRelativeURL() {
+		return entry.parser.typeForGVK(gvk)
+	}
+	data, err := gvPath.Schema("application/json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to download openapi v3 schema: %w", err)
+	}
+	parser, err := newGVParser(data)
+	if err != nil {
+		return nil, err
+	}
+	c.parsers[gv] = gvkParserCacheEntry{serverRelativeURL: gvPath.ServerRelativeURL(), parser: parser}
+	return parser.typeForGVK(gvk)
 }
 
 type extractor struct {
@@ -94,14 +197,17 @@ type extractor struct {
 // NewUnstructuredExtractor creates the extractor with which you can extract the applied configuration
 // for a given manager from an unstructured object.
 func NewUnstructuredExtractor(dc discovery.DiscoveryInterface) (UnstructuredExtractor, error) {
-	parser, err := regenerateGVKParser(dc)
+	client := dc.OpenAPIV3()
+	paths, err := client.Paths()
 	if err != nil {
-		return nil, fmt.Errorf("failed generating initial GVK Parser: %v", err)
+		return nil, fmt.Errorf("failed to list openapi v3 group versions: %w", err)
 	}
 	return &extractor{
 		cache: &gvkParserCache{
-			gvkParser:       parser,
-			discoveryClient: dc,
+			client:      client,
+			paths:       paths,
+			lastChecked: time.Now(),
+			parsers:     map[schema.GroupVersion]gvkParserCacheEntry{},
 		},
 	}, nil
 }
@@ -123,12 +229,12 @@ func (e *extractor) extractUnstructured(object *unstructured.Unstructured, field
 	gvk := object.GetObjectKind().GroupVersionKind()
 	objectType, err := e.cache.objectTypeForGVK(gvk)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch the objectType: %v", err)
+		return nil, fmt.Errorf("failed to fetch the objectType: %w", err)
 	}
 	result := &unstructured.Unstructured{}
 	err = managedfields.ExtractInto(object, *objectType, fieldManager, result, subresource) //nolint:forbidigo
 	if err != nil {
-		return nil, fmt.Errorf("failed calling ExtractInto for unstructured: %v", err)
+		return nil, fmt.Errorf("failed calling ExtractInto for unstructured: %w", err)
 	}
 	result.SetName(object.GetName())
 	result.SetNamespace(object.GetNamespace())
