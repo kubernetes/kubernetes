@@ -1534,6 +1534,40 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 	}
 }
 
+func TestGenerateLinuxContainerResourcesOversizedCPULimit(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.cpuCFSQuota = true
+
+	// A small request with a representable but enormous limit: MilliValue stays a
+	// large positive int64, so the quota conversion returns the unlimited -1 rail
+	// rather than the minimum, and shares still follow the request.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "foo", Namespace: "bar"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100000000000")},
+				},
+			}},
+		},
+	}
+
+	got := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
+	if got.CpuQuota != -1 {
+		t.Errorf("CpuQuota = %d, want -1 (an oversized limit is unlimited, not the minimum)", got.CpuQuota)
+	}
+	if got.CpuPeriod != 100000 {
+		t.Errorf("CpuPeriod = %d, want 100000", got.CpuPeriod)
+	}
+	if got.CpuShares != 102 {
+		t.Errorf("CpuShares = %d, want 102 (from the 100m request)", got.CpuShares)
+	}
+}
+
 func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
@@ -2968,4 +3002,30 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
 		assert.False(t, ok, "memory.high should NOT be set when container memory req==limit, even if pod is Burstable")
 	})
+}
+
+func TestToKubeContainerResourcesUnlimitedQuota(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		quota     int64
+		period    int64
+		wantLimit int64 // milliCPU; 0 means no limit is reported
+		wantFlag  bool
+	}{
+		{"an unlimited quota marks the limit as removed", -1, 100000, 0, true},
+		{"a finite quota reports the limit", 200000, 100000, 2000, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := toKubeContainerResources(&runtimeapi.ContainerResources{Linux: &runtimeapi.LinuxContainerResources{CpuQuota: tc.quota, CpuPeriod: tc.period}})
+			require.NotNil(t, got)
+			assert.Equal(t, tc.wantFlag, got.CPUQuotaUnlimited)
+			if tc.wantLimit == 0 {
+				assert.Nil(t, got.CPULimit)
+			} else {
+				assert.Equal(t, tc.wantLimit, got.CPULimit.MilliValue())
+			}
+		})
+	}
+	// Without a period the runtime reported nothing, so neither a limit nor the flag is set.
+	assert.Nil(t, toKubeContainerResources(&runtimeapi.ContainerResources{Linux: &runtimeapi.LinuxContainerResources{CpuQuota: -1}}))
 }
