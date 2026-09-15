@@ -1789,7 +1789,8 @@ func TestAsyncPreemption(t *testing.T) {
 				{
 					Name: "schedule the mid-priority preemptor Pod",
 					SchedulePod: &asyncframework.SchedulePod{
-						PodName: "preemptor-mid-priority",
+						PodName:             "preemptor-mid-priority",
+						ExpectUnschedulable: true,
 					},
 				},
 				{

@@ -225,6 +225,12 @@ func (cq *callQueue) add(apiCall *queuedAPICall) error {
 	cq.lock.Lock()
 	defer cq.lock.Unlock()
 
+	if cq.closed {
+		err := errors.New("dispatcher closed")
+		apiCall.sendOnFinish(err)
+		return err
+	}
+
 	apiCall.callID = cq.callIDCounter
 	cq.callIDCounter++
 
@@ -243,6 +249,10 @@ func (cq *callQueue) add(apiCall *queuedAPICall) error {
 func (cq *callQueue) pop() (*queuedAPICall, error) {
 	cq.lock.Lock()
 	defer cq.lock.Unlock()
+
+	if cq.closed {
+		return nil, nil
+	}
 
 	for cq.callsQueue.Len() == 0 {
 		if cq.closed {
@@ -317,7 +327,13 @@ func (cq *callQueue) syncObject(obj metav1.Object) (metav1.Object, error) {
 func (cq *callQueue) close() {
 	cq.lock.Lock()
 	defer cq.lock.Unlock()
-
+	if cq.closed {
+		return
+	}
+	// Cancel all api calls in queue
+	for _, call := range cq.apiCalls {
+		call.sendOnFinish(errors.New("dispatcher closed"))
+	}
 	cq.closed = true
 	cq.cond.Broadcast()
 }
