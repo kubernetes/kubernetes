@@ -35,6 +35,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/component-base/featuregate"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -874,7 +876,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					}
 
 					// In any case, we should make sure InFlightEvents is empty after running the scenario.
-					if err = checkEmptyInFlightEvents(); err != nil {
+					if err = waitForEmptyInFlightEvents(tCtx); err != nil {
 						tCtx.Errorf("%s: %s", w.Name, err)
 					}
 
@@ -963,7 +965,7 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 					}
 
 					// In any case, we should make sure InFlightEvents is empty after running the scenario.
-					if err = checkEmptyInFlightEvents(); err != nil {
+					if err = waitForEmptyInFlightEvents(tCtx); err != nil {
 						tCtx.Errorf("%s: %s", w.Name, err)
 					}
 				})
@@ -1074,23 +1076,40 @@ func applyThreshold(items []DataItem, threshold float64, metricSelector threshol
 }
 
 func checkEmptyInFlightEvents() error {
-	// checkEmptyInFlightEvents seems to race with completion of the scenario,
-	// which started to go wrong a lot after speeding up metrics gathering
-	// during the scenario.
-	//
-	// TODO: re-enable it when it's reliable again.
+	labels := append(schedframework.AllClusterEventLabels(), metrics.PodPoppedInFlightEvent)
+	for _, label := range labels {
+		value, err := testutil.GetGaugeMetricValue(metrics.InFlightEvents.WithLabelValues(label))
+		if err != nil {
+			return fmt.Errorf("failed to get InFlightEvents metric for label %s", label)
+		}
+		if value > 0 {
+			return fmt.Errorf("InFlightEvents for label %s should be empty, but has %v items", label, value)
+		}
+	}
 	return nil
-	// labels := append(schedframework.AllClusterEventLabels(), metrics.PodPoppedInFlightEvent)
-	// for _, label := range labels {
-	// 	value, err := testutil.GetGaugeMetricValue(metrics.InFlightEvents.WithLabelValues(label))
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to get InFlightEvents metric for label %s", label)
-	// 	}
-	//	if value > 0 {
-	//		return fmt.Errorf("InFlightEvents for label %s should be empty, but has %v items", label, value)
-	//	}
-	//}
-	// return nil
+}
+
+const (
+	inFlightEventsCheckInterval = 100 * time.Millisecond
+	inFlightEventsCheckTimeout  = time.Minute
+)
+
+// waitForEmptyInFlightEvents waits for scheduling and binding cycles that are
+// still completing when a workload reports its Pods as scheduled.
+func waitForEmptyInFlightEvents(ctx context.Context) error {
+	return waitForEmptyInFlightEventsWithCheck(ctx, inFlightEventsCheckInterval, inFlightEventsCheckTimeout, checkEmptyInFlightEvents)
+}
+
+func waitForEmptyInFlightEventsWithCheck(ctx context.Context, interval, timeout time.Duration, check func() error) error {
+	var lastErr error
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(context.Context) (bool, error) {
+		lastErr = check()
+		return lastErr == nil, nil
+	})
+	if err != nil {
+		return fmt.Errorf("InFlightEvents did not become empty: %w", errors.Join(err, lastErr))
+	}
+	return nil
 }
 
 func runWorkload(tCtx ktesting.TContext, tc *testCase, w *Workload, topicName string, scheduler *scheduler.Scheduler, informerFactory informers.SharedInformerFactory, opts *schedulerPerfOptions) ([]DataItem, error) {
