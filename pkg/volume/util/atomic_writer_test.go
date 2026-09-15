@@ -58,6 +58,53 @@ func TestNewAtomicWriter(t *testing.T) {
 	}
 }
 
+func TestIsTargetPopulated(t *testing.T) {
+	targetDir, err := utiltesting.MkTmpdir("atomic-write")
+	if err != nil {
+		t.Fatalf("unexpected error creating tmp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(targetDir) }()
+
+	// A freshly created target directory has never been written to, so the
+	// data directory symlink does not exist yet.
+	if IsTargetPopulated(targetDir) {
+		t.Fatalf("expected target dir to be reported as not populated before any write")
+	}
+
+	// After a successful Write the "..data" symlink exists and the target is
+	// considered populated. This is the signal volume plugins rely on to avoid
+	// tearing down an already-mounted volume on a later failed resync (#113242).
+	writer, err := NewAtomicWriter(targetDir, "-test-")
+	if err != nil {
+		t.Fatalf("unexpected error creating writer: %v", err)
+	}
+	payload := map[string]FileProjection{
+		"foo": {Data: []byte("foo"), Mode: 0644},
+	}
+	if err := writer.Write(payload, nil); err != nil {
+		t.Fatalf("unexpected error writing payload: %v", err)
+	}
+	if !IsTargetPopulated(targetDir) {
+		t.Fatalf("expected target dir to be reported as populated after a successful write")
+	}
+
+	// A non-existent target directory is trivially not populated.
+	if IsTargetPopulated(filepath.Join(targetDir, "does-not-exist")) {
+		t.Fatalf("expected non-existent dir to be reported as not populated")
+	}
+
+	// On an inconclusive Lstat error (here ENOTDIR, because the "target dir" is a
+	// regular file) the check must conservatively report the target as populated,
+	// so a possibly bind-mounted volume is not torn down on an inconclusive result.
+	regularFile := filepath.Join(targetDir, "not-a-dir")
+	if err := os.WriteFile(regularFile, []byte("x"), 0644); err != nil {
+		t.Fatalf("unexpected error creating file: %v", err)
+	}
+	if !IsTargetPopulated(regularFile) {
+		t.Fatalf("expected target to be reported as populated on a non-ENOENT Lstat error")
+	}
+}
+
 func TestValidatePath(t *testing.T) {
 	maxPath := strings.Repeat("a", maxPathLength+1)
 	maxFile := strings.Repeat("a", maxFileNameLength+1)
@@ -1032,6 +1079,167 @@ func TestSetPerms(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "error in setPerms") {
 		t.Fatalf("unexpected error while writing: %v", err)
+	}
+}
+
+func TestWriteFailureCleansUpTimestampDirectory(t *testing.T) {
+	tests := []struct {
+		name     string
+		payload  map[string]FileProjection
+		setPerms bool
+	}{
+		{
+			name: "payload write",
+			// Either iteration order writes one file before encountering the
+			// file/directory collision, leaving a partially written generation.
+			payload: map[string]FileProjection{
+				"new":       {Data: []byte("new data"), Mode: 0644},
+				"new/child": {Data: []byte("child data"), Mode: 0644},
+			},
+		},
+		{
+			name: "permissions",
+			payload: map[string]FileProjection{
+				"new": {Data: []byte("new data"), Mode: 0644},
+			},
+			setPerms: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			targetDir := t.TempDir()
+			writer, err := NewAtomicWriter(targetDir, "-test-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			original := map[string]FileProjection{
+				"old": {Data: []byte("old data"), Mode: 0644},
+			}
+			if err := writer.Write(original, nil); err != nil {
+				t.Fatal(err)
+			}
+			originalDir, err := os.Stat(targetDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			originalDataDir, err := os.Readlink(filepath.Join(targetDir, dataDirName))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var setPerms func(string) error
+			setPermsCalls := 0
+			if tc.setPerms {
+				setPerms = func(string) error {
+					setPermsCalls++
+					return fmt.Errorf("injected permission failure")
+				}
+			}
+			for range 3 {
+				if err := writer.Write(tc.payload, setPerms); err == nil {
+					t.Fatal("expected write to fail")
+				}
+				dataDir, err := os.Readlink(filepath.Join(targetDir, dataDirName))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if dataDir != originalDataDir {
+					t.Fatalf("failed write changed published directory from %q to %q", originalDataDir, dataDir)
+				}
+				checkVolumeContents(targetDir, tc.name, original, t)
+				checkAtomicWriterDirectories(t, targetDir, originalDir)
+			}
+			if tc.setPerms && setPermsCalls != 3 {
+				t.Fatalf("expected 3 permission failures, got %d", setPermsCalls)
+			}
+
+			recovered := map[string]FileProjection{
+				"new": {Data: []byte("recovered data"), Mode: 0644},
+			}
+			if err := writer.Write(recovered, nil); err != nil {
+				t.Fatalf("retry failed: %v", err)
+			}
+			checkVolumeContents(targetDir, tc.name, recovered, t)
+			checkAtomicWriterDirectories(t, targetDir, originalDir)
+		})
+	}
+}
+
+func checkAtomicWriterDirectories(t *testing.T, targetDir string, originalDir os.FileInfo) {
+	t.Helper()
+	currentDir, err := os.Stat(targetDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(originalDir, currentDir) {
+		t.Fatal("volume root was replaced")
+	}
+	dataDir, err := os.Readlink(filepath.Join(targetDir, dataDirName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(targetDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() && entry.Name() != dataDir {
+			t.Errorf("unpublished timestamp directory remains: %s", entry.Name())
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(targetDir, newDataDirName)); !os.IsNotExist(err) {
+		t.Errorf("expected no temporary data symlink, got error %v", err)
+	}
+}
+
+func TestWriteKeepsPublishedDirectoryOnError(t *testing.T) {
+	targetDir := t.TempDir()
+	writer, err := NewAtomicWriter(targetDir, "-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Write(map[string]FileProjection{
+		"old": {Data: []byte("old data"), Mode: 0644},
+	}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var publishedDir string
+	err = writer.Write(map[string]FileProjection{
+		"new": {Data: []byte("new data"), Mode: 0644},
+	}, func(subPath string) error {
+		publishedDir = subPath
+		// Obstruct removal of an old visible path to force an error after
+		// publication. Cleanup must not delete the now-active generation.
+		oldPath := filepath.Join(targetDir, "old")
+		if err := os.Remove(oldPath); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Mkdir(oldPath, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(oldPath, "obstruction"), nil, 0644); err != nil {
+			t.Fatal(err)
+		}
+		return nil
+	})
+	if err == nil {
+		t.Fatal("expected removal of the old visible path to fail")
+	}
+	dataDir, err := os.Readlink(filepath.Join(targetDir, dataDirName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dataDir != publishedDir {
+		t.Fatalf("expected published directory %q, got %q", publishedDir, dataDir)
+	}
+	data, err := os.ReadFile(filepath.Join(targetDir, "new"))
+	if err != nil {
+		t.Fatalf("published content was removed after a post-publication failure: %v", err)
+	}
+	if string(data) != "new data" {
+		t.Fatalf("expected published content %q, got %q", "new data", data)
 	}
 }
 
