@@ -1592,6 +1592,53 @@ func TestListAdd(t *testing.T) {
 	}
 }
 
+func TestUnstructuredListAddDoesNotMutateLHS(t *testing.T) {
+	tests := []struct {
+		name       string
+		listSchema *spec.Schema
+		expression string
+	}{
+		{
+			name:       "atomic list",
+			listSchema: stringArraySchema,
+			expression: "(x + ['c']) != (x + ['d'])",
+		},
+		{
+			name: "set list",
+			listSchema: &spec.Schema{
+				VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+					"x-kubernetes-list-type": "set",
+				}},
+				SchemaProps: stringArraySchema.SchemaProps,
+			},
+			expression: "(x + ['c']) != (x + ['d']) && 'c' in (x + ['c']) && !(x == ['a', 'c'])",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env, err := cel.NewEnv(cel.Variable("x", cel.DynType), cel.StdLib())
+			if err != nil {
+				t.Fatalf("Env creation error: %v", err)
+			}
+
+			elements := make([]interface{}, 2, 3)
+			elements[0] = "a"
+			elements[1] = "b"
+
+			out, err := evalExpression(t, env, tt.expression, map[string]interface{}{
+				"x": common.UnstructuredToVal(elements, &openapi.Schema{Schema: tt.listSchema}),
+			})
+			if err != nil {
+				t.Fatalf("Unexpected err with unstructured values: %v", err)
+			}
+			if out != types.True {
+				t.Errorf("Expected true with unstructured values but got %v", out)
+			}
+		})
+	}
+}
+
 func schemalessTypedToValActivation(vals map[string]typedValue) map[string]interface{} {
 	activation := make(map[string]interface{}, len(vals))
 	for k, tv := range vals {
