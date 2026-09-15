@@ -1091,7 +1091,12 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	// - adding or removing physical memory bank from the node
 	// - change of kubelet system-reserved, kube-reserved or pre-reserved-memory-zone parameters
 	if !areMachineStatesEqual(logger, machineState, expectedMachineState) {
-		return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+		if !utilfeature.DefaultFeatureGate.Enabled(features.MemoryManagerDriftTolerance) ||
+			!isTolerableMachineStateDrift(logger, machineState, expectedMachineState, defaultMaxMemoryDriftBytes) {
+			return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+		}
+		logger.Info("Tolerating a small NUMA node memory drift and re-baselining the memory manager state", "maxDriftBytes", defaultMaxMemoryDriftBytes)
+		s.SetMachineState(expectedMachineState)
 	}
 
 	return nil
@@ -1135,6 +1140,10 @@ func (p *staticPolicy) updateExpectedMachineState(expectedMachineState state.NUM
 			requestedSize -= memoryState.Free
 			memoryState.Reserved += memoryState.Free
 			memoryState.Free = 0
+		}
+
+		if requestedSize > 0 {
+			return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment does not fit the machine state", podUID, containerName)
 		}
 	}
 	return nil
@@ -1218,6 +1227,58 @@ func areMemoryStatesEqual(logger klog.Logger, memoryState1, memoryState2 *state.
 		return false
 	}
 	return true
+}
+
+const defaultMaxMemoryDriftBytes uint64 = 256 * 1024 * 1024
+
+func isTolerableMachineStateDrift(logger klog.Logger, stored, current state.NUMANodeMap, maxDrift uint64) bool {
+	if len(stored) != len(current) {
+		return false
+	}
+	for nodeID, storedNode := range stored {
+		currentNode, ok := current[nodeID]
+		if !ok {
+			return false
+		}
+		if storedNode.NumberOfAssignments != currentNode.NumberOfAssignments {
+			return false
+		}
+		if !areGroupsEqual(storedNode.Cells, currentNode.Cells) {
+			return false
+		}
+		if len(storedNode.MemoryMap) != len(currentNode.MemoryMap) {
+			return false
+		}
+		for resourceName, storedMem := range storedNode.MemoryMap {
+			currentMem, ok := currentNode.MemoryMap[resourceName]
+			if !ok {
+				return false
+			}
+			if storedMem.SystemReserved != currentMem.SystemReserved {
+				return false
+			}
+			if resourceName != v1.ResourceMemory {
+				if storedMem.TotalMemSize != currentMem.TotalMemSize || storedMem.Allocatable != currentMem.Allocatable {
+					return false
+				}
+				continue
+			}
+			if absoluteDiff(storedMem.TotalMemSize, currentMem.TotalMemSize) > maxDrift ||
+				absoluteDiff(storedMem.Allocatable, currentMem.Allocatable) > maxDrift {
+				logger.Info("NUMA node memory drift exceeds the tolerated bound, treating it as a real topology change",
+					"node", nodeID, "storedTotalMemSize", storedMem.TotalMemSize, "currentTotalMemSize", currentMem.TotalMemSize, "maxDriftBytes", maxDrift)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func absoluteDiff(a, b uint64) uint64 {
+	if a > b {
+		return a - b
+	}
+	return b - a
 }
 
 func (p *staticPolicy) getDefaultMachineState() state.NUMANodeMap {
