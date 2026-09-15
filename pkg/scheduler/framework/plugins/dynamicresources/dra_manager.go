@@ -39,7 +39,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
