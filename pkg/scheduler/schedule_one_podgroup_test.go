@@ -787,9 +787,6 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 
 	if podGroupInfo.Size() != 1 {
 		t.Errorf("Expected 1 queued pod left, got %d", podGroupInfo.Size())
-		t.Logf("podGroupInfo: %+v", podGroupInfo)
-		t.Logf("podGroupInfo: %+v", podGroupInfo.PodGroupInfo)
-		t.Logf("podGroupInfo: %+v", podGroupInfo.QueuedPodInfos)
 	}
 	if podGroupInfo.QueuedPodInfos[fwk.PodGroupKey("default", "pg")][0].Pod.Name != "p1" {
 		t.Errorf("Expected p1 to be left in queued pods, got %s", podGroupInfo.QueuedPodInfos[fwk.PodGroupKey("default", "pg")][0].Pod.Name)
