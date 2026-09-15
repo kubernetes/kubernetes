@@ -26,6 +26,7 @@ import (
 
 	"github.com/anishathalye/porcupine"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage"
@@ -36,16 +37,28 @@ import (
 var (
 	requestDistribution = []ChoiceWeight[RequestType]{{
 		Choice: RequestTypeCreate,
-		Weight: 25,
+		Weight: 15,
 	}, {
 		Choice: RequestTypeDelete,
 		Weight: 10,
 	}, {
 		Choice: RequestTypeDeleteUIDPrecondition,
-		Weight: 15,
+		Weight: 10,
 	}, {
 		Choice: RequestTypeGet,
-		Weight: 50,
+		Weight: 25,
+	}, {
+		Choice: RequestTypeUpdate,
+		Weight: 20,
+	}, {
+		Choice: RequestTypeUpdateUIDPrecondition,
+		Weight: 10,
+	}, {
+		Choice: RequestTypeUpdateNoOp,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeUpdateWithCachedObject,
+		Weight: 5,
 	}}
 
 	cfg = TraffiConfig{
@@ -77,7 +90,7 @@ func TestCorrectness(t *testing.T) {
 			list := &api.PodList{}
 			err := store.GetList(ctx, "/pods", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, list)
 			require.NoError(t, err)
-			initialState, err := correctness.NewModelFromStorage(storagePrefix, list, cacheKeyFunc)
+			initialState, err := correctness.NewModelFromStorage(storagePrefix, list, func() runtime.Object { return &api.Pod{} }, cacheKeyFunc)
 			require.NoError(t, err)
 
 			operations, err := RunTraffic(t.Context(), store, cfg)
