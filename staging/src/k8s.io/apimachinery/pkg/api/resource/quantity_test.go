@@ -1687,40 +1687,75 @@ func TestQuantityAsInt64(t *testing.T) {
 	negatedMostNegative := *NewQuantity(math.MinInt64, DecimalSI)
 	negatedMostNegative.Neg()
 
+	// No parse or promotion path yields an inf.Dec whose mantissa is outside
+	// int64, so those rows are built directly.
+	dec := func(unscaled *big.Int, scale int32) Quantity {
+		return *NewDecimalQuantity(*inf.NewDecBig(unscaled, inf.Scale(scale)), DecimalSI)
+	}
+	twoTo63 := new(big.Int).Lsh(big.NewInt(1), 63)
+	twoTo70 := new(big.Int).Lsh(big.NewInt(1), 70)
+
+	// Rows are grouped by how the value is stored. Within each group the value
+	// fits, overflows positive, or overflows negative.
 	table := []struct {
 		name  string
 		in    Quantity
 		value int64
 		ok    bool
 	}{
+		// Stored at scale 0.
 		{"zero", Quantity{Format: DecimalSI}, 0, true},
 		{"small integer", MustParse("5"), 5, true},
-		{"scaled integer", MustParse("50k"), 50000, true},
+		{"negative integer", MustParse("-5"), -5, true},
 		{"max int64", MustParse("9223372036854775807"), math.MaxInt64, true},
 		{"min int64", MustParse("-9223372036854775808"), math.MinInt64, true},
+		{"overflows after negation", negatedMostNegative, math.MaxInt64, false},
+		{"mantissa past max", dec(twoTo63, 0), math.MaxInt64, false},
+		{"mantissa past min", dec(new(big.Int).Neg(new(big.Int).Add(twoTo63, big.NewInt(1))), 0), math.MinInt64, false},
 
-		// Fractional digits are reported as a failed conversion even when the
-		// value is an exact integer.
-		{"integral but fractionally scaled", MustParse("1000m"), 0, false},
-		{"fractional", MustParse("1500m"), 0, false},
-		{"fractional decimal", MustParse("1.5"), 0, false},
-
+		// Stored at a larger power of ten: the value scales up exactly or
+		// saturates.
+		{"scaled integer", MustParse("50k"), 50000, true},
+		{"negative scaled integer", MustParse("-50k"), -50000, true},
+		{"zero at kilo scale", *NewScaledQuantity(0, Kilo), 0, true},
+		{"zero at huge scale", *NewScaledQuantity(0, 500), 0, true},
+		{"largest scaled value that fits", MustParse("9223372036854775k"), 9223372036854775000, true},
+		{"smallest scaled overflow", MustParse("9223372036854776k"), math.MaxInt64, false},
+		{"smallest negative scaled overflow", MustParse("-9223372036854776k"), math.MinInt64, false},
 		{"overflows positive", MustParse("100E"), math.MaxInt64, false},
 		{"overflows negative", MustParse("-100E"), math.MinInt64, false},
 		{"overflows by exponent", MustParse("1e30"), math.MaxInt64, false},
-		{"overflows after negation", negatedMostNegative, math.MaxInt64, false},
+		{"overflows negative by exponent", MustParse("-1e30"), math.MinInt64, false},
+		{"mantissa past max scaled up", dec(twoTo70, -3), math.MaxInt64, false},
+		{"mantissa past min scaled up", dec(new(big.Int).Neg(twoTo70), -3), math.MinInt64, false},
+		{"zero at most negative scale", dec(big.NewInt(0), math.MinInt32), 0, true},
+		{"one at most negative scale", dec(big.NewInt(1), math.MinInt32), math.MaxInt64, false},
+		{"minus one at most negative scale", dec(big.NewInt(-1), math.MinInt32), math.MinInt64, false},
+
+		// Stored with fractional digits: never converts, even when the value
+		// is whole or zero, and never saturates.
+		{"integral but fractionally scaled", MustParse("1000m"), 0, false},
+		{"negative integral but fractionally scaled", MustParse("-1000m"), 0, false},
+		{"zero at milli scale", *NewScaledQuantity(0, Milli), 0, false},
+		{"fractional", MustParse("1500m"), 0, false},
+		{"negative fractional", MustParse("-1500m"), 0, false},
+		{"fractional decimal", MustParse("1.5"), 0, false},
+		{"one at most positive scale", dec(big.NewInt(1), math.MaxInt32), 0, false},
+		{"whole and past max with fractional digits", dec(new(big.Int).Mul(twoTo70, big.NewInt(1000)), 3), 0, false},
+		{"fractional and past max", dec(new(big.Int).Add(twoTo70, big.NewInt(1)), 3), 0, false},
+		// Decimal parsing of a value past the int64 rails rounds to nano
+		// scale, so it lands here rather than saturating.
+		{"overflows and parses to nano scale", MustParse("9223372036854775808"), 0, false},
+		{"overflows negative and parses to nano scale", MustParse("-9223372036854775809"), 0, false},
 
 		// The binary suffixes cap at the int64 rails while parsing, so the
-		// stored value is exact and converts.
+		// stored value is whole and converts.
 		{"binary cap", MustParse("8Ei"), math.MaxInt64, true},
 		{"negative binary cap", MustParse("-8Ei"), -math.MaxInt64, true},
 		{"binary cap past 8Ei", MustParse("9Ei"), math.MaxInt64, true},
 		{"binary cap far past 8Ei", MustParse("100Ei"), math.MaxInt64, true},
 		{"binary cap from Ti", MustParse("8388608Ti"), math.MaxInt64, true},
 		{"binary cap from Ki", MustParse("9223372036854775807Ki"), math.MaxInt64, true},
-
-		// Decimal parsing rounds to nano instead, leaving fractional digits.
-		{"overflows and parses to nano scale", MustParse("9223372036854775808"), 0, false},
 	}
 
 	for _, item := range table {
@@ -1742,7 +1777,7 @@ func TestQuantityAsInt64(t *testing.T) {
 				promote.fn(&promoted)
 				got, gotOK := promoted.AsInt64()
 				if got != value || gotOK != ok {
-					t.Errorf("after %s(): AsInt64() = (%d, %t), want the int64 backend's (%d, %t)", promote.name, got, gotOK, value, ok)
+					t.Errorf("after %s(): AsInt64() = (%d, %t), want the same as before promotion (%d, %t)", promote.name, got, gotOK, value, ok)
 				}
 			}
 		})
