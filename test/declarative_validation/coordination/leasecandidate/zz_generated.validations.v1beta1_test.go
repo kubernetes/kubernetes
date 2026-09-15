@@ -61,6 +61,9 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.leaseName": {
+				{ErrorType: "FieldValueRequired"},
+			},
 		},
 	)
 }
