@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	certificatesapiv1 "k8s.io/api/certificates/v1"
-	certificatesapiv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -62,12 +61,6 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[certificatesapiv1beta1.SchemeGroupVersion.Version] = storageMap
-	}
-
-	if storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	} else if len(storageMap) > 0 {
-		apiGroupInfo.VersionedResourcesStorageMap[certificatesapiv1alpha1.SchemeGroupVersion.Version] = storageMap
 	}
 
 	return apiGroupInfo, nil
@@ -139,24 +132,6 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 			storage[resource+"/status"] = pcrStatusStorage
 		} else {
 			klog.Warning("PodCertificateRequest storage is disabled because the PodCertificateRequest feature gate is disabled")
-		}
-	}
-
-	return storage, nil
-}
-
-func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
-	storage := map[string]rest.Storage{}
-
-	if resource := "clustertrustbundles"; apiResourceConfigSource.ResourceEnabled(certificatesapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
-			bundleStorage, err := clustertrustbundlestore.NewREST(restOptionsGetter)
-			if err != nil {
-				return nil, err
-			}
-			storage[resource] = bundleStorage
-		} else {
-			klog.Warning("ClusterTrustBundle storage is disabled because the ClusterTrustBundle feature gate is disabled")
 		}
 	}
 
