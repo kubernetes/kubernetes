@@ -29,6 +29,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -174,7 +175,7 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 }
 
 func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
-	return v1.ResourceList{}, nil
+	return v1.ResourceList{v1.ResourceMemory: resource.MustParse("16Gi")}, nil
 }
 
 func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
