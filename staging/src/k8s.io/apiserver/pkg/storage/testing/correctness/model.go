@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -94,39 +95,40 @@ func (s *Model) Equal(other *Model) bool {
 	return s.ResourceVersion == other.ResourceVersion && s.Prefix == other.Prefix && reflect.DeepEqual(s.Items, other.Items)
 }
 
-// Step applies an operation to the sequential state machine.
-func (s *Model) Step(input Request, output Response) (ok bool, next *Model) {
+// Step applies an operation to the sequential state machine. event is the watch
+// event the operation produced, or nil if the operation didn't write.
+func (s *Model) Step(input Request, output Response) (ok bool, next *Model, event *watch.Event) {
 	next = s
 	var expected Response
 	switch input.Op {
 	case OpCreate:
 		next = s.Clone()
-		expected = next.create(input.Key, input.Create.Object)
+		expected, event = next.create(input.Key, input.Create.Object)
 	case OpDelete:
 		next = s.Clone()
-		expected = next.delete(context.Background(), input.Key, input.Delete.Preconditions, nil)
+		expected, event = next.delete(context.Background(), input.Key, input.Delete.Preconditions, nil)
 	case OpGet:
 		expected = s.get(input.Key, input.Get.Options)
 	case OpUpdate:
 		next = s.Clone()
-		expected = next.update(context.Background(), input.Key, input.Update.IgnoreNotFound, input.Update.Preconditions, input.Update.UpdateFunc, input.Update.CachedExistingObject)
+		expected, event = next.update(context.Background(), input.Key, input.Update.IgnoreNotFound, input.Update.Preconditions, input.Update.UpdateFunc, input.Update.CachedExistingObject)
 	}
 	if !reflect.DeepEqual(expected, output) {
-		return false, s
+		return false, s, nil
 	}
-	return true, next
+	return true, next, event
 }
 
-func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) Response {
+func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) (Response, *watch.Event) {
 	stored, exists := s.Items[key]
 	var currentObj runtime.Object
 	var currentRV uint64
 	if !exists {
 		if !ignoreNotFound {
-			return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, int64(s.ResourceVersion))}
+			return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, int64(s.ResourceVersion))}, nil
 		}
 		if s.NewFunc == nil {
-			return Response{Object: nil, Err: fmt.Errorf("NewFunc must be provided when ignoreNotFound=true")}
+			return Response{Object: nil, Err: fmt.Errorf("NewFunc must be provided when ignoreNotFound=true")}, nil
 		}
 		currentObj = s.NewFunc()
 		currentRV = 0
@@ -136,16 +138,16 @@ func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, pre
 	}
 
 	if err := preconditions.Check(s.Prefix+key, currentObj); err != nil {
-		return Response{Object: nil, Err: err}
+		return Response{Object: nil, Err: err}, nil
 	}
 
 	if tryUpdate == nil {
-		return Response{Object: nil, Err: fmt.Errorf("tryUpdate function must not be nil")}
+		return Response{Object: nil, Err: fmt.Errorf("tryUpdate function must not be nil")}, nil
 	}
 
 	updated, _, err := tryUpdate(currentObj, storage.ResponseMeta{ResourceVersion: currentRV})
 	if err != nil {
-		return Response{Object: nil, Err: err}
+		return Response{Object: nil, Err: err}, nil
 	}
 
 	if exists {
@@ -159,7 +161,8 @@ func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, pre
 			acc.SetResourceVersion("")
 		}
 		if reflect.DeepEqual(storedWithoutRV, updatedWithoutRV) {
-			return Response{Object: stored.DeepCopyObject(), Err: nil}
+			// Nothing is written, so no event is produced.
+			return Response{Object: stored.DeepCopyObject(), Err: nil}, nil
 		}
 	}
 
@@ -167,26 +170,31 @@ func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, pre
 	copied := updated.DeepCopyObject()
 	accessor, err := meta.Accessor(copied)
 	if err != nil {
-		return Response{Object: nil, Err: err}
+		return Response{Object: nil, Err: err}, nil
 	}
 	accessor.SetResourceVersion(strconv.FormatUint(s.ResourceVersion, 10))
 	s.Items[key] = copied
-	return Response{Object: copied, Err: nil}
+	// An update with ignoreNotFound on a missing key creates the object.
+	eventType := watch.Modified
+	if !exists {
+		eventType = watch.Added
+	}
+	return Response{Object: copied, Err: nil}, &watch.Event{Type: eventType, Object: copied}
 }
 
-func (s *Model) create(key string, obj runtime.Object) Response {
+func (s *Model) create(key string, obj runtime.Object) (Response, *watch.Event) {
 	if _, exists := s.Items[key]; exists {
-		return Response{Object: nil, Err: storage.NewKeyExistsError(s.Prefix+key, 0)}
+		return Response{Object: nil, Err: storage.NewKeyExistsError(s.Prefix+key, 0)}, nil
 	}
 	s.ResourceVersion++
 	copied := obj.DeepCopyObject()
 	accessor, err := meta.Accessor(copied)
 	if err != nil {
-		return Response{Object: nil, Err: err}
+		return Response{Object: nil, Err: err}, nil
 	}
 	accessor.SetResourceVersion(strconv.FormatUint(s.ResourceVersion, 10))
 	s.Items[key] = copied
-	return Response{Object: copied, Err: nil}
+	return Response{Object: copied, Err: nil}, &watch.Event{Type: watch.Added, Object: copied}
 }
 
 func (s *Model) get(key string, opts storage.GetOptions) Response {
@@ -200,28 +208,28 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 	return Response{Object: stored.DeepCopyObject(), Err: nil}
 }
 
-func (s *Model) delete(ctx context.Context, key string, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) Response {
+func (s *Model) delete(ctx context.Context, key string, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) (Response, *watch.Event) {
 	stored, exists := s.Items[key]
 	if !exists {
-		return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, int64(s.ResourceVersion))}
+		return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, int64(s.ResourceVersion))}, nil
 	}
 	if err := preconditions.Check(s.Prefix+key, stored); err != nil {
-		return Response{Object: nil, Err: err}
+		return Response{Object: nil, Err: err}, nil
 	}
 	if validateDeletion != nil && stored != nil {
 		if err := validateDeletion(ctx, stored); err != nil {
-			return Response{Object: nil, Err: err}
+			return Response{Object: nil, Err: err}, nil
 		}
 	}
 	s.ResourceVersion++
 	deletedObj := stored.DeepCopyObject()
 	accessor, err := meta.Accessor(deletedObj)
 	if err != nil {
-		return Response{Object: nil, Err: err}
+		return Response{Object: nil, Err: err}, nil
 	}
 	accessor.SetResourceVersion(strconv.FormatUint(s.ResourceVersion, 10))
 	delete(s.Items, key)
-	return Response{Object: deletedObj, Err: nil}
+	return Response{Object: deletedObj, Err: nil}, &watch.Event{Type: watch.Deleted, Object: deletedObj}
 }
 
 func (s *Model) Describe() string {
