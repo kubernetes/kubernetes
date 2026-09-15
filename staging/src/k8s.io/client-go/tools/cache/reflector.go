@@ -65,6 +65,10 @@ var (
 	defaultBackoffReset  = 2 * time.Minute
 	defaultBackoffFactor = 2.0
 	defaultBackoffJitter = 1.0
+	// defaultWatchListRetryDuration bounds how long watchList retries
+	// requests that never deliver the "initial-events-end" bookmark before
+	// giving up and falling back to a regular list.
+	defaultWatchListRetryDuration = defaultMinWatchTimeout
 )
 
 // ReflectorStore is the subset of cache.Store that the reflector uses
@@ -837,11 +841,17 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 
 	initTrace := trace.New("Reflector WatchList", trace.Field{Key: "name", Value: r.name})
 	defer initTrace.LogIfLong(10 * time.Second)
+	watchListStart := r.clock.Now()
 	for {
 		select {
 		case <-stopCh:
 			return nil, nil
 		default:
+		}
+
+		if elapsed := r.clock.Since(watchListStart); elapsed > defaultWatchListRetryDuration {
+			// A misbehaving API server could otherwise keep this informer from ever syncing.
+			return nil, fmt.Errorf("watch-list for %s did not receive the initial-events-end bookmark within %s, giving up", r.typeDescription, defaultWatchListRetryDuration)
 		}
 
 		resourceVersion = ""
