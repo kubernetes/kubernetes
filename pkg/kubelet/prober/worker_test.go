@@ -17,7 +17,9 @@ limitations under the License.
 package prober
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -36,6 +39,7 @@ import (
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	utilexec "k8s.io/utils/exec"
 )
 
 func init() {
@@ -44,6 +48,7 @@ func init() {
 // newTestWorkerWithRestartableInitContainer creates a test worker with an init container setup
 func newTestWorkerWithRestartableInitContainer(m *manager, probeType probeType) *worker {
 	pod := getTestPod()
+	setTestProbe(pod, probeType, v1.Probe{})
 
 	// Set up init container with restart policy
 	initContainer := pod.Spec.Containers[0]
@@ -479,6 +484,340 @@ func TestFailureThreshold(t *testing.T) {
 			expectContinue(t, w, w.doProbe(ctx), msg)
 			expectResult(t, w, results.Failure, msg)
 		}
+	}
+}
+
+func TestProbeConfigUpdateSemantics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableContainerProbes, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	w := newTestWorker(m, readiness, v1.Probe{PeriodSeconds: 1, SuccessThreshold: 1, FailureThreshold: 3})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
+
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	w.doProbe(ctx)
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	w.doProbe(ctx)
+	w.doProbe(ctx)
+
+	if w.resultRun != 2 {
+		t.Fatalf("expected two consecutive failures before update, got %d", w.resultRun)
+	}
+	if result, _ := w.resultsManager.Get(testContainerID); result != results.Success {
+		t.Fatalf("expected published readiness to remain successful, got %v", result)
+	}
+
+	oldEpoch := w.executionEpoch
+	lastCompletion := w.lastProbeCompletion
+	periodUpdate := w.pod.DeepCopy()
+	periodUpdate.Spec.Containers[0].ReadinessProbe = w.spec.DeepCopy()
+	periodUpdate.Spec.Containers[0].ReadinessProbe.PeriodSeconds = 5
+	w.updateConfig(periodUpdate, periodUpdate.Spec.Containers[0])
+
+	if w.resultRun != 2 {
+		t.Fatalf("period update reset consecutive result count to %d", w.resultRun)
+	}
+	if w.executionEpoch != oldEpoch {
+		t.Fatal("period update invalidated probe execution")
+	}
+	if got, want := w.nextProbeTime, lastCompletion.Add(5*time.Second); !got.Equal(want) {
+		t.Fatalf("period update scheduled next run at %v, want %v", got, want)
+	}
+	if result, _ := w.resultsManager.Get(testContainerID); result != results.Success {
+		t.Fatalf("period update changed published readiness to %v", result)
+	}
+
+	thresholdUpdate := periodUpdate.DeepCopy()
+	thresholdUpdate.Spec.Containers[0].ReadinessProbe.FailureThreshold = 4
+	w.updateConfig(thresholdUpdate, thresholdUpdate.Spec.Containers[0])
+
+	if w.resultRun != 0 {
+		t.Fatalf("threshold update did not immediately reset the result count: %d", w.resultRun)
+	}
+	if w.executionEpoch != oldEpoch {
+		t.Fatal("threshold update invalidated probe execution")
+	}
+
+	w.doProbe(ctx)
+
+	if w.resultRun != 1 {
+		t.Fatalf("first result under new threshold has run length %d, want 1", w.resultRun)
+	}
+	if result, _ := w.resultsManager.Get(testContainerID); result != results.Success {
+		t.Fatalf("threshold update changed published readiness to %v", result)
+	}
+
+	oldEpoch = w.executionEpoch
+	timeoutUpdate := thresholdUpdate.DeepCopy()
+	timeoutUpdate.Spec.Containers[0].ReadinessProbe.TimeoutSeconds++
+	w.updateConfig(timeoutUpdate, timeoutUpdate.Spec.Containers[0])
+
+	if w.executionEpoch == oldEpoch || w.resultRun != 0 {
+		t.Fatal("timeout update did not invalidate execution and reset the result count")
+	}
+	if result, _ := w.resultsManager.Get(testContainerID); result != results.Success {
+		t.Fatalf("timeout update changed published readiness to %v", result)
+	}
+
+	grace := int64(5)
+	graceUpdate := timeoutUpdate.DeepCopy()
+	graceUpdate.Spec.Containers[0].ReadinessProbe.TerminationGracePeriodSeconds = &grace
+	oldEpoch = w.executionEpoch
+	oldNextProbeTime := w.nextProbeTime
+	oldResultRun := w.resultRun
+	w.updateConfig(graceUpdate, graceUpdate.Spec.Containers[0])
+
+	if w.executionEpoch != oldEpoch || w.resultRun != oldResultRun || !w.nextProbeTime.Equal(oldNextProbeTime) {
+		t.Fatal("termination grace period update reset execution, policy, or schedule state")
+	}
+}
+
+type cancellationAwareRunner struct {
+	started      chan struct{}
+	canceled     chan struct{}
+	release      chan struct{}
+	startedOnce  sync.Once
+	canceledOnce sync.Once
+}
+
+type blockingExecProber struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+	result  probe.Result
+}
+
+func (p *blockingExecProber) Probe(_ utilexec.Cmd) (probe.Result, string, error) {
+	p.once.Do(func() { close(p.started) })
+	<-p.release
+	return p.result, "", nil
+}
+
+func TestInFlightResultUsesUpdatedThreshold(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableContainerProbes, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
+	m.prober.exec = fakeExecProber{result: probe.Success}
+	w.doProbe(ctx)
+
+	blocking := &blockingExecProber{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		result:  probe.Failure,
+	}
+
+	m.prober.exec = blocking
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+
+		w.doProbe(ctx)
+	}()
+	select {
+	case <-blocking.started:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("probe did not start")
+	}
+
+	oldEpoch := w.executionEpoch
+	updated := w.pod.DeepCopy()
+	updated.Spec.Containers[0].ReadinessProbe = w.spec.DeepCopy()
+	updated.Spec.Containers[0].ReadinessProbe.FailureThreshold = 3
+	w.updateConfig(updated, updated.Spec.Containers[0])
+
+	if w.executionEpoch != oldEpoch {
+		t.Fatal("threshold update invalidated an in-flight probe")
+	}
+
+	close(blocking.release)
+	select {
+	case <-done:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("probe did not return")
+	}
+
+	if w.resultRun != 1 {
+		t.Fatalf("in-flight result has run length %d under the new threshold, want 1", w.resultRun)
+	}
+	if result, ok := w.resultsManager.Get(testContainerID); !ok || result != results.Success {
+		t.Fatalf("in-flight result prematurely crossed the new threshold: result=%v, found=%v", result, ok)
+	}
+}
+
+func (r *cancellationAwareRunner) RunInContainer(ctx context.Context, _ kubecontainer.ContainerID, _ []string, _ time.Duration) ([]byte, error) {
+	r.startedOnce.Do(func() { close(r.started) })
+	<-ctx.Done()
+	r.canceledOnce.Do(func() { close(r.canceled) })
+	<-r.release
+
+	// A runtime may return after cancellation without propagating the context error. The epoch check
+	// is still responsible for rejecting this result.
+	return []byte("ok"), nil
+}
+
+func TestHandlerUpdateCancelsAndDiscardsInFlightResult(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableContainerProbes, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	runner := &cancellationAwareRunner{
+		started:  make(chan struct{}),
+		canceled: make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+
+	m.prober = newProber(runner, &record.FakeRecorder{})
+	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+
+		w.doProbe(ctx)
+	}()
+	select {
+	case <-runner.started:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("probe did not start")
+	}
+
+	oldEpoch := w.executionEpoch
+	updated := w.pod.DeepCopy()
+	updated.Spec.Containers[0].ReadinessProbe = w.spec.DeepCopy()
+	updated.Spec.Containers[0].ReadinessProbe.Exec.Command = []string{"new-handler"}
+	w.updateConfig(updated, updated.Spec.Containers[0])
+
+	if w.executionEpoch != oldEpoch+1 {
+		t.Fatalf("handler update did not advance execution epoch")
+	}
+
+	select {
+	case <-runner.canceled:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("handler update did not cancel the in-flight probe")
+	}
+
+	close(runner.release)
+	select {
+	case <-done:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("in-flight probe did not return")
+	}
+
+	if result, ok := w.resultsManager.Get(testContainerID); !ok || result != results.Failure {
+		t.Fatalf("stale in-flight result was published: result=%v, found=%v", result, ok)
+	}
+	if w.nextProbeTime.After(time.Now()) {
+		t.Fatal("handler update did not request an immediate run")
+	}
+}
+
+func TestProbeRemovalDiscardsInFlightResult(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableContainerProbes, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	runner := &cancellationAwareRunner{
+		started:  make(chan struct{}),
+		canceled: make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+
+	m.prober = newProber(runner, &record.FakeRecorder{})
+	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+	key := probeKey{testPodUID, testContainerName, readiness}
+	m.workers[key] = w
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+
+		w.doProbe(ctx)
+	}()
+	select {
+	case <-runner.started:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("probe did not start")
+	}
+
+	var queuedUpdate results.Update
+	select {
+	case queuedUpdate = <-w.resultsManager.Updates():
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("initial readiness result was not queued")
+	}
+
+	updated := w.pod.DeepCopy()
+	updated.Spec.Containers[0].ReadinessProbe = nil
+	statusChanged, err := m.ReconcilePod(ctx, updated)
+	if err != nil {
+		t.Fatalf("probe removal reconcile failed: %v", err)
+	}
+	if !statusChanged {
+		t.Fatal("readiness probe removal did not report a status change")
+	}
+	if m.IsResultCurrent(queuedUpdate, readiness) {
+		t.Fatal("queued result from removed readiness worker was still current")
+	}
+
+	select {
+	case <-runner.canceled:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("probe removal did not cancel the in-flight probe")
+	}
+
+	close(runner.release)
+	select {
+	case <-done:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("in-flight probe did not return")
+	}
+
+	if _, ok := w.resultsManager.Get(testContainerID); ok {
+		t.Fatal("removed readiness probe published a stale in-flight result")
+	}
+}
+
+func TestStartupProbeUpdateKeepsStartedMonotonicForContainerID(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableContainerProbes, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+	status := getTestRunningStatus()
+	m.statusManager.SetPodStatus(logger, w.pod, status)
+	w.holdForContainer(testContainerID)
+	w.resultsManager.Set(testContainerID, results.Success, w.pod)
+
+	updated := w.pod.DeepCopy()
+	updated.Spec.Containers[0].StartupProbe = w.spec.DeepCopy()
+	updated.Spec.Containers[0].StartupProbe.Exec.Command = []string{"updated"}
+	w.updateConfig(updated, updated.Spec.Containers[0])
+	w.doProbe(ctx)
+
+	if result, ok := w.resultsManager.Get(testContainerID); !ok || result != results.Success {
+		t.Fatalf("startup probe update rolled back current container: result=%v, found=%v", result, ok)
+	}
+
+	newContainerID := kubecontainer.ContainerID{Type: "test", ID: "replacement"}
+	started := false
+	status.ContainerStatuses[0].ContainerID = newContainerID.String()
+	status.ContainerStatuses[0].Started = &started
+	m.statusManager.SetPodStatus(logger, w.pod, status)
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	w.doProbe(ctx)
+
+	if _, ok := w.resultsManager.Get(testContainerID); ok {
+		t.Fatal("startup result for previous container ID was retained")
+	}
+	if result, ok := w.resultsManager.Get(newContainerID); !ok || result != results.Success {
+		t.Fatalf("updated startup probe was not applied to replacement container: result=%v, found=%v", result, ok)
 	}
 }
 

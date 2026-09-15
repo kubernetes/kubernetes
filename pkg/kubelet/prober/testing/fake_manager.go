@@ -22,6 +22,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
+	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
 
 // FakeManager simulates a prober.Manager for testing.
@@ -31,6 +33,12 @@ type FakeManager struct{}
 
 // AddPod simulates adding a Pod.
 func (FakeManager) AddPod(_ context.Context, _ *v1.Pod) {}
+
+// ReconcilePod simulates reconciling a Pod.
+func (FakeManager) ReconcilePod(_ context.Context, _ *v1.Pod) (bool, error) { return false, nil }
+
+// IsResultCurrent simulates validating a probe result.
+func (FakeManager) IsResultCurrent(_ results.Update, _ prober.ProbeType) bool { return true }
 
 // RemovePod simulates removing a Pod.
 func (FakeManager) RemovePod(_ *v1.Pod) {}

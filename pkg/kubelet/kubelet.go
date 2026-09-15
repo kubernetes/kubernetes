@@ -2249,8 +2249,20 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Fetch the pull secrets for the pod
 	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(logger, pod)
 
-	// Ensure the pod is being probed
-	kl.probeManager.AddPod(ctx, pod)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) {
+		kl.probeManager.AddPod(ctx, pod)
+	} else if !kl.podWorkers.IsPodTerminationRequested(pod.UID) {
+		// Termination owns probe shutdown; reconciliation must not recreate workers afterward.
+		statusChanged, err := kl.probeManager.ReconcilePod(ctx, pod)
+		if err != nil {
+			return false, nil, fmt.Errorf("failed to reconcile probes for pod %s/%s: %w", pod.Namespace, pod.Name, err)
+		}
+
+		if statusChanged {
+			apiPodStatus = kl.generateAPIPodStatus(ctx, pod, podStatus, false)
+			kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+		}
+	}
 
 	// TODO(#113606): use cancellation from the incoming context parameter, which comes from the pod worker.
 	// Currently, using cancellation from that context causes test failures. To remove this WithoutCancel,
@@ -2810,10 +2822,18 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		logger.V(4).Info("SyncLoop (SYNC) pods", "total", len(podsToSync), "pods", klog.KObjSlice(podsToSync))
 		handler.HandlePodSyncs(ctx, podsToSync)
 	case update := <-kl.livenessManager.Updates():
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) && !kl.probeManager.IsResultCurrent(update, prober.ProbeTypeLiveness) {
+			break
+		}
+
 		if update.Result == proberesults.Failure {
 			handleProbeSync(ctx, kl, update, handler, "liveness", "unhealthy")
 		}
 	case update := <-kl.readinessManager.Updates():
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) && !kl.probeManager.IsResultCurrent(update, prober.ProbeTypeReadiness) {
+			break
+		}
+
 		ready := update.Result == proberesults.Success
 		kl.statusManager.SetContainerReadiness(logger, update.PodUID, update.ContainerID, ready)
 
@@ -2823,6 +2843,10 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		}
 		handleProbeSync(ctx, kl, update, handler, "readiness", status)
 	case update := <-kl.startupManager.Updates():
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) && !kl.probeManager.IsResultCurrent(update, prober.ProbeTypeStartup) {
+			break
+		}
+
 		started := update.Result == proberesults.Success
 		kl.statusManager.SetContainerStartup(logger, update.PodUID, update.ContainerID, started)
 

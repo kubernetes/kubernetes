@@ -29,8 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
@@ -141,11 +144,13 @@ func testAddRemovePods(tCtx ktesting.TContext) {
 	}
 }
 
-func TestAddPodContinuesAfterExistingWorker(t *testing.T) {
-	ktesting.Init(t).SyncTest("", testAddPodContinuesAfterExistingWorker)
+func TestReconcilePodContinuesAfterExistingWorker(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableContainerProbes, true)
+
+	ktesting.Init(t).SyncTest("", testReconcilePodContinuesAfterExistingWorker)
 }
 
-func testAddPodContinuesAfterExistingWorker(tCtx ktesting.TContext) {
+func testReconcilePodContinuesAfterExistingWorker(tCtx ktesting.TContext) {
 	defer tCtx.Cancel("test completed")
 	t := tCtx.TB()
 	ctx := tCtx.Context
@@ -171,39 +176,35 @@ func testAddPodContinuesAfterExistingWorker(tCtx ktesting.TContext) {
 	m := newTestManager()
 	defer cleanup(t, m)
 
-	// First AddPod: registers workers for both containers.
-	m.AddPod(ctx, &pod)
+	// First reconcile registers workers for both containers.
+	m.ReconcilePod(ctx, &pod)
+
 	if err := expectProbes(m, []probeKey{
 		{"test_pod", "container_a", readiness},
 		{"test_pod", "container_b", readiness},
 	}); err != nil {
-		t.Fatalf("after first AddPod: %v", err)
+		t.Fatalf("after first reconcile: %v", err)
 	}
 
 	// Simulate container_b's worker being removed while container_a's is still present.
 	m.workers[probeKey{"test_pod", "container_b", readiness}].stop()
 	synctest.Wait()
 
-	// Second AddPod: should re-register container_b's missing worker.
+	// Second reconcile should re-register container_b's missing worker.
 	// Previously, hitting container_a's existing worker caused an early return,
 	// so container_b was never re-registered.
-	m.AddPod(ctx, &pod)
+	m.ReconcilePod(ctx, &pod)
 
 	if err := expectProbes(m, []probeKey{
 		{"test_pod", "container_a", readiness},
 		{"test_pod", "container_b", readiness},
 	}); err != nil {
-		t.Errorf("container_b worker was not re-registered after second AddPod: %v", err)
+		t.Errorf("container_b worker was not re-registered after second reconcile: %v", err)
 	}
 }
 
 func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	m := newTestManager()
-	defer cleanup(t, m)
-	if err := expectProbes(m, nil); err != nil {
-		t.Error(err)
-	}
 
 	testCases := []struct {
 		desc                        string
@@ -237,6 +238,9 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 	for _, tc := range testCases {
 		tCtx.SyncTest(tc.desc, func(tCtx ktesting.TContext) {
 			t := tCtx.TB()
+			m := newTestManager()
+			defer cleanup(t, m)
+
 			probePod := v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					UID: "restartable_init_container_pod",
@@ -281,83 +285,237 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 	}
 }
 
-func TestStopLivenessAndStartup(t *testing.T) {
-	ktesting.Init(t).SyncTest("", testStopLivenessAndStartup)
-}
+func TestReconcilePodMutableProbes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableContainerProbes, true)
 
-func testStopLivenessAndStartup(tCtx ktesting.TContext) {
-	t := tCtx.TB()
+	ctx := ktesting.Init(t)
+	logger := ctx.Logger()
 	m := newTestManager()
 	defer cleanup(t, m)
 
-	restartPolicyAlways := v1.ContainerRestartPolicyAlways
-	pod := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: "stop_probe_pod",
-		},
-		Spec: v1.PodSpec{
-			InitContainers: []v1.Container{
-				{
-					Name: "regular-init",
-				},
-				{
-					Name:           "sidecar",
-					RestartPolicy:  &restartPolicyAlways,
-					StartupProbe:   defaultProbe,
-					LivenessProbe:  defaultProbe,
-					ReadinessProbe: defaultProbe,
-				},
-			},
-			Containers: []v1.Container{
-				{
-					Name:           "main",
-					StartupProbe:   defaultProbe,
-					LivenessProbe:  defaultProbe,
-					ReadinessProbe: defaultProbe,
-				},
-			},
-		},
+	restartAlways := v1.ContainerRestartPolicyAlways
+	pod := getTestPod()
+	pod.Spec.InitContainers = []v1.Container{{Name: "sidecar", RestartPolicy: &restartAlways}}
+	probe := defaultProbe.DeepCopy()
+	probe.InitialDelaySeconds = 3600
+	pod.Spec.Containers[0].LivenessProbe = probe.DeepCopy()
+	status := getTestRunningStatus()
+	sidecarStarted := true
+	sidecarID := kubecontainer.ContainerID{Type: "test", ID: "sidecar"}
+	status.InitContainerStatuses = []v1.ContainerStatus{{
+		Name:        "sidecar",
+		ContainerID: sidecarID.String(),
+		Started:     &sidecarStarted,
+		State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()}},
+	}}
+
+	m.statusManager.SetPodStatus(logger, pod, status)
+
+	statusChanged, err := m.ReconcilePod(ctx, pod)
+	if err != nil {
+		t.Fatalf("initial reconcile failed: %v", err)
+	}
+	if statusChanged {
+		t.Fatal("adding only a liveness probe unexpectedly reported a status change")
 	}
 
-	m.AddPod(tCtx, &pod)
-	allProbes := []probeKey{
-		{"stop_probe_pod", "sidecar", startup},
-		{"stop_probe_pod", "sidecar", liveness},
-		{"stop_probe_pod", "sidecar", readiness},
-		{"stop_probe_pod", "main", startup},
-		{"stop_probe_pod", "main", liveness},
-		{"stop_probe_pod", "main", readiness},
+	updated := pod.DeepCopy()
+	for i := range updated.Spec.Containers {
+		updated.Spec.Containers[i].LivenessProbe = probe.DeepCopy()
+		updated.Spec.Containers[i].ReadinessProbe = probe.DeepCopy()
+		updated.Spec.Containers[i].StartupProbe = probe.DeepCopy()
 	}
-	if err := expectProbes(m, allProbes); err != nil {
+
+	for i := range updated.Spec.InitContainers {
+		updated.Spec.InitContainers[i].LivenessProbe = probe.DeepCopy()
+		updated.Spec.InitContainers[i].ReadinessProbe = probe.DeepCopy()
+		updated.Spec.InitContainers[i].StartupProbe = probe.DeepCopy()
+	}
+
+	statusChanged, err = m.ReconcilePod(ctx, updated)
+	if err != nil {
+		t.Fatalf("probe addition reconcile failed: %v", err)
+	}
+	if !statusChanged {
+		t.Fatal("adding readiness and startup probes did not report a status change")
+	}
+
+	expected := []probeKey{
+		{testPodUID, testContainerName, liveness},
+		{testPodUID, testContainerName, readiness},
+		{testPodUID, testContainerName, startup},
+		{testPodUID, "sidecar", liveness},
+		{testPodUID, "sidecar", readiness},
+		{testPodUID, "sidecar", startup},
+	}
+
+	if err := expectProbes(m, expected); err != nil {
 		t.Fatal(err)
 	}
-
-	m.StopLivenessAndStartup(&pod)
-
-	stoppedProbes := []probeKey{
-		{"stop_probe_pod", "sidecar", startup},
-		{"stop_probe_pod", "sidecar", liveness},
-		{"stop_probe_pod", "main", startup},
-		{"stop_probe_pod", "main", liveness},
+	if result, ok := m.startupManager.Get(testContainerID); !ok || result != results.Success {
+		t.Fatalf("startup probe addition rolled back regular container Started state: result=%v, found=%v", result, ok)
 	}
-	if err := waitForWorkerExit(t, m, stoppedProbes); err != nil {
-		t.Fatal(err)
+	if result, ok := m.startupManager.Get(sidecarID); !ok || result != results.Success {
+		t.Fatalf("startup probe addition rolled back sidecar Started state: result=%v, found=%v", result, ok)
 	}
 
-	remainingProbes := []probeKey{
-		{"stop_probe_pod", "sidecar", readiness},
-		{"stop_probe_pod", "main", readiness},
+	derived := status.DeepCopy()
+	m.UpdatePodStatus(ctx, updated, derived)
+
+	if !*derived.ContainerStatuses[0].Started || derived.ContainerStatuses[0].Ready {
+		t.Fatalf("unexpected regular container state after probe addition: started=%v ready=%v", *derived.ContainerStatuses[0].Started, derived.ContainerStatuses[0].Ready)
 	}
-	if err := expectProbes(m, remainingProbes); err != nil {
-		t.Error(err)
+	if !*derived.InitContainerStatuses[0].Started || derived.InitContainerStatuses[0].Ready {
+		t.Fatalf("unexpected sidecar state after probe addition: started=%v ready=%v", *derived.InitContainerStatuses[0].Started, derived.InitContainerStatuses[0].Ready)
 	}
 
-	m.RemovePod(&pod)
-	if err := waitForWorkerExit(t, m, remainingProbes); err != nil {
-		t.Fatal(err)
+	readinessWorker, _ := m.getWorker(testPodUID, testContainerName, readiness)
+	configured := updated.DeepCopy()
+	configured.Spec.Containers[0].ReadinessProbe.PeriodSeconds = 5
+	statusChanged, err = m.ReconcilePod(ctx, configured)
+	if err != nil {
+		t.Fatalf("probe configuration reconcile failed: %v", err)
+	}
+	if statusChanged {
+		t.Fatal("probe configuration update unexpectedly reported a status change")
+	}
+
+	currentReadinessWorker, _ := m.getWorker(testPodUID, testContainerName, readiness)
+	if currentReadinessWorker != readinessWorker {
+		t.Fatal("probe configuration update replaced its worker")
+	}
+	if got := currentReadinessWorker.configSnapshot().spec.PeriodSeconds; got != 5 {
+		t.Fatalf("probe configuration update did not reach worker: periodSeconds=%d", got)
+	}
+
+	updated = configured
+
+	removed := updated.DeepCopy()
+	for i := range removed.Spec.Containers {
+		removed.Spec.Containers[i].LivenessProbe = nil
+		removed.Spec.Containers[i].ReadinessProbe = nil
+		removed.Spec.Containers[i].StartupProbe = nil
+	}
+
+	for i := range removed.Spec.InitContainers {
+		removed.Spec.InitContainers[i].LivenessProbe = nil
+		removed.Spec.InitContainers[i].ReadinessProbe = nil
+		removed.Spec.InitContainers[i].StartupProbe = nil
+	}
+
+	statusChanged, err = m.ReconcilePod(ctx, removed)
+	if err != nil {
+		t.Fatalf("probe removal reconcile failed: %v", err)
+	}
+	if !statusChanged {
+		t.Fatal("removing readiness and startup probes did not report a status change")
 	}
 	if err := expectProbes(m, nil); err != nil {
-		t.Error(err)
+		t.Fatal(err)
+	}
+	if _, ok := m.startupManager.Get(testContainerID); ok {
+		t.Fatal("regular container startup result was not removed")
+	}
+	if _, ok := m.startupManager.Get(sidecarID); ok {
+		t.Fatal("sidecar startup result was not removed")
+	}
+
+	derived = status.DeepCopy()
+	m.UpdatePodStatus(ctx, removed, derived)
+
+	if !*derived.ContainerStatuses[0].Started || !derived.ContainerStatuses[0].Ready {
+		t.Fatalf("unexpected regular container state after probe removal: started=%v ready=%v", *derived.ContainerStatuses[0].Started, derived.ContainerStatuses[0].Ready)
+	}
+	if !*derived.InitContainerStatuses[0].Started || !derived.InitContainerStatuses[0].Ready {
+		t.Fatalf("unexpected sidecar state after probe removal: started=%v ready=%v", *derived.InitContainerStatuses[0].Started, derived.InitContainerStatuses[0].Ready)
+	}
+}
+
+func TestReconcilePodFeatureDisabledIsAddOnly(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableContainerProbes, false)
+
+	ctx := ktesting.Init(t)
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	pod := getTestPod()
+	pod.Spec.Containers[0].ReadinessProbe = defaultProbe.DeepCopy()
+	m.ReconcilePod(ctx, pod)
+
+	updated := pod.DeepCopy()
+	updated.Spec.Containers[0].ReadinessProbe = nil
+	statusChanged, err := m.ReconcilePod(ctx, updated)
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+	if statusChanged {
+		t.Fatal("disabled feature reported a dynamic status change")
+	}
+	if _, ok := m.getWorker(pod.UID, testContainerName, readiness); !ok {
+		t.Fatal("disabled feature removed an existing probe worker")
+	}
+}
+
+func TestReconcilePodRemovingStartupUngatesReadiness(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableContainerProbes, true)
+
+	ctx := ktesting.Init(t)
+	logger := ctx.Logger()
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	pod := getTestPod()
+	probe := defaultProbe.DeepCopy()
+	probe.InitialDelaySeconds = 3600
+	pod.Spec.Containers[0].StartupProbe = probe.DeepCopy()
+	pod.Spec.Containers[0].ReadinessProbe = probe.DeepCopy()
+	status := getTestRunningStatusWithStarted(false)
+	m.statusManager.SetPodStatus(logger, pod, status)
+	m.ReconcilePod(ctx, pod)
+	m.readinessManager.Set(testContainerID, results.Success, pod)
+
+	updated := pod.DeepCopy()
+	updated.Spec.Containers[0].StartupProbe = nil
+	statusChanged, err := m.ReconcilePod(ctx, updated)
+	if err != nil {
+		t.Fatalf("startup probe removal reconcile failed: %v", err)
+	}
+	if !statusChanged {
+		t.Fatal("startup probe removal did not report a status change")
+	}
+
+	derived := status.DeepCopy()
+	m.UpdatePodStatus(ctx, updated, derived)
+
+	if !*derived.ContainerStatuses[0].Started || !derived.ContainerStatuses[0].Ready {
+		t.Fatalf("startup probe removal did not ungate readiness: started=%v ready=%v", *derived.ContainerStatuses[0].Started, derived.ContainerStatuses[0].Ready)
+	}
+}
+
+func TestStopLivenessAndStartupIncludesRestartableInitContainers(t *testing.T) {
+	ctx := ktesting.Init(t)
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	restartAlways := v1.ContainerRestartPolicyAlways
+	pod := getTestPod()
+	pod.Spec.InitContainers = []v1.Container{{
+		Name:           "sidecar",
+		RestartPolicy:  &restartAlways,
+		LivenessProbe:  defaultProbe.DeepCopy(),
+		ReadinessProbe: defaultProbe.DeepCopy(),
+		StartupProbe:   defaultProbe.DeepCopy(),
+	}}
+
+	m.AddPod(ctx, pod)
+	m.StopLivenessAndStartup(pod)
+
+	stopped := []probeKey{{testPodUID, "sidecar", liveness}, {testPodUID, "sidecar", startup}}
+	if err := waitForWorkerExit(t, m, stopped); err != nil {
+		t.Fatal(err)
+	}
+	if err := expectProbes(m, []probeKey{{testPodUID, "sidecar", readiness}}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -523,13 +681,13 @@ func TestUpdatePodStatus(t *testing.T) {
 
 	// Setup probe "workers" and cached results.
 	m.workers = map[probeKey]*worker{
-		{testPodUID, unprobed.Name, liveness}:             {},
-		{testPodUID, probedReady.Name, readiness}:         {},
-		{testPodUID, probedPending.Name, readiness}:       {},
-		{testPodUID, probedUnready.Name, readiness}:       {},
-		{testPodUID, notStartedNoReadiness.Name, startup}: {},
-		{testPodUID, startedNoReadiness.Name, startup}:    {},
-		{testPodUID, terminated.Name, readiness}:          {},
+		{testPodUID, unprobed.Name, liveness}:             {probeState: probeState{enabled: true}},
+		{testPodUID, probedReady.Name, readiness}:         {probeState: probeState{enabled: true}},
+		{testPodUID, probedPending.Name, readiness}:       {probeState: probeState{enabled: true}},
+		{testPodUID, probedUnready.Name, readiness}:       {probeState: probeState{enabled: true}},
+		{testPodUID, notStartedNoReadiness.Name, startup}: {probeState: probeState{enabled: true}},
+		{testPodUID, startedNoReadiness.Name, startup}:    {probeState: probeState{enabled: true}},
+		{testPodUID, terminated.Name, readiness}:          {probeState: probeState{enabled: true}},
 	}
 	m.readinessManager.Set(kubecontainer.ParseContainerID(logger, probedReady.ContainerID), results.Success, &v1.Pod{})
 	m.readinessManager.Set(kubecontainer.ParseContainerID(logger, probedUnready.ContainerID), results.Failure, &v1.Pod{})
@@ -603,8 +761,8 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 
 	// Setup probe "workers" and cached results.
 	m.workers = map[probeKey]*worker{
-		{testPodUID, notStarted.Name, startup}: {},
-		{testPodUID, started.Name, startup}:    {},
+		{testPodUID, notStarted.Name, startup}: {probeState: probeState{enabled: true}},
+		{testPodUID, started.Name, startup}:    {probeState: probeState{enabled: true}},
 	}
 	m.startupManager.Set(kubecontainer.ParseContainerID(logger, started.ContainerID), results.Success, &v1.Pod{})
 
@@ -773,7 +931,11 @@ func expectProbes(m *manager, expectedProbes []probeKey) error {
 	copy(missing, expectedProbes)
 
 outer:
-	for probePath := range m.workers {
+	for probePath, w := range m.workers {
+		if !w.isEnabled() {
+			continue
+		}
+
 		for i, expectedPath := range missing {
 			if probePath == expectedPath {
 				missing = append(missing[:i], missing[i+1:]...)
@@ -796,7 +958,10 @@ const interval = 1 * time.Second
 func waitForWorkerExit(t ktesting.TB, m *manager, workerPaths []probeKey) error {
 	for _, w := range workerPaths {
 		condition := func() (bool, error) {
-			_, exists := m.getWorker(w.podUID, w.containerName, w.probeType)
+			m.workerLock.RLock()
+			defer m.workerLock.RUnlock()
+
+			_, exists := m.workers[w]
 			return !exists, nil
 		}
 		if exited, _ := condition(); exited {
