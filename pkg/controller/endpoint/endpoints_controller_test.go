@@ -1481,6 +1481,79 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
 }
 
+func TestSyncEndpointsItemsExcludeHermeticPods(t *testing.T) {
+	ns := "other"
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				LabelManagedBy: ControllerName,
+				"foo":          "bar",
+			},
+		},
+		Subsets: []v1.EndpointSubset{},
+	})
+	endpoints.podStore.Add(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "hermetic-pod",
+			Namespace: ns,
+			Labels:    map[string]string{"foo": "bar"},
+		},
+		Spec: v1.PodSpec{
+			Hermetic: ptr.To(true),
+			Containers: []v1.Container{{
+				Name:  "c",
+				Image: "image",
+				Ports: []v1.ContainerPort{{
+					Name:          "port",
+					ContainerPort: 8080,
+					Protocol:      v1.ProtocolTCP,
+				}},
+			}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			PodIP: "1.2.3.4",
+			Conditions: []v1.PodCondition{{
+				Type:   v1.PodReady,
+				Status: v1.ConditionTrue,
+			}},
+		},
+	})
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector:   map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+		},
+	})
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
+	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
+				v1.IsHeadlessService: "",
+			},
+		},
+		Subsets: []v1.EndpointSubset{},
+	})
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+}
+
 func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)

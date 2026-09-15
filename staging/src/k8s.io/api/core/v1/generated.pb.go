@@ -10020,6 +10020,18 @@ func (m *PodSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Hermetic != nil {
+		i--
+		if *m.Hermetic {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xe8
+	}
 	if len(m.EvictionResponders) > 0 {
 		for iNdEx := len(m.EvictionResponders) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -19264,6 +19276,9 @@ func (m *PodSpec) Size() (n int) {
 			n += 2 + l + sovGenerated(uint64(l))
 		}
 	}
+	if m.Hermetic != nil {
+		n += 3
+	}
 	return n
 }
 
@@ -23860,6 +23875,7 @@ func (this *PodSpec) String() string {
 		`HostnameOverride:` + valueToStringGenerated(this.HostnameOverride) + `,`,
 		`SchedulingGroup:` + strings.Replace(this.SchedulingGroup.String(), "PodSchedulingGroup", "PodSchedulingGroup", 1) + `,`,
 		`EvictionResponders:` + repeatedStringForEvictionResponders + `,`,
+		`Hermetic:` + valueToStringGenerated(this.Hermetic) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -56924,6 +56940,27 @@ func (m *PodSpec) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 45:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Hermetic", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Hermetic = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
