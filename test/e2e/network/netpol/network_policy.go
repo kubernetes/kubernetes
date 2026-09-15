@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -1319,6 +1322,103 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{Namespace: nsX, Pod: "a"}, &Peer{Namespace: nsY}, false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
+
+		f.It("should block north-south traffic to pods isolated by a 'default-deny-ingress' policy via NodePort",
+			feature.NetworkPolicy, func(ctx context.Context) {
+				k8s = initializeResources(ctx, f, []v1.Protocol{protocolTCP}, []int32{80}, "x/a", "y/a")
+				nsX, nsY, _ := getK8sNamespaces(k8s)
+
+				targetPod, err := k8s.clientSet.CoreV1().Pods(nsX).Get(ctx, "a", metav1.GetOptions{})
+				framework.ExpectNoError(err, "getting pod x/a to retrieve its host IP")
+
+				// externalTrafficPolicy=Local preserves the original client IP end-to-end.
+				// With Cluster, kube-proxy SNATs to the node IP, which is exempt from
+				// NetworkPolicy enforcement (kubelet probe exception), producing a false positive.
+				svc, err := k8s.clientSet.CoreV1().Services(nsX).Create(ctx, &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{Name: "north-south-np-test", Namespace: nsX},
+					Spec: v1.ServiceSpec{
+						Type:                  v1.ServiceTypeNodePort,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
+						Selector:              map[string]string{"pod": "a"},
+						Ports: []v1.ServicePort{{
+							Name:       "http",
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+							TargetPort: intstr.FromInt32(80),
+						}},
+					},
+				}, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "creating NodePort service in %s", nsX)
+				nodePort := strconv.Itoa(int(svc.Spec.Ports[0].NodePort))
+
+				framework.ExpectNoError(
+					e2eendpointslice.WaitForEndpointPods(ctx, k8s.clientSet, nsX, svc.Name, "a"),
+					"waiting for NodePort service %s/%s to have an endpoint for pod 'a'", nsX, svc.Name,
+				)
+
+				policy := GenNetworkPolicyWithNameAndPodSelector(
+					"deny-ingress", metav1.LabelSelector{}, SetSpecIngressRules(),
+				)
+				CreatePolicy(ctx, k8s, policy, nsX)
+
+				ginkgo.By("verifying east-west traffic into nsX is blocked")
+				reachability := NewReachability(k8s.AllPodStrings(), true)
+				reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
+				ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+
+				addr := net.JoinHostPort(targetPod.Status.HostIP, nodePort)
+				ginkgo.By(fmt.Sprintf("verifying north-south traffic via NodePort %s from %s/a is blocked", addr, nsY))
+				_, _, connErr := k8s.executeRemoteCommand(nsY, "a", []string{
+					"/agnhost", "connect", addr, "--timeout=5s", "--protocol=tcp",
+				})
+				if connErr == nil {
+					framework.Failf("north-south traffic reached pod x/a via NodePort %s; NetworkPolicy should have blocked it", addr)
+				}
+				framework.Logf("north-south traffic correctly blocked via NodePort (err: %v)", connErr)
+			})
+
+		f.It("should block north-south traffic to pods isolated by a 'default-deny-ingress' policy via LoadBalancer",
+			feature.NetworkPolicy, feature.LoadBalancer, func(ctx context.Context) {
+				k8s = initializeResources(ctx, f, []v1.Protocol{protocolTCP}, []int32{80}, "x/a", "y/a")
+				nsX, nsY, _ := getK8sNamespaces(k8s)
+
+				jig := e2eservice.NewTestJig(k8s.clientSet, nsX, "north-south-lb-np-test")
+				timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, k8s.clientSet)
+				// Some CNI dataplanes (e.g. Cilium eBPF, Calico eBPF) shortcut in-cluster
+				// LB traffic directly to the backing pod. NetworkPolicy is still enforced
+				// at the pod level in those paths, so the block assertion holds.
+				svc, err := jig.CreateLoadBalancerService(ctx, timeout, func(svc *v1.Service) {
+					svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+					svc.Spec.Selector = map[string]string{"pod": "a"}
+				})
+				framework.ExpectNoError(err, "creating LoadBalancer service in %s", nsX)
+				lbAddr := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+
+				framework.ExpectNoError(
+					e2eendpointslice.WaitForEndpointPods(ctx, k8s.clientSet, nsX, svc.Name, "a"),
+					"waiting for LoadBalancer service %s/%s to have an endpoint for pod 'a'", nsX, svc.Name,
+				)
+
+				policy := GenNetworkPolicyWithNameAndPodSelector(
+					"deny-ingress", metav1.LabelSelector{}, SetSpecIngressRules(),
+				)
+				CreatePolicy(ctx, k8s, policy, nsX)
+
+				ginkgo.By("verifying east-west traffic into nsX is blocked")
+				reachability := NewReachability(k8s.AllPodStrings(), true)
+				reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
+				ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+
+				addr := net.JoinHostPort(lbAddr, "80")
+				ginkgo.By(fmt.Sprintf("verifying north-south traffic via LoadBalancer %s from %s/a is blocked", addr, nsY))
+				_, _, connErr := k8s.executeRemoteCommand(nsY, "a", []string{
+					"/agnhost", "connect", addr, "--timeout=5s", "--protocol=tcp",
+				})
+				if connErr == nil {
+					framework.Failf("north-south traffic reached pod x/a via LoadBalancer %s; NetworkPolicy should have blocked it", addr)
+				}
+				framework.Logf("north-south traffic correctly blocked via LoadBalancer (err: %v)", connErr)
+			})
 	})
 })
 
