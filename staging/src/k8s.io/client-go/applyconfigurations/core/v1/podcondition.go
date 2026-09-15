@@ -28,22 +28,22 @@ import (
 //
 // PodCondition contains details for the current condition of this pod.
 type PodConditionApplyConfiguration struct {
-	// Type is the type of the condition.
+	// type is the type of the condition.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
 	Type *corev1.PodConditionType `json:"type,omitempty"`
-	// If set, this represents the .metadata.generation that the pod condition was set based upon.
+	// observedGeneration (if set) represents the .metadata.generation that the pod condition was set based upon.
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
-	// Status is the status of the condition.
+	// status is the status of the condition.
 	// Can be True, False, Unknown.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
 	Status *corev1.ConditionStatus `json:"status,omitempty"`
-	// Last time we probed the condition.
+	// lastProbeTime is the last time we probed the condition.
 	LastProbeTime *metav1.Time `json:"lastProbeTime,omitempty"`
-	// Last time the condition transitioned from one status to another.
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
-	// Unique, one-word, CamelCase reason for the condition's last transition.
+	// reason is a unique, one-word, CamelCase reason for the condition's last transition.
 	Reason *string `json:"reason,omitempty"`
-	// Human-readable message indicating details about last transition.
+	// message is a human-readable string indicating details about last transition.
 	Message *string `json:"message,omitempty"`
 }
 

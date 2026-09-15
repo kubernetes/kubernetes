@@ -29,10 +29,10 @@ import (
 //
 // PodTemplateSpec describes the data a pod should have when created from a template
 type PodTemplateSpecApplyConfiguration struct {
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the pod.
+	// spec specifies the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec *PodSpecApplyConfiguration `json:"spec,omitempty"`
 }

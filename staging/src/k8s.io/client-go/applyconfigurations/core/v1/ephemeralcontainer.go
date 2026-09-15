@@ -39,7 +39,7 @@ type EphemeralContainerApplyConfiguration struct {
 	// following inlined struct so than an EphemeralContainer may easily be converted
 	// to a Container.
 	EphemeralContainerCommonApplyConfiguration `json:""`
-	// If set, the name of the container from PodSpec that this ephemeral container targets.
+	// targetContainerName is the name of the container from PodSpec that this ephemeral container targets.
 	// The ephemeral container will be run in the namespaces (IPC, PID, etc) of this container.
 	// If not set then the ephemeral container uses the namespaces configured in the Pod spec.
 	//

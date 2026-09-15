@@ -23,14 +23,15 @@ package v1
 //
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
 type DownwardAPIVolumeFileApplyConfiguration struct {
-	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+	// path is the relative path name of the file to be created. Must not be absolute or contain the '..' path.
+	// Must be utf-8 encoded. The first item of the relative path must not start with '..'
 	Path *string `json:"path,omitempty"`
-	// Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
+	// fieldRef selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
 	FieldRef *ObjectFieldSelectorApplyConfiguration `json:"fieldRef,omitempty"`
-	// Selects a resource of the container: only resources limits and requests
+	// resourceFieldRef selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	ResourceFieldRef *ResourceFieldSelectorApplyConfiguration `json:"resourceFieldRef,omitempty"`
-	// Optional: mode bits used to set permissions on this file, must be an octal value
+	// mode bits used to set permissions on this file, must be an octal value
 	// between 0000 and 0777 or a decimal value between 0 and 511.
 	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
 	// If not specified, the volume defaultMode will be used.

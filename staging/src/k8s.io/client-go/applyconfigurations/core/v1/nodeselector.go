@@ -25,7 +25,7 @@ package v1
 // over a set of nodes; that is, it represents the OR of the selectors represented
 // by the node selector terms.
 type NodeSelectorApplyConfiguration struct {
-	// Required. A list of node selector terms. The terms are ORed.
+	// nodeSelectorTerms is a list of node selector terms. The terms are ORed.
 	NodeSelectorTerms []NodeSelectorTermApplyConfiguration `json:"nodeSelectorTerms,omitempty"`
 }
 

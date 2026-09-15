@@ -29,25 +29,25 @@ import (
 // ClusterTrustBundle objects and project their contents into the pod
 // filesystem.
 type ClusterTrustBundleProjectionApplyConfiguration struct {
-	// Select a single ClusterTrustBundle by object name.  Mutually-exclusive
-	// with signerName and labelSelector.
+	// name selects a single ClusterTrustBundle by object name.
+	// Mutually-exclusive with signerName and labelSelector.
 	Name *string `json:"name,omitempty"`
-	// Select all ClusterTrustBundles that match this signer name.
-	// Mutually-exclusive with name.  The contents of all selected
+	// signerName selects all ClusterTrustBundles that match this signer name.
+	// Mutually-exclusive with name. The contents of all selected
 	// ClusterTrustBundles will be unified and deduplicated.
 	SignerName *string `json:"signerName,omitempty"`
-	// Select all ClusterTrustBundles that match this label selector.  Only has
-	// effect if signerName is set.  Mutually-exclusive with name.  If unset,
-	// interpreted as "match nothing".  If set but empty, interpreted as "match
-	// everything".
+	// labelSelector selects ClusterTrustBundles that match the label query.
+	// Only has effect if signerName is set. Mutually-exclusive with name. If unset,
+	// interpreted as "match nothing". If set but empty, interpreted as "match everything".
 	LabelSelector *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
+	// optional guards ClusterTrustBundle availability and can prevent or allow
+	// pod startup if ClusterTrustBundle(s) aren't available.
 	// If true, don't block pod startup if the referenced ClusterTrustBundle(s)
-	// aren't available.  If using name, then the named ClusterTrustBundle is
-	// allowed not to exist.  If using signerName, then the combination of
-	// signerName and labelSelector is allowed to match zero
-	// ClusterTrustBundles.
+	// aren't available. If using name, then the named ClusterTrustBundle is
+	// allowed not to exist. If using signerName, then the combination of
+	// signerName and labelSelector is allowed to match zero ClusterTrustBundles.
 	Optional *bool `json:"optional,omitempty"`
-	// Relative path from the volume root to write the bundle.
+	// path is the relative path from the volume root to write the bundle.
 	Path *string `json:"path,omitempty"`
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
