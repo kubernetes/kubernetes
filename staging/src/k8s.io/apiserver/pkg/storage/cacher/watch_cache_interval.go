@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/watch"
@@ -68,47 +69,19 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 	}
 }
 
-// newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
-// returned by Next() need to be events from a List() done on the underlying store of
-// the watch cache.
-// The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
-	buffer := &watchCacheIntervalBuffer{}
-	var allItems []interface{}
-	var err error
-	if matchesSingle {
-		item, exists, err := indexer.GetByKey(key)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			allItems = append(allItems, item)
-		}
-	} else {
-		allItems, err = indexer.OrderedListPrefix("", "")
-		if err != nil {
-			return nil, err
-		}
-	}
-	buffer.buffer = make([]*watchCacheEvent, len(allItems))
-	for i, item := range allItems {
-		elem, ok := item.(*store.Element)
-		if !ok {
-			return nil, fmt.Errorf("not a storeElement: %v", elem)
-		}
+func newCacheIntervalFromElements(resourceVersion uint64, elems ...*store.Element) *watchCacheInterval {
+	buffer := &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, len(elems)), endIndex: len(elems)}
+	for i, elem := range elems {
 		buffer.buffer[i] = storeElementToWatchCacheEvent(elem, resourceVersion)
-		buffer.endIndex++
 	}
-	ci := &watchCacheInterval{
+	return &watchCacheInterval{
 		source:          &snapshotCacheIntervalSource{buffer: buffer},
 		resourceVersion: resourceVersion,
 	}
-
-	return ci, nil
 }
 
 // newCacheIntervalFromLazySnapshot builds an interval backed by an immutable store snapshot
-// Unlike newCacheIntervalFromStore, it captures snapshot reference which takes O(1) under watch-cache RLock
+// It captures snapshot reference which takes O(1) under watch-cache RLock
 // and defers O(N) traversal to first Next() call post lock release
 func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot) *watchCacheInterval {
 	return &watchCacheInterval{
@@ -269,28 +242,21 @@ type lazySnapshotCacheIntervalSource struct {
 	resourceVersion uint64
 	// loaded indicates whether items has been materialized from the snapshot.
 	loaded bool
-	// items holds the result of OrderedListPrefix, populated on the first Next() call
-	items []interface{}
+	// items holds the snapshot's elements in key order, populated on the first Next() call
+	items []*store.Element
 	// currentIndex tracks the current position within items.
 	currentIndex int
 }
 
 func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	if !s.loaded {
-		items, err := s.snapshot.OrderedListPrefix("", "")
-		if err != nil {
-			return nil, err
-		}
-		s.items = items
+		s.items = slices.Collect(s.snapshot.RangePrefix("", "").All())
 		s.loaded = true
 	}
 	if s.currentIndex >= len(s.items) {
 		return nil, nil
 	}
-	elem, ok := s.items[s.currentIndex].(*store.Element)
-	if !ok {
-		return nil, fmt.Errorf("not a storeElement: %v", s.items[s.currentIndex])
-	}
+	elem := s.items[s.currentIndex]
 	s.currentIndex++
 	return storeElementToWatchCacheEvent(elem, s.resourceVersion), nil
 }
