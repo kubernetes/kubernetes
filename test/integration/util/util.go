@@ -117,6 +117,7 @@ func StartSchedulerWithDone(tCtx ktesting.TContext, cfg *kubeschedulerconfig.Kub
 		scheduler.WithKubeConfig(tCtx.RESTConfig()),
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
+		scheduler.WithPercentageOfPlacementsToScore(cfg.PercentageOfPlacementsToScore),
 		scheduler.WithPodMaxBackoffSeconds(cfg.PodMaxBackoffSeconds),
 		scheduler.WithPodInitialBackoffSeconds(cfg.PodInitialBackoffSeconds),
 		scheduler.WithExtenders(cfg.Extenders...),
