@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -88,8 +89,8 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) &&
 			h.containerManager.GetNodeConfig().CPUManagerPolicy == string(cpumanager.PolicyStatic) &&
-			h.guaranteedPodResourceResizeRequired(pod, v1.ResourceCPU) {
-			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside CPU Manager policy \"%s\"", string(cpumanager.PolicyStatic))
+			h.hasIntegerCPUResize(pod) {
+			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods with integer CPU requests alongside CPU Manager policy \"%s\"", string(cpumanager.PolicyStatic))
 			logger.V(3).Info(msg, "pod", format.Pod(pod))
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy").Inc()
 			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
@@ -156,6 +157,41 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 		}
 	}
 	return false, ""
+}
+
+func isIntegerCPU(q resource.Quantity) bool {
+	return !q.IsZero() && q.Value()*1000 == q.MilliValue()
+}
+
+// hasIntegerCPUResize checks whether any container being resized has an integer
+// CPU value on either side of the resize (current allocation or desired request).
+// Also checks pod-level CPU resources.
+func (h *podResizesAdmitHandler) hasIntegerCPUResize(pod *v1.Pod) bool {
+	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if !IsResizableContainer(container, containerType) {
+			continue
+		}
+		requestedCPU := container.Resources.Requests[v1.ResourceCPU]
+		allocatedResources, _ := h.allocationManager.GetContainerResourceAllocation(pod.UID, container.Name)
+		allocatedCPU := allocatedResources.Requests[v1.ResourceCPU]
+		if requestedCPU.Equal(allocatedCPU) {
+			continue
+		}
+		if isIntegerCPU(requestedCPU) || isIntegerCPU(allocatedCPU) {
+			return true
+		}
+	}
+	if pod.Spec.Resources != nil {
+		requestedCPU := pod.Spec.Resources.Requests[v1.ResourceCPU]
+		allocatedPodResources, found := h.allocationManager.GetPodLevelResourceAllocation(pod.UID)
+		if found {
+			allocatedCPU := allocatedPodResources.Requests[v1.ResourceCPU]
+			if !requestedCPU.Equal(allocatedCPU) && (isIntegerCPU(requestedCPU) || isIntegerCPU(allocatedCPU)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (h *podResizesAdmitHandler) guaranteedPodResourceResizeRequired(pod *v1.Pod, resourceName v1.ResourceName) bool {
