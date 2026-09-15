@@ -17,15 +17,19 @@ limitations under the License.
 package egressselector
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"google.golang.org/grpc"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -199,6 +203,12 @@ func (f *fakeProxier) proxy(_ context.Context, _ string) (net.Conn, error) {
 		return nil, fmt.Errorf("fake error")
 	}
 	return nil, nil
+}
+
+type proxyServerConnectorFunc func(context.Context) (proxier, error)
+
+func (f proxyServerConnectorFunc) connect(ctx context.Context) (proxier, error) {
+	return f(ctx)
 }
 
 func TestMetrics(t *testing.T) {
@@ -403,4 +413,283 @@ func TestGetTLSConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHTTPConnectProxierReturnsOnContextDeadline(t *testing.T) {
+	clientConn, proxyConn := net.Pipe()
+	defer func() {
+		_ = clientConn.Close()
+		_ = proxyConn.Close()
+	}()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := (&httpConnectProxier{
+			conn:         clientConn,
+			proxyAddress: "proxy",
+		}).proxy(ctx, "webhook.default.svc:443")
+		errCh <- err
+	}()
+
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("expected CONNECT to fail when proxy does not return 200 OK")
+		}
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected context deadline exceeded, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for HTTP CONNECT proxy to return")
+	}
+}
+
+func TestHTTPConnectProxierReturnsOnContextCancel(t *testing.T) {
+	clientConn, proxyConn := net.Pipe()
+	defer func() {
+		_ = clientConn.Close()
+		_ = proxyConn.Close()
+	}()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	requestReadCh := make(chan error, 1)
+	go func() {
+		req, err := http.ReadRequest(bufio.NewReader(proxyConn))
+		if err == nil {
+			_ = req.Body.Close()
+		}
+		requestReadCh <- err
+	}()
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := (&httpConnectProxier{
+			conn:         clientConn,
+			proxyAddress: "proxy",
+		}).proxy(ctx, "webhook.default.svc:443")
+		errCh <- err
+	}()
+
+	select {
+	case err := <-requestReadCh:
+		if err != nil {
+			t.Fatalf("failed to read CONNECT request: %v", err)
+		}
+
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for CONNECT request")
+	}
+
+	select {
+	case <-errCh:
+		t.Fatal("should be blocked in building tunnel")
+	default:
+	}
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected context canceled, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for HTTP CONNECT proxy to return")
+	}
+}
+
+func TestDialerCreatorContextDeadline(t *testing.T) {
+	captureDeadline := func(t *testing.T, ctx context.Context) time.Time {
+		t.Helper()
+
+		var deadline time.Time
+		dialer := (&dialerCreator{connector: proxyServerConnectorFunc(func(ctx context.Context) (proxier, error) {
+			deadline, _ = ctx.Deadline()
+			return &fakeProxier{}, nil
+		})}).createDialer()
+
+		if _, err := dialer(ctx, "tcp", "webhook.default.svc:443"); err != nil {
+			t.Fatalf("unexpected dial error: %v", err)
+		}
+		if deadline.IsZero() {
+			t.Fatal("expected dial context to have a deadline")
+		}
+		return deadline
+	}
+
+	t.Run("adds default deadline", func(t *testing.T) {
+		_ = captureDeadline(t, context.Background())
+	})
+
+	t.Run("preserves existing deadline", func(t *testing.T) {
+		want := time.Now().Add(time.Hour)
+		ctx, cancel := context.WithDeadline(context.Background(), want)
+		defer cancel()
+
+		got := captureDeadline(t, ctx)
+		if !got.Equal(want) {
+			t.Fatalf("expected deadline %v, got %v", want, got)
+		}
+	})
+}
+
+type fakeGRPCTunnel struct {
+	dial func(context.Context, string, string) (net.Conn, error)
+}
+
+func (f *fakeGRPCTunnel) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return f.dial(ctx, network, address)
+}
+
+func (*fakeGRPCTunnel) Done() <-chan struct{} {
+	return nil
+}
+
+func TestGRPCProxierCancelsTunnel(t *testing.T) {
+	t.Run("dial failure", func(t *testing.T) {
+		dialErr := errors.New("dial failed")
+		tunnelCtx, cancel := context.WithCancelCause(context.Background())
+		proxier := &grpcProxier{
+			tunnel: &fakeGRPCTunnel{dial: func(context.Context, string, string) (net.Conn, error) {
+				return nil, dialErr
+			}},
+			cancel: cancel,
+		}
+
+		if _, err := proxier.proxy(t.Context(), "webhook.default.svc:443"); !errors.Is(err, dialErr) {
+			t.Fatalf("expected dial error %v, got %v", dialErr, err)
+		}
+
+		if cause := context.Cause(tunnelCtx); !errors.Is(cause, dialErr) {
+			t.Fatalf("expected tunnel cancellation cause %v, got %v", dialErr, cause)
+		}
+	})
+
+	t.Run("connection close", func(t *testing.T) {
+		clientConn, serverConn := net.Pipe()
+		defer func() {
+			_ = clientConn.Close()
+			_ = serverConn.Close()
+		}()
+
+		tunnelCtx, cancel := context.WithCancelCause(context.Background())
+		proxier := &grpcProxier{
+			tunnel: &fakeGRPCTunnel{dial: func(context.Context, string, string) (net.Conn, error) {
+				return clientConn, nil
+			}},
+			cancel: cancel,
+		}
+
+		conn, err := proxier.proxy(t.Context(), "webhook.default.svc:443")
+		if err != nil {
+			t.Fatalf("unexpected dial error: %v", err)
+		}
+		if err := conn.Close(); err != nil {
+			t.Fatalf("unexpected close error: %v", err)
+		}
+		if cause := context.Cause(tunnelCtx); !errors.Is(cause, context.Canceled) {
+			t.Fatalf("expected tunnel to be canceled when connection closes, got %v", cause)
+		}
+	})
+}
+
+func TestUDSGRPCConnectorTunnelOutlivesConnectContext(t *testing.T) {
+	udsName := filepath.Join(t.TempDir(), "proxy.sock")
+	listener, err := net.Listen("unix", udsName)
+	if err != nil {
+		t.Fatalf("failed to listen on UDS: %v", err)
+	}
+
+	proxyServer := &testGRPCProxyServer{t: t}
+	grpcServer := grpc.NewServer()
+	client.RegisterProxyServiceServer(grpcServer, proxyServer)
+
+	serveErrCh := make(chan error, 1)
+	go func() {
+		serveErrCh <- grpcServer.Serve(listener)
+	}()
+
+	t.Cleanup(func() {
+		grpcServer.Stop()
+		select {
+		case err := <-serveErrCh:
+			if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+				t.Logf("gRPC proxy server failed: %v", err)
+			}
+		case <-time.After(30 * time.Second):
+			t.Fatal("failed to wait for gRPC proxy server to exit")
+		}
+	})
+
+	canceledCtx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err := (&udsGRPCConnector{udsName: udsName}).connect(canceledCtx); err == nil {
+		t.Fatal("expected canceled connect context to stop connection setup")
+	}
+
+	connectCtx, cancelConnect := context.WithCancel(t.Context())
+	defer cancelConnect()
+	proxier, err := (&udsGRPCConnector{udsName: udsName}).connect(connectCtx)
+	if err != nil {
+		t.Fatalf("failed to connect to gRPC proxy: %v", err)
+	}
+
+	// tunnel context should be detached from connecting one.
+	cancelConnect()
+
+	dialCtx, cancelDial := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancelDial()
+	conn, err := proxier.proxy(dialCtx, "webhook.default.svc:443")
+	if err != nil {
+		t.Fatalf("tunnel did not survive connect context cancellation: %v", err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatalf("failed to close tunneled connection: %v", err)
+	}
+}
+
+type testGRPCProxyServer struct {
+	t *testing.T
+	client.UnimplementedProxyServiceServer
+}
+
+func (s *testGRPCProxyServer) Proxy(stream client.ProxyService_ProxyServer) error {
+	dialPacket, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+
+	s.t.Logf("received packet: %s", dialPacket.String())
+
+	if dialPacket.Type != client.PacketType_DIAL_REQ {
+		return fmt.Errorf("expected DIAL_REQ, got %v", dialPacket.Type)
+	}
+	if err := stream.Send(&client.Packet{
+		Type: client.PacketType_DIAL_RSP,
+		Payload: &client.Packet_DialResponse{DialResponse: &client.DialResponse{
+			ConnectID: 1,
+			Random:    dialPacket.GetDialRequest().Random,
+		}},
+	}); err != nil {
+		return err
+	}
+
+	closePacket, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+	if closePacket.Type != client.PacketType_CLOSE_REQ {
+		return fmt.Errorf("expected CLOSE_REQ, got %v", closePacket.Type)
+	}
+	return stream.Send(&client.Packet{
+		Type: client.PacketType_CLOSE_RSP,
+		Payload: &client.Packet_CloseResponse{CloseResponse: &client.CloseResponse{
+			ConnectID: closePacket.GetCloseRequest().ConnectID,
+		}},
+	})
 }

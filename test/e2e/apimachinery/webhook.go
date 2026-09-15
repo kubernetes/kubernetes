@@ -1467,8 +1467,8 @@ func testWebhook(ctx context.Context, f *framework.Framework) {
 		framework.Failf("expect error %q, got %q", "webhook", err.Error())
 	}
 	// ensure the error is a timeout
-	if !strings.Contains(err.Error(), "deadline") {
-		framework.Failf("expect error %q, got %q", "deadline", err.Error())
+	if !strings.Contains(err.Error(), "deadline") && !strings.Contains(err.Error(), "Client.Timeout exceeded") {
+		framework.Failf("expect a deadline or client timeout error, got %q", err.Error())
 	}
 	// ensure the pod was not actually created
 	if _, err := client.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{}); !apierrors.IsNotFound(err) {
