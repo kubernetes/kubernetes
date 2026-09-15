@@ -581,6 +581,20 @@ func podLocalVolumeUsage(volumeNames []string, podStats statsapi.PodStats) v1.Re
 	}
 }
 
+// diskUsagePerPodLocalVolume returns the disk usage for each local volume in the pod.
+func diskUsagePerPodLocalVolume(volumeNames []string, podStats statsapi.PodStats) map[string]resource.Quantity {
+	usage := make(map[string]resource.Quantity)
+	for _, volumeName := range volumeNames {
+		for _, volumeStats := range podStats.VolumeStats {
+			if volumeStats.Name == volumeName {
+				usage[volumeName] = *diskUsage(&volumeStats.FsStats)
+				break
+			}
+		}
+	}
+	return usage
+}
+
 // podDiskUsage aggregates pod disk usage and inode consumption for the specified stats to measure.
 func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
 	disk := resource.Quantity{Format: resource.BinarySI}
@@ -1270,6 +1284,7 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	if len(pod.Spec.InitContainers) != 0 {
 		containers = append(containers, pod.Spec.InitContainers...)
 	}
+	podLocalVolumeDiskUsages := diskUsagePerPodLocalVolume(localVolumeNames(pod), podStats)
 	for _, containerStats := range podStats.Containers {
 		for _, container := range containers {
 			if container.Name == containerStats.Name {
@@ -1279,6 +1294,14 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 				case v1.ResourceEphemeralStorage:
 					if containerStats.Rootfs != nil && containerStats.Rootfs.UsedBytes != nil && containerStats.Logs != nil && containerStats.Logs.UsedBytes != nil {
 						usage = resource.NewQuantity(int64(*containerStats.Rootfs.UsedBytes+*containerStats.Logs.UsedBytes), resource.BinarySI)
+					}
+					for _, volumeMount := range container.VolumeMounts {
+						if localVolumeUsage, found := podLocalVolumeDiskUsages[volumeMount.Name]; found && !localVolumeUsage.IsZero() {
+							if usage == nil {
+								usage = resource.NewQuantity(0, resource.BinarySI)
+							}
+							usage.Add(localVolumeUsage)
+						}
 					}
 				case v1.ResourceMemory:
 					if containerStats.Memory != nil && containerStats.Memory.WorkingSetBytes != nil {
