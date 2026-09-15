@@ -451,14 +451,14 @@ func TestClusterIPMetrics(t *testing.T) {
 
 	// Check initial state
 	em := testMetrics{
-		free:      0,
+		free:      254,
 		used:      0,
 		allocated: 0,
 		errors:    0,
 	}
 	expectMetrics(t, cidrIPv4, em)
 	em = testMetrics{
-		free:      0,
+		free:      65535,
 		used:      0,
 		allocated: 0,
 		errors:    0,
@@ -554,7 +554,7 @@ func TestClusterIPAllocatedMetrics(t *testing.T) {
 	a.EnableMetrics()
 
 	em := testMetrics{
-		free:      0,
+		free:      126,
 		used:      0,
 		allocated: 0,
 		errors:    0,
@@ -620,7 +620,7 @@ func TestMetricsDisabled(t *testing.T) {
 
 	// Check initial state
 	em := testMetrics{
-		free:      0,
+		free:      254,
 		used:      0,
 		allocated: 0,
 		errors:    0,
