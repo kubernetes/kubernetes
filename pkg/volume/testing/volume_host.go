@@ -338,6 +338,14 @@ func (f *fakeKubeletVolumeHost) WithNode(node *v1.Node) *fakeKubeletVolumeHost {
 	return f
 }
 
+// WithNodeLabels sets the labels returned by GetNodeLabels. GetNodeLabels is
+// informer-backed in production; setting it independently of the clientset Node
+// lets tests simulate a stale informer.
+func (f *fakeKubeletVolumeHost) WithNodeLabels(labels map[string]string) *fakeKubeletVolumeHost {
+	f.nodeLabels = labels
+	return f
+}
+
 type CSINodeLister []storagev1.CSINode
 
 // Get returns a fake CSINode object.
