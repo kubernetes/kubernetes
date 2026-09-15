@@ -158,16 +158,16 @@ const (
 
 // CronJobStatus represents the current state of a cron job.
 type CronJobStatus struct {
-	// A list of pointers to currently running jobs.
+	// active is a list of pointers to currently running jobs.
 	// +optional
 	// +listType=atomic
 	Active []v1.ObjectReference `json:"active,omitempty" protobuf:"bytes,1,rep,name=active"`
 
-	// Information when was the last time the job was successfully scheduled.
+	// lastScheduleTime is the time when the job was last successfully scheduled.
 	// +optional
 	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty" protobuf:"bytes,4,opt,name=lastScheduleTime"`
 
-	// Information when was the last time the job successfully completed.
+	// lastSuccessfulTime is the time when the job last successfully completed.
 	// +optional
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty" protobuf:"bytes,5,opt,name=lastSuccessfulTime"`
 }

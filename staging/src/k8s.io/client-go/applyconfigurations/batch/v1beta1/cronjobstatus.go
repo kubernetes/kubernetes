@@ -28,11 +28,11 @@ import (
 //
 // CronJobStatus represents the current state of a cron job.
 type CronJobStatusApplyConfiguration struct {
-	// A list of pointers to currently running jobs.
+	// active is a list of pointers to currently running jobs.
 	Active []v1.ObjectReferenceApplyConfiguration `json:"active,omitempty"`
-	// Information when was the last time the job was successfully scheduled.
+	// lastScheduleTime is the time when the job was last successfully scheduled.
 	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
-	// Information when was the last time the job successfully completed.
+	// lastSuccessfulTime is the time when the job last successfully completed.
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 }
 
