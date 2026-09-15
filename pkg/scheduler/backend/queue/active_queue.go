@@ -388,6 +388,8 @@ func (aq *activeQueue) list() []*v1.Pod {
 
 // len returns length of the queue.
 func (aq *activeQueue) len() int {
+	aq.lock.RLock()
+	defer aq.lock.RUnlock()
 	return aq.queue.Len()
 }
 
