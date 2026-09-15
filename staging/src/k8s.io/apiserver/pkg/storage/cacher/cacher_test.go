@@ -807,5 +807,5 @@ func BenchmarkStoreStats(b *testing.B) {
 func TestCorrectness(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
-	correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix())
+	correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc)
 }

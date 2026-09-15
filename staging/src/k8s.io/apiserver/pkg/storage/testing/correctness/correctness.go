@@ -24,8 +24,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 )
@@ -34,6 +37,7 @@ type testStep struct {
 	Name             string
 	Request          Request
 	CorrectResponse  Response
+	ExpectedEvent    *watch.Event
 	InvalidResponses []Response
 }
 
@@ -81,6 +85,10 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod1, "2"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Added,
 				Object: withRV(pod1, "2"),
 			},
 			InvalidResponses: []Response{
@@ -138,6 +146,10 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod2, "3"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Added,
 				Object: withRV(pod2, "3"),
 			},
 			InvalidResponses: []Response{
@@ -207,6 +219,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod1, "4"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Deleted,
+				Object: withRV(pod1, "4"),
+			},
 			InvalidResponses: []Response{
 				{Object: &example.Pod{}, Err: storage.NewKeyNotFoundError(pod1Key, 0)},
 				{Object: withRV(pod1, "2")},
@@ -255,6 +271,10 @@ func correctnessTestSteps() []testStep {
 				Delete: DeleteRequest{Preconditions: &storage.Preconditions{UID: &pod2UID, ResourceVersion: &pod2RV}},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod2, "5"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Deleted,
 				Object: withRV(pod2, "5"),
 			},
 			InvalidResponses: []Response{
@@ -370,6 +390,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod3v1, "6"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Added,
+				Object: withRV(pod3v1, "6"),
+			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v1, "5")},
 				{Object: withRV(pod3v1, "7")},
@@ -429,6 +453,10 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod3v2, "7"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
 				Object: withRV(pod3v2, "7"),
 			},
 			InvalidResponses: []Response{
@@ -505,6 +533,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod3v3, "8"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
+				Object: withRV(pod3v3, "8"),
+			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v3, "7")},
 				{Object: withRV(pod3v3, "9")},
@@ -528,6 +560,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod3v4, "9"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
+				Object: withRV(pod3v4, "9"),
+			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v4, "8")},
 				{Object: withRV(pod3v4, "10")},
@@ -549,6 +585,10 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod3v5, "10"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
 				Object: withRV(pod3v5, "10"),
 			},
 			InvalidResponses: []Response{
@@ -615,6 +655,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod3v6, "11"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
+				Object: withRV(pod3v6, "11"),
+			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v6, "10")},
 				{Object: withRV(pod3v6, "12")},
@@ -640,6 +684,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod3v7, "12"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
+				Object: withRV(pod3v7, "12"),
+			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v7, "11")},
 				{Object: withRV(pod3v7, "13")},
@@ -654,6 +702,10 @@ func correctnessTestSteps() []testStep {
 				Delete: DeleteRequest{},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod3v7, "13"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Deleted,
 				Object: withRV(pod3v7, "13"),
 			},
 			InvalidResponses: []Response{
@@ -683,11 +735,20 @@ func correctnessTestSteps() []testStep {
 }
 
 // RunTestCorrectness executes the operations from the sequential storage model against real storage
-// and validates that every transition matches the StorageModel specification.
-func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interface, storagePrefix string) {
+// and validates that every transition matches the StorageModel specification and watch guarantees.
+func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interface, storagePrefix string, keyFunc func(runtime.Object) (string, error)) {
 	model := NewEmptyModel(storagePrefix, func() runtime.Object { return &example.Pod{} })
 
-	for _, step := range correctnessTestSteps() {
+	watchRequest := WatchRequest{
+		ResourceVersion: "1",
+	}
+	watcher, err := store.Watch(ctx, "/pods/", storage.ListOptions{ResourceVersion: watchRequest.ResourceVersion, Predicate: storage.Everything, Recursive: true})
+	require.NoError(t, err)
+	defer watcher.Stop()
+
+	steps := correctnessTestSteps()
+	var executedOps []Operation
+	for _, step := range steps {
 		out := &example.Pod{}
 		var err error
 		switch step.Request.Op {
@@ -707,6 +768,11 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 			respObj = out
 		}
 		resp := Response{Object: respObj, Err: err}
+		executedOps = append(executedOps, Operation{
+			Request:  step.Request,
+			Response: resp,
+		})
+
 		ok, next := model.Step(step.Request, resp)
 		if respObj != nil {
 			acc, _ := meta.Accessor(respObj)
@@ -717,6 +783,39 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 		require.True(t, ok, "step %s failed to match model state transition: req=%+v resp=%+v", step.Name, step.Request, resp)
 		model = next
 	}
+	versioner := store.Versioner()
+
+	events := []watch.Event{}
+	for event := range watcher.ResultChan() {
+		require.NotEqual(t, watch.Error, event.Type)
+		accessor, err := meta.Accessor(event.Object)
+		require.NoError(t, err)
+		rv, err := versioner.ParseResourceVersion(accessor.GetResourceVersion())
+		require.NoError(t, err)
+		events = append(events, UnwrapEvent(event))
+		if rv >= model.ResourceVersion {
+			break
+		}
+	}
+	watcher.Stop()
+
+	ValidateWatch(t, versioner, OperationsToWatch(executedOps, versioner), watchRequest, events)
+}
+
+// PodAttrFunc returns the labels and fields for an example.Pod or generic runtime.Object.
+func PodAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
+	if obj == nil {
+		return nil, nil, nil
+	}
+	pod, ok := obj.(*example.Pod)
+	if !ok {
+		return storage.DefaultNamespaceScopedAttr(obj)
+	}
+	return labels.Set(pod.Labels), fields.Set{
+		"metadata.name":      pod.Name,
+		"metadata.namespace": pod.Namespace,
+		"spec.nodeName":      pod.Spec.NodeName,
+	}, nil
 }
 
 func newTestPod(name, namespace string, uid types.UID, rv string) *example.Pod {

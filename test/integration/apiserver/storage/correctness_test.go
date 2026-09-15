@@ -61,12 +61,19 @@ var (
 		Weight: 5,
 	}}
 
-	cfg = TraffiConfig{
-		Concurrency:         8,
-		Namespaces:          2,
-		Objects:             4,
-		MaxOperations:       10000,
-		RequestDistribution: requestDistribution,
+	cfg = TrafficConfig{
+		Namespaces: 2,
+		Objects:    4,
+		Unary: UnaryConfig{
+			Concurrency:         8,
+			MaxOperations:       10000,
+			RequestDistribution: requestDistribution,
+		},
+		Watch: WatchConfig{
+			Concurrency: 4,
+			Duration:    500 * time.Millisecond,
+			MaxEvents:   50,
+		},
 	}
 )
 
@@ -93,10 +100,10 @@ func TestCorrectness(t *testing.T) {
 			initialState, err := correctness.NewModelFromStorage(storagePrefix, list, func() runtime.Object { return &api.Pod{} }, cacheKeyFunc)
 			require.NoError(t, err)
 
-			operations, err := RunTraffic(t.Context(), store, cfg)
+			operations, recordedWatches, err := RunTraffic(t.Context(), store, cfg)
 			require.NoError(t, err)
-			t.Logf("Collected %d operations across %d concurrent workers on %s",
-				len(operations), cfg.Concurrency, s.name)
+			t.Logf("Collected %d unary operations and %d watch sessions on %s",
+				len(operations), len(recordedWatches), s.name)
 
 			model := ToPorcupineModel(initialState)
 			res, info := porcupine.CheckOperationsVerbose(model, toPorcupineOperations(operations), time.Minute)
@@ -113,6 +120,14 @@ func TestCorrectness(t *testing.T) {
 
 			require.Equal(t, porcupine.Ok, res, "Linearizability check failed across %d operations", len(operations))
 			t.Logf("Linearizability check succeeded across %d operations", len(operations))
+
+			expectedEvents := correctness.OperationsToWatch(operations, store.Versioner())
+			totalEvents := 0
+			for _, rw := range recordedWatches {
+				correctness.ValidateWatch(t, store.Versioner(), expectedEvents, rw.Request, rw.Response.Events)
+				totalEvents += len(rw.Response.Events)
+			}
+			require.Positive(t, totalEvents, "expected at least one watch event across %d sessions", len(recordedWatches))
 		})
 	}
 }

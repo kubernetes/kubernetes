@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -135,4 +136,21 @@ const (
 type Response struct {
 	Object runtime.Object
 	Err    error
+}
+
+// WatchRequest contains parameters for a watch stream.
+type WatchRequest struct {
+	ResourceVersion string
+}
+
+// WatchResponse contains the events and any terminal error received from a watch stream.
+type WatchResponse struct {
+	Events []watch.Event
+	Err    error
+}
+
+// WatchOperation captures a recorded watch operation with its request and response.
+type WatchOperation struct {
+	Request  WatchRequest
+	Response WatchResponse
 }

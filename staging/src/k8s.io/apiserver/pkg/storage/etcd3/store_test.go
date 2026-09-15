@@ -1427,5 +1427,11 @@ func TestPrefixStats(t *testing.T) {
 
 func TestCorrectness(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	correctness.RunTestCorrectness(ctx, t, store, "")
+	correctness.RunTestCorrectness(ctx, t, store, "", func(obj runtime.Object) (string, error) {
+		pod, ok := obj.(*example.Pod)
+		if !ok {
+			return "", fmt.Errorf("object is not a pod")
+		}
+		return computePodKey(pod), nil
+	})
 }
