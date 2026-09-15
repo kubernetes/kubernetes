@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
@@ -692,7 +693,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					features.TaintTolerationComparisonOperators: enabled,
 				})
 
-				testCtx := testutils.InitTestScheduler(t, testCtx)
+				testCtx := schedulerutils.InitTestScheduler(t, testCtx)
 				testutils.SyncSchedulerInformerFactory(testCtx)
 				go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 
@@ -738,12 +739,12 @@ func TestTaintNodeByCondition(t *testing.T) {
 					pods = append(pods, createdPod)
 
 					if p.fits {
-						if err := testutils.WaitForPodToSchedule(testCtx.Ctx, cs, createdPod); err != nil {
+						if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, cs, createdPod); err != nil {
 							t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
 								pod.Namespace, pod.Name, err)
 						}
 					} else {
-						if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, createdPod); err != nil {
+						if err := schedulerutils.WaitForPodUnschedulable(testCtx.Ctx, cs, createdPod); err != nil {
 							t.Errorf("Unschedulable pod %s/%s gets scheduled on the node, err: %v",
 								pod.Namespace, pod.Name, err)
 						}
@@ -752,7 +753,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 
 				testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
 				testutils.CleanupNodes(cs, t)
-				testutils.WaitForSchedulerCacheCleanup(testCtx.Ctx, testCtx.Scheduler, t)
+				schedulerutils.WaitForSchedulerCacheCleanup(testCtx.Ctx, testCtx.Scheduler, t)
 
 				// Clean up scheduler context
 				if testCtx.SchedulerCloseFn != nil {

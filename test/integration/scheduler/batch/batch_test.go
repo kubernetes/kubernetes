@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutil "k8s.io/kubernetes/test/integration/util"
 )
 
@@ -389,7 +390,7 @@ func TestBatchScenarios(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			profiles, registry := initSchedulerProfiles(t)
-			testCtx := testutil.InitTestSchedulerWithNS(t, "batch",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "batch",
 				scheduler.WithProfiles(profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithMaxBatchAge(time.Minute),
@@ -404,7 +405,7 @@ func TestBatchScenarios(t *testing.T) {
 			cs := testCtx.ClientSet
 
 			for _, n := range tt.nodes {
-				_, err := testutil.CreateNode(cs, newNode(&n))
+				_, err := schedulerutils.CreateNode(cs, newNode(&n))
 				if err != nil {
 					t.Fatal("Failed adding node", "node", n, err)
 				}
@@ -422,7 +423,7 @@ func TestBatchScenarios(t *testing.T) {
 						p.Namespace, p.Name, err)
 				}
 
-				if err := testutil.WaitForPodToScheduleWithTimeout(testCtx.Ctx, cs, createdPod, 5*time.Second); err != nil {
+				if err := schedulerutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, cs, createdPod, 5*time.Second); err != nil {
 					if !pd.expectUnschedulable {
 						t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
 							p.Namespace, p.Name, err)
