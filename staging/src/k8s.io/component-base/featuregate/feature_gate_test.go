@@ -2578,3 +2578,40 @@ func TestValidateDependencies(t *testing.T) {
 		})
 	}
 }
+
+func TestFeatureGateResolvedMap(t *testing.T) {
+	const testAlphaGate Feature = "TestAlpha"
+	const testBetaGate Feature = "TestBeta"
+
+	f := NewFeatureGate()
+	err := f.Add(map[Feature]FeatureSpec{
+		testAlphaGate: {Default: false, PreRelease: Alpha},
+		testBetaGate:  {Default: true, PreRelease: Beta},
+	})
+	if err != nil {
+		t.Fatalf("failed to add features: %v", err)
+	}
+
+	// Check initially defaults are resolved
+	resolved := f.resolvedMap()
+	if resolved[testAlphaGate] != false {
+		t.Errorf("expected TestAlpha to be false, got true")
+	}
+	if resolved[testBetaGate] != true {
+		t.Errorf("expected TestBeta to be true, got false")
+	}
+
+	// Override alpha to true and beta to false
+	err = f.Set("TestAlpha=true,TestBeta=false")
+	if err != nil {
+		t.Fatalf("failed to set feature gates: %v", err)
+	}
+
+	resolved = f.resolvedMap()
+	if resolved[testAlphaGate] != true {
+		t.Errorf("expected TestAlpha to be true, got false")
+	}
+	if resolved[testBetaGate] != false {
+		t.Errorf("expected TestBeta to be false, got true")
+	}
+}
