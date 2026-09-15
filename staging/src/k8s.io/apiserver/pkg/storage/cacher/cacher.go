@@ -832,14 +832,11 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 				hasMoreListItems = true
 				break
 			}
-			shardMatch := true
-			if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-				shardMatch, err = opts.Predicate.MatchesSharding(elem.Object)
-				if err != nil {
-					return fmt.Errorf("shard matching failed: %w", err)
-				}
+			matched, err := opts.Predicate.Matches(elem.Object)
+			if err != nil {
+				return err
 			}
-			if shardMatch && opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
+			if matched {
 				selectedObjects = append(selectedObjects, elem.Object)
 				lastSelectedObjectKey = elem.Key
 			}
@@ -856,22 +853,20 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			}
 		}
 	}
-	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
-	if c.versioner != nil {
-		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), totalCount, hasMoreListItems, opts)
-		if err != nil {
-			return err
-		}
+    span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
+    if c.versioner != nil {
+        continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), totalCount, hasMoreListItems, opts)
+        if err != nil {
+            return err
+        }
 
-		if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
-			return err
-		}
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-		opts.Predicate.SetShardInfoOnList(listObj)
-	}
-	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, numFetched, listVal.Len())
-	return nil
+        if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
+            return err
+        }
+    }
+    opts.Predicate.SetShardInfoOnList(listObj)
+    metrics.RecordListCacheMetrics(c.groupResource, indexUsed, numFetched, listVal.Len())
+    return nil
 }
 
 // baseObjectThreadUnsafe omits locking for cachingObject.
@@ -1251,25 +1246,20 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 }
 
 func filterWithAttrsAndPrefixFunction(prefix string, p storage.SelectionPredicate, groupResource schema.GroupResource) filterWithAttrsFunc {
-	isSharded := utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && p.ShardSelector != nil && !p.ShardSelector.Empty()
-	filterFunc := func(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
+	return func(objKey string, _ labels.Set, _ fields.Set, obj runtime.Object) bool {
 		if !key.HasPathPrefix(objKey, prefix) {
 			return false
 		}
-		if isSharded {
-			matches, err := p.MatchesSharding(obj)
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("shard matching failed for %v: %w", groupResource, err))
-				return false
-			}
-			if !matches {
-				metrics.RecordWatchFilteredEvent(groupResource)
-				return false
-			}
+		matches, err := p.Matches(baseObjectThreadUnsafe(obj))
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to match object for %v: %w", groupResource, err))
+			return false
 		}
-		return p.MatchesObjectAttributes(label, field)
+		if !matches {
+			metrics.RecordWatchFilteredEvent(groupResource)
+		}
+		return matches
 	}
-	return filterFunc
 }
 
 // LastSyncResourceVersion returns resource version to which the underlying cache is synced.
