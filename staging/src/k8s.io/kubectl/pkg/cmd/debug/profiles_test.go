@@ -34,6 +34,15 @@ var testNode = &corev1.Node{
 	},
 }
 
+var testWindowsNode = &corev1.Node{
+	ObjectMeta: metav1.ObjectMeta{
+		Name: "node-WIN",
+		Labels: map[string]string{
+			"kubernetes.io/os": "windows",
+		},
+	},
+}
+
 func TestLegacyProfile(t *testing.T) {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -1270,6 +1279,85 @@ func TestSysAdminProfile(t *testing.T) {
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{{Name: "host-root", MountPath: "/host"}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "debug by windows node",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "dbg", Image: "dbgimage"},
+					},
+				},
+			},
+			containerName: "dbg",
+			target:        testWindowsNode,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					HostNetwork: true,
+					SecurityContext: &corev1.PodSecurityContext{
+						WindowsOptions: &corev1.WindowsSecurityContextOptions{
+							HostProcess: ptr.To(true),
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								WindowsOptions: &corev1.WindowsSecurityContextOptions{
+									RunAsUserName: ptr.To("NT AUTHORITY\\SYSTEM"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "debug by windows node clears linux security context",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: ptr.To(true),
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+						},
+					},
+				},
+			},
+			containerName: "dbg",
+			target:        testWindowsNode,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					HostNetwork: true,
+					SecurityContext: &corev1.PodSecurityContext{
+						WindowsOptions: &corev1.WindowsSecurityContextOptions{
+							HostProcess: ptr.To(true),
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								WindowsOptions: &corev1.WindowsSecurityContextOptions{
+									RunAsUserName: ptr.To("NT AUTHORITY\\SYSTEM"),
+								},
+							},
 						},
 					},
 				},
