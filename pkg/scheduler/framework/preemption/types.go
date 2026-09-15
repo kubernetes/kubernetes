@@ -44,7 +44,7 @@ type podGroupPreemptor struct {
 
 func newPodGroupPreemptor(pgInfo fwk.PodGroupInfo, enablePodGroupPreemptionPolicy bool) *podGroupPreemptor {
 	p := &podGroupPreemptor{
-		pods: pgInfo.GetUnscheduledPods(),
+		pods: pgInfo.GetAllUnscheduledPods(),
 	}
 	if pgInfo.GetCompositePodGroup() != nil {
 		cpg := pgInfo.GetCompositePodGroup()
