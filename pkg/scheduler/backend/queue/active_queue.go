@@ -56,6 +56,8 @@ type activeQueuer interface {
 
 	listInFlightEvents() []interface{}
 	listInFlightPods() []*v1.Pod
+	inFlightPod(uid types.UID) *v1.Pod
+	deleteInFlight(uid types.UID)
 	clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) ([]*clusterEvent, error)
 	addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []fwk.ClusterEvent) bool
 	addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent) bool
@@ -64,6 +66,7 @@ type activeQueuer interface {
 	clearPoppedEntity()
 
 	schedulingCycle() int64
+	doneSchedulingCycle(pod types.UID)
 	done(pod types.UID)
 	close()
 	broadcast()
@@ -76,6 +79,9 @@ type unlockedActiveQueuer interface {
 	// update updates the pod in activeQ if oldEntity is already in the queue and the pod is present there.
 	// It returns new pod info if updated, nil otherwise.
 	update(newPod *v1.Pod, oldEntity framework.QueuedEntityInfo) *framework.QueuedPodInfo
+	// updateInFlightPod updates the *v1.Pod stored for an in-flight pod.
+	// It returns true if the pod was found in inFlightPods and updated, false otherwise.
+	updateInFlightPod(newPod *v1.Pod) bool
 	// addEventsIfPodInFlight adds events to inFlightEvents if the newPod is in inFlightPods.
 	// It returns true if pushed the event to the inFlightEvents.
 	addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []fwk.ClusterEvent) bool
@@ -88,18 +94,30 @@ type unlockedActiveQueueReader interface {
 	// Returns false if the entity doesn't exist in the queue.
 	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
 	get(entityLookup framework.QueuedEntityInfo) (framework.QueuedEntityInfo, bool)
+	// inFlightPod returns the *v1.Pod for the given UID if it is currently in flight.
+	inFlightPod(uid types.UID) *v1.Pod
+}
+
+// inFlightPodEntry holds tracking information for a pod that is currently in-flight.
+type inFlightPodEntry struct {
+	// pod is the latest version of the in-flight pod.
+	pod *v1.Pod
+	// eventsMarker is the entry of this pod in the inFlightEvents list.
+	// The value of that entry is the *v1.Pod at the time that scheduling of that
+	// pod started, which can be useful for logging or debugging.
+	eventsMarker *list.Element
 }
 
 // unlockedActiveQueue defines activeQ methods that are not protected by the lock itself.
 // activeQueue.underLock() or activeQueue.underRLock() method should be used to protect these methods.
 type unlockedActiveQueue struct {
 	queue           *heap.Heap[framework.QueuedEntityInfo]
-	inFlightPods    map[types.UID]*list.Element
+	inFlightPods    map[types.UID]*inFlightPodEntry
 	inFlightEvents  *list.List
 	metricsRecorder *metrics.MetricAsyncRecorder
 }
 
-func newUnlockedActiveQueue(queue *heap.Heap[framework.QueuedEntityInfo], inFlightPods map[types.UID]*list.Element, inFlightEvents *list.List, metricsRecorder *metrics.MetricAsyncRecorder) *unlockedActiveQueue {
+func newUnlockedActiveQueue(queue *heap.Heap[framework.QueuedEntityInfo], inFlightPods map[types.UID]*inFlightPodEntry, inFlightEvents *list.List, metricsRecorder *metrics.MetricAsyncRecorder) *unlockedActiveQueue {
 	return &unlockedActiveQueue{
 		queue:           queue,
 		inFlightPods:    inFlightPods,
@@ -122,11 +140,30 @@ func (uaq *unlockedActiveQueue) update(newPod *v1.Pod, oldEntity framework.Queue
 	return nil
 }
 
+// updateInFlightPod updates the *v1.Pod stored for an in-flight pod.
+// It returns true if the pod was found in inFlightPods and updated, false otherwise.
+func (uaq *unlockedActiveQueue) updateInFlightPod(newPod *v1.Pod) bool {
+	entry, ok := uaq.inFlightPods[newPod.UID]
+	if ok {
+		entry.pod = newPod
+		return true
+	}
+	return false
+}
+
+// inFlightPod returns the *v1.Pod for the given UID if it is currently in flight.
+func (uaq *unlockedActiveQueue) inFlightPod(uid types.UID) *v1.Pod {
+	if entry, ok := uaq.inFlightPods[uid]; ok {
+		return entry.pod
+	}
+	return nil
+}
+
 // addEventsIfPodInFlight adds events to inFlightEvents if the newPod is in inFlightPods.
 // It returns true if pushed the event to the inFlightEvents.
 func (uaq *unlockedActiveQueue) addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []fwk.ClusterEvent) bool {
-	_, ok := uaq.inFlightPods[newPod.UID]
-	if ok {
+	entry, ok := uaq.inFlightPods[newPod.UID]
+	if ok && entry.eventsMarker != nil {
 		for _, event := range events {
 			uaq.metricsRecorder.ObserveInFlightEventsAsync(event.Label(), 1, false)
 			uaq.inFlightEvents.PushBack(&clusterEvent{
@@ -181,11 +218,7 @@ type activeQueue struct {
 	// inFlightPods holds the UID of all pods which have been popped out for which Done
 	// hasn't been called yet - in other words, all pods that are currently being
 	// processed (being scheduled, in permit, or in the binding cycle).
-	//
-	// The values in the map are the entry of each pod in the inFlightEvents list.
-	// The value of that entry is the *v1.Pod at the time that scheduling of that
-	// pod started, which can be useful for logging or debugging.
-	inFlightPods map[types.UID]*list.Element
+	inFlightPods map[types.UID]*inFlightPodEntry
 
 	// inFlightEvents holds the events received by the scheduling queue
 	// (entry value is clusterEvent) together with in-flight pods (entry
@@ -225,7 +258,7 @@ type activeQueue struct {
 func newActiveQueue(queue *heap.Heap[framework.QueuedEntityInfo], metricRecorder *metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
 	aq := &activeQueue{
 		queue:           queue,
-		inFlightPods:    make(map[types.UID]*list.Element),
+		inFlightPods:    make(map[types.UID]*inFlightPodEntry),
 		inFlightEvents:  list.New(),
 		metricsRecorder: metricRecorder,
 		backoffQPopper:  backoffQPopper,
@@ -277,7 +310,11 @@ func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity f
 		}
 
 		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
-		aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
+		event := aq.inFlightEvents.PushBack(pInfo.Pod)
+		aq.inFlightPods[pInfo.Pod.UID] = &inFlightPodEntry{
+			pod:          pInfo.Pod,
+			eventsMarker: event,
+		}
 	}
 	if len(podsToDiscard) > 0 {
 		switch specificEntity := entity.(type) {
@@ -434,8 +471,8 @@ func (aq *activeQueue) listInFlightPods() []*v1.Pod {
 	aq.lock.RLock()
 	defer aq.lock.RUnlock()
 	var pods []*v1.Pod
-	for _, obj := range aq.inFlightPods {
-		pods = append(pods, obj.Value.(*v1.Pod))
+	for _, entry := range aq.inFlightPods {
+		pods = append(pods, entry.pod)
 	}
 	return pods
 }
@@ -454,9 +491,14 @@ func (aq *activeQueue) clusterEventsForPod(logger klog.Logger, pInfo *framework.
 	if !ok {
 		return nil, fmt.Errorf("in flight entity isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler")
 	}
+	// When DoneSchedulingCycle was called (e.g. pod is in the binding cycle), eventsMarker is nil
+	// because cluster events are only tracked during the scheduling cycle (up to Permit).
+	if inFlightPod.eventsMarker == nil {
+		return nil, nil
+	}
 
 	var events []*clusterEvent
-	for event := inFlightPod.Next(); event != nil; event = event.Next() {
+	for event := inFlightPod.eventsMarker.Next(); event != nil; event = event.Next() {
 		e, ok := event.Value.(*clusterEvent)
 		if !ok {
 			// Must be another in-flight Pod (*v1.Pod). Can be ignored.
@@ -476,13 +518,13 @@ func (aq *activeQueue) addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []f
 	return aq.unlockedQueue.addEventsIfPodInFlight(oldPod, newPod, events)
 }
 
-// addEventIfAnyInFlight adds clusterEvent to inFlightEvents if any pod is in inFlightPods.
+// addEventIfAnyInFlight adds clusterEvent to inFlightEvents if any pod is in its scheduling cycle (with a non-nil eventsMarker).
 // It returns true if pushed the event to the inFlightEvents.
 func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent) bool {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 
-	if len(aq.inFlightPods) != 0 {
+	if aq.hasInFlightSchedulingPods() {
 		aq.metricsRecorder.ObserveInFlightEventsAsync(event.Label(), 1, false)
 		aq.inFlightEvents.PushBack(&clusterEvent{
 			event:  event,
@@ -494,10 +536,53 @@ func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event f
 	return false
 }
 
+func (aq *activeQueue) hasInFlightSchedulingPods() bool {
+	for _, entry := range aq.inFlightPods {
+		if entry.eventsMarker != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (aq *activeQueue) schedulingCycle() int64 {
 	aq.lock.RLock()
 	defer aq.lock.RUnlock()
 	return aq.schedCycle
+}
+
+// inFlightPod returns the *v1.Pod for the given UID if it is currently in flight.
+func (aq *activeQueue) inFlightPod(uid types.UID) *v1.Pod {
+	aq.lock.RLock()
+	defer aq.lock.RUnlock()
+
+	return aq.unlockedQueue.inFlightPod(uid)
+}
+
+// deleteInFlight removes the in-flight pod from tracking if present.
+func (aq *activeQueue) deleteInFlight(uid types.UID) {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
+
+	aq.unlockedDone(uid)
+}
+
+// doneSchedulingCycle is called when a pod finishes its scheduling cycle (after Permit).
+// It removes the pod's marker from inFlightEvents so cluster events are no longer accumulated for this pod,
+// while keeping the pod in inFlightPods until done is called at the end of the binding cycle or on failure.
+func (aq *activeQueue) doneSchedulingCycle(podUID types.UID) {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
+
+	aq.unlockedDoneSchedulingCycle(podUID)
+}
+
+func (aq *activeQueue) unlockedDoneSchedulingCycle(podUID types.UID) {
+	inFlightEntity, ok := aq.inFlightPods[podUID]
+	if !ok {
+		return
+	}
+	aq.unlockedRemoveEventsMarker(inFlightEntity)
 }
 
 // done must be called for pod returned by Pop. This allows the queue to
@@ -518,10 +603,18 @@ func (aq *activeQueue) unlockedDone(podUID types.UID) {
 		return
 	}
 	delete(aq.inFlightPods, podUID)
+	aq.unlockedRemoveEventsMarker(inFlightEntity)
+}
 
-	// Remove the entity from the list.
-	aq.inFlightEvents.Remove(inFlightEntity)
+func (aq *activeQueue) unlockedRemoveEventsMarker(inFlightEntity *inFlightPodEntry) {
+	if inFlightEntity.eventsMarker != nil {
+		aq.inFlightEvents.Remove(inFlightEntity.eventsMarker)
+		inFlightEntity.eventsMarker = nil
+		aq.pruneInFlightEvents()
+	}
+}
 
+func (aq *activeQueue) pruneInFlightEvents() {
 	aggrMetricsCounter := map[string]int{}
 	// Remove events which are only referred to by this Pod
 	// so that the inFlightEvents list doesn't grow infinitely.
