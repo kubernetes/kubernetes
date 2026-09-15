@@ -113,7 +113,9 @@ func getEndOrdinal(set *apps.StatefulSet) int {
 // range of ordinals that this StatefulSet is set to control.
 func podInOrdinalRange(pod *v1.Pod, set *apps.StatefulSet) bool {
 	ordinal := getOrdinal(pod)
-	return ordinal >= getStartOrdinal(set) && ordinal <= getEndOrdinal(set)
+	return ordinal >= getStartOrdinal(set) &&
+		ordinal <= getEndOrdinal(set) &&
+		pod.Name == getPodName(set, ordinal)
 }
 
 // getPodName gets the name of set's child Pod with an ordinal index of ordinal
