@@ -543,10 +543,13 @@ message PodGroupStatus {
   //   due to disruption such as preemption.
   //
   // Known reasons for the PodGroupInitiallyScheduled condition:
+  // - "Scheduled": All required pods in the PodGroup have been successfully scheduled.
   // - "Unschedulable": The PodGroup cannot be scheduled due to resource constraints,
   //   affinity/anti-affinity rules, or insufficient capacity for the gang.
   // - "SchedulerError": The PodGroup cannot be scheduled due to some internal error
   //   that happened during scheduling, for example due to nodeAffinity parsing errors.
+  // - "Invalid": Set to False when kube-scheduler detects an invalid group configuration
+  //   during runtime validation (such as conflicting scheduler names, or priority/preemption policy conflicts).
   //
   // Known reasons for the DisruptionTarget condition:
   // - "PreemptionByScheduler": The PodGroup was preempted by the scheduler to make room for
