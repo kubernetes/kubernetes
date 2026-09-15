@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -38,8 +37,8 @@ func Test(t *testing.T) {
 		},
 	}).ExpectValid()
 
-	ptrS1 := ptr.To("same value")
-	ptrS2 := ptr.To("same value")
+	ptrS1 := new("same value")
+	ptrS2 := new("same value")
 	st.Value(&Struct{
 		SliceStringField:     []string{"aaa", "bbb", "ccc", "ccc", "bbb", "aaa"},
 		SliceIntField:        []int{1, 2, 3, 3, 2, 1},
@@ -88,7 +87,7 @@ func TestSetCorrelation(t *testing.T) {
 	structOld = ImmutableStruct{SliceSetPrimitiveField: []int{2, 1}}
 	st.Value(&structNew).OldValue(&structOld).ExpectValid()
 
-	structNew = ImmutableStruct{SliceSetFalselyComparableField: []FalselyComparableStruct{{StringPtrField: ptr.To("same value")}}}
-	structOld = ImmutableStruct{SliceSetFalselyComparableField: []FalselyComparableStruct{{StringPtrField: ptr.To("same value")}}}
+	structNew = ImmutableStruct{SliceSetFalselyComparableField: []FalselyComparableStruct{{StringPtrField: new("same value")}}}
+	structOld = ImmutableStruct{SliceSetFalselyComparableField: []FalselyComparableStruct{{StringPtrField: new("same value")}}}
 	st.Value(&structNew).OldValue(&structOld).ExpectValid()
 }

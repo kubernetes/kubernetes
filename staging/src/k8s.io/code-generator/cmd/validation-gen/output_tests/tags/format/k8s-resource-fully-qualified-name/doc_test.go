@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestFullyQualifiedName(t *testing.T) {
@@ -28,13 +27,13 @@ func TestFullyQualifiedName(t *testing.T) {
 
 	st.Value(&Struct{
 		FullyQualifiedNameField:        "my-prefix/my_name",
-		FullyQualifiedNamePtrField:     ptr.To("my-prefix/my_name"),
+		FullyQualifiedNamePtrField:     new("my-prefix/my_name"),
 		FullyQualifiedNameTypedefField: "my-prefix/my_name",
 	}).ExpectValid()
 
 	invalidStruct := &Struct{
 		FullyQualifiedNameField:        "my_name",
-		FullyQualifiedNamePtrField:     ptr.To(""),
+		FullyQualifiedNamePtrField:     new(""),
 		FullyQualifiedNameTypedefField: "my-prefix/",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByOrigin().ByField(), field.ErrorList{
