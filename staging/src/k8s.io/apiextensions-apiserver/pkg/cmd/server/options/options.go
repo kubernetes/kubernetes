@@ -156,7 +156,7 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions, resourceTra
 	etcdOptionsCopy.StorageConfig.StorageObjectCountTracker = tracker
 	etcdOptionsCopy.WatchCacheSizes = nil // this control is not provided for custom resources
 
-	return etcdOptions.CreateRESTOptionsGetter(&genericoptions.SimpleStorageFactory{StorageConfig: etcdOptionsCopy.StorageConfig}, resourceTransformers)
+	return etcdOptionsCopy.CreateRESTOptionsGetter(&genericoptions.SimpleStorageFactory{StorageConfig: etcdOptionsCopy.StorageConfig}, resourceTransformers)
 }
 
 type serviceResolver struct {
