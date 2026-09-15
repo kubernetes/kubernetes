@@ -302,16 +302,16 @@ func (_c *MockRuntime_GarbageCollect_Call) RunAndReturn(run func(ctx context.Con
 }
 
 // GeneratePodStatus provides a mock function for the type MockRuntime
-func (_mock *MockRuntime) GeneratePodStatus(event *v1.ContainerEventResponse) *container.PodStatus {
-	ret := _mock.Called(event)
+func (_mock *MockRuntime) GeneratePodStatus(ctx context.Context, event *v1.ContainerEventResponse) *container.PodStatus {
+	ret := _mock.Called(ctx, event)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GeneratePodStatus")
 	}
 
 	var r0 *container.PodStatus
-	if returnFunc, ok := ret.Get(0).(func(*v1.ContainerEventResponse) *container.PodStatus); ok {
-		r0 = returnFunc(event)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.ContainerEventResponse) *container.PodStatus); ok {
+		r0 = returnFunc(ctx, event)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*container.PodStatus)
@@ -326,19 +326,25 @@ type MockRuntime_GeneratePodStatus_Call struct {
 }
 
 // GeneratePodStatus is a helper method to define mock.On call
+//   - ctx context.Context
 //   - event *v1.ContainerEventResponse
-func (_e *MockRuntime_Expecter) GeneratePodStatus(event interface{}) *MockRuntime_GeneratePodStatus_Call {
-	return &MockRuntime_GeneratePodStatus_Call{Call: _e.mock.On("GeneratePodStatus", event)}
+func (_e *MockRuntime_Expecter) GeneratePodStatus(ctx interface{}, event interface{}) *MockRuntime_GeneratePodStatus_Call {
+	return &MockRuntime_GeneratePodStatus_Call{Call: _e.mock.On("GeneratePodStatus", ctx, event)}
 }
 
-func (_c *MockRuntime_GeneratePodStatus_Call) Run(run func(event *v1.ContainerEventResponse)) *MockRuntime_GeneratePodStatus_Call {
+func (_c *MockRuntime_GeneratePodStatus_Call) Run(run func(ctx context.Context, event *v1.ContainerEventResponse)) *MockRuntime_GeneratePodStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *v1.ContainerEventResponse
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*v1.ContainerEventResponse)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1.ContainerEventResponse
+		if args[1] != nil {
+			arg1 = args[1].(*v1.ContainerEventResponse)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -349,7 +355,7 @@ func (_c *MockRuntime_GeneratePodStatus_Call) Return(podStatus *container.PodSta
 	return _c
 }
 
-func (_c *MockRuntime_GeneratePodStatus_Call) RunAndReturn(run func(event *v1.ContainerEventResponse) *container.PodStatus) *MockRuntime_GeneratePodStatus_Call {
+func (_c *MockRuntime_GeneratePodStatus_Call) RunAndReturn(run func(ctx context.Context, event *v1.ContainerEventResponse) *container.PodStatus) *MockRuntime_GeneratePodStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
