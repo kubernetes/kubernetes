@@ -734,6 +734,22 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.TooLong(fldPath.Child("annotations"), "", TotalAnnotationSizeLimitB).MarkFromImperative(),
 			},
 		},
+		{
+			name:              "invalid label key",
+			obj:               mkMeta(tweakLabels(map[string]string{"-invalid": "val"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels"), "-invalid", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			name:              "annotations label value",
+			obj:               mkMeta(tweakLabels(map[string]string{"key": "a!"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels").Key("key"), "a!", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
+			},
+		},
 	}
 
 	matcher := field.ErrorMatcher{}.ByField().ByType().BySource().ByOrigin()
@@ -896,6 +912,24 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), &gracePeriod40, "").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
+		{
+			name:              "invalid label key on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakLabels(map[string]string{"-invalid": "val"})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels"), "-invalid", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			name:              "invalid label value on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakLabels(map[string]string{"key": "a!"})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels").Key("key"), "a!", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
+			},
+		},
 	}
 
 	for _, tc := range updateCases {
@@ -943,6 +977,10 @@ func tweakGeneration(g int64) func(*metav1.ObjectMeta) {
 
 func tweakAnnotations(ann map[string]string) func(*metav1.ObjectMeta) {
 	return func(o *metav1.ObjectMeta) { o.Annotations = ann }
+}
+
+func tweakLabels(labels map[string]string) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.Labels = labels }
 }
 
 func tweakManagedFields(entries ...metav1.ManagedFieldsEntry) func(*metav1.ObjectMeta) {
