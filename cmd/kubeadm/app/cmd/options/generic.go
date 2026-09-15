@@ -54,11 +54,10 @@ func AddIgnorePreflightErrorsFlag(fs *pflag.FlagSet, ignorePreflightErrors *[]st
 
 // AddControlPlanExtraArgsFlags adds the ExtraArgs flags for control plane components
 func AddControlPlanExtraArgsFlags(fs *pflag.FlagSet, apiServerExtraArgs, controllerManagerExtraArgs, schedulerExtraArgs *[]kubeadmapiv1.Arg) {
-	// TODO: these flags are deprecated, remove them and related logic:
-	// - AddControlPlanExtraArgsFlag()
-	// - files app/cmd/options/argslice*.go
-	// - options.*ExtraArgs
-	// - usages in app/cmd/init.go and app/cmd/phases/init/controlplane.go
+	// These flags are deprecated and will be removed in a future release.
+	// Users should use ClusterConfiguration.apiServer.extraArgs, controllerManager.extraArgs, or scheduler.extraArgs instead.
+	// Related files to clean up: app/cmd/options/argslice*.go, options.*ExtraArgs,
+	// and usages in app/cmd/init.go and app/cmd/phases/init/controlplane.go.
 	fs.Var(newArgSlice(apiServerExtraArgs), APIServerExtraArgs, "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
 	fs.Var(newArgSlice(controllerManagerExtraArgs), ControllerManagerExtraArgs, "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
 	fs.Var(newArgSlice(schedulerExtraArgs), SchedulerExtraArgs, "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")

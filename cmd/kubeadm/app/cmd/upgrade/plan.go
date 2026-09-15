@@ -156,7 +156,7 @@ func genUpgradePlan(availUpgrades []upgrade.Upgrade, configVersions []outputapiv
 	return plan
 }
 
-// TODO There is currently no way to cleanly output upgrades that involve adding, removing, or changing components
+// TODO: There is currently no way to cleanly output upgrades that involve adding, removing, or changing components.
 // https://github.com/kubernetes/kubeadm/issues/810 was created to track addressing this.
 func appendDNSComponent(components []outputapiv1alpha3.ComponentUpgradePlan, up *upgrade.Upgrade, name string) []outputapiv1alpha3.ComponentUpgradePlan {
 	beforeVersion := up.Before.DNSVersion

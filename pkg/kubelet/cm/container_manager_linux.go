@@ -206,6 +206,7 @@ func validateSystemRequirements(logger klog.Logger, mountUtil mount.Interface) (
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
+// See https://github.com/kubernetes/kubernetes/issues/115487 for tracking.
 func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
 	logger := klog.FromContext(ctx)
 

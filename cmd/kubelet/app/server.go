@@ -340,7 +340,8 @@ func mergeKubeletConfigurations(kubeletConfig *kubeletconfiginternal.KubeletConf
 	var skippedFiles []string
 
 	// TODO: move the "internal --> versioned --> merge --> default --> internal" operation inside the loop,
-	// and use the version of each drop-in file as the versioned target once config files can be in versions other than just v1beta1
+	// and use the version of each drop-in file as the versioned target once config files can be in versions other than just v1beta1.
+	// See https://github.com/kubernetes/kubernetes/issues/115477 for tracking.
 	versionedConfig := &kubeletconfigv1beta1.KubeletConfiguration{}
 	if err := kubeletconfigv1beta1conversion.Convert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(kubeletConfig, versionedConfig, nil); err != nil {
 		return nil, err
