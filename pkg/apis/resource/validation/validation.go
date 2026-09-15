@@ -89,10 +89,23 @@ var (
 	attributeAndCapacityMaxKeyLength = resource.DeviceMaxDomainLength + 1 + resource.DeviceMaxIDLength
 )
 
-func validatePoolName(name string, fldPath *field.Path) field.ErrorList {
+// validatePoolNameOption marks which validatePoolName errors are covered by
+// declarative validation.
+type validatePoolNameOption int
+
+const (
+	// poolNameRequiredCovered means the required check is covered by declarative validation.
+	poolNameRequiredCovered validatePoolNameOption = iota
+)
+
+func validatePoolName(name string, fldPath *field.Path, opts ...validatePoolNameOption) field.ErrorList {
 	var allErrs field.ErrorList
 	if name == "" {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+		err := field.Required(fldPath, "")
+		if slices.Contains(opts, poolNameRequiredCovered) {
+			err = err.MarkAlpha().MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
 	} else {
 		if len(name) > resource.PoolNameMaxLength {
 			allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.PoolNameMaxLength).WithOrigin("format=k8s-resource-pool-name"))
@@ -802,11 +815,11 @@ func ValidateResourceSliceUpdate(resourceSlice, oldResourceSlice *resource.Resou
 
 func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateDriverName(spec.Driver, fldPath.Child("driver"))...)
+	allErrs = append(allErrs, validateDriverName(spec.Driver, fldPath.Child("driver"), corevalidation.RequiredCovered)...)
 	allErrs = append(allErrs, validateResourcePool(spec.Pool, fldPath.Child("pool"))...)
 	if oldSpec != nil {
-		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Pool.Name, oldSpec.Pool.Name, fldPath.Child("pool", "name"))...)
-		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Driver, oldSpec.Driver, fldPath.Child("driver"))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Pool.Name, oldSpec.Pool.Name, fldPath.Child("pool", "name")).WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Driver, oldSpec.Driver, fldPath.Child("driver")).WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()...)
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.NodeName, oldSpec.NodeName, fldPath.Child("nodeName"))...)
 	}
 
@@ -1046,7 +1059,7 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 
 func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validatePoolName(pool.Name, fldPath.Child("name"))...)
+	allErrs = append(allErrs, validatePoolName(pool.Name, fldPath.Child("name"), poolNameRequiredCovered)...)
 	if pool.ResourceSliceCount <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceSliceCount"), pool.ResourceSliceCount, "must be greater than zero"))
 	}

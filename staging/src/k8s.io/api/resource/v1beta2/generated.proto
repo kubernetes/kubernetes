@@ -2029,6 +2029,8 @@ message ResourcePool {
   // separated by slashes. This field is immutable.
   //
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
+  // +k8s:alpha(since: "1.38")=+k8s:immutable
   optional string name = 1;
 
   // generation tracks the change in a pool over time. Whenever a driver
@@ -2114,6 +2116,8 @@ message ResourceSliceSpec {
   // This field is immutable.
   //
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
+  // +k8s:alpha(since: "1.38")=+k8s:immutable
   optional string driver = 1;
 
   // pool describes the pool that this ResourceSlice belongs to.
