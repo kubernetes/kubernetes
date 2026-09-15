@@ -88,6 +88,10 @@ type Config struct {
 	// "+k8s:required". Validators that refer to other tags by name, in
 	// messages or when inspecting a tag's nested value, must prepend it.
 	TagPrefix string
+
+	// Profile is the validation profile this project adds to the built-in one,
+	// read from --profile. Nil when none was given.
+	Profile *Profile
 }
 
 // Scope describes where a validation (or potential validation) is located.

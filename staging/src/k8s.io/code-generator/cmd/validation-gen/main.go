@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/code-generator/cmd/validation-gen/args"
 	"k8s.io/code-generator/cmd/validation-gen/generators"
+	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/klog/v2"
@@ -50,7 +51,11 @@ func main() {
 	}
 
 	if args.PrintDocs {
-		if err := generators.PrintDocs(os.Stdout, args.TagPrefix); err != nil {
+		profile, err := validators.LoadProfile(args.Profile)
+		if err != nil {
+			klog.Fatalf("Failed loading profile: %v", err)
+		}
+		if err := generators.PrintDocs(os.Stdout, args.TagPrefix, profile); err != nil {
 			klog.Fatalf("Error: %v", err)
 		}
 		os.Exit(0)

@@ -64,6 +64,10 @@ type Args struct {
 	// validation-gen set this to claim their own tag namespace.
 	TagPrefix string
 
+	// Profile is the path to a YAML file declaring the validation profile this
+	// project adds to the built-in one. Empty means the built-in profile only.
+	Profile string
+
 	apidefinitions.LintArgs
 }
 
@@ -92,6 +96,8 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"path to a YAML config file of rule-level filters to exclude from coverage fixture generation; only meaningful with --test-output-root")
 	fs.StringVar(&args.TagPrefix, "tag-prefix", args.TagPrefix,
 		"the prefix of every tag this generator recognizes, e.g. \"k8s:\" for +k8s:validation-gen and +k8s:required; empty or one or more ':'-terminated segments")
+	fs.StringVar(&args.Profile, "profile", "",
+		"path to a YAML file declaring the validation profile this project adds to the built-in one, such as its own \"format\" values")
 	apidefinitions.AddFlags(&args.LintArgs, fs)
 }
 
