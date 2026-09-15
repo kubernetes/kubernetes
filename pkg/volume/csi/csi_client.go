@@ -91,7 +91,8 @@ type csiClient interface {
 		targetPath string,
 	) (*volume.Metrics, error)
 	// NodeGetVolumeHealth returns adverse health conditions for a volume.
-	// An empty slice means the volume is healthy. stagingTargetPath and
+	// An empty slice means the volume is healthy; a driver that omits the
+	// health or answers for another volume is an error. stagingTargetPath and
 	// volumePublishPath are optional and may be empty when the volume was
 	// never successfully staged/published.
 	NodeGetVolumeHealth(
@@ -706,7 +707,14 @@ func (c *csiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagin
 	if err != nil {
 		return nil, err
 	}
-	return mapVolumeHealthConditions(resp.GetVolumeHealth()), nil
+	health := resp.GetVolumeHealth()
+	if health == nil {
+		return nil, fmt.Errorf("failed to get volume health from response. volume health is nil")
+	}
+	if health.GetVolumeId() != volID {
+		return nil, fmt.Errorf("NodeGetVolumeHealth returned health for volume %q, requested %q", health.GetVolumeId(), volID)
+	}
+	return mapVolumeHealthConditions(health), nil
 }
 
 func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
