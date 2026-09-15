@@ -136,11 +136,88 @@ func quantitySerializationCases() []serializationCase {
 			wantCanonical: "1000000001n",
 			canonicalTODO: "#138166: parse should canonicalize to 1000000001n",
 		},
+		// The same fast path fires for any (suffix exponent - fractional digits)
+		// that is a multiple of 3, so the class also has suffixed, exponent-form
+		// and negative members. #138166's guard flips all of them.
+		{
+			name: "three-fractional-digits-with-kilo-suffix", load: func() Quantity { return MustParse("1.441k") },
+			wantString: "1.441k", wantJSON: `"1.441k"`, wantCBOR: "46312e3434316b",
+			wantCanonical: "1441",
+			canonicalTODO: "#138166: parse should canonicalize to 1441",
+		},
+		{
+			name: "three-fractional-digits-with-milli-suffix", load: func() Quantity { return MustParse("1.234m") },
+			wantString: "1.234m", wantJSON: `"1.234m"`, wantCBOR: "46312e3233346d",
+			wantCanonical: "1234u",
+			canonicalTODO: "#138166: parse should canonicalize to 1234u",
+		},
+		{
+			name: "fractional-mantissa-decimal-exponent", load: func() Quantity { return MustParse("1.5e4") },
+			wantString: "1.5e4", wantJSON: `"1.5e4"`, wantCBOR: "45312e356534",
+			wantCanonical: "15e3",
+			canonicalTODO: "#138166: parse should canonicalize to 15e3",
+		},
+		{
+			name: "fractional-mantissa-exponent-cancels", load: func() Quantity { return MustParse("1.5e1") },
+			wantString: "1.5e1", wantJSON: `"1.5e1"`, wantCBOR: "45312e356531",
+			wantCanonical: "15",
+			canonicalTODO: "#138166: parse should canonicalize to 15",
+		},
+		{
+			name: "negative-three-fractional-digits", load: func() Quantity { return MustParse("-1.441") },
+			wantString: "-1.441", wantJSON: `"-1.441"`, wantCBOR: "462d312e343431",
+			wantCanonical: "-1441m",
+			canonicalTODO: "#138166: parse should canonicalize to -1441m",
+		},
 		{
 			// A non-3n fraction takes the slow path today, so it is already
 			// canonical. Kept as the control for the three rows above.
 			name: "one-fractional-digit-already-canonical", load: func() Quantity { return MustParse("1.5") },
 			wantString: "1500m", wantJSON: `"1500m"`, wantCBOR: "45313530306d", wantCanonical: "1500m",
+		},
+
+		// --- spellings the fast path caches verbatim without a fractional part ---
+		//
+		// The fast path checks the digits, not the spelling: a leading "+", leading
+		// zeros, an upper-case exponent marker, a "+" or zero exponent all pass
+		// and are cached as written. String() never emits any of them. #138166's
+		// guard is on the denominator, so it leaves these as they are.
+		{
+			name: "plus-sign-kept", load: func() Quantity { return MustParse("+1") },
+			wantString: "+1", wantJSON: `"+1"`, wantCBOR: "422b31",
+			wantCanonical: "1",
+			canonicalTODO: "#141166: fast path caches a non-canonical spelling; not covered by #138166",
+		},
+		{
+			name: "leading-zero-kept", load: func() Quantity { return MustParse("01") },
+			wantString: "01", wantJSON: `"01"`, wantCBOR: "423031",
+			wantCanonical: "1",
+			canonicalTODO: "#141166: fast path caches a non-canonical spelling; not covered by #138166",
+		},
+		{
+			name: "leading-zero-kept-binary", load: func() Quantity { return MustParse("01Ki") },
+			wantString: "01Ki", wantJSON: `"01Ki"`, wantCBOR: "4430314b69",
+			wantCanonical: "1Ki",
+			canonicalTODO: "#141166: fast path caches a non-canonical spelling; not covered by #138166",
+		},
+		{
+			name: "uppercase-exponent-marker-kept", load: func() Quantity { return MustParse("1E3") },
+			wantString: "1E3", wantJSON: `"1E3"`, wantCBOR: "43314533",
+			wantCanonical: "1e3",
+			canonicalTODO: "#141166: fast path caches a non-canonical spelling; not covered by #138166",
+		},
+		{
+			// The form JavaScript, Go and Python float encoders emit for 1e21.
+			name: "plus-in-exponent-kept", load: func() Quantity { return MustParse("1e+21") },
+			wantString: "1e+21", wantJSON: `"1e+21"`, wantCBOR: "4531652b3231",
+			wantCanonical: "1e21",
+			canonicalTODO: "#141166: fast path caches a non-canonical spelling; not covered by #138166",
+		},
+		{
+			name: "zero-exponent-kept", load: func() Quantity { return MustParse("1e0") },
+			wantString: "1e0", wantJSON: `"1e0"`, wantCBOR: "43316530",
+			wantCanonical: "1",
+			canonicalTODO: "#141166: fast path caches a non-canonical spelling; not covered by #138166",
 		},
 
 		// --- int64 boundaries ---
@@ -262,6 +339,23 @@ func TestQuantitySerializationGolden(t *testing.T) {
 				t.Errorf("MarshalCBOR() = %x, want %s", got, tc.wantCBOR)
 			}
 		})
+		// Protobuf is what the apiserver persists for built-in types. Quantity's
+		// custom marshaler writes String() as field 1, so the payload is pinned
+		// through wantString; this pins the framing around it.
+		t.Run(tc.name+"/Proto", func(t *testing.T) {
+			q := tc.load()
+			got, err := q.Marshal()
+			if err != nil {
+				t.Fatalf("Marshal() error = %v", err)
+			}
+			if len(tc.wantString) >= 0x80 {
+				t.Fatalf("row too long for a one-byte length prefix")
+			}
+			want := append([]byte{0x0a, byte(len(tc.wantString))}, tc.wantString...)
+			if string(got) != string(want) {
+				t.Errorf("Marshal() = %x, want %x", got, want)
+			}
+		})
 	}
 }
 
@@ -331,13 +425,17 @@ func TestQuantitySerializationSurvivesNoOpArithmetic(t *testing.T) {
 func TestQuantitySerializationRoundTripsByteStable(t *testing.T) {
 	for _, tc := range quantitySerializationCases() {
 		t.Run(tc.name+"/JSON", func(t *testing.T) {
-			first, err := json.Marshal(tc.load())
+			q := tc.load()
+			first, err := json.Marshal(q)
 			if err != nil {
 				t.Fatalf("json.Marshal() error = %v", err)
 			}
 			var decoded Quantity
 			if err := json.Unmarshal(first, &decoded); err != nil {
 				t.Fatalf("json.Unmarshal(%s) error = %v", first, err)
+			}
+			if decoded.Cmp(q) != 0 {
+				t.Errorf("decoded %s as %s, a different value", first, decoded.String())
 			}
 			second, err := json.Marshal(decoded)
 			if err != nil {
@@ -357,12 +455,70 @@ func TestQuantitySerializationRoundTripsByteStable(t *testing.T) {
 			if err := decoded.UnmarshalCBOR(first); err != nil {
 				t.Fatalf("UnmarshalCBOR(%x) error = %v", first, err)
 			}
+			if decoded.Cmp(q) != 0 {
+				t.Errorf("decoded %x as %s, a different value", first, decoded.String())
+			}
 			second, err := decoded.MarshalCBOR()
 			if err != nil {
 				t.Fatalf("MarshalCBOR() of decoded value error = %v", err)
 			}
 			if string(second) != string(first) {
 				t.Errorf("re-encoded %x, want %x", second, first)
+			}
+		})
+		t.Run(tc.name+"/Proto", func(t *testing.T) {
+			q := tc.load()
+			first, err := q.Marshal()
+			if err != nil {
+				t.Fatalf("Marshal() error = %v", err)
+			}
+			var decoded Quantity
+			if err := decoded.Unmarshal(first); err != nil {
+				t.Fatalf("Unmarshal(%x) error = %v", first, err)
+			}
+			if decoded.Cmp(q) != 0 {
+				t.Errorf("decoded %x as %s, a different value", first, decoded.String())
+			}
+			second, err := decoded.Marshal()
+			if err != nil {
+				t.Fatalf("Marshal() of decoded value error = %v", err)
+			}
+			if string(second) != string(first) {
+				t.Errorf("re-encoded %x, want %x", second, first)
+			}
+		})
+	}
+}
+
+// TestQuantitySerializationFromJSONNumber pins what a JSON number decodes and
+// re-encodes as. Quantity accepts numbers as well as strings, and float encoders
+// produce spellings (1e+21, 1E3) that a Go caller would not type, so this is the
+// realistic entry for the verbatim-cache rows above.
+func TestQuantitySerializationFromJSONNumber(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want string
+	}{
+		{`1.441`, `"1.441"`}, // #138166: becomes "1441m"
+		{`1.5`, `"1500m"`},
+		{`1.0`, `"1"`},
+		{`1000000`, `"1M"`},
+		{`1e21`, `"1e21"`},
+		{`1e+21`, `"1e+21"`},
+		{`1E3`, `"1E3"`},
+		{`1e0`, `"1e0"`},
+	} {
+		t.Run(tc.in, func(t *testing.T) {
+			var q Quantity
+			if err := json.Unmarshal([]byte(tc.in), &q); err != nil {
+				t.Fatalf("json.Unmarshal(%s) error = %v", tc.in, err)
+			}
+			got, err := json.Marshal(q)
+			if err != nil {
+				t.Fatalf("json.Marshal() error = %v", err)
+			}
+			if string(got) != tc.want {
+				t.Errorf("json number %s re-encodes as %s, want %s", tc.in, got, tc.want)
 			}
 		})
 	}
