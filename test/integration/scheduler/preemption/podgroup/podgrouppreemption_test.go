@@ -43,6 +43,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -1272,7 +1273,7 @@ func TestPodGroupPreemption(t *testing.T) {
 					if !tt.tempRemovePG && tt.preemptorPodsQueuedInCreationOrder {
 						podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
 						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-							_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
+							_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(klog.FromContext(ctx), p.Name, p.Namespace, p.Spec.SchedulingGroup)
 							if ok {
 								return true, nil
 							}

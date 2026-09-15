@@ -259,7 +259,7 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 		// this node. So, we should remove their nomination. Removing their
 		// nomination updates these pods and moves them to the active queue. It
 		// lets scheduler find another place for them sooner than after waiting for preemption completion.
-		nominatedPods := getLowerPriorityNominatedPods(e.fh, preemptor.Priority(), c.Name())
+		nominatedPods := getLowerPriorityNominatedPods(logger, e.fh, preemptor.Priority(), c.Name())
 		if err := clearNominatedNodeName(ctx, e.fh.ClientSet(), e.fh.APICacher(), nominatedPods...); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
 			result = metrics.GoroutineResultError
@@ -351,7 +351,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 	// this node. So, we should remove their nomination. Removing their
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them sooner than after waiting for preemption completion.
-	nominatedPods := getLowerPriorityNominatedPods(fh, preemptor.Priority(), c.Name())
+	nominatedPods := getLowerPriorityNominatedPods(logger, fh, preemptor.Priority(), c.Name())
 	if err := clearNominatedNodeName(ctx, cs, fh.APICacher(), nominatedPods...); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
@@ -448,8 +448,8 @@ func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCach
 // manipulation of NodeInfo and PreFilter state per nominated pod. It may not be
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
-func getLowerPriorityNominatedPods(pn fwk.PodNominator, priority int32, nodeName string) []*v1.Pod {
-	podInfos := pn.NominatedPodsForNode(nodeName)
+func getLowerPriorityNominatedPods(logger klog.Logger, pn fwk.PodNominator, priority int32, nodeName string) []*v1.Pod {
+	podInfos := pn.NominatedPodsForNode(logger, nodeName)
 
 	if len(podInfos) == 0 {
 		return nil

@@ -869,7 +869,7 @@ func TestAddPod(t *testing.T) {
 
 			sched.addPod(tt.pod)
 
-			_, ok := sched.SchedulingQueue.GetPod(tt.pod.Name, tt.pod.Namespace, tt.pod.Spec.SchedulingGroup)
+			_, ok := sched.SchedulingQueue.GetPod(logger, tt.pod.Name, tt.pod.Namespace, tt.pod.Spec.SchedulingGroup)
 			if tt.expectInQueue && !ok {
 				t.Errorf("Expected pod to be in scheduling queue")
 			} else if !tt.expectInQueue && ok {
@@ -1260,7 +1260,7 @@ func TestUpdatePod(t *testing.T) {
 				}
 			}
 
-			qPod, ok := sched.SchedulingQueue.GetPod(tt.newPod.Name, tt.newPod.Namespace, tt.newPod.Spec.SchedulingGroup)
+			qPod, ok := sched.SchedulingQueue.GetPod(logger, tt.newPod.Name, tt.newPod.Namespace, tt.newPod.Spec.SchedulingGroup)
 			if tt.expectInQueue != nil {
 				if !ok {
 					t.Errorf("Expected pod to be in scheduling queue")
@@ -1480,7 +1480,7 @@ func TestDeletePod(t *testing.T) {
 			} else if err == nil {
 				t.Errorf("Unexpected pod in cache after removal")
 			}
-			_, ok := sched.SchedulingQueue.GetPod(tt.initialPod.Name, tt.initialPod.Namespace, tt.initialPod.Spec.SchedulingGroup)
+			_, ok := sched.SchedulingQueue.GetPod(logger, tt.initialPod.Name, tt.initialPod.Namespace, tt.initialPod.Spec.SchedulingGroup)
 			if ok {
 				t.Errorf("Unexpected pod in scheduling queue after removal")
 			}
@@ -2186,7 +2186,7 @@ func TestEventHandlers_DeferredResize(t *testing.T) {
 				targetPod = tt.updatedPod
 			}
 
-			_, ok := sched.SchedulingQueue.GetPod(targetPod.Name, targetPod.Namespace, targetPod.Spec.SchedulingGroup)
+			_, ok := sched.SchedulingQueue.GetPod(logger, targetPod.Name, targetPod.Namespace, targetPod.Spec.SchedulingGroup)
 			if ok != tt.expectInQueue {
 				t.Errorf("Unexpected queue state: got inQueue=%v, want inQueue=%v", ok, tt.expectInQueue)
 			}

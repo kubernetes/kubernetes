@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -305,7 +306,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 
 			// Verify the pod remains parked in the scheduler queue
 			queue := testCtx.Scheduler.SchedulingQueue
-			_, found := queue.GetPod(preemptorPod.Name, preemptorPod.Namespace, nil)
+			_, found := queue.GetPod(klog.FromContext(testCtx.Ctx), preemptorPod.Name, preemptorPod.Namespace, nil)
 			if !found {
 				t.Errorf("Expected preemptor pod to be found in scheduling queue")
 			}
@@ -583,7 +584,7 @@ func TestDeferredResizeQueueingHints(t *testing.T) {
 			cs := testCtx.ClientSet
 			queue := testCtx.Scheduler.SchedulingQueue
 
-			queuedPod, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+			queuedPod, found := queue.GetPod(klog.FromContext(testCtx.Ctx), pod.Name, pod.Namespace, nil)
 			if !found {
 				t.Fatalf("Pod not found in queue")
 			}
@@ -594,8 +595,8 @@ func TestDeferredResizeQueueingHints(t *testing.T) {
 			}
 
 			if tc.expectIncrement {
-				err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, false, func(context.Context) (bool, error) {
-					qPod, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+				err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+					qPod, found := queue.GetPod(klog.FromContext(ctx), pod.Name, pod.Namespace, nil)
 					return found && qPod.Attempts > initialAttempts, nil
 				})
 				if err != nil {
@@ -603,7 +604,7 @@ func TestDeferredResizeQueueingHints(t *testing.T) {
 				}
 			} else {
 				time.Sleep(300 * time.Millisecond)
-				qPod, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+				qPod, found := queue.GetPod(klog.FromContext(testCtx.Ctx), pod.Name, pod.Namespace, nil)
 				if found && qPod.Attempts > initialAttempts {
 					t.Fatalf("Expected attempts not to increment, but went from %d to %d", initialAttempts, qPod.Attempts)
 				}
@@ -641,7 +642,7 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 		cs := testCtx.ClientSet
 		queue := testCtx.Scheduler.SchedulingQueue
 
-		queuedPod, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+		queuedPod, found := queue.GetPod(klog.FromContext(testCtx.Ctx), pod.Name, pod.Namespace, nil)
 		if !found {
 			t.Fatalf("Expected pod to be in queue initially")
 		}
@@ -662,7 +663,7 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 
 		// Verify pod attempts do not increment (QHint skipped)
 		time.Sleep(300 * time.Millisecond)
-		qPod, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+		qPod, found := queue.GetPod(klog.FromContext(testCtx.Ctx), pod.Name, pod.Namespace, nil)
 		if !found || qPod.Attempts > initialAttempts {
 			t.Fatalf("Expected attempts not to increment, but went from %d to %d (or pod was lost)", initialAttempts, qPod.Attempts)
 		}
@@ -676,7 +677,7 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 		cs := testCtx.ClientSet
 		queue := testCtx.Scheduler.SchedulingQueue
 
-		queuedPod, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+		queuedPod, found := queue.GetPod(klog.FromContext(testCtx.Ctx), pod.Name, pod.Namespace, nil)
 		if !found {
 			t.Fatalf("Expected pod to still be in queue")
 		}
@@ -694,8 +695,8 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 		}
 
 		// Verify pod is retried (attempts incremented)
-		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, false, func(context.Context) (bool, error) {
-			qPod, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+			qPod, found := queue.GetPod(klog.FromContext(ctx), pod.Name, pod.Namespace, nil)
 			return found && qPod.Attempts > initialAttempts, nil
 		})
 		if err != nil {
@@ -711,7 +712,7 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 		cs := testCtx.ClientSet
 		queue := testCtx.Scheduler.SchedulingQueue
 
-		queuedPod, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+		queuedPod, found := queue.GetPod(klog.FromContext(testCtx.Ctx), pod.Name, pod.Namespace, nil)
 		if !found {
 			t.Fatalf("Expected pod to be in queue initially")
 		}
@@ -731,7 +732,7 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 		}
 
 		time.Sleep(300 * time.Millisecond)
-		qPod, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+		qPod, found := queue.GetPod(klog.FromContext(testCtx.Ctx), pod.Name, pod.Namespace, nil)
 		if !found || qPod.Attempts > initialAttempts {
 			t.Fatalf("Expected attempts not to increment and pod to remain in queue for irrelevant node update")
 		}
@@ -821,7 +822,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		queue := testCtx.Scheduler.SchedulingQueue
 		var found bool
 		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, found = queue.GetPod(pod.Name, pod.Namespace, nil)
+			_, found = queue.GetPod(klog.FromContext(ctx), pod.Name, pod.Namespace, nil)
 			return found, nil
 		})
 		if err != nil || !found {
@@ -893,7 +894,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 
 		// Verify the pod is NOT in the scheduling queue
 		time.Sleep(300 * time.Millisecond)
-		if _, found := queue.GetPod(pod.Name, pod.Namespace, nil); found {
+		if _, found := queue.GetPod(klog.FromContext(testCtx.Ctx), pod.Name, pod.Namespace, nil); found {
 			t.Fatalf("Expected pod to not be in scheduling queue initially")
 		}
 
@@ -928,7 +929,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		// Verify the pod was enqueued automatically by the UpdatePod event handler!
 		var found bool
 		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, found = queue.GetPod(pod.Name, pod.Namespace, nil)
+			_, found = queue.GetPod(klog.FromContext(ctx), pod.Name, pod.Namespace, nil)
 			return found, nil
 		})
 		if err != nil || !found {
@@ -1001,7 +1002,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+			_, found := queue.GetPod(klog.FromContext(ctx), pod.Name, pod.Namespace, nil)
 			return found, nil
 		})
 		if err != nil {
@@ -1023,7 +1024,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+			_, found := queue.GetPod(klog.FromContext(ctx), pod.Name, pod.Namespace, nil)
 			return !found, nil
 		})
 		if err != nil {
@@ -1112,8 +1113,8 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		// Wait for pod to be enqueued and in cache
-		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
-			_, foundInQueue := queue.GetPod(pod.Name, pod.Namespace, nil)
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+			_, foundInQueue := queue.GetPod(klog.FromContext(ctx), pod.Name, pod.Namespace, nil)
 			_, errCache := cache.GetPod(pod)
 			return foundInQueue && errCache == nil, nil
 		})
@@ -1127,8 +1128,8 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		// Verify the pod is removed from both queue and cache by DeletePod event handler
-		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
-			_, foundInQueue := queue.GetPod(pod.Name, pod.Namespace, nil)
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+			_, foundInQueue := queue.GetPod(klog.FromContext(ctx), pod.Name, pod.Namespace, nil)
 			_, errCache := cache.GetPod(pod)
 			return !foundInQueue && errCache != nil, nil
 		})
