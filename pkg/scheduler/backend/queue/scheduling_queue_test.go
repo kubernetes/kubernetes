@@ -3679,6 +3679,7 @@ func TestFlushUnschedulablePodsLeftoverSetsFlag_GatedPod(t *testing.T) {
 // podMaxInUnschedulablePodsDuration, and not on every periodic flush execution.
 func TestGatedPodFlushFrequency(t *testing.T) {
 	gatedPod := mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj())
+	gatedGroupPod := mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").PodGroupName("pg").Obj())
 
 	tests := []struct {
 		name       string
@@ -3687,26 +3688,16 @@ func TestGatedPodFlushFrequency(t *testing.T) {
 		{
 			name: "queued pod",
 			entityInfo: &framework.QueuedPodInfo{
-				PodInfo:        gatedPod,
-				QueueingParams: framework.QueueingParams{UnschedulablePlugins: sets.New("foo")},
+				PodInfo:              gatedPod,
+				UnschedulablePlugins: sets.New("foo"),
 			},
 		},
 		{
 			name: "queued pod group",
-			entityInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{
-						ObjectMeta: metav1.ObjectMeta{
-							Namespace: gatedPod.GetNamespace(),
-							Name:      "pg",
-						},
-					}),
-					UnscheduledPods: []*v1.Pod{gatedPod.Pod},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("test", "pg"): {{PodInfo: gatedPod, QueueingParams: framework.QueueingParams{UnschedulablePlugins: sets.New("foo")}}},
-				},
-			},
+			entityInfo: newSingleLevelPodGroupInfo(&framework.QueuedPodInfo{
+				PodInfo:              gatedGroupPod,
+				UnschedulablePlugins: sets.New("foo"),
+			}, nil),
 		},
 	}
 
@@ -6244,7 +6235,6 @@ func makeQueuedPodGroup(namespace, pgName string, podInfos ...*framework.QueuedP
 			GenericPodGroup: fwk.NewGenericPodGroup(pg),
 			Children:        make([]*framework.PodGroupInfo, 0),
 		},
-		QueuedPodInfos: make(map[fwk.EntityKey][]*framework.QueuedPodInfo),
 	}
 	for _, pInfo := range podInfos {
 		pgqi.AddPod(pInfo)
@@ -10136,29 +10126,24 @@ func newQueuedPodGroupInfoForLookup(namespace, name string, entityType fwk.Entit
 
 func newSingleLevelPodGroupInfo(podInfo *framework.QueuedPodInfo, podGroup *schedulingv1beta1.PodGroup) *framework.QueuedPodGroupInfo {
 	pgName := *podInfo.Pod.Spec.SchedulingGroup.PodGroupName
-	key := fwk.PodGroupKey(podInfo.Pod.Namespace, pgName)
-	var pgObj *schedulingv1beta1.PodGroup
-	if podGroup != nil {
-		pgObj = podGroup
-	} else {
+	pgObj := podGroup
+	if pgObj == nil {
 		pgObj = &schedulingv1beta1.PodGroup{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: podInfo.Pod.Namespace,
-				Name:      pgName,
-			},
+			Namespace: podInfo.Pod.Namespace,
+			Name:      pgName,
 		}
 	}
-	return &framework.QueuedPodGroupInfo{
+	pgqi := &framework.QueuedPodGroupInfo{
 		PodGroupInfo: &framework.PodGroupInfo{
 			GenericPodGroup: fwk.NewGenericPodGroup(pgObj),
-			UnscheduledPods: []*v1.Pod{podInfo.Pod},
 		},
-		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{key: {podInfo}},
 		QueueingParams: framework.QueueingParams{
 			Timestamp:               podInfo.Timestamp,
 			InitialAttemptTimestamp: podInfo.InitialAttemptTimestamp,
 		},
 	}
+	pgqi.AddPod(podInfo)
+	return pgqi
 }
 
 func TestPriorityQueue_DeferredPodGroupCompatibility(t *testing.T) {

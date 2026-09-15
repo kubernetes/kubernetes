@@ -76,7 +76,7 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	// skipPodGroupPodSchedule could remove some pods from the pod group.
 	// Pod group constraints will be re-evaluated on a PlacementFeasible phase.
 	// Now, verify if it has any pods left.
-	if len(podGroupInfo.QueuedPodInfos) == 0 {
+	if !podGroupInfo.HasQueuedPodInfos() {
 		// Finish the in-flight attempt so members that arrived while these pods were
 		// being skipped can be requeued instead of remaining pending indefinitely.
 		if err := sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle(), fwk.NewStatus(fwk.Success)); err != nil {
@@ -355,7 +355,7 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 		completePGResults = completeCompositePodGroupAlgorithmResult(ctx, rootPodGroupInfo, podGroupCycleState, pgResults)
 	} else {
 		// pgResults has exactly 1 element.
-		queuedPodInfos := rootPodGroupInfo.QueuedPodInfos[rootPodGroupInfo.PodGroupInfo.GetKey()]
+		queuedPodInfos := rootPodGroupInfo.PodInfosForGroup(rootPodGroupInfo.PodGroupInfo.GetKey())
 		result := completePodGroupAlgorithmResult(ctx, queuedPodInfos, podGroupCycleState, pgResults[rootPodGroupInfo.PodGroupInfo.GetKey()])
 		completePGResults = map[fwk.EntityKey]*podGroupAlgorithmResult{rootPodGroupInfo.PodGroupInfo.GetKey(): result}
 	}
@@ -426,7 +426,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 	}()
 
 	// Retrieve the queued podinfos for the given pod group from the root queuedPodGroupInfo.
-	queuedPodInfos := queuedPodGroupInfo.QueuedPodInfos[podGroupInfo.GetKey()]
+	queuedPodInfos := queuedPodGroupInfo.PodInfosForGroup(podGroupInfo.GetKey())
 	result = &podGroupAlgorithmResult{
 		podGroupInfo:        podGroupInfo,
 		podResults:          make([]algorithmResult, 0, len(queuedPodInfos)),
@@ -559,7 +559,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 	}, revertFn
 }
 
-// completePodGroupAlgorithmResult ensures that the podGroupAlgorithmResult contains the same number of podResults as there are pods in QueuedPodInfos.
+// completePodGroupAlgorithmResult ensures that the podGroupAlgorithmResult contains the same number of podResults as there are queued pods in the pod group.
 func completePodGroupAlgorithmResult(ctx context.Context, queuedPodInfos []*framework.QueuedPodInfo, podGroupState *framework.CycleState, podGroupResult *podGroupAlgorithmResult) *podGroupAlgorithmResult {
 	numInResult := len(podGroupResult.podResults)
 	numInQueue := len(queuedPodInfos)
@@ -587,7 +587,7 @@ func completePodGroupAlgorithmResult(ctx context.Context, queuedPodInfos []*fram
 // are propagated down the tree before finalizing the cycle.
 func completeCompositePodGroupAlgorithmResult(ctx context.Context, rootPodGroupInfo *framework.QueuedPodGroupInfo, rootCycleState *framework.CycleState, pgResults map[fwk.EntityKey]*podGroupAlgorithmResult) map[fwk.EntityKey]*podGroupAlgorithmResult {
 	completeCompositePodGroupAlgorithmResultMap(ctx, rootPodGroupInfo.PodGroupInfo, pgResults, &podGroupAlgorithmResult{})
-	for pgKey, queuedPodInfos := range rootPodGroupInfo.QueuedPodInfos {
+	for pgKey, queuedPodInfos := range rootPodGroupInfo.ForEachPodInfosByGroup() {
 		pgResult := pgResults[pgKey]
 		// Ensure podResults has an entry for each pod in the pod group with a status.
 		completePodGroupAlgorithmResult(ctx, queuedPodInfos, rootCycleState, pgResult)
@@ -680,7 +680,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			// Composite pod groups do not own any pods directly.
 			continue
 		}
-		queuedPodInfos := rootPodGroupInfo.QueuedPodInfos[pgi.GetKey()]
+		queuedPodInfos := rootPodGroupInfo.PodInfosForGroup(pgi.GetKey())
 		if len(podGroupResult.podResults) != len(queuedPodInfos) {
 			// This should never happen, but if it does, complete the result with the error status.
 			logger.Error(fmt.Errorf("some pods were not processed"), "scheduling error for pod group", "podGroup", klog.KObj(pgi))
@@ -1140,7 +1140,7 @@ func nominatedPlacement(placements []*fwk.Placement, podGroupInfo *framework.Pod
 	// (podGroupInfo), which for CPG TAS is the CPG or PG carrying the TAS constraints, not the
 	// whole hierarchy rooted at queuedPodGroupInfo.
 	nominatedNodes := sets.New[string]()
-	for _, podInfo := range queuedPodGroupInfo.QueuedPodInfos[podGroupInfo.GetKey()] {
+	for _, podInfo := range queuedPodGroupInfo.PodInfosForGroup(podGroupInfo.GetKey()) {
 		if nnn := podInfo.Pod.Status.NominatedNodeName; nnn != "" {
 			nominatedNodes.Insert(nnn)
 		}
