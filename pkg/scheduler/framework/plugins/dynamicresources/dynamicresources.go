@@ -287,7 +287,7 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange, PreQueueingHintFn: pl.preQueueingHint},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate, PreQueueingHintFn: pl.preQueueingHintForPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
 		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
@@ -370,6 +370,19 @@ func (pl *DynamicResources) preQueueingHint(logger klog.Logger, oldObj, newObj i
 		}
 	}
 	return fwk.PreQueueingHintResult{Pods: pods}, nil
+}
+
+// preQueueingHintForPodUpdate narrows an UpdatePodGeneratedResourceClaim event to
+// the single pod whose status changed.
+func (pl *DynamicResources) preQueueingHintForPodUpdate(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+	_, modifiedPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		// Shouldn't happen; conservatively evaluate all pods.
+		return fwk.PreQueueingHintResult{AllPods: true}, nil
+	}
+
+	return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
+		{Namespace: modifiedPod.Namespace, Name: modifiedPod.Name}}}, nil
 }
 
 // isSchedulableAfterClaimChange is invoked for add and update claim events reported by
@@ -479,6 +492,11 @@ func (pl *DynamicResources) isSchedulableAfterTargetPodUpdate(logger klog.Logger
 	if err != nil {
 		// Shouldn't happen.
 		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterTargetPodUpdate: %w", err)
+	}
+
+	// A pod's status update should only unblock the same pod.
+	if pod.UID != modifiedPod.UID {
+		return fwk.QueueSkip, nil
 	}
 
 	if err := pl.foreachPodResourceClaim(modifiedPod, nil); err != nil {
