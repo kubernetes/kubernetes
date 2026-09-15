@@ -173,7 +173,17 @@ func (s *server) Register(ctx context.Context, r *api.RegisterRequest) (*api.Emp
 		return &api.Empty{}, err
 	}
 
-	if err := s.connectClient(ctx, r.ResourceName, filepath.Join(s.socketDir, r.Endpoint)); err != nil {
+	// The API contract documents Endpoint as "Name of the unix socket the device
+	// plugin is listening on", joined under DevicePluginPath. Reject endpoints that
+	// resolve outside the socket directory after Join+Clean.
+	socketPath := filepath.Join(s.socketDir, r.Endpoint)
+	if filepath.Dir(socketPath) != filepath.Clean(s.socketDir) {
+		err := fmt.Errorf("invalid endpoint %q: must name a socket directly within the device plugin directory", r.Endpoint)
+		logger.Error(err, "Bad registration request from device plugin", "resourceName", r.ResourceName)
+		return &api.Empty{}, err
+	}
+
+	if err := s.connectClient(ctx, r.ResourceName, socketPath); err != nil {
 		logger.Error(err, "Error connecting to device plugin client")
 		return &api.Empty{}, err
 	}
