@@ -56,12 +56,18 @@ func TestPreQueueingHint_PodNotYetIndexed(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Known limitation: when pod's ResourceClaimStatuses isn't populated yet,
-	// the indexer cannot find the pod. The periodic flush rescues such pods.
+	// When a template pod's ResourceClaimStatuses isn't populated yet, the
+	// generated claim name isn't known, so the indexer cannot map the claim to
+	// the pod and this claim event narrows the pod out. That is expected and
+	// safe: populating ResourceClaimStatuses is itself a pod update that emits a
+	// TargetPod/UpdatePodGeneratedResourceClaim event (see
+	// isSchedulableAfterTargetPodUpdate), which requeues the pod. The rescue does
+	// not depend on the periodic flush.
 	if got.AllPods {
-		t.Logf("AllPods=true (safe fallback)")
-	} else if len(got.Pods) == 0 {
-		t.Logf("empty Pods (known race - pod rescued by flush)")
+		t.Errorf("expected AllPods=false when the pod is not yet indexed, got true")
+	}
+	if len(got.Pods) != 0 {
+		t.Errorf("expected no pods when the pod is not yet indexed, got %v", got.Pods)
 	}
 }
 
