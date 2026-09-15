@@ -146,12 +146,15 @@ type manager struct {
 var _ Manager = &manager{}
 
 // NewManager returns new instance of the memory manager
-func NewManager(logger klog.Logger, policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(logger klog.Logger, policyName string, policyOptions map[string]string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
 	var policy Policy
 
 	switch policyType(policyName) {
 
 	case policyTypeNone:
+		if len(policyOptions) > 0 {
+			return nil, fmt.Errorf("policy %q does not support policy options %v", policyTypeNone, policyOptions)
+		}
 		policy = NewPolicyNone(logger)
 
 	case PolicyTypeStatic:
@@ -164,7 +167,7 @@ func NewManager(logger klog.Logger, policyName string, machineInfo *cadvisorapi.
 			return nil, err
 		}
 
-		policy, err = NewPolicyStatic(logger, machineInfo, systemReserved, affinity)
+		policy, err = NewPolicyStatic(logger, machineInfo, systemReserved, affinity, policyOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -183,7 +186,7 @@ func NewManager(logger klog.Logger, policyName string, machineInfo *cadvisorapi.
 			if !ok {
 				return nil, fmt.Errorf("policy %q requires an AuthoritativeStore affinity", policyTypeBestEffort)
 			}
-			policy, err = NewPolicyBestEffort(logger, machineInfo, systemReserved, authStore)
+			policy, err = NewPolicyBestEffort(logger, machineInfo, systemReserved, authStore, policyOptions)
 			if err != nil {
 				return nil, err
 			}

@@ -159,7 +159,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 
 			// Create new manager
 			sDir := t.TempDir()
-			mgr, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
+			mgr, err := NewManager(logger, string(PolicyTypeStatic), nil, &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
 			if err != nil {
 				t.Fatalf("could not create manager: %v", err)
 			}
@@ -204,7 +204,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 
 			// Re-create manager to simulate restart
 			restoredAffinity := topologymanager.NewFakeManager(logger)
-			mgr2, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, restoredAffinity)
+			mgr2, err := NewManager(logger, string(PolicyTypeStatic), nil, &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, restoredAffinity)
 			if err != nil {
 				t.Fatalf("could not create manager 2: %v", err)
 			}
@@ -306,7 +306,7 @@ func TestMemoryManagerRestoreStateWithMemoryDrift(t *testing.T) {
 	activePods := func() []*v1.Pod { return []*v1.Pod{pod} }
 
 	machineInfo := returnMachineInfo()
-	mgr, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
+	mgr, err := NewManager(logger, string(PolicyTypeStatic), nil, &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
 	if err != nil {
 		t.Fatalf("could not create manager: %v", err)
 	}
@@ -329,7 +329,7 @@ func TestMemoryManagerRestoreStateWithMemoryDrift(t *testing.T) {
 	rebootedMachineInfo.Topology[0].Memory -= 4 * mb
 	rebootedMachineInfo.Topology[1].Memory -= 4 * mb
 
-	mgr2, err := NewManager(logger, string(PolicyTypeStatic), &rebootedMachineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
+	mgr2, err := NewManager(logger, string(PolicyTypeStatic), nil, &rebootedMachineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
 	if err != nil {
 		t.Fatalf("could not create manager after reboot: %v", err)
 	}

@@ -75,7 +75,7 @@ type staticPolicy struct {
 var _ Policy = &staticPolicy{}
 
 // NewPolicyStatic returns new static policy instance
-func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
+func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store, policyOptions map[string]string) (Policy, error) {
 	var totalSystemReserved uint64
 	for _, node := range reserved {
 		if _, ok := node[v1.ResourceMemory]; !ok {
@@ -95,9 +95,17 @@ func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, r
 		affinity:                     affinity,
 		initContainersReusableMemory: reusableMemory{},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManagerDriftTolerance) {
-		p.maxMemoryDrift = memoryDriftFromKernelImage(logger, procIomemPath)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MemoryManagerDriftTolerance) {
+		if len(policyOptions) > 0 {
+			return nil, fmt.Errorf("[memorymanager] policy options %v require the %s feature gate", policyOptions, features.MemoryManagerDriftTolerance)
+		}
+		return p, nil
 	}
+	maxMemoryDrift, err := maxMemoryDriftFromOptions(logger, policyOptions)
+	if err != nil {
+		return nil, err
+	}
+	p.maxMemoryDrift = maxMemoryDrift
 	return p, nil
 }
 
@@ -1096,8 +1104,7 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	// - adding or removing physical memory bank from the node
 	// - change of kubelet system-reserved, kube-reserved or pre-reserved-memory-zone parameters
 	if !areMachineStatesEqual(logger, machineState, expectedMachineState) {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.MemoryManagerDriftTolerance) ||
-			!isTolerableMachineStateDrift(logger, machineState, expectedMachineState, p.maxMemoryDrift) {
+		if p.maxMemoryDrift == 0 || !isTolerableMachineStateDrift(logger, machineState, expectedMachineState, p.maxMemoryDrift) {
 			return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
 		}
 		logger.Info("Tolerating a small NUMA node memory drift and re-baselining the memory manager state", "maxDriftBytes", p.maxMemoryDrift)

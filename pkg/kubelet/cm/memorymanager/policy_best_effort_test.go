@@ -135,7 +135,7 @@ func TestBestEffortPolicyAllocateFollowsCPUManager(t *testing.T) {
 				hint:              topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: false},
 				hintAuthoritative: tc.hasExclusiveCPUs,
 			}
-			p, err := NewPolicyBestEffort(logger, machineInfo, systemReserved, affinity)
+			p, err := NewPolicyBestEffort(logger, machineInfo, systemReserved, affinity, nil)
 			if err != nil {
 				t.Fatalf("NewPolicyBestEffort() failed: %v", err)
 			}
