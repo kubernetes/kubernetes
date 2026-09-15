@@ -888,22 +888,25 @@ func (sched *Scheduler) finishFailureWithRequeue(ctx context.Context, podFwk fra
 		return
 	}
 
-	onFinish, err := dispatchPodStatusPatch(apiCacher, pod, podCondition, nominatingInfo)
-	if err != nil {
-		utilruntime.HandleErrorWithLogger(logger, err, "Error dispatching pod status patch", "pod", klog.KObj(pod))
-		sched.requeue(logger, podInfo)
-		return
-	}
-
 	if isPodGroupMember {
+		// Requeue before patching so the rest of the group can be retried while this patch
+		// is in flight. Unlike the path below, this blocks the caller's goroutine until the
+		// patch completes, so it already allows at most one patch in flight and does not go
+		// through statusPatchLimiter.
 		sched.requeue(logger, podInfo)
+		onFinish, err := dispatchPodStatusPatch(apiCacher, pod, podCondition, nominatingInfo)
+		if err != nil {
+			utilruntime.HandleErrorWithLogger(logger, err, "Error dispatching pod status patch", "pod", klog.KObj(pod))
+			return
+		}
 		waitPodStatusPatch(ctx, apiCacher, pod, onFinish)
 		return
 	}
 
+	// The patch and the requeue that follows it outlive the scheduling cycle.
 	bgCtx := context.WithoutCancel(ctx)
 	go func() {
-		waitPodStatusPatch(bgCtx, apiCacher, pod, onFinish)
+		sched.patchPodStatusLimited(bgCtx, apiCacher, pod, podCondition, nominatingInfo)
 		sched.requeue(logger, podInfo)
 	}()
 }
@@ -919,17 +922,20 @@ func (sched *Scheduler) finishFailureWithoutRequeue(ctx context.Context, podFwk 
 		return
 	}
 
-	// Discarded pods do not re-enter the scheduling queue, so waiting for patch completion is unnecessary.
-	// Dispatch asynchronously when available to avoid blocking, falling back to synchronous patch otherwise.
-	var updateErr error
-	if apiCacher := podFwk.APICacher(); apiCacher != nil {
-		_, updateErr = dispatchPodStatusPatch(apiCacher, pod, podCondition, nominatingInfo)
-	} else {
-		updateErr = patchPodStatusSync(ctx, sched.client, pod, podCondition, nominatingInfo)
+	// Discarded pods do not re-enter the scheduling queue, so nothing waits for the patch,
+	// but it still competes for client rate limiter tokens. Hence the same limiter as the
+	// requeueing path, and a goroutine to hold the slot until the call completes.
+	apiCacher := podFwk.APICacher()
+	if apiCacher == nil {
+		if err := patchPodStatusSync(ctx, sched.client, pod, podCondition, nominatingInfo); err != nil {
+			utilruntime.HandleErrorWithLogger(logger, err, "Error updating pod", "pod", klog.KObj(pod))
+		}
+		return
 	}
-	if updateErr != nil {
-		utilruntime.HandleErrorWithLogger(logger, updateErr, "Error updating pod", "pod", klog.KObj(pod))
-	}
+
+	// The patch outlives the scheduling cycle.
+	bgCtx := context.WithoutCancel(ctx)
+	go sched.patchPodStatusLimited(bgCtx, apiCacher, pod, podCondition, nominatingInfo)
 }
 
 // truncateMessage truncates a message if it hits the NoteLengthLimit.
@@ -959,6 +965,37 @@ func waitPodStatusPatch(ctx context.Context, apiCacher fwk.APICacher, pod *v1.Po
 	if err := apiCacher.WaitOnFinish(ctx, onFinish); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod", "pod", klog.KObj(pod))
 	}
+}
+
+// isNomination reports whether nominatingInfo claims a node for the pod, as opposed to
+// clearing a previous nomination (clearNominatedNode) or leaving it untouched.
+func isNomination(nominatingInfo *fwk.NominatingInfo) bool {
+	return nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != ""
+}
+
+// patchPodStatusLimited dispatches a failure-handler status patch under the limiter and
+// blocks until it completes.
+//
+// We gate before dispatching to prevent lower-priority pod status updates from starving
+// binding API calls. Nominations bypass the limiter so preempting pods record their
+// nominated node without waiting behind failure patches.
+func (sched *Scheduler) patchPodStatusLimited(ctx context.Context, apiCacher fwk.APICacher, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) {
+	logger := klog.FromContext(ctx)
+
+	if !isNomination(nominatingInfo) {
+		if !sched.statusPatchLimiter.acquire(sched.StopEverything) {
+			// Shutting down.
+			return
+		}
+		defer sched.statusPatchLimiter.release()
+	}
+
+	onFinish, err := dispatchPodStatusPatch(apiCacher, pod, condition, nominatingInfo)
+	if err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Error dispatching pod status patch", "pod", klog.KObj(pod))
+		return
+	}
+	waitPodStatusPatch(ctx, apiCacher, pod, onFinish)
 }
 
 func patchPodStatusSync(ctx context.Context, client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) error {

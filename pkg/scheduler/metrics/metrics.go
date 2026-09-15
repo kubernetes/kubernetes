@@ -180,9 +180,10 @@ var (
 	PreemptionGoroutinesExecutionTotal *metrics.CounterVec
 
 	// The below are only available when the SchedulerAsyncAPICalls feature gate is enabled.
-	AsyncAPICallsTotal   *metrics.CounterVec
-	AsyncAPICallDuration *metrics.HistogramVec
-	AsyncAPIPendingCalls *metrics.GaugeVec
+	AsyncAPICallsTotal             *metrics.CounterVec
+	AsyncAPICallDuration           *metrics.HistogramVec
+	AsyncAPIPendingCalls           *metrics.GaugeVec
+	FailureHandlerThrottledPatches *metrics.Gauge
 
 	// The below is only available when the DRAExtendedResource feature gate is enabled.
 	// This is the same metric that also gets recorded in the kube-controller-manager.
@@ -230,6 +231,7 @@ func Register() {
 				AsyncAPICallsTotal,
 				AsyncAPICallDuration,
 				AsyncAPIPendingCalls,
+				FailureHandlerThrottledPatches,
 			)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
@@ -536,6 +538,14 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"call_type"})
+
+	FailureHandlerThrottledPatches = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "failure_handler_throttled_status_patches",
+			Help:           "Number of failure handler status patches waiting for a slot in the concurrency limiter.",
+			StabilityLevel: metrics.ALPHA,
+		})
 
 	DRABindingConditionsAllocationsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
