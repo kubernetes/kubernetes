@@ -74,9 +74,6 @@ const (
 //
 // For resources that are not local to a node, the node name is not set. Instead,
 // the driver may use a node selector to specify where the devices are available.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type ResourceSlice struct {
 	metav1.TypeMeta `json:""`
 	// Standard object metadata
@@ -1181,9 +1178,6 @@ type ResourceSliceList struct {
 // with specific properties, this is how that request is expressed. The status
 // stanza tracks whether this claim has been satisfied and what specific
 // resources have been allocated.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type ResourceClaim struct {
 	metav1.TypeMeta `json:""`
 	// Standard object metadata
@@ -2387,9 +2381,6 @@ type ResourceClaimList struct {
 // device configuration and selectors. It can be referenced in
 // the device requests of a claim to apply these presets.
 // Cluster scoped.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type DeviceClass struct {
 	metav1.TypeMeta `json:""`
 	// Standard object metadata
@@ -2478,9 +2469,6 @@ type DeviceClassList struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.33
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type ResourceClaimTemplate struct {
 	metav1.TypeMeta `json:""`
 	// Standard object metadata

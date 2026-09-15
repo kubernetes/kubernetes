@@ -379,14 +379,6 @@ const (
 	// DisableNodeKubeProxyVersion disable the status.nodeInfo.kubeProxyVersion field of v1.Node
 	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
 
-	// owner: @pohly
-	// kep: http://kep.k8s.io/4381
-	//
-	// Enables support for resources with custom parameters and a lifecycle
-	// that is independent of a Pod. Resource allocation is done by the scheduler
-	// based on "structured parameters".
-	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
-
 	// owner: @nispriha
 	// kep: https://kep.k8s.io/5502
 	//
@@ -1519,14 +1511,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true}, // lock to default in 1.36 and remove in v1.39
 	},
 
-	DynamicResourceAllocation: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-		// TODO (https://github.com/kubernetes/kubernetes/issues/134459): remove completely in 1.38
-	},
-
 	EmptyDirVolumeMode: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2469,45 +2453,45 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	CrossNamespaceVolumeDataSource: {},
 
-	DRAAdminAccess: {DynamicResourceAllocation},
+	DRAAdminAccess: {},
 
-	DRAConsumableCapacity: {DynamicResourceAllocation},
+	DRAConsumableCapacity: {},
 
-	DRADerivedAttributes: {DynamicResourceAllocation},
+	DRADerivedAttributes: {},
 
-	DRADeviceBindingConditions: {DynamicResourceAllocation, DRAResourceClaimDeviceStatus},
+	DRADeviceBindingConditions: {DRAResourceClaimDeviceStatus},
 
-	DRADeviceCompatibilityGroups: {DynamicResourceAllocation, DRAPartitionableDevices},
+	DRADeviceCompatibilityGroups: {DRAPartitionableDevices},
 
-	DRADeviceTaintRules: {DRADeviceTaints}, // DynamicResourceAllocation is indirect.
+	DRADeviceTaintRules: {DRADeviceTaints},
 
-	DRADeviceTaints: {DynamicResourceAllocation},
+	DRADeviceTaints: {},
 
-	DRAExtendedResource: {DynamicResourceAllocation},
+	DRAExtendedResource: {},
 
 	DRAFractionalCapacityRange: {DRAConsumableCapacity},
 
-	DRAListTypeAttributes: {DynamicResourceAllocation},
+	DRAListTypeAttributes: {},
 
-	DRANodeAllocatableResources: {DynamicResourceAllocation},
+	DRANodeAllocatableResources: {},
 
-	DRAOptionalNodeOperations: {DynamicResourceAllocation, NodeDeclaredFeatures},
+	DRAOptionalNodeOperations: {NodeDeclaredFeatures},
 
-	DRAPartitionableDevices: {DynamicResourceAllocation},
+	DRAPartitionableDevices: {},
 
-	DRAPartitionableDevicesType: {DynamicResourceAllocation, DRAPartitionableDevices, DRAResourcePoolStatus},
+	DRAPartitionableDevicesType: {DRAPartitionableDevices, DRAResourcePoolStatus},
 
-	DRAPrioritizedList: {DynamicResourceAllocation},
+	DRAPrioritizedList: {},
 
-	DRAResourceClaimDeviceStatus: {}, // Soft dependency on DynamicResourceAllocation due to on/off-by-default conflict.
+	DRAResourceClaimDeviceStatus: {},
 
-	DRAResourceClaimGranularStatusAuthorization: {DynamicResourceAllocation, DRAResourceClaimDeviceStatus},
+	DRAResourceClaimGranularStatusAuthorization: {DRAResourceClaimDeviceStatus},
 
-	DRAResourcePoolStatus: {DynamicResourceAllocation},
+	DRAResourcePoolStatus: {},
 
-	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
+	DRASchedulerFilterTimeout: {},
 
-	DRAWorkloadResourceClaims: {DynamicResourceAllocation, GenericWorkload},
+	DRAWorkloadResourceClaims: {GenericWorkload},
 
 	DefaultPodSysctls: {},
 
@@ -2516,8 +2500,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DisableCPUQuotaWithExclusiveCPUs: {},
 
 	DisableNodeKubeProxyVersion: {},
-
-	DynamicResourceAllocation: {},
 
 	EmptyDirVolumeMode: {},
 
@@ -2697,7 +2679,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ReloadKubeletServerCertificateFile: {},
 
-	ResourceHealthStatus: {DynamicResourceAllocation},
+	ResourceHealthStatus: {},
 
 	ResourceHealthStatusMessage: {ResourceHealthStatus},
 

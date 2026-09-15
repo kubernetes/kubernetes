@@ -61,8 +61,7 @@ type FrameworkComponents struct {
 	apiDispatcher   *apidispatcher.APIDispatcher
 	metricsRecorder *metrics.MetricAsyncRecorder
 
-	// DRA components required for registering event handlers. Nil unless
-	// DynamicResourceAllocation feature gate is enabled.
+	// DRA components required for registering event handlers.
 	resourceClaimCache   *assumecache.AssumeCache
 	resourceSliceTracker *resourceslicetracker.Tracker
 	draManager           fwk.SharedDRAManager
@@ -116,29 +115,24 @@ func newFrameworkComponents(ctx context.Context,
 
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
 
-	var resourceClaimCache *assumecache.AssumeCache
-	var resourceSliceTracker *resourceslicetracker.Tracker
-	var draManager fwk.SharedDRAManager
-	if feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
-		resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
-		resourceSliceTrackerOpts := resourceslicetracker.Options{
-			EnableDeviceTaintRules:   feature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
-			EnableConsumableCapacity: feature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
-			SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
-			KubeClient:               client,
-		}
-		// If device taint rules are disabled, the additional informers are not needed and
-		// the tracker turns into a simple wrapper around the slice informer.
-		if resourceSliceTrackerOpts.EnableDeviceTaintRules {
-			resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
-		}
-		resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, resourceSliceTrackerOpts)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't start resource slice tracker: %w", err)
-		}
-		draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
+	resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
+	resourceClaimCache := assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+	resourceSliceTrackerOpts := resourceslicetracker.Options{
+		EnableDeviceTaintRules:   feature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
+		EnableConsumableCapacity: feature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
+		KubeClient:               client,
 	}
+	// If device taint rules are disabled, the additional informers are not needed and
+	// the tracker turns into a simple wrapper around the slice informer.
+	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
+		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
+	}
+	resourceSliceTracker, err := resourceslicetracker.StartTracker(ctx, resourceSliceTrackerOpts)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't start resource slice tracker: %w", err)
+	}
+	draManager := dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
 
 	var apiDispatcher *apidispatcher.APIDispatcher
 	if feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncAPICalls) {

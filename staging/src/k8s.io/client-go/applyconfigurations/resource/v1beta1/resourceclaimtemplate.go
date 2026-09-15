@@ -31,9 +31,6 @@ import (
 // with apply.
 //
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
 type ResourceClaimTemplateApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
 	// Standard object metadata
