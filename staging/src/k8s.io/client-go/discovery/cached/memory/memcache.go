@@ -63,15 +63,6 @@ var (
 	ErrCacheNotFound = errors.New("not found")
 )
 
-// Server returning empty ResourceList for Group/Version.
-type emptyResponseError struct {
-	gv string
-}
-
-func (e *emptyResponseError) Error() string {
-	return fmt.Sprintf("received empty response for: %s", e.gv)
-}
-
 var _ discovery.CachedDiscoveryInterface = &memCacheClient{}
 var _ discovery.CachedDiscoveryInterfaceWithContext = &memCacheClient{}
 
@@ -125,13 +116,7 @@ func (d *memCacheClient) ServerResourcesForGroupVersionWithContext(ctx context.C
 	if cachedVal.err != nil && isTransientError(cachedVal.err) {
 		r, err := d.serverResourcesForGroupVersion(ctx, groupVersion)
 		if err != nil {
-			// Don't log "empty response" as an error; it is a common response for metrics.
-			if _, emptyErr := err.(*emptyResponseError); emptyErr {
-				// Log at same verbosity as disk cache.
-				klog.FromContext(ctx).V(3).Info(err.Error())
-			} else {
-				utilruntime.HandleErrorWithContext(ctx, err, "Couldn't get resource list", "gv", groupVersion)
-			}
+			utilruntime.HandleErrorWithContext(ctx, err, "Couldn't get resource list", "gv", groupVersion)
 		}
 		cachedVal = &cacheEntry{r, err}
 		d.groupToServerResources[groupVersion] = cachedVal
@@ -395,13 +380,7 @@ func (d *memCacheClient) refreshLocked(ctx context.Context) error {
 
 				r, err := d.serverResourcesForGroupVersion(ctx, gv)
 				if err != nil {
-					// Don't log "empty response" as an error; it is a common response for metrics.
-					if _, emptyErr := err.(*emptyResponseError); emptyErr {
-						// Log at same verbosity as disk cache.
-						klog.FromContext(ctx).V(3).Info(err.Error())
-					} else {
-						utilruntime.HandleErrorWithContext(ctx, err, "Couldn't get resource list", "groupVersion", gv)
-					}
+					utilruntime.HandleErrorWithContext(ctx, err, "Couldn't get resource list", "groupVersion", gv)
 				}
 
 				resultLock.Lock()
@@ -423,7 +402,9 @@ func (d *memCacheClient) serverResourcesForGroupVersion(ctx context.Context, gro
 		return r, err
 	}
 	if len(r.APIResources) == 0 {
-		return r, &emptyResponseError{gv: groupVersion}
+		// Don't return an error; it is a common response for metrics.
+		// Log at same verbosity as disk cache.
+		klog.FromContext(ctx).V(3).Info("no resources found", "GroupVersion", groupVersion)
 	}
 	return r, nil
 }
