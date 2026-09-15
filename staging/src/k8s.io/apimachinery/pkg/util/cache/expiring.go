@@ -34,7 +34,8 @@ func NewExpiring() *Expiring {
 func NewExpiringWithClock(clock clock.Clock) *Expiring {
 	return &Expiring{
 		clock: clock,
-		cache: make(map[interface{}]entry),
+		cache: make(map[interface{}]*entry),
+		heap:  expiringHeap{},
 	}
 }
 
@@ -52,24 +53,14 @@ type Expiring struct {
 	// mu protects the below fields
 	mu sync.RWMutex
 	// cache is the internal map that backs the cache.
-	cache map[interface{}]entry
-	// generation is used as a cheap resource version for cache entries. Cleanups
-	// are scheduled with a key and generation. When the cleanup runs, it first
-	// compares its generation with the current generation of the entry. It
-	// deletes the entry iff the generation matches. This prevents cleanups
-	// scheduled for earlier versions of an entry from deleting later versions of
-	// an entry when Set() is called multiple times with the same key.
-	//
-	// The integer value of the generation of an entry is meaningless.
-	generation uint64
-
+	cache map[interface{}]*entry
+	// heap is a min-heap that is sorted by expiration time.
 	heap expiringHeap
 }
 
 type entry struct {
-	val        interface{}
-	expiry     time.Time
-	generation uint64
+	val      interface{}
+	heapNode *expiringHeapEntry
 }
 
 // Get looks up an entry in the cache.
@@ -80,7 +71,7 @@ func (c *Expiring) Get(key interface{}) (val interface{}, ok bool) {
 	if !ok {
 		return nil, false
 	}
-	if !c.AllowExpiredGet && !c.clock.Now().Before(e.expiry) {
+	if !c.AllowExpiredGet && !c.clock.Now().Before(e.heapNode.expiry) {
 		return nil, false
 	}
 	return e.val, true
@@ -99,46 +90,30 @@ func (c *Expiring) Set(key interface{}, val interface{}, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.generation++
-
-	c.cache[key] = entry{
-		val:        val,
-		expiry:     expiry,
-		generation: c.generation,
-	}
-
-	// Run GC inline before pushing the new entry.
+	// Run GC inline before updating or pushing the new entry.
 	c.gc(now)
 
-	heap.Push(&c.heap, &expiringHeapEntry{
-		key:        key,
-		expiry:     expiry,
-		generation: c.generation,
-	})
+	if ci, exists := c.cache[key]; exists {
+		// update value and expiration in-place
+		ci.val = val
+		ci.heapNode.expiry = expiry
+		heap.Fix(&c.heap, ci.heapNode.index)
+		return
+	}
+
+	hi := &expiringHeapEntry{key: key, expiry: expiry}
+	ci := &entry{
+		val:      val,
+		heapNode: hi,
+	}
+	c.cache[key] = ci
+	heap.Push(&c.heap, hi)
 }
 
 // Delete deletes an entry in the map.
 func (c *Expiring) Delete(key interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.del(key, 0)
-}
-
-// del deletes the entry for the given key. The generation argument is the
-// generation of the entry that should be deleted. If the generation has been
-// changed (e.g. if a set has occurred on an existing element but the old
-// cleanup still runs), this is a noop. If the generation argument is 0, the
-// entry's generation is ignored and the entry is deleted.
-//
-// del must be called under the write lock.
-func (c *Expiring) del(key interface{}, generation uint64) {
-	e, ok := c.cache[key]
-	if !ok {
-		return
-	}
-	if generation != 0 && generation != e.generation {
-		return
-	}
 	delete(c.cache, key)
 }
 
@@ -162,14 +137,14 @@ func (c *Expiring) gc(now time.Time) {
 			return
 		}
 		cleanup := heap.Pop(&c.heap).(*expiringHeapEntry)
-		c.del(cleanup.key, cleanup.generation)
+		delete(c.cache, cleanup.key)
 	}
 }
 
 type expiringHeapEntry struct {
-	key        interface{}
-	expiry     time.Time
-	generation uint64
+	key    interface{}
+	expiry time.Time
+	index  int // for heap.fix to use.
 }
 
 // expiringHeap is a min-heap ordered by expiration time of its entries. The
@@ -189,14 +164,18 @@ func (cq expiringHeap) Less(i, j int) bool {
 
 func (cq expiringHeap) Swap(i, j int) {
 	cq[i], cq[j] = cq[j], cq[i]
+	cq[i].index, cq[j].index = i, j
 }
 
 func (cq *expiringHeap) Push(c interface{}) {
-	*cq = append(*cq, c.(*expiringHeapEntry))
+	item := c.(*expiringHeapEntry)
+	item.index = len(*cq)
+	*cq = append(*cq, item)
 }
 
 func (cq *expiringHeap) Pop() interface{} {
 	c := (*cq)[cq.Len()-1]
+	c.index = -1
 	*cq = (*cq)[:cq.Len()-1]
 	return c
 }
