@@ -2516,6 +2516,17 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: container_memory_usage_bytes
+  help: Current memory usage of the container in bytes
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - container
+  - pod
+  - namespace
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics/resource
 - name: container_swap_limit_bytes
   help: Current amount of the container swap limit in bytes. Reported only on non-windows
     systems
@@ -5641,6 +5652,13 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: node_memory_usage_bytes
+  help: Current memory usage of the node in bytes
+  type: Custom
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics/resource
 - name: node_swap_usage_bytes
   help: Current swap usage of the node in bytes. Reported only on non-windows systems
   type: Custom
@@ -5682,6 +5700,16 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: pod_memory_usage_bytes
+  help: Current memory usage of the pod in bytes
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - pod
+  - namespace
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics/resource
 - name: pod_security_errors_total
   help: Number of errors preventing normal evaluation. Non-fatal errors may result
     in the latest restricted profile being used for evaluation.
