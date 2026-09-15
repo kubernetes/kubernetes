@@ -277,6 +277,14 @@ func TestRunResourceFor(t *testing.T) {
 			},
 		},
 		{
+			name:        "server-supported impersonation groups resource with overlapping discovery",
+			o:           &CanIOptions{},
+			resourceArg: "groups",
+			expectGVR: schema.GroupVersionResource{
+				Resource: "groups",
+			},
+		},
+		{
 			name:        "invalid resources",
 			o:           &CanIOptions{},
 			resourceArg: "invalid",
