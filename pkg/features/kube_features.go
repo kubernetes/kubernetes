@@ -2325,6 +2325,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	genericfeatures.OpenAPIV2LazyBuild: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	genericfeatures.RemoteRequestHeaderUID: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
@@ -2838,6 +2842,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.MutatingAdmissionPolicy: {},
 
 	genericfeatures.OpenAPIEnums: {},
+
+	genericfeatures.OpenAPIV2LazyBuild: {},
 
 	genericfeatures.RemoteRequestHeaderUID: {},
 
