@@ -31,6 +31,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -352,6 +355,37 @@ func TestPrepareRun(t *testing.T) {
 	resp, err = http.Get(server.URL + "/healthz/ping")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
+}
+
+// TestNewAppliesMaxPooledEncodeBufferSize verifies that building a server
+// configures the process-wide encode buffer pool bound from the config when
+// the AllocatorPoolBufferCap gate is enabled, and leaves it unbounded when
+// the gate is disabled.
+func TestNewAppliesMaxPooledEncodeBufferSize(t *testing.T) {
+	t.Cleanup(func() { runtime.SetMaxPooledBufferCapacity(0) })
+	for _, tc := range []struct {
+		name        string
+		gateEnabled bool
+		size        int
+		want        int
+	}{
+		{name: "gate enabled, default size", gateEnabled: true, size: DefaultMaxPooledEncodeBufferSize, want: DefaultMaxPooledEncodeBufferSize},
+		{name: "gate enabled, custom size", gateEnabled: true, size: 128 * 1024, want: 128 * 1024},
+		{name: "gate disabled", gateEnabled: false, size: 128 * 1024, want: 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllocatorPoolBufferCap, tc.gateEnabled)
+			runtime.SetMaxPooledBufferCapacity(-1)
+			config, _ := setUp(t)
+			config.MaxPooledEncodeBufferSize = tc.size
+			if _, err := config.Complete(nil).New("test", NewEmptyDelegate()); err != nil {
+				t.Fatal(err)
+			}
+			if got := runtime.MaxPooledBufferCapacity(); got != tc.want {
+				t.Fatalf("got pool bound %d, want %d", got, tc.want)
+			}
+		})
+	}
 }
 
 func TestUpdateOpenAPISpec(t *testing.T) {

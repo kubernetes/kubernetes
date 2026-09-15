@@ -18,6 +18,7 @@ package runtime
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 // AllocatorPool simply stores Allocator objects to avoid additional memory allocations
@@ -26,7 +27,7 @@ import (
 // Usage:
 //
 //	memoryAllocator := runtime.AllocatorPool.Get().(*runtime.Allocator)
-//	defer runtime.AllocatorPool.Put(memoryAllocator)
+//	defer runtime.PutAllocator(memoryAllocator)
 //
 // A note for future:
 //
@@ -36,6 +37,52 @@ var AllocatorPool = sync.Pool{
 	New: func() interface{} {
 		return &Allocator{}
 	},
+}
+
+// maxPooledBufferCapacity bounds the buffer capacity an Allocator may retain
+// while parked in AllocatorPool; zero means unbounded. An Allocator's buffer
+// grows to the largest object it has ever encoded and never shrinks, so
+// without a bound a burst of large responses leaves every pooled allocator
+// holding a multi-megabyte buffer for the lifetime of the process. Encodes
+// larger than the bound still work; their buffers are simply released to the
+// GC instead of being pooled.
+//
+// The bound is process-wide and unbounded by default so that library
+// consumers see no behavior change; servers configure it at startup with
+// SetMaxPooledBufferCapacity.
+var maxPooledBufferCapacity atomic.Int64
+
+// SetMaxPooledBufferCapacity sets the largest buffer capacity, in bytes, that
+// PutAllocator returns to AllocatorPool. Zero (the default) or a negative
+// value disables the bound. It is safe to call concurrently with PutAllocator;
+// it is intended to be called once at process startup.
+func SetMaxPooledBufferCapacity(n int) {
+	if n < 0 {
+		n = 0
+	}
+	maxPooledBufferCapacity.Store(int64(n))
+}
+
+// MaxPooledBufferCapacity returns the bound set by SetMaxPooledBufferCapacity,
+// or zero if the pool is unbounded.
+func MaxPooledBufferCapacity() int {
+	return int(maxPooledBufferCapacity.Load())
+}
+
+// PutAllocator returns a MemoryAllocator previously obtained from
+// AllocatorPool. When a bound is configured with SetMaxPooledBufferCapacity,
+// buffers that grew beyond it are dropped before pooling so that steady-state
+// memory retained by the pool stays bounded. Allocators of other types are
+// ignored.
+func PutAllocator(m MemoryAllocator) {
+	a, ok := m.(*Allocator)
+	if !ok {
+		return
+	}
+	if limit := maxPooledBufferCapacity.Load(); limit > 0 && int64(cap(a.buf)) > limit {
+		a.buf = nil
+	}
+	AllocatorPool.Put(a)
 }
 
 // Allocator knows how to allocate memory
@@ -59,7 +106,17 @@ func (a *Allocator) Allocate(n uint64) []byte {
 		return a.buf
 	}
 	// grow the buffer
-	size := uint64(2*cap(a.buf)) + n
+	var size uint64
+	if maxPooledBufferCapacity.Load() > 0 {
+		// With a pool bound configured, grow geometrically but never past
+		// what the request or plain doubling needs. Callers pass exact sizes
+		// (the protobuf encoder sizes the object first), so the historical
+		// 2*cap+n formula over-allocates by up to 3x the object size, and the
+		// excess is what the pool then retains.
+		size = max(n, uint64(2*cap(a.buf)))
+	} else {
+		size = uint64(2*cap(a.buf)) + n
+	}
 	a.buf = make([]byte, size)
 	a.buf = a.buf[:n]
 	return a.buf
