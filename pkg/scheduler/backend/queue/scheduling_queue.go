@@ -1209,7 +1209,7 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 		return nil
 	}
 	// hadUnschedulableOrErrorPods is true if at least one pod of the pod group in this scheduling cycle was unschedulable or had an error.
-	hadUnschedulableOrErrorPods := hasIntersection(pgInfo.QueuedPodInfos, pendingPods)
+	hadUnschedulableOrErrorPods := hasIntersection(pgInfo, pendingPods)
 
 	rootInfo := p.workloadForest.buildQueuedPodGroupInfo(logger, pgInfo)
 	if rootInfo == nil {
@@ -1289,13 +1289,11 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 	return nil
 }
 
-// hasIntersection returns true if any pod in slice is present in the map.
-func hasIntersection(m map[fwk.EntityKey][]*framework.QueuedPodInfo, slice []*framework.QueuedPodInfo) bool {
+// hasIntersection returns true if any pod in slice is queued in pgInfo.
+func hasIntersection(pgInfo *framework.QueuedPodGroupInfo, slice []*framework.QueuedPodInfo) bool {
 	uids := sets.New[types.UID]()
-	for _, pInfos := range m {
-		for _, pInfo := range pInfos {
-			uids.Insert(pInfo.Pod.UID)
-		}
+	for pInfo := range pgInfo.ForEachPodInfo() {
+		uids.Insert(pInfo.Pod.UID)
 	}
 
 	for _, pInfo := range slice {
