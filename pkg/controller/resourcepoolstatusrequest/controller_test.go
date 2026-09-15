@@ -576,6 +576,66 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 	}
 }
 
+func TestIncompletePoolIsProcessedAfterRetryLimit(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	request := makeRequest("test.example.com")
+	fakeClient := fake.NewClientset(request)
+	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+	controller, err := NewController(ctx, fakeClient,
+		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
+		informerFactory.Resource().V1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1().DeviceTaintRules(),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create controller: %v", err)
+	}
+	if err := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Add(request); err != nil {
+		t.Fatalf("Failed to add request to informer: %v", err)
+	}
+	if err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(
+		makeSliceWithExpectedCount("slice-1", "test.example.com", "pool-1", "node-1", 4, 1, 2),
+	); err != nil {
+		t.Fatalf("Failed to add incomplete slice to informer: %v", err)
+	}
+
+	for range maxRetries {
+		controller.workqueue.AddRateLimited(request.Name)
+		key, shutdown := controller.workqueue.Get()
+		if shutdown {
+			t.Fatal("workqueue shut down unexpectedly")
+		}
+		controller.workqueue.Done(key)
+	}
+	controller.workqueue.Add(request.Name)
+	if !controller.processNextWorkItem(ctx) {
+		t.Fatal("worker stopped unexpectedly")
+	}
+	if controller.workqueue.NumRequeues(request.Name) == 0 {
+		t.Fatal("expected incomplete request to be requeued after retry limit")
+	}
+
+	if err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(
+		makeSliceWithExpectedCount("slice-2", "test.example.com", "pool-1", "node-1", 4, 1, 2),
+	); err != nil {
+		t.Fatalf("Failed to add completed slice to informer: %v", err)
+	}
+	controller.workqueue.Forget(request.Name)
+	controller.workqueue.Add(request.Name)
+	if !controller.processNextWorkItem(ctx) {
+		t.Fatal("worker stopped unexpectedly")
+	}
+
+	updated, err := fakeClient.ResourceV1alpha3().ResourcePoolStatusRequests().Get(ctx, request.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get request: %v", err)
+	}
+	if updated.Status == nil {
+		t.Fatal("expected request status after pool became complete")
+	}
+}
+
 func TestSyncRequestWritesStructuralViewError(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
