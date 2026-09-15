@@ -36,6 +36,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -223,6 +224,70 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			gomega.Eventually(func() error {
 				return verifyErrorInKubeletLogs("image was not found")
 			}).WithPolling(5*time.Second).WithTimeout(20*time.Second).ToNot(gomega.HaveOccurred(), "Could not verify error in kubelet logs")
+		})
+	})
+
+	framework.Context("Image volume digest", feature.CriProxy, framework.WithFeatureGate(features.ImageVolumeWithDigest), func() {
+		ginkgo.BeforeEach(func() {
+			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
+				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+			}
+			ginkgo.DeferCleanup(func() error {
+				return resetCRIProxyInjector(e2eCriProxy)
+			})
+		})
+
+		ginkgo.It("should report the image volume digest provided by the container runtime", func(ctx context.Context) {
+			const (
+				imageVolumeName      = "image-volume"
+				imageVolumeMountPath = "/image-volume"
+				imageRef             = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+			)
+
+			ginkgo.By("Reporting a fixed image volume digest in the container status")
+			err := addCRIProxyContainerStatusModifier(e2eCriProxy, func(resp *runtimeapi.ContainerStatusResponse) {
+				for _, mount := range resp.GetStatus().GetMounts() {
+					if mount.GetContainerPath() != imageVolumeMountPath {
+						continue
+					}
+					if mount.Image == nil {
+						mount.Image = &runtimeapi.ImageSpec{}
+					}
+					mount.Image.ImageRef = imageRef
+				}
+			})
+			framework.ExpectNoError(err)
+
+			pod := e2epod.NewPodClient(f).Create(ctx, &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "image-volume-digest-" + string(uuid.NewUUID())},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:         "container",
+						Image:        imageutils.GetPauseImageName(),
+						VolumeMounts: []v1.VolumeMount{{Name: imageVolumeName, MountPath: imageVolumeMountPath}},
+					}},
+					Volumes: []v1.Volume{{
+						Name:         imageVolumeName,
+						VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: imageutils.GetPauseImageName()}},
+					}},
+				},
+			})
+
+			ginkgo.By("Waiting for the image volume digest in the pod status")
+			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+				updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return "", err
+				}
+				for _, containerStatus := range updatedPod.Status.ContainerStatuses {
+					for _, volumeMount := range containerStatus.VolumeMounts {
+						if volumeMount.Name == imageVolumeName && volumeMount.VolumeStatus != nil && volumeMount.VolumeStatus.Image != nil {
+							return volumeMount.VolumeStatus.Image.ImageRef, nil
+						}
+					}
+				}
+				return "", nil
+			}).WithPolling(5 * time.Second).WithTimeout(2 * time.Minute).Should(gomega.Equal(imageRef))
 		})
 	})
 

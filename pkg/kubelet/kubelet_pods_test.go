@@ -67,6 +67,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	netutils "k8s.io/utils/net"
@@ -4367,14 +4368,15 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 	}
 }
 
-// imageDigestRuntime is a simple wrapper that returns a fixed digest for image volumes
-type imageDigestRuntime struct {
+// imageRefSpy records unexpected image status lookups.
+type imageRefSpy struct {
 	*containertest.FakeRuntime
-	digest string
+	getImageRefCalls int
 }
 
-func (r *imageDigestRuntime) GetImageRef(ctx context.Context, image kubecontainer.ImageSpec) (string, error) {
-	return r.digest, nil
+func (r *imageRefSpy) GetImageRef(ctx context.Context, image kubecontainer.ImageSpec) (string, error) {
+	r.getImageRefCalls++
+	return "unexpected-image-ref", nil
 }
 
 func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
@@ -4384,19 +4386,66 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 		imageVolumeMountPath = "/mock/path"
 		imageVolumeRef       = "registry.k8s.io/example:1.2.3"
 		imageDigest          = "sha256:abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd"
+		otherImageDigest     = "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 	)
 
 	now := metav1.Now()
+	newPod := func(mountPaths ...string) *v1.Pod {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-pod"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{Name: "containerA"}},
+				Volumes:    []v1.Volume{{Name: imageVolumeName, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: imageVolumeRef}}}},
+			},
+		}
+		for _, mountPath := range mountPaths {
+			pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{Name: imageVolumeName, MountPath: mountPath})
+		}
+		return pod
+	}
+	runtimeMount := func(containerPath, imageRef string) kubecontainer.Mount {
+		return kubecontainer.Mount{ContainerPath: containerPath, Image: &runtimeapi.ImageSpec{Image: imageVolumeRef, ImageRef: imageRef}}
+	}
+	runningStatus := func(containerID string, mounts ...kubecontainer.Mount) *kubecontainer.PodStatus {
+		return &kubecontainer.PodStatus{
+			ContainerStatuses: []*kubecontainer.Status{
+				{
+					ID:     kubecontainer.ContainerID{Type: "test", ID: containerID},
+					Name:   "containerA",
+					State:  kubecontainer.ContainerStateRunning,
+					Image:  imageVolumeRef,
+					Mounts: mounts,
+				},
+			},
+		}
+	}
+	mountStatus := func(mountPath, imageRef string) v1.VolumeMountStatus {
+		status := v1.VolumeMountStatus{Name: imageVolumeName, MountPath: mountPath}
+		if imageRef != "" {
+			status.VolumeStatus = &v1.VolumeStatus{Image: &v1.ImageVolumeStatus{ImageRef: imageRef}}
+		}
+		return status
+	}
+	previousRunning := func(containerID string, mounts ...v1.VolumeMountStatus) []v1.ContainerStatus {
+		return []v1.ContainerStatus{{Name: "containerA", ContainerID: "test://" + containerID, State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}, VolumeMounts: mounts}}
+	}
+	expectedRunning := func(containerID string, mounts ...v1.VolumeMountStatus) []v1.ContainerStatus {
+		return []v1.ContainerStatus{{Name: "containerA", Image: imageVolumeRef, ContainerID: "test://" + containerID, State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}, VolumeMounts: mounts, Resources: &v1.ResourceRequirements{}}}
+	}
 
 	tests := []struct {
-		name           string
-		pod            *v1.Pod
-		currentStatus  *kubecontainer.PodStatus
-		previousStatus []v1.ContainerStatus
-		expected       []v1.ContainerStatus
+		name                string
+		dnlevEnabled        bool
+		imageDigestDisabled bool
+		initContainer       bool
+		actuatedMounts      []v1.VolumeMount
+		pod                 *v1.Pod
+		currentStatus       *kubecontainer.PodStatus
+		previousStatus      []v1.ContainerStatus
+		expected            []v1.ContainerStatus
 	}{
 		{
-			name: "with image volume - should include digest in status",
+			name: "with image volume - should include runtime digest in status",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					NodeName: "node123",
@@ -4438,9 +4487,8 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 						Image: imageVolumeRef,
 						Mounts: []kubecontainer.Mount{
 							{
-								Name:          imageVolumeName,
 								ContainerPath: imageVolumeMountPath,
-								Image:         &runtimeapi.ImageSpec{Image: imageVolumeRef},
+								Image:         &runtimeapi.ImageSpec{Image: imageVolumeRef, ImageRef: imageDigest},
 							},
 						},
 					},
@@ -4474,6 +4522,91 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 					return containerStatus
 				}(),
 			},
+		},
+		{
+			name:           "with image volume - should match a relative mount path",
+			pod:            newPod("mock/path"),
+			currentStatus:  runningStatus("containerA-id", runtimeMount(volumeutil.MakeAbsolutePath(goruntime.GOOS, "mock/path"), imageDigest)),
+			previousStatus: previousRunning("containerA-id", mountStatus("mock/path", "")),
+			expected:       expectedRunning("containerA-id", mountStatus("mock/path", imageDigest)),
+		},
+		{
+			name:           "with image volume mounted twice - should match each mount by its own path",
+			pod:            newPod(imageVolumeMountPath, "/other/path"),
+			currentStatus:  runningStatus("containerA-id", runtimeMount("/other/path", otherImageDigest), runtimeMount(imageVolumeMountPath, imageDigest)),
+			previousStatus: previousRunning("containerA-id", mountStatus(imageVolumeMountPath, ""), mountStatus("/other/path", "")),
+			expected:       expectedRunning("containerA-id", mountStatus(imageVolumeMountPath, imageDigest), mountStatus("/other/path", otherImageDigest)),
+		},
+		{
+			name:           "with image volume - should ignore a mount with a different path",
+			pod:            newPod(imageVolumeMountPath),
+			currentStatus:  runningStatus("containerA-id", runtimeMount(imageVolumeMountPath+"-different", imageDigest)),
+			previousStatus: previousRunning("containerA-id", mountStatus(imageVolumeMountPath, "")),
+			expected:       expectedRunning("containerA-id", mountStatus(imageVolumeMountPath, "")),
+		},
+		{
+			name:           "with image volume - should omit stale digest when runtime omits image ref",
+			pod:            newPod(imageVolumeMountPath),
+			currentStatus:  runningStatus("containerA-id", runtimeMount(imageVolumeMountPath, "")),
+			previousStatus: previousRunning("containerA-id", mountStatus(imageVolumeMountPath, imageDigest)),
+			expected:       expectedRunning("containerA-id", mountStatus(imageVolumeMountPath, "")),
+		},
+		{
+			name:           "with image volume - should omit a runtime digest longer than the API limit",
+			pod:            newPod(imageVolumeMountPath),
+			currentStatus:  runningStatus("containerA-id", runtimeMount(imageVolumeMountPath, strings.Repeat("a", 257))),
+			previousStatus: previousRunning("containerA-id", mountStatus(imageVolumeMountPath, imageDigest)),
+			expected:       expectedRunning("containerA-id", mountStatus(imageVolumeMountPath, "")),
+		},
+		{
+			name:           "with image volume - should report the runtime digest of a restarted container",
+			pod:            newPod(imageVolumeMountPath),
+			currentStatus:  runningStatus("containerA-new-id", runtimeMount(imageVolumeMountPath, otherImageDigest)),
+			previousStatus: previousRunning("containerA-id", mountStatus(imageVolumeMountPath, imageDigest)),
+			expected:       expectedRunning("containerA-new-id", mountStatus(imageVolumeMountPath, otherImageDigest)),
+		},
+		{
+			name:           "with image volume - should not report a digest without previously reported mounts",
+			pod:            newPod(imageVolumeMountPath),
+			currentStatus:  runningStatus("containerA-id", runtimeMount(imageVolumeMountPath, imageDigest)),
+			previousStatus: previousRunning("containerA-id"),
+			expected:       expectedRunning("containerA-id"),
+		},
+		{
+			name:          "with image volume in an init container - should include runtime digest in status",
+			initContainer: true,
+			pod: func() *v1.Pod {
+				pod := newPod(imageVolumeMountPath)
+				pod.Spec.InitContainers, pod.Spec.Containers = pod.Spec.Containers, nil
+				return pod
+			}(),
+			currentStatus:  runningStatus("containerA-id", runtimeMount(imageVolumeMountPath, imageDigest)),
+			previousStatus: previousRunning("containerA-id", mountStatus(imageVolumeMountPath, "")),
+			expected:       expectedRunning("containerA-id", mountStatus(imageVolumeMountPath, imageDigest)),
+		},
+		{
+			name:           "with dynamic volume mounts - should include runtime digest for actuated mounts",
+			dnlevEnabled:   true,
+			actuatedMounts: []v1.VolumeMount{{Name: imageVolumeName, MountPath: imageVolumeMountPath}},
+			pod:            newPod(imageVolumeMountPath),
+			currentStatus:  runningStatus("containerA-id", runtimeMount(imageVolumeMountPath, imageDigest)),
+			expected:       expectedRunning("containerA-id", mountStatus(imageVolumeMountPath, imageDigest)),
+		},
+		{
+			name:           "with dynamic volume mounts - should update the digest of preserved mounts",
+			dnlevEnabled:   true,
+			pod:            newPod(imageVolumeMountPath),
+			currentStatus:  runningStatus("containerA-id", runtimeMount(imageVolumeMountPath, otherImageDigest)),
+			previousStatus: previousRunning("containerA-id", mountStatus(imageVolumeMountPath, imageDigest)),
+			expected:       expectedRunning("containerA-id", mountStatus(imageVolumeMountPath, otherImageDigest)),
+		},
+		{
+			name:                "with feature gate disabled - should drop a previously reported digest",
+			imageDigestDisabled: true,
+			pod:                 newPod(imageVolumeMountPath),
+			currentStatus:       runningStatus("containerA-id", runtimeMount(imageVolumeMountPath, imageDigest)),
+			previousStatus:      previousRunning("containerA-id", mountStatus(imageVolumeMountPath, imageDigest)),
+			expected:            expectedRunning("containerA-id", mountStatus(imageVolumeMountPath, "")),
 		},
 		{
 			name: "with no image volume - should not include digest in status",
@@ -4517,17 +4650,32 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolumeWithDigest, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, test.dnlevEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolumeWithDigest, !test.imageDigestDisabled)
 
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
 
-			// Mock the container runtime to return the expected image digest
-			kl.containerRuntime = &imageDigestRuntime{
+			spy := &imageRefSpy{
 				FakeRuntime: &containertest.FakeRuntime{},
-				digest:      imageDigest,
+			}
+			kl.containerRuntime = spy
+			containers, containerType := test.pod.Spec.Containers, podutil.Containers
+			if test.initContainer {
+				containers, containerType = test.pod.Spec.InitContainers, podutil.InitContainers
+			}
+			if test.actuatedMounts != nil {
+				require.NoError(t, kl.actuatedState.SetContainer(tCtx.Logger(), test.pod.UID, containerType, v1.Container{Name: "containerA", VolumeMounts: test.actuatedMounts}))
+			}
+			// Like generateAPIPodStatus, only collect image volume names while the feature is enabled.
+			var imageVolumeNames sets.Set[string]
+			if !test.imageDigestDisabled {
+				imageVolumeNames = sets.New(imageVolumeName)
+			}
+			previousStatus := slices.Clone(test.previousStatus)
+			for i := range previousStatus {
+				previousStatus[i] = *previousStatus[i].DeepCopy()
 			}
 
 			containerStatuses := kl.convertToAPIContainerStatuses(
@@ -4535,15 +4683,18 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 				test.pod,
 				test.currentStatus,
 				test.previousStatus,
-				test.pod.Spec.Containers,
-				sets.New(imageVolumeName),
-				false,
-				podutil.Containers,
+				containers,
+				imageVolumeNames,
+				len(test.pod.Spec.InitContainers) > 0,
+				containerType,
 				false,
 			)
+			require.Len(t, containerStatuses, len(test.expected), "[test %s]", test.name)
 			for i, status := range containerStatuses {
 				assert.Equal(t, test.expected[i], status, "[test %s]", test.name)
 			}
+			assert.Zero(t, spy.getImageRefCalls, "GetImageRef must not be called")
+			assert.Equal(t, previousStatus, test.previousStatus, "previous status must not be mutated")
 		})
 	}
 }
