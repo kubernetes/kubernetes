@@ -74,6 +74,7 @@
       initPods: 0
       measurePods: 10
   - name: Explicit_25classes_2000pods_200nodes
+    labels: [performance]
     params:
       class: example.com/gpu
       classes: 25
@@ -92,6 +93,7 @@
       initPods: 2500
       measurePods: 2500
   - name: Explicit_50classes_2000pods_200nodes
+    labels: [performance]
     params:
       class: example.com/gpu
       classes: 50
@@ -110,6 +112,7 @@
       initPods: 2500
       measurePods: 2500
   - name: Implicit_25classes_2000pods_200nodes
+    labels: [performance]
     params:
       class: deviceclass.resource.kubernetes.io/test-class
       classes: 25
