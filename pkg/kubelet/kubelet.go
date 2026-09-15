@@ -328,6 +328,7 @@ type Dependencies struct {
 	PodConfig                 *config.PodConfig
 	ProbeManager              prober.Manager
 	Recorder                  record.EventRecorderLogger
+	InsecureIDEventRecorder   record.EventRecorderLogger
 	Subpather                 subpath.Interface
 	TracerProvider            trace.TracerProvider
 	VolumePlugins             []volume.VolumePlugin
@@ -648,6 +649,7 @@ func NewMainKubelet(ctx context.Context,
 		nodeLister:                   nodeLister,
 		nodeHasSynced:                nodeHasSynced,
 		recorder:                     kubeDeps.Recorder,
+		insecureIDEventRecorder:      kubeDeps.InsecureIDEventRecorder,
 		cadvisor:                     kubeDeps.CAdvisorInterface,
 		externalCloudProvider:        cloudprovider.IsExternal(cloudProvider),
 		providerID:                   providerID,
@@ -1387,6 +1389,9 @@ type Kubelet struct {
 
 	// The EventRecorder to use
 	recorder record.EventRecorderLogger
+
+	// insecureIDEventRecorder is a separately-throttled EventRecorderLogger for InsecureUserID/InsecureGroupID warnings.
+	insecureIDEventRecorder record.EventRecorderLogger
 
 	// Policy for handling garbage collection of dead containers.
 	containerGC kubecontainer.GC
