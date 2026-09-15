@@ -308,6 +308,7 @@ message CapacityRequirements {
   // the aggregated amount across all requests must not exceed the capacity value.
   // The consumed capacity, which may be adjusted based on the requestPolicy if defined,
   // is recorded in the resource claim’s status.devices[*].consumedCapacity field.
+  // Requests may have at most 32 entries.
   //
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 1;
