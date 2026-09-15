@@ -115,7 +115,7 @@ func NewComponentStatusInformerWithOptions(client kubernetes.Interface, options 
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedComponentStatusInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) ComponentStatusIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuss"}
+	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apicorev1.ComponentStatus](cache.NewSharedIndexInformerWithOptions(
