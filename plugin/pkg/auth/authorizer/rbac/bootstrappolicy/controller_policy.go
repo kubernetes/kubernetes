@@ -504,12 +504,18 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		rules := []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch", "update").Groups(schedulingGroup).Resources("podgroups").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+			rules = append(rules,
+				rbacv1helpers.NewRule("get", "list", "watch", "update").Groups(schedulingGroup).Resources("compositepodgroups").RuleOrDie(),
+			)
+		}
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "podgroup-protection-controller"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get", "list", "watch", "update").Groups(schedulingGroup).Resources("podgroups").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			},
+			Rules:      rules,
 		})
 	}
 
