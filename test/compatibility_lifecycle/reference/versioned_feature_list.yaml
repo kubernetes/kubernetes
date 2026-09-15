@@ -489,6 +489,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.37"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.38"
 - name: DRADeviceTaints
   versionedSpecs:
   - default: false
@@ -503,6 +507,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.37"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.38"
 - name: DRAExtendedResource
   versionedSpecs:
   - default: false
