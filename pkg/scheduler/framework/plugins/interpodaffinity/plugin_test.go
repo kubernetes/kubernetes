@@ -193,6 +193,27 @@ func Test_isSchedulableAfterAssignedPodChange(t *testing.T) {
 				PodAntiAffinityIn("app", "region", []string{"web"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			expectedHint: fwk.Queue,
 		},
+		{
+			name: "delete a pod matching pending pod's affinity when pending has self-affinity",
+			pod: st.MakePod().UID("p").Name("p").Label("app", "self-affinity-repro").
+				PodAffinityIn("app", "hostname", []string{"self-affinity-repro"}, st.PodAffinityWithRequiredReq).Obj(),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("app", "self-affinity-repro").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name: "delete a pod matching pending pod's affinity when pending does not self-match",
+			pod: st.MakePod().UID("p").Name("p").Label("app", "other-label").
+				PodAffinityIn("app", "hostname", []string{"self-affinity-repro"}, st.PodAffinityWithRequiredReq).Obj(),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("app", "self-affinity-repro").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name: "delete a non-matching pod while pending has self-affinity",
+			pod: st.MakePod().UID("p").Name("p").Label("app", "self-affinity-repro").
+				PodAffinityIn("app", "hostname", []string{"self-affinity-repro"}, st.PodAffinityWithRequiredReq).Obj(),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("app", "unrelated").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
