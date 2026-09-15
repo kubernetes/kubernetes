@@ -51,11 +51,11 @@ func RegisterFlags(fs *pflag.FlagSet) {
 	defer tolerationSecondsMutex.Unlock()
 
 	fs.Int64Var(&defaultNotReadyTolerationSeconds, "default-not-ready-toleration-seconds", defaultNotReadyTolerationSeconds,
-		"Indicates the tolerationSeconds of the toleration for notReady:NoExecute"+
-			" that is added by default to every pod that does not already have such a toleration.")
+		"Indicates the tolerationSeconds of the toleration for notReady:NoExecute "+
+			"that is added by default to every pod that does not already have such a toleration.")
 	fs.Int64Var(&defaultUnreachableTolerationSeconds, "default-unreachable-toleration-seconds", defaultUnreachableTolerationSeconds,
-		"Indicates the tolerationSeconds of the toleration for unreachable:NoExecute"+
-			" that is added by default to every pod that does not already have such a toleration.")
+		"Indicates the tolerationSeconds of the toleration for unreachable:NoExecute "+
+			"that is added by default to every pod that does not already have such a toleration.")
 }
 
 // Register registers a plugin
