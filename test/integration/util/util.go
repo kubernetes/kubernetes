@@ -419,6 +419,48 @@ func CleanupPods(ctx context.Context, cs clientset.Interface, t testutils.TB, po
 	}
 }
 
+// CleanupPodGroups deletes the given pod groups and waits for them to be actually deleted.
+func CleanupPodGroups(ctx context.Context, cs clientset.Interface, t testutils.TB, podGroups []*schedulingapiv1beta1.PodGroup) {
+	for _, pg := range podGroups {
+		patch := []byte(`{"metadata":{"finalizers":null}}`)
+		if _, err := cs.SchedulingV1beta1().PodGroups(pg.Namespace).Patch(ctx, pg.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			t.Errorf("error while removing finalizers from podgroup %v/%v: %v", pg.Namespace, pg.Name, err)
+		}
+		if err := cs.SchedulingV1beta1().PodGroups(pg.Namespace).Delete(ctx, pg.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			t.Errorf("error while deleting podgroup %v/%v: %v", pg.Namespace, pg.Name, err)
+		}
+	}
+	for _, pg := range podGroups {
+		if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			_, err := cs.SchedulingV1beta1().PodGroups(pg.Namespace).Get(ctx, pg.Name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err), nil
+		}); err != nil {
+			t.Errorf("error while waiting for podgroup %v/%v to get deleted: %v", pg.Namespace, pg.Name, err)
+		}
+	}
+}
+
+// CleanupCompositePodGroups deletes the given composite pod groups and waits for them to be actually deleted.
+func CleanupCompositePodGroups(ctx context.Context, cs clientset.Interface, t testutils.TB, compositePodGroups []*schedulingapiv1alpha3.CompositePodGroup) {
+	for _, cpg := range compositePodGroups {
+		patch := []byte(`{"metadata":{"finalizers":null}}`)
+		if _, err := cs.SchedulingV1alpha3().CompositePodGroups(cpg.Namespace).Patch(ctx, cpg.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			t.Errorf("error while removing finalizers from compositepodgroup %v/%v: %v", cpg.Namespace, cpg.Name, err)
+		}
+		if err := cs.SchedulingV1alpha3().CompositePodGroups(cpg.Namespace).Delete(ctx, cpg.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			t.Errorf("error while deleting compositepodgroup %v/%v: %v", cpg.Namespace, cpg.Name, err)
+		}
+	}
+	for _, cpg := range compositePodGroups {
+		if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			_, err := cs.SchedulingV1alpha3().CompositePodGroups(cpg.Namespace).Get(ctx, cpg.Name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err), nil
+		}); err != nil {
+			t.Errorf("error while waiting for compositepodgroup %v/%v to get deleted: %v", cpg.Namespace, cpg.Name, err)
+		}
+	}
+}
+
 // AddTaintToNode add taints to specific node
 func AddTaintToNode(cs clientset.Interface, nodeName string, taint v1.Taint) error {
 	node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
