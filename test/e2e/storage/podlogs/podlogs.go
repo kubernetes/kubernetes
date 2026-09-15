@@ -28,6 +28,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"os"
 	"path"
 	"regexp"
@@ -37,8 +38,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
 )
+
+// reconnectJitter bounds the random delay before reconnecting a broken log
+// stream, to avoid a thundering herd when many streams break at once.
+const reconnectJitter = 90 * time.Second
 
 // LogOutput determines where output from CopyAllLogs goes.
 //
@@ -108,13 +115,19 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 			FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
 		}
 	}
-	watcher, err := cs.CoreV1().Pods(ns).Watch(ctx, options)
-
+	// RetryWatcher reconnects internally after a blip. A plain watcher's
+	// closed result channel would otherwise busy-loop check().
+	initialList, err := cs.CoreV1().Pods(ns).List(ctx, options)
+	if err != nil {
+		return fmt.Errorf("cannot list pods in %s: %w", ns, err)
+	}
+	watcher, err := watchtools.NewRetryWatcherWithContext(ctx, initialList.ResourceVersion, podsWatcher{cs: cs, ns: ns, fieldSelector: options.FieldSelector})
 	if err != nil {
 		return fmt.Errorf("cannot create Pod event watcher: %w", err)
 	}
 
 	go func() {
+		defer watcher.Stop()
 		var m sync.Mutex
 		// Key is pod/container name, true if currently logging it.
 		active := map[string]bool{}
@@ -122,6 +135,8 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 		started := map[string]bool{}
 		// Key is pod/container/container-id, value the time stamp of the last log line that has been seen.
 		latest := map[string]*meta.Time{}
+		// Key is pod/container name, value is the earliest time a reconnect is allowed.
+		retryAfter := map[string]time.Time{}
 
 		check := func() {
 			m.Lock()
@@ -154,7 +169,10 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 						// Don't attempt to get logs for a container unless it is running or has terminated.
 						// Trying to get a log would just end up with an error that we would have to suppress.
 						(pod.Status.ContainerStatuses[i].State.Running == nil &&
-							pod.Status.ContainerStatuses[i].State.Terminated == nil) {
+							pod.Status.ContainerStatuses[i].State.Terminated == nil) ||
+						// Still within the jittered reconnect delay after a broken stream?
+						// If yes, don't reconnect yet.
+						time.Now().Before(retryAfter[name]) {
 						continue
 					}
 
@@ -222,6 +240,7 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 						})
 					if err != nil {
 						closeOutput()
+						retryAfter[name] = time.Now().Add(rand.N(reconnectJitter))
 
 						// We do get "normal" errors here, like trying to read too early.
 						// We can ignore those.
@@ -250,6 +269,8 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 								}
 							}
 							active[name] = false
+							// Jitter reconnects to avoid a thundering herd.
+							retryAfter[name] = time.Now().Add(rand.N(reconnectJitter))
 							m.Unlock()
 							readCloser.Close()
 						}()
@@ -324,6 +345,7 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 			case <-watcher.ResultChan():
 				check()
 			case <-ticker.C:
+				check()
 			case <-ctx.Done():
 				return
 			}
@@ -331,6 +353,21 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 	}()
 
 	return nil
+}
+
+// podsWatcher implements cache.WatcherWithContext, optionally restricted to
+// a single pod name, for use with watchtools.NewRetryWatcherWithContext.
+type podsWatcher struct {
+	cs            clientset.Interface
+	ns            string
+	fieldSelector string
+}
+
+func (w podsWatcher) WatchWithContext(ctx context.Context, options meta.ListOptions) (watch.Interface, error) {
+	if w.fieldSelector != "" {
+		options.FieldSelector = w.fieldSelector
+	}
+	return w.cs.CoreV1().Pods(w.ns).Watch(ctx, options)
 }
 
 func maybeClose(writer io.Writer) {
