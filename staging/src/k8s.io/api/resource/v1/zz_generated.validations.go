@@ -3172,7 +3172,39 @@ func Validate_ResourceSliceSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *ResourceSliceSpec) (errs field.ErrorList) {
 
-	// field ResourceSliceSpec.Driver has no validation
+	{ // field ResourceSliceSpec.Driver
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ResourceSliceSpec) *string {
+				return &oldObj.Driver
+			})
+		errs = append(errs, fn(fldPath.Child("driver"), &obj.Driver, oldVal, oldObj != nil)...)
+	}
+
 	// field ResourceSliceSpec.Pool has no validation
 	// field ResourceSliceSpec.NodeName has no validation
 	// field ResourceSliceSpec.NodeSelector has no validation

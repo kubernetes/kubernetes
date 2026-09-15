@@ -113,6 +113,8 @@ type ResourceSliceSpec struct {
 	// This field is immutable.
 	//
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
 
 	// pool describes the pool that this ResourceSlice belongs to.

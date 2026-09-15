@@ -2086,7 +2086,7 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			},
 		},
 		"invalid-update-drivername": {
-			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), name+"-updated", "field is immutable")},
+			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), name+"-updated", "field is immutable").WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()},
 			oldResourceSlice: validResourceSlice,
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				slice.Spec.Driver += "-updated"

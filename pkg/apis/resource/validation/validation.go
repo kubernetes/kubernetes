@@ -802,11 +802,11 @@ func ValidateResourceSliceUpdate(resourceSlice, oldResourceSlice *resource.Resou
 
 func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateDriverName(spec.Driver, fldPath.Child("driver"))...)
+	allErrs = append(allErrs, validateDriverName(spec.Driver, fldPath.Child("driver"), corevalidation.RequiredCovered)...)
 	allErrs = append(allErrs, validateResourcePool(spec.Pool, fldPath.Child("pool"))...)
 	if oldSpec != nil {
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Pool.Name, oldSpec.Pool.Name, fldPath.Child("pool", "name"))...)
-		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Driver, oldSpec.Driver, fldPath.Child("driver"))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Driver, oldSpec.Driver, fldPath.Child("driver")).WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()...)
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.NodeName, oldSpec.NodeName, fldPath.Child("nodeName"))...)
 	}
 

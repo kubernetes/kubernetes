@@ -64,6 +64,13 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid": {
 					input: mkResourceSliceWithDevices(),
 				},
+				// spec.driver
+				"invalid: empty driver": {
+					input: mkResourceSliceWithDevices(tweakDriver("")),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "driver"), "").MarkAlpha(),
+					},
+				},
 				// spec.devices[%d].bindingConditions
 				"valid: one binding condition": {
 					input: mkResourceSliceWithDevices(tweakBindingConditions(1)),
@@ -606,6 +613,14 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					old:    mkResourceSliceWithDevices(),
 					update: mkResourceSliceWithDevices(),
 				},
+				// spec.driver
+				"invalid update: driver changed": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDriver("other.driver.io")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "driver"), "other.driver.io", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
 				// spec.devices[%d].bindingConditions
 				"valid update: at limit binding conditions": {
 					old:    mkResourceSliceWithDevices(),
@@ -958,6 +973,12 @@ func tweakBindingConditions(count int) func(*resource.ResourceSlice) {
 		for i := 0; i < count; i++ {
 			rs.Spec.Devices[0].BindingConditions = append(rs.Spec.Devices[0].BindingConditions, fmt.Sprintf("condition-%d", i))
 		}
+	}
+}
+
+func tweakDriver(driver string) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.Driver = driver
 	}
 }
 
