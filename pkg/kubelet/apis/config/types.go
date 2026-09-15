@@ -273,6 +273,10 @@ type KubeletConfiguration struct {
 	// MemoryManagerPolicy is the name of the policy to use.
 	// Requires the MemoryManager feature gate to be enabled.
 	MemoryManagerPolicy string
+	// MemoryManagerPolicyOptions is a set of key=value which allows to set extra options
+	// to fine tune the behaviour of the memory manager policies.
+	// Requires the MemoryManagerDriftTolerance feature gate to be enabled.
+	MemoryManagerPolicyOptions map[string]string
 	// TopologyManagerPolicy is the name of the policy to use.
 	TopologyManagerPolicy string
 	// TopologyManagerScope represents the scope of topology hint generation

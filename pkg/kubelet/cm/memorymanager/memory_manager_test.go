@@ -81,7 +81,7 @@ func returnPolicyByName(logger klog.Logger, testCase testMemoryManager) Policy {
 			err: fmt.Errorf("fake reg error"),
 		}
 	case PolicyTypeStatic:
-		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager(logger))
+		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager(logger), nil)
 		return policy
 	case policyTypeNone:
 		return NewPolicyNone(logger)
@@ -2025,7 +2025,7 @@ func TestNewManager(t *testing.T) {
 				require.NoErrorf(t, os.RemoveAll(stateFileDirectory), "unable to remove dir %s", stateFileDirectory)
 			})
 
-			mgr, err := NewManager(logger, string(testCase.policyName), &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity)
+			mgr, err := NewManager(logger, string(testCase.policyName), nil, &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity)
 
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Errorf("Could not create the Memory Manager. Expected error: '%v', but got: '%v'",
