@@ -271,3 +271,57 @@ func setupMetrics() {
 	ephemeralvolumemetrics.EphemeralVolumeCreateAttempts.Reset()
 	ephemeralvolumemetrics.EphemeralVolumeCreateFailures.Reset()
 }
+
+func Test_UpdatePodWithEnableFeature(t *testing.T) {
+	ec := buildController()
+	var pod interface{} = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test_pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "ephemeral_vol",
+					VolumeSource: v1.VolumeSource{
+						Ephemeral: &v1.EphemeralVolumeSource{
+							VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{
+								Spec: v1.PersistentVolumeClaimSpec{
+									VolumeName: "ephemeral_vol",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodFailed,
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodRejected,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+	ec.updatePod(nil, pod)
+	item, _ := ec.queue.Get()
+	if item != "default/test_pod" {
+		t.Errorf("item is incorrect. : %v", item)
+	}
+}
+
+func buildController() *ephemeralController {
+	ctx, cancel := context.WithCancel(context.Background())
+	fakeKubeClient := createTestClient()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	defer informerFactory.Shutdown()
+	defer cancel()
+	podInformer := informerFactory.Core().V1().Pods()
+	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
+
+	c, _ := NewController(ctx, fakeKubeClient, podInformer, pvcInformer)
+	ec, _ := c.(*ephemeralController)
+	return ec
+}
