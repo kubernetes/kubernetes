@@ -310,6 +310,25 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 				},
 			},
 		},
+		"matchLabelKeys without labelSelector": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       "node",
+						WhenUnsatisfiable: v1.DoNotSchedule,
+						MatchLabelKeys:    []string{"app"},
+					},
+				},
+				DefaultingType: config.ListDefaulting,
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeForbidden,
+					Field: "defaultConstraints[0].matchLabelKeys",
+				},
+			},
+		},
 		"maxSkew less than zero": {
 			args: &config.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{

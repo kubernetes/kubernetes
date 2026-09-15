@@ -128,6 +128,9 @@ func ValidatePodTopologySpreadArgs(path *field.Path, args *config.PodTopologySpr
 		if err := validateNodeInclusionPolicy(p.Child("nodeTaintsPolicy"), c.NodeTaintsPolicy); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		if len(c.MatchLabelKeys) > 0 {
+			allErrs = append(allErrs, field.Forbidden(p.Child("matchLabelKeys"), "must not be specified when labelSelector is not set"))
+		}
 		if c.LabelSelector != nil {
 			f := field.Forbidden(p.Child("labelSelector"), "constraint must not define a selector, as they deduced for each pod")
 			allErrs = append(allErrs, f)
