@@ -506,69 +506,156 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 	}
 }
 
-// TestUpdatePod tests that a pod will be updated if added before.
+// TestUpdatePod tests updating pods in the cache, including updating pod resources
+// with the same UID and recreating pods with different UIDs.
 func TestUpdatePod(t *testing.T) {
-	nodeName := "node"
+	nodeName1 := "node-1"
+	nodeName2 := "node-2"
 	testPods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
-		makeBasePod(t, nodeName, "test", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName1, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName1, "test", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
-	test := struct {
+	oldPod := st.MakePod().Name("pod-1").Namespace("default").UID("uid-1").Node(nodeName1).Obj()
+	newPodUnscheduled := st.MakePod().Name("pod-1").Namespace("default").UID("uid-2").Obj()
+	newPodAssignedDifferentNode := st.MakePod().Name("pod-1").Namespace("default").UID("uid-3").Node(nodeName2).Obj()
+	newPodAssignedSameNode := st.MakePod().Name("pod-1").Namespace("default").UID("uid-4").Node(nodeName1).Obj()
+
+	tests := []struct {
+		name         string
 		podsToAdd    []*v1.Pod
 		podsToUpdate []*v1.Pod
-
-		wNodeInfo []*framework.NodeInfo
-	}{ // add a pod and then update it twice
-		podsToAdd:    []*v1.Pod{testPods[0]},
-		podsToUpdate: []*v1.Pod{testPods[0], testPods[1], testPods[0]},
-		wNodeInfo: []*framework.NodeInfo{newNodeInfo(
-			&framework.Resource{
-				MilliCPU: 200,
-				Memory:   1024,
+		wantNodeInfo map[string][]*framework.NodeInfo
+	}{
+		{
+			name:         "add a pod and then update it twice",
+			podsToAdd:    []*v1.Pod{testPods[0]},
+			podsToUpdate: []*v1.Pod{testPods[0], testPods[1], testPods[0]},
+			wantNodeInfo: map[string][]*framework.NodeInfo{
+				nodeName1: {
+					newNodeInfo(
+						&framework.Resource{
+							MilliCPU: 200,
+							Memory:   1024,
+						},
+						&framework.Resource{
+							MilliCPU: 200,
+							Memory:   1024,
+						},
+						[]*v1.Pod{testPods[1]},
+						newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
+						make(map[string]*fwk.ImageStateSummary),
+					),
+					newNodeInfo(
+						&framework.Resource{
+							MilliCPU: 100,
+							Memory:   500,
+						},
+						&framework.Resource{
+							MilliCPU: 100,
+							Memory:   500,
+						},
+						[]*v1.Pod{testPods[0]},
+						newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+						make(map[string]*fwk.ImageStateSummary),
+					),
+				},
 			},
-			&framework.Resource{
-				MilliCPU: 200,
-				Memory:   1024,
+		},
+		{
+			name:         "old pod assigned, new pod unscheduled with different UID",
+			podsToAdd:    []*v1.Pod{oldPod},
+			podsToUpdate: []*v1.Pod{oldPod, newPodUnscheduled},
+			wantNodeInfo: map[string][]*framework.NodeInfo{
+				nodeName1: {nil},
 			},
-			[]*v1.Pod{testPods[1]},
-			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*fwk.ImageStateSummary),
-		), newNodeInfo(
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
+		},
+		{
+			name:         "old pod assigned, new pod assigned to a different node with different UID",
+			podsToAdd:    []*v1.Pod{oldPod},
+			podsToUpdate: []*v1.Pod{oldPod, newPodAssignedDifferentNode},
+			wantNodeInfo: map[string][]*framework.NodeInfo{
+				nodeName1: {nil},
+				nodeName2: {
+					newNodeInfo(
+						&framework.Resource{},
+						&framework.Resource{},
+						[]*v1.Pod{newPodAssignedDifferentNode},
+						newHostPortInfoBuilder().build(),
+						make(map[string]*fwk.ImageStateSummary),
+					),
+				},
 			},
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
+		},
+		{
+			name:         "old pod assigned, new pod assigned to same node with different UID",
+			podsToAdd:    []*v1.Pod{oldPod},
+			podsToUpdate: []*v1.Pod{oldPod, newPodAssignedSameNode},
+			wantNodeInfo: map[string][]*framework.NodeInfo{
+				nodeName1: {
+					newNodeInfo(
+						&framework.Resource{},
+						&framework.Resource{},
+						[]*v1.Pod{newPodAssignedSameNode},
+						newHostPortInfoBuilder().build(),
+						make(map[string]*fwk.ImageStateSummary),
+					),
+				},
 			},
-			[]*v1.Pod{testPods[0]},
-			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*fwk.ImageStateSummary),
-		)},
+		},
 	}
 
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	cache := newCache(ctx, time.Second, nil, false, false)
-	for _, podToAdd := range test.podsToAdd {
-		if err := cache.AddPod(logger, podToAdd); err != nil {
-			t.Fatalf("AddPod failed: %v", err)
-		}
-	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			cache := newCache(ctx, time.Second, nil, false, false)
+			for _, podToAdd := range tc.podsToAdd {
+				if err := cache.AddPod(logger, podToAdd); err != nil {
+					t.Fatalf("AddPod failed: %v", err)
+				}
+			}
 
-	for j := range test.podsToUpdate {
-		if j == 0 {
-			continue
-		}
-		if err := cache.UpdatePod(logger, test.podsToUpdate[j-1], test.podsToUpdate[j]); err != nil {
-			t.Fatalf("UpdatePod failed: %v", err)
-		}
-		n := cache.nodes[nodeName]
-		if err := deepEqualWithoutGeneration(n, test.wNodeInfo[j-1]); err != nil {
-			t.Errorf("update %d: %v", j, err)
-		}
+			for j := range tc.podsToUpdate {
+				if j == 0 {
+					continue
+				}
+				oldPod := tc.podsToUpdate[j-1]
+				pod := tc.podsToUpdate[j]
+				if err := cache.UpdatePod(logger, oldPod, pod); err != nil {
+					t.Fatalf("UpdatePod failed: %v", err)
+				}
+				for nodeName, wantNodeInfos := range tc.wantNodeInfo {
+					if err := deepEqualWithoutGeneration(cache.nodes[nodeName], wantNodeInfos[j-1]); err != nil {
+						t.Errorf("update %d on node %q: %v", j, nodeName, err)
+					}
+				}
+
+				if oldPod.UID != pod.UID {
+					oldKey, err := framework.GetPodKey(oldPod)
+					if err != nil {
+						t.Fatalf("GetPodKey failed: %v", err)
+					}
+					if _, ok := cache.podStates[oldKey]; ok {
+						t.Errorf("update %d: expected old pod %v to be removed from podStates", j, oldKey)
+					}
+				}
+				key, err := framework.GetPodKey(pod)
+				if err != nil {
+					t.Fatalf("GetPodKey failed: %v", err)
+				}
+				ps, ok := cache.podStates[key]
+				if pod.Spec.NodeName == "" {
+					if ok {
+						t.Errorf("update %d: expected pod %v not to be in podStates", j, key)
+					}
+				} else {
+					if !ok || ps.pod != pod {
+						t.Errorf("update %d: expected pod %v in podStates, got %v", j, pod, ps)
+					}
+				}
+			}
+		})
 	}
 }
 
