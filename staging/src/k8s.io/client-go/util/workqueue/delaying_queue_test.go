@@ -71,7 +71,12 @@ func TestSimpleQueue(t *testing.T) {
 
 func TestDeduping(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	mp := testMetricsProvider{}
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{
+		Name:            "test-delay",
+		Clock:           fakeClock,
+		MetricsProvider: &mp,
+	})
 
 	first := "foo"
 
@@ -79,6 +84,13 @@ func TestDeduping(t *testing.T) {
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	if mp.delayed.gaugeValue() != 1 {
+		t.Errorf("expected 1 delayed, got %v", mp.delayed.gaugeValue())
+	}
+	if mp.retries.gaugeValue() != 1 {
+		t.Errorf("expected 1 retry, got %v", mp.retries.gaugeValue())
+	}
+
 	q.AddAfter(first, 70*time.Millisecond)
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -86,11 +98,20 @@ func TestDeduping(t *testing.T) {
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
 	}
+	if mp.delayed.gaugeValue() != 1 {
+		t.Errorf("expected 1 delayed, got %v", mp.delayed.gaugeValue())
+	}
+	if mp.retries.gaugeValue() != 2 {
+		t.Errorf("expected 2 retries, got %v", mp.retries.gaugeValue())
+	}
 
 	// step past the first block, we should receive now
 	fakeClock.Step(60 * time.Millisecond)
 	if err := waitForAdded(q, 1); err != nil {
 		t.Errorf("should have added")
+	}
+	if mp.delayed.gaugeValue() != 0 {
+		t.Errorf("expected 0 delayed, got %v", mp.delayed.gaugeValue())
 	}
 	item, _ := q.Get()
 	q.Done(item)
@@ -110,10 +131,19 @@ func TestDeduping(t *testing.T) {
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
 	}
+	if mp.delayed.gaugeValue() != 1 {
+		t.Errorf("expected 1 delayed, got %v", mp.delayed.gaugeValue())
+	}
+	if mp.retries.gaugeValue() != 4 {
+		t.Errorf("expected 4 retries, got %v", mp.retries.gaugeValue())
+	}
 
 	fakeClock.Step(40 * time.Millisecond)
 	if err := waitForAdded(q, 1); err != nil {
 		t.Errorf("should have added")
+	}
+	if mp.delayed.gaugeValue() != 0 {
+		t.Errorf("expected 0 delayed, got %v", mp.delayed.gaugeValue())
 	}
 	item, _ = q.Get()
 	q.Done(item)
