@@ -31,11 +31,9 @@ func TestSnapshotListPrefix(t *testing.T) {
 		testStorageElement("/pods/ns1/a", "a", 1),
 		testStorageElement("/pods/ns1/c", "c", 3),
 	}
-	// orderedListSnapshot is excluded: it serves a pre-computed range and
-	// ignores prefix and continueKey by contract. Prefixes are "/"-terminated
-	// as the cacher produces them; the implementations differ on other
-	// prefixes (strings.HasPrefix in the btree, path segments in
-	// listSnapshot).
+	// Prefixes are "/"-terminated as the cacher produces them; the
+	// implementations differ on other prefixes (strings.HasPrefix in the
+	// btree, path segments in listSnapshot).
 	snapshots := []struct {
 		name        string
 		newSnapshot func(t *testing.T) Snapshot
