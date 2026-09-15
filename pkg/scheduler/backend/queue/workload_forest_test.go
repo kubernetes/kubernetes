@@ -929,6 +929,12 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 	cpg2WithParent := st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
 	cpg3WithCycle := st.MakeCompositePodGroup().Name("cpg3").Namespace("ns1").ParentCompositePodGroup("cpg4").Obj()
 	cpg4WithCycle := st.MakeCompositePodGroup().Name("cpg4").Namespace("ns1").ParentCompositePodGroup("cpg3").Obj()
+	cpgDepth1 := st.MakeCompositePodGroup().Name("cpg-d1").Namespace("ns1").Obj()
+	cpgDepth2 := st.MakeCompositePodGroup().Name("cpg-d2").Namespace("ns1").ParentCompositePodGroup("cpg-d1").Obj()
+	cpgDepth3 := st.MakeCompositePodGroup().Name("cpg-d3").Namespace("ns1").ParentCompositePodGroup("cpg-d2").Obj()
+	cpgDepth4 := st.MakeCompositePodGroup().Name("cpg-d4").Namespace("ns1").ParentCompositePodGroup("cpg-d3").Obj()
+	cpgDepth5 := st.MakeCompositePodGroup().Name("cpg-d5").Namespace("ns1").ParentCompositePodGroup("cpg-d4").Obj()
+	cpgDepth6 := st.MakeCompositePodGroup().Name("cpg-d6").Namespace("ns1").ParentCompositePodGroup("cpg-d5").Obj()
 
 	tests := []struct {
 		name        string
@@ -967,6 +973,12 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg3WithCycle, cpg4WithCycle},
 			cpg:         cpg3WithCycle,
 			wantInfo:    nil, // cycle returns nil, false
+		},
+		{
+			name:        "cpg depth exceeded",
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpgDepth1, cpgDepth2, cpgDepth3, cpgDepth4, cpgDepth5, cpgDepth6},
+			cpg:         cpgDepth6,
+			wantInfo:    nil, // depth exceeded returns nil, false
 		},
 	}
 
@@ -1127,8 +1139,7 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			visited := sets.New[fwk.EntityKey]()
-			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericPodGroup(tt.pg), visited)
+			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericPodGroup(tt.pg))
 
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
 				t.Errorf("Unexpected PodGroupInfo (-want,+got)\n%s", diff)
@@ -1189,8 +1200,7 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			visited := sets.New[fwk.EntityKey]()
-			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericCompositePodGroup(tt.cpg), visited)
+			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericCompositePodGroup(tt.cpg))
 
 			// Note: Children are sorted by name in buildPodGroupInfoForCPG, so it is deterministic.
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {

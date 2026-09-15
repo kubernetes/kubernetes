@@ -33,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kube-scheduler/framework/hierarchy"
 	"k8s.io/kubernetes/pkg/features"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
@@ -40,6 +41,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -1102,31 +1104,28 @@ type mockPodGroupManager struct {
 }
 
 func (m *mockPodGroupManager) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
-	currentKey := key
-	for {
-		switch currentKey.Type {
+	rootKey, err := hierarchy.WalkUp(key, func(curr fwk.EntityKey) (*fwk.EntityKey, error) {
+		switch curr.Type {
 		case fwk.PodKeyType:
-			return currentKey, true, nil
+			return nil, nil
 		case fwk.PodGroupKeyType:
-			pg, ok := m.pgs[currentKey.Name]
-			if !ok {
-				return currentKey, true, nil
+			pg, ok := m.pgs[curr.Name]
+			if !ok || pg.Spec.ParentCompositePodGroupName == nil || !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+				return nil, nil
 			}
-			if pg.Spec.ParentCompositePodGroupName == nil || !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-				return currentKey, true, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(currentKey.Namespace, *pg.Spec.ParentCompositePodGroupName)
+			return ptr.To(fwk.CompositePodGroupKey(curr.Namespace, *pg.Spec.ParentCompositePodGroupName)), nil
 		case fwk.CompositePodGroupKeyType:
-			cpg, ok := m.cpgs[currentKey.Name]
-			if !ok {
-				return currentKey, true, nil
+			cpg, ok := m.cpgs[curr.Name]
+			if !ok || cpg.Spec.ParentCompositePodGroupName == nil || !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+				return nil, nil
 			}
-			if cpg.Spec.ParentCompositePodGroupName == nil || !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-				return currentKey, true, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(currentKey.Namespace, *cpg.Spec.ParentCompositePodGroupName)
+			return ptr.To(fwk.CompositePodGroupKey(curr.Namespace, *cpg.Spec.ParentCompositePodGroupName)), nil
 		default:
-			return currentKey, true, nil
+			return nil, nil
 		}
+	}, nil)
+	if err != nil {
+		return fwk.EntityKey{}, false, err
 	}
+	return rootKey, true, nil
 }

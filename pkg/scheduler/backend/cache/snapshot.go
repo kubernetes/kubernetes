@@ -24,13 +24,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kube-scheduler/framework/hierarchy"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/utils/ptr"
 )
 
 // placementNodes stores nodes that are present in the current placement.
@@ -933,45 +936,39 @@ func removeNodeInfoFromList(logger klog.Logger, list []fwk.NodeInfo, nodeInfoToR
 // GetRootKeyForGroup returns the root key of the given EntityKey.
 // The key must be of PodGroupKey or CompositePodGroupKey type.
 func (s *Snapshot) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
-	currentKey := key
-	visited := sets.New[fwk.EntityKey]()
-	for {
-		if visited.Has(currentKey) {
-			return fwk.EntityKey{}, false, fmt.Errorf("cycle detected in the hierarchy: %v", visited.UnsortedList())
-		}
-		visited.Insert(currentKey)
-
+	rootKey, err := hierarchy.WalkUp(key, func(currentKey fwk.EntityKey) (*fwk.EntityKey, error) {
 		switch currentKey.Type {
 		case fwk.PodGroupKeyType:
 			pgs, ok := s.podGroupStates[currentKey]
-			if !ok {
-				return fwk.EntityKey{}, false, nil
+			if !ok || pgs.podGroup == nil {
+				return nil, apierrors.NewNotFound(schedulingv1beta1.Resource("podgroups"), currentKey.Name)
 			}
-			pg := pgs.podGroup
-			if pg == nil {
-				return fwk.EntityKey{}, false, nil
+			if !s.compositePodGroupEnabled || pgs.podGroup.Spec.ParentCompositePodGroupName == nil {
+				return nil, nil
 			}
-			if !s.compositePodGroupEnabled || pg.Spec.ParentCompositePodGroupName == nil {
-				return currentKey, true, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(pg.Namespace, *pg.Spec.ParentCompositePodGroupName)
+			return ptr.To(fwk.CompositePodGroupKey(pgs.podGroup.Namespace, *pgs.podGroup.Spec.ParentCompositePodGroupName)), nil
 		case fwk.CompositePodGroupKeyType:
 			cpgs, ok := s.compositePodGroupStates[currentKey]
-			if !ok {
-				return fwk.EntityKey{}, false, nil
+			if !ok || cpgs.compositePodGroup == nil {
+				return nil, apierrors.NewNotFound(schedulingv1alpha3.Resource("compositepodgroups"), currentKey.Name)
 			}
-			cpg := cpgs.compositePodGroup
-			if cpg == nil {
-				return fwk.EntityKey{}, false, nil
+			if cpgs.compositePodGroup.Spec.ParentCompositePodGroupName == nil {
+				return nil, nil
 			}
-			if cpg.Spec.ParentCompositePodGroupName == nil {
-				return currentKey, true, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(cpg.Namespace, *cpg.Spec.ParentCompositePodGroupName)
+			return ptr.To(fwk.CompositePodGroupKey(cpgs.compositePodGroup.Namespace, *cpgs.compositePodGroup.Spec.ParentCompositePodGroupName)), nil
 		case fwk.PodKeyType:
-			return fwk.EntityKey{}, false, fmt.Errorf("pod key type not supported in snapshot GetRootKeyForGroup for %s", currentKey.String())
+			return nil, fmt.Errorf("pod key type not supported in snapshot GetRootKeyForGroup for %s", currentKey.String())
+		default:
+			return nil, nil
 		}
+	}, nil)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fwk.EntityKey{}, false, nil
+		}
+		return fwk.EntityKey{}, false, err
 	}
+	return rootKey, true, nil
 }
 
 func (s *Snapshot) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error) {

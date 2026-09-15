@@ -184,17 +184,11 @@ func getHighestAllAncestor(pod *v1.Pod, pgLister fwk.PodGroupLister, cpgLister f
 	var highestAllKey fwk.EntityKey
 	var hasAll bool
 
-	TraverseHierarchyUp(pod.Namespace, startKey, pgLister, cpgLister, func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
-		if pg != nil {
-			if pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil {
-				highestAllKey = key
-				hasAll = true
-			}
-		} else if cpg != nil {
-			if cpg.Spec.DisruptionMode != nil && cpg.Spec.DisruptionMode.All != nil {
-				highestAllKey = key
-				hasAll = true
-			}
+	traverseHierarchyUp(pod.Namespace, startKey, pgLister, cpgLister, func(key fwk.EntityKey, gpg *fwk.GenericPodGroup) bool {
+		if (gpg.PodGroup != nil && gpg.PodGroup.Spec.DisruptionMode != nil && gpg.PodGroup.Spec.DisruptionMode.All != nil) ||
+			(gpg.CompositePodGroup != nil && gpg.CompositePodGroup.Spec.DisruptionMode != nil && gpg.CompositePodGroup.Spec.DisruptionMode.All != nil) {
+			highestAllKey = key
+			hasAll = true
 		}
 		return false
 	})
