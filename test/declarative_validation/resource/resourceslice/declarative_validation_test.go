@@ -320,6 +320,16 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
 					},
 				},
+				"invalid: partitionTypeAttribute with more than one slash": {
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakPartitionTypeAttribute("gpu.example.com/profile/full"),
+					),
+					enablePartitionTypeAttr: true,
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+					},
+				},
 				"invalid: partitionTypeAttribute with feature disabled": {
 					input: mkResourceSliceWithDevices(
 						tweakDeviceCounter(counters("valid-key")),
