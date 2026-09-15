@@ -19,6 +19,7 @@ package config
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	cbconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
@@ -152,6 +153,14 @@ type KubeletConfiguration struct {
 	// certificate signing requests. The RotateKubeletServerCertificate feature
 	// must be enabled.
 	ServerTLSBootstrap bool
+	// clientCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// client certificate signing requests during certificate rotation.
+	// Defaults to ECDSA-P256 when empty.
+	ClientCertificateKeyAlgorithm cbconfig.EncryptionAlgorithmType
+	// serverCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// server certificate signing requests during certificate rotation.
+	// Defaults to ECDSA-P256 when empty.
+	ServerCertificateKeyAlgorithm cbconfig.EncryptionAlgorithmType
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized

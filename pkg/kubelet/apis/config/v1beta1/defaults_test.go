@@ -134,6 +134,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				ClientCertificateKeyAlgorithm: "ECDSA-P256",
+				ServerCertificateKeyAlgorithm: "ECDSA-P256",
 				SingleProcessOOMKill:          nil,
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
 					MaxContainerRestartPeriod: &metav1.Duration{Duration: MaxContainerBackOff},
@@ -380,6 +382,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(false),
 				LocalStorageCapacityIsolation: ptr.To(false),
 				PodLogsDir:                    DefaultPodLogsDir,
+				ClientCertificateKeyAlgorithm: "ECDSA-P256",
+				ServerCertificateKeyAlgorithm: "ECDSA-P256",
 				SingleProcessOOMKill:          ptr.To(false),
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
 					MaxContainerRestartPeriod: &metav1.Duration{Duration: MaxContainerBackOff},
@@ -701,6 +705,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    "/custom/path",
+				ClientCertificateKeyAlgorithm: "ECDSA-P256",
+				ServerCertificateKeyAlgorithm: "ECDSA-P256",
 				SingleProcessOOMKill:          ptr.To(true),
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
 					MaxContainerRestartPeriod: &metav1.Duration{Duration: 55 * time.Second},
@@ -801,6 +807,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				ClientCertificateKeyAlgorithm: "ECDSA-P256",
+				ServerCertificateKeyAlgorithm: "ECDSA-P256",
 				SingleProcessOOMKill:          nil,
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
 					MaxContainerRestartPeriod: &metav1.Duration{Duration: MaxContainerBackOff},
@@ -901,6 +909,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				ClientCertificateKeyAlgorithm: "ECDSA-P256",
+				ServerCertificateKeyAlgorithm: "ECDSA-P256",
 				SingleProcessOOMKill:          nil,
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
 					MaxContainerRestartPeriod: &metav1.Duration{Duration: MaxContainerBackOff},
@@ -1001,6 +1011,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				ClientCertificateKeyAlgorithm: "ECDSA-P256",
+				ServerCertificateKeyAlgorithm: "ECDSA-P256",
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
 					MaxContainerRestartPeriod: &metav1.Duration{Duration: MaxContainerBackOff},
 				},
@@ -1101,6 +1113,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				ClientCertificateKeyAlgorithm: "ECDSA-P256",
+				ServerCertificateKeyAlgorithm: "ECDSA-P256",
 				SingleProcessOOMKill:          nil,
 				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
 			},

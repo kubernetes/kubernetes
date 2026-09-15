@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	cbconfig "k8s.io/component-base/config"
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -116,6 +117,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.AllowedUnsafeSysctls = nil
 			obj.VolumePluginDir = kubeletconfigv1beta1.DefaultVolumePluginDir
 			obj.ContainerRuntimeEndpoint = "unix:///run/containerd/containerd.sock"
+			obj.ClientCertificateKeyAlgorithm = cbconfig.EncryptionAlgorithmDefault
+			obj.ServerCertificateKeyAlgorithm = cbconfig.EncryptionAlgorithmDefault
 
 			if obj.Logging.Format == "" {
 				obj.Logging.Format = "text"
