@@ -146,8 +146,7 @@ func ValidateVolumeAttachment(volumeAttachment *storage.VolumeAttachment) field.
 // has valid data.
 func validateVolumeAttachmentSpec(
 	spec *storage.VolumeAttachmentSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := apivalidation.ValidateCSIDriverName(spec.Attacher, fldPath.Child("attacher"), apivalidation.RequiredCovered, apivalidation.FormatCovered, apivalidation.SizeCovered)
-	allErrs = append(allErrs, validateVolumeAttachmentSource(&spec.Source, fldPath.Child("source"))...)
+	allErrs := validateVolumeAttachmentSource(&spec.Source, fldPath.Child("source"))
 	allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
 	return allErrs
 }
@@ -223,10 +222,8 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 }
 
 // ValidateVolumeAttachmentUpdate validates a VolumeAttachment.
-func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.ErrorList {
-	allErrs := ValidateVolumeAttachment(new)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec, old.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-	return allErrs
+func ValidateVolumeAttachmentUpdate(new, _ *storage.VolumeAttachment) field.ErrorList {
+	return ValidateVolumeAttachment(new)
 }
 
 var supportedVolumeBindingModes = sets.NewString(string(storage.VolumeBindingImmediate), string(storage.VolumeBindingWaitForFirstConsumer))
