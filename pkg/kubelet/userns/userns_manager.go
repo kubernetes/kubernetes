@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -154,6 +155,14 @@ func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int6
 	if kubeletMappingID < userNsLength {
 		// We don't allow to map 0, as security is circumvented.
 		return nil, fmt.Errorf("kubelet user assigned ID %v must be greater or equal to %v", kubeletMappingID, userNsLength)
+	}
+	if uint64(kubeletMappingID)+uint64(kubeletMappingLen) > math.MaxUint32 {
+		// 2^32-1 is INVALID_UID in the kernel and can't be mapped, so it must be
+		// left out of the range. Going past it is even worse, as certain subranges
+		// (idsPerPod controlled) would overflow back around and unintentionally
+		// include lower uid users than intended.
+		return nil, fmt.Errorf("kubelet user assigned ID %v with assigned IDs length %v ends past the last mappable ID %v",
+			kubeletMappingID, kubeletMappingLen, uint64(math.MaxUint32)-1)
 	}
 	if kubeletMappingLen%userNsLength != 0 {
 		return nil, fmt.Errorf("kubelet user assigned IDs length %v is not a multiple of %v", kubeletMappingLen, userNsLength)
