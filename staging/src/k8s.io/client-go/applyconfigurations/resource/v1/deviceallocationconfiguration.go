@@ -27,11 +27,11 @@ import (
 //
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
 type DeviceAllocationConfigurationApplyConfiguration struct {
-	// Source records whether the configuration comes from a class and thus
+	// source records whether the configuration comes from a class and thus
 	// is not something that a normal user would have been able to set
 	// or from a claim.
 	Source *resourcev1.AllocationConfigSource `json:"source,omitempty"`
-	// Requests lists the names of requests where the configuration applies.
+	// requests lists the names of requests where the configuration applies.
 	// If empty, its applies to all requests.
 	//
 	// References to subrequests must include the name of the main request

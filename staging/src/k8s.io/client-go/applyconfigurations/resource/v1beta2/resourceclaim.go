@@ -40,12 +40,12 @@ import (
 // feature gate.
 type ResourceClaimApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object metadata
+	// metadata is the standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec describes what is being requested and how to configure it.
+	// spec describes what is being requested and how to configure it.
 	// The spec is immutable.
 	Spec *ResourceClaimSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status describes whether the claim is ready to use and what has been allocated.
+	// status describes whether the claim is ready to use and what has been allocated.
 	Status *ResourceClaimStatusApplyConfiguration `json:"status,omitempty"`
 }
 

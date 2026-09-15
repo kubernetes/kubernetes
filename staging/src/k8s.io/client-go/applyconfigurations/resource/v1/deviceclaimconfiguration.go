@@ -23,7 +23,7 @@ package v1
 //
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.
 type DeviceClaimConfigurationApplyConfiguration struct {
-	// Requests lists the names of requests where the configuration applies.
+	// requests lists the names of requests where the configuration applies.
 	// If empty, it applies to all requests.
 	//
 	// References to subrequests must include the name of the main request
