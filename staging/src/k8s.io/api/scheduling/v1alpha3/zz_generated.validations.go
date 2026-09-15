@@ -639,11 +639,11 @@ func Validate_CompositePodGroupSpec(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -928,11 +928,11 @@ func Validate_CompositePodGroupTemplate(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -1590,11 +1590,11 @@ func Validate_PodGroupSpec(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "CompositePodGroup", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "CompositePodGroup", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "CompositePodGroup", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -1688,11 +1688,11 @@ func Validate_PodGroupSpec(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", true, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -1881,11 +1881,11 @@ func Validate_PodGroupSpec(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -2074,11 +2074,11 @@ func Validate_PodGroupTemplate(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -2265,11 +2265,11 @@ func Validate_PodGroupTemplate(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -3329,11 +3329,11 @@ func Validate_WorkloadSpec(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "CompositePodGroup", false, validate.OptionalSlice).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "CompositePodGroup", true, validate.OptionalSlice).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "CompositePodGroup", true, validate.OptionalSlice).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj,
