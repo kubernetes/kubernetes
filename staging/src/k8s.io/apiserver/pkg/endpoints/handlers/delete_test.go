@@ -181,6 +181,11 @@ func TestDeleteResourceDeleteOptions(t *testing.T) {
 			expectCode: 200,
 		},
 		{
+			name: "dryRun invalid Go type",
+			body: `{"dryRun" : "All"}`,
+			expectCode: 400,
+		},
+		{
 			name:       "orphanDependents invalid Go type",
 			body:       `{"orphanDependents": "randomString"}`,
 			expectCode: 400,
@@ -315,6 +320,11 @@ func TestDeleteCollectionDeleteOptions(t *testing.T) {
 			name:       "valid delete options",
 			body:       "{}",
 			expectCode: 200,
+		},
+		{
+			name: "dryRun invalid Go type",
+			body: `{"dryRun" : "All"}`,
+			expectCode: 400,
 		},
 		{
 			name:       "orphanDependents invalid Go type",
