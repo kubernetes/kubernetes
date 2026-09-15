@@ -1672,14 +1672,9 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 
 	logger := klog.FromContext(ctx)
 
-	podGroupState, err := getPodGroupStateData(cs)
-	if err != nil {
-		return statusError(logger, err)
-	}
-
 	for index, claim := range state.claims.all() {
 		if !resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) {
-			claim, successCleanup, err := pl.bindClaim(ctx, state, podGroupState, index, pod, nodeName)
+			claim, successCleanup, err := pl.bindClaim(ctx, state, index, pod, nodeName)
 			if err != nil {
 				return statusError(logger, err)
 			}
@@ -1802,7 +1797,7 @@ func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleSt
 // and reservation are recorded. This finishes the work started in Reserve.
 // Returns the updated claim, a function which (if not nil) should run when the
 // pod has been successfully bound, and an error if one occurred.
-func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, podGroupState *podGroupStateData, index int, pod *v1.Pod, nodeName string) (*resourceapi.ResourceClaim, func(), error) {
+func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (*resourceapi.ResourceClaim, func(), error) {
 	logger := klog.FromContext(ctx)
 	claim := state.claims.get(index)
 	binding := state.claims.getBinding(index, pod)
@@ -1851,16 +1846,13 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, pod
 		if allocation != nil {
 			for _, claimUID := range claimUIDs {
 				if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claimUID, true); deleted {
-					// If we are currently asynchronously Binding Pods in a
-					// PodGroup, then the pendingAllocations set does not need
-					// to be updated. New PodGroup scheduling cycles will start
+					// Since PodGroup cycle state is not set during asynchronous
+					// binding, pendingAllocations does not need to be updated.
+					// New PodGroup scheduling cycles will start
 					// with an empty set and not share pending allocations
 					// started in *this* cycle until Unreserve completes for all
 					// the Pods sharing that pending allocation and they can be
 					// Reserved again in another cycle.
-					if podGroupState != nil {
-						delete(podGroupState.pendingAllocations, claim.UID)
-					}
 					logger.V(5).Info("Removed claim from in-flight claims", "claim", klog.KObj(claim), "uid", claimUID, "resourceVersion", resourceVersion, "allocation", klog.Format(allocation))
 				}
 			}
