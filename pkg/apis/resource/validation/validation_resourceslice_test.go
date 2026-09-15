@@ -1465,6 +1465,18 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"negative-counter-in-counter-set": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters").Key("memory").Child("value"), "-1Gi", "must be greater than or equal to 0"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters[0].Counters = map[string]resourceapi.Counter{
+					"memory": {Value: resource.MustParse("-1Gi")},
+				}
+				return slice
+			}(),
+		},
 		"missing-name-counterset-consumes-counter": {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counterSet"), "").MarkCoveredByDeclarative(),
@@ -1521,6 +1533,23 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
 					{
 						CounterSet: "counterset-0",
+					},
+				}
+				return slice
+			}(),
+		},
+		"negative-counter-consumes-counter": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters").Key("memory").Child("value"), "-1Gi", "must be greater than or equal to 0"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: "counterset-0",
+						Counters: map[string]resourceapi.Counter{
+							"memory": {Value: resource.MustParse("-1Gi")},
+						},
 					},
 				}
 				return slice
