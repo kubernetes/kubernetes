@@ -60,7 +60,6 @@ func setup(t testing.TB, maxReadonlyRequestsInFlight, maxMutatingRequestsInFligh
 	})
 
 	newTeardown := func() {
-		tCtx.Cancel("tearing down apiserver")
 		tearDownFn()
 	}
 	return tCtx, kubeConfig, newTeardown

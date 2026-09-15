@@ -59,10 +59,9 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 	// Not parallel because it creates a controller.
 
 	var wg sync.WaitGroup
-	defer func() {
-		tCtx.Cancel("time to shut down")
+	tCtx.Cleanup(func() {
 		wg.Wait()
-	}()
+	})
 
 	numPods := 1000
 	devicesPerSlice := 50
