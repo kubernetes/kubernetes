@@ -20,10 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -45,36 +47,216 @@ import (
 )
 
 func TestStatefulPodControlCreatesPods(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	claimIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	claimLister := corelisters.NewPersistentVolumeClaimLister(claimIndexer)
-	control := NewStatefulPodControl(fakeClient, nil, claimLister, recorder, consistency.NewNoopConsistencyStore())
-	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetResource().Resource)
-	})
-	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		create := action.(core.CreateAction)
-		claimIndexer.Add(create.GetObject())
-		return true, create.GetObject(), nil
-	})
-	fakeClient.AddReactor("create", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		create := action.(core.CreateAction)
-		return true, create.GetObject(), nil
-	})
-	if err := control.CreateStatefulPod(context.TODO(), set, pod); err != nil {
-		t.Errorf("StatefulPodControl failed to create Pod error: %s", err)
+	otherController := metav1.OwnerReference{
+		APIVersion: "example.com/v1",
+		Kind:       "Other",
+		Name:       "other",
+		UID:        "other",
+		Controller: ptr.To(true),
 	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Expected 2 events for successful create found %d", eventCount)
+	otherOwner := metav1.OwnerReference{
+		APIVersion: "example.com/v1",
+		Kind:       "Other",
+		Name:       "other",
+		UID:        "other",
 	}
-	for i := range events {
-		if !strings.Contains(events[i], v1.EventTypeNormal) {
-			t.Errorf("Found unexpected non-normal event %s", events[i])
-		}
+	setOwner := *metav1.NewControllerRef(newStatefulSet(1), controllerKind)
+	nonControllerSetOwner := setOwner
+	nonControllerSetOwner.Controller = ptr.To(false)
+	nonControllerSetOwner.BlockOwnerDeletion = nil
+	unsetControllerSetOwner := nonControllerSetOwner
+	unsetControllerSetOwner.Controller = nil
+	staleSetOwner := setOwner
+	staleSetOwner.UID = "previous-set"
+	podOwner := metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Name:       "other-pod",
+		UID:        "other-pod",
+		Controller: ptr.To(true),
+	}
+	for _, tc := range []struct {
+		name                   string
+		whenDeleted            apps.PersistentVolumeClaimRetentionPolicyType
+		whenScaled             apps.PersistentVolumeClaimRetentionPolicyType
+		owners                 []metav1.OwnerReference
+		podUID                 types.UID
+		wantAdditionalSetOwner bool
+		wantPromotedSetOwner   bool
+		wantConflict           bool
+	}{
+		{
+			name:        "retain both",
+			whenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			whenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+		},
+		{
+			// podUID is unset (empty string) because CreateStatefulPod is called
+			// before the pod exists on the API server. The ref.UID == pod.UID leg
+			// of the removeRefs predicate is therefore a no-op on this path; it
+			// only takes effect from UpdateStatefulPod where the pod already has a
+			// server-assigned UID (see "displace current Pod controller" case).
+			name:                   "delete with set",
+			whenDeleted:            apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:             apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			wantAdditionalSetOwner: true,
+		},
+		{
+			name:        "delete on scale down only",
+			whenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			whenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+		},
+		{
+			name:                   "delete both",
+			whenDeleted:            apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:             apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			wantAdditionalSetOwner: true,
+		},
+		{
+			name:         "respect another controller",
+			wantConflict: true,
+			whenDeleted:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:   apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			owners:       []metav1.OwnerReference{otherController},
+		},
+		{
+			name:                   "preserve existing StatefulSet controller",
+			whenDeleted:            apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:             apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			owners:                 []metav1.OwnerReference{setOwner},
+			wantAdditionalSetOwner: false, // already present in tc.owners
+		},
+		{
+			name:                 "promote explicit non-controller StatefulSet owner",
+			whenDeleted:          apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:           apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			owners:               []metav1.OwnerReference{nonControllerSetOwner},
+			wantPromotedSetOwner: true,
+		},
+		{
+			name:                 "promote StatefulSet owner with omitted controller flag",
+			whenDeleted:          apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:           apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			owners:               []metav1.OwnerReference{unsetControllerSetOwner},
+			wantPromotedSetOwner: true,
+		},
+		{
+			name:         "preserve stale StatefulSet owner",
+			wantConflict: true,
+			whenDeleted:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:   apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			owners:       []metav1.OwnerReference{staleSetOwner},
+		},
+		{
+			name:         "respect existing Pod controller",
+			wantConflict: true,
+			whenDeleted:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:   apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			owners:       []metav1.OwnerReference{podOwner},
+		},
+		{
+			// hasUnexpectedController treats a stale pod ref (name matches, UID differs) as
+			// unexpected regardless of its controller flag, so UpdatePodClaimForRetentionPolicy
+			// emits the ConflictingController event even though Controller is nil here.
+			name:        "preserve stale non-controller Pod owner",
+			whenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			owners: []metav1.OwnerReference{{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       newStatefulSetPod(newStatefulSet(3), 0).Name,
+				UID:        "previous-pod",
+			}},
+			wantConflict: true,
+		},
+		{
+			name:                   "preserve non-controller owner",
+			whenDeleted:            apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:             apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			owners:                 []metav1.OwnerReference{otherOwner},
+			wantAdditionalSetOwner: true,
+		},
+		{
+			// A template can carry a controller ref for the current pod (e.g. left over from a
+			// previous reconciliation cycle). hasUnexpectedController accepts it, but if we only
+			// strip the StatefulSet ref we produce two controller=true refs, which the API rejects.
+			// The fix strips both set and pod refs before stamping the StatefulSet controller ref.
+			name:        "displace current Pod controller with StatefulSet ownership",
+			whenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			podUID:      "current-pod",
+			owners: []metav1.OwnerReference{{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       newStatefulSetPod(newStatefulSet(3), 0).Name,
+				UID:        "current-pod",
+				Controller: ptr.To(true),
+			}},
+			wantPromotedSetOwner: true, // pod ref stripped, StatefulSet controller ref added
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := record.NewFakeRecorder(10)
+			set := newStatefulSet(3)
+			set.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{WhenDeleted: tc.whenDeleted, WhenScaled: tc.whenScaled}
+			set.Spec.VolumeClaimTemplates[0].OwnerReferences = tc.owners
+			original := set.DeepCopy()
+			pod := newStatefulSetPod(set, 0)
+			pod.UID = tc.podUID
+			fakeClient := &fake.Clientset{}
+			claimIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			claimLister := corelisters.NewPersistentVolumeClaimLister(claimIndexer)
+			control := NewStatefulPodControl(fakeClient, nil, claimLister, recorder, consistency.NewNoopConsistencyStore())
+			fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+				return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetResource().Resource)
+			})
+			fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+				create := action.(core.CreateAction)
+				// Check the create request before populating the cache: a later
+				// ownership update cannot protect a PVC created during deletion.
+				claim := create.GetObject().(*v1.PersistentVolumeClaim)
+				wantOwners := append([]metav1.OwnerReference(nil), tc.owners...)
+				if tc.wantAdditionalSetOwner {
+					wantOwners = append(wantOwners, *metav1.NewControllerRef(set, controllerKind))
+				}
+				if tc.wantPromotedSetOwner {
+					wantOwners = []metav1.OwnerReference{setOwner}
+				}
+				if !reflect.DeepEqual(wantOwners, claim.OwnerReferences) {
+					return true, nil, fmt.Errorf("unexpected PVC owner references: got %v, want %v", claim.OwnerReferences, wantOwners)
+				}
+				// Make the PVC visible so conflict warnings can be emitted immediately.
+				// With informer lag, they require a later retention-policy reconciliation.
+				claimIndexer.Add(create.GetObject())
+				return true, create.GetObject(), nil
+			})
+			fakeClient.AddReactor("create", "pods", func(action core.Action) (bool, runtime.Object, error) {
+				create := action.(core.CreateAction)
+				return true, create.GetObject(), nil
+			})
+			if err := control.CreateStatefulPod(context.TODO(), set, pod); err != nil {
+				t.Fatalf("StatefulPodControl failed to create Pod error: %s", err)
+			}
+			events := collectEvents(recorder.Events)
+			expectedEvents := 2
+			if tc.wantConflict {
+				expectedEvents++
+			}
+			require.Len(t, events, expectedEvents, "unexpected event count")
+			conflicts := 0
+			for i := range events {
+				if tc.wantConflict && strings.Contains(events[i], "ConflictingController") {
+					assert.Contains(t, events[i], v1.EventTypeWarning)
+					conflicts++
+					continue
+				}
+				assert.Contains(t, events[i], v1.EventTypeNormal, "unexpected non-normal event")
+			}
+			assert.Equal(t, tc.wantConflict, conflicts == 1, "unexpected conflicting-controller event count")
+			// getPersistentVolumeClaims deep-copies templates so owner-reference
+			// changes on a new claim must not mutate the StatefulSet template.
+			assert.Equal(t, original, set, "claim template must not be mutated")
+		})
 	}
 }
 
@@ -333,50 +515,115 @@ func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
-	control := NewStatefulPodControl(fakeClient, nil, pvcLister, recorder, consistency.NewNoopConsistencyStore())
-	pvcs := getPersistentVolumeClaims(set, pod)
-	volumes := make([]v1.Volume, 0, len(pod.Spec.Volumes))
-	for i := range pod.Spec.Volumes {
-		if _, contains := pvcs[pod.Spec.Volumes[i].Name]; !contains {
-			volumes = append(volumes, pod.Spec.Volumes[i])
-		}
-	}
-	pod.Spec.Volumes = volumes
-	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), nil
-	})
-	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), nil
-	})
-	var updated *v1.Pod
-	fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		updated = update.GetObject().(*v1.Pod)
-		return true, update.GetObject(), nil
-	})
-	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
-		t.Errorf("Successful update returned an error: %s", err)
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Pod storage update successful: got %d events, but want 2", eventCount)
-	}
-	for i := range events {
-		if !strings.Contains(events[i], v1.EventTypeNormal) {
-			t.Errorf("Found unexpected non-normal event %s", events[i])
-		}
-	}
-	if !storageMatches(set, updated) {
-		t.Error("Name update failed identity does not match")
+	for _, tc := range []struct {
+		name         string
+		whenDeleted  apps.PersistentVolumeClaimRetentionPolicyType
+		whenScaled   apps.PersistentVolumeClaimRetentionPolicyType
+		owners       []metav1.OwnerReference
+		wantSetOwner bool
+	}{
+		{
+			name:         "retain policy creates missing PVC without StatefulSet ownership",
+			whenDeleted:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			whenScaled:   apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			wantSetOwner: false,
+		},
+		{
+			name:         "delete policy creates missing PVC with StatefulSet ownership",
+			whenDeleted:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:   apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			wantSetOwner: true,
+		},
+		{
+			name:         "delete both policies creates missing PVC with StatefulSet ownership",
+			whenDeleted:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:   apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			wantSetOwner: true,
+		},
+		{
+			// hasUnexpectedController detects the conflicting controller and skips
+			// the stamp; the PVC is created with the pre-existing owner unchanged.
+			name:         "delete policy preserves another controller while informer lags",
+			whenDeleted:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			whenScaled:   apps.RetainPersistentVolumeClaimRetentionPolicyType,
+			wantSetOwner: false,
+			owners: []metav1.OwnerReference{{
+				APIVersion: "example.com/v1",
+				Kind:       "Other",
+				Name:       "other",
+				UID:        "other",
+				Controller: ptr.To(true),
+			}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			recorder := record.NewFakeRecorder(10)
+			set := newStatefulSet(3)
+			set.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: tc.whenDeleted,
+				WhenScaled:  tc.whenScaled,
+			}
+			set.Spec.VolumeClaimTemplates[0].OwnerReferences = tc.owners
+			original := set.DeepCopy()
+			pod := newStatefulSetPod(set, 0)
+			pod.UID = "existing-pod"
+			fakeClient := &fake.Clientset{}
+			pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+			control := NewStatefulPodControl(fakeClient, nil, pvcLister, recorder, consistency.NewNoopConsistencyStore())
+			pvcs := getPersistentVolumeClaims(set, pod)
+			volumes := make([]v1.Volume, 0, len(pod.Spec.Volumes))
+			for i := range pod.Spec.Volumes {
+				if _, contains := pvcs[pod.Spec.Volumes[i].Name]; !contains {
+					volumes = append(volumes, pod.Spec.Volumes[i])
+				}
+			}
+			pod.Spec.Volumes = volumes
+			fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+				update := action.(core.UpdateAction)
+				return true, update.GetObject(), nil
+			})
+			createdClaims := 0
+			fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+				create := action.(core.CreateAction)
+				claim := create.GetObject().(*v1.PersistentVolumeClaim)
+				wantOwners := append([]metav1.OwnerReference(nil), tc.owners...)
+				if tc.wantSetOwner {
+					wantOwners = append(wantOwners, *metav1.NewControllerRef(set, controllerKind))
+				}
+				if !reflect.DeepEqual(wantOwners, claim.OwnerReferences) {
+					return true, nil, fmt.Errorf("unexpected PVC owner references: got %v, want %v", claim.OwnerReferences, wantOwners)
+				}
+				createdClaims++
+				// Leave the PVC out of the informer cache to exercise the storage-update
+				// path without a subsequent retention-policy update repairing ownership.
+				return true, create.GetObject(), nil
+			})
+			var updated *v1.Pod
+			fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+				update := action.(core.UpdateAction)
+				updated = update.GetObject().(*v1.Pod)
+				return true, update.GetObject(), nil
+			})
+			if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
+				t.Fatalf("Successful update returned an error: %s", err)
+			}
+			assert.Equal(t, len(pvcs), createdClaims)
+			assert.Empty(t, pvcIndexer.List())
+			for _, action := range fakeClient.Actions() {
+				assert.False(t, action.Matches("update", "persistentvolumeclaims"))
+			}
+			// The lister cannot see the PVC yet, so even a conflicting controller
+			// produces no warning until a later retention-policy reconciliation.
+			events := collectEvents(recorder.Events)
+			require.Len(t, events, 2, "unexpected event count")
+			for i := range events {
+				assert.Contains(t, events[i], v1.EventTypeNormal, "unexpected non-normal event")
+			}
+			assert.True(t, storageMatches(set, updated), "storage identity does not match")
+			assert.Equal(t, original, set, "claim template must not be mutated")
+		})
 	}
 }
 
