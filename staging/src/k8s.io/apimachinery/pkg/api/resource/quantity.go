@@ -568,7 +568,7 @@ func (q *Quantity) AsFloat64Slow() float64 {
 
 // AsInt64 returns a representation of the current value as an int64 if a fast conversion
 // is possible. If false is returned, callers must use the inf.Dec form of this quantity.
-// A value too large for an int64 saturates to math.MinInt64 or math.MaxInt64.
+// A value too large for an int64 saturates to math.MinInt64 or math.MaxInt64 and returns false.
 func (q *Quantity) AsInt64() (int64, bool) {
 	if q.d.Dec == nil {
 		return q.i.AsInt64()
