@@ -25,9 +25,9 @@ package v1
 type SecretKeySelectorApplyConfiguration struct {
 	// The name of the secret in the pod's namespace to select from.
 	LocalObjectReferenceApplyConfiguration `json:""`
-	// The key of the secret to select from.  Must be a valid secret key.
+	// key of the secret to select from.  Must be a valid secret key.
 	Key *string `json:"key,omitempty"`
-	// Specify whether the Secret or its key must be defined
+	// optional specifies whether the Secret or its key must be defined
 	Optional *bool `json:"optional,omitempty"`
 }
 

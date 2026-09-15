@@ -38,39 +38,39 @@ import (
 // treated as informative, best-effort, supplemental data.
 type EventApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// The object that this event is about.
+	// involvedObject is the object that this event is about.
 	InvolvedObject *ObjectReferenceApplyConfiguration `json:"involvedObject,omitempty"`
-	// This should be a short, machine understandable string that gives the reason
+	// reason should be a short, machine understandable string that gives the reason
 	// for the transition into the object's current status.
 	// TODO: provide exact specification for format.
 	Reason *string `json:"reason,omitempty"`
-	// A human-readable description of the status of this operation.
+	// message is a human-readable description of the status of this operation.
 	// TODO: decide on maximum length.
 	Message *string `json:"message,omitempty"`
-	// The component reporting this event. Should be a short machine understandable string.
+	// source of the reported event. Should be a short machine understandable string.
 	Source *EventSourceApplyConfiguration `json:"source,omitempty"`
-	// The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
+	// firstTimestamp is the time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
 	FirstTimestamp *apismetav1.Time `json:"firstTimestamp,omitempty"`
-	// The time at which the most recent occurrence of this event was recorded.
+	// lastTimestamp is the time at which the most recent occurrence of this event was recorded.
 	LastTimestamp *apismetav1.Time `json:"lastTimestamp,omitempty"`
-	// The number of times this event has occurred.
+	// count is the number of times this event has occurred.
 	Count *int32 `json:"count,omitempty"`
-	// Type of this event (Normal, Warning), new types could be added in the future
+	// type of this event (Normal, Warning), new types could be added in the future
 	Type *string `json:"type,omitempty"`
-	// Time when this Event was first observed.
+	// eventTime is the time when this Event was first observed.
 	EventTime *apismetav1.MicroTime `json:"eventTime,omitempty"`
-	// Data about the Event series this event represents or nil if it's a singleton Event.
+	// series holds data about the Event series this event represents or nil if it's a singleton Event.
 	Series *EventSeriesApplyConfiguration `json:"series,omitempty"`
-	// What action was taken/failed regarding to the Regarding object.
+	// action that was taken/failed regarding to the Regarding object.
 	Action *string `json:"action,omitempty"`
-	// Optional secondary object for more complex actions.
+	// related holds an optional secondary object for more complex actions.
 	Related *ObjectReferenceApplyConfiguration `json:"related,omitempty"`
-	// Name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
+	// reportingComponent is the name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
 	ReportingController *string `json:"reportingComponent,omitempty"`
-	// ID of the controller instance, e.g. `kubelet-xyzf`.
+	// reportingInstance is the ID of the controller instance, e.g. `kubelet-xyzf`.
 	ReportingInstance *string `json:"reportingInstance,omitempty"`
 }
 

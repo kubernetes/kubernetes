@@ -27,12 +27,12 @@ import (
 //
 // VolumeMount describes a mounting of a Volume within a container.
 type VolumeMountApplyConfiguration struct {
-	// This must match the Name of a Volume.
+	// name must match the Name of a Volume.
 	Name *string `json:"name,omitempty"`
-	// Mounted read-only if true, read-write otherwise (false or unspecified).
+	// readOnly causes volume to be mounted in read-only mode if true, read-write otherwise (false or unspecified).
 	// Defaults to false.
 	ReadOnly *bool `json:"readOnly,omitempty"`
-	// RecursiveReadOnly specifies whether read-only mounts should be handled
+	// recursiveReadOnly specifies whether read-only mounts should be handled
 	// recursively.
 	//
 	// If ReadOnly is false, this field has no meaning and must be unspecified.
@@ -49,9 +49,9 @@ type VolumeMountApplyConfiguration struct {
 	//
 	// If this field is not specified, it is treated as an equivalent of Disabled.
 	RecursiveReadOnly *corev1.RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty"`
-	// Path within the container at which the volume should be mounted.
+	// mountPath is a path within the container at which the volume should be mounted.
 	MountPath *string `json:"mountPath,omitempty"`
-	// Path within the volume from which the container's volume should be mounted.
+	// subPath is a path within the volume from which the container's volume should be mounted.
 	// Defaults to "" (volume's root).
 	SubPath *string `json:"subPath,omitempty"`
 	// mountPropagation determines how mounts are propagated from the host
@@ -61,7 +61,7 @@ type VolumeMountApplyConfiguration struct {
 	// When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
 	// (which defaults to None).
 	MountPropagation *corev1.MountPropagationMode `json:"mountPropagation,omitempty"`
-	// Expanded path within the volume from which the container's volume should be mounted.
+	// subPathExpr is an expanded path within the volume from which the container's volume should be mounted.
 	// Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
 	// Defaults to "" (volume's root).
 	// SubPathExpr and SubPath are mutually exclusive.

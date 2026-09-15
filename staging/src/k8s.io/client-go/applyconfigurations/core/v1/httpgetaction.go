@@ -28,21 +28,21 @@ import (
 //
 // HTTPGetAction describes an action based on HTTP Get requests.
 type HTTPGetActionApplyConfiguration struct {
-	// Path to access on the HTTP server.
+	// path to access on the HTTP server.
 	Path *string `json:"path,omitempty"`
-	// Name or number of the port to access on the container.
+	// port is the name or number of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
 	Port *intstr.IntOrString `json:"port,omitempty"`
-	// Host name to connect to, defaults to the pod IP. You probably want to set
+	// host name to connect to, defaults to the pod IP. You probably want to set
 	// "Host" in httpHeaders instead.
 	Host *string `json:"host,omitempty"`
-	// Scheme to use for connecting to the host.
+	// scheme to use for connecting to the host.
 	// Defaults to HTTP.
 	Scheme *corev1.URIScheme `json:"scheme,omitempty"`
-	// Custom headers to set in the request. HTTP allows repeated headers.
+	// httpHeaders are custom headers to set in the request. HTTP allows repeated headers.
 	HTTPHeaders []HTTPHeaderApplyConfiguration `json:"httpHeaders,omitempty"`
-	// Protocol selects the wire protocol for the probe connection.
+	// protocol selects the wire protocol for the probe connection.
 	// Nil defaults to HTTP/1.1.
 	Protocol *corev1.HTTPProtocol `json:"protocol,omitempty"`
 }

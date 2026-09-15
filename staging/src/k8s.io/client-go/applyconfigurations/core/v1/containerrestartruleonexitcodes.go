@@ -28,14 +28,14 @@ import (
 // ContainerRestartRuleOnExitCodes describes the condition
 // for handling an exited container based on its exit codes.
 type ContainerRestartRuleOnExitCodesApplyConfiguration struct {
-	// Represents the relationship between the container exit code(s) and the
+	// operator represents the relationship between the container exit code(s) and the
 	// specified values. Possible values are:
 	// - In: the requirement is satisfied if the container exit code is in the
 	// set of specified values.
 	// - NotIn: the requirement is satisfied if the container exit code is
 	// not in the set of specified values.
 	Operator *corev1.ContainerRestartRuleOnExitCodesOperator `json:"operator,omitempty"`
-	// Specifies the set of values to check for container exit codes.
+	// values to compare container exit codes to.
 	// At most 255 elements are allowed.
 	Values []int32 `json:"values,omitempty"`
 }

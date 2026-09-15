@@ -27,16 +27,16 @@ import (
 //
 // Information about the condition of a component.
 type ComponentConditionApplyConfiguration struct {
-	// Type of condition for a component.
+	// type of condition for a component.
 	// Valid value: "Healthy"
 	Type *corev1.ComponentConditionType `json:"type,omitempty"`
-	// Status of the condition for a component.
+	// status of the condition for a component.
 	// Valid values for "Healthy": "True", "False", or "Unknown".
 	Status *corev1.ConditionStatus `json:"status,omitempty"`
-	// Message about the condition for a component.
+	// message about the condition for a component.
 	// For example, information about a health check.
 	Message *string `json:"message,omitempty"`
-	// Condition error code for a component.
+	// error code condition for a component.
 	// For example, a health check error code.
 	Error *string `json:"error,omitempty"`
 }

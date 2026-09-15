@@ -24,7 +24,7 @@ package v1
 // A scope selector represents the AND of the selectors represented
 // by the scoped-resource selector requirements.
 type ScopeSelectorApplyConfiguration struct {
-	// A list of scope selector requirements by scope of the resources.
+	// matchExpressions is a list of scope selector requirements.
 	MatchExpressions []ScopedResourceSelectorRequirementApplyConfiguration `json:"matchExpressions,omitempty"`
 }
 

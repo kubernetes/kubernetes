@@ -23,10 +23,10 @@ package v1
 //
 // NodeRuntimeHandler is a set of runtime handler information.
 type NodeRuntimeHandlerApplyConfiguration struct {
-	// Runtime handler name.
+	// name of the runtime handler.
 	// Empty for the default runtime handler.
 	Name *string `json:"name,omitempty"`
-	// Supported features.
+	// features supported.
 	Features *NodeRuntimeHandlerFeaturesApplyConfiguration `json:"features,omitempty"`
 }
 

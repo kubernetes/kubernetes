@@ -23,12 +23,12 @@ package v1
 //
 // EnvVar represents an environment variable present in a Container.
 type EnvVarApplyConfiguration struct {
-	// Name of the environment variable.
+	// name of the environment variable.
 	// May consist of any printable ASCII characters except '='.
 	Name *string `json:"name,omitempty"`
-	// Variable references $(VAR_NAME) are expanded
-	// using the previously defined environment variables in the container and
-	// any service environment variables. If a variable cannot be resolved,
+	// value for the environment variable to be set.
+	// Variable references $(VAR_NAME) are expanded using the previously defined environment
+	// variables in the container and any service environment variables. If a variable cannot be resolved,
 	// the reference in the input string will be unchanged. Double $$ are reduced
 	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
 	// "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
@@ -36,7 +36,7 @@ type EnvVarApplyConfiguration struct {
 	// exists or not.
 	// Defaults to "".
 	Value *string `json:"value,omitempty"`
-	// Source for the environment variable's value. Cannot be used if value is not empty.
+	// valueFrom configures the source for the environment variable's value. Cannot be used if value is not empty.
 	ValueFrom *EnvVarSourceApplyConfiguration `json:"valueFrom,omitempty"`
 }
 

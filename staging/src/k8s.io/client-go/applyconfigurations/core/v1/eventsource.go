@@ -23,9 +23,9 @@ package v1
 //
 // EventSource contains information for an event.
 type EventSourceApplyConfiguration struct {
-	// Component from which the event is generated.
+	// component from which the event is generated.
 	Component *string `json:"component,omitempty"`
-	// Node name on which the event is generated.
+	// host is the Node name on which the event is generated.
 	Host *string `json:"host,omitempty"`
 }
 

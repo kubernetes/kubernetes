@@ -34,15 +34,15 @@ import (
 // the Data field must be less than MaxSecretSize bytes.
 type SecretApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Immutable, if set to true, ensures that data stored in the Secret cannot
-	// be updated (only object metadata can be modified).
+	// immutable ensures that data stored in the Secret cannot be updated
+	// (only object metadata can be modified), if set to true.
 	// If not set to true, the field can be modified at any time.
 	// Defaulted to nil.
 	Immutable *bool `json:"immutable,omitempty"`
-	// Data contains the secret data. Each key must consist of alphanumeric
+	// data contains the secret data. Each key must consist of alphanumeric
 	// characters, '-', '_' or '.'. The serialized form of the secret data is a
 	// base64 encoded string, representing the arbitrary (possibly non-string)
 	// data value here. Described in https://tools.ietf.org/html/rfc4648#section-4
@@ -52,7 +52,7 @@ type SecretApplyConfiguration struct {
 	// All keys and values are merged into the data field on write, overwriting any existing values.
 	// The stringData field is never output when reading from the API.
 	StringData map[string]string `json:"stringData,omitempty"`
-	// Used to facilitate programmatic handling of secret data.
+	// type is used to facilitate programmatic handling of secret data.
 	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 	Type *corev1.SecretType `json:"type,omitempty"`
 }

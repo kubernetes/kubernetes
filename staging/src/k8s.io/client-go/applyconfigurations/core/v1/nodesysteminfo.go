@@ -23,33 +23,35 @@ package v1
 //
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfoApplyConfiguration struct {
-	// MachineID reported by the node. For unique machine identification
+	// machineID reported by the node. For unique machine identification
 	// in the cluster this field is preferred. Learn more from man(5)
 	// machine-id: http://man7.org/linux/man-pages/man5/machine-id.5.html
 	MachineID *string `json:"machineID,omitempty"`
-	// SystemUUID reported by the node. For unique machine identification
+	// systemUUID reported by the node. For unique machine identification
 	// MachineID is preferred. This field is specific to Red Hat hosts
 	// https://access.redhat.com/documentation/en-us/red_hat_subscription_management/1/html/rhsm/uuid
 	SystemUUID *string `json:"systemUUID,omitempty"`
-	// Boot ID reported by the node.
+	// bootID reported by the node.
 	BootID *string `json:"bootID,omitempty"`
-	// Kernel Version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64).
+	// kernelVersion reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64).
 	KernelVersion *string `json:"kernelVersion,omitempty"`
-	// OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy)).
+	// osImage reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy)).
 	OSImage *string `json:"osImage,omitempty"`
-	// ContainerRuntime Version reported by the node through runtime remote API (e.g. containerd://1.4.2).
+	// containerRuntimeVersion reported by the node through runtime remote API (e.g. containerd://1.4.2).
 	ContainerRuntimeVersion *string `json:"containerRuntimeVersion,omitempty"`
-	// Kubelet Version reported by the node.
+	// kubeletVersion reported by the node.
+	// This field is deprecated.
 	KubeletVersion *string `json:"kubeletVersion,omitempty"`
-	// Deprecated: KubeProxy Version reported by the node.
+	// kubeProxyVersion reported by the node.
+	// This field is deprecated.
 	KubeProxyVersion *string `json:"kubeProxyVersion,omitempty"`
-	// The Operating System reported by the node
+	// operatingSystem reported by the node
 	OperatingSystem *string `json:"operatingSystem,omitempty"`
-	// The Architecture reported by the node
+	// architecture reported by the node
 	Architecture *string `json:"architecture,omitempty"`
-	// Swap Info reported by the node.
+	// swap Info reported by the node.
 	Swap *NodeSwapStatusApplyConfiguration `json:"swap,omitempty"`
-	// Whether the node is running in a user namespace.
+	// runningInUserNamespace indicates whether the node is running in a user namespace.
 	RunningInUserNamespace *bool `json:"runningInUserNamespace,omitempty"`
 }
 
