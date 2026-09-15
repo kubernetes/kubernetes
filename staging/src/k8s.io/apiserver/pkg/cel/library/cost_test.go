@@ -1463,6 +1463,55 @@ func TestSize(t *testing.T) {
 			argSizes:   []checker.SizeEstimate{{Min: 1, Max: 2}, {Min: 1, Max: 1}},
 			expectSize: checker.SizeEstimate{Min: 2, Max: 4},
 		},
+		{
+			name:       "getScheme result size",
+			function:   "getScheme",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getHostname result size",
+			function:   "getHostname",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getHost result size",
+			function:   "getHost",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getPort result size",
+			function:   "getPort",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getQuery result size",
+			function:   "getQuery",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getEscapedPath result size with 3x expansion",
+			function:   "getEscapedPath",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: checker.SizeEstimate{Min: 100, Max: 300},
+		},
+		{
+			name:       "getEscapedPath result size preserves range",
+			function:   "getEscapedPath",
+			targetSize: checker.SizeEstimate{Min: 10, Max: 100},
+			argSizes:   nil,
+			expectSize: checker.SizeEstimate{Min: 10, Max: 300},
+		},
 	}
 
 	originalPanicOnUnknown := panicOnUnknown
