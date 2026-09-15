@@ -81,6 +81,7 @@ message LeaseCandidateSpec {
   // binaryVersion is the binary version. It must be in a semver format without leading `v`.
   // This field is required.
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
   optional string binaryVersion = 4;
 
   // emulationVersion is the emulation version. It must be in a semver format without leading `v`.
