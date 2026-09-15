@@ -4187,20 +4187,46 @@ func (m *mockHandle) MutableSnapshotSharedLister() fwk.MutableSnapshotSharedList
 
 func TestDefaultPreemption_PodGroupPostFilter_WorkloadPreemptionAttempts(t *testing.T) {
 	tests := []struct {
-		name   string
-		status *fwk.Status
+		name          string
+		status        *fwk.Status
+		isCPG         bool
+		wantPreemptor string
 	}{
 		{
-			name:   "preemption success",
-			status: fwk.NewStatus(fwk.Success),
+			name:          "podgroup preemption success",
+			status:        fwk.NewStatus(fwk.Success),
+			isCPG:         false,
+			wantPreemptor: metrics.PodGroup,
 		},
 		{
-			name:   "preemption unschedulable",
-			status: fwk.NewStatus(fwk.Unschedulable),
+			name:          "compositepodgroup preemption success",
+			status:        fwk.NewStatus(fwk.Success),
+			isCPG:         true,
+			wantPreemptor: metrics.CompositePodGroup,
 		},
 		{
-			name:   "preemption error",
-			status: fwk.NewStatus(fwk.Error),
+			name:          "podgroup preemption unschedulable",
+			status:        fwk.NewStatus(fwk.Unschedulable),
+			isCPG:         false,
+			wantPreemptor: metrics.PodGroup,
+		},
+		{
+			name:          "compositepodgroup preemption unschedulable",
+			status:        fwk.NewStatus(fwk.Unschedulable),
+			isCPG:         true,
+			wantPreemptor: metrics.CompositePodGroup,
+		},
+		{
+			name:          "podgroup preemption error",
+			status:        fwk.NewStatus(fwk.Error),
+			isCPG:         false,
+			wantPreemptor: metrics.PodGroup,
+		},
+		{
+			name:          "compositepodgroup preemption error",
+			status:        fwk.NewStatus(fwk.Error),
+			isCPG:         true,
+			wantPreemptor: metrics.CompositePodGroup,
 		},
 	}
 
@@ -4216,16 +4242,21 @@ func TestDefaultPreemption_PodGroupPostFilter_WorkloadPreemptionAttempts(t *test
 			}
 
 			expectedStatus := tt.status.Code().String()
-			stateBefore := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus)
+			stateBefore := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus, tt.wantPreemptor)
 
-			pgInfo := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Obj())}
+			var pgInfo *framework.PodGroupInfo
+			if tt.isCPG {
+				pgInfo = &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Obj())}
+			} else {
+				pgInfo = &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Obj())}
+			}
 			pl.PodGroupPostFilter(ctx, nil, pgInfo, nil)
 
-			stateAfter := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus)
+			stateAfter := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus, tt.wantPreemptor)
 
 			diff := stateAfter.count - stateBefore.count
 			if diff != 1 {
-				t.Errorf("Expected %s count delta to be 1, got %d", expectedStatus, diff)
+				t.Errorf("Expected %s count delta for %s to be 1, got %d", expectedStatus, tt.wantPreemptor, diff)
 			}
 		})
 	}
@@ -4235,16 +4266,16 @@ type workloadPreemptionAttemptsState struct {
 	count uint64
 }
 
-func captureWorkloadPreemptionAttempts(g componentmetrics.Gatherer, status string) workloadPreemptionAttemptsState {
+func captureWorkloadPreemptionAttempts(g componentmetrics.Gatherer, status, preemptorType string) workloadPreemptionAttemptsState {
 	state := workloadPreemptionAttemptsState{}
-	if count, err := getCounterFromGatherer(g, "scheduler_workload_preemption_attempts_total", status); err == nil {
+	if count, err := getCounterFromGatherer(g, "scheduler_workload_preemption_attempts_total", status, preemptorType); err == nil {
 		state.count = count
 	}
 	return state
 }
 
-func getCounterFromGatherer(g componentmetrics.Gatherer, name string, resultLabelValue string) (uint64, error) {
-	vals, err := testutil.GetCounterValuesFromGatherer(g, name, nil, "result")
+func getCounterFromGatherer(g componentmetrics.Gatherer, name string, resultLabelValue, preemptorType string) (uint64, error) {
+	vals, err := testutil.GetCounterValuesFromGatherer(g, name, map[string]string{"preemptor": preemptorType}, "result")
 	if err != nil {
 		return 0, err
 	}

@@ -363,7 +363,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 func observeVictims(preemptor ExecutorPreemptor, candidate Candidate) {
 	numVictims := float64(len(candidate.Victims().Pods))
 	if preemptor.Type() == string(fwk.PodGroupKeyType) || preemptor.Type() == string(fwk.CompositePodGroupKeyType) {
-		metrics.WorkloadPreemptionVictims.Observe(numVictims)
+		metrics.WorkloadPreemptionVictims.WithLabelValues(preemptor.Type()).Observe(numVictims)
 	} else {
 		metrics.PreemptionVictims.Observe(numVictims)
 	}
