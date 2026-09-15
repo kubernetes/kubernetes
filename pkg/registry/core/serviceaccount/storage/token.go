@@ -47,7 +47,6 @@ import (
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	authenticationvalidation "k8s.io/kubernetes/pkg/apis/authentication/validation"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	token "k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -207,9 +206,6 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 				}
 			}
 		case gvk.Group == "" && gvk.Kind == "Node":
-			if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) {
-				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token to a Node object as the %q feature-gate is disabled", features.ServiceAccountTokenNodeBinding))
-			}
 			newCtx := newContext(ctx, "nodes", ref.Name, "", gvk)
 			nodeObj, err := r.nodes.Get(newCtx, ref.Name, &metav1.GetOptions{})
 			if err != nil {
@@ -301,7 +297,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		Token:               tokdata,
 		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(out.Spec.ExpirationSeconds) * time.Second)},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) && len(sc.ID) > 0 {
+	if len(sc.ID) > 0 {
 		audit.AddAuditAnnotation(ctx, serviceaccount.IssuedCredentialIDAuditAnnotationKey, authenticationtokenjwt.CredentialIDForJTI(sc.ID))
 	}
 	return out, nil
