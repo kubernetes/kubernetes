@@ -3542,6 +3542,50 @@ func Validate_ResourceClaimTemplateSpec(
 	return errs
 }
 
+// Validate_ResourcePool validates an instance of ResourcePool according
+// to declarative validation rules in the API schema.
+func Validate_ResourcePool(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1.ResourcePool) (errs field.ErrorList) {
+
+	{ // field resourcev1.ResourcePool.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.ResourcePool) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	// field resourcev1.ResourcePool.Generation has no validation
+	// field resourcev1.ResourcePool.ResourceSliceCount has no validation
+	return errs
+}
+
 // Validate_ResourceSlice validates an instance of ResourceSlice according
 // to declarative validation rules in the API schema.
 func Validate_ResourceSlice(
@@ -3636,7 +3680,28 @@ func Validate_ResourceSliceSpec(
 		errs = append(errs, fn(fldPath.Child("driver"), &obj.Driver, oldVal, oldObj != nil)...)
 	}
 
-	// field resourcev1.ResourceSliceSpec.Pool has no validation
+	{ // field resourcev1.ResourceSliceSpec.Pool
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1.ResourcePool,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ResourcePool(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.ResourceSliceSpec) *resourcev1.ResourcePool {
+				return &oldObj.Pool
+			})
+		errs = append(errs, fn(fldPath.Child("pool"), &obj.Pool, oldVal, oldObj != nil)...)
+	}
+
 	// field resourcev1.ResourceSliceSpec.NodeName has no validation
 	// field resourcev1.ResourceSliceSpec.NodeSelector has no validation
 	// field resourcev1.ResourceSliceSpec.AllNodes has no validation

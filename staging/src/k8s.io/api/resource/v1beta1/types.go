@@ -304,6 +304,8 @@ type ResourcePool struct {
 	// separated by slashes. This field is immutable.
 	//
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
 	// generation tracks the change in a pool over time. Whenever a driver
