@@ -156,7 +156,8 @@ type WorkloadSpec struct {
 	PodGroupTemplates []PodGroupTemplate `json:"podGroupTemplates" protobuf:"bytes,2,rep,name=podGroupTemplates"`
 
 	// compositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
-	// The maximum number of templates is 8. This field is immutable.
+	// The maximum number of templates is 8. Templates cannot be added or removed after the workload is created.
+	// Existing templates may still be updated where their individual fields allow it.
 	// Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
 	//
 	// This field is used only when the CompositePodGroup feature gate is enabled.
@@ -858,11 +859,14 @@ type TopologyConstraint struct {
 
 // CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup.
 // Exactly one policy must be set.
+// The policy is chosen at creation time by setting either the Basic or Gang field.
+// The CompositePodGroup may not change policy after creation. Fields within chosen policy may be updated
+// after creation when their individual fields allow it.
 //
 // +union
 type CompositePodGroupSchedulingPolicy struct {
 	// basic specifies that the groups of this composite group should be scheduled independently.
-	// This field is immutable.
+	// Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward.
 	//
 	// +optional
 	// +k8s:optional
@@ -871,7 +875,9 @@ type CompositePodGroupSchedulingPolicy struct {
 	Basic *CompositeBasicSchedulingPolicy `json:"basic,omitempty" protobuf:"bytes,1,opt,name=basic"`
 
 	// gang specifies that the groups of this composite group should be scheduled using
-	// all-or-nothing semantics.
+	// all-or-nothing semantics. Setting this field at group creation time
+	// opts this group to gang scheduling; this field cannot be set or unset afterward.
+	// The minGroupCount field within Gang scheduling policy remains mutable after group creation.
 	//
 	// +optional
 	// +k8s:optional
@@ -895,7 +901,15 @@ type CompositeBasicSchedulingPolicy struct {
 type CompositeGangSchedulingPolicy struct {
 	// minGroupCount is the minimum number of child groups that must be schedulable
 	// or scheduled at the same time for the scheduler to admit the entire group.
-	// It must be a positive integer.
+	// It must be a positive integer. This field is mutable to support workload scaling.
+	//
+	// Note that the scheduler operates on an eventually consistent model. Updates
+	// to minGroupCount may not be immediately reflected in scheduling decisions due to
+	// propagation delays. If minGroupCount is updated while a scheduling cycle is in
+	// progress for that group, the new value may not take effect until the next
+	// cycle. Moreover, minGroupCount is only enforced during scheduling, meaning that
+	// modifications to this field do not affect already-scheduled pods, applying
+	// only to those evaluated in future cycles.
 	//
 	// +required
 	// +k8s:required
