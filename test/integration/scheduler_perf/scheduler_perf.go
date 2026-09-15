@@ -68,6 +68,7 @@ const (
 	createPodsOpcode             operationCode = "createPods"
 	createPodSetsOpcode          operationCode = "createPodSets"
 	deletePodsOpcode             operationCode = "deletePods"
+	deleteNodesOpcode            operationCode = "deleteNodes"
 	createResourceClaimsOpcode   operationCode = "createResourceClaims"
 	churnOpcode                  operationCode = "churn"
 	updateAnyOpcode              operationCode = "updateAny"
@@ -521,6 +522,7 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		createPodsOpcode:             &createPodsOp{},
 		createPodSetsOpcode:          &createPodSetsOp{},
 		deletePodsOpcode:             &deletePodsOp{},
+		deleteNodesOpcode:            &deleteNodesOp{},
 		createResourceClaimsOpcode:   &createResourceClaimsOp{},
 		churnOpcode:                  &churnOp{},
 		updateAnyOpcode:              &updateAny{},
@@ -531,7 +533,6 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		createPodGroupsOpcode:        &createPodGroups{},
 		startCollectingProfileOpcode: &startCollectingProfileOp{},
 		stopCollectingProfileOpcode:  &stopCollectingProfileOp{},
-		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	// First determine the opcode using lenient decoding (= ignore extra fields).
 	var possibleOp struct {

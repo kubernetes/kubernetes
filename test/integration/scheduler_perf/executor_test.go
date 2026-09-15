@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -30,10 +31,12 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -45,9 +48,140 @@ func TestRunOp(t *testing.T) {
 		name            string
 		op              realOp
 		workload        *Workload
+		initialObjects  []runtime.Object
+		initialOps      []realOp
+		prepareClient   func(*fake.Clientset)
 		expectedFailure bool
 		verifyFuncs     []verifyFunc
 	}{
+		{
+			name: "Delete Nodes Matching Selector",
+			initialObjects: []runtime.Object{
+				&v1.Node{
+					Name:              "node-a",
+					CreationTimestamp: metav1.NewTime(time.Unix(1, 0)),
+					Labels: map[string]string{
+						"delete": "true",
+						"order":  "old",
+					},
+				},
+				&v1.Node{
+					Name:              "node-b",
+					CreationTimestamp: metav1.NewTime(time.Unix(2, 0)),
+					Labels: map[string]string{
+						"delete": "true",
+						"order":  "new",
+					},
+				},
+				&v1.Node{
+					Name: "node-c",
+					Labels: map[string]string{
+						"delete": "false",
+						"order":  "excluded",
+					},
+				},
+			},
+			op: &deleteNodesOp{
+				Opcode:        deleteNodesOpcode,
+				Count:         1,
+				LabelSelector: map[string]string{"delete": "true"},
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(2),
+				verifyCountWithListOptions(1, metav1.ListOptions{LabelSelector: "delete=false"}),
+				verifyCountWithListOptions(1, metav1.ListOptions{LabelSelector: "delete=true"}),
+				verifyCountWithListOptions(1, metav1.ListOptions{
+					LabelSelector: "order=old",
+				}),
+				verifyCountWithListOptions(0, metav1.ListOptions{
+					LabelSelector: "order=new",
+				}),
+			},
+		},
+		{
+			name: "Delete Most Recently Created Nodes Without Selector",
+			initialObjects: []runtime.Object{
+				&v1.Node{
+					Name:              "node-old",
+					CreationTimestamp: metav1.NewTime(time.Unix(1, 0)),
+					Labels:            map[string]string{"order": "old"},
+				},
+				&v1.Node{
+					Name:              "node-middle",
+					CreationTimestamp: metav1.NewTime(time.Unix(2, 0)),
+					Labels:            map[string]string{"order": "middle"},
+				},
+				&v1.Node{
+					Name:              "node-new",
+					CreationTimestamp: metav1.NewTime(time.Unix(3, 0)),
+					Labels:            map[string]string{"order": "new"},
+				},
+			},
+			op: &deleteNodesOp{
+				Opcode: deleteNodesOpcode,
+				Count:  2,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(1),
+				verifyCountWithListOptions(1, metav1.ListOptions{
+					LabelSelector: "order=old",
+				}),
+			},
+		},
+		{
+			name: "Delete Nodes Fails When Selector Matches Too Few Nodes",
+			initialObjects: []runtime.Object{
+				&v1.Node{
+					Name:   "node-a",
+					Labels: map[string]string{"delete": "true"},
+				},
+				&v1.Node{
+					Name:   "node-b",
+					Labels: map[string]string{"delete": "true"},
+				},
+				&v1.Node{
+					Name:   "node-c",
+					Labels: map[string]string{"delete": "false"},
+				},
+			},
+			op: &deleteNodesOp{
+				Opcode:        deleteNodesOpcode,
+				Count:         3,
+				LabelSelector: map[string]string{"delete": "true"},
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create Nodes After Deletion",
+			initialOps: []realOp{
+				&createNodesOp{Opcode: createNodesOpcode, Count: 2},
+				&deleteNodesOp{Opcode: deleteNodesOpcode, Count: 1},
+			},
+			op: &createNodesOp{Opcode: createNodesOpcode, Count: 1},
+			verifyFuncs: []verifyFunc{
+				verifyCount(2),
+			},
+		},
+		{
+			name: "Delete Nodes Returns API Error",
+			initialObjects: []runtime.Object{
+				&v1.Node{
+					Name: "node-a",
+				},
+			},
+			op: &deleteNodesOp{
+				Opcode: deleteNodesOpcode,
+				Count:  1,
+			},
+			prepareClient: func(client *fake.Clientset) {
+				client.PrependReactor("delete", "nodes",
+					func(_ clienttesting.Action) (bool, runtime.Object, error) {
+						return true, nil, fmt.Errorf("injected delete error")
+					},
+				)
+			},
+			expectedFailure: true,
+		},
 		{
 			name: "Create Single Node",
 			op: &createNodesOp{
@@ -520,7 +654,10 @@ func TestRunOp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			client := fake.NewSimpleClientset()
+			client := fake.NewSimpleClientset(tt.initialObjects...)
+			if tt.prepareClient != nil {
+				tt.prepareClient(client)
+			}
 			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -541,8 +678,14 @@ func TestRunOp(t *testing.T) {
 				workload:         tt.workload,
 			}
 
+			for i, op := range tt.initialOps {
+				if err := exec.runOp(tCtx, op, i); err != nil {
+					t.Fatalf("Failed to run initial op %d: %v", i, err)
+				}
+			}
+
 			opToRun := tt.op
-			opIndex := 0
+			opIndex := len(tt.initialOps)
 			w := tt.workload
 			if w == nil {
 				w = &Workload{}
@@ -584,10 +727,16 @@ func TestRunOp(t *testing.T) {
 // verifyCount returns a verification function that checks if the number of existing objects
 // matches the expected count based on the operation type.
 func verifyCount(expectedCount int) verifyFunc {
+	return verifyCountWithListOptions(expectedCount, metav1.ListOptions{})
+}
+
+// verifyCountWithListOptions returns a verification function that checks the number of objects
+// matching the provided list options based on the operation type.
+func verifyCountWithListOptions(expectedCount int, opts metav1.ListOptions) verifyFunc {
 	return func(t *testing.T, tCtx ktesting.TContext, op realOp, opIndex int) error {
 		switch concreteOp := op.(type) {
-		case *createNodesOp:
-			nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
+		case *createNodesOp, *deleteNodesOp:
+			nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, opts)
 			if err != nil {
 				return fmt.Errorf("failed to list nodes: %w", err)
 			}
@@ -599,7 +748,7 @@ func verifyCount(expectedCount int) verifyFunc {
 			if concreteOp.Namespace != nil {
 				namespace = *concreteOp.Namespace
 			}
-			pods, err := tCtx.Client().CoreV1().Pods(namespace).List(tCtx, metav1.ListOptions{})
+			pods, err := tCtx.Client().CoreV1().Pods(namespace).List(tCtx, opts)
 			if err != nil {
 				return fmt.Errorf("failed to list pods: %w", err)
 			}
@@ -607,7 +756,7 @@ func verifyCount(expectedCount int) verifyFunc {
 				return fmt.Errorf("unexpected pod count: got %d, want %d", got, expectedCount)
 			}
 		case *createPodGroups:
-			pgs, err := tCtx.Client().SchedulingV1beta1().PodGroups(concreteOp.Namespace).List(tCtx, metav1.ListOptions{})
+			pgs, err := tCtx.Client().SchedulingV1beta1().PodGroups(concreteOp.Namespace).List(tCtx, opts)
 			if err != nil {
 				return fmt.Errorf("failed to list pod groups: %w", err)
 			}
@@ -1331,4 +1480,81 @@ func TestProfileCollection(t *testing.T) {
 			t.Fatalf("Expected profile file %q to exist, got error: %v", expectedPath, err)
 		}
 	})
+}
+
+func TestPatchParams(t *testing.T) {
+	tests := []struct {
+		name            string
+		op              realOp
+		workloadParams  params
+		expectedOp      realOp
+		expectedFailure bool
+	}{
+		{
+			name: "Delete Nodes Count",
+			op: &deleteNodesOp{
+				Opcode:     deleteNodesOpcode,
+				CountParam: "$deleteNodes",
+			},
+			workloadParams: params{
+				params: map[string]any{
+					"deleteNodes": float64(3),
+				},
+				isUsed: map[string]bool{},
+			},
+			expectedOp: &deleteNodesOp{
+				Opcode:     deleteNodesOpcode,
+				Count:      3,
+				CountParam: "$deleteNodes",
+			},
+		},
+		{
+			name: "Delete Nodes Undefined Count Parameter",
+			op: &deleteNodesOp{
+				Opcode:     deleteNodesOpcode,
+				CountParam: "$missing",
+			},
+			workloadParams: params{
+				params: map[string]any{},
+				isUsed: map[string]bool{},
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Delete Nodes Negative Count Parameter",
+			op: &deleteNodesOp{
+				Opcode:     deleteNodesOpcode,
+				CountParam: "$deleteNodes",
+			},
+			workloadParams: params{
+				params: map[string]any{
+					"deleteNodes": float64(-1),
+				},
+				isUsed: map[string]bool{},
+			},
+			expectedFailure: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workload := &Workload{
+				Params: tt.workloadParams,
+			}
+
+			got, err := tt.op.patchParams(workload)
+			if tt.expectedFailure {
+				if err == nil {
+					t.Errorf("Expected failure, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("patchParams() returned an error: %v", err)
+			}
+			if diff := cmp.Diff(tt.expectedOp, got); diff != "" {
+				t.Errorf("unexpected patched operation (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
