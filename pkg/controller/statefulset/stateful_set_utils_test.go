@@ -1837,70 +1837,88 @@ func TestGetStatefulSetMaxUnavailable(t *testing.T) {
 
 func TestCompleteUpdate(t *testing.T) {
 	tests := []struct {
-		name            string
-		strategyType    apps.StatefulSetUpdateStrategyType
-		replicas        int32
-		readyReplicas   int32
-		updatedReplicas int32
-		totalReplicas   int32
-		currentRevision string
-		updateRevision  string
-		expectPromoted  bool
+		name              string
+		strategyType      apps.StatefulSetUpdateStrategyType
+		replicas          int32
+		readyReplicas     int32
+		availableReplicas int32
+		updatedReplicas   int32
+		totalReplicas     int32
+		currentRevision   string
+		updateRevision    string
+		expectPromoted    bool
 	}{
 		{
-			name:            "RollingUpdate: all replicas updated and ready",
-			strategyType:    apps.RollingUpdateStatefulSetStrategyType,
-			replicas:        3,
-			readyReplicas:   3,
-			updatedReplicas: 3,
-			totalReplicas:   3,
-			currentRevision: "rev-1",
-			updateRevision:  "rev-2",
-			expectPromoted:  true,
+			name:              "RollingUpdate: all replicas updated and ready",
+			strategyType:      apps.RollingUpdateStatefulSetStrategyType,
+			replicas:          3,
+			readyReplicas:     3,
+			availableReplicas: 3,
+			updatedReplicas:   3,
+			totalReplicas:     3,
+			currentRevision:   "rev-1",
+			updateRevision:    "rev-2",
+			expectPromoted:    true,
 		},
 		{
-			name:            "OnDelete: all replicas updated and ready",
-			strategyType:    apps.OnDeleteStatefulSetStrategyType,
-			replicas:        3,
-			readyReplicas:   3,
-			updatedReplicas: 3,
-			totalReplicas:   3,
-			currentRevision: "rev-1",
-			updateRevision:  "rev-2",
-			expectPromoted:  true,
+			name:              "OnDelete: all replicas updated and ready",
+			strategyType:      apps.OnDeleteStatefulSetStrategyType,
+			replicas:          3,
+			readyReplicas:     3,
+			availableReplicas: 3,
+			updatedReplicas:   3,
+			totalReplicas:     3,
+			currentRevision:   "rev-1",
+			updateRevision:    "rev-2",
+			expectPromoted:    true,
 		},
 		{
-			name:            "OnDelete: partial update",
-			strategyType:    apps.OnDeleteStatefulSetStrategyType,
-			replicas:        3,
-			readyReplicas:   3,
-			updatedReplicas: 1,
-			totalReplicas:   3,
-			currentRevision: "rev-1",
-			updateRevision:  "rev-2",
-			expectPromoted:  false,
+			name:              "OnDelete: partial update",
+			strategyType:      apps.OnDeleteStatefulSetStrategyType,
+			replicas:          3,
+			readyReplicas:     3,
+			availableReplicas: 3,
+			updatedReplicas:   1,
+			totalReplicas:     3,
+			currentRevision:   "rev-1",
+			updateRevision:    "rev-2",
+			expectPromoted:    false,
 		},
 		{
-			name:            "RollingUpdate: not all ready",
-			strategyType:    apps.RollingUpdateStatefulSetStrategyType,
-			replicas:        3,
-			readyReplicas:   2,
-			updatedReplicas: 3,
-			totalReplicas:   3,
-			currentRevision: "rev-1",
-			updateRevision:  "rev-2",
-			expectPromoted:  false,
+			name:              "RollingUpdate: not all ready",
+			strategyType:      apps.RollingUpdateStatefulSetStrategyType,
+			replicas:          3,
+			readyReplicas:     2,
+			availableReplicas: 2,
+			updatedReplicas:   3,
+			totalReplicas:     3,
+			currentRevision:   "rev-1",
+			updateRevision:    "rev-2",
+			expectPromoted:    false,
 		},
 		{
-			name:            "not all replicas created",
-			strategyType:    apps.RollingUpdateStatefulSetStrategyType,
-			replicas:        3,
-			readyReplicas:   2,
-			updatedReplicas: 2,
-			totalReplicas:   2,
-			currentRevision: "rev-1",
-			updateRevision:  "rev-2",
-			expectPromoted:  false,
+			name:              "not all replicas created",
+			strategyType:      apps.RollingUpdateStatefulSetStrategyType,
+			replicas:          3,
+			readyReplicas:     2,
+			availableReplicas: 2,
+			updatedReplicas:   2,
+			totalReplicas:     2,
+			currentRevision:   "rev-1",
+			updateRevision:    "rev-2",
+			expectPromoted:    false,
+		},
+		{
+			name:              "RollingUpdate: ready but not yet available (minReadySeconds)",
+			strategyType:      apps.RollingUpdateStatefulSetStrategyType,
+			replicas:          3,
+			readyReplicas:     3,
+			availableReplicas: 2,
+			updatedReplicas:   3,
+			totalReplicas:     3,
+			currentRevision:   "rev-1",
+			updateRevision:    "rev-2",
+			expectPromoted:    false,
 		},
 	}
 
@@ -1910,11 +1928,12 @@ func TestCompleteUpdate(t *testing.T) {
 			set.Spec.UpdateStrategy.Type = tc.strategyType
 
 			status := apps.StatefulSetStatus{
-				Replicas:        tc.totalReplicas,
-				ReadyReplicas:   tc.readyReplicas,
-				UpdatedReplicas: tc.updatedReplicas,
-				CurrentRevision: tc.currentRevision,
-				UpdateRevision:  tc.updateRevision,
+				Replicas:          tc.totalReplicas,
+				ReadyReplicas:     tc.readyReplicas,
+				AvailableReplicas: tc.availableReplicas,
+				UpdatedReplicas:   tc.updatedReplicas,
+				CurrentRevision:   tc.currentRevision,
+				UpdateRevision:    tc.updateRevision,
 			}
 			completeUpdate(set, &status)
 
