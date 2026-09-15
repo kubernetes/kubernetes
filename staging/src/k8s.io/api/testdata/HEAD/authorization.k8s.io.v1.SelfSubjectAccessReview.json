@@ -80,12 +80,66 @@
     "nonResourceAttributes": {
       "path": "pathValue",
       "verb": "verbValue"
+    },
+    "authorizationOptions": {
+      "handledDecisionTypes": [
+        "handledDecisionTypesValue"
+      ]
     }
   },
   "status": {
     "allowed": true,
     "denied": true,
     "reason": "reasonValue",
-    "evaluationError": "evaluationErrorValue"
+    "evaluationError": "evaluationErrorValue",
+    "conditionalDecision": {
+      "type": "typeValue",
+      "deny": {
+        "reason": "reasonValue",
+        "evaluationError": "evaluationErrorValue"
+      },
+      "noOpinion": {
+        "reason": "reasonValue",
+        "evaluationError": "evaluationErrorValue"
+      },
+      "allow": {
+        "reason": "reasonValue",
+        "evaluationError": "evaluationErrorValue"
+      },
+      "conditionsMap": {
+        "denyConditions": [
+          {
+            "id": "idValue",
+            "condition": "conditionValue",
+            "type": "typeValue",
+            "description": "descriptionValue"
+          }
+        ],
+        "noOpinionConditions": [
+          {
+            "id": "idValue",
+            "condition": "conditionValue",
+            "type": "typeValue",
+            "description": "descriptionValue"
+          }
+        ],
+        "allowConditions": [
+          {
+            "id": "idValue",
+            "condition": "conditionValue",
+            "type": "typeValue",
+            "description": "descriptionValue"
+          }
+        ]
+      },
+      "union": [
+        {
+          "authorizerName": "authorizerNameValue",
+          "decision": {
+            "type": ""
+          }
+        }
+      ]
+    }
   }
 }
