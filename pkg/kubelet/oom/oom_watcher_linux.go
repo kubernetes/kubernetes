@@ -43,8 +43,10 @@ type realWatcher struct {
 var _ Watcher = &realWatcher{}
 
 // NewWatcher creates and initializes an OOMWatcher backed by the kernel log
-// (/dev/kmsg) oom streamer.
-func NewWatcher(recorder record.EventRecorderLogger) (Watcher, error) {
+// (/dev/kmsg) oom streamer. The container status getter is unused on Linux,
+// where OOM events come from the kernel log, but is kept in the signature so
+// callers compile unchanged across platforms.
+func NewWatcher(recorder record.EventRecorderLogger, _ containerStatusGetter) (Watcher, error) {
 	// for test purpose
 	_, ok := recorder.(*record.FakeRecorder)
 	if ok {
