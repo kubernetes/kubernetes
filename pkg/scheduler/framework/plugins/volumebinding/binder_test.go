@@ -2282,6 +2282,17 @@ func TestCapacity(t *testing.T) {
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
+		"capacity-exceeds-int64": {
+			// 800E overflows Value() but Cmp orders it above the 1Gi request.
+			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "800E", ""),
+			},
+			expectedProvisions: []*DynamicProvision{{
+				PVC:          provisionedPVC,
+				NodeCapacity: makeCapacity("net", waitClassWithProvisioner, node1, "800E", ""),
+			}},
+		},
 	}
 
 	testNode := &v1.Node{
