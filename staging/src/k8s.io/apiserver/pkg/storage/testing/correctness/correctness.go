@@ -734,10 +734,11 @@ func correctnessTestSteps() []testStep {
 
 // RunTestCorrectness executes the operations from the sequential storage model against real storage
 // and validates that every transition matches the StorageModel specification.
-func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interface, storagePrefix string) {
+func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interface, storagePrefix string, keyFunc func(obj runtime.Object) (string, error)) {
 	model := NewEmptyModel(storagePrefix, func() runtime.Object { return &example.Pod{} })
 
-	watcher, err := store.Watch(ctx, "/pods/", storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything, Recursive: true})
+	watchRequest := WatchRequest{ResourceVersion: "1"}
+	watcher, err := store.Watch(ctx, "/pods/", storage.ListOptions{ResourceVersion: watchRequest.ResourceVersion, Predicate: storage.Everything, Recursive: true})
 	require.NoError(t, err)
 	defer watcher.Stop()
 
@@ -778,6 +779,8 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 
 	gotEvents := collectEventsTillRV(t, watcher, store.Versioner(), model.ResourceVersion)
 	require.Equal(t, expectEvents, gotEvents)
+	validator := NewWatchValidator(store.Versioner(), keyFunc, expectEvents)
+	require.NoError(t, validator.ValidateWatch(watchRequest, WatchResponse{Events: gotEvents}))
 }
 
 func collectEventsTillRV(t *testing.T, watcher watch.Interface, versioner storage.Versioner, targetRV uint64) []watch.Event {
