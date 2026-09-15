@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -62,6 +63,10 @@ func AuthorizedForAdmin(ctx context.Context, deviceRequests []resource.DeviceReq
 		// No need to validate unless admin access is requested
 		return allErrs
 	}
+
+	// Record the request for administrative device access even if it is
+	// subsequently rejected because the namespace is not authorized.
+	audit.AddAuditAnnotation(ctx, resource.DRAAdminNamespaceLabelKey, "true")
 
 	// Retrieve the namespace object from the store
 	ns, err := nsClient.Get(ctx, namespaceName, metav1.GetOptions{})
