@@ -48,12 +48,19 @@ var (
 		Weight: 50,
 	}}
 
-	cfg = TraffiConfig{
-		Concurrency:         8,
-		Namespaces:          2,
-		Objects:             4,
-		MaxOperations:       10000,
-		RequestDistribution: requestDistribution,
+	cfg = TrafficConfig{
+		Namespaces: 2,
+		Objects:    4,
+		Unary: UnaryConfig{
+			Concurrency:         8,
+			MaxOperations:       10000,
+			RequestDistribution: requestDistribution,
+		},
+		Watch: WatchConfig{
+			Concurrency: 4,
+			Duration:    100 * time.Millisecond,
+			MaxEvents:   50,
+		},
 	}
 )
 
@@ -80,10 +87,10 @@ func TestCorrectness(t *testing.T) {
 			initialState, err := correctness.NewModelFromStorage(storagePrefix, list, cacheKeyFunc)
 			require.NoError(t, err)
 
-			operations, err := RunTraffic(t.Context(), store, cfg)
+			operations, recordedWatches, err := RunTraffic(t.Context(), store, cfg)
 			require.NoError(t, err)
-			t.Logf("Collected %d operations across %d concurrent workers on %s",
-				len(operations), cfg.Concurrency, s.name)
+			t.Logf("Collected %d unary operations and %d watch sessions on %s",
+				len(operations), len(recordedWatches), s.name)
 
 			model := ToPorcupineModel(initialState)
 			res, info := porcupine.CheckOperationsVerbose(model, toPorcupineOperations(operations), time.Minute)
@@ -100,6 +107,16 @@ func TestCorrectness(t *testing.T) {
 
 			require.Equal(t, porcupine.Ok, res, "Linearizability check failed across %d operations", len(operations))
 			t.Logf("Linearizability check succeeded across %d operations", len(operations))
+
+			history := correctness.NewWatchHistory(operations, store.Versioner())
+			for _, rw := range recordedWatches {
+				correctness.ValidateWatchGuarantees(t, store.Versioner(), history, rw.Request, rw.Response)
+			}
+
+			coverage := correctness.ComputeWatchCoverage(recordedWatches)
+			t.Logf("Watch Coverage Report for %s:\n%s", s.name, coverage.Summary())
+			require.Greater(t, coverage.TotalWatches, 0, "expected at least one watch session")
+			require.Greater(t, coverage.TotalEvents, 0, "expected at least one watch event across sessions")
 		})
 	}
 }

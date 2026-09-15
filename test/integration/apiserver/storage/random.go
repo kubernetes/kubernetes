@@ -17,7 +17,14 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
 	"math/rand"
+	"strconv"
+
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/testing/correctness"
 )
 
 type ChoiceWeight[T any] struct {
@@ -38,4 +45,58 @@ func PickRandom[T any](choices []ChoiceWeight[T]) T {
 		roll -= op.Weight
 	}
 	panic("unexpected")
+}
+
+func randomWatchRequest(keys []types.NamespacedName, lastRV uint64) correctness.WatchRequest {
+	k := keys[rand.Intn(len(keys))]
+	scopeChoice := rand.Intn(100)
+	var key string
+	switch {
+	case scopeChoice < 30:
+		key = "/pods/"
+	case scopeChoice < 70:
+		key = fmt.Sprintf("/pods/%s/", k.Namespace)
+	default:
+		key = fmt.Sprintf("/pods/%s/%s", k.Namespace, k.Name)
+	}
+
+	var startRV string
+	if lastRV == 0 {
+		if rand.Intn(100) < 50 {
+			startRV = "0"
+		} else {
+			startRV = "1"
+		}
+	} else {
+		rvChoice := rand.Intn(100)
+		switch {
+		case rvChoice < 30:
+			// Live stream from latest point in time
+			startRV = "0"
+		case rvChoice < 40:
+			// Replay from beginning
+			startRV = "1"
+		default:
+			// Concrete RV with +/- 10 offset from last observed RV
+			offset := rand.Intn(21) - 10 // [-10, +10]
+			targetRV := int64(lastRV) + int64(offset)
+			if targetRV < 1 {
+				targetRV = 1
+			}
+			startRV = strconv.FormatUint(uint64(targetRV), 10)
+		}
+	}
+
+	var pred storage.SelectionPredicate
+	if rand.Intn(100) < 30 {
+		pred = storage.SelectionPredicate{
+			Field: fields.OneTermEqualSelector("metadata.name", k.Name),
+		}
+	}
+
+	return correctness.WatchRequest{
+		Key:             key,
+		ResourceVersion: startRV,
+		Predicate:       pred,
+	}
 }

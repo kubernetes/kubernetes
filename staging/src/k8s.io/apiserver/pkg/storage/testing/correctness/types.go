@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -117,10 +118,34 @@ const (
 	OpCreate OpType = "Create"
 	OpDelete OpType = "Delete"
 	OpGet    OpType = "Get"
+	OpUpdate OpType = "Update"
 )
 
 // Response represents the output/result from the storage interface invocation.
 type Response struct {
 	Object runtime.Object
 	Err    error
+}
+
+// WatchRequest contains parameters for a watch stream.
+type WatchRequest struct {
+	Name              string
+	Key               string
+	ResourceVersion   string
+	Predicate         storage.SelectionPredicate
+	SendInitialEvents bool
+	Recursive         bool
+	ProgressNotify    bool
+}
+
+// WatchResponse contains the events and any terminal error received from a watch stream.
+type WatchResponse struct {
+	Events []watch.Event
+	Err    error
+}
+
+// RecordedWatch captures a recorded watch operation with its request and response.
+type RecordedWatch struct {
+	Request  WatchRequest
+	Response WatchResponse
 }

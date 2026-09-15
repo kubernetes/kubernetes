@@ -44,15 +44,47 @@ const (
 	RequestTypeGet                   RequestType = "Get"
 )
 
-type TraffiConfig struct {
+type TrafficConfig struct {
+	Namespaces int
+	Objects    int
+
+	Unary UnaryConfig
+	Watch WatchConfig
+}
+
+type UnaryConfig struct {
 	Concurrency         int
 	MaxOperations       int
-	Namespaces          int
-	Objects             int
 	RequestDistribution []ChoiceWeight[RequestType]
 }
 
-func generateKeys(cfg TraffiConfig) []types.NamespacedName {
+type WatchConfig struct {
+	Concurrency int
+	Duration    time.Duration
+	MaxEvents   int
+}
+
+type rvTracker struct {
+	latest atomic.Uint64
+}
+
+func (t *rvTracker) Record(rv uint64) {
+	for {
+		curr := t.latest.Load()
+		if rv <= curr {
+			return
+		}
+		if t.latest.CompareAndSwap(curr, rv) {
+			return
+		}
+	}
+}
+
+func (t *rvTracker) Latest() uint64 {
+	return t.latest.Load()
+}
+
+func generateKeys(cfg TrafficConfig) []types.NamespacedName {
 	numNamespaces := cfg.Namespaces
 	if numNamespaces <= 0 {
 		numNamespaces = 1
@@ -70,46 +102,82 @@ func generateKeys(cfg TraffiConfig) []types.NamespacedName {
 }
 
 // RunTraffic drives concurrent storage operations and records all invocations.
-func RunTraffic(ctx context.Context, store storage.Interface, cfg TraffiConfig) ([]correctness.Operation, error) {
-	if cfg.Concurrency <= 0 {
-		return nil, fmt.Errorf("concurrency must be positive")
+func RunTraffic(ctx context.Context, store storage.Interface, cfg TrafficConfig) ([]correctness.Operation, []correctness.RecordedWatch, error) {
+	if cfg.Unary.Concurrency <= 0 {
+		return nil, nil, fmt.Errorf("unary concurrency must be positive")
 	}
 	if cfg.Objects <= 0 {
-		return nil, fmt.Errorf("objects must be positive")
+		return nil, nil, fmt.Errorf("objects must be positive")
 	}
 	if cfg.Namespaces <= 0 {
-		return nil, fmt.Errorf("namespaces must be positive")
+		return nil, nil, fmt.Errorf("namespaces must be positive")
 	}
-	if len(cfg.RequestDistribution) == 0 {
-		return nil, fmt.Errorf("operations must be non-empty")
+	if len(cfg.Unary.RequestDistribution) == 0 {
+		return nil, nil, fmt.Errorf("operations must be non-empty")
 	}
-	if cfg.MaxOperations <= 0 {
-		return nil, fmt.Errorf("MaxOperations must be positive")
+	if cfg.Unary.MaxOperations <= 0 {
+		return nil, nil, fmt.Errorf("MaxOperations must be positive")
 	}
 
 	keys := generateKeys(cfg)
 	var requestCounter atomic.Int64
-	var mu sync.Mutex
+	var unaryMu sync.Mutex
 	var operations []correctness.Operation
 
-	var wg sync.WaitGroup
-	for clientID := 0; clientID < cfg.Concurrency; clientID++ {
-		wg.Add(1)
+	trafficCtx, cancelTraffic := context.WithCancel(ctx)
+	defer cancelTraffic()
+
+	rvTracker := &rvTracker{}
+
+	var watchMu sync.Mutex
+	var recordedWatches []correctness.RecordedWatch
+	var watchWg sync.WaitGroup
+
+	if cfg.Watch.Concurrency > 0 {
+		watchDuration := cfg.Watch.Duration
+		if watchDuration <= 0 {
+			watchDuration = 100 * time.Millisecond
+		}
+		for wid := 0; wid < cfg.Watch.Concurrency; wid++ {
+			watchWg.Add(1)
+			go func(id int) {
+				defer watchWg.Done()
+				for {
+					select {
+					case <-trafficCtx.Done():
+						return
+					default:
+					}
+					req := randomWatchRequest(keys, rvTracker.Latest())
+					recWatch, err := runWatchSession(trafficCtx, store, req, watchDuration, cfg.Watch.MaxEvents)
+					if err == nil {
+						watchMu.Lock()
+						recordedWatches = append(recordedWatches, recWatch)
+						watchMu.Unlock()
+					}
+				}
+			}(wid)
+		}
+	}
+
+	var unaryWg sync.WaitGroup
+	for clientID := 0; clientID < cfg.Unary.Concurrency; clientID++ {
+		unaryWg.Add(1)
 		go func(cid int) {
-			defer wg.Done()
+			defer unaryWg.Done()
 			var cachedObj runtime.Object
 			for {
 				select {
-				case <-ctx.Done():
+				case <-trafficCtx.Done():
 					return
 				default:
 				}
-				request := randomRequest(keys, cfg.RequestDistribution, cachedObj)
+				request := randomRequest(keys, cfg.Unary.RequestDistribution, cachedObj)
 				if request == nil {
 					continue
 				}
 				requestNumber := requestCounter.Add(1)
-				if cfg.MaxOperations > 0 && requestNumber > int64(cfg.MaxOperations) {
+				if cfg.Unary.MaxOperations > 0 && requestNumber > int64(cfg.Unary.MaxOperations) {
 					return
 				}
 				start := time.Now()
@@ -117,6 +185,11 @@ func RunTraffic(ctx context.Context, store storage.Interface, cfg TraffiConfig) 
 				end := time.Now()
 				if response.Object != nil {
 					cachedObj = response.Object
+					if acc, err := meta.Accessor(response.Object); err == nil {
+						if rv, err := store.Versioner().ParseResourceVersion(acc.GetResourceVersion()); err == nil {
+							rvTracker.Record(rv)
+						}
+					}
 				}
 
 				op := correctness.Operation{
@@ -127,15 +200,48 @@ func RunTraffic(ctx context.Context, store storage.Interface, cfg TraffiConfig) 
 					Response: response,
 				}
 
-				mu.Lock()
+				unaryMu.Lock()
 				operations = append(operations, op)
-				mu.Unlock()
+				unaryMu.Unlock()
 			}
 		}(clientID)
 	}
 
-	wg.Wait()
-	return operations, nil
+	unaryWg.Wait()
+	cancelTraffic()
+	watchWg.Wait()
+
+	return operations, recordedWatches, nil
+}
+
+func runWatchSession(ctx context.Context, store storage.Interface, req correctness.WatchRequest, duration time.Duration, maxEvents int) (correctness.RecordedWatch, error) {
+	rec, err := correctness.NewWatchRecorder(ctx, store, req)
+	if err != nil {
+		return correctness.RecordedWatch{}, err
+	}
+
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	done := false
+	for !done {
+		select {
+		case <-ctx.Done():
+			done = true
+		case <-timer.C:
+			done = true
+		case <-ticker.C:
+			if maxEvents > 0 && len(rec.Events()) >= maxEvents {
+				done = true
+			}
+		}
+	}
+
+	rec.Stop()
+	return rec.RecordedWatch(), nil
 }
 
 func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType], cached runtime.Object) *correctness.Request {
@@ -206,6 +312,11 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return correctness.Response{
+				Err: err,
+			}
+		}
 		if _, ok := errors.AsType[*storage.StorageError](err); ok {
 			return correctness.Response{
 				Err: err,

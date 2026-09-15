@@ -20,12 +20,16 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 )
@@ -34,6 +38,7 @@ type testStep struct {
 	Name             string
 	Request          Request
 	CorrectResponse  Response
+	ExpectedEvent    *watch.Event
 	InvalidResponses []Response
 }
 
@@ -58,6 +63,10 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod1, "2"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Added,
 				Object: withRV(pod1, "2"),
 			},
 			InvalidResponses: []Response{
@@ -115,6 +124,10 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod2, "3"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Added,
 				Object: withRV(pod2, "3"),
 			},
 			InvalidResponses: []Response{
@@ -184,6 +197,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod1, "4"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Deleted,
+				Object: withRV(pod1, "4"),
+			},
 			InvalidResponses: []Response{
 				{Object: &example.Pod{}, Err: storage.NewKeyNotFoundError(pod1Key, 0)},
 				{Object: withRV(pod1, "2")},
@@ -234,6 +251,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod2, "5"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Deleted,
+				Object: withRV(pod2, "5"),
+			},
 			InvalidResponses: []Response{
 				{Object: &example.Pod{}, Err: storage.NewKeyNotFoundError(pod2Key, 0)},
 				{Object: withRV(pod2, "3")},
@@ -262,11 +283,40 @@ func correctnessTestSteps() []testStep {
 }
 
 // RunTestCorrectness executes the operations from the sequential storage model against real storage
-// and validates that every transition matches the StorageModel specification.
+// and validates that every transition matches the StorageModel specification and watch guarantees.
 func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interface, storagePrefix string) {
 	model := NewEmptyModel(storagePrefix)
 
-	for _, step := range correctnessTestSteps() {
+	// Start background watchers to validate watch stream guarantees against real storage.
+	wAll, err := NewWatchRecorder(ctx, store, WatchRequest{
+		Name:            "watch-all",
+		Key:             "/pods/",
+		ResourceVersion: "1",
+	})
+	require.NoError(t, err)
+	defer wAll.Stop()
+
+	predPod1 := CreatePodPredicate(nil, fields.OneTermEqualSelector("metadata.name", "pod1"))
+	wPod1, err := NewWatchRecorder(ctx, store, WatchRequest{
+		Name:            "watch-pod1",
+		Key:             "/pods/",
+		ResourceVersion: "1",
+		Predicate:       predPod1,
+	})
+	require.NoError(t, err)
+	defer wPod1.Stop()
+
+	wFrom2, err := NewWatchRecorder(ctx, store, WatchRequest{
+		Name:            "watch-from-2",
+		Key:             "/pods/",
+		ResourceVersion: "2",
+	})
+	require.NoError(t, err)
+	defer wFrom2.Stop()
+
+	steps := correctnessTestSteps()
+	var executedOps []Operation
+	for _, step := range steps {
 		out := &example.Pod{}
 		var err error
 		switch step.Request.Op {
@@ -284,6 +334,11 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 			respObj = out
 		}
 		resp := Response{Object: respObj, Err: err}
+		executedOps = append(executedOps, Operation{
+			Request:  step.Request,
+			Response: resp,
+		})
+
 		ok, next := model.Step(step.Request, resp)
 		if respObj != nil {
 			acc, _ := meta.Accessor(respObj)
@@ -293,6 +348,19 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 		}
 		require.True(t, ok, "step %s failed to match model state transition: req=%+v resp=%+v", step.Name, step.Request, resp)
 		model = next
+	}
+
+	history := NewWatchHistory(executedOps, store.Versioner())
+	for _, w := range []*WatchRecorder{wAll, wPod1, wFrom2} {
+		req := w.Request()
+		startRV, _ := store.Versioner().ParseResourceVersion(req.ResourceVersion)
+		expected := history.ExpectedEvents(req.Key, startRV, req.Predicate)
+
+		_ = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+			return len(w.Events()) >= len(expected), nil
+		})
+		w.Stop()
+		ValidateWatchGuarantees(t, store.Versioner(), history, w.Request(), w.Response())
 	}
 }
 
