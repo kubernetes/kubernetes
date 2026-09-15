@@ -34,6 +34,9 @@ type testPullRecordsAccessor struct {
 	intents         map[string]*kubeletconfiginternal.ImagePullIntent
 	intentListError error
 
+	preloadedRecords          map[string]*kubeletconfiginternal.ImagePreloadedRecord
+	preloadedRecordsListError error
+
 	pulledRecords          map[string]*kubeletconfiginternal.ImagePulledRecord
 	pulledRecordsListError error
 
@@ -113,6 +116,65 @@ func (a *testPullRecordsAccessor) DeleteImagePulledRecord(logger klog.Logger, im
 	return nil
 }
 
+func (a *testPullRecordsAccessor) ListImagePreloadedRecords() ([]*kubeletconfiginternal.ImagePreloadedRecord, error) {
+	ret := make([]*kubeletconfiginternal.ImagePreloadedRecord, 0, len(a.preloadedRecords))
+	for _, record := range a.preloadedRecords {
+		ret = append(ret, record)
+	}
+
+	slices.SortFunc(ret, preloadedRecordsCmp)
+	return ret, a.preloadedRecordsListError
+}
+
+func (a *testPullRecordsAccessor) GetImagePreloadedRecord(imageRef string) (*kubeletconfiginternal.ImagePreloadedRecord, error) {
+	if a.nextGetWriteError != nil {
+		return nil, a.nextGetWriteError
+	}
+	return a.preloadedRecords[imageRef], nil
+}
+
+func (a *testPullRecordsAccessor) WriteImagePreloadedRecord(logger klog.Logger, rec *kubeletconfiginternal.ImagePreloadedRecord) error {
+	if a.nextGetWriteError != nil {
+		return a.nextGetWriteError
+	}
+
+	if a.preloadedRecords == nil {
+		a.preloadedRecords = make(map[string]*kubeletconfiginternal.ImagePreloadedRecord)
+	}
+	a.preloadedRecords[rec.ImageRef] = rec
+	return nil
+}
+
+func (a *testPullRecordsAccessor) DeleteImagePreloadedRecordObservedImage(logger klog.Logger, imageName, imageRef string) error {
+	if a.nextGetWriteError != nil {
+		return a.nextGetWriteError
+	}
+
+	sanitizedImageName, err := trimImageTagDigest(imageName)
+	if err != nil {
+		return err
+	}
+
+	record, ok := a.preloadedRecords[imageRef]
+	if !ok {
+		return nil
+	}
+	delete(record.ObservedImages, sanitizedImageName)
+	if len(record.ObservedImages) == 0 {
+		delete(a.preloadedRecords, imageRef)
+	}
+	return nil
+}
+
+func (a *testPullRecordsAccessor) DeleteImagePreloadedRecord(logger klog.Logger, imageRef string) error {
+	if a.nextGetWriteError != nil {
+		return a.nextGetWriteError
+	}
+
+	delete(a.preloadedRecords, imageRef)
+	return nil
+}
+
 func (a *testPullRecordsAccessor) withIntentsListError(err error) *testPullRecordsAccessor {
 	a.intentListError = err
 	return a
@@ -120,6 +182,11 @@ func (a *testPullRecordsAccessor) withIntentsListError(err error) *testPullRecor
 
 func (a *testPullRecordsAccessor) withPulledRecordsListError(err error) *testPullRecordsAccessor {
 	a.pulledRecordsListError = err
+	return a
+}
+
+func (a *testPullRecordsAccessor) withPreloadedRecordsListError(err error) *testPullRecordsAccessor {
+	a.preloadedRecordsListError = err
 	return a
 }
 
@@ -131,10 +198,16 @@ func (a *testPullRecordsAccessor) withNextGetWriteError(err error) *testPullReco
 func newTestPullRecordsAccessor(
 	pullIntents []*kubeletconfiginternal.ImagePullIntent,
 	pulledRecords []*kubeletconfiginternal.ImagePulledRecord,
+	preloadedRecords []*kubeletconfiginternal.ImagePreloadedRecord,
 ) *testPullRecordsAccessor {
 	cachedPullIntents := make(map[string]*kubeletconfiginternal.ImagePullIntent)
 	for _, intent := range pullIntents {
 		cachedPullIntents[intent.Image] = intent
+	}
+
+	cachedPreloadedRecords := make(map[string]*kubeletconfiginternal.ImagePreloadedRecord)
+	for _, record := range preloadedRecords {
+		cachedPreloadedRecords[record.ImageRef] = record
 	}
 
 	cachedPullRecords := make(map[string]*kubeletconfiginternal.ImagePulledRecord)
@@ -143,8 +216,9 @@ func newTestPullRecordsAccessor(
 	}
 
 	return &testPullRecordsAccessor{
-		intents:       cachedPullIntents,
-		pulledRecords: cachedPullRecords,
+		intents:          cachedPullIntents,
+		preloadedRecords: cachedPreloadedRecords,
+		pulledRecords:    cachedPullRecords,
 	}
 }
 
@@ -193,113 +267,206 @@ func (a *recordingPullRecordsAccessor) DeleteImagePulledRecord(logger klog.Logge
 	return a.delegate.DeleteImagePulledRecord(logger, imageRef)
 }
 
+func (a *recordingPullRecordsAccessor) ListImagePreloadedRecords() ([]*kubeletconfiginternal.ImagePreloadedRecord, error) {
+	a.methodsCalled = append(a.methodsCalled, "ListImagePreloadedRecords")
+	return a.delegate.ListImagePreloadedRecords()
+}
+
+func (a *recordingPullRecordsAccessor) GetImagePreloadedRecord(imageRef string) (*kubeletconfiginternal.ImagePreloadedRecord, error) {
+	a.methodsCalled = append(a.methodsCalled, "GetImagePreloadedRecord")
+	return a.delegate.GetImagePreloadedRecord(imageRef)
+}
+
+func (a *recordingPullRecordsAccessor) WriteImagePreloadedRecord(logger klog.Logger, rec *kubeletconfiginternal.ImagePreloadedRecord) error {
+	a.methodsCalled = append(a.methodsCalled, "WriteImagePreloadedRecord")
+	return a.delegate.WriteImagePreloadedRecord(logger, rec)
+}
+
+func (a *recordingPullRecordsAccessor) DeleteImagePreloadedRecordObservedImage(logger klog.Logger, imageName, imageRef string) error {
+	a.methodsCalled = append(a.methodsCalled, "DeleteImagePreloadedRecordObservedImage")
+	return a.delegate.DeleteImagePreloadedRecordObservedImage(logger, imageName, imageRef)
+}
+
+func (a *recordingPullRecordsAccessor) DeleteImagePreloadedRecord(logger klog.Logger, imageRef string) error {
+	a.methodsCalled = append(a.methodsCalled, "DeleteImagePreloadedRecord")
+	return a.delegate.DeleteImagePreloadedRecord(logger, imageRef)
+}
+
 func TestNewCachedPullRecordsAccessor(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	manyPullIntents := generateTestPullIntents(51)
 	slices.SortFunc(manyPullIntents, pullIntentsCmp)
 
+	manyPreloadedRecords := generateTestPreloadedRecords(101)
+	slices.SortFunc(manyPreloadedRecords, preloadedRecordsCmp)
+
 	manyPulledRecords := generateTestPulledRecords(101)
 	slices.SortFunc(manyPulledRecords, pulledRecordsCmp)
 
 	tests := []struct {
-		name                           string
-		delegate                       *testPullRecordsAccessor
-		wantIntents                    []*kubeletconfiginternal.ImagePullIntent
-		wantIntentsAuthoritative       bool
-		wantCacheIntents               map[string]*kubeletconfiginternal.ImagePullIntent
-		wantIntentsError               error
-		wantPulledRecords              []*kubeletconfiginternal.ImagePulledRecord
-		wantPulledRecordsAuthoritative bool
-		wantCachePulledRecords         map[string]*kubeletconfiginternal.ImagePulledRecord
-		wantPulledRecordsError         error
+		name                              string
+		delegate                          *testPullRecordsAccessor
+		wantIntents                       []*kubeletconfiginternal.ImagePullIntent
+		wantIntentsAuthoritative          bool
+		wantCacheIntents                  map[string]*kubeletconfiginternal.ImagePullIntent
+		wantIntentsError                  error
+		wantPreloadedRecords              []*kubeletconfiginternal.ImagePreloadedRecord
+		wantPreloadedRecordsAuthoritative bool
+		wantCachePreloadedRecords         map[string]*kubeletconfiginternal.ImagePreloadedRecord
+		wantPreloadedRecordsError         error
+		wantPulledRecords                 []*kubeletconfiginternal.ImagePulledRecord
+		wantPulledRecordsAuthoritative    bool
+		wantCachePulledRecords            map[string]*kubeletconfiginternal.ImagePulledRecord
+		wantPulledRecordsError            error
 	}{
 		{
 			name: "no issues during init",
 			delegate: newTestPullRecordsAccessor(
 				testPullIntents(),
 				testPulledRecords(),
+				testPreloadedRecords(),
 			),
-			wantCacheIntents:               pullIntentsToMap(testPullIntents()),
-			wantIntents:                    testPullIntentsSorted(),
-			wantIntentsAuthoritative:       true,
-			wantPulledRecords:              testPulledRecordsSorted(),
-			wantPulledRecordsAuthoritative: true,
-			wantCachePulledRecords:         pulledRecordsToMap(testPulledRecordsSorted()),
+			wantCacheIntents:                  pullIntentsToMap(testPullIntents()),
+			wantIntents:                       testPullIntentsSorted(),
+			wantIntentsAuthoritative:          true,
+			wantPreloadedRecords:              testPreloadedRecordsSorted(),
+			wantPreloadedRecordsAuthoritative: true,
+			wantCachePreloadedRecords:         preloadedRecordsToMap(testPreloadedRecordsSorted()),
+			wantPulledRecords:                 testPulledRecordsSorted(),
+			wantPulledRecordsAuthoritative:    true,
+			wantCachePulledRecords:            pulledRecordsToMap(testPulledRecordsSorted()),
 		},
 		{
 			name: "delegate intents list error",
 			delegate: newTestPullRecordsAccessor(
 				testPullIntents(),
 				testPulledRecords(),
+				testPreloadedRecords(),
 			).withIntentsListError(fmt.Errorf("intentsError")),
-			wantIntents:                    testPullIntentsSorted(),
-			wantIntentsAuthoritative:       false,
-			wantCacheIntents:               pullIntentsToMap(testPullIntents()),
-			wantIntentsError:               fmt.Errorf("intentsError"),
-			wantPulledRecords:              testPulledRecordsSorted(),
-			wantPulledRecordsAuthoritative: true,
-			wantCachePulledRecords:         pulledRecordsToMap(testPulledRecordsSorted()),
+			wantIntents:                       testPullIntentsSorted(),
+			wantIntentsAuthoritative:          false,
+			wantCacheIntents:                  pullIntentsToMap(testPullIntents()),
+			wantIntentsError:                  fmt.Errorf("intentsError"),
+			wantPreloadedRecords:              testPreloadedRecordsSorted(),
+			wantPreloadedRecordsAuthoritative: true,
+			wantCachePreloadedRecords:         preloadedRecordsToMap(testPreloadedRecordsSorted()),
+			wantPulledRecords:                 testPulledRecordsSorted(),
+			wantPulledRecordsAuthoritative:    true,
+			wantCachePulledRecords:            pulledRecordsToMap(testPulledRecordsSorted()),
+		},
+		{
+			name: "delegate preloadedRecords list error",
+			delegate: newTestPullRecordsAccessor(
+				testPullIntents(),
+				testPulledRecords(),
+				testPreloadedRecords(),
+			).withPreloadedRecordsListError(fmt.Errorf("preloadedRecordsError")),
+			wantIntents:                       testPullIntentsSorted(),
+			wantIntentsAuthoritative:          true,
+			wantCacheIntents:                  pullIntentsToMap(testPullIntents()),
+			wantPreloadedRecords:              testPreloadedRecordsSorted(),
+			wantPreloadedRecordsAuthoritative: false,
+			wantCachePreloadedRecords:         preloadedRecordsToMap(testPreloadedRecordsSorted()),
+			wantPreloadedRecordsError:         fmt.Errorf("preloadedRecordsError"),
+			wantPulledRecords:                 testPulledRecordsSorted(),
+			wantPulledRecordsAuthoritative:    true,
+			wantCachePulledRecords:            pulledRecordsToMap(testPulledRecordsSorted()),
 		},
 		{
 			name: "delegate pulledRecords list error",
 			delegate: newTestPullRecordsAccessor(
 				testPullIntents(),
 				testPulledRecords(),
+				testPreloadedRecords(),
 			).withPulledRecordsListError(fmt.Errorf("pulledRecordsError")),
-			wantIntents:                    testPullIntentsSorted(),
-			wantIntentsAuthoritative:       true,
-			wantCacheIntents:               pullIntentsToMap(testPullIntents()),
-			wantPulledRecords:              testPulledRecordsSorted(),
-			wantPulledRecordsAuthoritative: false,
-			wantCachePulledRecords:         pulledRecordsToMap(testPulledRecordsSorted()),
-			wantPulledRecordsError:         fmt.Errorf("pulledRecordsError"),
+			wantIntents:                       testPullIntentsSorted(),
+			wantIntentsAuthoritative:          true,
+			wantCacheIntents:                  pullIntentsToMap(testPullIntents()),
+			wantPreloadedRecords:              testPreloadedRecordsSorted(),
+			wantPreloadedRecordsAuthoritative: true,
+			wantCachePreloadedRecords:         preloadedRecordsToMap(testPreloadedRecordsSorted()),
+			wantPulledRecords:                 testPulledRecordsSorted(),
+			wantPulledRecordsAuthoritative:    false,
+			wantCachePulledRecords:            pulledRecordsToMap(testPulledRecordsSorted()),
+			wantPulledRecordsError:            fmt.Errorf("pulledRecordsError"),
 		},
 		{
-			name: "both delegate lists fail during init",
+			name: "all delegate lists fail during init",
 			delegate: newTestPullRecordsAccessor(
 				testPullIntents(),
 				testPulledRecords(),
+				testPreloadedRecords(),
 			).withPulledRecordsListError(fmt.Errorf("pulledRecordsError")).
+				withPreloadedRecordsListError(fmt.Errorf("preloadedRecordsError")).
 				withIntentsListError(fmt.Errorf("intentsError")),
-			wantIntents:                    testPullIntentsSorted(),
-			wantIntentsAuthoritative:       false,
-			wantCacheIntents:               pullIntentsToMap(testPullIntents()),
-			wantIntentsError:               fmt.Errorf("intentsError"),
-			wantPulledRecords:              testPulledRecordsSorted(),
-			wantPulledRecordsAuthoritative: false,
-			wantCachePulledRecords:         pulledRecordsToMap(testPulledRecordsSorted()),
-			wantPulledRecordsError:         fmt.Errorf("pulledRecordsError"),
+			wantIntents:                       testPullIntentsSorted(),
+			wantIntentsAuthoritative:          false,
+			wantCacheIntents:                  pullIntentsToMap(testPullIntents()),
+			wantIntentsError:                  fmt.Errorf("intentsError"),
+			wantPreloadedRecords:              testPreloadedRecordsSorted(),
+			wantPreloadedRecordsAuthoritative: false,
+			wantCachePreloadedRecords:         preloadedRecordsToMap(testPreloadedRecordsSorted()),
+			wantPreloadedRecordsError:         fmt.Errorf("preloadedRecordsError"),
+			wantPulledRecords:                 testPulledRecordsSorted(),
+			wantPulledRecordsAuthoritative:    false,
+			wantCachePulledRecords:            pulledRecordsToMap(testPulledRecordsSorted()),
+			wantPulledRecordsError:            fmt.Errorf("pulledRecordsError"),
 		},
 		{
 			name: "too many intents get cropped",
 			delegate: newTestPullRecordsAccessor(
 				manyPullIntents,
 				testPulledRecords(),
+				testPreloadedRecords(),
 			),
-			wantIntents:                    manyPullIntents,
-			wantIntentsAuthoritative:       false,
-			wantCacheIntents:               pullIntentsToMap(manyPullIntents[:50]),
-			wantPulledRecords:              testPulledRecordsSorted(),
-			wantPulledRecordsAuthoritative: true,
-			wantCachePulledRecords:         pulledRecordsToMap(testPulledRecordsSorted()),
+			wantIntents:                       manyPullIntents,
+			wantIntentsAuthoritative:          false,
+			wantCacheIntents:                  pullIntentsToMap(manyPullIntents[:50]),
+			wantPreloadedRecords:              testPreloadedRecordsSorted(),
+			wantPreloadedRecordsAuthoritative: true,
+			wantCachePreloadedRecords:         preloadedRecordsToMap(testPreloadedRecordsSorted()),
+			wantPulledRecords:                 testPulledRecordsSorted(),
+			wantPulledRecordsAuthoritative:    true,
+			wantCachePulledRecords:            pulledRecordsToMap(testPulledRecordsSorted()),
+		},
+		{
+			name: "too many preloaded records get cropped",
+			delegate: newTestPullRecordsAccessor(
+				testPullIntents(),
+				testPulledRecords(),
+				manyPreloadedRecords,
+			),
+			wantIntents:                       testPullIntentsSorted(),
+			wantIntentsAuthoritative:          true,
+			wantCacheIntents:                  pullIntentsToMap(testPullIntents()),
+			wantPreloadedRecords:              manyPreloadedRecords,
+			wantPreloadedRecordsAuthoritative: false,
+			wantCachePreloadedRecords:         preloadedRecordsToMap(manyPreloadedRecords[:100]),
+			wantPulledRecords:                 testPulledRecordsSorted(),
+			wantPulledRecordsAuthoritative:    true,
+			wantCachePulledRecords:            pulledRecordsToMap(testPulledRecordsSorted()),
 		},
 		{
 			name: "too many pulled records get cropped",
 			delegate: newTestPullRecordsAccessor(
 				testPullIntents(),
 				manyPulledRecords,
+				testPreloadedRecords(),
 			),
-			wantIntents:                    testPullIntentsSorted(),
-			wantIntentsAuthoritative:       true,
-			wantCacheIntents:               pullIntentsToMap(testPullIntents()),
-			wantPulledRecords:              manyPulledRecords,
-			wantPulledRecordsAuthoritative: false,
-			wantCachePulledRecords:         pulledRecordsToMap(manyPulledRecords[:100]),
+			wantIntents:                       testPullIntentsSorted(),
+			wantIntentsAuthoritative:          true,
+			wantCacheIntents:                  pullIntentsToMap(testPullIntents()),
+			wantPreloadedRecords:              testPreloadedRecordsSorted(),
+			wantPreloadedRecordsAuthoritative: true,
+			wantCachePreloadedRecords:         preloadedRecordsToMap(testPreloadedRecordsSorted()),
+			wantPulledRecords:                 manyPulledRecords,
+			wantPulledRecordsAuthoritative:    false,
+			wantCachePulledRecords:            pulledRecordsToMap(manyPulledRecords[:100]),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotAccessor := NewCachedPullRecordsAccessor(logger, tt.delegate, 50, 100, 10)
+			gotAccessor := NewCachedPullRecordsAccessor(logger, tt.delegate, 50, 100, 100, 10)
 			gotMeteredAccessor, ok := gotAccessor.(*meteringRecordsAccessor)
 			if !ok {
 				t.Fatalf("the tested accessor must be a metered records accessor, got %T", gotAccessor)
@@ -322,6 +489,21 @@ func TestNewCachedPullRecordsAccessor(t *testing.T) {
 			if !cmpErrorStrings(intentsErr, tt.wantIntentsError) {
 				t.Errorf("NewCachedPullRecordsAccessor().ListImagePullIntents() errors don't match = %v, want %v", intentsErr, tt.wantIntentsError)
 			}
+
+			expectedPreloadedRecords := tt.wantCachePreloadedRecords
+			if err := cmpRecordsMapAndCache(expectedPreloadedRecords, inMemAccessor.preloadedRecords); err != nil {
+				t.Errorf("NewCachedPullRecordsAccessor cache does not match: %v", err)
+			}
+
+			gotPreloadedRecords, preloadedRecordsErr := gotAccessor.ListImagePreloadedRecords()
+			if !reflect.DeepEqual(gotPreloadedRecords, tt.wantPreloadedRecords) {
+				t.Errorf("NewCachedPullRecordsAccessor().ListImagePreloadedRecords() = %v, want %v", gotPreloadedRecords, tt.wantPreloadedRecords)
+			}
+
+			if !cmpErrorStrings(preloadedRecordsErr, tt.wantPreloadedRecordsError) {
+				t.Errorf("NewCachedPullRecordsAccessor().ListImagePreloadedRecords() errors don't match = %v, want %v", preloadedRecordsErr, tt.wantPreloadedRecordsError)
+			}
+
 			expectedPulledRecords := tt.wantCachePulledRecords
 			if err := cmpRecordsMapAndCache(expectedPulledRecords, inMemAccessor.pulledRecords); err != nil {
 				t.Errorf("NewCachedPullRecordsAccessor cache does not match: %v", err)
@@ -338,6 +520,10 @@ func TestNewCachedPullRecordsAccessor(t *testing.T) {
 
 			if gotIntentsAuthoritative := inMemAccessor.intents.authoritative.Load(); gotIntentsAuthoritative != tt.wantIntentsAuthoritative {
 				t.Errorf("NewCachedPullRecordsAccessor().intents.authoritative = %v, want %v", gotIntentsAuthoritative, tt.wantIntentsAuthoritative)
+			}
+
+			if gotPreloadedRecordsAuthoritative := inMemAccessor.preloadedRecords.authoritative.Load(); gotPreloadedRecordsAuthoritative != tt.wantPreloadedRecordsAuthoritative {
+				t.Errorf("NewCachedPullRecordsAccessor().preloadedRecords.authoritative = %v, want %v", gotPreloadedRecordsAuthoritative, tt.wantPreloadedRecordsAuthoritative)
 			}
 
 			if gotPulledRecordsAuthoritative := inMemAccessor.pulledRecords.authoritative.Load(); gotPulledRecordsAuthoritative != tt.wantPulledRecordsAuthoritative {
@@ -362,6 +548,7 @@ func Test_cachedPullRecordsAccessor_ListImagePullIntents(t *testing.T) {
 			delegate: newTestPullRecordsAccessor(
 				testPullIntents(),
 				nil,
+				nil,
 			),
 			inMemCache: mapToCache(pullIntentsToMap([]*kubeletconfiginternal.ImagePullIntent{
 				{Image: "unexpected for this test"},
@@ -375,6 +562,7 @@ func Test_cachedPullRecordsAccessor_ListImagePullIntents(t *testing.T) {
 			delegate: newTestPullRecordsAccessor(
 				testPullIntents(),
 				nil,
+				nil,
 			),
 			inMemCache: mapToCache(pullIntentsToMap([]*kubeletconfiginternal.ImagePullIntent{
 				{Image: "this would be wrong"},
@@ -387,6 +575,7 @@ func Test_cachedPullRecordsAccessor_ListImagePullIntents(t *testing.T) {
 			name: "partial intents listed from delegate with an error, start authoritative",
 			delegate: newTestPullRecordsAccessor(
 				testPullIntents()[:2],
+				nil,
 				nil,
 			).withIntentsListError(fmt.Errorf("only partial list was returned")),
 			inMemCache: mapToCache(pullIntentsToMap([]*kubeletconfiginternal.ImagePullIntent{
@@ -402,6 +591,7 @@ func Test_cachedPullRecordsAccessor_ListImagePullIntents(t *testing.T) {
 			delegate: newTestPullRecordsAccessor(
 				testPullIntents(),
 				nil,
+				nil,
 			).withIntentsListError(fmt.Errorf("only partial list was returned")),
 			inMemCache: mapToCache(pullIntentsToMap([]*kubeletconfiginternal.ImagePullIntent{
 				{Image: "this would be wrong"},
@@ -413,7 +603,7 @@ func Test_cachedPullRecordsAccessor_ListImagePullIntents(t *testing.T) {
 		},
 		{
 			name:              "delegate returns empty list",
-			delegate:          newTestPullRecordsAccessor(nil, nil),
+			delegate:          newTestPullRecordsAccessor(nil, nil, nil),
 			inMemCache:        mapToCache(pullIntentsToMap([]*kubeletconfiginternal.ImagePullIntent{})),
 			initAuthoritative: true,
 			wantAuthoritative: true,
@@ -461,6 +651,7 @@ func Test_cachedPullRecordsAccessor_ListImagePulledRecords(t *testing.T) {
 			delegate: newTestPullRecordsAccessor(
 				nil,
 				testPulledRecords(),
+				nil,
 			),
 			inMemCache: mapToCache(pulledRecordsToMap([]*kubeletconfiginternal.ImagePulledRecord{
 				{ImageRef: "this would be wrong"},
@@ -474,6 +665,7 @@ func Test_cachedPullRecordsAccessor_ListImagePulledRecords(t *testing.T) {
 			delegate: newTestPullRecordsAccessor(
 				nil,
 				testPulledRecords(),
+				nil,
 			).withPulledRecordsListError(fmt.Errorf("only partial list was returned")),
 			inMemCache: mapToCache(pulledRecordsToMap([]*kubeletconfiginternal.ImagePulledRecord{
 				{ImageRef: "this would be wrong"},
@@ -485,7 +677,7 @@ func Test_cachedPullRecordsAccessor_ListImagePulledRecords(t *testing.T) {
 		},
 		{
 			name:     "delegate returns empty list",
-			delegate: newTestPullRecordsAccessor(nil, nil),
+			delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			inMemCache: mapToCache(pulledRecordsToMap([]*kubeletconfiginternal.ImagePulledRecord{
 				{ImageRef: "unexpected for this test"},
 			})),
@@ -534,7 +726,7 @@ func Test_cachedPullRecordsAccessor_ImagePullIntentExists(t *testing.T) {
 	}{
 		{
 			name: "intent exists in cache",
-			delegate: newTestPullRecordsAccessor(nil, nil).
+			delegate: newTestPullRecordsAccessor(nil, nil, nil).
 				withNextGetWriteError(fmt.Errorf("should not have occurred")),
 			initialCache:      mapToCache(pullIntentsToMap(testPullIntents())),
 			initAuthoritative: true,
@@ -545,7 +737,7 @@ func Test_cachedPullRecordsAccessor_ImagePullIntentExists(t *testing.T) {
 		},
 		{
 			name:     "intent exists in delegate, nonauthoritative cache gets updated",
-			delegate: newTestPullRecordsAccessor(testPullIntents(), nil),
+			delegate: newTestPullRecordsAccessor(testPullIntents(), nil, nil),
 			initialCache: mapToCache(pullIntentsToMap([]*kubeletconfiginternal.ImagePullIntent{
 				{Image: "test.repo/org1/project3:tag"},
 				{Image: "test.repo/org2/project1:tag"},
@@ -562,7 +754,7 @@ func Test_cachedPullRecordsAccessor_ImagePullIntentExists(t *testing.T) {
 		},
 		{
 			name:     "intent exists in delegate, authoritative cache sends not found", // not a real scenario, but tests the cache is authoritative
-			delegate: newTestPullRecordsAccessor(testPullIntents(), nil),
+			delegate: newTestPullRecordsAccessor(testPullIntents(), nil, nil),
 			initialCache: mapToCache(pullIntentsToMap([]*kubeletconfiginternal.ImagePullIntent{
 				{Image: "test.repo/org1/project3:tag"},
 				{Image: "test.repo/org2/project1:tag"},
@@ -578,7 +770,7 @@ func Test_cachedPullRecordsAccessor_ImagePullIntentExists(t *testing.T) {
 		},
 		{
 			name:              "intent does not exist in cache or delegate",
-			delegate:          newTestPullRecordsAccessor(testPullIntents(), nil),
+			delegate:          newTestPullRecordsAccessor(testPullIntents(), nil, nil),
 			initialCache:      mapToCache(pullIntentsToMap(testPullIntents())),
 			initAuthoritative: false,
 			wantAuthoritative: false,
@@ -588,7 +780,7 @@ func Test_cachedPullRecordsAccessor_ImagePullIntentExists(t *testing.T) {
 		},
 		{
 			name: "intent does not exist in cache, delegate returns error on GET",
-			delegate: newTestPullRecordsAccessor(testPullIntents(), nil).
+			delegate: newTestPullRecordsAccessor(testPullIntents(), nil, nil).
 				withNextGetWriteError(fmt.Errorf("record malformed")),
 			initialCache:      mapToCache(pullIntentsToMap(testPullIntents())),
 			initAuthoritative: false,
@@ -647,7 +839,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 		{
 			name: "successful write through an empty cache to delegate",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			},
 			initialCache:      newLRUCache[string, kubeletconfiginternal.ImagePullIntent](100),
 			initAuthoritative: true,
@@ -661,7 +853,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 		{
 			name: "rewrite cached intent, write through to delegate",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			},
 			initialCache: mapToCache(map[string]*kubeletconfiginternal.ImagePullIntent{
 				"test.repo/org1/project1:tag": {Image: "something else"}, // this is not a real scenario but we're testing the cache can be overridden
@@ -677,7 +869,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 		{
 			name: "write even though the very same intent is already in the cache",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			},
 			initialCache: mapToCache(map[string]*kubeletconfiginternal.ImagePullIntent{
 				"test.repo/org1/project1:tag": {Image: "test.repo/org1/project1:tag"},
@@ -691,7 +883,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 		{
 			name: "write to delegate returns error",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil).withNextGetWriteError(fmt.Errorf("write error")),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil).withNextGetWriteError(fmt.Errorf("write error")),
 			},
 			initialCache:        newLRUCache[string, kubeletconfiginternal.ImagePullIntent](100),
 			inputImage:          "test.repo/org1/project1:tag",
@@ -702,7 +894,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 		{
 			name: "write to cache that's already populated",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			},
 			initialCache: mapToCache(pullIntentsToMap(testPullIntents())),
 			inputImage:   "test.repo/org1/newimage:tag",
@@ -714,7 +906,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 		{
 			name: "exceeding the cache size turns it from authoritative to non-authoritative",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			},
 			initialCache:      listToCache(justEnoughIntents, pullIntentToCacheKey),
 			initAuthoritative: true,
@@ -772,7 +964,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 		{
 			name: "successful write through an empty cache to delegate",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			},
 			initialCache: newLRUCache[string, kubeletconfiginternal.ImagePulledRecord](100),
 			inputRecord: &kubeletconfiginternal.ImagePulledRecord{
@@ -788,7 +980,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 		{
 			name: "rewrite cached pulled record, write through to delegate",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			},
 			initialCache: mapToCache(map[string]*kubeletconfiginternal.ImagePulledRecord{
 				"someref-1": {
@@ -835,7 +1027,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 		{
 			name: "write even though the same pulled record is already in the cache",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			},
 			initialCache: mapToCache(map[string]*kubeletconfiginternal.ImagePulledRecord{
 				"someref-1": {ImageRef: "someref-1"},
@@ -851,7 +1043,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 		{
 			name: "write to delegate returns error",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil).withNextGetWriteError(fmt.Errorf("write error")),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil).withNextGetWriteError(fmt.Errorf("write error")),
 			},
 			initialCache: newLRUCache[string, kubeletconfiginternal.ImagePulledRecord](100),
 			inputRecord: &kubeletconfiginternal.ImagePulledRecord{
@@ -864,7 +1056,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 		{
 			name: "write to cache that's already populated",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			},
 			initialCache: mapToCache(pulledRecordsToMap(testPulledRecords())),
 			inputRecord: &kubeletconfiginternal.ImagePulledRecord{
@@ -878,7 +1070,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 		{
 			name: "exceeding the cache size turns it from authoritative to non-authoritative",
 			delegate: &recordingPullRecordsAccessor{
-				delegate: newTestPullRecordsAccessor(nil, nil),
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
 			},
 			initialCache:      listToCache(justEnoughPulledRecords, pulledRecordToCacheKey),
 			initAuthoritative: true,
@@ -934,21 +1126,21 @@ func Test_cachedPullRecordsAccessor_DeleteImagePullIntent(t *testing.T) {
 	}{
 		{
 			name:         "delete an existing intent from the cache",
-			delegate:     newTestPullRecordsAccessor(testPullIntents(), nil),
+			delegate:     newTestPullRecordsAccessor(testPullIntents(), nil, nil),
 			initialCache: mapToCache(pullIntentsToMap(testPullIntents())),
 			inputImage:   "test.repo/org1/project1:tag",
 			wantIntents:  deleteFromStringMap(pullIntentsToMap(testPullIntents()), "test.repo/org1/project1:tag"),
 		},
 		{
 			name:         "attempt to delete a non-existent intent from the cache",
-			delegate:     newTestPullRecordsAccessor(testPullIntents(), nil),
+			delegate:     newTestPullRecordsAccessor(testPullIntents(), nil, nil),
 			initialCache: mapToCache(pullIntentsToMap(testPullIntents())),
 			inputImage:   "test.repo/org1/doesnotexist:tag",
 			wantIntents:  pullIntentsToMap(testPullIntents()),
 		},
 		{
 			name:         "error deleting an intent from delegate",
-			delegate:     newTestPullRecordsAccessor(testPullIntents(), nil).withNextGetWriteError(fmt.Errorf("error deleting intent")),
+			delegate:     newTestPullRecordsAccessor(testPullIntents(), nil, nil).withNextGetWriteError(fmt.Errorf("error deleting intent")),
 			initialCache: mapToCache(pullIntentsToMap(testPullIntents())),
 			inputImage:   "test.repo/org1/project1:tag",
 			wantIntents:  pullIntentsToMap(testPullIntents()),
@@ -1003,21 +1195,21 @@ func Test_cachedPullRecordsAccessor_DeleteImagePulledRecord(t *testing.T) {
 	}{
 		{
 			name:              "delete an existing pulled record from the cache",
-			delegate:          newTestPullRecordsAccessor(nil, testPulledRecords()),
+			delegate:          newTestPullRecordsAccessor(nil, testPulledRecords(), nil),
 			initialCache:      mapToCache(pulledRecordsToMap(testPulledRecords())),
 			imageRef:          "ref-22",
 			wantPulledRecords: deleteFromStringMap(pulledRecordsToMap(testPulledRecords()), "ref-22"),
 		},
 		{
 			name:              "attempt to delete a non-existent imagePulledRecord from the cache",
-			delegate:          newTestPullRecordsAccessor(nil, testPulledRecords()),
+			delegate:          newTestPullRecordsAccessor(nil, testPulledRecords(), nil),
 			initialCache:      mapToCache(pulledRecordsToMap(testPulledRecords())),
 			imageRef:          "non-existent-ref",
 			wantPulledRecords: pulledRecordsToMap(testPulledRecords()),
 		},
 		{
 			name:              "error deleting an imagePulledRecord from delegate",
-			delegate:          newTestPullRecordsAccessor(nil, testPulledRecords()).withNextGetWriteError(fmt.Errorf("error deleting imagePulledRecord")),
+			delegate:          newTestPullRecordsAccessor(nil, testPulledRecords(), nil).withNextGetWriteError(fmt.Errorf("error deleting imagePulledRecord")),
 			initialCache:      mapToCache(pulledRecordsToMap(testPulledRecords())),
 			imageRef:          "ref-22",
 			wantPulledRecords: pulledRecordsToMap(testPulledRecords()),
@@ -1076,7 +1268,7 @@ func Test_cachedPullRecordsAccessor_GetImagePulledRecord(t *testing.T) {
 	}{
 		{
 			name:                   "pulled record exists in cache",
-			delegate:               newTestPullRecordsAccessor(nil, nil),
+			delegate:               newTestPullRecordsAccessor(nil, nil, nil),
 			cachedPulledRecords:    mapToCache(pulledRecordsToMap(testPulledRecords())),
 			initAuthoritative:      true,
 			wantAuthoritative:      true,
@@ -1087,7 +1279,7 @@ func Test_cachedPullRecordsAccessor_GetImagePulledRecord(t *testing.T) {
 		},
 		{
 			name:                   "pulled record exists in delegate, nonauthoritative cache gets updated",
-			delegate:               newTestPullRecordsAccessor(nil, testPulledRecords()),
+			delegate:               newTestPullRecordsAccessor(nil, testPulledRecords(), nil),
 			cachedPulledRecords:    mapToCache(deleteFromStringMap(pulledRecordsToMap(testPulledRecords()), "ref-22")),
 			initAuthoritative:      false,
 			wantAuthoritative:      false,
@@ -1098,7 +1290,7 @@ func Test_cachedPullRecordsAccessor_GetImagePulledRecord(t *testing.T) {
 		},
 		{
 			name:                   "pulled record exists in delegate, authoritative cache return not found", // not a real scenario, but tests the cache is authoritative
-			delegate:               newTestPullRecordsAccessor(nil, testPulledRecords()),
+			delegate:               newTestPullRecordsAccessor(nil, testPulledRecords(), nil),
 			cachedPulledRecords:    mapToCache(deleteFromStringMap(pulledRecordsToMap(testPulledRecords()), "ref-22")),
 			initAuthoritative:      true,
 			wantAuthoritative:      true,
@@ -1109,7 +1301,7 @@ func Test_cachedPullRecordsAccessor_GetImagePulledRecord(t *testing.T) {
 		},
 		{
 			name:                   "pulled record does not exist",
-			delegate:               newTestPullRecordsAccessor(nil, nil),
+			delegate:               newTestPullRecordsAccessor(nil, nil, nil),
 			cachedPulledRecords:    mapToCache(deleteFromStringMap(pulledRecordsToMap(testPulledRecords()), "ref-87")),
 			initAuthoritative:      false,
 			wantAuthoritative:      false,
@@ -1120,7 +1312,7 @@ func Test_cachedPullRecordsAccessor_GetImagePulledRecord(t *testing.T) {
 		},
 		{
 			name:                   "pulled record not cached and not in delegate, delegate returns error on read",
-			delegate:               newTestPullRecordsAccessor(nil, nil).withNextGetWriteError(fmt.Errorf("error reading pulled record")),
+			delegate:               newTestPullRecordsAccessor(nil, nil, nil).withNextGetWriteError(fmt.Errorf("error reading pulled record")),
 			cachedPulledRecords:    newLRUCache[string, kubeletconfiginternal.ImagePulledRecord](100),
 			initAuthoritative:      false,
 			wantAuthoritative:      false,
@@ -1132,7 +1324,7 @@ func Test_cachedPullRecordsAccessor_GetImagePulledRecord(t *testing.T) {
 		},
 		{
 			name:                   "pulled record not cached, exists in delegate, delegate returns error",
-			delegate:               newTestPullRecordsAccessor(nil, testPulledRecords()).withNextGetWriteError(fmt.Errorf("error reading pulled record")),
+			delegate:               newTestPullRecordsAccessor(nil, testPulledRecords(), nil).withNextGetWriteError(fmt.Errorf("error reading pulled record")),
 			cachedPulledRecords:    newLRUCache[string, kubeletconfiginternal.ImagePulledRecord](100),
 			initAuthoritative:      false,
 			wantAuthoritative:      false,
@@ -1172,6 +1364,502 @@ func Test_cachedPullRecordsAccessor_GetImagePulledRecord(t *testing.T) {
 				t.Errorf("cachedPullRecordsAccessor.GetImagePulledRecord() cache authoritative = %v, want %v", gotAuthoritative, tt.wantAuthoritative)
 			}
 		})
+	}
+}
+
+func Test_cachedPullRecordsAccessor_ListImagePreloadedRecords(t *testing.T) {
+	tests := []struct {
+		name                          string
+		delegate                      *testPullRecordsAccessor
+		inMemCache                    *lruCache[string, kubeletconfiginternal.ImagePreloadedRecord]
+		initAuthoritative             bool
+		wantAuthoritative             bool
+		wantListPreloadedRecords      []*kubeletconfiginternal.ImagePreloadedRecord
+		wantListPreloadedRecordsError error
+	}{
+		{
+			name: "initial cache error gets cleared by successful imagePreloadedRecords list from delegate",
+			delegate: newTestPullRecordsAccessor(
+				nil,
+				nil,
+				testPreloadedRecords(),
+			),
+			inMemCache: mapToCache(preloadedRecordsToMap([]*kubeletconfiginternal.ImagePreloadedRecord{
+				{ImageRef: "this would be wrong"},
+			})),
+			initAuthoritative:        false,
+			wantAuthoritative:        true,
+			wantListPreloadedRecords: testPreloadedRecordsSorted(),
+		},
+		{
+			name: "initial cache error, partial imagePreloadedRecords listed from delegate with an error",
+			delegate: newTestPullRecordsAccessor(
+				nil,
+				nil,
+				testPreloadedRecords(),
+			).withPreloadedRecordsListError(fmt.Errorf("only partial list was returned")),
+			inMemCache: mapToCache(preloadedRecordsToMap([]*kubeletconfiginternal.ImagePreloadedRecord{
+				{ImageRef: "this would be wrong"},
+			})),
+			initAuthoritative:             false,
+			wantAuthoritative:             false,
+			wantListPreloadedRecords:      testPreloadedRecordsSorted(),
+			wantListPreloadedRecordsError: fmt.Errorf("only partial list was returned"),
+		},
+		{
+			name:     "delegate returns empty list",
+			delegate: newTestPullRecordsAccessor(nil, nil, nil),
+			inMemCache: mapToCache(preloadedRecordsToMap([]*kubeletconfiginternal.ImagePreloadedRecord{
+				{ImageRef: "unexpected for this test"},
+			})),
+			initAuthoritative:        true,
+			wantAuthoritative:        true,
+			wantListPreloadedRecords: []*kubeletconfiginternal.ImagePreloadedRecord{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cachedAccessor := &cachedPullRecordsAccessor{
+				delegate:         tt.delegate,
+				preloadedLocks:   NewStripedLockSet(10),
+				preloadedRecords: tt.inMemCache,
+			}
+			cachedAccessor.preloadedRecords.authoritative.Store(tt.initAuthoritative)
+
+			gotPreloadedRecords, gotErr := cachedAccessor.ListImagePreloadedRecords()
+			if !reflect.DeepEqual(gotPreloadedRecords, tt.wantListPreloadedRecords) {
+				t.Errorf("ListImagePreloadedRecords() = %v, want %v", gotPreloadedRecords, tt.wantListPreloadedRecords)
+			}
+
+			if !cmpErrorStrings(gotErr, tt.wantListPreloadedRecordsError) {
+				t.Errorf("ListImagePreloadedRecords() error = %v, want %v", gotErr, tt.wantListPreloadedRecordsError)
+			}
+
+			if gotAuthoritative := cachedAccessor.preloadedRecords.authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
+				t.Errorf("ListImagePreloadedRecords() cache authoritative = %v, want %v", gotAuthoritative, tt.wantAuthoritative)
+			}
+		})
+	}
+}
+
+func Test_cachedPullRecordsAccessor_GetImagePreloadedRecord(t *testing.T) {
+	tests := []struct {
+		name                      string
+		delegate                  PullRecordsAccessor
+		cachedPreloadedRecords    *lruCache[string, kubeletconfiginternal.ImagePreloadedRecord]
+		initAuthoritative         bool
+		wantAuthoritative         bool
+		imageRef                  string
+		wantPreloadedRecord       *kubeletconfiginternal.ImagePreloadedRecord
+		wantErr                   error
+		wantCachePreloadedRecords map[string]*kubeletconfiginternal.ImagePreloadedRecord
+	}{
+		{
+			name:                      "preloaded record exists in cache",
+			delegate:                  newTestPullRecordsAccessor(nil, nil, nil),
+			cachedPreloadedRecords:    mapToCache(preloadedRecordsToMap(testPreloadedRecords())),
+			initAuthoritative:         true,
+			wantAuthoritative:         true,
+			imageRef:                  "preloaded-ref-009",
+			wantPreloadedRecord:       preloadedRecordsToMap(testPreloadedRecords())["preloaded-ref-009"],
+			wantCachePreloadedRecords: preloadedRecordsToMap(testPreloadedRecords()),
+		},
+		{
+			name:                      "preloaded record exists in delegate, nonauthoritative cache gets updated",
+			delegate:                  newTestPullRecordsAccessor(nil, nil, testPreloadedRecords()),
+			cachedPreloadedRecords:    mapToCache(deleteFromStringMap(preloadedRecordsToMap(testPreloadedRecords()), "preloaded-ref-22")),
+			initAuthoritative:         false,
+			wantAuthoritative:         false,
+			imageRef:                  "preloaded-ref-22",
+			wantPreloadedRecord:       preloadedRecordsToMap(testPreloadedRecords())["preloaded-ref-22"],
+			wantCachePreloadedRecords: preloadedRecordsToMap(testPreloadedRecords()),
+		},
+		{
+			name:                      "preloaded record exists in delegate, authoritative cache returns not found", // not a real scenario, but tests the cache is authoritative
+			delegate:                  newTestPullRecordsAccessor(nil, nil, testPreloadedRecords()),
+			cachedPreloadedRecords:    mapToCache(deleteFromStringMap(preloadedRecordsToMap(testPreloadedRecords()), "preloaded-ref-22")),
+			initAuthoritative:         true,
+			wantAuthoritative:         true,
+			imageRef:                  "preloaded-ref-22",
+			wantPreloadedRecord:       nil,
+			wantCachePreloadedRecords: deleteFromStringMap(preloadedRecordsToMap(testPreloadedRecords()), "preloaded-ref-22"),
+		},
+		{
+			name:                      "preloaded record does not exist",
+			delegate:                  newTestPullRecordsAccessor(nil, nil, nil),
+			cachedPreloadedRecords:    mapToCache(deleteFromStringMap(preloadedRecordsToMap(testPreloadedRecords()), "preloaded-ref-87")),
+			initAuthoritative:         false,
+			wantAuthoritative:         false,
+			imageRef:                  "preloaded-ref-87",
+			wantPreloadedRecord:       nil,
+			wantCachePreloadedRecords: deleteFromStringMap(preloadedRecordsToMap(testPreloadedRecords()), "preloaded-ref-87"),
+		},
+		{
+			name:                      "preloaded record not cached and not in delegate, delegate returns error on read",
+			delegate:                  newTestPullRecordsAccessor(nil, nil, nil).withNextGetWriteError(fmt.Errorf("error reading preloaded record")),
+			cachedPreloadedRecords:    newLRUCache[string, kubeletconfiginternal.ImagePreloadedRecord](100),
+			initAuthoritative:         false,
+			wantAuthoritative:         false,
+			imageRef:                  "doesnotexist",
+			wantPreloadedRecord:       nil,
+			wantErr:                   fmt.Errorf("error reading preloaded record"),
+			wantCachePreloadedRecords: map[string]*kubeletconfiginternal.ImagePreloadedRecord{},
+		},
+		{
+			name:                      "preloaded record not cached, exists in delegate, delegate returns error",
+			delegate:                  newTestPullRecordsAccessor(nil, nil, testPreloadedRecords()).withNextGetWriteError(fmt.Errorf("error reading preloaded record")),
+			cachedPreloadedRecords:    newLRUCache[string, kubeletconfiginternal.ImagePreloadedRecord](100),
+			initAuthoritative:         false,
+			wantAuthoritative:         false,
+			imageRef:                  "preloaded-ref-3",
+			wantPreloadedRecord:       nil,
+			wantErr:                   fmt.Errorf("error reading preloaded record"),
+			wantCachePreloadedRecords: map[string]*kubeletconfiginternal.ImagePreloadedRecord{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &cachedPullRecordsAccessor{
+				delegate:         tt.delegate,
+				preloadedLocks:   NewStripedLockSet(10),
+				preloadedRecords: tt.cachedPreloadedRecords,
+			}
+			c.preloadedRecords.authoritative.Store(tt.initAuthoritative)
+
+			gotPreloadedRecord, err := c.GetImagePreloadedRecord(tt.imageRef)
+			if !cmpErrorStrings(err, tt.wantErr) {
+				t.Errorf("cachedPullRecordsAccessor.GetImagePreloadedRecord() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotPreloadedRecord, tt.wantPreloadedRecord) {
+				t.Errorf("cachedPullRecordsAccessor.GetImagePreloadedRecord() gotPreloadedRecord = %v, want %v", gotPreloadedRecord, tt.wantPreloadedRecord)
+			}
+
+			if err := cmpRecordsMapAndCache(tt.wantCachePreloadedRecords, c.preloadedRecords); err != nil {
+				t.Errorf("cachedPullRecordsAccessor.GetImagePreloadedRecord() expected final cache state differs: %v", err)
+			}
+
+			if gotAuthoritative := c.preloadedRecords.authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
+				t.Errorf("cachedPullRecordsAccessor.GetImagePreloadedRecord() cache authoritative = %v, want %v", gotAuthoritative, tt.wantAuthoritative)
+			}
+		})
+	}
+}
+
+func Test_cachedPullRecordsAccessor_WriteImagePreloadedRecord(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	justEnoughPreloadedRecords := generateTestPreloadedRecords(100)
+
+	tests := []struct {
+		name                      string
+		delegate                  *recordingPullRecordsAccessor
+		initialCache              *lruCache[string, kubeletconfiginternal.ImagePreloadedRecord]
+		initAuthoritative         bool
+		wantAuthoritative         bool
+		inputRecord               *kubeletconfiginternal.ImagePreloadedRecord
+		wantErr                   error
+		wantCachePreloadedRecords map[string]*kubeletconfiginternal.ImagePreloadedRecord
+		wantRecordedMethods       []string
+	}{
+		{
+			name: "successful write through an empty cache to delegate",
+			delegate: &recordingPullRecordsAccessor{
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
+			},
+			initialCache: newLRUCache[string, kubeletconfiginternal.ImagePreloadedRecord](100),
+			inputRecord: &kubeletconfiginternal.ImagePreloadedRecord{
+				ImageRef: "someref-1",
+				ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+					"image.some/org1/image": {},
+				},
+			},
+			initAuthoritative: true,
+			wantAuthoritative: true,
+			wantCachePreloadedRecords: preloadedRecordsToMap([]*kubeletconfiginternal.ImagePreloadedRecord{
+				{
+					ImageRef: "someref-1",
+					ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+						"image.some/org1/image": {},
+					},
+				},
+			}),
+			wantRecordedMethods: []string{"WriteImagePreloadedRecord"},
+		},
+		{
+			name: "rewrite cached preloaded record, write through to delegate",
+			delegate: &recordingPullRecordsAccessor{
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
+			},
+			initialCache: mapToCache(map[string]*kubeletconfiginternal.ImagePreloadedRecord{
+				"someref-1": {
+					ImageRef: "someref-1",
+					ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+						"image.some/org1/image": {},
+					},
+				},
+			}),
+			inputRecord: &kubeletconfiginternal.ImagePreloadedRecord{
+				ImageRef: "someref-1",
+				ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+					"image.some/org1/image":  {},
+					"image.some/org2/image2": {},
+				},
+			},
+			initAuthoritative: false,
+			wantAuthoritative: false,
+			wantCachePreloadedRecords: preloadedRecordsToMap([]*kubeletconfiginternal.ImagePreloadedRecord{
+				{
+					ImageRef: "someref-1",
+					ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+						"image.some/org1/image":  {},
+						"image.some/org2/image2": {},
+					},
+				},
+			}),
+			wantRecordedMethods: []string{"WriteImagePreloadedRecord"},
+		},
+		{
+			name: "write even though the same preloaded record is already in the cache",
+			delegate: &recordingPullRecordsAccessor{
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
+			},
+			initialCache: mapToCache(map[string]*kubeletconfiginternal.ImagePreloadedRecord{
+				"someref-1": {ImageRef: "someref-1"},
+			}),
+			inputRecord: &kubeletconfiginternal.ImagePreloadedRecord{
+				ImageRef: "someref-1",
+			},
+			wantCachePreloadedRecords: preloadedRecordsToMap([]*kubeletconfiginternal.ImagePreloadedRecord{
+				{ImageRef: "someref-1"},
+			}),
+			wantRecordedMethods: []string{"WriteImagePreloadedRecord"},
+		},
+		{
+			name: "write to delegate returns error",
+			delegate: &recordingPullRecordsAccessor{
+				delegate: newTestPullRecordsAccessor(nil, nil, nil).withNextGetWriteError(fmt.Errorf("write error")),
+			},
+			initialCache: newLRUCache[string, kubeletconfiginternal.ImagePreloadedRecord](100),
+			inputRecord: &kubeletconfiginternal.ImagePreloadedRecord{
+				ImageRef: "someref-1",
+			},
+			wantCachePreloadedRecords: map[string]*kubeletconfiginternal.ImagePreloadedRecord{},
+			wantErr:                   fmt.Errorf("write error"),
+			wantRecordedMethods:       []string{"WriteImagePreloadedRecord"},
+		},
+		{
+			name: "write to cache that's already populated",
+			delegate: &recordingPullRecordsAccessor{
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
+			},
+			initialCache: mapToCache(preloadedRecordsToMap(testPreloadedRecords())),
+			inputRecord: &kubeletconfiginternal.ImagePreloadedRecord{
+				ImageRef: "newref",
+			},
+			wantCachePreloadedRecords: preloadedRecordsToMap(
+				append(testPreloadedRecords(), &kubeletconfiginternal.ImagePreloadedRecord{ImageRef: "newref"}),
+			),
+			wantRecordedMethods: []string{"WriteImagePreloadedRecord"},
+		},
+		{
+			name: "exceeding the cache size turns it from authoritative to non-authoritative",
+			delegate: &recordingPullRecordsAccessor{
+				delegate: newTestPullRecordsAccessor(nil, nil, nil),
+			},
+			initialCache:      listToCache(justEnoughPreloadedRecords, preloadedRecordToCacheKey),
+			initAuthoritative: true,
+			wantAuthoritative: false,
+			inputRecord: &kubeletconfiginternal.ImagePreloadedRecord{
+				ImageRef: "newref",
+			},
+			wantCachePreloadedRecords: preloadedRecordsToMap(
+				append(justEnoughPreloadedRecords[1:], &kubeletconfiginternal.ImagePreloadedRecord{
+					ImageRef: "newref",
+				}),
+			),
+			wantRecordedMethods: []string{"WriteImagePreloadedRecord"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &cachedPullRecordsAccessor{
+				delegate:         tt.delegate,
+				preloadedLocks:   NewStripedLockSet(10),
+				preloadedRecords: tt.initialCache,
+			}
+			c.preloadedRecords.authoritative.Store(tt.initAuthoritative)
+
+			if err := c.WriteImagePreloadedRecord(logger, tt.inputRecord); !cmpErrorStrings(err, tt.wantErr) {
+				t.Errorf("cachedPullRecordsAccessor.WriteImagePreloadedRecord() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if err := cmpRecordsMapAndCache(tt.wantCachePreloadedRecords, c.preloadedRecords); err != nil {
+				t.Errorf("cachedPullRecordsAccessor.WriteImagePreloadedRecord() expected cache state differs: %v", err)
+			}
+
+			if !reflect.DeepEqual(tt.delegate.methodsCalled, tt.wantRecordedMethods) {
+				t.Errorf("cachedPullRecordsAccessor.WriteImagePreloadedRecord() recorded methods = %v, want %v", tt.delegate.methodsCalled, tt.wantRecordedMethods)
+			}
+
+			if gotAuthoritative := c.preloadedRecords.authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
+				t.Errorf("cachedPullRecordsAccessor.WriteImagePreloadedRecord() cache authoritative = %v, want %v", gotAuthoritative, tt.wantAuthoritative)
+			}
+		})
+	}
+}
+
+func Test_cachedPullRecordsAccessor_DeleteImagePreloadedRecordObservedImage(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	tests := []struct {
+		name                 string
+		delegate             *testPullRecordsAccessor
+		initialCache         *lruCache[string, kubeletconfiginternal.ImagePreloadedRecord]
+		imageName            string
+		imageRef             string
+		wantErr              error
+		wantPreloadedRecords map[string]*kubeletconfiginternal.ImagePreloadedRecord
+	}{
+		{
+			name:         "delete one of multiple observed images keeps the record",
+			delegate:     newTestPullRecordsAccessor(nil, nil, testPreloadedRecords()),
+			initialCache: mapToCache(preloadedRecordsToMap(testPreloadedRecords())),
+			imageName:    "image.some/org2/image",
+			imageRef:     "preloaded-ref-3",
+			wantPreloadedRecords: func() map[string]*kubeletconfiginternal.ImagePreloadedRecord {
+				m := preloadedRecordsToMap(testPreloadedRecords())
+				delete(m["preloaded-ref-3"].ObservedImages, "image.some/org2/image")
+				return m
+			}(),
+		},
+		{
+			name:                 "delete the only observed image removes the record",
+			delegate:             newTestPullRecordsAccessor(nil, nil, testPreloadedRecords()),
+			initialCache:         mapToCache(preloadedRecordsToMap(testPreloadedRecords())),
+			imageName:            "image.some/org1/imagex",
+			imageRef:             "preloaded-ref-87",
+			wantPreloadedRecords: deleteFromStringMap(preloadedRecordsToMap(testPreloadedRecords()), "preloaded-ref-87"),
+		},
+		{
+			name:                 "attempt to delete an observed image from a non-existent record",
+			delegate:             newTestPullRecordsAccessor(nil, nil, testPreloadedRecords()),
+			initialCache:         mapToCache(preloadedRecordsToMap(testPreloadedRecords())),
+			imageName:            "image.some/org1/imagex",
+			imageRef:             "non-existent-ref",
+			wantPreloadedRecords: preloadedRecordsToMap(testPreloadedRecords()),
+		},
+		{
+			name:                 "error deleting an observed image from delegate",
+			delegate:             newTestPullRecordsAccessor(nil, nil, testPreloadedRecords()).withNextGetWriteError(fmt.Errorf("error deleting observed image")),
+			initialCache:         mapToCache(preloadedRecordsToMap(testPreloadedRecords())),
+			imageName:            "image.some/org1/imagex",
+			imageRef:             "preloaded-ref-87",
+			wantPreloadedRecords: preloadedRecordsToMap(testPreloadedRecords()),
+			wantErr:              fmt.Errorf("error deleting observed image"),
+		},
+	}
+	for _, tt := range tests {
+		for _, initAuthoritative := range []bool{true, false} {
+			tt.name += fmt.Sprintf(", authoritative=%v", initAuthoritative)
+			t.Run(tt.name, func(t *testing.T) {
+				c := &cachedPullRecordsAccessor{
+					delegate:         tt.delegate,
+					preloadedLocks:   NewStripedLockSet(10),
+					preloadedRecords: tt.initialCache,
+				}
+				c.preloadedRecords.authoritative.Store(initAuthoritative)
+
+				if err := c.DeleteImagePreloadedRecordObservedImage(logger, tt.imageName, tt.imageRef); !cmpErrorStrings(err, tt.wantErr) {
+					t.Errorf("cachedPullRecordsAccessor.DeleteImagePreloadedRecordObservedImage() error = %v, wantErr %v", err, tt.wantErr)
+				}
+
+				c.preloadedRecords.deletingKeys.Range(func(key any, _ any) bool {
+					t.Errorf("key '%v' should no longer be present in the cache.ignoreEvictionKeys map", key)
+					return true
+				})
+
+				if err := cmpRecordsMapAndCache(tt.wantPreloadedRecords, c.preloadedRecords); err != nil {
+					t.Errorf("cachedPullRecordsAccessor.DeleteImagePreloadedRecordObservedImage() expected cache state differs: %v", err)
+				}
+
+				if !reflect.DeepEqual(tt.delegate.preloadedRecords, tt.wantPreloadedRecords) {
+					t.Errorf("cachedPullRecordsAccessor.DeleteImagePreloadedRecordObservedImage() delegate preloaded records = %v, want %v", tt.delegate.preloadedRecords, tt.wantPreloadedRecords)
+				}
+
+				if gotAuthoritative := c.preloadedRecords.authoritative.Load(); gotAuthoritative != initAuthoritative {
+					t.Errorf("cachedPullRecordsAccessor.DeleteImagePreloadedRecordObservedImage() should not cause authoritative changes = %v, want %v", gotAuthoritative, initAuthoritative)
+				}
+			})
+		}
+	}
+}
+
+func Test_cachedPullRecordsAccessor_DeleteImagePreloadedRecord(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	tests := []struct {
+		name                 string
+		delegate             *testPullRecordsAccessor
+		initialCache         *lruCache[string, kubeletconfiginternal.ImagePreloadedRecord]
+		imageRef             string
+		wantErr              error
+		wantPreloadedRecords map[string]*kubeletconfiginternal.ImagePreloadedRecord
+	}{
+		{
+			name:                 "delete an existing preloaded record from the cache",
+			delegate:             newTestPullRecordsAccessor(nil, nil, testPreloadedRecords()),
+			initialCache:         mapToCache(preloadedRecordsToMap(testPreloadedRecords())),
+			imageRef:             "preloaded-ref-22",
+			wantPreloadedRecords: deleteFromStringMap(preloadedRecordsToMap(testPreloadedRecords()), "preloaded-ref-22"),
+		},
+		{
+			name:                 "attempt to delete a non-existent imagePreloadedRecord from the cache",
+			delegate:             newTestPullRecordsAccessor(nil, nil, testPreloadedRecords()),
+			initialCache:         mapToCache(preloadedRecordsToMap(testPreloadedRecords())),
+			imageRef:             "non-existent-ref",
+			wantPreloadedRecords: preloadedRecordsToMap(testPreloadedRecords()),
+		},
+		{
+			name:                 "error deleting an imagePreloadedRecord from delegate",
+			delegate:             newTestPullRecordsAccessor(nil, nil, testPreloadedRecords()).withNextGetWriteError(fmt.Errorf("error deleting imagePreloadedRecord")),
+			initialCache:         mapToCache(preloadedRecordsToMap(testPreloadedRecords())),
+			imageRef:             "preloaded-ref-22",
+			wantPreloadedRecords: preloadedRecordsToMap(testPreloadedRecords()),
+			wantErr:              fmt.Errorf("error deleting imagePreloadedRecord"),
+		},
+	}
+	for _, tt := range tests {
+		for _, initAuthoritative := range []bool{true, false} {
+			tt.name += fmt.Sprintf(", authoritative=%v", initAuthoritative)
+			t.Run(tt.name, func(t *testing.T) {
+				c := &cachedPullRecordsAccessor{
+					delegate:         tt.delegate,
+					preloadedLocks:   NewStripedLockSet(10),
+					preloadedRecords: tt.initialCache,
+				}
+				c.preloadedRecords.authoritative.Store(initAuthoritative)
+
+				if err := c.DeleteImagePreloadedRecord(logger, tt.imageRef); !cmpErrorStrings(err, tt.wantErr) {
+					t.Errorf("cachedPullRecordsAccessor.DeleteImagePreloadedRecord() error = %v, wantErr %v", err, tt.wantErr)
+				}
+
+				c.preloadedRecords.deletingKeys.Range(func(key any, _ any) bool {
+					t.Errorf("key '%v' should no longer be present in the cache.ignoreEvictionKeys map", key)
+					return true
+				})
+
+				if err := cmpRecordsMapAndCache(tt.wantPreloadedRecords, c.preloadedRecords); err != nil {
+					t.Errorf("cachedPullRecordsAccessor.DeleteImagePreloadedRecord() expected cache state differs: %v", err)
+				}
+
+				if !reflect.DeepEqual(tt.delegate.preloadedRecords, tt.wantPreloadedRecords) {
+					t.Errorf("cachedPullRecordsAccessor.DeleteImagePreloadedRecord() delegate imagePreloadedRecords = %v, want %v", tt.delegate.preloadedRecords, tt.wantPreloadedRecords)
+				}
+
+				if gotAuthoritative := c.preloadedRecords.authoritative.Load(); gotAuthoritative != initAuthoritative {
+					t.Errorf("cachedPullRecordsAccessor.DeleteImagePreloadedRecord() should not cause authoritative changes = %v, want %v", gotAuthoritative, initAuthoritative)
+				}
+			})
+		}
 	}
 }
 
@@ -1272,6 +1960,65 @@ func pulledRecordsToMap(records []*kubeletconfiginternal.ImagePulledRecord) map[
 	return ret
 }
 
+func testPreloadedRecords() []*kubeletconfiginternal.ImagePreloadedRecord {
+	return []*kubeletconfiginternal.ImagePreloadedRecord{
+		{
+			ImageRef: "preloaded-ref-87",
+			ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+				"image.some/org1/imagex": {},
+			},
+		},
+		{
+			ImageRef: "preloaded-ref-3",
+			ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+				"image.some/org2/image":  {},
+				"image.some/org2/image2": {},
+			},
+		},
+		{
+			ImageRef: "preloaded-ref-22",
+			ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+				"image.some/org1/image-2": {},
+			},
+		},
+		{
+			ImageRef: "preloaded-ref-17",
+			ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+				"image.some/org1/image-3": {},
+			},
+		},
+		{
+			ImageRef: "preloaded-ref-009",
+			ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+				"image.some/org3/image": {},
+			},
+		},
+	}
+}
+
+func generateTestPreloadedRecords(recordsNum int) []*kubeletconfiginternal.ImagePreloadedRecord {
+	repoFormat := "image.some/org%d/image%d"
+	ret := make([]*kubeletconfiginternal.ImagePreloadedRecord, 0, recordsNum)
+	for i := range recordsNum {
+		ret = append(ret,
+			&kubeletconfiginternal.ImagePreloadedRecord{
+				ImageRef: fmt.Sprintf("preloaded-ref-%d", i),
+				ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+					fmt.Sprintf(repoFormat, randNonNegativeIntOrDie(), randNonNegativeIntOrDie()): {},
+				},
+			})
+	}
+	return ret
+}
+
+func preloadedRecordsToMap(records []*kubeletconfiginternal.ImagePreloadedRecord) map[string]*kubeletconfiginternal.ImagePreloadedRecord {
+	ret := make(map[string]*kubeletconfiginternal.ImagePreloadedRecord, len(records))
+	for _, record := range records {
+		ret[record.ImageRef] = record
+	}
+	return ret
+}
+
 func mapToCache[V any](m map[string]*V) *lruCache[string, V] {
 	ret := newLRUCache[string, V](100)
 	for k, v := range m {
@@ -1299,6 +2046,12 @@ func testPullIntentsSorted() []*kubeletconfiginternal.ImagePullIntent {
 func testPulledRecordsSorted() []*kubeletconfiginternal.ImagePulledRecord {
 	records := testPulledRecords()
 	slices.SortFunc(records, pulledRecordsCmp)
+	return records
+}
+
+func testPreloadedRecordsSorted() []*kubeletconfiginternal.ImagePreloadedRecord {
+	records := testPreloadedRecords()
+	slices.SortFunc(records, preloadedRecordsCmp)
 	return records
 }
 
@@ -1343,5 +2096,8 @@ func pullIntentsCmp(a, b *kubeletconfiginternal.ImagePullIntent) int {
 	return strings.Compare(a.Image, b.Image)
 }
 func pulledRecordsCmp(a, b *kubeletconfiginternal.ImagePulledRecord) int {
+	return strings.Compare(a.ImageRef, b.ImageRef)
+}
+func preloadedRecordsCmp(a, b *kubeletconfiginternal.ImagePreloadedRecord) int {
 	return strings.Compare(a.ImageRef, b.ImageRef)
 }
