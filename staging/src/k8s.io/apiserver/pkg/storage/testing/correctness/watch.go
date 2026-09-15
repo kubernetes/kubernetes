@@ -44,6 +44,9 @@ func NewWatchValidator(versioner storage.Versioner, keyFunc func(runtime.Object)
 }
 
 func (v WatchValidator) ValidateWatch(request WatchRequest, response WatchResponse) error {
+	if response.Err != nil {
+		return fmt.Errorf("watch %+v: unexpected error: %w", request, response.Err)
+	}
 	if err := v.validateReliable(request, response); err != nil {
 		return fmt.Errorf("watch %+v: Broke reliable %w", request, err)
 	}
