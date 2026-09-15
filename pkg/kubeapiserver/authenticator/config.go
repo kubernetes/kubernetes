@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync/atomic"
 	"time"
 
@@ -28,8 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
+	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
@@ -239,6 +242,50 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 
 	authenticator = group.NewAuthenticatedGroupAdder(authenticator)
 
+	// Apply top-level userValidationRules.
+	// Create the pointer and wrap the authenticator whenever AuthenticationConfig is in use,
+	// so that hot-reload can add/remove rules without restarting the server.
+	if config.AuthenticationConfig != nil {
+		var initialRules authenticationcel.UserMapper
+		if len(config.AuthenticationConfig.UserValidationRules) > 0 {
+			compiledRules, errs := apiservervalidation.CompileAndValidateUserValidationRules(
+				authenticationcel.NewDefaultCompiler(), config.AuthenticationConfig.UserValidationRules,
+			)
+			if errs != nil {
+				return nil, nil, nil, nil, errs.ToAggregate()
+			}
+			initialRules = compiledRules
+		}
+		userValidationRulesPtr := &atomic.Pointer[authenticationcel.UserMapper]{}
+		userValidationRulesPtr.Store(&initialRules)
+		authenticator = &userValidatingAuthenticator{
+			delegate: authenticator,
+			rulesPtr: userValidationRulesPtr,
+		}
+
+		// Extend the hot-reload callback to also update the user validation rules.
+		if updateAuthenticationConfig != nil {
+			prevUpdate := updateAuthenticationConfig
+			updateAuthenticationConfig = func(ctx context.Context, authCfg *apiserver.AuthenticationConfiguration) error {
+				if err := prevUpdate(ctx, authCfg); err != nil {
+					return err
+				}
+				var newRules authenticationcel.UserMapper
+				if len(authCfg.UserValidationRules) > 0 {
+					compiled, ruleErrs := apiservervalidation.CompileAndValidateUserValidationRules(
+						authenticationcel.NewDefaultCompiler(), authCfg.UserValidationRules,
+					)
+					if ruleErrs != nil {
+						return ruleErrs.ToAggregate()
+					}
+					newRules = compiled
+				}
+				userValidationRulesPtr.Store(&newRules)
+				return nil
+			}
+		}
+	}
+
 	if config.Anonymous.Enabled {
 		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token
 		// or invalid username/password combination anonymous).
@@ -252,6 +299,50 @@ type jwtAuthenticatorWithCancel struct {
 	jwtAuthenticator authenticator.Token
 	healthCheck      func() error
 	cancel           func()
+}
+
+// userValidatingAuthenticator wraps an authenticator.Request and applies top-level
+// user validation rules (CEL expressions) to the authenticated user. This enables
+// blocking specific credentials (e.g., by x509 fingerprint) regardless of which
+// authenticator produced the user.Info.
+type userValidatingAuthenticator struct {
+	delegate authenticator.Request
+	rulesPtr *atomic.Pointer[authenticationcel.UserMapper]
+}
+
+func (a *userValidatingAuthenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+	resp, ok, err := a.delegate.AuthenticateRequest(req)
+	if err != nil || !ok {
+		return resp, ok, err
+	}
+
+	rules := a.rulesPtr.Load()
+	if rules == nil || *rules == nil {
+		return resp, ok, nil
+	}
+
+	userInfoVal := authenticationcel.NewUserInfoMapper(resp.User)
+
+	evalResults, err := (*rules).EvalUser(req.Context(), userInfoVal)
+	if err != nil {
+		return nil, false, fmt.Errorf("error evaluating user validation rule: %w", err)
+	}
+
+	for _, result := range evalResults {
+		val, isBool := result.EvalResult.Value().(bool)
+		if !isBool {
+			return nil, false, fmt.Errorf("user validation rule must return a boolean")
+		}
+		if !val {
+			msg := fmt.Sprintf("validation expression '%s' failed", result.ExpressionAccessor.GetExpression())
+			if condition, ok := result.ExpressionAccessor.(*authenticationcel.UserValidationCondition); ok && condition.Message != "" {
+				msg = condition.Message
+			}
+			return nil, false, fmt.Errorf("user validation failed: %s", msg)
+		}
+	}
+
+	return resp, true, nil
 }
 
 func newJWTAuthenticator(serverLifecycle context.Context, config *apiserver.AuthenticationConfiguration, oidcSigningAlgs []string, apiAudiences authenticator.Audiences, disallowedIssuers []string, egressLookup egressselector.Lookup, apiServerID string) (_ *jwtAuthenticatorWithCancel, buildErr error) {
