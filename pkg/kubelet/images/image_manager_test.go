@@ -812,12 +812,12 @@ type mockDockerKeyringWithTrackedCreds struct {
 	trackedCreds map[string][]credentialprovider.TrackedAuthConfig
 }
 
-func (m *mockDockerKeyringWithTrackedCreds) Lookup(image string) ([]credentialprovider.TrackedAuthConfig, bool) {
+func (m *mockDockerKeyringWithTrackedCreds) Lookup(ctx context.Context, image string) ([]credentialprovider.TrackedAuthConfig, bool) {
 	if creds, ok := m.trackedCreds[image]; ok {
 		return creds, true
 	}
 	// Fall back to basic keyring lookup - it already returns TrackedAuthConfig
-	return m.BasicDockerKeyring.Lookup(image)
+	return m.BasicDockerKeyring.Lookup(ctx, image)
 }
 
 func pullerTestEnv(
