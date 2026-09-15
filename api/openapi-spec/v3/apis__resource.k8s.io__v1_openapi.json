@@ -660,7 +660,7 @@
         "description": "DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.",
         "properties": {
           "config": {
-            "description": "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
+            "description": "Config defines configuration parameters that apply to each device that is claimed via this class. Some classes may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceClassConfiguration"
             },
