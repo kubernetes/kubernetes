@@ -37,6 +37,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kube-scheduler/framework/hierarchy"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -1082,40 +1083,66 @@ func (pgqi *QueuedPodGroupInfo) RemoveGenericPodGroup(gpg *fwk.GenericPodGroup) 
 	return pgqi.deleteSubtreePods(node)
 }
 
+type nodeAndParent struct {
+	node   *PodGroupInfo
+	parent *PodGroupInfo
+}
+
 // findTreeNodeAndParent uses DFS to find a tree node by EntityKey in the hierarchy.
 // It returns the target node and its parent. If the target is the root, parent is nil.
 // The target may be a leaf podgroup or a composite podgroup.
 func findTreeNodeAndParent(curr, parent *PodGroupInfo, key fwk.EntityKey) (*PodGroupInfo, *PodGroupInfo) {
-	if curr.GetKey() == key {
-		return curr, parent
+	if curr == nil {
+		return nil, nil
 	}
-	for _, child := range curr.Children {
-		if n, p := findTreeNodeAndParent(child, curr, key); n != nil {
-			return n, p
+	var targetNode, targetParent *PodGroupInfo
+	_ = hierarchy.WalkDown(nodeAndParent{node: curr, parent: parent}, func(currPair nodeAndParent) ([]nodeAndParent, error) {
+		if currPair.node == nil || len(currPair.node.Children) == 0 {
+			return nil, nil
 		}
-	}
-	return nil, nil
+		children := make([]nodeAndParent, len(currPair.node.Children))
+		for i, child := range currPair.node.Children {
+			children[i] = nodeAndParent{node: child, parent: currPair.node}
+		}
+		return children, nil
+	}, func(currPair nodeAndParent, depth int) (bool, bool, error) {
+		if currPair.node.GetKey() == key {
+			targetNode = currPair.node
+			targetParent = currPair.parent
+			return true, true, nil
+		}
+		return false, false, nil
+	})
+	return targetNode, targetParent
 }
 
 // deleteSubtreePods recursively traverses the subtree starting at the given node and removes
 // all encountered PodGroups from the pgqi.QueuedPodInfos map.
 // It returns a flat slice of all QueuedPodInfo elements that were successfully removed.
 func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedPodInfo {
+	if curr == nil {
+		return nil
+	}
 	removedPods := make([]*QueuedPodInfo, 0)
-	if curr.GetType() == fwk.PodGroupKeyType {
-		key := fwk.PodGroupKey(curr.GetNamespace(), curr.GetName())
-		if pods, ok := pgqi.QueuedPodInfos[key]; ok {
-			removedPods = append(removedPods, pods...)
-			for _, pInfo := range pods {
-				pgqi.removePodPendingPlugins(pInfo)
-			}
-			delete(pgqi.QueuedPodInfos, key)
+	_ = hierarchy.WalkDown(curr, func(node *PodGroupInfo) ([]*PodGroupInfo, error) {
+		if node == nil || node.GetType() == fwk.PodGroupKeyType {
+			return nil, nil
 		}
-		return removedPods
-	}
-	for _, child := range curr.Children {
-		removedPods = append(removedPods, pgqi.deleteSubtreePods(child)...)
-	}
+		return node.Children, nil
+	}, func(node *PodGroupInfo, depth int) (bool, bool, error) {
+		if node.GetType() == fwk.PodGroupKeyType {
+			key := fwk.PodGroupKey(node.GetNamespace(), node.GetName())
+			if pods, ok := pgqi.QueuedPodInfos[key]; ok {
+				removedPods = append(removedPods, pods...)
+				for _, pInfo := range pods {
+					pgqi.removePodPendingPlugins(pInfo)
+				}
+				delete(pgqi.QueuedPodInfos, key)
+			}
+			return false, true, nil
+		}
+		return false, false, nil
+	})
 	return removedPods
 }
 
@@ -1143,9 +1170,18 @@ func (pgi *PodGroupInfo) GetAllUnscheduledPods() []*v1.Pod {
 		return pgi.UnscheduledPods
 	}
 	var pods []*v1.Pod
-	for _, child := range pgi.Children {
-		pods = append(pods, child.GetAllUnscheduledPods()...)
-	}
+	_ = hierarchy.WalkDown(pgi, func(node *PodGroupInfo) ([]*PodGroupInfo, error) {
+		if node == nil || node.PodGroup != nil {
+			return nil, nil
+		}
+		return node.Children, nil
+	}, func(node *PodGroupInfo, depth int) (bool, bool, error) {
+		if node.PodGroup != nil {
+			pods = append(pods, node.UnscheduledPods...)
+			return false, true, nil
+		}
+		return false, false, nil
+	})
 	return pods
 }
 

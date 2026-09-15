@@ -995,7 +995,7 @@ func TestGetPodPriority(t *testing.T) {
 	}
 }
 
-func TestTraverseHierarchyUp(t *testing.T) {
+func Test_traverseHierarchyUp(t *testing.T) {
 	namespace := metav1.NamespaceDefault
 
 	tests := []struct {
@@ -1168,13 +1168,13 @@ func TestTraverseHierarchyUp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var visitedKeys []fwk.EntityKey
-			traverseFn := func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
+			traverseFn := func(key fwk.EntityKey, gpg *fwk.GenericPodGroup) bool {
 				visitedKeys = append(visitedKeys, key)
 				return key.Name == tt.stopAt
 			}
-			TraverseHierarchyUp(namespace, tt.startKey, tt.podGroupLister, tt.compositePodGroupLister, traverseFn)
+			traverseHierarchyUp(namespace, tt.startKey, tt.podGroupLister, tt.compositePodGroupLister, traverseFn)
 			if diff := cmp.Diff(tt.expectedVisitedKeys, visitedKeys); diff != "" {
-				t.Errorf("TraverseHierarchyUp() mismatch (-want, +got):\n%s", diff)
+				t.Errorf("traverseHierarchyUp() mismatch (-want, +got):\n%s", diff)
 			}
 		})
 	}

@@ -1139,7 +1139,7 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericPodGroup(tt.pg), 0)
+			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericPodGroup(tt.pg))
 
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
 				t.Errorf("Unexpected PodGroupInfo (-want,+got)\n%s", diff)
@@ -1200,7 +1200,7 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericCompositePodGroup(tt.cpg), 0)
+			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericCompositePodGroup(tt.cpg))
 
 			// Note: Children are sorted by name in buildPodGroupInfoForCPG, so it is deterministic.
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {

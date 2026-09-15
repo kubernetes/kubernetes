@@ -19,12 +19,11 @@ package preemption
 import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kube-scheduler/framework/hierarchy"
 	"k8s.io/kube-scheduler/util"
 )
 
@@ -105,52 +104,67 @@ func victimRank(vi Victim) int {
 	}
 }
 
-// TraverseHierarchyUp traverses the hierarchy of PodGroups/CompositePodGroups upward from startKey.
-// At each node (either a PodGroup or a CompositePodGroup), visitFn is called.
+func getGenericPodGroup(namespace string, key fwk.EntityKey, pgLister fwk.PodGroupLister, cpgLister fwk.CompositePodGroupLister) (*fwk.GenericPodGroup, error) {
+	switch key.Type {
+	case fwk.PodGroupKeyType:
+		pg, err := pgLister.Get(namespace, key.Name)
+		if err != nil {
+			return nil, err
+		}
+		return fwk.NewGenericPodGroup(pg), nil
+	case fwk.CompositePodGroupKeyType:
+		cpg, err := cpgLister.Get(namespace, key.Name)
+		if err != nil {
+			return nil, err
+		}
+		return fwk.NewGenericCompositePodGroup(cpg), nil
+	default:
+		return nil, nil
+	}
+}
+
+// traverseHierarchyUp traverses the hierarchy of PodGroups/CompositePodGroups upward from startKey.
+// At each node, visitFn is called with the resolved GenericPodGroup entity.
 // If visitFn returns (stop = true), the traversal stops immediately.
-// If the next parent is missing, or cannot be listed, the traversal also stops.
-// This method assumes that both GenericWorkload as well as CompositePodGroup feature gates are enabled.
-// TODO: log/return an error if there is a gap in the hierarchy.
-func TraverseHierarchyUp(
+// If the next parent is missing, or cannot be listed, the traversal also stops gracefully.
+func traverseHierarchyUp(
 	namespace string,
 	startKey fwk.EntityKey,
 	pgLister fwk.PodGroupLister,
 	cpgLister fwk.CompositePodGroupLister,
-	visitFn func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) (stop bool),
+	visitFn func(key fwk.EntityKey, gpg *fwk.GenericPodGroup) (stop bool),
 ) {
 	if pgLister == nil || cpgLister == nil {
 		return
 	}
-	currentKey := startKey
-	for range schedulingv1beta1.WorkloadMaxTreeDepth {
-		switch currentKey.Type {
-		case fwk.PodGroupKeyType:
-			pg, err := pgLister.Get(namespace, currentKey.Name)
-			if err != nil || pg == nil {
-				return
+	var currentGPG *fwk.GenericPodGroup
+	_, _ = hierarchy.WalkUp(
+		startKey,
+		func(curr fwk.EntityKey) (*fwk.EntityKey, error) {
+			if currentGPG == nil {
+				var err error
+				currentGPG, err = getGenericPodGroup(namespace, curr, pgLister, cpgLister)
+				if err != nil {
+					return nil, err
+				}
 			}
-			if visitFn(currentKey, pg, nil) {
-				return
+			if currentGPG == nil {
+				return nil, nil
 			}
-			if pg.Spec.ParentCompositePodGroupName == nil {
-				return
+			if parentKey, ok := currentGPG.GetParentKey(); ok {
+				return &parentKey, nil
 			}
-			currentKey = fwk.CompositePodGroupKey(namespace, *pg.Spec.ParentCompositePodGroupName)
-
-		case fwk.CompositePodGroupKeyType:
-			cpg, err := cpgLister.Get(namespace, currentKey.Name)
-			if err != nil || cpg == nil {
-				return
+			return nil, nil
+		},
+		func(curr fwk.EntityKey, depth int) (bool, error) {
+			var err error
+			currentGPG, err = getGenericPodGroup(namespace, curr, pgLister, cpgLister)
+			if err != nil || currentGPG == nil {
+				return true, nil
 			}
-			if visitFn(currentKey, nil, cpg) {
-				return
-			}
-			if cpg.Spec.ParentCompositePodGroupName == nil {
-				return
-			}
-			currentKey = fwk.CompositePodGroupKey(namespace, *cpg.Spec.ParentCompositePodGroupName)
-		}
-	}
+			return visitFn(curr, currentGPG), nil
+		},
+	)
 }
 
 // GetPodPriority returns the effective preemption priority of a pod. If the pod belongs to
@@ -172,25 +186,15 @@ func GetPodPriority(p *v1.Pod, podGroupLister fwk.PodGroupLister, compositePodGr
 	}
 
 	startKey := fwk.PodGroupKey(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
-	var lastPG *schedulingv1beta1.PodGroup
-	var lastCPG *schedulingv1alpha3.CompositePodGroup
+	var lastGPG *fwk.GenericPodGroup
 
-	TraverseHierarchyUp(p.Namespace, startKey, podGroupLister, compositePodGroupLister, func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
-		if pg != nil {
-			lastPG = pg
-			lastCPG = nil
-		} else if cpg != nil {
-			lastCPG = cpg
-			lastPG = nil
-		}
+	traverseHierarchyUp(p.Namespace, startKey, podGroupLister, compositePodGroupLister, func(key fwk.EntityKey, gpg *fwk.GenericPodGroup) bool {
+		lastGPG = gpg
 		return false
 	})
 
-	if lastCPG != nil {
-		return util.CompositePodGroupPriority(lastCPG)
-	}
-	if lastPG != nil {
-		return util.PodGroupPriority(lastPG)
+	if lastGPG != nil {
+		return lastGPG.GetPriority()
 	}
 	return corev1helpers.PodPriority(p)
 }

@@ -17,15 +17,17 @@ limitations under the License.
 package queue
 
 import (
-	"fmt"
-
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kube-scheduler/framework/hierarchy"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/utils/ptr"
 )
 
 // workloadForest maintains a consistent view of observed GenericPodGroup objects (either PodGroup or CompositePodGroup).
@@ -128,21 +130,25 @@ func (wf *workloadForest) getRootLookupInfo(gpg *fwk.GenericPodGroup) (*framewor
 // getRootLookupInfoForParentCPG is a helper to traverse up the parent chain and return the lookup info of the root CompositePodGroup.
 // It should be called only when the CompositePodGroup feature gate is enabled.
 func (wf *workloadForest) getRootLookupInfoForParentCPG(parentName, namespace string) (*framework.QueuedPodGroupInfo, bool) {
-	currParentName := parentName
-	for range schedulingv1beta1.WorkloadMaxTreeDepth {
-		cpgKey := fwk.CompositePodGroupKey(namespace, currParentName)
-		cpg, exists := wf.podGroups[cpgKey]
+	startKey := fwk.CompositePodGroupKey(namespace, parentName)
+	rootKey, err := hierarchy.WalkUp(startKey, func(curr fwk.EntityKey) (*fwk.EntityKey, error) {
+		cpg, exists := wf.podGroups[curr]
 		if !exists {
+			return nil, apierrors.NewNotFound(schedulingv1alpha3.Resource("compositepodgroups"), curr.Name)
+		}
+		if !cpg.HasParent() {
+			return nil, nil
+		}
+		return ptr.To(fwk.CompositePodGroupKey(namespace, *cpg.GetParentCompositePodGroupName())), nil
+	}, nil)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
 			return nil, false
 		}
-
-		if !cpg.HasParent() {
-			return newCompositePodGroupInfoForLookup(cpg.GetNamespace(), cpg.GetName()), true
-		}
-		currParentName = *cpg.GetParentCompositePodGroupName()
+		utilruntime.HandleError(err)
+		return nil, false
 	}
-	utilruntime.HandleError(fmt.Errorf("hierarchy exceeded maximum tree depth when getting root info: %s/%s", parentName, namespace))
-	return nil, false
+	return newCompositePodGroupInfoForLookup(rootKey.Namespace, rootKey.Name), true
 }
 
 // getLeafPodGroups returns all PodGroups that are leaf nodes in the subtree rooted at the given rootLookupInfo.
@@ -157,60 +163,70 @@ func (wf *workloadForest) getLeafPodGroups(logger klog.Logger, rootLookupInfo *f
 	}
 
 	var pgs []*schedulingv1beta1.PodGroup
-	var collectLeaves func(currKey fwk.EntityKey, depth int)
-	collectLeaves = func(currKey fwk.EntityKey, depth int) {
-		if depth >= schedulingv1beta1.WorkloadMaxTreeDepth {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Hierarchy exceeded maximum tree depth when getting leaf PodGroups", "compositePodGroup", klog.KObj(rootLookupInfo))
-			return
-		}
-
-		children, exists := wf.children[currKey]
+	err := hierarchy.WalkDown(key, func(curr fwk.EntityKey) ([]fwk.EntityKey, error) {
+		children, exists := wf.children[curr]
 		if !exists {
-			return
+			return nil, nil
 		}
-
+		childKeys := make([]fwk.EntityKey, 0, len(children))
 		for childKey := range children {
-			gpg, ok := wf.podGroups[childKey]
-			if !ok {
-				continue
-			}
-			if gpg.PodGroup != nil {
-				pgs = append(pgs, gpg.PodGroup)
-			} else if gpg.CompositePodGroup != nil {
-				collectLeaves(childKey, depth+1)
-			}
+			childKeys = append(childKeys, childKey)
 		}
+		return childKeys, nil
+	}, func(curr fwk.EntityKey, depth int) (bool, bool, error) {
+		if curr == key {
+			return false, false, nil
+		}
+		gpg, ok := wf.podGroups[curr]
+		if !ok {
+			return false, true, nil
+		}
+		if gpg.PodGroup != nil {
+			pgs = append(pgs, gpg.PodGroup)
+			return false, true, nil
+		}
+		return false, false, nil
+	})
+	if err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to get leaf PodGroups", "compositePodGroup", klog.KObj(rootLookupInfo))
 	}
-	collectLeaves(key, 0)
 	return pgs
 }
 
 // buildPodGroupInfo recursively constructs a PodGroupInfo representation for a given GenericPodGroup
-// and all its children up to WorkloadMaxTreeDepth.
-func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *fwk.GenericPodGroup, depth int) *framework.PodGroupInfo {
-	if depth >= schedulingv1beta1.WorkloadMaxTreeDepth {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Hierarchy exceeded maximum tree depth when building PodGroupInfo", "groupType", gpg.GetType(), "group", klog.KObj(gpg))
-		return nil
-	}
-
-	pgi := &framework.PodGroupInfo{
+// and all its children.
+func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *fwk.GenericPodGroup) *framework.PodGroupInfo {
+	root := &framework.PodGroupInfo{
 		GenericPodGroup: gpg,
 		Children:        make([]*framework.PodGroupInfo, 0),
 	}
-
-	key := gpg.GetKey()
-	childrenSet, ok := wf.children[key]
-	if !ok {
-		return pgi
-	}
-	for childKey := range childrenSet {
-		if childGPG, ok := wf.podGroups[childKey]; ok {
-			if childInfo := wf.buildPodGroupInfo(logger, childGPG, depth+1); childInfo != nil {
-				pgi.Children = append(pgi.Children, childInfo)
+	err := hierarchy.WalkDown(
+		root,
+		func(node *framework.PodGroupInfo) ([]*framework.PodGroupInfo, error) {
+			childrenSet, ok := wf.children[node.GetKey()]
+			if !ok {
+				return nil, nil
 			}
-		}
+			var children []*framework.PodGroupInfo
+			for childKey := range childrenSet {
+				if childGPG, ok := wf.podGroups[childKey]; ok {
+					childInfo := &framework.PodGroupInfo{
+						GenericPodGroup: childGPG,
+						Children:        make([]*framework.PodGroupInfo, 0),
+					}
+					node.Children = append(node.Children, childInfo)
+					children = append(children, childInfo)
+				}
+			}
+			return children, nil
+		},
+		nil,
+	)
+	if err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to build PodGroupInfo", "groupType", gpg.GetType(), "group", klog.KObj(gpg))
+		return nil
 	}
-	return pgi
+	return root
 }
 
 // buildQueuedPodGroupInfo constructs a QueuedPodGroupInfo starting from the provided root lookup info,
@@ -221,7 +237,11 @@ func (wf *workloadForest) buildQueuedPodGroupInfo(logger klog.Logger, rootLookup
 	if !ok {
 		return nil
 	}
+	pgi := wf.buildPodGroupInfo(logger, gpg)
+	if pgi == nil {
+		return nil
+	}
 	return &framework.QueuedPodGroupInfo{
-		PodGroupInfo: wf.buildPodGroupInfo(logger, gpg, 0),
+		PodGroupInfo: pgi,
 	}
 }
