@@ -679,6 +679,21 @@ mergingList:
 		},
 	},
 	{
+		Description: "missing merge key error message should include the field name",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    value: a
+`),
+			TwoWay: []byte(`
+mergingList:
+  - value: b
+`),
+			ExpectedError: "mergingList entry",
+		},
+	},
+	{
 		Description: "$deleteFromPrimitiveList of nonexistent item in primitive list should not add the item to the list",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
 			Original: []byte(`
