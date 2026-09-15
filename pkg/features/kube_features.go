@@ -702,6 +702,12 @@ const (
 	// Enables maxUnavailable for StatefulSet
 	MaxUnavailableStatefulSet featuregate.Feature = "MaxUnavailableStatefulSet"
 
+	// owner: @AI-Armless
+	// kep: https://kep.k8s.io/6232
+	//
+	// Allows the memory manager Static policy to tolerate a bounded per-NUMA memory drift on restart.
+	MemoryManagerDriftTolerance featuregate.Feature = "MemoryManagerDriftTolerance"
+
 	// owner: @xiaoxubeii
 	// kep: https://kep.k8s.io/2570
 	//
@@ -1701,6 +1707,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	MemoryManagerDriftTolerance: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	MemoryQoS: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
@@ -2521,6 +2531,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MatchLabelKeysInPodTopologySpreadSelectorMerge: {MatchLabelKeysInPodTopologySpread},
 
 	MaxUnavailableStatefulSet: {},
+
+	MemoryManagerDriftTolerance: {},
 
 	MemoryQoS: {},
 
