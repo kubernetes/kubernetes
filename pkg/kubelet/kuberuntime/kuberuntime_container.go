@@ -297,6 +297,9 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	}
 	m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Container started")
 
+	// Anchor probe timing to container start.
+	m.probeLifecycle.StartProbes(ctx, pod, container, kubecontainer.ContainerID{Type: m.runtimeName, ID: containerID}, podIPs, time.Now())
+
 	// Symlink container logs to the legacy container log location for cluster logging
 	// support.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
@@ -863,6 +866,11 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(ctx context.
 // * Stop the container.
 func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, containerName string, message string, reason containerKillReason, gracePeriodOverride *int64, ordering *terminationOrdering) error {
 	logger := klog.FromContext(ctx)
+
+	// Stop liveness and startup probes immediately to avoid redundant probing during shutdown.
+	// Readiness probes continue running so draining containers can be marked NotReady.
+	m.probeLifecycle.StopProbes(containerID, kubecontainer.LivenessProbe|kubecontainer.StartupProbe)
+
 	var containerSpec *v1.Container
 	if pod != nil {
 		if containerSpec = kubecontainer.GetContainerSpec(pod, containerName); containerSpec == nil {
@@ -920,6 +928,10 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	}
 	logger.V(3).Info("Container exited normally", "pod", klog.KObj(pod), "podUID", pod.UID,
 		"containerName", containerName, "containerID", containerID.String())
+
+	// Container has stopped: stop the remaining readiness probe and drop all
+	// cached probe results.
+	m.probeLifecycle.StopProbes(containerID, kubecontainer.AllProbes)
 
 	if ordering != nil {
 		ordering.containerTerminated(containerName)
