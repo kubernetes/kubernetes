@@ -104,16 +104,18 @@ func (pdev *podDevices) podDevices(podUID, resource string) sets.Set[string] {
 
 	ret := sets.New[string]()
 	for contName := range pdev.devs[podUID] {
-		ret = ret.Union(pdev.containerDevices(podUID, contName, resource))
+		devIds := pdev.containerDevicesNoLock(podUID, contName, resource)
+		if devIds != nil {
+			ret = ret.Union(devIds)
+		}
 	}
 	return ret
 }
 
-// Returns list of device Ids allocated to the given container for the given resource.
+// containerDevicesNoLock returns list of device Ids allocated to the given container for the given resource
+// without acquiring a lock.
 // Returns nil if we don't have cached state for the given <podUID, contName, resource>.
-func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets.Set[string] {
-	pdev.RLock()
-	defer pdev.RUnlock()
+func (pdev *podDevices) containerDevicesNoLock(podUID, contName, resource string) sets.Set[string] {
 	if _, podExists := pdev.devs[podUID]; !podExists {
 		return nil
 	}
@@ -125,7 +127,16 @@ func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets
 		return nil
 	}
 	return devs.deviceIds.Devices()
+} 
+
+// Returns list of device Ids allocated to the given container for the given resource.
+// Returns nil if we don't have cached state for the given <podUID, contName, resource>.
+func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets.Set[string] {
+	pdev.RLock()
+	defer pdev.RUnlock()
+	return pdev.containerDevicesNoLock(podUID, contName, resource)
 }
+
 
 // Populates allocatedResources with the device resources allocated to the specified <podUID, contName>.
 func (pdev *podDevices) addContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.Set[string]) {
