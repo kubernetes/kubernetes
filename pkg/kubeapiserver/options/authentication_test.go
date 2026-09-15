@@ -384,12 +384,8 @@ func TestToAuthenticationConfig(t *testing.T) {
 		TokenFailureCacheTTL: 0,
 
 		RequestHeaderConfig: &authenticatorfactory.RequestHeaderConfig{
-			UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
-			UIDHeaders:          headerrequest.StaticStringSlice{"x-remote-uid"},
-			GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
-			ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
-			CAContentProvider:   nil, // this is nil because you can't compare functions
-			AllowedClientNames:  headerrequest.StaticStringSlice{"kube-aggregator"},
+			Config:            headerrequest.NewStaticRequestHeaderConfig([]string{"x-remote-user"}, []string{"x-remote-uid"}, []string{"x-remote-group"}, []string{"x-remote-extra-"}, []string{"kube-aggregator"}),
+			CAContentProvider: nil, // this is nil because you can't compare functions
 		},
 	}
 

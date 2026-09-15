@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
@@ -365,12 +366,13 @@ func CreateConfig(
 		return nil, nil, err
 	}
 	if requestHeaderConfig != nil {
+		requestHeaderOptions := opts.Authentication.RequestHeader
 		config.ClusterAuthenticationInfo.RequestHeaderCA = requestHeaderConfig.CAContentProvider
-		config.ClusterAuthenticationInfo.RequestHeaderAllowedNames = requestHeaderConfig.AllowedClientNames
-		config.ClusterAuthenticationInfo.RequestHeaderExtraHeaderPrefixes = requestHeaderConfig.ExtraHeaderPrefixes
-		config.ClusterAuthenticationInfo.RequestHeaderGroupHeaders = requestHeaderConfig.GroupHeaders
-		config.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
-		config.ClusterAuthenticationInfo.RequestHeaderUIDHeaders = requestHeaderConfig.UIDHeaders
+		config.ClusterAuthenticationInfo.RequestHeaderAllowedNames = headerrequest.StaticStringSlice(requestHeaderOptions.AllowedNames)
+		config.ClusterAuthenticationInfo.RequestHeaderExtraHeaderPrefixes = headerrequest.StaticStringSlice(requestHeaderOptions.ExtraHeaderPrefixes)
+		config.ClusterAuthenticationInfo.RequestHeaderGroupHeaders = headerrequest.StaticStringSlice(requestHeaderOptions.GroupHeaders)
+		config.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = headerrequest.StaticStringSlice(requestHeaderOptions.UsernameHeaders)
+		config.ClusterAuthenticationInfo.RequestHeaderUIDHeaders = headerrequest.StaticStringSlice(requestHeaderOptions.UIDHeaders)
 	}
 
 	// setup admission
