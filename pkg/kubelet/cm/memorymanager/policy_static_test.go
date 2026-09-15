@@ -1354,6 +1354,7 @@ func TestStaticPolicyStartWithMemoryDrift(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
+			p.(*staticPolicy).maxMemoryDrift = defaultMaxMemoryDriftBytes
 
 			err = p.Start(logger, s)
 			if !reflect.DeepEqual(err, testCase.expectedError) {
@@ -1420,6 +1421,7 @@ func TestStaticPolicyStartMemoryDriftBound(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
+			p.(*staticPolicy).maxMemoryDrift = defaultMaxMemoryDriftBytes
 			if err := p.Start(logger, s); !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Fatalf("Start error = %v, want %v", err, testCase.expectedError)
 			}
@@ -1475,6 +1477,7 @@ func TestStaticPolicyStartCrossNUMAMemoryDrift(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	p.(*staticPolicy).maxMemoryDrift = defaultMaxMemoryDriftBytes
 	if err := p.Start(logger, s); !reflect.DeepEqual(err, tc.expectedError) {
 		t.Fatalf("Start error = %v, want %v", err, tc.expectedError)
 	}
