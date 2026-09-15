@@ -638,6 +638,27 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 		if certificateAuthorityFile := config.overrides.ClusterInfo.CertificateAuthority; len(certificateAuthorityFile) > 0 {
 			icc.TLSClientConfig.CAFile = certificateAuthorityFile
 		}
+
+		// Runtime client behavior overrides do not select the kubeconfig source,
+		// but once in-cluster configuration is selected, they still apply to the
+		// resulting REST client configuration.
+		if len(config.overrides.Timeout) > 0 {
+			timeout, err := ParseTimeout(config.overrides.Timeout)
+			if err != nil {
+				return nil, err
+			}
+			icc.Timeout = timeout
+		}
+		if config.overrides.ClusterInfo.DisableCompression {
+			icc.DisableCompression = true
+		}
+		if len(config.overrides.ClusterInfo.ProxyURL) > 0 {
+			proxyURL, err := parseProxyURL(config.overrides.ClusterInfo.ProxyURL)
+			if err != nil {
+				return nil, err
+			}
+			icc.Proxy = http.ProxyURL(proxyURL)
+		}
 	}
 
 	return icc, nil
