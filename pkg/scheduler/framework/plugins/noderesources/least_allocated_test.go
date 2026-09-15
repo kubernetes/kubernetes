@@ -18,6 +18,7 @@ package noderesources
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -62,7 +63,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
 			},
 			existingPods:   nil,
-			expectedScores: []fwk.NodeScore{{Name: "node1", Score: fwk.MaxNodeScore}, {Name: "node2", Score: fwk.MaxNodeScore}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: fwk.MaxScore}, {Name: "node2", Score: fwk.MaxScore}},
 			resources:      defaultResources,
 		},
 		{
@@ -123,7 +124,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 				st.MakePod().Node("node2").Obj(),
 				st.MakePod().Node("node2").Obj(),
 			},
-			expectedScores: []fwk.NodeScore{{Name: "node1", Score: fwk.MaxNodeScore}, {Name: "node2", Score: fwk.MaxNodeScore}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: fwk.MaxScore}, {Name: "node2", Score: fwk.MaxScore}},
 			resources:      defaultResources,
 		},
 		{
@@ -433,6 +434,59 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 
 			if diff := cmp.Diff(test.expectedScores, gotScores); diff != "" {
 				t.Errorf("Unexpected scores (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestLeastRequestedScore(t *testing.T) {
+	tests := []struct {
+		name      string
+		requested int64
+		capacity  int64
+		want      int64
+	}{
+		{
+			name:      "zero capacity",
+			requested: 10,
+			capacity:  0,
+			want:      0,
+		},
+		{
+			name:      "requested exceeds capacity",
+			requested: 2000,
+			capacity:  1000,
+			want:      0,
+		},
+		{
+			name:      "normal range",
+			requested: 250,
+			capacity:  1000,
+			want:      75,
+		},
+		{
+			name:      "free above the multiplication overflow threshold",
+			requested: 0,
+			capacity:  math.MaxInt64,
+			want:      fwk.MaxScore,
+		},
+		{
+			name:      "free just below the multiplication overflow threshold",
+			requested: math.MaxInt64 - math.MaxInt64/fwk.MaxScore,
+			capacity:  math.MaxInt64,
+			want:      0,
+		},
+		{
+			name:      "exact utilization at the float64 boundary",
+			requested: 1,
+			capacity:  1000000000000000000,
+			want:      99,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := leastRequestedScore(tt.requested, tt.capacity); got != tt.want {
+				t.Errorf("leastRequestedScore(%d, %d) = %d, want %d", tt.requested, tt.capacity, got, tt.want)
 			}
 		})
 	}
