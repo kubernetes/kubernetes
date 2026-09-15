@@ -804,7 +804,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 				}
 				allocatedState = &structured.AllocatedState{
 					AllocatedDevices:         allocatedDevices,
-					AllocatedSharedDeviceIDs: sets.New[structured.SharedDeviceID](),
+					AllocatedSharedDeviceIDs: sets.New[structured.DeviceID](),
 					AggregatedCapacity:       structured.NewConsumedCapacityCollection(),
 				}
 				// Done.
