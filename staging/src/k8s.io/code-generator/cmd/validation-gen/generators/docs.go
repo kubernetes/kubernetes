@@ -32,7 +32,7 @@ import (
 // JSON, to w. Tag names are qualified with tagPrefix. It initializes the
 // global tag registry, so it must not be combined with GetTargets in the same
 // process.
-func PrintDocs(w io.Writer, tagPrefix string) error {
+func PrintDocs(w io.Writer, tagPrefix string, profile *validators.Profile) error {
 	// We need a fake context to init the validator plugins.
 	c := &generator.Context{
 		Namers:    namer.NameSystems{},
@@ -41,7 +41,7 @@ func PrintDocs(w io.Writer, tagPrefix string) error {
 	}
 
 	// Initialize all registered validators.
-	validator := validators.InitGlobalValidator(c, nil, tagPrefix)
+	validator := validators.InitGlobalValidator(c, nil, tagPrefix, profile)
 
 	docs := validator.Docs()
 	for i := range docs {

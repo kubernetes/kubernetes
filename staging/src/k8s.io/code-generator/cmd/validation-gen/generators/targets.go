@@ -300,6 +300,11 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	prefix := args.TagPrefix
 	spec := apidefinitions.ValidationSpec(prefix)
 
+	profile, err := validators.LoadProfile(args.Profile)
+	if err != nil {
+		klog.Fatalf("Failed loading profile: %v", err)
+	}
+
 	var idOpts []apidefinitions.Option
 	if len(args.LintRules) > 0 {
 		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
@@ -383,7 +388,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	context.Order = orderer.OrderUniverse(context.Universe)
 
 	// Initialize all validator plugins exactly once.
-	validator := validators.InitGlobalValidator(context, inputToOutputPkgs, prefix)
+	validator := validators.InitGlobalValidator(context, inputToOutputPkgs, prefix, profile)
 
 	// Create a type discoverer for all types of all inputs.
 	td := NewTypeDiscoverer(validator, inputToOutputPkgs, prefix)
