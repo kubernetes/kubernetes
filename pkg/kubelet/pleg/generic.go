@@ -54,6 +54,8 @@ type GenericPLEG struct {
 	runtime kubecontainer.Runtime
 	// The channel from which the subscriber listens events.
 	eventChannel chan *PodLifecycleEvent
+	// Called after a container exit is confirmed in the runtime cache.
+	containerDiedHandler func(string)
 	// The internal cache for pod/container information.
 	// Guarded by relistLock.
 	podRecords podRecords
@@ -132,18 +134,19 @@ type podRecords map[types.UID]*podRecord
 // NewGenericPLEG instantiates a new GenericPLEG object and return it.
 func NewGenericPLEG(runtime kubecontainer.Runtime, eventChannel chan *PodLifecycleEvent,
 	relistDuration *RelistDuration, cache kubecontainer.Cache,
-	clock clock.Clock) PodLifecycleEventGenerator {
+	clock clock.Clock, containerDiedHandler func(string)) PodLifecycleEventGenerator {
 	if cache == nil {
 		panic("cache cannot be nil")
 	}
 	return &GenericPLEG{
-		relistDuration: relistDuration,
-		runtime:        runtime,
-		eventChannel:   eventChannel,
-		podRecords:     make(podRecords),
-		cache:          cache,
-		clock:          clock,
-		relistRequests: make(chan relistRequest, 200),
+		relistDuration:       relistDuration,
+		runtime:              runtime,
+		eventChannel:         eventChannel,
+		podRecords:           make(podRecords),
+		cache:                cache,
+		clock:                clock,
+		relistRequests:       make(chan relistRequest, 200),
+		containerDiedHandler: containerDiedHandler,
 	}
 }
 
@@ -402,6 +405,9 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 				}
 			}
 			if containerID, ok := events[i].Data.(string); ok {
+				if g.containerDiedHandler != nil {
+					g.containerDiedHandler(containerID)
+				}
 				if exitCode, ok := containerExitCode[containerID]; ok && pod != nil {
 					logger.V(2).Info("Generic (PLEG): container finished", "podID", pod.ID, "containerID", containerID, "exitCode", exitCode)
 				}
