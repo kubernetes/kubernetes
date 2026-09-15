@@ -330,6 +330,69 @@ func TestPodResourceNameCompletionFuncJointFormTooManyArgs(t *testing.T) {
 	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
+func TestDebugResourceNameCompletionFunc(t *testing.T) {
+	testCases := []struct {
+		name              string
+		obj               runtime.Object
+		args              []string
+		toComplete        string
+		expectedComps     []string
+		expectedDirective cobra.ShellCompDirective
+	}{
+		{
+			name:              "pod names",
+			obj:               &corev1.PodList{Items: []corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, {ObjectMeta: metav1.ObjectMeta{Name: "foo"}}}},
+			toComplete:        "b",
+			expectedComps:     []string{"bar"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "resource types",
+			obj:               &corev1.PodList{},
+			toComplete:        "",
+			expectedComps:     []string{"nodes/", "pods/"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace,
+		},
+		{
+			name:              "pod type and name",
+			obj:               &corev1.PodList{Items: []corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, {ObjectMeta: metav1.ObjectMeta{Name: "foo"}}}},
+			toComplete:        "pods/b",
+			expectedComps:     []string{"pods/bar"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "node type and name",
+			obj:               &corev1.NodeList{Items: []corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, {ObjectMeta: metav1.ObjectMeta{Name: "foo"}}}},
+			toComplete:        "nodes/f",
+			expectedComps:     []string{"nodes/foo"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "singular resource type",
+			obj:               &corev1.NodeList{Items: []corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}}},
+			toComplete:        "node/b",
+			expectedComps:     []string{"node/bar"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "target already provided",
+			obj:               &corev1.PodList{},
+			args:              []string{"bar"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tf, cmd := prepareCompletionTest()
+			addResourceToFactory(tf, tc.obj)
+
+			comps, directive := DebugResourceNameCompletionFunc(tf)(cmd, tc.args, tc.toComplete)
+			checkCompletion(t, comps, tc.expectedComps, directive, tc.expectedDirective)
+		})
+	}
+}
+
 func TestResourceAndContainerNameCompletionFunc(t *testing.T) {
 	barPod := getTestPod()
 
