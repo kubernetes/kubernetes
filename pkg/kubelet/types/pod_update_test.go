@@ -323,6 +323,12 @@ func TestPreemptable(t *testing.T) {
 			preemptee: getTestPod(configSourceAnnotation(FileSource), &systemPriority, ""),
 			expected:  false,
 		},
+		{
+			name:      "a non critical pod with priority preempts a non critical pod without priority",
+			preemptor: getTestPod(nil, &systemPriority, ""),
+			preemptee: getTestPod(nil, nil, ""),
+			expected:  true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
