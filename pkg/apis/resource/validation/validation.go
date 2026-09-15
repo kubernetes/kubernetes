@@ -803,8 +803,9 @@ func ValidateResourceSliceUpdate(resourceSlice, oldResourceSlice *resource.Resou
 func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
 	// An unchanged spec is accepted as it is stored. Validation which was added
 	// after the object was written does not have to be satisfied retroactively,
-	// as long as the spec is left alone. Any change to it, including merely
-	// reordering devices, validates the whole spec.
+	// as long as the spec is left alone. When the spec does change, devices are
+	// still correlated by name below, so a stored value in one device does not
+	// block updates of another.
 	if oldSpec != nil && apiequality.Semantic.DeepEqual(spec, oldSpec) {
 		return nil
 	}
@@ -875,7 +876,8 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	}
 	allErrs = append(allErrs, validateSet(spec.Devices, maxDevices,
 		func(device resource.Device, fldPath *field.Path) field.ErrorList {
-			return validateDevice(device, fldPath, spec.PerDeviceNodeSelection)
+			oldDevice := lookupDevice(oldSpec, device.Name)
+			return validateDevice(device, oldDevice, fldPath, spec.PerDeviceNodeSelection)
 		},
 		func(device resource.Device) string {
 			return device.Name
@@ -1020,6 +1022,19 @@ func haveConsumesCounters(spec *resource.ResourceSliceSpec) bool {
 	return false
 }
 
+func lookupDevice(spec *resource.ResourceSliceSpec, deviceName string) *resource.Device {
+	if spec == nil {
+		return nil
+	}
+	for i := range spec.Devices {
+		device := &spec.Devices[i]
+		if device.Name == deviceName {
+			return device
+		}
+	}
+	return nil
+}
+
 func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if counterSet.Name == "" {
@@ -1050,7 +1065,7 @@ func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field
 	return allErrs
 }
 
-func validateDevice(device resource.Device, fldPath *field.Path, perDeviceNodeSelection *bool) field.ErrorList {
+func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath *field.Path, perDeviceNodeSelection *bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allowMultipleAllocations := device.AllowMultipleAllocations != nil && *device.AllowMultipleAllocations
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
@@ -1067,17 +1082,29 @@ func validateDevice(device resource.Device, fldPath *field.Path, perDeviceNodeSe
 		allErrs = append(allErrs, field.Invalid(fldPath, numAttributeValues, fmt.Sprintf("the total number of attribute values must not exceed %d", resource.ResourceSliceMaxAttributeValuesPerDevice)))
 	}
 
-	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
-	if allowMultipleAllocations {
-		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
-	} else {
-		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+	// If the entire set of attributes is the same as before then validation can
+	// be skipped. This ratchets the key format: a slice which already stores a
+	// key that today's validation rejects can still be updated, as long as the
+	// attributes themselves are left alone.
+	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Attributes, device.Attributes) {
+		allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
 	}
-	allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength,
-		func(taint resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
-			return validateDeviceTaint(taint, nil, fldPath)
-		},
-		fldPath.Child("taints"))...)
+	// If the entire capacity is the same as before then validation can be skipped.
+	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Capacity, device.Capacity) {
+		if allowMultipleAllocations {
+			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+		} else {
+			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+		}
+	}
+	// If the entire set is the same as before then validation can be skipped.
+	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Taints, device.Taints) {
+		allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength,
+			func(taint resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
+				return validateDeviceTaint(taint, nil, fldPath)
+			},
+			fldPath.Child("taints"))...)
+	}
 
 	allErrs = append(allErrs, validateSet(device.ConsumesCounters, resource.ResourceSliceMaxDeviceCounterConsumptionsPerDevice,
 		validateDeviceCounterConsumption,
