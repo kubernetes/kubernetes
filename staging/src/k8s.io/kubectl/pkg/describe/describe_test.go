@@ -6384,6 +6384,26 @@ func TestDescribeNode(t *testing.T) {
 				Phase: corev1.PodRunning,
 			},
 		},
+		&corev1.Pod{
+			Name:      "pod-with-limits",
+			Namespace: "foo",
+			Kind:      "Pod",
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "cpu-mem-limits",
+						Image: "image:latest",
+						Resources: corev1.ResourceRequirements{
+							Requests: getResourceList("1", "1Gi"),
+							Limits:   getResourceList("2", "2Gi"),
+						},
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		},
 		&corev1.EventList{
 			Items: []corev1.Event{
 				{
@@ -6433,8 +6453,8 @@ func TestDescribeNode(t *testing.T) {
   (Total limits may be over 100 percent, i.e., overcommitted.)
   Resource           Requests     Limits
   --------           --------     ------
-  cpu                1 (25%)      2 (50%)
-  memory             1Gi (8%)     2Gi (16%)
+  cpu                2 (50%)      2 (50%)
+  memory             2Gi (16%)    2Gi (16%)
   ephemeral-storage  0 (0%)       0 (0%)
   hugepages-1Gi      0 (0%)       0 (0%)
   hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
@@ -6585,8 +6605,8 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
   (Total limits may be over 100 percent, i.e., overcommitted.)
   Resource           Requests     Limits
   --------           --------     ------
-  cpu                2 (50%)      2 (50%)
-  memory             2Gi (16%)    2Gi (16%)
+  cpu                2 (50%)      0 (0%)
+  memory             2Gi (16%)    0 (0%)
   ephemeral-storage  0 (0%)       0 (0%)
   hugepages-1Gi      0 (0%)       0 (0%)
   hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
