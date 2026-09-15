@@ -66,6 +66,12 @@ const (
 	VolumeStatsInodesKey               = "volume_stats_inodes"
 	VolumeStatsInodesFreeKey           = "volume_stats_inodes_free"
 	VolumeStatsInodesUsedKey           = "volume_stats_inodes_used"
+	VolumeStatsPodCapacityBytesKey     = "volume_stats_pod_capacity_bytes"
+	VolumeStatsPodAvailableBytesKey    = "volume_stats_pod_available_bytes"
+	VolumeStatsPodUsedBytesKey         = "volume_stats_pod_used_bytes"
+	VolumeStatsPodInodesKey            = "volume_stats_pod_inodes"
+	VolumeStatsPodInodesFreeKey        = "volume_stats_pod_inodes_free"
+	VolumeStatsPodInodesUsedKey        = "volume_stats_pod_inodes_used"
 
 	RunningPodsKey             = "running_pods"
 	RunningContainersKey       = "running_containers"
