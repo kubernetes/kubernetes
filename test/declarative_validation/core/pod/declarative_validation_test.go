@@ -76,6 +76,36 @@ func TestDeclarativeValidate(t *testing.T) {
 					field.Invalid(field.NewPath("spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				},
 			},
+			"activeDeadlineSeconds valid": {
+				input: func() *api.Pod {
+					p := podtest.MakePod("foo")
+					deadline := int64(30)
+					p.Spec.ActiveDeadlineSeconds = &deadline
+					return p
+				}(),
+			},
+			"activeDeadlineSeconds minimum boundary violation": {
+				input: func() *api.Pod {
+					p := podtest.MakePod("foo")
+					deadline := int64(0)
+					p.Spec.ActiveDeadlineSeconds = &deadline
+					return p
+				}(),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+				},
+			},
+			"activeDeadlineSeconds maximum boundary violation": {
+				input: func() *api.Pod {
+					p := podtest.MakePod("foo")
+					deadline := int64(2147483648)
+					p.Spec.ActiveDeadlineSeconds = &deadline
+					return p
+				}(),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+				},
+			},
 		}
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
