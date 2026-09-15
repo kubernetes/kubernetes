@@ -18,6 +18,7 @@ package noderesources
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -389,6 +390,65 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 
 			if diff := cmp.Diff(test.expectedScores, gotScores); diff != "" {
 				t.Errorf("Unexpected scores (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestMostRequestedScore(t *testing.T) {
+	tests := []struct {
+		name      string
+		requested int64
+		capacity  int64
+		want      int64
+	}{
+		{
+			name:      "zero capacity",
+			requested: 10,
+			capacity:  0,
+			want:      0,
+		},
+		{
+			name:      "requested exceeds capacity is clamped",
+			requested: 2000,
+			capacity:  1000,
+			want:      fwk.MaxScore,
+		},
+		{
+			name:      "normal range",
+			requested: 250,
+			capacity:  1000,
+			want:      25,
+		},
+		{
+			name:      "requested just below the multiplication overflow threshold",
+			requested: math.MaxInt64 / fwk.MaxScore,
+			capacity:  math.MaxInt64,
+			want:      0,
+		},
+		{
+			name:      "requested above the multiplication overflow threshold",
+			requested: math.MaxInt64/fwk.MaxScore + 1,
+			capacity:  math.MaxInt64,
+			want:      1,
+		},
+		{
+			name:      "saturated requested",
+			requested: math.MaxInt64,
+			capacity:  math.MaxInt64,
+			want:      fwk.MaxScore,
+		},
+		{
+			name:      "exact utilization at the float64 boundary",
+			requested: 999999999999999999,
+			capacity:  1000000000000000000,
+			want:      99,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := mostRequestedScore(tt.requested, tt.capacity); got != tt.want {
+				t.Errorf("mostRequestedScore(%d, %d) = %d, want %d", tt.requested, tt.capacity, got, tt.want)
 			}
 		})
 	}
