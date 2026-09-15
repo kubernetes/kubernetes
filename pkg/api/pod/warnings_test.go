@@ -863,6 +863,21 @@ func TestWarnings(t *testing.T) {
 			expected: nil,
 		},
 		{
+			name: "large fractional byte resources",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceMemory: resource.MustParse("9223372036854775808.001"),
+						},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].resources.requests[memory]: fractional byte value "9223372036854775808001m" is invalid, must be an integer`,
+			},
+		},
+		{
 			name: "node labels in nodeSelector",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				NodeSelector: map[string]string{
