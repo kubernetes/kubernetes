@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -283,6 +284,96 @@ func TestSchedulerCreation(t *testing.T) {
 	}
 }
 
+// TestSchedulerCreation_StatusPatchLimiter verifies that New initializes statusPatchLimiter
+// only when async API calls are enabled and failureHandlerParallelism is positive.
+func TestSchedulerCreation_StatusPatchLimiter(t *testing.T) {
+	defaultProfileOpt := WithProfiles(
+		schedulerapi.KubeSchedulerProfile{
+			SchedulerName: "default-scheduler",
+			Plugins: &schedulerapi.Plugins{
+				QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+				Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+			},
+		},
+	)
+
+	tests := []struct {
+		name                 string
+		asyncAPICallsEnabled bool
+		opts                 []Option
+		wantCapacity         int // 0 means limiter should be nil
+	}{
+		{
+			name:                 "default parallelism with async API calls",
+			asyncAPICallsEnabled: true,
+			wantCapacity:         defaultFailureHandlerParallelism,
+		},
+		{
+			name:                 "custom positive parallelism with async API calls",
+			asyncAPICallsEnabled: true,
+			opts:                 []Option{withFailureHandlerParallelism(8)},
+			wantCapacity:         8,
+		},
+		{
+			name:                 "zero parallelism with async API calls disables limiter",
+			asyncAPICallsEnabled: true,
+			opts:                 []Option{withFailureHandlerParallelism(0)},
+			wantCapacity:         0,
+		},
+		{
+			name:                 "negative parallelism with async API calls disables limiter",
+			asyncAPICallsEnabled: true,
+			opts:                 []Option{withFailureHandlerParallelism(-1)},
+			wantCapacity:         0,
+		},
+		{
+			name:                 "async API calls disabled leaves limiter nil",
+			asyncAPICallsEnabled: false,
+			wantCapacity:         0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, tt.asyncAPICallsEnabled)
+
+			client := fake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			opts := append([]Option{defaultProfileOpt}, tt.opts...)
+			s, err := New(
+				ctx,
+				client,
+				informerFactory,
+				nil,
+				profile.NewRecorderFactory(eventBroadcaster),
+				opts...,
+			)
+			if err != nil {
+				t.Fatalf("Failed to create scheduler: %v", err)
+			}
+
+			if tt.wantCapacity == 0 {
+				if s.statusPatchLimiter != nil {
+					t.Errorf("statusPatchLimiter = %v, want nil", s.statusPatchLimiter)
+				}
+			} else {
+				if s.statusPatchLimiter == nil {
+					t.Fatalf("statusPatchLimiter = nil, want capacity %d", tt.wantCapacity)
+				}
+				if got := cap(s.statusPatchLimiter.tokens); got != tt.wantCapacity {
+					t.Errorf("statusPatchLimiter capacity = %d, want %d", got, tt.wantCapacity)
+				}
+			}
+		})
+	}
+}
+
 func TestFailureHandler(t *testing.T) {
 	metrics.Register()
 	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
@@ -440,6 +531,376 @@ func TestFailureHandler_GateQueueReentry(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed waiting for pod %s/%s to be requeued after status patch: %v", testPod.Namespace, testPod.Name, err)
 			}
+		})
+	}
+}
+
+// trackingAPICacher wraps fwk.APICacher to track concurrent status patches and hold the first
+// patch to force subsequent patches to compete for limiter slots.
+type trackingAPICacher struct {
+	fwk.APICacher
+	mu                    sync.Mutex
+	inFlight, maxInFlight int
+	total                 int
+	firstPatchStarted     chan struct{}
+	releaseFirstPatch     chan struct{}
+}
+
+func (c *trackingAPICacher) PatchPodStatus(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
+	c.mu.Lock()
+	c.inFlight++
+	c.total++
+	c.maxInFlight = max(c.maxInFlight, c.inFlight)
+	// total only ever grows under mu, so exactly one caller sees 1.
+	first := c.total == 1
+	c.mu.Unlock()
+
+	// Hold the first patch in-flight so subsequent pods are forced to wait on the limiter.
+	if first {
+		close(c.firstPatchStarted)
+		<-c.releaseFirstPatch
+	}
+
+	return c.APICacher.PatchPodStatus(pod, conditions, nominatingInfo)
+}
+
+func (c *trackingAPICacher) WaitOnFinish(ctx context.Context, onFinish <-chan error) error {
+	defer func() {
+		c.mu.Lock()
+		c.inFlight--
+		c.mu.Unlock()
+	}()
+	return c.APICacher.WaitOnFinish(ctx, onFinish)
+}
+
+// TestFailureHandler_StatusPatchLimiterCapsDispatch verifies that the failure handler never has
+// more status patches in flight than the limiter allows, on both the requeueing and the
+// discarding failure path, and that no pod is dropped as a result.
+func TestFailureHandler_StatusPatchLimiterCapsDispatch(t *testing.T) {
+	const (
+		limit   = 1
+		numPods = 4
+	)
+
+	tests := []struct {
+		name string
+		// discard omits the pods from the client, and therefore from the informer cache,
+		// which routes them to finishFailureWithoutRequeue instead of finishFailureWithRequeue.
+		discard bool
+	}{
+		{name: "pods are requeued"},
+		{name: "pods are discarded", discard: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			var (
+				pods  []*v1.Pod
+				items []v1.Pod
+			)
+			for i := range numPods {
+				name := fmt.Sprintf("test-pod-limited-%d", i)
+				pod := st.MakePod().Name(name).UID(name).Namespace(v1.NamespaceDefault).Obj()
+				pods = append(pods, pod)
+				if !tt.discard {
+					items = append(items, *pod)
+				}
+			}
+
+			client := fake.NewClientset(&v1.PodList{Items: items})
+			h := newFailureHandlerHarness(ctx, t, client, true)
+			h.scheduler.statusPatchLimiter = newStatusPatchLimiter(limit)
+
+			cacher := &trackingAPICacher{
+				firstPatchStarted: make(chan struct{}),
+				APICacher:         h.framework.APICacher(),
+				releaseFirstPatch: make(chan struct{}),
+			}
+			h.framework.SetAPICacher(cacher)
+
+			for i, pod := range pods {
+				h.popPod(ctx, t, pod)
+				podInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, pod)}
+				h.scheduler.FailureHandler(ctx, h.framework, podInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("simulated failure")), nil, time.Now())
+
+				if i == 0 {
+					// Ensure the first patch has entered the APICacher and is holding its slot
+					// before dispatching the remaining pods.
+					select {
+					case <-cacher.firstPatchStarted:
+					case <-time.After(wait.ForeverTestTimeout):
+						t.Fatal("Timed out waiting for first status patch to start")
+					}
+				}
+			}
+
+			// Release the first patch now that all other pods have been handed to the failure handler.
+			close(cacher.releaseFirstPatch)
+
+			// Throttling must delay the patches, not drop them.
+			err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+				if tt.discard {
+					// Discarded pods never come back to the queue, so the patches are all we can wait for.
+					cacher.mu.Lock()
+					defer cacher.mu.Unlock()
+					return cacher.total == numPods && cacher.inFlight == 0, nil
+				}
+				for _, pod := range pods {
+					if getPodFromPriorityQueue(h.queue, pod) == nil || podListContainsPod(h.queue.InFlightPods(), pod) {
+						return false, nil
+					}
+				}
+				return true, nil
+			})
+			if err != nil {
+				t.Fatalf("Failed waiting for all %d pods to be handled: %v", numPods, err)
+			}
+
+			cacher.mu.Lock()
+			defer cacher.mu.Unlock()
+			if cacher.maxInFlight > limit {
+				t.Errorf("Observed %d concurrent status patches, want at most %d", cacher.maxInFlight, limit)
+			}
+			if cacher.maxInFlight == 0 {
+				t.Error("No status patch was observed, so the limit was not actually exercised")
+			}
+		})
+	}
+}
+
+// TestFailureHandler_StatusPatchLimiterAdmission verifies which failure patches must wait for a
+// saturated statusPatchLimiter and which bypass it: preemption nominations, synchronous pod-group
+// members and no-op patches go straight through, while clearing a nomination waits its turn.
+func TestFailureHandler_StatusPatchLimiterAdmission(t *testing.T) {
+	// Matches the condition FailureHandler builds for the simulated failure below, so patching
+	// it again changes nothing.
+	alreadyUnschedulable := st.MakePod().Name("repeat").UID("repeat").Namespace(v1.NamespaceDefault).Obj()
+	alreadyUnschedulable.Status.Conditions = []v1.PodCondition{{
+		Type:    v1.PodScheduled,
+		Status:  v1.ConditionFalse,
+		Reason:  v1.PodReasonUnschedulable,
+		Message: "simulated failure",
+	}}
+
+	tests := []struct {
+		name                   string
+		targetPod              *v1.Pod
+		nominatingInfo         *fwk.NominatingInfo
+		genericWorkloadEnabled bool
+		wantThrottled          bool
+	}{
+		{
+			name:      "preemption nomination bypasses limiter",
+			targetPod: st.MakePod().Name("preemptor").UID("preemptor").Namespace(v1.NamespaceDefault).Obj(),
+			nominatingInfo: &fwk.NominatingInfo{
+				NominatingMode:    fwk.ModeOverride,
+				NominatedNodeName: "node-1",
+			},
+		},
+		{
+			name: "pod group member bypasses limiter",
+			targetPod: st.MakePod().Name("member").UID("member").Namespace(v1.NamespaceDefault).
+				PodGroupName("pg").Obj(),
+			nominatingInfo:         clearNominatedNode,
+			genericWorkloadEnabled: true,
+		},
+		{
+			name:           "no-op patch bypasses limiter",
+			targetPod:      alreadyUnschedulable,
+			nominatingInfo: clearNominatedNode,
+		},
+		{
+			name:           "clearing a nomination waits for the limiter",
+			targetPod:      st.MakePod().Name("cleared").UID("cleared").Namespace(v1.NamespaceDefault).Obj(),
+			nominatingInfo: clearNominatedNode,
+			wantThrottled:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			initThrottledPatchesMetricForTest()
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			blocker := st.MakePod().Name("blocker").UID("blocker").Namespace(v1.NamespaceDefault).Obj()
+			client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*blocker, *tt.targetPod}})
+			h := newFailureHandlerHarness(ctx, t, client, true)
+			h.scheduler.genericWorkloadEnabled = tt.genericWorkloadEnabled
+			// A single slot, so anything subject to the limiter is stuck behind the blocker.
+			h.scheduler.statusPatchLimiter = newStatusPatchLimiter(1)
+
+			cacher := &trackingAPICacher{
+				firstPatchStarted: make(chan struct{}),
+				releaseFirstPatch: make(chan struct{}),
+				APICacher:         h.framework.APICacher(),
+			}
+			h.framework.SetAPICacher(cacher)
+			releaseBlocker := sync.OnceFunc(func() { close(cacher.releaseFirstPatch) })
+			// Unblock on the way out so the blocker's dispatcher goroutine is not leaked.
+			defer releaseBlocker()
+
+			dispatched := func() int {
+				cacher.mu.Lock()
+				defer cacher.mu.Unlock()
+				return cacher.total
+			}
+			waitForDispatched := func(want int) {
+				t.Helper()
+				err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+					return dispatched() == want, nil
+				})
+				if err != nil {
+					t.Fatalf("Expected %d status patches to be dispatched, got %d", want, dispatched())
+				}
+			}
+
+			// The blocker takes the only slot and holds it inside the API cacher.
+			h.popPod(ctx, t, blocker)
+			h.scheduler.FailureHandler(ctx, h.framework, &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, blocker)},
+				fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("simulated failure")), clearNominatedNode, time.Now())
+			select {
+			case <-cacher.firstPatchStarted:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatal("Timed out waiting for the blocking status patch to start")
+			}
+			assertLimiterAtCapacity(t, h.scheduler.statusPatchLimiter)
+
+			// FailureHandler itself must never block on the limiter; only the patch may wait.
+			h.popPod(ctx, t, tt.targetPod)
+			done := make(chan struct{})
+			go func() {
+				h.scheduler.FailureHandler(ctx, h.framework, &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, tt.targetPod)},
+					fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("simulated failure")), tt.nominatingInfo, time.Now())
+				close(done)
+			}()
+			select {
+			case <-done:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatal("FailureHandler blocked on a saturated statusPatchLimiter")
+			}
+
+			if !tt.wantThrottled {
+				waitForDispatched(2)
+				assertThrottledPatchesMetric(t, 0)
+				return
+			}
+
+			// The throttled metric rises once the patch is parked in acquire, which is the
+			// point to check that it hasn't been dispatched.
+			err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+				got, err := testutil.GetGaugeMetricValue(metrics.FailureHandlerThrottledPatches)
+				return got == 1, err
+			})
+			if err != nil {
+				t.Fatalf("Status patch never waited on the saturated limiter: %v", err)
+			}
+			if got := dispatched(); got != 1 {
+				t.Fatalf("Status patch was dispatched while the limiter was saturated: %d dispatched, want 1", got)
+			}
+			releaseBlocker()
+			waitForDispatched(2)
+		})
+	}
+}
+
+// fakeStatusPatchCacher completes status patches immediately with a configurable outcome and
+// records whether a patch was dispatched and how many limiter slots were held at that point.
+type fakeStatusPatchCacher struct {
+	fwk.APICacher
+	limiter        *statusPatchLimiter
+	dispatchErr    error
+	patchErr       error
+	dispatched     bool
+	heldAtDispatch int
+}
+
+func (c *fakeStatusPatchCacher) PatchPodStatus(*v1.Pod, []*v1.PodCondition, *fwk.NominatingInfo) (<-chan error, error) {
+	c.dispatched = true
+	c.heldAtDispatch = len(c.limiter.tokens)
+	if c.dispatchErr != nil {
+		return nil, c.dispatchErr
+	}
+	onFinish := make(chan error, 1)
+	onFinish <- c.patchErr
+	return onFinish, nil
+}
+
+func (c *fakeStatusPatchCacher) WaitOnFinish(_ context.Context, onFinish <-chan error) error {
+	return <-onFinish
+}
+
+// TestPatchPodStatusLimited verifies that a patch holds a limiter slot while it is dispatched and
+// returns it however the patch ends, so failed patches cannot shrink the limiter's capacity, and
+// that a patch still waiting for a slot at shutdown is dropped without taking or releasing one.
+func TestPatchPodStatusLimited(t *testing.T) {
+	tests := []struct {
+		name        string
+		dispatchErr error
+		patchErr    error
+		// stopWhileWaiting fills the limiter and stops the scheduler once the patch waits for a slot.
+		stopWhileWaiting bool
+		wantDispatched   bool
+		// wantHeld is the number of limiter slots held once patchPodStatusLimited returns.
+		wantHeld int
+	}{
+		{name: "patch succeeds", wantDispatched: true},
+		{name: "dispatch fails", dispatchErr: errors.New("dispatch failed"), wantDispatched: true},
+		{name: "patch fails", patchErr: errors.New("patch failed"), wantDispatched: true},
+		// Only the slot of the other patch remains.
+		{name: "scheduler stops while waiting for a slot", stopWhileWaiting: true, wantHeld: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			initThrottledPatchesMetricForTest()
+			synctest.Test(t, func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				stopCh := make(chan struct{})
+				sched := &Scheduler{
+					statusPatchLimiter: newStatusPatchLimiter(1),
+					StopEverything:     stopCh,
+				}
+				cacher := &fakeStatusPatchCacher{
+					limiter:     sched.statusPatchLimiter,
+					dispatchErr: tt.dispatchErr,
+					patchErr:    tt.patchErr,
+				}
+				pod := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Obj()
+				condition := &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse, Reason: v1.PodReasonUnschedulable, Message: "simulated failure"}
+
+				if tt.stopWhileWaiting {
+					// Another patch holds the only slot.
+					sched.statusPatchLimiter.acquire(nil)
+				}
+				done := make(chan struct{})
+				go func() {
+					sched.patchPodStatusLimited(ctx, cacher, pod, condition, clearNominatedNode)
+					close(done)
+				}()
+				if tt.stopWhileWaiting {
+					synctest.Wait()
+					assertThrottledPatchesMetric(t, 1)
+					close(stopCh)
+				}
+				<-done
+
+				if cacher.dispatched != tt.wantDispatched {
+					t.Fatalf("Patch dispatched = %v, want %v", cacher.dispatched, tt.wantDispatched)
+				}
+				if tt.wantDispatched && cacher.heldAtDispatch != 1 {
+					t.Errorf("Patch was dispatched holding %d limiter slots, want 1", cacher.heldAtDispatch)
+				}
+				if held := len(sched.statusPatchLimiter.tokens); held != tt.wantHeld {
+					t.Errorf("Limiter holds %d slot(s) after the patch ended, want %d", held, tt.wantHeld)
+				}
+				assertThrottledPatchesMetric(t, 0)
+			})
 		})
 	}
 }

@@ -6516,6 +6516,15 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: failure_handler_throttled_status_patches
+  subsystem: scheduler
+  help: Number of failure handler status patches waiting for a slot in the concurrency
+    limiter.
+  type: Gauge
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: generated_placements_total
   subsystem: scheduler
   help: Number of candidate placements generated when scheduling pod groups, by scheduler

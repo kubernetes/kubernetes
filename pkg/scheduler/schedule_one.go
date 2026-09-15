@@ -38,6 +38,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -885,27 +886,23 @@ func (sched *Scheduler) finishFailureWithRequeue(ctx context.Context, podFwk fra
 		return
 	}
 
-	onFinish, err := dispatchPodStatusPatch(apiCacher, pod, podCondition, nominatingInfo)
-	if err != nil {
-		utilruntime.HandleErrorWithLogger(logger, err, "Error dispatching pod status patch", "pod", klog.KObj(pod))
-		sched.requeue(logger, podInfo)
-		return
-	}
-
 	// Pod group members must wait and requeue synchronously because AddAttemptedPodGroupIfNeeded
 	// runs immediately after FailureHandler on the scheduling goroutine and drains pendingPodGroupPods;
 	// requeuing in a background goroutine would race with AddAttemptedPodGroupIfNeeded, leaving
-	// pendingPodGroupPods empty or incomplete.
+	// pendingPodGroupPods empty or incomplete. Unlike the path below, this blocks the caller's
+	// goroutine until the patch completes, so it already allows at most one patch in flight and
+	// does not go through statusPatchLimiter.
 	// TODO: implement async gate for pod groups.
 	if isPodGroupMember {
-		waitForPodStatusPatch(ctx, apiCacher, pod, onFinish)
+		dispatchAndWaitForPodStatusPatch(ctx, apiCacher, pod, podCondition, nominatingInfo)
 		sched.requeue(logger, podInfo)
 		return
 	}
 
+	// The patch and the requeue that follows it outlive the scheduling cycle.
 	detachedCtx := context.WithoutCancel(ctx)
 	go func() {
-		waitForPodStatusPatch(detachedCtx, apiCacher, pod, onFinish)
+		sched.patchPodStatusLimited(detachedCtx, apiCacher, pod, podCondition, nominatingInfo)
 		sched.requeue(logger, podInfo)
 	}()
 }
@@ -920,16 +917,18 @@ func (sched *Scheduler) finishFailureWithoutRequeue(ctx context.Context, podFwk 
 	logger := klog.FromContext(ctx)
 	sched.recordFailure(logger, podFwk, podInfo, nominatingInfo, podCondition)
 
-	// Discarded pods do not re-enter the scheduling queue, so waiting for patch completion is unnecessary.
-	// Dispatch asynchronously when available to avoid blocking, falling back to synchronous patch otherwise.
-	var updateErr error
+	// The pod is not requeued, so nothing needs to wait for this patch. It still goes
+	// through the limiter because it spends client rate limiter tokens like any other
+	// patch; the goroutine keeps the scheduling cycle from blocking on a free slot.
 	if apiCacher := podFwk.APICacher(); apiCacher != nil {
-		_, updateErr = dispatchPodStatusPatch(apiCacher, pod, podCondition, nominatingInfo)
-	} else {
-		updateErr = patchPodStatusSync(ctx, sched.client, pod, podCondition, nominatingInfo)
+		// The patch outlives the scheduling cycle.
+		detachedCtx := context.WithoutCancel(ctx)
+		go sched.patchPodStatusLimited(detachedCtx, apiCacher, pod, podCondition, nominatingInfo)
+		return
 	}
-	if updateErr != nil {
-		utilruntime.HandleErrorWithLogger(logger, updateErr, "Error updating pod", "pod", klog.KObj(pod))
+
+	if err := patchPodStatusSync(ctx, sched.client, pod, podCondition, nominatingInfo); err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Error updating pod", "pod", klog.KObj(pod))
 	}
 }
 
@@ -958,6 +957,44 @@ func waitForPodStatusPatch(ctx context.Context, apiCacher fwk.APICacher, pod *v1
 	if err := apiCacher.WaitOnFinish(ctx, onFinish); err != nil {
 		klog.FromContext(ctx).V(4).Info("Pod status patch failed", "pod", klog.KObj(pod), "err", err)
 	}
+}
+
+// dispatchAndWaitForPodStatusPatch enqueues a status patch to the API cacher and waits for it to complete.
+func dispatchAndWaitForPodStatusPatch(ctx context.Context, apiCacher fwk.APICacher, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) {
+	onFinish, err := dispatchPodStatusPatch(apiCacher, pod, condition, nominatingInfo)
+	if err != nil {
+		utilruntime.HandleErrorWithContext(ctx, err, "Error dispatching pod status patch", "pod", klog.KObj(pod))
+		return
+	}
+	waitForPodStatusPatch(ctx, apiCacher, pod, onFinish)
+}
+
+// patchPodStatusLimited dispatches a failure-handler status patch under the limiter and
+// blocks until it completes.
+//
+// We gate before dispatching to prevent lower-priority pod status updates from starving
+// binding API calls. Two kinds of patches bypass the limiter:
+//   - Nominations, so preempting pods record their nominated node without waiting behind
+//     failure patches. Clearing a nomination does not count.
+//   - No-ops, e.g. a pod failing again with the same message. The dispatcher drops them at
+//     enqueue without an API request, so they would hold a slot for nothing. If a call for
+//     the same pod is already in flight the dispatcher keeps the no-op instead, and it then
+//     runs unthrottled; that is at most one extra call per pod.
+func (sched *Scheduler) patchPodStatusLimited(ctx context.Context, apiCacher fwk.APICacher, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) {
+	var conditions []*v1.PodCondition
+	if condition != nil {
+		conditions = []*v1.PodCondition{condition}
+	}
+	isNomination := nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != ""
+	if !isNomination && !apicalls.Implementations.PodStatusPatch(pod, conditions, nominatingInfo).IsNoOp() {
+		if !sched.statusPatchLimiter.acquire(sched.StopEverything) {
+			// Shutting down.
+			return
+		}
+		defer sched.statusPatchLimiter.release()
+	}
+
+	dispatchAndWaitForPodStatusPatch(ctx, apiCacher, pod, condition, nominatingInfo)
 }
 
 // patchPodStatusSync patches the pod status and nominated node name synchronously via the API client.
