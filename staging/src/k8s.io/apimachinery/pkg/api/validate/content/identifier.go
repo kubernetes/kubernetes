@@ -33,3 +33,10 @@ func IsCIdentifier(value string) []string {
 	}
 	return nil
 }
+
+func IsConditionReason(value string) []string {
+	if !cIdentifierRegexp.MatchString(value) {
+		return []string{RegexError(identifierErrMsg, cIdentifierFmt, "my_name", "MY_NAME", "MyName")}
+	}
+	return nil
+}
