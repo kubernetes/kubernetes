@@ -95,10 +95,11 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
-	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
+	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm.
+	// This is a config check that warns users about deprecated feature gates before the upgrade proceeds.
 	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, initCfg.FeatureGates); len(msg) > 0 {
 		for _, m := range msg {
-			printer.Printf("[upgrade/config] %s\n", m)
+			printer.Printf("[upgrade/config] WARNING: %s\n", m)
 		}
 	}
 

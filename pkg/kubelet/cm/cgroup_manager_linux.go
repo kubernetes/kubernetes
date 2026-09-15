@@ -222,6 +222,7 @@ func (m *cgroupCommon) libctCgroupConfig(logger klog.Logger, in *CgroupConfig, n
 	// and split it appropriately, using essentially the logic below.
 	// This was done for cgroupfs in opencontainers/runc#497 but a counterpart
 	// for systemd was never introduced.
+	// See https://github.com/kubernetes/kubernetes/issues/115490 for tracking.
 	dir, base := path.Split(in.Name.ToSystemd())
 	if dir == "/" {
 		dir = "-.slice"
