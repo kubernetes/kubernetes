@@ -2595,7 +2595,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
 			if cStatus.State == kubecontainer.ContainerStateRunning {
 				if oldStatus, ok := oldStatuses[status.Name]; ok && oldStatus.Started != nil {
-					status.Started = oldStatus.Started
+					// A kubelet restart loses in-memory probe results, so preserve Started
+					// for the same container. A replacement must pass its own startup probe.
+					// See https://github.com/kubernetes/kubernetes/issues/141155
+					if oldStatus.ContainerID == status.ContainerID {
+						status.Started = oldStatus.Started
+					}
 				}
 			}
 		}
