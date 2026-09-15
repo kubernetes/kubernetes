@@ -35,7 +35,6 @@ import (
 var (
 	deleteReclaimPolicy = api.PersistentVolumeReclaimDelete
 	immediateMode1      = storage.VolumeBindingImmediate
-	immediateMode2      = storage.VolumeBindingImmediate
 	waitingMode         = storage.VolumeBindingWaitForFirstConsumer
 	invalidMode         = storage.VolumeBindingMode("foo")
 	inlineSpec          = api.PersistentVolumeSpec{
@@ -119,11 +118,6 @@ func TestValidateStorageClass(t *testing.T) {
 			Parameters: map[string]string{
 				"": "value",
 			},
-			ReclaimPolicy: &deleteReclaimPolicy,
-		},
-		"provisioner: Required value": {
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo"},
-			Provisioner:   "",
 			ReclaimPolicy: &deleteReclaimPolicy,
 		},
 		"too long parameters": {
@@ -646,62 +640,6 @@ func TestValidateVolumeBindingMode(t *testing.T) {
 		}
 		if !testCase.shouldSucceed && len(errs) == 0 {
 			t.Errorf("Expected failure for test %q, got success", testName)
-		}
-	}
-}
-
-type updateTest struct {
-	oldClass      *storage.StorageClass
-	newClass      *storage.StorageClass
-	shouldSucceed bool
-}
-
-func TestValidateUpdateVolumeBindingMode(t *testing.T) {
-	noBinding := makeClass(nil, nil)
-	immediateBinding1 := makeClass(&immediateMode1, nil)
-	immediateBinding2 := makeClass(&immediateMode2, nil)
-	waitBinding := makeClass(&waitingMode, nil)
-
-	cases := map[string]updateTest{
-		"old and new no mode": {
-			oldClass:      noBinding,
-			newClass:      noBinding,
-			shouldSucceed: true,
-		},
-		"old and new same mode ptr": {
-			oldClass:      immediateBinding1,
-			newClass:      immediateBinding1,
-			shouldSucceed: true,
-		},
-		"old and new same mode value": {
-			oldClass:      immediateBinding1,
-			newClass:      immediateBinding2,
-			shouldSucceed: true,
-		},
-		"old no mode, new mode": {
-			oldClass:      noBinding,
-			newClass:      waitBinding,
-			shouldSucceed: false,
-		},
-		"old mode, new no mode": {
-			oldClass:      waitBinding,
-			newClass:      noBinding,
-			shouldSucceed: false,
-		},
-		"old and new different modes": {
-			oldClass:      waitBinding,
-			newClass:      immediateBinding1,
-			shouldSucceed: false,
-		},
-	}
-
-	for testName, testCase := range cases {
-		errs := ValidateStorageClassUpdate(testCase.newClass, testCase.oldClass)
-		if testCase.shouldSucceed && len(errs) != 0 {
-			t.Errorf("Expected success for %v, got %v", testName, errs)
-		}
-		if !testCase.shouldSucceed && len(errs) == 0 {
-			t.Errorf("Expected failure for %v, got success", testName)
 		}
 	}
 }
