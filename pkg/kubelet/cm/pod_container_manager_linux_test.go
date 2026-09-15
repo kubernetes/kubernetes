@@ -295,3 +295,52 @@ func TestGetPodContainerName(t *testing.T) {
 		})
 	}
 }
+
+func TestPodRequestsWritableCgroups(t *testing.T) {
+	writable := v1.CgroupMountModeWritable
+	readOnly := v1.CgroupMountModeReadOnly
+	scWith := func(mode *v1.CgroupMountMode) *v1.SecurityContext {
+		return &v1.SecurityContext{CgroupOptions: &v1.CgroupOptions{MountMode: mode}}
+	}
+
+	tests := []struct {
+		name string
+		pod  *v1.Pod
+		want bool
+	}{
+		{
+			name: "no security context",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c"}}}},
+			want: false,
+		},
+		{
+			name: "read-only mount mode",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c", SecurityContext: scWith(&readOnly)}}}},
+			want: false,
+		},
+		{
+			name: "writable on a container",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c", SecurityContext: scWith(&writable)}}}},
+			want: true,
+		},
+		{
+			name: "writable on an init container",
+			pod:  &v1.Pod{Spec: v1.PodSpec{InitContainers: []v1.Container{{Name: "i", SecurityContext: scWith(&writable)}}}},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, podRequestsWritableCgroups(tt.pod))
+		})
+	}
+}
+
+func TestApplyPodLevelCgroupLimits(t *testing.T) {
+	m := &podContainerManagerImpl{}
+	rc := &ResourceConfig{}
+	m.applyPodLevelCgroupLimits(rc)
+	require.Equal(t, defaultWritableCgroupMaxDescendants, rc.Unified[Cgroup2MaxDescendants])
+	require.Equal(t, defaultWritableCgroupMaxDepth, rc.Unified[Cgroup2MaxDepth])
+}

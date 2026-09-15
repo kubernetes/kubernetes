@@ -121,6 +121,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: CgroupOptions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: ChangeContainerStatusOnKubeletRestart
   versionedSpecs:
   - default: true

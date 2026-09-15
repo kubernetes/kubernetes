@@ -636,6 +636,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.CephFSPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CephFSVolumeSource"):
 		return &applyconfigurationscorev1.CephFSVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("CgroupOptions"):
+		return &applyconfigurationscorev1.CgroupOptionsApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderPersistentVolumeSource"):
 		return &applyconfigurationscorev1.CinderPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderVolumeSource"):

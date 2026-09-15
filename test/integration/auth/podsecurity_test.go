@@ -101,6 +101,9 @@ func TestPodSecurityWebhook(t *testing.T) {
 		"--allow-privileged=true",
 		// The webhook should pass tests even when PodSecurity is disabled.
 		"--disable-admission-plugins=PodSecurity",
+		// Enable CgroupOptions so its (alpha) securityContext.cgroupOptions field is
+		// retained rather than dropped, allowing the restricted check's failure cases to run.
+		"--feature-gates=CgroupOptions=true",
 	}, framework.SharedEtcd())
 	t.Cleanup(testServer.TearDownFn)
 
@@ -136,6 +139,9 @@ func startPodSecurityServer(t *testing.T) *kubeapiservertesting.TestServer {
 		"--anonymous-auth=false",
 		"--enable-admission-plugins=PodSecurity",
 		"--allow-privileged=true",
+		// Enable CgroupOptions so its (alpha) securityContext.cgroupOptions field is
+		// retained rather than dropped, allowing the restricted check's failure cases to run.
+		"--feature-gates=CgroupOptions=true",
 		// TODO: "--admission-control-config-file=" + admissionConfigFile.Name(),
 	}, framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)

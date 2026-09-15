@@ -103,6 +103,16 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
 			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
+		// When a pod opts into writable cgroups, bound the number and depth of
+		// descendant cgroups its containers may create by setting conservative
+		// defaults on the Pod-level cgroup. This is enforced by the kubelet (not the
+		// CRI) and applies to the whole Pod cgroup subtree. See KEP-5474.
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CgroupOptions) &&
+			libcontainercgroups.IsCgroup2UnifiedMode() &&
+			podRequestsWritableCgroups(pod) {
+			m.applyPodLevelCgroupLimits(containerConfig.ResourceParameters)
+			logger.V(4).Info("Writable cgroups: set Pod-level descendant limits", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
+		}
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
@@ -118,6 +128,56 @@ func (m *podContainerManagerImpl) applyPodLevelMemoryHigh(pod *v1.Pod, rc *Resou
 	if m.memoryThrottlingFactor != nil {
 		ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
 	}
+}
+
+const (
+	// defaultWritableCgroupMaxDescendants bounds the number of descendant cgroups that a
+	// pod opting into writable cgroups may create, applied on the Pod-level cgroup.
+	// Conservative alpha default (order of hundreds); exact value TBD during implementation.
+	defaultWritableCgroupMaxDescendants = "500"
+	// defaultWritableCgroupMaxDepth bounds the depth of the descendant cgroup tree that a
+	// pod opting into writable cgroups may create, applied on the Pod-level cgroup.
+	// Conservative alpha default (order of tens); exact value TBD during implementation.
+	defaultWritableCgroupMaxDepth = "50"
+)
+
+// applyPodLevelCgroupLimits sets conservative cgroup.max.descendants and cgroup.max.depth
+// defaults on the Pod-level cgroup (cgroup v2 unified params) to bound descendant cgroup
+// creation by containers with writable cgroups.
+func (m *podContainerManagerImpl) applyPodLevelCgroupLimits(rc *ResourceConfig) {
+	if rc.Unified == nil {
+		rc.Unified = map[string]string{}
+	}
+	rc.Unified[Cgroup2MaxDescendants] = defaultWritableCgroupMaxDescendants
+	rc.Unified[Cgroup2MaxDepth] = defaultWritableCgroupMaxDepth
+}
+
+// containerRequestsWritableCgroups reports whether a container opts into writable
+// cgroups via securityContext.cgroupOptions.mountMode=Writable.
+func containerRequestsWritableCgroups(sc *v1.SecurityContext) bool {
+	return sc != nil && sc.CgroupOptions != nil && sc.CgroupOptions.MountMode != nil &&
+		*sc.CgroupOptions.MountMode == v1.CgroupMountModeWritable
+}
+
+// podRequestsWritableCgroups reports whether any container in the pod opts into
+// writable cgroups via securityContext.cgroupOptions.mountMode=Writable.
+func podRequestsWritableCgroups(pod *v1.Pod) bool {
+	for i := range pod.Spec.Containers {
+		if containerRequestsWritableCgroups(pod.Spec.Containers[i].SecurityContext) {
+			return true
+		}
+	}
+	for i := range pod.Spec.InitContainers {
+		if containerRequestsWritableCgroups(pod.Spec.InitContainers[i].SecurityContext) {
+			return true
+		}
+	}
+	for i := range pod.Spec.EphemeralContainers {
+		if containerRequestsWritableCgroups(pod.Spec.EphemeralContainers[i].SecurityContext) {
+			return true
+		}
+	}
+	return false
 }
 
 // GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.
