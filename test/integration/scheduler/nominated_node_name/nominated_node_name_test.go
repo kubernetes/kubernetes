@@ -18,12 +18,16 @@ package nominatednodename
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -203,49 +207,114 @@ func TestNominatedNodeNameIsSetBeforePreBindAndWaitOnPermit(t *testing.T) {
 	}
 }
 
+type createPods struct {
+	pods []*v1.Pod
+	// nominatedNodeName to be set on each pod (same for all pods).
+	nominatedNodeName string
+}
+
+type createPodGroup struct {
+	podGroup *schedulingv1beta1.PodGroup
+}
+
+type createCompositePodGroup struct {
+	compositePodGroup *schedulingv1alpha3.CompositePodGroup
+}
+
+type schedulePod struct {
+	podName string
+}
+
+type schedulePodGroup struct {
+	podGroupName string
+	podNames     []string
+}
+
+type verifyPodsScheduled struct {
+	podNames              []string
+	expectedScheduledNode string
+	validateNNNCleared    bool
+}
+
+type verifyPodsUnschedulable struct {
+	podNames []string
+}
+
+type checkNNN struct {
+	podNames    []string
+	expectedNNN string
+}
+
+type scenario struct {
+	// name is this step's name, just for the debugging purpose.
+	name string
+
+	// Only one of the following actions should be set.
+
+	// createPods creates Pods.
+	createPods *createPods
+	// createPodGroup creates a PodGroup.
+	createPodGroup *createPodGroup
+	// createCompositePodGroup creates a CompositePodGroup.
+	createCompositePodGroup *createCompositePodGroup
+	// createNode creates a Node.
+	createNode *v1.Node
+	// schedulePod schedules one Pod that is at the top of the activeQ.
+	// You should give a Pod name that is supposed to be scheduled.
+	schedulePod *schedulePod
+	// schedulePodGroup schedules one PodGroup or CompositePodGroup that is at the top of the activeQ.
+	schedulePodGroup *schedulePodGroup
+	// verifyPodsScheduled verifies that the given Pods are scheduled on the expected node.
+	verifyPodsScheduled *verifyPodsScheduled
+	// verifyPodsUnschedulable verifies that the given Pods are in the unschedulable pod pool.
+	verifyPodsUnschedulable *verifyPodsUnschedulable
+	// completePreemption completes the preemption that is currently on-going.
+	// completePreemption waits until Pod or PodGroup completed preemption. It is no-op when AsyncPreemption is disabled.
+	// You should give a Pod or PodGroup/CompositePodGroup name.
+	completePreemption string
+	// checkNNN checks that NominatedNodeName is set as expected.
+	checkNNN *checkNNN
+}
+
+func makeNode(name, cpu string) *v1.Node {
+	return st.MakeNode().Name(name).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: cpu, v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj()
+}
+
+func makePod(name string, priority int32, cpu string) *v1.Pod {
+	return st.MakePod().Name(name).Req(map[v1.ResourceName]string{v1.ResourceCPU: cpu}).Container("image").ZeroTerminationGracePeriod().Priority(priority).Obj()
+}
+
+func makeScheduledPod(name, node string, priority int32, cpu string) *v1.Pod {
+	return st.MakePod().Name(name).Node(node).Req(map[v1.ResourceName]string{v1.ResourceCPU: cpu}).Container("image").ZeroTerminationGracePeriod().Priority(priority).Obj()
+}
+
+func makePodGroupPod(name, podgroupName string, priority int32, cpu string) *v1.Pod {
+	return st.MakePod().Name(name).PodGroupName(podgroupName).Req(map[v1.ResourceName]string{v1.ResourceCPU: cpu}).Container("image").ZeroTerminationGracePeriod().Priority(priority).Obj()
+}
+
+func makeGangPodGroup(name string, priority, minCount int32) *schedulingv1beta1.PodGroup {
+	return st.MakePodGroup().Name(name).Priority(priority).MinCount(minCount).Obj()
+}
+
+func makeBasicPodGroup(name string, priority int32) *schedulingv1beta1.PodGroup {
+	return st.MakePodGroup().Name(name).Priority(priority).BasicPolicy().Obj()
+}
+
+func makeCompositePodGroup(name string, priority int32) *schedulingv1alpha3.CompositePodGroup {
+	return st.MakeCompositePodGroup().Name(name).Priority(priority).BasicPolicy().WorkloadRef("wl1", "t1").Obj()
+}
+
+func makeChildGangPodGroup(name, parentCPGName string, priority, minCount int32) *schedulingv1beta1.PodGroup {
+	return st.MakePodGroup().Name(name).Priority(priority).MinCount(minCount).ParentCompositePodGroup(parentCPGName).WorkloadRef("wl1", "t1").Obj()
+}
+
+const (
+	lowPriority  = 1
+	highPriority = 100
+)
+
 // TestPreemptionAndNominatedNodeNameScenarios tests setting/clearing NominatedNodeName in scenarios with preemption.
 func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
-	type createPod struct {
-		pod               *v1.Pod
-		nominatedNodeName string
-		// count is the number of times the pod should be created by this action.
-		// i.e., if you use it, you have to use GenerateName.
-		// By default, it's 1.
-		count *int
-	}
-
-	type schedulePod struct {
-		podName               string
-		expectSuccess         bool
-		expectUnschedulable   bool
-		expectedScheduledNode string
-	}
-
-	type checkNNN struct {
-		podName     string
-		expectedNNN string
-	}
-
-	type scenario struct {
-		// name is this step's name, just for the debugging purpose.
-		name string
-
-		// Only one of the following actions should be set.
-
-		// createPod creates a Pod.
-		createPod *createPod
-		// createNode creates an additional Node.
-		createNode string
-		// schedulePod schedules one Pod that is at the top of the activeQ.
-		// You should give a Pod name that is supposed to be scheduled.
-		schedulePod *schedulePod
-		// completePreemption completes the preemption that is currently on-going.
-		// You should give a Pod name.
-		completePreemption string
-		// checkNNN checks that NominatedNodeName is set as expected.
-		checkNNN *checkNNN
-	}
-
 	tests := []struct {
 		name string
 		// scenarios after the first attempt of scheduling the pod.
@@ -255,28 +324,41 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 			name: "basic preemption sets NominatedNodeName",
 			scenarios: []scenario{
 				{
+					name:       "create node",
+					createNode: makeNode("node", "4"),
+				},
+				{
 					name: "create scheduled Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("victim").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makeScheduledPod("victim", "node", lowPriority, "4"),
+						},
 					},
 				},
 				{
 					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).Obj(),
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePod("preemptor", highPriority, "2"),
+						},
 					},
 				},
 				{
 					name: "schedule the preemptor Pod",
 					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+						podName: "preemptor",
+					},
+				},
+				{
+					name: "verify the preemptor Pod is unschedulable",
+					verifyPodsUnschedulable: &verifyPodsUnschedulable{
+						podNames: []string{"preemptor"},
 					},
 				},
 				{
 					name: "check NNN is set in preemptor",
 					checkNNN: &checkNNN{
-						podName:     "preemptor",
+						podNames:    []string{"preemptor"},
 						expectedNNN: "node",
 					},
 				},
@@ -287,9 +369,15 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 				{
 					name: "schedule the preemptor Pod again",
 					schedulePod: &schedulePod{
-						podName:               "preemptor",
-						expectSuccess:         true,
+						podName: "preemptor",
+					},
+				},
+				{
+					name: "verify the preemptor Pod is scheduled and NNN is cleared after binding (depending on the enabled feature)",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"preemptor"},
 						expectedScheduledNode: "node",
+						validateNNNCleared:    true,
 					},
 				},
 			},
@@ -298,40 +386,55 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 			name: "Overwrite NominatedNodeName with preemption",
 			scenarios: []scenario{
 				{
+					name:       "create node",
+					createNode: makeNode("node", "4"),
+				},
+				{
 					name:       "create node2",
-					createNode: "node2",
+					createNode: makeNode("node2", "4"),
 				},
 				{
 					name: "create pods on node",
-					createPod: &createPod{
-						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
-						count: ptr.To(2),
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makeScheduledPod("victim-1", "node", lowPriority, "2"),
+							makeScheduledPod("victim-2", "node", lowPriority, "2"),
+						},
 					},
 				},
 				{
 					name: "create pod on node2",
-					createPod: &createPod{
-						pod: st.MakePod().Name("victim-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Node("node2").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makeScheduledPod("victim-3", "node2", lowPriority, "3"),
+						},
 					},
 				},
 				{
 					name: "create a preemptor Pod with NNN set to node",
-					createPod: &createPod{
-						pod:               st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePod("preemptor", highPriority, "4"),
+						},
 						nominatedNodeName: "node",
 					},
 				},
 				{
 					name: "schedule the preemptor Pod",
 					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+						podName: "preemptor",
+					},
+				},
+				{
+					name: "verify the preemptor Pod is unschedulable",
+					verifyPodsUnschedulable: &verifyPodsUnschedulable{
+						podNames: []string{"preemptor"},
 					},
 				},
 				{
 					name: "check NNN in preemptor gets changed to node2 (because preemption of only 1 victim is needed on this node)",
 					checkNNN: &checkNNN{
-						podName:     "preemptor",
+						podNames:    []string{"preemptor"},
 						expectedNNN: "node2",
 					},
 				},
@@ -342,9 +445,15 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 				{
 					name: "schedule the preemptor Pod again",
 					schedulePod: &schedulePod{
-						podName:               "preemptor",
-						expectSuccess:         true,
+						podName: "preemptor",
+					},
+				},
+				{
+					name: "verify the preemptor Pod is scheduled and NNN is cleared after binding (depending on the enabled feature)",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"preemptor"},
 						expectedScheduledNode: "node2",
+						validateNNNCleared:    true,
 					},
 				},
 			},
@@ -353,16 +462,24 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 			name: "NNN is ignored on pod that cannot fit on the node",
 			scenarios: []scenario{
 				{
+					name:       "create node",
+					createNode: makeNode("node", "4"),
+				},
+				{
 					name: "create pod with NNN that exceeds capacity of the node",
-					createPod: &createPod{
-						pod:               st.MakePod().Name("pod-exceeds-capacity").Req(map[v1.ResourceName]string{v1.ResourceCPU: "5"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePod("pod-exceeds-capacity", lowPriority, "5"),
+						},
 						nominatedNodeName: "node",
 					},
 				},
 				{
 					name: "create pod without NNN that fits on the node",
-					createPod: &createPod{
-						pod: st.MakePod().Name("pod-fits").Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePod("pod-fits", lowPriority, "3"),
+						},
 					},
 				},
 				{
@@ -374,15 +491,20 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 				{
 					name: "check NNN in pod-exceeds-capacity gets cleared upon scheduling failure",
 					checkNNN: &checkNNN{
-						podName:     "pod-exceeds-capacity",
+						podNames:    []string{"pod-exceeds-capacity"},
 						expectedNNN: "",
 					},
 				},
 				{
 					name: "schedule pod-fits",
 					schedulePod: &schedulePod{
-						podName:               "pod-fits",
-						expectSuccess:         true,
+						podName: "pod-fits",
+					},
+				},
+				{
+					name: "verify pod-fits is scheduled",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"pod-fits"},
 						expectedScheduledNode: "node",
 					},
 				},
@@ -392,23 +514,36 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 			name: "NNN is ignored on lower priority pod when higher priority pod without NNN is being scheduled",
 			scenarios: []scenario{
 				{
+					name:       "create node",
+					createNode: makeNode("node", "4"),
+				},
+				{
 					name: "create low priority pod with NNN",
-					createPod: &createPod{
-						pod:               st.MakePod().Name("low-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePod("low-priority", lowPriority, "4"),
+						},
 						nominatedNodeName: "node",
 					},
 				},
 				{
 					name: "create high priority pod without NNN",
-					createPod: &createPod{
-						pod: st.MakePod().Name("high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").ZeroTerminationGracePeriod().Priority(100).Obj(),
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePod("high-priority", highPriority, "4"),
+						},
 					},
 				},
 				{
 					name: "schedule high-priority",
 					schedulePod: &schedulePod{
-						podName:               "high-priority",
-						expectSuccess:         true,
+						podName: "high-priority",
+					},
+				},
+				{
+					name: "verify high-priority is scheduled",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"high-priority"},
 						expectedScheduledNode: "node",
 					},
 				},
@@ -421,7 +556,7 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 				{
 					name: "check NNN in low priority pod gets cleared upon scheduling failure",
 					checkNNN: &checkNNN{
-						podName:     "low-priority",
+						podNames:    []string{"low-priority"},
 						expectedNNN: "",
 					},
 				},
@@ -431,282 +566,665 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 			name: "No preemption, NNN is cleared after binding",
 			scenarios: []scenario{
 				{
+					name:       "create node",
+					createNode: makeNode("node", "4"),
+				},
+				{
 					name: "create pod with NNN",
-					createPod: &createPod{
-						pod:               st.MakePod().Name("pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePod("pod", lowPriority, "4"),
+						},
 						nominatedNodeName: "node",
 					},
 				},
 				{
-					name: "schedule pod (this step also verifies is NNN is cleared after binding, depending on the enabled feature)",
+					name: "schedule pod",
 					schedulePod: &schedulePod{
-						podName:               "pod",
-						expectSuccess:         true,
+						podName: "pod",
+					},
+				},
+				{
+					name: "verify pod is scheduled and NNN is cleared after binding (depending on the enabled feature)",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"pod"},
 						expectedScheduledNode: "node",
+						validateNNNCleared:    true,
 					},
 				},
 			},
 		},
 	}
-	// All test cases run on the same node.
-	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+	// ClearingNominatedNodeNameAfterBinding is the only flag affecting the API server, so the API server can be shared across the tests in the loop below.
+	for _, clearNNNAfterBindingEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("ClearingNominatedNodeNameAfterBinding: %v", clearNNNAfterBindingEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.ClearingNominatedNodeNameAfterBinding: clearNNNAfterBindingEnabled,
+			})
+			sharedAPICtx := testutils.InitTestAPIServer(t, "preemption", nil)
 
-	for _, nnnForExpectationEnabled := range []bool{true, false} {
-		for _, clearNNNAfterBindingEnabled := range []bool{true, false} {
-			for _, test := range tests {
-
-				t.Run(fmt.Sprintf("%s (NominatedNodeName for expectation: %v, Clearing NNN: %v)", test.name, nnnForExpectationEnabled, clearNNNAfterBindingEnabled), func(t *testing.T) {
-					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-						features.NominatedNodeNameForExpectation:       nnnForExpectationEnabled,
-						features.ClearingNominatedNodeNameAfterBinding: clearNNNAfterBindingEnabled,
-						features.SchedulerAsyncPreemption:              true,
+			for _, nnnForExpectationEnabled := range []bool{true, false} {
+				for _, test := range tests {
+					t.Run(fmt.Sprintf("%s (NominatedNodeName for expectation: %v)", test.name, nnnForExpectationEnabled), func(t *testing.T) {
+						// This call to SetFeatureGatesDuringTest does not override the feature gates set in the call above.
+						featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+							features.NominatedNodeNameForExpectation: nnnForExpectationEnabled,
+							features.SchedulerAsyncPreemption:        true,
+						})
+						initializeAndRunTestScenarios(t, sharedAPICtx, test.scenarios)
 					})
-
-					// We need to use a custom preemption plugin to test async preemption behavior
-					delayedPreemptionPluginName := "delay-preemption"
-					var lock sync.Mutex
-					// keyed by the pod name
-					preemptionDoneChannels := make(map[string]chan struct{})
-					defer func() {
-						lock.Lock()
-						defer lock.Unlock()
-						for _, ch := range preemptionDoneChannels {
-							close(ch)
-						}
-					}()
-					registry := make(frameworkruntime.Registry)
-					var preemptionPlugin *defaultpreemption.DefaultPreemption
-					err := registry.Register(delayedPreemptionPluginName, func(c context.Context, r runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-						p, err := frameworkruntime.FactoryAdapter(plfeature.Features{EnableAsyncPreemption: true}, defaultpreemption.New)(c, &config.DefaultPreemptionArgs{
-							// Set default values to pass the validation at the initialization, not related to the test.
-							MinCandidateNodesPercentage: 10,
-							MinCandidateNodesAbsolute:   100,
-						}, fh)
-						if err != nil {
-							return nil, fmt.Errorf("error creating default preemption plugin: %w", err)
-						}
-
-						var ok bool
-						preemptionPlugin, ok = p.(*defaultpreemption.DefaultPreemption)
-						if !ok {
-							return nil, fmt.Errorf("unexpected plugin type %T", p)
-						}
-
-						executor, ok := preemptionPlugin.Executor.(*preemption.Executor)
-						if !ok {
-							return nil, fmt.Errorf("unexpected executor type %T", preemptionPlugin.Executor)
-						}
-						preemptPodFn := executor.PreemptPod
-						executor.PreemptPod = func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
-							// block the preemption goroutine to complete until the test case allows it to proceed.
-							lock.Lock()
-							ch, ok := preemptionDoneChannels[preemptor.GetName()]
-							lock.Unlock()
-							if ok {
-								<-ch
-							}
-							return preemptPodFn(ctx, c, preemptor, victim, pluginName)
-						}
-
-						return preemptionPlugin, nil
-					})
-					if err != nil {
-						t.Fatalf("Error registering a filter: %v", err)
-					}
-
-					cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-						Profiles: []configv1.KubeSchedulerProfile{{
-							SchedulerName: ptr.To(v1.DefaultSchedulerName),
-							Plugins: &configv1.Plugins{
-								MultiPoint: configv1.PluginSet{
-									Enabled: []configv1.Plugin{
-										{Name: delayedPreemptionPluginName},
-									},
-									Disabled: []configv1.Plugin{
-										{Name: names.DefaultPreemption},
-									},
-								},
-							},
-						}},
-					})
-
-					// It initializes the scheduler, but doesn't start.
-					// We manually trigger the scheduling cycle.
-					testCtx := testutils.InitTestSchedulerWithOptions(t,
-						testutils.InitTestAPIServer(t, "preemption", nil),
-						0,
-						scheduler.WithProfiles(cfg.Profiles...),
-						scheduler.WithFrameworkOutOfTreeRegistry(registry),
-						// disable backoff
-						scheduler.WithPodMaxBackoffSeconds(0),
-						scheduler.WithPodInitialBackoffSeconds(0),
-					)
-					testutils.SyncSchedulerInformerFactory(testCtx)
-					cs := testCtx.ClientSet
-
-					if preemptionPlugin == nil {
-						t.Fatalf("the preemption plugin should be initialized")
-					}
-
-					logger, _ := ktesting.NewTestContext(t)
-					if testCtx.Scheduler.APIDispatcher != nil {
-						testCtx.Scheduler.APIDispatcher.Run(logger)
-						defer testCtx.Scheduler.APIDispatcher.Close()
-					}
-					testCtx.Scheduler.SchedulingQueue.Run(logger)
-					defer testCtx.Scheduler.SchedulingQueue.Close()
-
-					createdPods := []*v1.Pod{}
-					defer func() {
-						testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
-					}()
-
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
-
-					if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
-						t.Fatalf("Failed to create an initial Node %q: %v", node.Name, err)
-					}
-					defer func() {
-						if err := cs.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{}); err != nil {
-							t.Fatalf("Failed to delete the Node %q: %v", node.Name, err)
-						}
-					}()
-
-					for _, scenario := range test.scenarios {
-						t.Logf("Running scenario: %s", scenario.name)
-						switch {
-						case scenario.createNode != "":
-							newNode := st.MakeNode().Name(scenario.createNode).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
-							if _, err := cs.CoreV1().Nodes().Create(ctx, newNode, metav1.CreateOptions{}); err != nil {
-								t.Fatalf("Failed to create an initial Node %q: %v", newNode.Name, err)
-							}
-							defer func() {
-								if err := cs.CoreV1().Nodes().Delete(ctx, newNode.Name, metav1.DeleteOptions{}); err != nil {
-									t.Fatalf("Failed to delete the Node %q: %v", newNode.Name, err)
-								}
-							}()
-						case scenario.createPod != nil:
-							if scenario.createPod.count == nil {
-								scenario.createPod.count = ptr.To(1)
-							}
-
-							for i := 0; i < *scenario.createPod.count; i++ {
-								pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(ctx, scenario.createPod.pod, metav1.CreateOptions{})
-								if err != nil {
-									t.Fatalf("Failed to create a Pod %q: %v", scenario.createPod.pod.Name, err)
-								}
-
-								if scenario.createPod.nominatedNodeName != "" {
-									patch := []byte(fmt.Sprintf(`{"status":{"nominatedNodeName":"%s"}}`, scenario.createPod.nominatedNodeName))
-									pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Patch(ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "status")
-									if err != nil {
-										t.Fatalf("update pod %s status with NNN: %v", scenario.createPod.pod.Name, err)
-									}
-									// Wait until the scheduler picks up the NNN set on the pod.
-									if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-										nominatedPods := testCtx.Scheduler.SchedulingQueue.NominatedPodsForNode(klog.FromContext(ctx), scenario.createPod.nominatedNodeName)
-										if contains(nominatedPods, pod.Name) {
-											return true, nil
-										}
-										return false, nil
-									}); err != nil {
-										t.Fatalf("scheduler does not see NNN set on pod %s: %v", scenario.createPod.pod.Name, err)
-									}
-								}
-								createdPods = append(createdPods, pod)
-							}
-						case scenario.schedulePod != nil:
-							lastFailure := ""
-							if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-								if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
-									lastFailure = fmt.Sprintf("Expected the pod %s to be scheduled, but no pod arrives at the activeQ", scenario.schedulePod.podName)
-									return false, nil
-								}
-
-								if testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name != scenario.schedulePod.podName {
-									// need to wait more because maybe the queue will get another Pod that higher priority than the current top pod.
-									lastFailure = fmt.Sprintf("The pod %s is expected to be scheduled, but the top Pod is %s", scenario.schedulePod.podName, testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name)
-									return false, nil
-								}
-
-								return true, nil
-							}); err != nil {
-								t.Fatal(lastFailure)
-							}
-
-							lock.Lock()
-							preemptionDoneChannels[scenario.schedulePod.podName] = make(chan struct{})
-							lock.Unlock()
-							testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
-
-							if scenario.schedulePod.expectSuccess {
-								lastFailure := ""
-								if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-									pod, err2 := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, scenario.schedulePod.podName, metav1.GetOptions{})
-									if err2 != nil {
-										// This could be a connection error so we want to retry.
-										return false, nil
-									}
-									if pod.Spec.NodeName == "" {
-										// Pod is not scheduled yet.
-										return false, nil
-									}
-									if scenario.schedulePod.expectedScheduledNode != pod.Spec.NodeName {
-										lastFailure = fmt.Sprintf("Expected pod %s to be scheduled on node %s but got %v", scenario.schedulePod.podName, scenario.schedulePod.expectedScheduledNode, pod.Spec.NodeName)
-										return false, err2
-									}
-									if clearNNNAfterBindingEnabled && pod.Status.NominatedNodeName != "" {
-										lastFailure = fmt.Sprintf("Expected pod %s to have NNN cleared after binding but got \"%v\"", scenario.schedulePod.podName, pod.Status.NominatedNodeName)
-										return false, err2
-									}
-									return true, nil
-								}); err != nil {
-									t.Fatal(lastFailure)
-								}
-
-							} else if scenario.schedulePod.expectUnschedulable {
-								// Wait some time for the scheduling operation to finish and move the pod to unschedulable or backoff.
-								if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, 2*time.Second, false, func(ctx context.Context) (bool, error) {
-									if podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.schedulePod.podName) {
-										return true, nil
-									}
-									return false, nil
-								}); err != nil {
-									t.Fatalf("Expected the pod %s to be in the unschedulable queue after the scheduling attempt", scenario.schedulePod.podName)
-								}
-							}
-						case scenario.completePreemption != "":
-							lock.Lock()
-							if _, ok := preemptionDoneChannels[scenario.completePreemption]; !ok {
-								t.Fatalf("The preemptor Pod %q is not running preemption", scenario.completePreemption)
-							}
-
-							close(preemptionDoneChannels[scenario.completePreemption])
-							delete(preemptionDoneChannels, scenario.completePreemption)
-							lock.Unlock()
-						case scenario.checkNNN != nil:
-							lastFailure := ""
-							if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-								pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, scenario.checkNNN.podName, metav1.GetOptions{})
-
-								if err != nil {
-									lastFailure = fmt.Sprintf("Cannot retrieve pod %v", scenario.checkNNN.podName)
-									return false, err
-								}
-								if scenario.checkNNN.expectedNNN != pod.Status.NominatedNodeName {
-									lastFailure = fmt.Sprintf("Expected .status.nominatedNodeName %v for pod \"%v\" but got \"%v\"", scenario.checkNNN.expectedNNN, scenario.checkNNN.podName, pod.Status.NominatedNodeName)
-									return false, nil
-								}
-
-								return true, nil
-							}); err != nil {
-								t.Fatal(lastFailure, err)
-							}
-						}
-					}
-				})
+				}
 			}
+		})
+	}
+}
+
+// TestPodGroupPreemptionAndNominatedNodeNameScenarios tests setting/clearing NominatedNodeName in scenarios with workload aware preemption.
+func TestPodGroupPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
+	tests := []struct {
+		name      string
+		scenarios []scenario
+	}{
+		{
+			name: "full gang podgroup preemption sets NominatedNodeName on all preemptor pods",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "3"),
+				},
+				{
+					name: "create preemptor gang pg1",
+					createPodGroup: &createPodGroup{
+						podGroup: makeGangPodGroup("pg1", highPriority, 3),
+					},
+				},
+				{
+					name: "create scheduled pods on node1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makeScheduledPod("low-1", "node1", lowPriority, "1"),
+							makeScheduledPod("low-2", "node1", lowPriority, "1"),
+							makeScheduledPod("low-3", "node1", lowPriority, "1"),
+						},
+					},
+				},
+				{
+					name: "create preemptor pods in gang pg1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("high-1", "pg1", highPriority, "1"),
+							makePodGroupPod("high-2", "pg1", highPriority, "1"),
+							makePodGroupPod("high-3", "pg1", highPriority, "1"),
+						},
+					},
+				},
+				{
+					name: "schedule the preemptor PodGroup",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg1",
+						podNames:     []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "verify the preemptor PodGroup pods are unschedulable",
+					verifyPodsUnschedulable: &verifyPodsUnschedulable{
+						podNames: []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "check NNN is set in all preemptor pods",
+					checkNNN: &checkNNN{
+						podNames:    []string{"high-1", "high-2", "high-3"},
+						expectedNNN: "node1",
+					},
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "pg1",
+				},
+				{
+					name: "re-enter pg1 in the scheduling cycle",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg1",
+						podNames:     []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "verify pg1 pods are scheduled and NNN is cleared after binding (depending on the enabled feature)",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"high-1", "high-2", "high-3"},
+						expectedScheduledNode: "node1",
+						validateNNNCleared:    true,
+					},
+				},
+			},
+		},
+		{
+			name: "full basic podgroup preemption sets NominatedNodeName on all preemptor pods",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "3"),
+				},
+				{
+					name: "create preemptor basic pg1",
+					createPodGroup: &createPodGroup{
+						podGroup: makeBasicPodGroup("pg1", highPriority),
+					},
+				},
+				{
+					name: "create scheduled pods on node1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makeScheduledPod("low-1", "node1", lowPriority, "1"),
+							makeScheduledPod("low-2", "node1", lowPriority, "1"),
+							makeScheduledPod("low-3", "node1", lowPriority, "1"),
+						},
+					},
+				},
+				{
+					name: "create preemptor pods in basic pg1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("high-1", "pg1", highPriority, "1"),
+							makePodGroupPod("high-2", "pg1", highPriority, "1"),
+							makePodGroupPod("high-3", "pg1", highPriority, "1"),
+						},
+					},
+				},
+				{
+					// BasicPolicy does not wait for all pods in PreEnqueue, so a live scheduler may
+					// start preemption before all pods arrive in activeQ. Waiting for all pods here simplifies
+					// testing NNN; preemption behavior is covered by tests in preemption/podgroup/podgrouppreemption_test.go.
+					name: "schedule the preemptor PodGroup",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg1",
+						podNames:     []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "verify the preemptor PodGroup pods are unschedulable",
+					verifyPodsUnschedulable: &verifyPodsUnschedulable{
+						podNames: []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "check NNN is set in preemptor",
+					checkNNN: &checkNNN{
+						podNames:    []string{"high-1", "high-2", "high-3"},
+						expectedNNN: "node1",
+					},
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "pg1",
+				},
+				{
+					name: "schedule the preemptor PodGroup again",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg1",
+						podNames:     []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "verify pg1 pods are scheduled and NNN is cleared after binding (depending on the enabled feature)",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"high-1", "high-2", "high-3"},
+						expectedScheduledNode: "node1",
+						validateNNNCleared:    true,
+					},
+				},
+			},
+		},
+		{
+			name: "composite podgroup preemption sets NominatedNodeName on all preemptor pods",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "3"),
+				},
+				{
+					name: "create preemptor composite pod group cpg1",
+					createCompositePodGroup: &createCompositePodGroup{
+						compositePodGroup: makeCompositePodGroup("cpg1", highPriority),
+					},
+				},
+				{
+					name: "create child gang pg1",
+					createPodGroup: &createPodGroup{
+						podGroup: makeChildGangPodGroup("pg1", "cpg1", highPriority, 2),
+					},
+				},
+				{
+					name: "create child gang pg2",
+					createPodGroup: &createPodGroup{
+						podGroup: makeChildGangPodGroup("pg2", "cpg1", highPriority, 1),
+					},
+				},
+				{
+					name: "create scheduled pods on node1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makeScheduledPod("low-1", "node1", lowPriority, "1"),
+							makeScheduledPod("low-2", "node1", lowPriority, "1"),
+							makeScheduledPod("low-3", "node1", lowPriority, "1"),
+						},
+					},
+				},
+				{
+					name: "create preemptor pods in pg1 and pg2",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("high-1", "pg1", highPriority, "1"),
+							makePodGroupPod("high-2", "pg1", highPriority, "1"),
+							makePodGroupPod("high-3", "pg2", highPriority, "1"),
+						},
+					},
+				},
+				{
+					name: "schedule the preemptor CompositePodGroup",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "cpg1",
+						podNames:     []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "verify the preemptor CompositePodGroup pods are unschedulable",
+					verifyPodsUnschedulable: &verifyPodsUnschedulable{
+						podNames: []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "check NNN is set in all preemptor pods",
+					checkNNN: &checkNNN{
+						podNames:    []string{"high-1", "high-2", "high-3"},
+						expectedNNN: "node1",
+					},
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "cpg1",
+				},
+				{
+					name: "re-enter cpg1 in the scheduling cycle",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "cpg1",
+						podNames:     []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "verify cpg1 pods are scheduled and NNN is cleared after binding (depending on the enabled feature)",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"high-1", "high-2", "high-3"},
+						expectedScheduledNode: "node1",
+						validateNNNCleared:    true,
+					},
+				},
+			},
+		},
+	}
+	for _, clearNNNAfterBindingEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("ClearingNominatedNodeNameAfterBinding: %v", clearNNNAfterBindingEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                       true,
+				features.TopologyAwareWorkloadScheduling:       true,
+				features.CompositePodGroup:                     true,
+				features.ClearingNominatedNodeNameAfterBinding: clearNNNAfterBindingEnabled,
+			})
+			// Feature gates: NominatedNodeNameForExpectation, SchedulerAsyncPreemption and SchedulerAsyncAPICalls don't affect the API Server,
+			// so the API Server instance created here can be shared across test cases in the loop below.
+			sharedAPICtx := testutils.InitTestAPIServer(t, "preemption", nil)
+
+			for _, asyncPreemptionEnabled := range []bool{true, false} {
+				for _, asyncAPICallsEnabled := range []bool{true, false} {
+					for _, nnnForExpectationEnabled := range []bool{true, false} {
+						for _, test := range tests {
+							t.Run(fmt.Sprintf("%s (AsyncPreemption: %v, AsyncAPICalls: %v, NNN for expectation: %v)", test.name, asyncPreemptionEnabled, asyncAPICallsEnabled, nnnForExpectationEnabled), func(t *testing.T) {
+								// This call to SetFeatureGatesDuringTest does not override the feature gates set in the call above.
+								featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+									features.NominatedNodeNameForExpectation: nnnForExpectationEnabled,
+									features.SchedulerAsyncPreemption:        asyncPreemptionEnabled,
+									features.SchedulerAsyncAPICalls:          asyncAPICallsEnabled,
+								})
+								initializeAndRunTestScenarios(t, sharedAPICtx, test.scenarios)
+							})
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+func initializeAndRunTestScenarios(t *testing.T, sharedAPICtx *testutils.TestContext, scenarios []scenario) {
+	// We need to use a custom preemption plugin to test async preemption behavior
+	delayedPreemptionPluginName := "delay-preemption"
+	var lock sync.Mutex
+	// keyed by the pod or podgroup name
+	preemptionDoneChannels := make(map[string]chan struct{})
+	defer func() {
+		lock.Lock()
+		defer lock.Unlock()
+		for _, ch := range preemptionDoneChannels {
+			close(ch)
+		}
+	}()
+	registry := make(frameworkruntime.Registry)
+	var preemptionPlugin *defaultpreemption.DefaultPreemption
+	err := registry.Register(delayedPreemptionPluginName, func(c context.Context, r runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+		p, err := frameworkruntime.FactoryAdapter(plfeature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate), defaultpreemption.New)(c, &config.DefaultPreemptionArgs{
+			// Set default values to pass the validation at the initialization, not related to the test.
+			MinCandidateNodesPercentage: 10,
+			MinCandidateNodesAbsolute:   100,
+		}, fh)
+		if err != nil {
+			return nil, fmt.Errorf("error creating default preemption plugin: %w", err)
+		}
+
+		var ok bool
+		preemptionPlugin, ok = p.(*defaultpreemption.DefaultPreemption)
+		if !ok {
+			return nil, fmt.Errorf("unexpected plugin type %T", p)
+		}
+
+		executor, ok := preemptionPlugin.Executor.(*preemption.Executor)
+		if !ok {
+			return nil, fmt.Errorf("unexpected executor type %T", preemptionPlugin.Executor)
+		}
+		preemptPodFn := executor.PreemptPod
+		executor.PreemptPod = func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
+			// block the preemption goroutine to complete until the test case allows it to proceed.
+			lock.Lock()
+			ch, ok := preemptionDoneChannels[preemptor.GetName()]
+			lock.Unlock()
+			if ok {
+				<-ch
+			}
+			return preemptPodFn(ctx, c, preemptor, victim, pluginName)
+		}
+
+		return preemptionPlugin, nil
+	})
+	if err != nil {
+		t.Fatalf("Error registering preemption plugin: %v", err)
+	}
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			Plugins: &configv1.Plugins{
+				MultiPoint: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
+						{Name: delayedPreemptionPluginName},
+					},
+					Disabled: []configv1.Plugin{
+						{Name: names.DefaultPreemption},
+					},
+				},
+			},
+		}},
+	})
+
+	// It initializes the scheduler, but doesn't start.
+	// We manually trigger the scheduling cycle.
+	testCtx := testutils.InitTestSchedulerWithOptions(t,
+		// Create a fresh namespace for each test case to prevent tests from interfering with each other.
+		testutils.WithNewNamespace(t, sharedAPICtx, "preemption"),
+		0,
+		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry),
+		scheduler.WithPodMaxBackoffSeconds(0 /* disable backoff */),
+		scheduler.WithPodInitialBackoffSeconds(0),
+	)
+	defer testCtx.SchedulerCloseFn()
+	testutils.SyncSchedulerInformerFactory(testCtx)
+	cs := testCtx.ClientSet
+
+	if preemptionPlugin == nil {
+		t.Fatalf("the preemption plugin should be initialized")
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	if testCtx.Scheduler.APIDispatcher != nil {
+		testCtx.Scheduler.APIDispatcher.Run(logger)
+		defer testCtx.Scheduler.APIDispatcher.Close()
+	}
+	testCtx.Scheduler.SchedulingQueue.Run(logger)
+	defer testCtx.Scheduler.SchedulingQueue.Close()
+
+	createdPods := []*v1.Pod{}
+	createdPodGroups := []*schedulingv1beta1.PodGroup{}
+	createdCompositePodGroups := []*schedulingv1alpha3.CompositePodGroup{}
+	defer func() {
+		testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+		schedulerutils.CleanupPodGroups(testCtx.Ctx, cs, t, createdPodGroups)
+		schedulerutils.CleanupCompositePodGroups(testCtx.Ctx, cs, t, createdCompositePodGroups)
+		testutils.CleanupNodes(cs, t)
+	}()
+
+	for _, scenario := range scenarios {
+		t.Logf("Running scenario: %s", scenario.name)
+		switch {
+		case scenario.createNode != nil:
+			runCreateNode(t, testCtx, scenario.createNode)
+		case scenario.createPodGroup != nil:
+			runCreatePodGroup(t, testCtx, scenario.createPodGroup, &createdPodGroups)
+		case scenario.createCompositePodGroup != nil:
+			runCreateCompositePodGroup(t, testCtx, scenario.createCompositePodGroup, &createdCompositePodGroups)
+		case scenario.createPods != nil:
+			runCreatePods(t, testCtx, scenario.createPods, &createdPods)
+		case scenario.schedulePod != nil:
+			runSchedulePod(t, testCtx, scenario.schedulePod, &lock, preemptionDoneChannels)
+		case scenario.schedulePodGroup != nil:
+			runSchedulePodGroup(t, testCtx, scenario.schedulePodGroup, &lock, preemptionDoneChannels)
+		case scenario.verifyPodsScheduled != nil:
+			runVerifyPodsScheduled(t, testCtx, scenario.verifyPodsScheduled)
+		case scenario.verifyPodsUnschedulable != nil:
+			runVerifyPodsUnschedulable(t, testCtx, scenario.verifyPodsUnschedulable)
+		case scenario.completePreemption != "":
+			runCompletePreemption(t, scenario.completePreemption, &lock, preemptionDoneChannels)
+		case scenario.checkNNN != nil:
+			runCheckNNN(t, testCtx, scenario.checkNNN)
+		}
+	}
+}
+
+func runCreateNode(t *testing.T, testCtx *testutils.TestContext, node *v1.Node) {
+	cs := testCtx.ClientSet
+	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create an initial Node %q: %v", node.Name, err)
+	}
+}
+
+func runCreatePodGroup(t *testing.T, testCtx *testutils.TestContext, action *createPodGroup, createdPodGroups *[]*schedulingv1beta1.PodGroup) {
+	pg, err := testCtx.ClientSet.SchedulingV1beta1().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, action.podGroup, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create PodGroup %q: %v", action.podGroup.Name, err)
+	}
+	*createdPodGroups = append(*createdPodGroups, pg)
+}
+
+func runCreateCompositePodGroup(t *testing.T, testCtx *testutils.TestContext, action *createCompositePodGroup, createdCompositePodGroups *[]*schedulingv1alpha3.CompositePodGroup) {
+	cpg, err := testCtx.ClientSet.SchedulingV1alpha3().CompositePodGroups(testCtx.NS.Name).Create(testCtx.Ctx, action.compositePodGroup, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create CompositePodGroup %q: %v", action.compositePodGroup.Name, err)
+	}
+	*createdCompositePodGroups = append(*createdCompositePodGroups, cpg)
+}
+
+func runCreatePods(t *testing.T, testCtx *testutils.TestContext, action *createPods, createdPods *[]*v1.Pod) {
+	cs := testCtx.ClientSet
+	for _, p := range action.pods {
+		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, p, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create a Pod %q: %v", p.Name, err)
+		}
+
+		if action.nominatedNodeName != "" {
+			patch := []byte(fmt.Sprintf(`{"status":{"nominatedNodeName":"%s"}}`, action.nominatedNodeName))
+			pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Patch(testCtx.Ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "status")
+			if err != nil {
+				t.Fatalf("update pod %s status with NNN: %v", p.Name, err)
+			}
+			// Wait until the scheduler picks up the NNN set on the pod.
+			if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+				nominatedPods := testCtx.Scheduler.SchedulingQueue.NominatedPodsForNode(klog.FromContext(ctx), action.nominatedNodeName)
+				if contains(nominatedPods, pod.Name) {
+					return true, nil
+				}
+				return false, nil
+			}); err != nil {
+				t.Fatalf("scheduler does not see NNN set on pod %s: %v", p.Name, err)
+			}
+		}
+		*createdPods = append(*createdPods, pod)
+	}
+}
+
+func runSchedulePod(t *testing.T, testCtx *testutils.TestContext, action *schedulePod, lock *sync.Mutex, preemptionDoneChannels map[string]chan struct{}) {
+	lastFailure := ""
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
+			lastFailure = fmt.Sprintf("Expected the pod %s to be scheduled, but no pod arrives at the activeQ", action.podName)
+			return false, nil
+		}
+
+		if testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name != action.podName {
+			// need to wait more because maybe the queue will get another Pod that higher priority than the current top pod.
+			lastFailure = fmt.Sprintf("The pod %s is expected to be scheduled, but the top Pod is %s", action.podName, testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name)
+			return false, nil
+		}
+
+		return true, nil
+	}); err != nil {
+		t.Fatal(lastFailure)
+	}
+
+	lock.Lock()
+	preemptionDoneChannels[action.podName] = make(chan struct{})
+	lock.Unlock()
+	testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+}
+
+func runSchedulePodGroup(t *testing.T, testCtx *testutils.TestContext, action *schedulePodGroup, lock *sync.Mutex, preemptionDoneChannels map[string]chan struct{}) {
+	lastFailure := ""
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		podsInActiveQ := testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()
+		if len(podsInActiveQ) < len(action.podNames) {
+			lastFailure = fmt.Sprintf("Expected pods %v to be at the top of the activeQ, but only %d pods are in the activeQ", action.podNames, len(podsInActiveQ))
+			return false, nil
+		}
+		for _, pod := range podsInActiveQ[:len(action.podNames)] {
+			if !slices.Contains(action.podNames, pod.Name) {
+				// need to wait more because maybe the queue will get another Pod that higher priority than the current top pod.
+				lastFailure = fmt.Sprintf("Pods %v are expected to be found in activeQ, but one of the top Pods is %s", action.podNames, pod.Name)
+				return false, nil
+			}
+		}
+
+		return true, nil
+	}); err != nil {
+		t.Fatal(lastFailure)
+	}
+
+	// If async preemption is disabled, there is no need for blocking until preemption is completed.
+	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption) {
+		lock.Lock()
+		preemptionDoneChannels[action.podGroupName] = make(chan struct{})
+		lock.Unlock()
+	}
+	testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+}
+
+func runVerifyPodsScheduled(t *testing.T, testCtx *testutils.TestContext, action *verifyPodsScheduled) {
+	cs := testCtx.ClientSet
+	for _, podName := range action.podNames {
+		lastFailure := ""
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			pod, err2 := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, podName, metav1.GetOptions{})
+			if err2 != nil {
+				lastFailure = fmt.Sprintf("Failed to get pod %s: %v", podName, err2)
+				// This could be a connection error so we want to retry.
+				return false, nil
+			}
+			if pod.Spec.NodeName == "" {
+				lastFailure = fmt.Sprintf("Expected pod %s to be scheduled, but it is not scheduled yet", podName)
+				// Pod is not scheduled yet, retry check.
+				return false, nil
+			}
+			if action.expectedScheduledNode != pod.Spec.NodeName {
+				lastFailure = fmt.Sprintf("Expected pod %s to be scheduled on node %s but got %v", podName, action.expectedScheduledNode, pod.Spec.NodeName)
+				// Terminate polling, as node name is immutable once set.
+				return true, errors.New(lastFailure)
+			}
+			if action.validateNNNCleared {
+				expectedClearedNNN := utilfeature.DefaultFeatureGate.Enabled(features.ClearingNominatedNodeNameAfterBinding)
+				actualClearedNNN := pod.Status.NominatedNodeName == ""
+				if expectedClearedNNN != actualClearedNNN {
+					lastFailure = fmt.Sprintf("Expected pod %s to have NNN cleared=%v after binding, but got NominatedNodeName=%q", podName, expectedClearedNNN, pod.Status.NominatedNodeName)
+					// pod.Spec.NodeName is set, so the pod is already bound and we don't expect the NNN field to change.
+					return true, errors.New(lastFailure)
+				}
+			}
+			return true, nil
+		}); err != nil {
+			t.Fatal(lastFailure)
+		}
+	}
+}
+
+func runVerifyPodsUnschedulable(t *testing.T, testCtx *testutils.TestContext, action *verifyPodsUnschedulable) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption) {
+		// Wait some time for the scheduling operation to finish and move the pod to unschedulable or backoff.
+		// This is not applicable when async preemption is disabled, because the pod may return to activeQ.
+		return
+	}
+	for _, podName := range action.podNames {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, 2*time.Second, false, func(ctx context.Context) (bool, error) {
+			if podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, podName) {
+				return true, nil
+			}
+			return false, nil
+		}); err != nil {
+			t.Fatalf("Expected the pod %s to be in the unschedulable queue after the scheduling attempt", podName)
+		}
+	}
+}
+
+func runCompletePreemption(t *testing.T, preemptorName string, lock *sync.Mutex, preemptionDoneChannels map[string]chan struct{}) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption) {
+		return
+	}
+
+	lock.Lock()
+	defer lock.Unlock()
+	ch, ok := preemptionDoneChannels[preemptorName]
+	if !ok {
+		t.Fatalf("The preemptor %q is not running preemption", preemptorName)
+	}
+	close(ch)
+	delete(preemptionDoneChannels, preemptorName)
+}
+
+func runCheckNNN(t *testing.T, testCtx *testutils.TestContext, action *checkNNN) {
+	cs := testCtx.ClientSet
+	for _, podName := range action.podNames {
+		lastFailure := ""
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, podName, metav1.GetOptions{})
+
+			if err != nil {
+				lastFailure = fmt.Sprintf("Cannot retrieve pod %v", podName)
+				return false, err
+			}
+			if action.expectedNNN != pod.Status.NominatedNodeName {
+				lastFailure = fmt.Sprintf("Expected .status.nominatedNodeName %v for pod \"%v\" but got \"%v\"", action.expectedNNN, podName, pod.Status.NominatedNodeName)
+				return false, nil
+			}
+
+			return true, nil
+		}); err != nil {
+			t.Fatal(lastFailure, err)
 		}
 	}
 }
