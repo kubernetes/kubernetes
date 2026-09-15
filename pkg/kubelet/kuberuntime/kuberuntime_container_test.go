@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
@@ -518,32 +517,10 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 	_, _, m, _ := createTestRuntimeManager(tCtx)
 
 	for desc, test := range map[string]struct {
-		input          *runtimeapi.ContainerUser
-		expected       *kubecontainer.ContainerUser
-		featureEnabled bool
+		input    *runtimeapi.ContainerUser
+		expected *kubecontainer.ContainerUser
 	}{
-		"non nil user, SupplementalGroupsPolicy is disabled": {
-			input: &runtimeapi.ContainerUser{
-				Linux: &runtimeapi.LinuxContainerUser{
-					Uid:                0,
-					Gid:                0,
-					SupplementalGroups: []int64{10},
-				},
-			},
-			expected:       nil,
-			featureEnabled: false,
-		},
-		"empty user, SupplementalGroupsPolicy is disabled": {
-			input:          &runtimeapi.ContainerUser{},
-			expected:       nil,
-			featureEnabled: false,
-		},
-		"nil user, SupplementalGroupsPolicy is disabled": {
-			input:          nil,
-			expected:       nil,
-			featureEnabled: false,
-		},
-		"non nil user, SupplementalGroupsPolicy is enabled": {
+		"non nil user": {
 			input: &runtimeapi.ContainerUser{
 				Linux: &runtimeapi.LinuxContainerUser{
 					Uid:                0,
@@ -558,23 +535,17 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 					SupplementalGroups: []int64{10},
 				},
 			},
-			featureEnabled: true,
 		},
-		"empty user, SupplementalGroupsPolicy is enabled": {
-			input:          &runtimeapi.ContainerUser{},
-			expected:       &kubecontainer.ContainerUser{},
-			featureEnabled: true,
+		"empty user": {
+			input:    &runtimeapi.ContainerUser{},
+			expected: &kubecontainer.ContainerUser{},
 		},
-		"nil user, SupplementalGroupsPolicy is enabled": {
-			input:          nil,
-			expected:       nil,
-			featureEnabled: true,
+		"nil user": {
+			input:    nil,
+			expected: nil,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			// Set emulation version so that the feature gate can be disabled in the test
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, test.featureEnabled)
 			cStatus := &runtimeapi.ContainerStatus{
 				Id:        cid.ID,
 				Metadata:  meta,
