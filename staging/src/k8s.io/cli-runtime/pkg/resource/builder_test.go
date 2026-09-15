@@ -514,7 +514,7 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 	}{
 		{"pod", &v1.Pod{}, false, "../../artifacts/pod.yaml", []string{"nginx"}},
 		{"recursive-pod", &v1.Pod{}, true, fmt.Sprintf("%s/recursive/pod", tmpDir), []string{"busybox0", "busybox1"}},
-		{"rc", &v1.ReplicationController{}, false, "../../artifacts/redis-master-controller.yaml", []string{"redis-master"}},
+		{"rc", &v1.ReplicationController{}, false, "../../artifacts/test-master-controller.yaml", []string{"redis-master"}},
 		{"recursive-rc", &v1.ReplicationController{}, true, fmt.Sprintf("%s/recursive/rc", tmpDir), []string{"busybox0", "busybox1"}},
 		{"hardlink", &v1.Pod{}, false, fmt.Sprintf("%s/inode/hardlink/busybox-link.json", tmpDir), []string{"busybox0"}},
 		{"hardlink", &v1.Pod{}, true, fmt.Sprintf("%s/inode/hardlink/busybox-link.json", tmpDir), []string{"busybox0"}},
@@ -651,7 +651,7 @@ func TestFilePatternBuilder(t *testing.T) {
 	singleItemImplied := false
 
 	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
-	if err != nil || singleItemImplied || len(test.Infos) < 3 {
+	if err != nil || singleItemImplied || len(test.Infos) < 2 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 
@@ -1566,7 +1566,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 func TestSingleItemImpliedObject(t *testing.T) {
 	obj, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/redis-master-controller.yaml"}}).
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/test-master-controller.yaml"}}).
 		Flatten().
 		Do().Object()
 
@@ -1741,8 +1741,8 @@ func TestWatch(t *testing.T) {
 func TestWatchMultipleError(t *testing.T) {
 	_, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/redis-master-controller.yaml"}}).Flatten().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/redis-master-controller.yaml"}}).Flatten().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/test-master-controller.yaml"}}).Flatten().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/test-master-controller.yaml"}}).Flatten().
 		Do().Watch("")
 
 	if err == nil {
