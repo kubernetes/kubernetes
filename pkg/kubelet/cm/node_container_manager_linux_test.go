@@ -510,3 +510,88 @@ func TestGetCgroupConfig(t *testing.T) {
 		})
 	}
 }
+func TestGetCgroupConfigProportionalCPUWeight(t *testing.T) {
+	cases := []struct {
+		name                string
+		totalCapacity       v1.ResourceList
+		allocatable         v1.ResourceList
+		expectedMaxShares   uint64 // shares should be <= this
+		expectedMinShares   uint64 // shares should be >= this
+	}{
+		{
+			// 16 core node, 8 reserved for system → pods get 50%
+			// proportionalShares = (8000 * 1024) / 16000 = 512
+			// Before fix: MilliCPUToShares(8000) = 8192 → weight 313
+			// After fix:  proportionalShares = 512 → weight ~20
+			name: "16 core node half reserved - shares should be proportional",
+			totalCapacity: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("16"),
+			},
+			allocatable: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("8"),
+			},
+			expectedMaxShares: 1024, // must be well below old value of 8192
+			expectedMinShares: MinShares,
+		},
+		{
+			// 64 core node, 32 reserved → pods get 50%
+			// Before fix: MilliCPUToShares(32000) = 32768 → weight 1249
+			// After fix:  proportionalShares = (32000*1024)/64000 = 512 → weight ~20
+			name: "64 core node half reserved - shares must not scale with core count",
+			totalCapacity: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("64"),
+			},
+			allocatable: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("32"),
+			},
+			expectedMaxShares: 1024,
+			expectedMinShares: MinShares,
+		},
+		{
+			// 16 core node, 2 reserved → pods get 87.5%
+			// proportionalShares = (14000 * 1024) / 16000 = 896
+			name: "16 core node small reservation",
+			totalCapacity: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("16"),
+			},
+			allocatable: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("14"),
+			},
+			expectedMaxShares: 2048,
+			expectedMinShares: MinShares,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cm := &containerManagerImpl{
+				capacity: tc.totalCapacity,
+			}
+			rc := getCgroupConfigInternal(tc.allocatable, false)
+			assert.NotNil(t, rc)
+			assert.NotNil(t, rc.CPUShares)
+
+			// Simulate what getCgroupConfig does on cgroupv2
+			if rc.CPUShares != nil {
+				if totalCPU, exists := cm.capacity[v1.ResourceCPU]; exists {
+					totalMilliCPU := totalCPU.MilliValue()
+					if totalMilliCPU > 0 {
+						if allocCPU, exists := tc.allocatable[v1.ResourceCPU]; exists {
+							allocMilliCPU := allocCPU.MilliValue()
+							proportionalShares := uint64((allocMilliCPU * SharesPerCPU) / totalMilliCPU)
+							if proportionalShares < MinShares {
+								proportionalShares = MinShares
+							}
+							rc.CPUShares = &proportionalShares
+						}
+					}
+				}
+			}
+
+			assert.GreaterOrEqual(t, *rc.CPUShares, tc.expectedMinShares,
+				"CPUShares should be >= MinShares")
+			assert.LessOrEqual(t, *rc.CPUShares, tc.expectedMaxShares,
+				"CPUShares should be proportional, not scaling with core count")
+		})
+	}
+}
