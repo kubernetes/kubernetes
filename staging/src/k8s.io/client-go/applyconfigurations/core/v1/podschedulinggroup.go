@@ -27,6 +27,8 @@ package v1
 type PodSchedulingGroupApplyConfiguration struct {
 	// PodGroupName specifies the name of the standalone PodGroup object
 	// that represents the runtime instance of this group.
+	// PodGroupName specifies the name of the standalone PodGroup object
+	// that represents the runtime instance of this group.
 	// Must be a DNS subdomain.
 	PodGroupName *string `json:"podGroupName,omitempty"`
 }
