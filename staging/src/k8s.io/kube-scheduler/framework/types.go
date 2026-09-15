@@ -912,3 +912,22 @@ func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
 	}
 	return v1.PreemptLowerPriority
 }
+
+// GetUID returns the UID of the wrapped object.
+func (gpg *GenericPodGroup) GetUID() types.UID {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.UID
+	}
+	return gpg.CompositePodGroup.UID
+}
+
+// GetKind returns the human-readable kind of the wrapped group ("pod group" or "composite pod group").
+func (gpg *GenericPodGroup) GetKind() string {
+	if gpg == nil {
+		return ""
+	}
+	if gpg.PodGroup != nil {
+		return "pod group"
+	}
+	return "composite pod group"
+}

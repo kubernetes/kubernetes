@@ -110,6 +110,7 @@ type Scheduler struct {
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
 	podGroupPreemptionPolicyEnabled                     bool
+	podGroupHierarchyTracker                            fwk.PodGroupHierarchyTracker
 
 	algorithm *SchedulingAlgorithm
 }
@@ -384,6 +385,7 @@ func New(ctx context.Context,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
 		podGroupPreemptionPolicyEnabled:                     feature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
+		podGroupHierarchyTracker:                            comps.podGroupHierarchyTracker,
 	}
 	sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore))
 	sched.NextEntity = podQueue.Pop
