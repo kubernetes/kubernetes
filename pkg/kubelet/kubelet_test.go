@@ -2182,12 +2182,11 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		Namespace: pod.Namespace,
 	}
 	tests := []struct {
-		containers    []v1.Container
-		statuses      []*kubecontainer.Status
-		reasons       map[string]error
-		oldStatuses   []v1.ContainerStatus
-		expectedState map[string]v1.ContainerState
-		// Only set expectedInitState when it is different from expectedState
+		containers                   []v1.Container
+		statuses                     []*kubecontainer.Status
+		reasons                      map[string]error
+		oldStatuses                  []v1.ContainerStatus
+		expectedState                map[string]v1.ContainerState
 		expectedInitState            map[string]v1.ContainerState
 		expectedLastTerminationState map[string]v1.ContainerState
 	}{
@@ -2211,7 +2210,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 			},
 			expectedInitState: map[string]v1.ContainerState{
 				"without-old-record": {Waiting: &v1.ContainerStateWaiting{
-					Reason: PodInitializing,
+					Reason: ContainerCreating,
 				}},
 				"with-old-record": {Waiting: &v1.ContainerStateWaiting{
 					Reason: PodInitializing,
