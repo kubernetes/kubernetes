@@ -1,0 +1,330 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package apiserver
+
+import (
+	"bytes"
+	"errors"
+	"io"
+	"testing"
+)
+
+func TestWrapBodyForRetry(t *testing.T) {
+	tests := []struct {
+		name           string
+		bodyContent    string
+		limit          int
+		maxAttempts    int
+		wantGetBodyErr error
+	}{
+		{
+			name:        "small body within limit",
+			bodyContent: "hello world",
+			limit:       1024,
+			maxAttempts: 2,
+		},
+		{
+			name:           "body exceeds limit",
+			bodyContent:    "this body is way too large for the limit we set",
+			limit:          10,
+			maxAttempts:    2,
+			wantGetBodyErr: errRequestBodyTooLarge,
+		},
+		{
+			name:        "exact limit boundary",
+			bodyContent: "exactly10!",
+			limit:       10,
+			maxAttempts: 2,
+		},
+		{
+			name:        "empty body",
+			bodyContent: "",
+			limit:       1024,
+			maxAttempts: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			originalBody := io.NopCloser(bytes.NewBufferString(tc.bodyContent))
+			config := retryableBodyConfig{maxRetryBytes: tc.limit, maxAttempts: tc.maxAttempts}
+
+			wrappedBody, getBody := wrapBodyForRetry(originalBody, config)
+			if wrappedBody == nil {
+				t.Fatal("expected non-nil wrapped body")
+			}
+
+			// Read the entire body through the wrapper
+			_, err := io.ReadAll(wrappedBody)
+			if err != nil {
+				t.Errorf("unexpected read error: %v", err)
+			}
+
+			// Close the wrapped body (should be no-op)
+			if err := wrappedBody.Close(); err != nil {
+				t.Errorf("unexpected close error: %v", err)
+			}
+
+			retryBody, err := getBody()
+			if tc.wantGetBodyErr != nil {
+				if err == nil {
+					t.Errorf("expected GetBody error %v, got none", tc.wantGetBodyErr)
+				} else if !errors.Is(err, tc.wantGetBodyErr) {
+					t.Errorf("expected GetBody error %v, got %v", tc.wantGetBodyErr, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected GetBody error: %v", err)
+				return
+			}
+
+			// Read the retry body and verify content
+			retryData, err := io.ReadAll(retryBody)
+			if err != nil {
+				t.Errorf("unexpected retry body read error: %v", err)
+				return
+			}
+			if string(retryData) != tc.bodyContent {
+				t.Errorf("expected retry body %q, got %q", tc.bodyContent, string(retryData))
+			}
+		})
+	}
+}
+
+func TestWrapBodyForRetryMaxAttempts(t *testing.T) {
+	tests := []struct {
+		name        string
+		maxAttempts int
+		callCount   int
+		wantLastErr error
+	}{
+		{
+			name:        "single attempt allowed, first call succeeds",
+			maxAttempts: 1,
+			callCount:   1,
+			wantLastErr: nil,
+		},
+		{
+			name:        "single attempt allowed, second call fails",
+			maxAttempts: 1,
+			callCount:   2,
+			wantLastErr: errRetryAlreadyAttempted,
+		},
+		{
+			name:        "six attempts allowed, all succeed",
+			maxAttempts: 6,
+			callCount:   6,
+			wantLastErr: nil,
+		},
+		{
+			name:        "six attempts allowed, seventh fails",
+			maxAttempts: 6,
+			callCount:   7,
+			wantLastErr: errRetryAlreadyAttempted,
+		},
+		{
+			name:        "default max attempts exceeded",
+			maxAttempts: defaultMaxRetryAttempts,
+			callCount:   defaultMaxRetryAttempts + 1,
+			wantLastErr: errRetryAlreadyAttempted,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bodyContent := "test body content"
+			originalBody := io.NopCloser(bytes.NewBufferString(bodyContent))
+			config := retryableBodyConfig{maxRetryBytes: 1024, maxAttempts: tc.maxAttempts}
+
+			wrappedBody, getBody := wrapBodyForRetry(originalBody, config)
+
+			if _, err := io.ReadAll(wrappedBody); err != nil {
+				t.Fatalf("unexpected read error: %v", err)
+			}
+
+			// Call GetBody multiple times
+			var lastErr error
+			for i := 0; i < tc.callCount; i++ {
+				body, err := getBody()
+				lastErr = err
+				if err == nil && body != nil {
+					err := body.Close()
+					if err != nil {
+						t.Errorf("unexpected close error: %v", err)
+					}
+				}
+			}
+
+			if tc.wantLastErr != nil {
+				if lastErr == nil {
+					t.Errorf("expected error %v on call %d, got none", tc.wantLastErr, tc.callCount)
+				} else if !errors.Is(lastErr, tc.wantLastErr) {
+					t.Errorf("expected error %v, got %v", tc.wantLastErr, lastErr)
+				}
+			} else {
+				if lastErr != nil {
+					t.Errorf("unexpected error on call %d: %v", tc.callCount, lastErr)
+				}
+			}
+		})
+	}
+}
+
+func TestWrapBodyForRetryAccumulatesProgressAcrossRetries(t *testing.T) {
+	bodyContent := "0123456789abcdefghijklmnopqrstuvwxyz"
+	originalBody := io.NopCloser(bytes.NewBufferString(bodyContent))
+	config := retryableBodyConfig{maxRetryBytes: 1024, maxAttempts: 3}
+
+	wrappedBody, getBody := wrapBodyForRetry(originalBody, config)
+
+	// Simulate first request attempt consuming only a prefix before a retry.
+	firstAttemptRead := make([]byte, 5)
+	if _, err := io.ReadFull(wrappedBody, firstAttemptRead); err != nil {
+		t.Fatalf("unexpected first attempt read error: %v", err)
+	}
+	if string(firstAttemptRead) != bodyContent[:5] {
+		t.Fatalf("expected first attempt prefix %q, got %q", bodyContent[:5], string(firstAttemptRead))
+	}
+	if err := wrappedBody.Close(); err != nil {
+		t.Fatalf("unexpected wrappedBody close error: %v", err)
+	}
+
+	// Simulate first retry consuming bytes from buffered prefix and original body, then failing.
+	firstRetryBody, err := getBody()
+	if err != nil {
+		t.Fatalf("unexpected first getBody error: %v", err)
+	}
+	firstRetryRead := make([]byte, 8)
+	if _, err := io.ReadFull(firstRetryBody, firstRetryRead); err != nil {
+		t.Fatalf("unexpected first retry read error: %v", err)
+	}
+	if string(firstRetryRead) != bodyContent[:8] {
+		t.Fatalf("expected first retry prefix %q, got %q", bodyContent[:8], string(firstRetryRead))
+	}
+	if err := firstRetryBody.Close(); err != nil {
+		t.Fatalf("unexpected firstRetryBody close error: %v", err)
+	}
+
+	// Next retry should still reconstruct the full original body.
+	secondRetryBody, err := getBody()
+	if err != nil {
+		t.Fatalf("unexpected second getBody error: %v", err)
+	}
+	secondRetryData, err := io.ReadAll(secondRetryBody)
+	if err != nil {
+		t.Fatalf("unexpected second retry read error: %v", err)
+	}
+	if string(secondRetryData) != bodyContent {
+		t.Fatalf("expected full body %q, got %q", bodyContent, string(secondRetryData))
+	}
+}
+
+// TestCloseIdempotent verifies that Close() can be called multiple times safely.
+// A no-op wrapped body is required as doRequest performs a cleanup, so we
+// avoid closing the delegating to originalBody and closing it.
+func TestCloseIdempotent(t *testing.T) {
+	originalBody := io.NopCloser(bytes.NewBufferString("test content"))
+	config := retryableBodyConfig{maxRetryBytes: 1024, maxAttempts: 2}
+
+	wrappedBody, _ := wrapBodyForRetry(originalBody, config)
+
+	// Read all content
+	_, err := io.ReadAll(wrappedBody)
+	if err != nil {
+		t.Fatalf("unexpected read error: %v", err)
+	}
+
+	// Close multiple times - should not error
+	for i := range 3 {
+		if err := wrappedBody.Close(); err != nil {
+			t.Errorf("Close() call %d returned error: %v", i+1, err)
+		}
+	}
+}
+
+func TestLimitedWriterStopsBuffering(t *testing.T) {
+	tests := []struct {
+		name         string
+		limit        int
+		writes       []string
+		wantExceeded bool
+		wantBufLen   int
+	}{
+		{
+			name:         "within limit",
+			limit:        100,
+			writes:       []string{"hello", " ", "world"},
+			wantExceeded: false,
+			wantBufLen:   11,
+		},
+		{
+			name:         "exactly at limit",
+			limit:        11,
+			writes:       []string{"hello", " ", "world"},
+			wantExceeded: false,
+			wantBufLen:   11,
+		},
+		{
+			name:         "exceeds on first write",
+			limit:        3,
+			writes:       []string{"hello"},
+			wantExceeded: true,
+		},
+		{
+			name:         "exceeds on later write",
+			limit:        8,
+			writes:       []string{"hello", " ", "world"},
+			wantExceeded: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			lw := &limitedWriter{buf: &buf, limit: tc.limit}
+
+			for _, w := range tc.writes {
+				n, err := lw.Write([]byte(w))
+				if err != nil {
+					t.Errorf("unexpected write error: %v", err)
+				}
+				if n != len(w) {
+					t.Errorf("expected write length %d, got %d", len(w), n)
+				}
+			}
+
+			buffered, exceeded := lw.snapshotForRetry(1)
+			if exceeded != nil {
+				if !tc.wantExceeded {
+					t.Errorf("expected exceeded=false, got error: %v", exceeded)
+				} else if !errors.Is(exceeded, errRequestBodyTooLarge) {
+					t.Errorf("expected errRequestBodyTooLarge, got: %v", exceeded)
+				}
+			} else if tc.wantExceeded {
+				t.Errorf("expected exceeded=true, got false")
+			}
+
+			if !tc.wantExceeded {
+				if len(buffered) != tc.wantBufLen {
+					t.Errorf("expected buffer length %d, got %d", tc.wantBufLen, len(buffered))
+				}
+			}
+		})
+	}
+}
