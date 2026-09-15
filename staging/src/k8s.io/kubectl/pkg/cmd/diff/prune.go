@@ -122,6 +122,11 @@ func (p *pruner) prune(tracker *tracker, namespace string, mapping *meta.RESTMap
 	return pobjs, nil
 }
 
+// VisitedUids returns the set of visited UIDs
+func (t *tracker) VisitedUids() sets.Set[types.UID] {
+	return t.visitedUids
+}
+
 // MarkVisited marks visited namespaces and uids
 func (t *tracker) MarkVisited(info *resource.Info) {
 	if info.Namespaced() {
