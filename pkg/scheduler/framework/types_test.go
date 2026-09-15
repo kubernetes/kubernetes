@@ -294,9 +294,9 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 				PodGroupInfo: &PodGroupInfo{
 					GenericPodGroup: fwk.NewGenericPodGroup(pg),
 				},
-				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
-				signatureOrder: make(map[fwk.EntityKey][]string),
-				buckets:        make(map[fwk.EntityKey]map[string][]*QueuedPodInfo),
+				QueuedPodInfos:  make(map[fwk.EntityKey][]*QueuedPodInfo),
+				signatureOrder:  make(map[fwk.EntityKey][]string),
+				subGroupBuckets: make(map[fwk.EntityKey]map[string][]*QueuedPodInfo),
 			}
 			for _, p := range tt.podsToAdd {
 				pgqi.AddPod(p)
@@ -859,42 +859,62 @@ func TestQueuedPodGroupInfo_SubGroups(t *testing.T) {
 		},
 		PodSignature: fwk.PodSignature("ps"),
 	}
+	ps2 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("ps2").UID("p2").Priority(highPriority).PodGroupName("pg1").Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp.Add(50 * time.Second),
+		},
+		PodSignature: fwk.PodSignature("ps"),
+	}
 
 	tests := []struct {
 		name          string
-		podsToAdd     []*QueuedPodInfo
+		initialPods   []*QueuedPodInfo
 		podToAdd      *QueuedPodInfo
 		podToRemove   *QueuedPodInfo
 		expectedOrder []*QueuedPodInfo
 	}{
 		{
 			name:          "SetPods groups by signature and sorts sub-groups by oldest representative pod",
-			podsToAdd:     []*QueuedPodInfo{driver1, worker2, driver2, worker1},
+			initialPods:   []*QueuedPodInfo{driver1, worker2, driver2, worker1},
 			expectedOrder: []*QueuedPodInfo{worker1, worker2, driver1, driver2},
 		},
 		{
 			name:          "AddPod inserts into existing bucket and maintains sub-group order",
-			podsToAdd:     []*QueuedPodInfo{worker1, worker2, driver1, driver2},
+			initialPods:   []*QueuedPodInfo{worker1, worker2, driver1, driver2},
 			podToAdd:      worker3,
 			expectedOrder: []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2},
 		},
 		{
 			name:          "AddPod with older timestamp creates new bucket and shifts sub-group order to front",
-			podsToAdd:     []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2},
+			initialPods:   []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2},
 			podToAdd:      ps1,
 			expectedOrder: []*QueuedPodInfo{ps1, worker1, worker3, worker2, driver1, driver2},
 		},
 		{
+			name:          "AddPod with older timestamp adds to existing bucket and shifts sub-group to the front",
+			initialPods:   []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2, ps2},
+			podToAdd:      ps1,
+			expectedOrder: []*QueuedPodInfo{ps1, ps2, worker1, worker3, worker2, driver1, driver2},
+		},
+		{
 			name:          "RemovePod removing sole pod in bucket removes sub-group",
-			podsToAdd:     []*QueuedPodInfo{ps1, worker1, worker3, worker2, driver1, driver2},
+			initialPods:   []*QueuedPodInfo{ps1, worker1, worker3, worker2, driver1, driver2},
 			podToRemove:   ps1,
 			expectedOrder: []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2},
 		},
 		{
 			name:          "RemovePod removing representative pod updates bucket head without breaking sub-group order",
-			podsToAdd:     []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2},
+			initialPods:   []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2},
 			podToRemove:   worker1,
 			expectedOrder: []*QueuedPodInfo{worker3, worker2, driver1, driver2},
+		},
+		{
+			name:          "RemovePod removing representative pod updates bucket head and reorder sub-groups",
+			initialPods:   []*QueuedPodInfo{ps1, ps2, worker1, worker3, worker2, driver1, driver2},
+			podToRemove:   ps1,
+			expectedOrder: []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2, ps2},
 		},
 	}
 
@@ -905,11 +925,11 @@ func TestQueuedPodGroupInfo_SubGroups(t *testing.T) {
 				PodGroupInfo: &PodGroupInfo{
 					GenericPodGroup: fwk.NewGenericPodGroup(pg),
 				},
-				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
-				signatureOrder: make(map[fwk.EntityKey][]string),
-				buckets:        make(map[fwk.EntityKey]map[string][]*QueuedPodInfo),
+				QueuedPodInfos:  make(map[fwk.EntityKey][]*QueuedPodInfo),
+				signatureOrder:  make(map[fwk.EntityKey][]string),
+				subGroupBuckets: make(map[fwk.EntityKey]map[string][]*QueuedPodInfo),
 			}
-			for _, p := range tt.podsToAdd {
+			for _, p := range tt.initialPods {
 				pgqi.AddPod(p)
 			}
 			if tt.podToAdd != nil {
@@ -975,9 +995,9 @@ func TestQueuedPodGroupInfo_UpdateAndAddPod(t *testing.T) {
 		PodGroupInfo: &PodGroupInfo{
 			GenericPodGroup: fwk.NewGenericPodGroup(pg),
 		},
-		QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
-		signatureOrder: make(map[fwk.EntityKey][]string),
-		buckets:        make(map[fwk.EntityKey]map[string][]*QueuedPodInfo),
+		QueuedPodInfos:  make(map[fwk.EntityKey][]*QueuedPodInfo),
+		signatureOrder:  make(map[fwk.EntityKey][]string),
+		subGroupBuckets: make(map[fwk.EntityKey]map[string][]*QueuedPodInfo),
 	}
 	pgqi.AddPod(worker1)
 	pgqi.AddPod(driver1)
@@ -1045,7 +1065,7 @@ func TestQueuedPodGroupInfo_Update(t *testing.T) {
 				if string(pInfo.PodSignature) != "sig1" {
 					t.Errorf("pod signature changed unexpectedly")
 				}
-				if len(pgqi.buckets) != 1 || len(pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig1"]) != 1 {
+				if len(pgqi.subGroupBuckets) != 1 || len(pgqi.subGroupBuckets[fwk.PodGroupKey("default", "pg-test")]["sig1"]) != 1 {
 					t.Errorf("buckets state is invalid")
 				}
 				if len(pgqi.signatureOrder) != 1 || pgqi.signatureOrder[fwk.PodGroupKey("default", "pg-test")][0] != "sig1" {
@@ -1069,15 +1089,15 @@ func TestQueuedPodGroupInfo_Update(t *testing.T) {
 			newSignature: fwk.PodSignature("sig2"),
 			verifyState: func(t *testing.T, pgqi *QueuedPodGroupInfo) {
 				// sig1 bucket should be completely removed
-				if _, ok := pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig1"]; ok {
+				if _, ok := pgqi.subGroupBuckets[fwk.PodGroupKey("default", "pg-test")]["sig1"]; ok {
 					t.Errorf("sig1 bucket should have been deleted")
 				}
 				if len(pgqi.signatureOrder[fwk.PodGroupKey("default", "pg-test")]) != 1 || pgqi.signatureOrder[fwk.PodGroupKey("default", "pg-test")][0] != "sig2" {
 					t.Errorf("sig1 should have been removed from signatureOrder, got order: %v", pgqi.signatureOrder[fwk.PodGroupKey("default", "pg-test")])
 				}
 				// sig2 bucket should contain both p1 and p2
-				if len(pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]) != 2 {
-					t.Errorf("expected 2 pods in sig2 bucket, got %d", len(pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]))
+				if len(pgqi.subGroupBuckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]) != 2 {
+					t.Errorf("expected 2 pods in sig2 bucket, got %d", len(pgqi.subGroupBuckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]))
 				}
 			},
 		},
@@ -1110,7 +1130,7 @@ func TestQueuedPodGroupInfo_Update(t *testing.T) {
 			newSignature: fwk.PodSignature("sig2"),
 			verifyState: func(t *testing.T, pgqi *QueuedPodGroupInfo) {
 				// p1 (ts=10s) should be inserted in the middle of sig2 bucket: p2-early (5s), p1 (10s), p2-late (20s)
-				bucket := pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]
+				bucket := pgqi.subGroupBuckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]
 				if len(bucket) != 3 {
 					t.Fatalf("expected 3 pods in sig2 bucket, got %d", len(bucket))
 				}
@@ -1154,7 +1174,7 @@ func TestQueuedPodGroupInfo_Update(t *testing.T) {
 			newSignature: fwk.PodSignature("sig2"),
 			verifyState: func(t *testing.T, pgqi *QueuedPodGroupInfo) {
 				// p2 (ts=6s) should be the only pod in sig1 bucket
-				bucket1 := pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig1"]
+				bucket1 := pgqi.subGroupBuckets[fwk.PodGroupKey("default", "pg-test")]["sig1"]
 				if len(bucket1) != 1 {
 					t.Fatalf("expected 1 pod in sig1 bucket, got %d", len(bucket1))
 				}
@@ -1162,7 +1182,7 @@ func TestQueuedPodGroupInfo_Update(t *testing.T) {
 					t.Errorf("sig1 bucket pods are in wrong order: %s", bucket1[0].Pod.Name)
 				}
 				// p1 (ts=5s) should be inserted in the front of sig2 bucket2: p1 (5s), p3-early(5s), p3-late(20s)
-				bucket2 := pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]
+				bucket2 := pgqi.subGroupBuckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]
 				if len(bucket2) != 3 {
 					t.Fatalf("expected 3 pods in sig2 bucket, got %d", len(bucket2))
 				}
@@ -1192,9 +1212,9 @@ func TestQueuedPodGroupInfo_Update(t *testing.T) {
 				PodGroupInfo: &PodGroupInfo{
 					GenericPodGroup: fwk.NewGenericPodGroup(pg),
 				},
-				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
-				signatureOrder: make(map[fwk.EntityKey][]string),
-				buckets:        make(map[fwk.EntityKey]map[string][]*QueuedPodInfo),
+				QueuedPodInfos:  make(map[fwk.EntityKey][]*QueuedPodInfo),
+				signatureOrder:  make(map[fwk.EntityKey][]string),
+				subGroupBuckets: make(map[fwk.EntityKey]map[string][]*QueuedPodInfo),
 			}
 			for _, pInfo := range tt.initialPods {
 				pgqi.AddPod(pInfo)
@@ -5196,7 +5216,7 @@ func TestQueuedPodGroupInfo_UpdateAndRemovePod(t *testing.T) {
 			signatureOrder: map[fwk.EntityKey][]string{
 				podKeyStandalone: {sig},
 			},
-			buckets: map[fwk.EntityKey]map[string][]*QueuedPodInfo{
+			subGroupBuckets: map[fwk.EntityKey]map[string][]*QueuedPodInfo{
 				podKeyStandalone: {sig: []*QueuedPodInfo{pInfo1}},
 			},
 		}
@@ -5215,7 +5235,7 @@ func TestQueuedPodGroupInfo_UpdateAndRemovePod(t *testing.T) {
 			signatureOrder: map[fwk.EntityKey][]string{
 				podKeyShared: {sig},
 			},
-			buckets: map[fwk.EntityKey]map[string][]*QueuedPodInfo{
+			subGroupBuckets: map[fwk.EntityKey]map[string][]*QueuedPodInfo{
 				podKeyShared: {sig: []*QueuedPodInfo{pInfoShared}},
 			},
 		}
