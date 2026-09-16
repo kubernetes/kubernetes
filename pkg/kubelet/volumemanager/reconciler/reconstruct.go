@@ -189,7 +189,9 @@ func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumep
 		// with no pod and no mounted device, the reconciler would take it for a
 		// volume to detach, report it detached and drop it, and nothing would
 		// unstage the mount until the next kubelet start.
-		rc.actualStateOfWorld.DeleteVolume(volumeName)
+		if err := rc.actualStateOfWorld.DeleteVolume(volumeName); err != nil {
+			logger.Error(err, "Could not remove the global mount from the actual state of world", "volumeName", volumeName)
+		}
 		return
 	}
 

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -139,7 +140,7 @@ func TestReconstructGlobalVolumes(t *testing.T) {
 		// Attachability stays uncertain until node.status.volumesAttached is
 		// read, which is why the volume has to be queued for that update: it is
 		// what decides whether it is reported in node.status.volumesInUse.
-		if !containsVolume(rc.volumesNeedUpdateFromNodeStatus, volumeName) {
+		if !slices.Contains(rc.volumesNeedUpdateFromNodeStatus, volumeName) {
 			t.Errorf("volume %q was not queued for a device path update, got %v", volumeName, rc.volumesNeedUpdateFromNodeStatus)
 		}
 	})
@@ -204,7 +205,7 @@ func TestReconstructGlobalVolumes(t *testing.T) {
 		if !found {
 			t.Fatalf("block volume %q is not among the attached volumes", volumeName)
 		}
-		if !containsVolume(rc.volumesNeedUpdateFromNodeStatus, volumeName) {
+		if !slices.Contains(rc.volumesNeedUpdateFromNodeStatus, volumeName) {
 			t.Errorf("block volume %q was not queued for a device path update, got %v", volumeName, rc.volumesNeedUpdateFromNodeStatus)
 		}
 	})
@@ -281,13 +282,4 @@ func TestReconstructGlobalVolumes(t *testing.T) {
 			t.Errorf("volume %q did not reach the actual state of world with the gate on", volumeName)
 		}
 	})
-}
-
-func containsVolume(names []v1.UniqueVolumeName, name v1.UniqueVolumeName) bool {
-	for _, n := range names {
-		if n == name {
-			return true
-		}
-	}
-	return false
 }
