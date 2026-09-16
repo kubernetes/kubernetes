@@ -35,7 +35,10 @@ type NodePortAddresses struct {
 }
 
 // RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
-var ipv4LoopbackStart = net.IPv4(127, 0, 0, 0)
+var (
+	ipv4LoopbackStart = net.IPv4(127, 0, 0, 0)
+	ipv4Localhost     = net.IPv4(127, 0, 0, 1)
+)
 
 // NewNodePortAddresses takes an IP family and the `--nodeport-addresses` value (which is
 // assumed to contain only valid CIDRs, potentially of both IP families) and returns a
@@ -60,7 +63,17 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAdd
 	}
 
 	for _, str := range npa.cidrStrings {
-		if _, cidr, err := netutils.ParseCIDRSloppy(str); err == nil && cidr.IP.IsLoopback() {
+		_, cidr, err := netutils.ParseCIDRSloppy(str)
+		if err != nil || !cidr.IP.IsLoopback() {
+			continue
+		}
+
+		if family == v1.IPv4Protocol {
+			if cidr.Contains(ipv4Localhost) {
+				npa.containsExplicitLoopback = true
+				break
+			}
+		} else if cidr.Contains(net.IPv6loopback) {
 			npa.containsExplicitLoopback = true
 			break
 		}
