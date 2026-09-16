@@ -18,8 +18,6 @@ package generators
 
 import (
 	"fmt"
-	"path"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/util"
@@ -51,90 +49,6 @@ func alphaBetaPrefix(tagPrefix string) lintRule {
 			// Only check alpha/beta tags or validation tags.
 			if msg, err := checkAlphaBetaUsage(tagPrefix, tag, true); err != nil || msg != "" {
 				return msg, err
-			}
-		}
-		return "", nil
-	}
-}
-
-// checkTagStability recursively checks that a tag and its nested tags
-// satisfy the stability requirements of the context.
-func checkTagStability(tag codetags.Tag, contextLevel validators.TagStabilityLevel) (string, error) {
-	tagStability, err := validators.GetStability(tag.Name)
-	// all DV tags have stability, if a tag doesn't have stability then it is not a valid DV tag.
-	if err != nil {
-		return "", nil
-	}
-	cmpOrder, err := tagStability.Compare(contextLevel)
-	if err != nil {
-		return "", err
-	}
-	if cmpOrder < 0 {
-		return fmt.Sprintf("tag %q with stability level %q cannot be used in %s validation", tag.Name, tagStability, contextLevel), nil
-	}
-	if tag.ValueTag != nil {
-		return checkTagStability(*tag.ValueTag, contextLevel)
-	}
-	return "", nil
-}
-
-// validationStability enforces stability level constraints on tags.
-func validationStability(tagPrefix string) lintRule {
-	alphaTag, betaTag := tagPrefix+"alpha", tagPrefix+"beta"
-	ifEnabledTag, ifDisabledTag := tagPrefix+"ifEnabled", tagPrefix+"ifDisabled"
-	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
-		pkgPath := t.Name.Package
-		if container != nil {
-			pkgPath = container.Name.Package
-		}
-
-		// Unprefixed validations are normally required to be Stable.
-		// In Alpha packages, we allow Alpha-level and Beta-level validations
-		// without a prefix. In Beta packages, we allow Beta-level validations
-		// without a prefix.
-		defaultContextLevel := validators.TagStabilityLevelStable
-		// APIVersion is the last element of the package path.
-		apiVersion := path.Base(pkgPath)
-		if strings.Contains(apiVersion, "alpha") {
-			defaultContextLevel = validators.TagStabilityLevelAlpha
-		} else if strings.Contains(apiVersion, "beta") {
-			defaultContextLevel = validators.TagStabilityLevelBeta
-		}
-
-		for _, tag := range tags {
-			contextLevel := defaultContextLevel
-			tagToCheck := tag
-
-			// For stability level tags, set the stability context for the inner validation,
-			// overriding the package-level default.
-			if tag.Name == alphaTag || tag.Name == betaTag {
-				if tag.Name == alphaTag {
-					contextLevel = validators.TagStabilityLevelAlpha
-				} else {
-					contextLevel = validators.TagStabilityLevelBeta
-				}
-				if tag.ValueTag == nil {
-					continue
-				}
-				tagToCheck = *tag.ValueTag
-			}
-
-			// For feature gate tags, we allow developers to use nested beta validation tags
-			// without forcing validation authors to write redundant handwritten code (bypassing the
-			// declarative validation equivalence check), we automatically relax the stability
-			// context to Beta if the current context is Stable.
-			if tagToCheck.Name == ifEnabledTag || tagToCheck.Name == ifDisabledTag {
-				if contextLevel == validators.TagStabilityLevelStable {
-					contextLevel = validators.TagStabilityLevelBeta
-				}
-			}
-
-			msg, err := checkTagStability(tagToCheck, contextLevel)
-			if err != nil {
-				return "", err
-			}
-			if msg != "" {
-				return msg, nil
 			}
 		}
 		return "", nil
@@ -452,7 +366,6 @@ func nonPointerStructRequiredness(extractor validators.ValidationExtractor, tagP
 func lintRules(extractor validators.ValidationExtractor, tagPrefix string) []lintRule {
 	return []lintRule{
 		alphaBetaPrefix(tagPrefix),
-		validationStability(tagPrefix),
 		requiredAndOptional(extractor, tagPrefix),
 		nonPointerStructRequiredness(extractor, tagPrefix),
 	}

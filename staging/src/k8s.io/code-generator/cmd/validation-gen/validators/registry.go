@@ -266,11 +266,6 @@ func (reg *registry) Stability(tag string) (TagStabilityLevel, error) {
 	return tv.Docs().StabilityLevel, nil
 }
 
-// GetStability returns the stability level for a given tag from the global registry.
-func GetStability(tag string) (TagStabilityLevel, error) {
-	return globalRegistry.Stability(tag)
-}
-
 // IsKnownTag returns true if the tag has been registered as a validation tag.
 func (reg *registry) IsKnownTag(tag string) bool {
 	_, err := reg.Stability(tag)
