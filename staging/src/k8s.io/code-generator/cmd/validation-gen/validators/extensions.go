@@ -17,12 +17,17 @@ limitations under the License.
 package validators
 
 import (
+	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/gengo/v2/types"
 	"sigs.k8s.io/yaml"
 )
@@ -57,7 +62,7 @@ type FormatExtension struct {
 var formatNamePattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 // LoadExtensions reads, merges, and validates the extensions files at paths.
-// Each file is one YAML document. Empty paths returns nil.
+// Empty paths returns nil.
 func LoadExtensions(paths []string) (*Extensions, error) {
 	if len(paths) == 0 {
 		return nil, nil
@@ -67,24 +72,43 @@ func LoadExtensions(paths []string) (*Extensions, error) {
 	seen := map[string]string{} // format name -> the file that declared it
 
 	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("reading extensions file %q: %w", path, err)
+		if err := loadExtensionsFile(path, combined, seen); err != nil {
+			return nil, err
 		}
-		var ext Extensions
-		if err := yaml.UnmarshalStrict(data, &ext); err != nil {
-			return nil, fmt.Errorf("parsing extensions file %q: %w", path, err)
-		}
-		if err := ext.validate(path, seen); err != nil {
-			return nil, fmt.Errorf("extensions file %q: %w", path, err)
-		}
-		combined.Formats = append(combined.Formats, ext.Formats...)
 	}
 	return combined, nil
 }
 
-// validate checks one file's formats. seen maps each name already declared to
-// the file that declared it, so that two files cannot claim the same name.
+// loadExtensionsFile appends one file's formats to combined. A file may hold
+// several YAML documents, so that generated and hand-written ones concatenate.
+func loadExtensionsFile(path string, combined *Extensions, seen map[string]string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading extensions file %q: %w", path, err)
+	}
+
+	reader := utilyaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(data)))
+	for {
+		doc, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("parsing extensions file %q: %w", path, err)
+		}
+		var ext Extensions
+		if err := yaml.UnmarshalStrict(doc, &ext); err != nil {
+			return fmt.Errorf("parsing extensions file %q: %w", path, err)
+		}
+		if err := ext.validate(path, seen); err != nil {
+			return fmt.Errorf("extensions file %q: %w", path, err)
+		}
+		combined.Formats = append(combined.Formats, ext.Formats...)
+	}
+}
+
+// validate checks one document's formats. seen maps each name already declared
+// to the file that declared it, so that two files cannot claim the same name.
 func (e *Extensions) validate(path string, seen map[string]string) error {
 	for i := range e.Formats {
 		f := &e.Formats[i]

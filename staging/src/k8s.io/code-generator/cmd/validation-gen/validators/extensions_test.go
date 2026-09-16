@@ -61,6 +61,17 @@ func TestLoadExtensions(t *testing.T) {
 		}
 	})
 
+	t.Run("across documents in one file", func(t *testing.T) {
+		path := write(t, "multi.yaml", "formats:\n"+format("doc-one", "^1$")+"---\nformats:\n"+format("doc-two", "^2$"))
+		ext, err := LoadExtensions([]string{path})
+		if err != nil {
+			t.Fatalf("LoadExtensions() = %v", err)
+		}
+		if got := ext.formats(); len(got) != 2 {
+			t.Errorf("formats() = %+v, want both documents", got)
+		}
+	})
+
 	t.Run("duplicate across files names both", func(t *testing.T) {
 		a := write(t, "a.yaml", "formats:\n"+format("dup", "^a$"))
 		b := write(t, "b.yaml", "formats:\n"+format("dup", "^b$"))

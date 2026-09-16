@@ -13,8 +13,9 @@ the **stock** generator rather than one built for the project:
 validation-gen --validation-extensions-file=path/to/extensions.yaml ...
 ```
 
-The flag may be repeated. Each file is one YAML document, formats from every
-file are concatenated, and a name may only be declared once across all of them.
+The flag may be repeated, and a file may hold several YAML documents; formats
+from every file and document are concatenated, and a name may only be declared
+once across all of them.
 
 [extensions.yaml](extensions.yaml) is this example's file,
 [output_tests/generate.go](output_tests/generate.go) is the invocation that
