@@ -25,8 +25,8 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/ktesting"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // testOptionalNodeOperations verifies DRA optional node operations.

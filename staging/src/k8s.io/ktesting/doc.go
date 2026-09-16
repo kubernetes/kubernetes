@@ -20,10 +20,10 @@ limitations under the License.
 //
 // # Examples
 //
-// The examples in [k8s.io/kubernetes/test/utils/ktesting/examples] are unit tests which
+// The examples in [k8s.io/ktesting/examples] are unit tests which
 // intentionally contain failures and tests which get stuck. To run them, use:
 //
-//	go test -timeout=10s -tags example k8s.io/kubernetes/test/utils/ktesting/examples/...
+//	go test -timeout=10s -tags example k8s.io/ktesting/examples/...
 //
 // Individual examples will be called out below where applicable.
 //
@@ -41,7 +41,7 @@ limitations under the License.
 // sub-tests), [testing/synctest] (running code in a synctest bubble) and
 // Ginkgo (timeouts and interrupt handling, progress reporting).
 //
-// [k8s.io/kubernetes/test/utils/client-go/ktesting] adds type-safe passing
+// [k8s.io/client-go/ktesting] adds type-safe passing
 // of all relevant client-go instances through a single TContext parameter,
 // similar to [k8s.io/kubernetes/test/e2e/framework.Framework].
 //
@@ -97,8 +97,8 @@ limitations under the License.
 //
 // These two examples demonstrate the difference in behavior with and without ktesting:
 //
-//	go test -tags example -timeout=10s -v k8s.io/kubernetes/test/utils/ktesting/examples/with_ktesting
-//	go test -tags example -timeout=10s -v k8s.io/kubernetes/test/utils/ktesting/examples/without_ktesting
+//	go test -tags example -timeout=10s -v k8s.io/ktesting/examples/with_ktesting
+//	go test -tags example -timeout=10s -v k8s.io/ktesting/examples/without_ktesting
 //
 // You can try interrupting before the 10 second timeout, too.
 //
@@ -152,7 +152,7 @@ limitations under the License.
 // For example, `t.Fatal(err)` don't make it clear that the error string
 // is the test failure.
 //
-//	go test -tags example -v -run=TestFormat k8s.io/kubernetes/test/utils/ktesting/examples/logging -args -v=1
+//	go test -tags example -v -run=TestFormat k8s.io/ktesting/examples/logging -args -v=1
 //	=== RUN   TestFormat
 //	    example_test.go:57: I0820 14:33:51.450589] hello via tCtx.Logf (unstructured logging): x is 1
 //	    example_test.go:58: I0820 14:33:51.450605] hello via tCtx.Logger().Info (structured logging) x=1
@@ -236,7 +236,7 @@ limitations under the License.
 // and "set heat for baking" are passed to two different WithStep calls and "oven not found" to
 // [TContext.Fatal]. There are two "FATAL ERRORs" because a cleanup function also fails:
 //
-//	go test -tags example -v -run=TestWithStep k8s.io/kubernetes/test/utils/ktesting/examples/logging
+//	go test -tags example -v -run=TestWithStep k8s.io/ktesting/examples/logging
 //	=== RUN   TestWithStep
 //	    baking_test.go:29: I0821 17:08:55.019097] bake cake/set heat for baking: Log()
 //	    baking_test.go:30: I0821 17:08:55.019114] bake cake/set heat for baking: Logger().Info()
@@ -251,28 +251,28 @@ limitations under the License.
 //
 //	=== RUN   TestWithError
 //	    example_test.go:92: I0821 15:01:50.576258] checking oven temperature: failed at:
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.checkTemperature({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...}, ...)
-//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:100 +0x67
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x30e55d1b4b48?)
-//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:92 +0x12b
+//	                k8s.io/ktesting/examples/logging.checkTemperature({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...}, ...)
+//	                        /nvme/gopath/src/k8s.io/kubernetes/staging/src/k8s.io/ktesting/examples/logging/example_test.go:100 +0x67
+//	                k8s.io/ktesting/examples/logging.TestWithError(0x30e55d1b4b48?)
+//	                        /nvme/gopath/src/k8s.io/kubernetes/staging/src/k8s.io/ktesting/examples/logging/example_test.go:92 +0x12b
 //	    example_test.go:92: ERROR: I0821 15:01:50.576273]
 //	                checking oven temperature: oven temperature 42°C is too low for baking
 //	    example_test.go:93: I0821 15:01:50.576325] checking oven readiness: failed at:
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.checkOvenReady({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...}, ...)
-//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:110 +0x306
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x30e55d1b4b48?)
-//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:93 +0x205
+//	                k8s.io/ktesting/examples/logging.checkOvenReady({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...}, ...)
+//	                        /nvme/gopath/src/k8s.io/kubernetes/staging/src/k8s.io/ktesting/examples/logging/example_test.go:110 +0x306
+//	                k8s.io/ktesting/examples/logging.TestWithError(0x30e55d1b4b48?)
+//	                        /nvme/gopath/src/k8s.io/kubernetes/staging/src/k8s.io/ktesting/examples/logging/example_test.go:93 +0x205
 //	    example_test.go:93: ERROR: I0821 15:01:50.576338]
 //	                checking oven readiness: oven is not ready yet
 //	    baking_test.go:29: I0821 15:01:50.576343] Log()
 //	    baking_test.go:30: I0821 15:01:50.576351] Logger().Info()
 //	    example_test.go:94: I0821 15:01:50.576384] baking cake: failed at:
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.heatOven({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
-//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/baking_test.go:31 +0x1a5
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.bakeCake({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
-//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:118 +0x22d
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x30e55d1b4b48?)
-//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:94 +0x2db
+//	                k8s.io/ktesting/examples/logging.heatOven({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
+//	                        /nvme/gopath/src/k8s.io/kubernetes/staging/src/k8s.io/ktesting/examples/logging/baking_test.go:31 +0x1a5
+//	                k8s.io/ktesting/examples/logging.bakeCake({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
+//	                        /nvme/gopath/src/k8s.io/kubernetes/staging/src/k8s.io/ktesting/examples/logging/example_test.go:118 +0x22d
+//	                k8s.io/ktesting/examples/logging.TestWithError(0x30e55d1b4b48?)
+//	                        /nvme/gopath/src/k8s.io/kubernetes/staging/src/k8s.io/ktesting/examples/logging/example_test.go:94 +0x2db
 //	    example_test.go:94: ERROR: I0821 15:01:50.576390]
 //	                baking cake: oven not found
 //	    baking_test.go:37: FATAL ERROR: I0821 15:01:50.576397]
@@ -318,7 +318,7 @@ limitations under the License.
 // explanation, indented and prefixed by the name of the sub-test that it
 // belongs to:
 //
-//	go test -tags example -timeout=20s k8s.io/kubernetes/test/utils/ktesting/examples/with_ktesting & pid=$!; sleep 5; killall -USR1 with_ktesting.test; wait $pid
+//	go test -tags example -timeout=20s k8s.io/ktesting/examples/with_ktesting & pid=$!; sleep 5; killall -USR1 with_ktesting.test; wait $pid
 //	...
 //	You requested a progress report.
 //	Currently running:
@@ -363,7 +363,7 @@ limitations under the License.
 //	                    <int>: 2
 //	    example_test.go:38: Cleaning up...
 //	FAIL
-//	FAIL    k8s.io/kubernetes/test/utils/ktesting/examples/with_ktesting    15.007s
+//	FAIL    k8s.io/ktesting/examples/with_ktesting    15.007s
 //
 // Normally, raising an assertion inside a polling callback is wrong. In the following example,
 // a failed assertion aborts the test instead of triggering a retry:

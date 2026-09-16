@@ -104,6 +104,7 @@ require (
 	k8s.io/externaljwt v0.0.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/kms v0.0.0
+	k8s.io/ktesting v0.0.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
 	k8s.io/kube-openapi v0.0.0-20260929181212-2cfbdf149b9a
@@ -234,6 +235,7 @@ replace (
 	k8s.io/endpointslice => ./staging/src/k8s.io/endpointslice
 	k8s.io/externaljwt => ./staging/src/k8s.io/externaljwt
 	k8s.io/kms => ./staging/src/k8s.io/kms
+	k8s.io/ktesting => ./staging/src/k8s.io/ktesting
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy

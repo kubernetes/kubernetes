@@ -20,7 +20,7 @@ package logging
 
 import (
 	"github.com/onsi/gomega"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 // heatOven demonstrates how log output and failures are handle when using

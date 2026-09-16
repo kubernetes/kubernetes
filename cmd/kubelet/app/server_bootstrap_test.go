@@ -44,9 +44,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/ktesting"
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
 	"k8s.io/kubernetes/pkg/controller/certificates/authority"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Test_buildClientCertificateManager validates that we can build a local client cert

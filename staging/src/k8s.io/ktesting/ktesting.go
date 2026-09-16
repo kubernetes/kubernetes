@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/klog/v2"
-	_ "k8s.io/kubernetes/test/utils/ktesting/format" // Activate YAML format in Gomega.
+	_ "k8s.io/ktesting/format" // Activate YAML format in Gomega.
 )
 
 var klogVFlag *flag.Flag

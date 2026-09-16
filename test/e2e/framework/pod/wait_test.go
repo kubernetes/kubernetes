@@ -31,10 +31,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	_ "k8s.io/ktesting/format" // activate YAML object dumps
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/internal/output"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	_ "k8s.io/kubernetes/test/utils/ktesting/format" // activate YAML object dumps
 )
 
 // The line number of the following code is checked in TestFailureOutput below.

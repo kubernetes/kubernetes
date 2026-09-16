@@ -21,9 +21,9 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type policyMergeTestCase struct {

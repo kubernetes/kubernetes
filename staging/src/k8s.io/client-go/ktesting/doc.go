@@ -21,6 +21,4 @@ limitations under the License.
 //
 // Those could of course also be passed as separate parameters.
 // When using TContext, a single parameter is enough.
-//
-// TODO: move to k8s.io/client-go/ktesting
 package ktesting

@@ -21,8 +21,8 @@ import (
 	"sort"
 	"testing"
 
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
