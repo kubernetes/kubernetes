@@ -2454,6 +2454,14 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-scheduler
   library: true
+- destination: ktesting
+  branches:
+  - name: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/ktesting
+  library: true
 - destination: endpointslice
   branches:
   - name: master

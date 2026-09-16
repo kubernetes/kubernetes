@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - sig-testing-approvers
+  - klueska
+  - pohly
+reviewers:
+  - pohly
+labels:
+  - sig/testing
