@@ -22,6 +22,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -751,8 +752,14 @@ func validateStubPKCS10Request(req *certificates.PodCertificateRequest) field.Er
 			allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, fmt.Sprintf("%d-bit modulus", pkcs10Pub.Size()*8), "RSA keys must have modulus size 3072 or 4096"))
 			return allErrors
 		}
+	case *mldsa.PublicKey:
+		keyParam := pkcs10Pub.Parameters().String()
+		if keyParam != mldsa.MLDSA44().String() && keyParam != mldsa.MLDSA65().String() && keyParam != mldsa.MLDSA87().String() {
+			allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, fmt.Sprintf("key parameters %q", keyParam), fmt.Sprintf("ML-DSA keys must have key parameters of %s, %s, or %s", mldsa.MLDSA44().String(), mldsa.MLDSA65().String(), mldsa.MLDSA87().String())))
+			return allErrors
+		}
 	default:
-		allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, field.OmitValueType{}, "unknown public key type; supported types are Ed25519, ECDSA, and RSA"))
+		allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, field.OmitValueType{}, "unknown public key type; supported types are Ed25519, ECDSA, RSA, and ML-DSA"))
 		return allErrors
 	}
 
@@ -930,6 +937,11 @@ func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodC
 				return allErrors
 			}
 		case *ecdsa.PublicKey:
+			if !wantPK.Equal(leafCert.PublicKey) {
+				allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "leaf certificate was not issued to the requested public key"))
+				return allErrors
+			}
+		case *mldsa.PublicKey:
 			if !wantPK.Equal(leafCert.PublicKey) {
 				allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "leaf certificate was not issued to the requested public key"))
 				return allErrors
