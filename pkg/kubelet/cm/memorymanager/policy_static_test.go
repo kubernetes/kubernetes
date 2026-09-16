@@ -1489,6 +1489,56 @@ func TestStaticPolicyStartCrossNUMAMemoryDrift(t *testing.T) {
 	}
 }
 
+func TestStaticPolicyStartMemoryDriftMetrics(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+	metrics.MemoryManagerDriftToleranceBytes.Create(nil)
+	metrics.MemoryManagerMemoryDriftBytes.Create(nil)
+	metrics.MemoryManagerMemoryDriftBytes.Reset()
+	tc := testStaticPolicy{
+		assignments: state.ContainerMemoryAssignments{},
+		machineState: state.NUMANodeMap{
+			0: &state.NUMANodeState{
+				MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+					v1.ResourceMemory: {Allocatable: 512 * mb, Free: 512 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+					hugepages1Gi:      {Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb},
+				},
+				Cells:               []int{0},
+				NumberOfAssignments: 0,
+			},
+		},
+		systemReserved: systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}},
+		machineInfo: &cadvisorapi.MachineInfo{
+			Topology: []cadvisorapi.Node{
+				{Id: 0, Memory: 2*gb - 4*mb, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+			},
+		},
+	}
+
+	p, s, err := initTests(t, &tc, nil, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	p.(*staticPolicy).maxMemoryDrift = testMemoryDriftBound
+	if err := p.Start(logger, s); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	tolerance, err := testutil.GetGaugeMetricValue(metrics.MemoryManagerDriftToleranceBytes)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if tolerance != float64(testMemoryDriftBound) {
+		t.Fatalf("drift tolerance metric = %v, want %d", tolerance, testMemoryDriftBound)
+	}
+	drift, err := testutil.GetGaugeMetricValue(metrics.MemoryManagerMemoryDriftBytes.WithLabelValues("0"))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if drift != float64(4*mb) {
+		t.Fatalf("memory drift metric = %v, want %d", drift, 4*mb)
+	}
+}
+
 func TestStaticPolicyStartMemoryDriftGateDisabled(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, false)

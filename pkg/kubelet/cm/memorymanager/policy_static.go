@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -1058,6 +1059,7 @@ func areGroupsEqual(group1, group2 []int) bool {
 }
 
 func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
+	metrics.MemoryManagerDriftToleranceBytes.Set(float64(p.maxMemoryDrift))
 	machineState := s.GetMachineState()
 	memoryAssignments := s.GetMemoryAssignments()
 
@@ -1103,6 +1105,7 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 		logger.Info("Tolerating a small NUMA node memory drift and re-baselining the memory manager state", "maxDriftBytes", p.maxMemoryDrift)
 		s.SetMachineState(expectedMachineState)
 	}
+	recordMemoryDrift(machineState, expectedMachineState)
 
 	return nil
 }
@@ -1282,6 +1285,24 @@ func absoluteDiff(a, b uint64) uint64 {
 		return a - b
 	}
 	return b - a
+}
+
+func recordMemoryDrift(stored, current state.NUMANodeMap) {
+	for nodeID, storedNode := range stored {
+		currentNode, ok := current[nodeID]
+		if !ok {
+			continue
+		}
+		storedMem, ok := storedNode.MemoryMap[v1.ResourceMemory]
+		if !ok {
+			continue
+		}
+		currentMem, ok := currentNode.MemoryMap[v1.ResourceMemory]
+		if !ok {
+			continue
+		}
+		metrics.MemoryManagerMemoryDriftBytes.WithLabelValues(strconv.Itoa(nodeID)).Set(float64(absoluteDiff(storedMem.TotalMemSize, currentMem.TotalMemSize)))
+	}
 }
 
 func (p *staticPolicy) getDefaultMachineState() state.NUMANodeMap {
