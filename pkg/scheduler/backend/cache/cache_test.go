@@ -3528,6 +3528,15 @@ func Test_BuildHierarchySnapshotFromPod(t *testing.T) {
 			},
 		},
 		{
+			name:                     "missing CPG in hierarchy",
+			pod:                      pod3,
+			initialPGs:               []*schedulingv1beta1.PodGroup{pg3},
+			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpg2},
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			wantErr:                  true,
+		},
+		{
 			name:                     "cycle detection in hierarchy",
 			pod:                      podCycle,
 			initialPGs:               []*schedulingv1beta1.PodGroup{pgCycle},

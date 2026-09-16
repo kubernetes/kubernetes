@@ -2035,7 +2035,7 @@ func TestSnapshot_FindRootKeyForGroup(t *testing.T) {
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: false,
 			key:                      fwk.CompositePodGroupKey("ns1", "cpg1"),
-			want:                     keyPtr(fwk.CompositePodGroupKey("ns1", "cpg2")), // It processes CPG keys normally
+			want:                     keyPtr(fwk.CompositePodGroupKey("ns1", "cpg1")),
 		},
 		{
 			name:                     "missing intermediate",

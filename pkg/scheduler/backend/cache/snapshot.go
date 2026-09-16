@@ -934,45 +934,7 @@ func removeNodeInfoFromList(logger klog.Logger, list []fwk.NodeInfo, nodeInfoToR
 // or nil if the root group was not found (i.e. does not exist).
 // The key must be of PodGroupKey or CompositePodGroupKey type.
 func (s *Snapshot) FindRootKeyForGroup(key fwk.EntityKey) (*fwk.EntityKey, error) {
-	currentKey := key
-	visited := sets.New[fwk.EntityKey]()
-	for {
-		if visited.Has(currentKey) {
-			return nil, fmt.Errorf("cycle detected in the hierarchy: %v", visited.UnsortedList())
-		}
-		visited.Insert(currentKey)
-
-		switch currentKey.Type {
-		case fwk.PodGroupKeyType:
-			pgs, ok := s.podGroupStates[currentKey]
-			if !ok {
-				return nil, nil
-			}
-			pg := pgs.podGroup
-			if pg == nil {
-				return nil, nil
-			}
-			if !s.compositePodGroupEnabled || pg.Spec.ParentCompositePodGroupName == nil {
-				return &currentKey, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(pg.Namespace, *pg.Spec.ParentCompositePodGroupName)
-		case fwk.CompositePodGroupKeyType:
-			cpgs, ok := s.compositePodGroupStates[currentKey]
-			if !ok {
-				return nil, nil
-			}
-			cpg := cpgs.compositePodGroup
-			if cpg == nil {
-				return nil, nil
-			}
-			if cpg.Spec.ParentCompositePodGroupName == nil {
-				return &currentKey, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(cpg.Namespace, *cpg.Spec.ParentCompositePodGroupName)
-		case fwk.PodKeyType:
-			return nil, fmt.Errorf("pod key type not supported in snapshot FindRootKeyForGroup for %s", currentKey.String())
-		}
-	}
+	return newHierarchyWrapper(s.podGroupStates, s.compositePodGroupStates, s.compositePodGroupEnabled).FindRootKeyForGroup(key)
 }
 
 func (s *Snapshot) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error) {
@@ -983,34 +945,5 @@ func (s *Snapshot) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManag
 // or CompositePodGroup/CompositePodGroupState (if root is a CompositePodGroup) for the given EntityKey,
 // or nil if the root group was not found.
 func (s *Snapshot) FindRootGroup(key fwk.EntityKey) (*fwk.RootGroup, error) {
-	rootKey, err := s.FindRootKeyForGroup(key)
-	if err != nil {
-		return nil, err
-	}
-	if rootKey == nil {
-		return nil, nil
-	}
-
-	switch rootKey.Type {
-	case fwk.PodGroupKeyType:
-		pgs, ok := s.podGroupStates[*rootKey]
-		if !ok || pgs.podGroup == nil {
-			return nil, nil
-		}
-		return &fwk.RootGroup{
-			GenericPodGroup: fwk.NewGenericPodGroup(pgs.podGroup),
-			PodGroupState:   pgs,
-		}, nil
-	case fwk.CompositePodGroupKeyType:
-		cpgs, ok := s.compositePodGroupStates[*rootKey]
-		if !ok || cpgs.compositePodGroup == nil {
-			return nil, nil
-		}
-		return &fwk.RootGroup{
-			GenericPodGroup:        fwk.NewGenericCompositePodGroup(cpgs.compositePodGroup),
-			CompositePodGroupState: cpgs,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported root key type %s for %s", rootKey.Type, key.String())
-	}
+	return newHierarchyWrapper(s.podGroupStates, s.compositePodGroupStates, s.compositePodGroupEnabled).FindRootGroup(key)
 }
