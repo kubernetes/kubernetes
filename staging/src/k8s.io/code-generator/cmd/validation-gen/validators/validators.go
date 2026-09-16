@@ -88,6 +88,10 @@ type Config struct {
 	// "+k8s:required". Validators that refer to other tags by name, in
 	// messages or when inspecting a tag's nested value, must prepend it.
 	TagPrefix string
+
+	// Extensions are the validations this project adds to the built-in
+	// ones, read from --validation-extensions-file. Nil when none were given.
+	Extensions *Extensions
 }
 
 // Scope describes where a validation (or potential validation) is located.

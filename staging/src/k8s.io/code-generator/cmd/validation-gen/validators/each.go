@@ -111,14 +111,15 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 		return Validations{}, err
 	}
 
-	if len(validations.Variables) > 0 {
-		return Validations{}, fmt.Errorf("variable generation is not supported")
-	}
-
 	result := Validations{
 		OpaqueValType: validations.OpaqueType, // Map element opacity to collection value opacity
 	}
 	result.Comments = append(result.Comments, validations.Comments...)
+	// A variable is a package-level declaration and does not depend on the
+	// element being iterated, so it is hoisted out rather than rejected.
+	for _, v := range validations.Variables {
+		result.AddVariable(v)
+	}
 
 	if len(validations.Functions) > 0 {
 		// We defer this because we want listType and listMapKey to compute list keys first.
@@ -230,10 +231,12 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		vfn.Comments = nil
 		return Function(eachValTagName, DefaultFlags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
 	})
-	// Only Functions/Deferred carry forward; element opacity becomes value opacity.
+	// Element opacity becomes value opacity. Variables carry forward because a
+	// deferred tag can ask for one after GetValidations has hoisted.
 	return Validations{
 		Functions:     wrapped.Functions,
 		Deferred:      wrapped.Deferred,
+		Variables:     wrapped.Variables,
 		OpaqueValType: validations.OpaqueType,
 	}, nil
 }
@@ -260,6 +263,7 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	return Validations{
 		Functions:     wrapped.Functions,
 		Deferred:      wrapped.Deferred,
+		Variables:     wrapped.Variables,
 		OpaqueValType: validations.OpaqueType,
 	}, nil
 }
@@ -325,14 +329,14 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 		return Validations{}, err
 	}
 
-	if len(validations.Variables) > 0 {
-		return Validations{}, fmt.Errorf("variable generation is not supported")
-	}
-
 	result := Validations{
 		OpaqueKeyType: validations.OpaqueType,
 	}
 	result.Comments = append(result.Comments, validations.Comments...)
+	// Hoisted out of the iteration; see eachValTagValidator.
+	for _, v := range validations.Variables {
+		result.AddVariable(v)
+	}
 
 	if len(validations.Functions) > 0 {
 		innerVals, err := ektv.getValidations(t, Validations{Functions: validations.Functions})
@@ -376,6 +380,7 @@ func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Valida
 	return Validations{
 		Functions:     wrapped.Functions,
 		Deferred:      wrapped.Deferred,
+		Variables:     wrapped.Variables,
 		OpaqueKeyType: validations.OpaqueType,
 	}, nil
 }
