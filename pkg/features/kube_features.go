@@ -836,6 +836,12 @@ const (
 	// Requires the CRI implementation supports supplying the required stats.
 	PodAndContainerStatsFromCRI featuregate.Feature = "PodAndContainerStatsFromCRI"
 
+	// owner: @everettraven
+	// issue: https://github.com/kubernetes/kubernetes/issues/141838
+	//
+	// Adds support for using ML-DSA with PodCertificateRequest objects and podCertificate projected volume sources.
+	PodCertificateMLDSA featuregate.Feature = "PodCertificateMLDSA"
+
 	// owner: @ahmedtd
 	// kep: https://kep.k8s.io/4317
 	//
@@ -1888,6 +1894,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
 	},
 
+	PodCertificateMLDSA: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.38")},
+	},
+
 	PodCertificateRequest: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Beta},
@@ -2683,6 +2694,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PersistentVolumeClaimUnusedSinceTime: {},
 
 	PodAndContainerStatsFromCRI: {},
+
+	PodCertificateMLDSA: {},
 
 	PodCertificateRequest: {},
 
