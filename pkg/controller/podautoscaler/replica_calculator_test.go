@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -115,8 +116,9 @@ type calcScenario struct {
 	// that aren't counted in currentReplicas).
 	podReadiness         []v1.ConditionStatus
 	podStartTime         []metav1.Time
-	podPhase             []v1.PodPhase
-	podDeletionTimestamp []bool
+	podPhase                    []v1.PodPhase
+	podDeletionTimestamp        []bool
+	podContainerStatusResources []v1.ResourceRequirements
 }
 
 // cpuRequests returns n identical CPU resource quantities parsed from val.
@@ -311,6 +313,18 @@ func buildFakePod(f *calcScenario, i int) v1.Pod {
 		pod.Spec.Containers[0].Resources = req
 		pod.Spec.Containers[1].Resources = req
 	}
+	if f.podContainerStatusResources != nil && i < len(f.podContainerStatusResources) {
+		pod.Status.ContainerStatuses = []v1.ContainerStatus{
+			{
+				Name:      "container1",
+				Resources: &f.podContainerStatusResources[i],
+			},
+			{
+				Name:      "container2",
+				Resources: &f.podContainerStatusResources[i],
+			},
+		}
+	}
 	return pod
 }
 
@@ -466,6 +480,58 @@ func assertResourceReplicas(t *testing.T, wantReplicas int32, wantUtilization in
 // TestReplicaCalcResourceScale covers scale-up, scale-down, and no-scale scenarios for GetResourceReplicas.
 func TestReplicaCalcResourceScale(t *testing.T) {
 	testCases := []resourceCase{
+		{
+			name: "scale up: in-flight resize evaluates actuated status.Resources instead of spec",
+			fixture: calcScenario{
+				currentReplicas: 1,
+				resource: &cpuResource{
+					// spec requests updated to 4.0 CPU during in-flight resize
+					requests: cpuRequests(1, "4.0"),
+					// usage is 900m per container (total 1800m for 2 containers)
+					levels: makePodMetricLevels(900),
+				},
+				// actuated capacity currently on node is 1.0 CPU per container
+				podContainerStatusResources: []v1.ResourceRequirements{
+					{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1.0")},
+					},
+				},
+			},
+			// target is 80% utilization
+			// Against actuated 1.0 (2.0 total for 2 containers): 1800 / 2000 = 90% utilization.
+			// HPA calculates: ceil(1 * 0.9 / 0.8) = 2 replicas (scale-out).
+			// If it evaluated spec 4.0 (8.0 total): 1800 / 8000 = 22.5% utilization, which would recommend scale-in.
+			targetUtilization:   80,
+			expectedReplicas:    2,
+			expectedUtilization: 90,
+			expectedRawValue:    numContainersPerPod * 900,
+		},
+		{
+			name: "scale down: in-flight resize evaluates actuated status.Resources instead of spec",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				resource: &cpuResource{
+					// spec requests reduced to 0.5 CPU during in-flight resize
+					requests: cpuRequests(3, "0.5"),
+					// usage is 300m per container (total 600m per pod)
+					levels: makePodMetricLevels(300, 300, 300),
+				},
+				// actuated capacity currently on node is 1.0 CPU per container (2.0 total per pod)
+				podContainerStatusResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1.0")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1.0")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1.0")}},
+				},
+			},
+			// target is 60% utilization
+			// Against actuated 2.0 total per pod: 600 / 2000 = 30% utilization.
+			// HPA calculates: ceil(3 * 0.3 / 0.6) = 2 replicas (scale-down).
+			// If it evaluated spec 0.5 (1.0 total per pod): 600 / 1000 = 60% utilization, which would keep 3 replicas.
+			targetUtilization:   60,
+			expectedReplicas:    2,
+			expectedUtilization: 30,
+			expectedRawValue:    numContainersPerPod * 300,
+		},
 		{
 			name: "scale up",
 			fixture: calcScenario{
@@ -2699,6 +2765,456 @@ func TestCeilToInt32(t *testing.T) {
 			if got := ceilToInt32(tc.input); got != tc.expected {
 				t.Errorf("ceilToInt32(%v) = %d, want %d", tc.input, got, tc.expected)
 			}
+		})
+	}
+}
+
+func TestCalculateRequests_InPlacePodVerticalScaling(t *testing.T) {
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
+	testPod := "test-pod"
+
+	tests := []struct {
+		name                                   string
+		pod                                    *v1.Pod
+		container                              string
+		resource                               v1.ResourceName
+		disableInPlacePodVerticalScaling       bool
+		enablePodLevelResources                bool
+		disableInPlacePodLevelResourcesScaling bool
+		expectedRequests                       map[string]int64
+		expectedError                          error
+	}{
+		{
+			name: "In-flight container scale-up: uses actuated status.Resources instead of spec when InPlacePodVerticalScaling enabled",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "container1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+							},
+						},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 1000},
+		},
+		{
+			name:                             "In-flight container scale-up: uses spec when InPlacePodVerticalScaling disabled",
+			disableInPlacePodVerticalScaling: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "container1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+							},
+						},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 4000},
+		},
+		{
+			name: "In-flight container scale-down: uses actuated status.Resources instead of spec",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "container1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+							},
+						},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 4000},
+		},
+		{
+			name: "Completed container resize: status matches spec",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "container1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+							},
+						},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 4000},
+		},
+		{
+			name: "Infeasible container resize: uses actuated status.Resources",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonInfeasible,
+							Status: v1.ConditionTrue,
+						},
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "container1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+							},
+						},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 1000},
+		},
+		{
+			name: "Container status with nil Resources falls back to spec",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2000m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:      "container1",
+							Resources: nil,
+						},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 2000},
+		},
+		{
+			name: "Container status without target resource in Requests falls back to spec",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2000m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "container1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+							},
+						},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 2000},
+		},
+		{
+			name: "Multi-container pod: one in-flight resize, one unchanged",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "container1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+							},
+						},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 1500},
+		},
+		{
+			name: "Specific container targeted in HPA",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "container1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+							},
+						},
+					},
+				},
+			},
+			container:        "container1",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 1000},
+		},
+		{
+			name: "Restartable init container with in-flight resize",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name:          "sidecar",
+							RestartPolicy: &containerRestartPolicyAlways,
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2000m")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "sidecar",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+							},
+						},
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "container1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+							},
+						},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 1500},
+		},
+		{
+			name:                    "Pod-level in-flight scale-up: uses actuated status.Resources",
+			enablePodLevelResources: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+				Status: v1.PodStatus{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 1000},
+		},
+		{
+			name:                                   "Pod-level in-flight scale-up: uses spec when InPlacePodLevelResourcesVerticalScaling disabled",
+			enablePodLevelResources:                true,
+			disableInPlacePodLevelResourcesScaling: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+				Status: v1.PodStatus{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 4000},
+		},
+		{
+			name:                    "Pod-level in-flight scale-down: uses actuated status.Resources",
+			enablePodLevelResources: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+				Status: v1.PodStatus{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
+					},
+				},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 4000},
+		},
+		{
+			name:                    "Pod-level status.Resources nil falls back to spec",
+			enablePodLevelResources: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2000m")},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+				Status: v1.PodStatus{},
+			},
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 2000},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.disableInPlacePodVerticalScaling {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, false)
+			}
+			if tc.enablePodLevelResources {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+				if tc.disableInPlacePodLevelResourcesScaling {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, false)
+				}
+			}
+
+			requests, err := calculateRequests([]*v1.Pod{tc.pod}, tc.container, tc.resource)
+			assert.Equal(t, tc.expectedRequests, requests, "requests should be as expected")
+			assert.Equal(t, tc.expectedError, err, "error should be as expected")
 		})
 	}
 }

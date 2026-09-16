@@ -24,6 +24,7 @@ import (
 
 	autoscaling "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -496,6 +497,13 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 // calculatePodLevelRequests computes the requests for the specific resource at
 // the pod level.
 func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
+	if feature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		if pod.Status.Resources != nil && pod.Status.Resources.Requests != nil {
+			if podRequest, ok := pod.Status.Resources.Requests[resource]; ok {
+				return podRequest.MilliValue(), nil
+			}
+		}
+	}
 	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
 		ExcludeOverhead: true,
 	})
@@ -520,7 +528,7 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 	request := int64(0)
 	for _, c := range containers {
 		if container == "" || container == c.Name {
-			containerRequest, ok := c.Resources.Requests[resource]
+			containerRequest, ok := getContainerRequest(pod, &c, resource)
 			if !ok {
 				return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
 			}
@@ -538,6 +546,39 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 	}
 
 	return request, nil
+}
+
+// getContainerRequest returns the request for the given container and resource.
+// If InPlacePodVerticalScaling is enabled and the container has actuated resources
+// reported in pod.Status, that actuated request is returned. Otherwise, it falls back
+// to the requested resources from container.Resources.Requests in pod.Spec.
+func getContainerRequest(pod *v1.Pod, c *v1.Container, resource v1.ResourceName) (resource.Quantity, bool) {
+	if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		cs := findContainerStatus(pod, c.Name)
+		if cs != nil && cs.Resources != nil && cs.Resources.Requests != nil {
+			if req, ok := cs.Resources.Requests[resource]; ok {
+				return req, true
+			}
+		}
+	}
+	req, ok := c.Resources.Requests[resource]
+	return req, ok
+}
+
+// findContainerStatus finds the container status for a given container name
+// in pod.Status.ContainerStatuses or pod.Status.InitContainerStatuses.
+func findContainerStatus(pod *v1.Pod, name string) *v1.ContainerStatus {
+	for i := range pod.Status.ContainerStatuses {
+		if pod.Status.ContainerStatuses[i].Name == name {
+			return &pod.Status.ContainerStatuses[i]
+		}
+	}
+	for i := range pod.Status.InitContainerStatuses {
+		if pod.Status.InitContainerStatuses[i].Name == name {
+			return &pod.Status.InitContainerStatuses[i]
+		}
+	}
+	return nil
 }
 
 func removeMetricsForPods(metrics metricsclient.PodMetricsInfo, pods sets.Set[string]) {
