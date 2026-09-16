@@ -33,13 +33,10 @@ import (
 )
 
 type toleranceSet bool
-type zeroMinReplicasSet bool
 
 const (
-	withTolerance    toleranceSet       = true
-	withoutTolerance                    = false
-	zeroMinReplicas  zeroMinReplicasSet = true
-	oneMinReplicas                      = false
+	withTolerance    toleranceSet = true
+	withoutTolerance              = false
 )
 
 func TestPrepareForGeneration(t *testing.T) {
@@ -68,7 +65,7 @@ func TestPrepareForGeneration(t *testing.T) {
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, tc.featureGateEnabled)
 
-			hpa := prepareHPA(oneMinReplicas, withTolerance)
+			hpa := prepareHPA(withTolerance)
 			Strategy.PrepareForCreate(context.Background(), &hpa)
 
 			if hpa.Generation != tc.expectedGenerationOnCreate {
@@ -76,7 +73,7 @@ func TestPrepareForGeneration(t *testing.T) {
 			}
 
 			// Create an updated HPA with a different spec
-			hpaUpdated := hpa.DeepCopy() // prepareHPA(zeroMinReplicas, withoutTolerance)
+			hpaUpdated := hpa.DeepCopy()
 			hpaUpdated.Spec.MaxReplicas = 100
 			Strategy.PrepareForUpdate(context.Background(), hpaUpdated, &hpa)
 
@@ -89,7 +86,7 @@ func TestPrepareForGeneration(t *testing.T) {
 
 func TestPrepareForCreateConfigurableToleranceEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
-	hpa := prepareHPA(oneMinReplicas, withTolerance)
+	hpa := prepareHPA(withTolerance)
 
 	Strategy.PrepareForCreate(context.Background(), &hpa)
 	if hpa.Spec.Behavior.ScaleUp.Tolerance == nil {
@@ -101,7 +98,7 @@ func TestPrepareForCreateConfigurableToleranceDisabled(t *testing.T) {
 	// Set emulated version to 1.36 so that disabling the feature gate is allowed.
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
-	hpa := prepareHPA(oneMinReplicas, withTolerance)
+	hpa := prepareHPA(withTolerance)
 
 	Strategy.PrepareForCreate(context.Background(), &hpa)
 	if hpa.Spec.Behavior.ScaleUp.Tolerance != nil {
@@ -111,8 +108,8 @@ func TestPrepareForCreateConfigurableToleranceDisabled(t *testing.T) {
 
 func TestPrepareForUpdateConfigurableToleranceEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
-	newHPA := prepareHPA(oneMinReplicas, withTolerance)
-	oldHPA := prepareHPA(oneMinReplicas, withTolerance)
+	newHPA := prepareHPA(withTolerance)
+	oldHPA := prepareHPA(withTolerance)
 
 	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
 	if newHPA.Spec.Behavior.ScaleUp.Tolerance == nil {
@@ -124,47 +121,19 @@ func TestPrepareForUpdateConfigurableToleranceDisabled(t *testing.T) {
 	// Set emulated version to 1.36 so that disabling the feature gate is allowed.
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
-	newHPA := prepareHPA(oneMinReplicas, withTolerance)
-	oldHPA := prepareHPA(oneMinReplicas, withoutTolerance)
+	newHPA := prepareHPA(withTolerance)
+	oldHPA := prepareHPA(withoutTolerance)
 
 	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
 	if newHPA.Spec.Behavior.ScaleUp.Tolerance != nil {
 		t.Errorf("Expected tolerance field wiped out, got %v", newHPA.Spec.Behavior.ScaleUp.Tolerance)
 	}
 
-	newHPA = prepareHPA(oneMinReplicas, withTolerance)
-	oldHPA = prepareHPA(oneMinReplicas, withTolerance)
+	newHPA = prepareHPA(withTolerance)
+	oldHPA = prepareHPA(withTolerance)
 	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
 	if newHPA.Spec.Behavior.ScaleUp.Tolerance == nil {
 		t.Errorf("Expected tolerance field not wiped out, got nil")
-	}
-}
-
-func TestValidateOptionsScaleToZeroEnabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)
-	oneReplicasHPA := prepareHPA(oneMinReplicas, withoutTolerance)
-
-	opts := validationOptionsForHorizontalPodAutoscaler(&oneReplicasHPA, &oneReplicasHPA)
-	if opts.MinReplicasLowerBound != 0 {
-		t.Errorf("Expected zero minReplicasLowerBound, got %v", opts.MinReplicasLowerBound)
-	}
-}
-
-func TestValidateOptionsScaleToZeroDisabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, false)
-	zeroReplicasHPA := prepareHPA(zeroMinReplicas, withoutTolerance)
-	oneReplicasHPA := prepareHPA(oneMinReplicas, withoutTolerance)
-
-	// MinReplicas should be 0 despite the gate being disabled since the old HPA
-	// had MinReplicas set to 0 already.
-	opts := validationOptionsForHorizontalPodAutoscaler(&zeroReplicasHPA, &zeroReplicasHPA)
-	if opts.MinReplicasLowerBound != 0 {
-		t.Errorf("Expected zero minReplicasLowerBound, got %v", opts.MinReplicasLowerBound)
-	}
-
-	opts = validationOptionsForHorizontalPodAutoscaler(&zeroReplicasHPA, &oneReplicasHPA)
-	if opts.MinReplicasLowerBound == 0 {
-		t.Errorf("Expected non-zero minReplicasLowerBound, got 0")
 	}
 }
 
@@ -213,70 +182,15 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 		newHPA                             *autoscaling.HorizontalPodAutoscaler
 		oldHPA                             *autoscaling.HorizontalPodAutoscaler
 		scaleToZeroEnabled                 bool
-		expectMinReplicasLower             int32
 		expectScaleTargetRefValidationOpts validation.CrossVersionObjectReferenceValidationOptions
 		expectMetricsValidationOpts        validation.CrossVersionObjectReferenceValidationOptions
 	}{
-		// MinReplicasLowerBound tests
-		{
-			name:                   "scale to zero disabled, no old hpa",
-			newHPA:                 hpa(1, "apps/v1", "Deployment", nil),
-			oldHPA:                 nil,
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
-			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
-			},
-			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
-			},
-		},
-		{
-			name:                   "scale to zero disabled, old hpa has minReplicas=1",
-			newHPA:                 hpa(1, "apps/v1", "Deployment", nil),
-			oldHPA:                 hpa(1, "apps/v1", "Deployment", nil),
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
-			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
-			},
-			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
-			},
-		},
-		{
-			name:                   "scale to zero disabled, old hpa has minReplicas=0",
-			newHPA:                 hpa(0, "apps/v1", "Deployment", nil),
-			oldHPA:                 hpa(0, "apps/v1", "Deployment", nil),
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 0,
-			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
-			},
-			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
-			},
-		},
-		{
-			name:                   "scale to zero enabled",
-			newHPA:                 hpa(0, "apps/v1", "Deployment", nil),
-			oldHPA:                 nil,
-			scaleToZeroEnabled:     true,
-			expectMinReplicasLower: 0,
-			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
-			},
-			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
-			},
-		},
 		// ScaleTargetRefValidationOptions tests
 		{
-			name:                   "ReplicationController with the legacy API Version",
-			newHPA:                 hpa(1, "", "ReplicationController", nil),
-			oldHPA:                 nil,
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			name:               "ReplicationController with the legacy API Version",
+			newHPA:             hpa(1, "", "ReplicationController", nil),
+			oldHPA:             nil,
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true, RequiredCoveredByDeclarative: true,
 			},
@@ -285,11 +199,10 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			name:                   "scale target ref api version changed",
-			newHPA:                 hpa(1, "apps/v1", "Deployment", nil),
-			oldHPA:                 hpa(1, "extensions/v1beta1", "RandomCR", nil),
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			name:               "scale target ref api version changed",
+			newHPA:             hpa(1, "apps/v1", "Deployment", nil),
+			oldHPA:             hpa(1, "extensions/v1beta1", "RandomCR", nil),
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
@@ -298,11 +211,10 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			name:                   "scale target ref api version unchanged",
-			newHPA:                 hpa(1, "apps/v1", "", nil),
-			oldHPA:                 hpa(1, "apps/v1", "", nil),
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			name:               "scale target ref api version unchanged",
+			newHPA:             hpa(1, "apps/v1", "", nil),
+			oldHPA:             hpa(1, "apps/v1", "", nil),
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
@@ -311,11 +223,10 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			name:                   "scale target ref api and Kind are changed to ReplicationController",
-			newHPA:                 hpa(1, "", "ReplicationController", nil),
-			oldHPA:                 hpa(1, "apps/v1", "Deployment", nil),
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			name:               "scale target ref api and Kind are changed to ReplicationController",
+			newHPA:             hpa(1, "", "ReplicationController", nil),
+			oldHPA:             hpa(1, "apps/v1", "Deployment", nil),
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true, RequiredCoveredByDeclarative: true,
 			},
@@ -324,11 +235,10 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			name:                   "Kind changed",
-			newHPA:                 hpa(1, "apps/v1", "CronJobs", nil),
-			oldHPA:                 hpa(1, "apps/v1", "Deployment", nil),
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			name:               "Kind changed",
+			newHPA:             hpa(1, "apps/v1", "CronJobs", nil),
+			oldHPA:             hpa(1, "apps/v1", "Deployment", nil),
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
@@ -338,11 +248,10 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 		},
 		// MetricsValidationOptions tests
 		{
-			name:                   "no metrics",
-			newHPA:                 hpa(1, "apps/v1", "Deployment", nil),
-			oldHPA:                 nil,
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			name:               "no metrics",
+			newHPA:             hpa(1, "apps/v1", "Deployment", nil),
+			oldHPA:             nil,
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
@@ -351,11 +260,10 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			name:                   "non-object metric",
-			newHPA:                 hpa(1, "", "", []autoscaling.MetricSpec{podsMetric}),
-			oldHPA:                 nil,
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			name:               "non-object metric",
+			newHPA:             hpa(1, "", "", []autoscaling.MetricSpec{podsMetric}),
+			oldHPA:             nil,
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
@@ -364,11 +272,10 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			name:                   "new object metric with valid api version",
-			newHPA:                 hpa(1, "", "", []autoscaling.MetricSpec{objectMetric("apps/v1")}),
-			oldHPA:                 nil,
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			name:               "new object metric with valid api version",
+			newHPA:             hpa(1, "", "", []autoscaling.MetricSpec{objectMetric("apps/v1")}),
+			oldHPA:             nil,
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
@@ -377,11 +284,10 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			name:                   "old object metric with invalid api version",
-			newHPA:                 hpa(1, "apps/v1", "Deployment", []autoscaling.MetricSpec{objectMetric("apps/v1/v3")}),
-			oldHPA:                 hpa(2, "apps/v1", "Deployment", []autoscaling.MetricSpec{objectMetric("apps/v1/v2")}),
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			name:               "old object metric with invalid api version",
+			newHPA:             hpa(1, "apps/v1", "Deployment", []autoscaling.MetricSpec{objectMetric("apps/v1/v3")}),
+			oldHPA:             hpa(2, "apps/v1", "Deployment", []autoscaling.MetricSpec{objectMetric("apps/v1/v2")}),
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
@@ -390,11 +296,10 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			name:                   "new object metric with invalid api version",
-			newHPA:                 hpa(1, "", "", []autoscaling.MetricSpec{objectMetric("apps/v1/v2")}),
-			oldHPA:                 nil,
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			name:               "new object metric with invalid api version",
+			newHPA:             hpa(1, "", "", []autoscaling.MetricSpec{objectMetric("apps/v1/v2")}),
+			oldHPA:             nil,
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
@@ -408,9 +313,8 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 				Type:   autoscaling.ObjectMetricSourceType,
 				Object: nil,
 			}}),
-			oldHPA:                 nil,
-			scaleToZeroEnabled:     false,
-			expectMinReplicasLower: 1,
+			oldHPA:             nil,
+			scaleToZeroEnabled: false,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
@@ -425,9 +329,6 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, tc.scaleToZeroEnabled)
 			opts := validationOptionsForHorizontalPodAutoscaler(tc.newHPA, tc.oldHPA)
 
-			if opts.MinReplicasLowerBound != tc.expectMinReplicasLower {
-				t.Errorf("expected MinReplicasLowerBound %d, got %d", tc.expectMinReplicasLower, opts.MinReplicasLowerBound)
-			}
 			if opts.ScaleTargetRefValidationOptions != tc.expectScaleTargetRefValidationOpts {
 				t.Errorf("expected ScaleTargetRefValidationOptions %v, got %v", tc.expectScaleTargetRefValidationOpts, opts.ScaleTargetRefValidationOptions)
 			}
@@ -439,16 +340,13 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 	}
 }
 
-func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet, hasTolerance toleranceSet) autoscaling.HorizontalPodAutoscaler {
+func prepareHPA(hasTolerance toleranceSet) autoscaling.HorizontalPodAutoscaler {
 	tolerance := ptr.To(resource.MustParse("0.1"))
 	if !hasTolerance {
 		tolerance = nil
 	}
 
-	minReplicas := int32(0)
-	if !hasZeroMinReplicas {
-		minReplicas = 1
-	}
+	minReplicas := int32(1)
 
 	return autoscaling.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
