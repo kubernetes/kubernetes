@@ -21,7 +21,6 @@ import (
 
 	"github.com/onsi/gomega"
 
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -40,22 +39,18 @@ func TestWithRESTConfig(t *testing.T) {
 	tCtx.Assert(client).NotTo(gomega.BeNil(), "Client()")
 	dynamic := tCtx.Dynamic()
 	tCtx.Assert(dynamic).NotTo(gomega.BeNil(), "Dynamic()")
-	extensions := tCtx.APIExtensions()
-	tCtx.Assert(extensions).NotTo(gomega.BeNil(), "APIExtensions()")
 
 	otherCtx := tCtx.WithCancel()
 	tCtx.Assert(otherCtx.RESTConfig()).To(gomega.Equal(config), "RESTConfig()")
 	tCtx.Assert(otherCtx.RESTMapper()).To(gomega.BeIdenticalTo(mapper), "RESTMapper()")
 	tCtx.Assert(otherCtx.Client()).To(gomega.BeIdenticalTo(client), "Client()")
 	tCtx.Assert(otherCtx.Dynamic()).To(gomega.BeIdenticalTo(dynamic), "Dynamic()")
-	tCtx.Assert(otherCtx.APIExtensions()).To(gomega.BeIdenticalTo(extensions), "APIExtensions()")
 
 	tCtx.CleanupCtx(func(tCtx TContext) {
 		tCtx.Assert(tCtx.RESTConfig()).To(gomega.Equal(config), "RESTConfig()")
 		tCtx.Assert(tCtx.RESTMapper()).To(gomega.BeIdenticalTo(mapper), "RESTMapper()")
 		tCtx.Assert(tCtx.Client()).To(gomega.BeIdenticalTo(client), "Client()")
 		tCtx.Assert(tCtx.Dynamic()).To(gomega.BeIdenticalTo(dynamic), "Dynamic()")
-		tCtx.Assert(tCtx.APIExtensions()).To(gomega.BeIdenticalTo(extensions), "APIExtensions()")
 	})
 
 	// Cancel, then let testing.T invoke test cleanup.
@@ -68,27 +63,23 @@ func TestWithClients(t *testing.T) {
 	mapper := &restmapper.DeferredDiscoveryRESTMapper{}
 	client := clientset.NewForConfigOrDie(config)
 	dynamic := dynamic.NewForConfigOrDie(config)
-	extensions := apiextensions.NewForConfigOrDie(config)
-	tCtx = tCtx.WithClients(config, mapper, client, dynamic, extensions)
+	tCtx = tCtx.WithClients(config, mapper, client, dynamic)
 	tCtx.Assert(tCtx.RESTConfig()).To(gomega.Equal(config), "RESTConfig()")
 	tCtx.Assert(tCtx.RESTMapper()).To(gomega.BeIdenticalTo(mapper), "RESTMapper()")
 	tCtx.Assert(tCtx.Client()).To(gomega.BeIdenticalTo(client), "Client()")
 	tCtx.Assert(tCtx.Dynamic()).To(gomega.BeIdenticalTo(dynamic), "Dynamic()")
-	tCtx.Assert(tCtx.APIExtensions()).To(gomega.BeIdenticalTo(extensions), "APIExtensions()")
 
 	otherCtx := tCtx.WithCancel()
 	tCtx.Assert(otherCtx.RESTConfig()).To(gomega.Equal(config), "RESTConfig()")
 	tCtx.Assert(otherCtx.RESTMapper()).To(gomega.BeIdenticalTo(mapper), "RESTMapper()")
 	tCtx.Assert(otherCtx.Client()).To(gomega.BeIdenticalTo(client), "Client()")
 	tCtx.Assert(otherCtx.Dynamic()).To(gomega.BeIdenticalTo(dynamic), "Dynamic()")
-	tCtx.Assert(otherCtx.APIExtensions()).To(gomega.BeIdenticalTo(extensions), "APIExtensions()")
 
 	tCtx.CleanupCtx(func(tCtx TContext) {
 		tCtx.Assert(tCtx.RESTConfig()).To(gomega.Equal(config), "RESTConfig()")
 		tCtx.Assert(tCtx.RESTMapper()).To(gomega.BeIdenticalTo(mapper), "RESTMapper()")
 		tCtx.Assert(tCtx.Client()).To(gomega.BeIdenticalTo(client), "Client()")
 		tCtx.Assert(tCtx.Dynamic()).To(gomega.BeIdenticalTo(dynamic), "Dynamic()")
-		tCtx.Assert(tCtx.APIExtensions()).To(gomega.BeIdenticalTo(extensions), "APIExtensions()")
 	})
 
 	// Cancel, then let testing.T invoke test cleanup.
