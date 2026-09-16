@@ -939,6 +939,10 @@ type Handle interface {
 	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.
 	RunFilterPluginsWithNominatedPods(ctx context.Context, state CycleState, pod *v1.Pod, info NodeInfo) *Status
 
+	// RunCrossNodeFilterPluginsWithNominatedPods runs the set of configured cross-node filter plugins
+	// (filter plugins that implement PreFilterExtensions) for nominated pod on the given node.
+	RunCrossNodeFilterPluginsWithNominatedPods(ctx context.Context, state CycleState, pod *v1.Pod, info NodeInfo) *Status
+
 	// Extenders returns registered scheduler extenders.
 	Extenders() []Extender
 
@@ -1013,6 +1017,9 @@ type PluginsRunner interface {
 	// removed from it to evaluate the possibility of preempting them to
 	// schedule the target pod.
 	RunFilterPlugins(context.Context, CycleState, *v1.Pod, NodeInfo) *Status
+	// RunCrossNodeFilterPlugins runs the set of configured Filter plugins that depend on
+	// cross-node state (i.e. implement PreFilterExtensions) for pod on the given node.
+	RunCrossNodeFilterPlugins(context.Context, CycleState, *v1.Pod, NodeInfo) *Status
 	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
