@@ -2110,9 +2110,7 @@ func recordIncomingEntitiesMetrics(targetQueueLabel string, entity framework.Que
 	metrics.SchedulerQueueIncomingPods.WithLabelValues(targetQueueLabel, event).Add(float64(entity.Size()))
 
 	if strategy == nil || targetQueueLabel != strategyToQueueLabel(*strategy) {
-		if entityLabel, ok := metrics.EntityToLabel(entity); ok {
-			metrics.SchedulerQueueIncomingEntities.WithLabelValues(targetQueueLabel, event, entityLabel).Inc()
-		}
+		metrics.SchedulerQueueIncomingEntities.WithLabelValues(targetQueueLabel, event, metrics.EntityTypeToLabel(entity.Type())).Inc()
 	}
 }
 

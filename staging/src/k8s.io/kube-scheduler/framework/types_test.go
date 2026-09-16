@@ -22,6 +22,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -277,6 +279,82 @@ func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
 			}, test.term)
 			if diff := cmp.Diff(test.want, got); diff != "" {
 				t.Errorf("Unexpected namespaces (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestGenericPodGroup_HasDisruptionModeAll(t *testing.T) {
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want bool
+	}{
+		{
+			name: "nil PodGroup and nil CompositePodGroup",
+			gpg:  &GenericPodGroup{},
+			want: false,
+		},
+		{
+			name: "PodGroup with nil DisruptionMode",
+			gpg:  NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+			want: false,
+		},
+		{
+			name: "PodGroup with Single DisruptionMode",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					DisruptionMode: &schedulingv1beta1.DisruptionMode{
+						Single: &schedulingv1beta1.SingleDisruptionMode{},
+					},
+				},
+			}),
+			want: false,
+		},
+		{
+			name: "PodGroup with All DisruptionMode",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					DisruptionMode: &schedulingv1beta1.DisruptionMode{
+						All: &schedulingv1beta1.AllDisruptionMode{},
+					},
+				},
+			}),
+			want: true,
+		},
+		{
+			name: "CompositePodGroup with nil DisruptionMode",
+			gpg:  NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{}),
+			want: false,
+		},
+		{
+			name: "CompositePodGroup with Single DisruptionMode",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{
+						Single: &schedulingv1alpha3.SingleCompositeDisruptionMode{},
+					},
+				},
+			}),
+			want: false,
+		},
+		{
+			name: "CompositePodGroup with All DisruptionMode",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{
+						All: &schedulingv1alpha3.AllCompositeDisruptionMode{},
+					},
+				},
+			}),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.HasDisruptionModeAll(); got != tt.want {
+				t.Errorf("HasDisruptionModeAll() = %v, want %v", got, tt.want)
 			}
 		})
 	}
