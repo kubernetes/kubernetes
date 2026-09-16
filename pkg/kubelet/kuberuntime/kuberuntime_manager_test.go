@@ -6508,9 +6508,9 @@ func TestOnPodSandboxReadyInvocation(t *testing.T) {
 			onPodSandboxReadyShouldErr: false,
 			deviceAllocationShouldErr:  true,
 			expectOnPodSandboxReady:    false,
-			expectSyncPodSuccess:       true, // SyncPod doesn't return error, just returns early if `PrepareDynamicResources` call ends up failing
+			expectSyncPodSuccess:       false,
 			expectDeviceAllocation:     true,
-			description:                "Verifies PrepareDynamicResources failure causes early return in case of pod with ResourceClaims",
+			description:                "Verifies PrepareDynamicResources failure is reported in SyncResult in case of pod with ResourceClaims",
 		},
 	}
 
