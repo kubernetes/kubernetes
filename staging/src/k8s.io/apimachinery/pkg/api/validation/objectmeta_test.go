@@ -734,6 +734,22 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.TooLong(fldPath.Child("annotations"), "", TotalAnnotationSizeLimitB).MarkFromImperative(),
 			},
 		},
+		{
+			name:              "invalid finalizer format",
+			obj:               mkMeta(tweakFinalizers([]string{"invalid/format/slash"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers").Index(0), "invalid/format/slash", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			name:              "conflicting finalizers",
+			obj:               mkMeta(tweakFinalizers([]string{metav1.FinalizerOrphanDependents, metav1.FinalizerDeleteDependents})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers"), []string{metav1.FinalizerOrphanDependents, metav1.FinalizerDeleteDependents}, "finalizer orphan and foregroundDeletion cannot be both set").MarkFromImperative(),
+			},
+		},
 	}
 
 	matcher := field.ErrorMatcher{}.ByField().ByType().BySource().ByOrigin()
@@ -896,6 +912,45 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), &gracePeriod40, "").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
+		{
+			name:              "invalid finalizer format on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakFinalizers([]string{"invalid/format/slash"})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers").Index(0), "invalid/format/slash", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			name:              "no new finalizers if deleted on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakDeletionTimestamp(&now), tweakFinalizers([]string{"example.com/a", "example.com/b"})),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakDeletionTimestamp(&now), tweakFinalizers([]string{"example.com/a"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Forbidden(fldPath.Child("finalizers"), "no new finalizers can be added if the object is being deleted, found new finalizers []string{\"example.com/b\"}").MarkFromImperative(),
+			},
+		},
+		{
+			// Ratcheting: pre-existing invalid finalizer that hasn't changed must not
+			// block unrelated updates. DV does the same (SemanticDeepEqual short-circuit).
+			name:              "pre-existing invalid finalizer unchanged is ratcheted on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakFinalizers([]string{"invalid/format/slash"})),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakFinalizers([]string{"invalid/format/slash"})),
+			requiresNamespace: true,
+			expectedErrs:      field.ErrorList{},
+		},
+		{
+			// Ratcheting ends when the list changes: all entries are re-validated, so
+			// even the pre-existing invalid entry appears in the error list again.
+			name:              "new invalid finalizer added alongside pre-existing invalid finalizer is rejected",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakFinalizers([]string{"invalid/format/slash", "also/invalid/slash"})),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakFinalizers([]string{"invalid/format/slash"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers").Index(0), "invalid/format/slash", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				field.Invalid(fldPath.Child("finalizers").Index(1), "also/invalid/slash", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
 	}
 
 	for _, tc := range updateCases {
@@ -943,6 +998,10 @@ func tweakGeneration(g int64) func(*metav1.ObjectMeta) {
 
 func tweakAnnotations(ann map[string]string) func(*metav1.ObjectMeta) {
 	return func(o *metav1.ObjectMeta) { o.Annotations = ann }
+}
+
+func tweakFinalizers(f []string) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.Finalizers = f }
 }
 
 func tweakManagedFields(entries ...metav1.ManagedFieldsEntry) func(*metav1.ObjectMeta) {

@@ -117,7 +117,7 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 func ValidateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(stringValue) {
-		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg).WithOrigin("format=k8s-label-key"))
 	}
 
 	return allErrs
@@ -301,8 +301,8 @@ func ValidateFinalizers(finalizers []string, fldPath *field.Path) field.ErrorLis
 	allErrs := field.ErrorList{}
 	hasFinalizerOrphanDependents := false
 	hasFinalizerDeleteDependents := false
-	for _, finalizer := range finalizers {
-		allErrs = append(allErrs, ValidateFinalizerName(finalizer, fldPath)...)
+	for i, finalizer := range finalizers {
+		allErrs = append(allErrs, ValidateFinalizerName(finalizer, fldPath.Index(i)).MarkCoveredByDeclarative()...)
 		if finalizer == metav1.FinalizerOrphanDependents {
 			hasFinalizerOrphanDependents = true
 		}
@@ -363,6 +363,13 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.GetAnnotations(), fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(newMeta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
+	// Ratcheting: DV skips format re-validation when the finalizers list is semantically
+	// unchanged on update. Mirror that here so pre-existing invalid entries don't block
+	// unrelated updates. The conflict check in ValidateFinalizers always runs via the
+	// create path, so it does not need to be re-run when the list is unchanged.
+	if !apiequality.Semantic.DeepEqual(newMeta.GetFinalizers(), oldMeta.GetFinalizers()) {
+		allErrs = append(allErrs, ValidateFinalizers(newMeta.GetFinalizers(), fldPath.Child("finalizers"))...)
+	}
 	allErrs = append(allErrs, v1validation.ValidateManagedFields(newMeta.GetManagedFields(), fldPath.Child("managedFields"), v1validation.CoveredByDeclarative)...)
 
 	return allErrs
