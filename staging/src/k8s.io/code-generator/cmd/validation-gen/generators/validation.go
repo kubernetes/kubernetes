@@ -1822,14 +1822,10 @@ func (g *genValidations) toGolangSourceDataLiteral(sw *generator.SnippetWriter, 
 	case uint, uint8, uint16, uint32, uint64, int, int8, int16, int32, int64, float32, float64, bool:
 		sw.Do(fmt.Sprintf("%v", value), nil)
 	case string:
-		// If the incoming string was quoted, we still do it ourselves, JIC.
-		str := value.(string)
-		if s, err := strconv.Unquote(str); err == nil {
-			str = s
-		}
-		// Pass as an argument, not as the template: "$" is the delimiter, and
-		// an anchored regex contains one.
-		sw.Do("$.$", fmt.Sprintf("%q", str))
+		// Values arrive unquoted, so quote exactly once: unquoting first would
+		// corrupt a value that is itself a quoted string. Pass as an argument,
+		// not as the template, since "$" is the delimiter.
+		sw.Do("$.$", fmt.Sprintf("%q", v))
 	case *types.Type:
 		sw.Do("$.|raw$", v)
 	case types.Member:
