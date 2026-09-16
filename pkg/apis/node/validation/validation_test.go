@@ -41,19 +41,6 @@ func TestValidateRuntimeClass(t *testing.T) {
 			Handler:    "foo",
 		},
 	}, {
-		name:        "invalid Handler name",
-		expectError: true,
-		rc: node.RuntimeClass{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Handler:    "&@#$",
-		},
-	}, {
-		name:        "invalid empty RuntimeClass",
-		expectError: true,
-		rc: node.RuntimeClass{
-			ObjectMeta: metav1.ObjectMeta{Name: "empty"},
-		},
-	}, {
 		name:        "valid Handler",
 		expectError: false,
 		rc: node.RuntimeClass{
@@ -103,14 +90,6 @@ func TestValidateRuntimeUpdate(t *testing.T) {
 				Namespace: "somethingelse", // immutable
 			},
 			Handler: "bar",
-		},
-	}, {
-		name:        "invalid Handler update",
-		expectError: true,
-		old:         old,
-		new: node.RuntimeClass{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Handler:    "somethingelse",
 		},
 	}}
 
