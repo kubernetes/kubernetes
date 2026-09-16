@@ -744,6 +744,72 @@ func TestQuantityCmpInt64(t *testing.T) {
 	}
 }
 
+func TestQuantityCanonicalExponentOverflow(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "1000e2147483647", want: "10000e2147483646"},
+		{input: "-1000e2147483647", want: "-10000e2147483646"},
+		// Only two of the three zeros fit in the exponent.
+		{input: "1000e2147483646", want: "1000e2147483646"},
+		// Every zero fits; only the multiple-of-3 step moves the exponent.
+		{input: "100e2147483645", want: "10e2147483646"},
+		{input: "7e2147483647", want: "70e2147483646"},
+	}
+	for _, tc := range tests {
+		for _, asDec := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/asDec=%t", tc.input, asDec), func(t *testing.T) {
+				q := MustParse(tc.input)
+				if asDec {
+					q.ToDec()
+				}
+
+				if got := q.String(); got != tc.want {
+					t.Errorf("String() = %q, want %q", got, tc.want)
+				}
+
+				roundTripped := MustParse(tc.want)
+				if q.Cmp(roundTripped) != 0 {
+					t.Error("canonical form changed the quantity")
+				}
+			})
+		}
+	}
+}
+
+// These canonical forms cannot be reparsed: the parser rounds anything finer
+// than nano, and a 20-digit mantissa takes the Dec path, which does not
+// terminate at these exponents.
+func TestQuantityCanonicalExponentStringOnly(t *testing.T) {
+	tests := []struct {
+		name string
+		q    Quantity
+		want string
+	}{
+		// The multiple-of-3 step overflows int64 and falls back to the Dec path.
+		{name: "int64-fallback", q: MustParse("9223372036854775800e2147483647"), want: "92233720368547758000e2147483646"},
+		// No multiple-of-3 exponent exists at or below -MaxInt32.
+		{name: "floor", q: *NewScaledQuantity(1, Scale(-math.MaxInt32)), want: "1e-2147483647"},
+		{name: "floor-plus-1", q: *NewScaledQuantity(1, Scale(-math.MaxInt32+1)), want: "1e-2147483646"},
+		{name: "floor-plus-2", q: *NewScaledQuantity(1, Scale(-math.MaxInt32+2)), want: "10e-2147483646"},
+		{name: "floor-with-zeros", q: *NewScaledQuantity(1000, Scale(-math.MaxInt32)), want: "100e-2147483646"},
+	}
+	for _, tc := range tests {
+		for _, asDec := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/asDec=%t", tc.name, asDec), func(t *testing.T) {
+				q := tc.q
+				if asDec {
+					q.ToDec()
+				}
+				if got := q.String(); got != tc.want {
+					t.Errorf("String() = %q, want %q", got, tc.want)
+				}
+			})
+		}
+	}
+}
+
 func TestQuantityNeg(t *testing.T) {
 	table := []struct {
 		a   Quantity
@@ -942,14 +1008,10 @@ func TestQuantityStringBelowNano(t *testing.T) {
 		{intQuantity(1, math.MinInt32+2, BinarySI), "1e-2147483646"},
 		{intQuantity(1024, math.MinInt32+2, BinarySI), "1024e-2147483646"},
 		{intQuantity(math.MaxInt64, math.MinInt32+2, BinarySI), "9223372036854775807e-2147483646"},
-		// TODO(#141166): Must print the exact value, 1024e-2147483647.
-		{intQuantity(1024, math.MinInt32+1, BinarySI), "102400e2147483647"},
-		// TODO(#141166): Must print the exact value, 1e-2147483648.
-		{intQuantity(1, math.MinInt32, BinarySI), "1"},
-		// TODO(#141166): Must print the exact value, 1024e-2147483648.
-		{intQuantity(1024, math.MinInt32, BinarySI), "1Ki"},
-		// TODO(#141166): Must print the exact value, 9223372036854775807e-2147483648.
-		{intQuantity(math.MaxInt64, math.MinInt32, BinarySI), "9223372036854775807"},
+		{intQuantity(1024, math.MinInt32+1, BinarySI), "1024e-2147483647"},
+		{intQuantity(1, math.MinInt32, BinarySI), "1e-2147483648"},
+		{intQuantity(1024, math.MinInt32, BinarySI), "1024e-2147483648"},
+		{intQuantity(math.MaxInt64, math.MinInt32, BinarySI), "9223372036854775807e-2147483648"},
 	}
 	for _, item := range table {
 		if e, a := item.expect, item.in.String(); e != a {

@@ -457,7 +457,11 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	switch format {
 	case DecimalExponent, DecimalSI:
 	case BinarySI:
-		if q.CmpInt64(-1024) > 0 && q.CmpInt64(1024) < 0 {
+		if q.d.Dec == nil && !q.i.scale.canInfScale() {
+			// MinInt32 cannot be represented by the inf.Dec comparison fallback,
+			// and is far below the range of the BinarySI suffixes.
+			format = DecimalSI
+		} else if q.CmpInt64(-1024) > 0 && q.CmpInt64(1024) < 0 {
 			// This avoids rounding and hopefully confusion, too.
 			format = DecimalSI
 		} else {
