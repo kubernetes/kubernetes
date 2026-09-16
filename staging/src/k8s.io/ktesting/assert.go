@@ -89,7 +89,7 @@ func NewFailure(msg string) FailureError {
 // those add useful information for diagnosing test failures: the former are
 // internal implementation details, the latter merely point back at the
 // ktesting API call that triggered capturing the backtrace.
-var runtimeStackFrameRE = regexp.MustCompile(`/src/testing/|/src/runtime/|/onsi/gomega/|/test/utils/ktesting/[^/]+\.go:`)
+var runtimeStackFrameRE = regexp.MustCompile(`/src/testing/|/src/runtime/|/onsi/gomega/|/ktesting/[^/]+\.go:`)
 
 // captureBacktrace returns a pruned stack backtrace pointing at the caller of
 // captureBacktrace, suitable for use as [FailureError.FullStackTrace].

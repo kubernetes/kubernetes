@@ -29,7 +29,7 @@ import (
 
 	"github.com/onsi/gomega"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestError(t *testing.T) {

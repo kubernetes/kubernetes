@@ -40,13 +40,13 @@ import (
 	"k8s.io/klog/v2"
 	klogtesting "k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init" // activate ktesting command line flags
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )

@@ -29,13 +29,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/ktesting"
 	_ "k8s.io/component-base/logs/json/register"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	perf "k8s.io/kubernetes/test/integration/scheduler_perf"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // This test benchmarks the NodeDeclaredFeatures features performance impact.

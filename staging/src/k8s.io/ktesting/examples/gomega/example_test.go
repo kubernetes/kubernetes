@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestGomega(t *testing.T) {

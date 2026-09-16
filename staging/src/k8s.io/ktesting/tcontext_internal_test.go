@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 	"go.uber.org/goleak"
 
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	"k8s.io/ktesting/initoption"
 )
 
 func TestSyncTestInit(t *testing.T) {

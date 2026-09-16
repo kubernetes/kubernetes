@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
 
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 // See [ktesting.FailureError].

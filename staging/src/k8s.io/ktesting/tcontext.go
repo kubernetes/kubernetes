@@ -29,9 +29,9 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/format"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
-	"k8s.io/kubernetes/test/utils/ktesting/internal"
+	"k8s.io/ktesting/format"
+	"k8s.io/ktesting/initoption"
+	"k8s.io/ktesting/internal"
 )
 
 // Underlier is the additional interface implemented by the per-test LogSink

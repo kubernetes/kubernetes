@@ -20,7 +20,7 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 // TestSyncTestInit matches the corresponding test in the core package. It

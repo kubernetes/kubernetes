@@ -19,7 +19,7 @@ package initoption
 import (
 	"time"
 
-	"k8s.io/kubernetes/test/utils/ktesting/internal"
+	"k8s.io/ktesting/internal"
 )
 
 // InitOption is a functional option for Init and InitCtx.

@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
@@ -42,7 +43,6 @@ import (
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {

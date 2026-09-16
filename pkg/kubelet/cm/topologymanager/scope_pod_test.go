@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestPodCalculateAffinity(t *testing.T) {

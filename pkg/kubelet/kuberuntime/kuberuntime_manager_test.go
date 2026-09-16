@@ -54,6 +54,7 @@ import (
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	crierror "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -64,7 +65,6 @@ import (
 	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )

@@ -61,11 +61,11 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/feature"
 
 	// reconfigure framework
+	"k8s.io/ktesting"
+	_ "k8s.io/ktesting/format"
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	_ "k8s.io/kubernetes/test/utils/ktesting/format"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
