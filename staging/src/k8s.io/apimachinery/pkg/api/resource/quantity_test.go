@@ -708,6 +708,37 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 	}
 }
 
+func TestQuantityCanonicalExponentOverflow(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "1e2147483647", want: "10e2147483646"},
+		{input: "10e2147483647", want: "100e2147483646"},
+		{input: "100e2147483647", want: "1000e2147483646"},
+		{input: "1000e2147483647", want: "10000e2147483646"},
+	}
+	for _, tc := range tests {
+		for _, asDec := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/asDec=%t", tc.input, asDec), func(t *testing.T) {
+				q := MustParse(tc.input)
+				if asDec {
+					q.ToDec()
+				}
+
+				if got := q.String(); got != tc.want {
+					t.Errorf("String() = %q, want %q", got, tc.want)
+				}
+
+				roundTripped := MustParse(tc.want)
+				if q.Cmp(roundTripped) != 0 {
+					t.Error("canonical form changed the quantity")
+				}
+			})
+		}
+	}
+}
+
 func TestQuantityNeg(t *testing.T) {
 	table := []struct {
 		a   Quantity
