@@ -2354,7 +2354,7 @@ func testEviction(tCtx ktesting.TContext) {
 		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			start := time.Now()
 			fakeClientset := fake.NewClientset(tt.initialObjects...)
-			tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 			var podGets int
 			var podUpdates int
@@ -2479,7 +2479,7 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, toleration, slowDelete bool
 			tCtx.Logf("Proceeding with pod deletion")
 		}}
 	}
-	tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, client, nil)
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
@@ -2672,7 +2672,7 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 		return false, nil, nil
 	})
 
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 	controller := newTestController(tCtx)
 
 	podEvicting := false
@@ -2756,7 +2756,7 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		inUseClaim,
 		pod,
 	)
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get pod before eviction")
@@ -2817,7 +2817,7 @@ func synctestRetry(tCtx ktesting.TContext) {
 		inUseClaim,
 		pod,
 	)
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get pod before eviction")
