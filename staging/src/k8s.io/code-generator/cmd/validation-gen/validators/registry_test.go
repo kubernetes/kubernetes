@@ -24,7 +24,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	InitGlobalValidator(&generator.Context{}, nil, "k8s:")
+	InitGlobalValidator(&generator.Context{}, nil, "k8s:", nil)
 	os.Exit(m.Run())
 }
 

@@ -49,7 +49,7 @@ func mkCountRule(counter *int, realRule lintRule) lintRule {
 
 const testTagPrefix = "k8s:"
 
-var validator = validators.InitGlobalValidator(&generator.Context{}, nil, testTagPrefix)
+var validator = validators.InitGlobalValidator(&generator.Context{}, nil, testTagPrefix, nil)
 
 func TestLintCommentsRuleInvocation(t *testing.T) {
 	tests := []struct {
