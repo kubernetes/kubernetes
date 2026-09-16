@@ -1034,13 +1034,13 @@ func (sched *Scheduler) updateCompositePodGroupCondition(ctx context.Context,
 // For a standalone PodGroup it evaluates the placement matching the pods' NominatedNodeName first
 // and uses it if the gang is feasible there, short-circuiting the rest. Otherwise it evaluates
 // candidates up to the feasible-placement limit and runs placement scorer plugins to select the best one.
-func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) (finalResult *podGroupAlgorithmResult, revertFns revertFns) {
+func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) (finalResult *podGroupAlgorithmResult) {
 	allNodes, err := sched.nodeInfoSnapshot.ListNodesInPlacement()
 	if err != nil {
 		return &podGroupAlgorithmResult{
 			podGroupInfo: podGroupInfo,
 			status:       fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err)),
-		}, nil
+		}
 	}
 
 	// For now, always record plugin metrics until we understand its impact on performance.
@@ -1050,7 +1050,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		return &podGroupAlgorithmResult{
 			podGroupInfo: podGroupInfo,
 			status:       status,
-		}, nil
+		}
 	}
 	metrics.RecordGeneratedPlacements(schedFwk.ProfileName(), metrics.EntityTypeToLabel(podGroupInfo.GetType()), len(placements))
 
@@ -1063,7 +1063,6 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		err := sched.nodeInfoSnapshot.AssumePlacement(parentPlacement)
 		if err != nil {
 			finalResult.status = fwk.AsStatus(fmt.Errorf("failed to restore parent pod group placement: %w", err))
-			revertFns.revert()
 		}
 	}()
 
@@ -1086,7 +1085,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	if nominated != nil {
 		result := sched.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, nominated)
 		if result.status.IsError() {
-			return result, nil
+			return result
 		}
 		anyResult = result
 		// Honoring the nominated placement matters more than fitting more pods elsewhere: the NNN
@@ -1113,7 +1112,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 			}
 			result := sched.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, placement)
 			if result.status.IsError() {
-				return result, nil
+				return result
 			}
 
 			if anyResult == nil {
@@ -1142,7 +1141,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		}
 		fitError := newPodGroupPlacementFitError(reportStatus, len(placements))
 		anyResult.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
-		return anyResult, nil
+		return anyResult
 	}
 
 	bestPlacement, status := sched.findBestPodGroupPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, successfulResults)
@@ -1150,22 +1149,9 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		return &podGroupAlgorithmResult{
 			podGroupInfo: podGroupInfo,
 			status:       status,
-		}, nil
-	}
-	bestResult := successfulResults[bestPlacement]
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-		revertFns, err = sched.assumeSubtreeWithRevert(ctx, schedFwk, podGroupInfo, map[fwk.EntityKey]*podGroupAlgorithmResult{podGroupInfo.GetKey(): bestResult})
-		if err != nil {
-			return &podGroupAlgorithmResult{
-				podGroupInfo: podGroupInfo,
-				status:       fwk.AsStatus(fmt.Errorf("failed to assume the subtree: %w", err)),
-			}, nil
 		}
-
-		return bestResult, revertFns
 	}
-	return bestResult, nil
+	return successfulResults[bestPlacement]
 }
 
 // compositePodGroupSchedulingPlacementAlgorithm tries several different combinations for scheduling the child pod groups and selects the best one.
@@ -1173,7 +1159,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 // Placement is a set of nodes that will be considered when scheduling a pod group.
 // Then it evaluates candidate placements through compositePodGroupSchedulingDefaultAlgorithm up to the feasible-placement limit.
 // Finally, it runs placement scorer plugins to select the best placement.
-func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (finalResult *podGroupAlgorithmResult, revertFns revertFns) {
+func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (finalResult *podGroupAlgorithmResult) {
 	defer func() {
 		results[podGroupInfo.GetKey()] = finalResult
 	}()
@@ -1183,7 +1169,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 		return &podGroupAlgorithmResult{
 			podGroupInfo: podGroupInfo,
 			status:       fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err)),
-		}, nil
+		}
 	}
 
 	// For now, always record plugin metrics until we understand its impact on performance.
@@ -1193,7 +1179,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 		return &podGroupAlgorithmResult{
 			podGroupInfo: podGroupInfo,
 			status:       status,
-		}, nil
+		}
 	}
 	metrics.RecordGeneratedPlacements(schedFwk.ProfileName(), metrics.EntityTypeToLabel(podGroupInfo.GetType()), len(placements))
 
@@ -1208,7 +1194,6 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 		err := sched.nodeInfoSnapshot.AssumePlacement(parentPlacement)
 		if err != nil {
 			finalResult.status = fwk.AsStatus(fmt.Errorf("failed to restore parent pod group placement: %w", err))
-			revertFns.revert()
 		}
 	}()
 
@@ -1220,7 +1205,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 			return &podGroupAlgorithmResult{
 				podGroupInfo: podGroupInfo,
 				status:       fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
-			}, nil
+			}
 		}
 		placementCycleState := newPlacementCycleState(podGroupCycleState, placement)
 		subtreeResult := map[fwk.EntityKey]*podGroupAlgorithmResult{}
@@ -1232,7 +1217,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 			// If omitted, the pod results are reconstructed later using the generic parent error
 			// (*podGroupFitError) rather than their original *framework.FitError.
 			maps.Copy(results, subtreeResult)
-			return result, nil
+			return result
 		}
 
 		if anyResultSubtree == nil {
@@ -1263,7 +1248,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 		// Losing the FitError means we lose the UnschedulablePlugins for each pod,
 		// which breaks the QueueingHints.
 		maps.Copy(results, anyResultSubtree)
-		return anyResultRoot, nil
+		return anyResultRoot
 	}
 
 	bestPlacement, status := sched.findBestCompositePodGroupPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, successfulResults)
@@ -1271,21 +1256,11 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 		return &podGroupAlgorithmResult{
 			podGroupInfo: podGroupInfo,
 			status:       status,
-		}, nil
+		}
 	}
 
-	bestResult := successfulResults[bestPlacement]
-
-	revertFns, err = sched.assumeSubtreeWithRevert(ctx, schedFwk, podGroupInfo, bestResult)
-	if err != nil {
-		return &podGroupAlgorithmResult{
-			podGroupInfo: podGroupInfo,
-			status:       fwk.AsStatus(fmt.Errorf("failed to assume the subtree: %w", err)),
-		}, nil
-	}
-	maps.Copy(results, bestResult)
-
-	return bestResult[podGroupInfo.GetKey()], revertFns
+	maps.Copy(results, successfulResults[bestPlacement])
+	return results[podGroupInfo.GetKey()]
 }
 
 // randShufflePlacements is the default placement shuffler, randomizing placement order in place.
@@ -1528,7 +1503,9 @@ func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFw
 	defer cancel()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
-		return sched.podGroupSchedulingPlacementAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo)
+		// If this pod group has subsequent siblings in a composite pod group hierarchy,
+		// compositePodGroupSchedulingDefaultAlgorithm will assume the chosen result and own its revertFn.
+		return sched.podGroupSchedulingPlacementAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo), nil
 	}
 	// The non-TAS default algorithm does not evaluate placement candidates, but it
 	// still runs in a single implicit placement context so placement-scoped
@@ -1552,12 +1529,12 @@ func (sched *Scheduler) podGroupSchedulingRecursiveAlgorithm(ctx context.Context
 		algorithmResult, childRevertFns = sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, root)
 		results[podGroupInfo.GetKey()] = algorithmResult
 	} else {
-		algorithmResult, childRevertFns = sched.compositePodGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, results)
+		algorithmResult = sched.compositePodGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, results)
 	}
 	return algorithmResult, childRevertFns
 }
 
-func (sched *Scheduler) compositePodGroupSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (result *podGroupAlgorithmResult, revertFns revertFns) {
+func (sched *Scheduler) compositePodGroupSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) *podGroupAlgorithmResult {
 	podGroupCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -1599,7 +1576,7 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 	}
 
 	anyScheduled := false
-	for _, childPGInfo := range podGroupInfo.Children() {
+	for i, childPGInfo := range podGroupInfo.Children() {
 		childPodGroupState := framework.NewCycleState()
 		childPodGroupState.SetPlacementCycleState(placementCycleState)
 		childResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, childPodGroupState, root, childPGInfo, results)
@@ -1622,6 +1599,21 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 			// We can stop the scheduling loop early.
 			break
 		}
+
+		// If this is not the last child and its scheduled pods are not already assumed in the snapshot,
+		// assume the child's placement so that subsequent siblings are evaluated against it.
+		if i < len(podGroupInfo.Children())-1 && childResult.status.IsSuccess() && childResult.anyScheduled && len(childRevertFns) == 0 {
+			assumeRevertFns, err := sched.assumeSubtreeWithRevert(ctx, schedFwk, childPGInfo, results)
+			if err != nil {
+				childResult.status = fwk.AsStatus(fmt.Errorf("failed to assume child %s subtree in snapshot: %w", klog.KObj(childPGInfo), err))
+				return &podGroupAlgorithmResult{
+					podGroupInfo:        podGroupInfo,
+					status:              fwk.AsStatus(fmt.Errorf("composite pod group %q evaluation failed due to child %q error: %w", podGroupInfo.GetName(), childPGInfo.GetName(), childResult.status.AsError())),
+					placementCycleState: placementCycleState,
+				}, revertFns
+			}
+			revertFns.append(assumeRevertFns)
+		}
 	}
 
 	return &podGroupAlgorithmResult{
@@ -1635,6 +1627,7 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 // assumeSubtreeWithRevert runs AssumeAndReserveInSnapshot on all pods within the subtree.
 // This is needed for placement-based algorithm, because after evaluating the results for all placements,
 // the chosen result needs to be assumed for the other pods in the hierarchy to see the result.
+// Callers skip it when no subsequent evaluation depends on the snapshot (e.g. root or last child).
 func (sched *Scheduler) assumeSubtreeWithRevert(ctx context.Context, schedFwk framework.Framework, pgi *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (_ revertFns, err error) {
 	if results == nil {
 		return nil, fmt.Errorf("results for the subtree are missing")

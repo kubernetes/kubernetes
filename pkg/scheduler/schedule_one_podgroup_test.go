@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -187,6 +189,38 @@ func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, pl
 		}
 	}
 	return nil
+}
+
+// fakeAssumeAndReserveRecorderPlugin records every assume and revert in order.
+type fakeAssumeAndReserveRecorderPlugin struct {
+	mu     sync.Mutex
+	events []string
+	// assumeErrorAt is a "pod@node" whose assume returns an error, but only after it has been previously reverted,
+	// because the first assume of a pod on a node is done during placement evaluation, which is always reverted.
+	// Skipping it makes the error hit the assume of the chosen placement for subsequent siblings.
+	assumeErrorAt string
+}
+
+var _ fwk.ReservePlugin = &fakeAssumeAndReserveRecorderPlugin{}
+
+func (p *fakeAssumeAndReserveRecorderPlugin) Name() string { return "FakeAssumeAndReserveRecorder" }
+
+func (p *fakeAssumeAndReserveRecorderPlugin) Reserve(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	key := pod.Name + "@" + nodeName
+	revertedBefore := slices.Contains(p.events, "revert "+key)
+	p.events = append(p.events, "assume "+key)
+	if revertedBefore && key == p.assumeErrorAt {
+		return fwk.NewStatus(fwk.Error, "injected reserve failure")
+	}
+	return nil
+}
+
+func (p *fakeAssumeAndReserveRecorderPlugin) Unreserve(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.events = append(p.events, "revert "+pod.Name+"@"+nodeName)
 }
 
 // newPGInfo builds a leaf PodGroupInfo. Pods are kept in the given order.
@@ -3793,7 +3827,7 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 			}
 			pgInfo := newQueuedPodGroupInfo(rootPodGroupInfo, queuedPodInfos...)
 
-			result, _ := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), childPodGroupInfo, pgInfo)
+			result := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), childPodGroupInfo, pgInfo)
 
 			if tt.expectError {
 				if result.status == nil || !result.status.IsError() {
@@ -3968,7 +4002,7 @@ func TestPodGroupSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 					t.Fatalf("Failed to update snapshot: %v", err)
 				}
 
-				result, _ := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
+				result := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
 
 				expectedHost := placements[tt.expectedPlacement][0]
 				actualHost := result.podResults[0].scheduleResult.SuggestedHost
@@ -4153,7 +4187,7 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 
 			queuedPodInfos := []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: podGroupPod}}}
 			pgInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, queuedPodInfos...)
-			result, _ := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
+			result := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
 			if !result.status.IsSuccess() {
 				t.Fatalf("Expected success, got: %v", result.status)
 			}
@@ -9405,25 +9439,20 @@ func TestPodGroupSchedulingPlacementAlgorithm_PlacementLimit(t *testing.T) {
 }
 
 // runPlacementAlgorithm runs the placement algorithm for podGroup, or for a CompositePodGroup with
-// podGroup as its only child when compositePodGroup is true, and reverts the assumed result.
+// podGroup as its only child when compositePodGroup is true.
 func runPlacementAlgorithm(ctx context.Context, t *testing.T, sched *Scheduler, schedFwk framework.Framework, podGroup *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup, compositePodGroup bool, pod *v1.Pod) *podGroupAlgorithmResult {
 	t.Helper()
 	podGroupInfo := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(podGroup)}
 	podInfo := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}}
-	var result *podGroupAlgorithmResult
-	var revert revertFns
 	if compositePodGroup {
 		cpgInfo := newQueuedPodGroupInfo(
 			framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), podGroupInfo),
 			podInfo,
 		)
-		result, revert = sched.compositePodGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgInfo, cpgInfo.PodGroupInfo, map[fwk.EntityKey]*podGroupAlgorithmResult{})
-	} else {
-		pgInfo := newQueuedPodGroupInfo(podGroupInfo, podInfo)
-		result, revert = sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
+		return sched.compositePodGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgInfo, cpgInfo.PodGroupInfo, map[fwk.EntityKey]*podGroupAlgorithmResult{})
 	}
-	revert.revert()
-	return result
+	pgInfo := newQueuedPodGroupInfo(podGroupInfo, podInfo)
+	return sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
 }
 
 // fixedOrderPlacementPlugin returns one placement per node of the parent placement in a
@@ -10194,6 +10223,292 @@ func TestScheduleOnePodGroup_AttemptAndLatencyMetrics(t *testing.T) {
 					assertCounterValueFromGatherer(t, testRegistry, "scheduler_podgroup_schedule_attempts_total", nil, "entity", otherType, 0)
 					assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_podgroup_scheduling_attempt_duration_seconds", map[string]string{"entity": otherType}, 0)
 				})
+			}
+		})
+	}
+}
+
+func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
+		features.CompositePodGroup:               true,
+	})
+
+	rootPodGroup := st.MakePodGroup().Name("pg").Namespace("default").MinCount(1).Obj()
+	podGroupPod := st.MakePod().Name("pod").Namespace("default").UID("pod").PodGroupName("pg").Obj()
+
+	rootCompositePodGroup := st.MakeCompositePodGroup().Name("cpg").Namespace("default").Obj()
+	childBasicPodGroup1 := st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg").BasicPolicy().Obj()
+	childPodGroup1 := st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg").MinCount(1).Obj()
+	childPodGroup2 := st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg").MinCount(1).Obj()
+	pg1Pod1 := st.MakePod().Name("pg1-pod1").Namespace("default").UID("pg1-pod1").PodGroupName("pg1").Obj()
+	pg1Pod2 := st.MakePod().Name("pg1-pod2").Namespace("default").UID("pg1-pod2").PodGroupName("pg1").Obj()
+	pg1Pod3 := st.MakePod().Name("pg1-pod3").Namespace("default").UID("pg1-pod3").PodGroupName("pg1").Obj()
+	pg2Pod1 := st.MakePod().Name("pg2-pod1").Namespace("default").UID("pg2-pod1").PodGroupName("pg2").Obj()
+
+	childCompositePodGroup1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("default").ParentCompositePodGroup("cpg").Obj()
+	childCompositePodGroup2 := st.MakeCompositePodGroup().Name("cpg2").Namespace("default").ParentCompositePodGroup("cpg").Obj()
+	childPodGroup3 := st.MakePodGroup().Name("pg3").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(1).Obj()
+	childPodGroup4 := st.MakePodGroup().Name("pg4").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(1).Obj()
+	childPodGroup5 := st.MakePodGroup().Name("pg5").Namespace("default").ParentCompositePodGroup("cpg2").MinCount(1).Obj()
+	pg3Pod1 := st.MakePod().Name("pg3-pod1").Namespace("default").UID("pg3-pod1").PodGroupName("pg3").Obj()
+	pg4Pod1 := st.MakePod().Name("pg4-pod1").Namespace("default").UID("pg4-pod1").PodGroupName("pg4").Obj()
+	pg5Pod1 := st.MakePod().Name("pg5-pod1").Namespace("default").UID("pg5-pod1").PodGroupName("pg5").Obj()
+
+	rootCompositePodGroupKey := fwk.CompositePodGroupKey("default", "cpg")
+	childPodGroup1Key := fwk.PodGroupKey("default", "pg1")
+	childCompositePodGroup1Key := fwk.CompositePodGroupKey("default", "cpg1")
+
+	tests := []struct {
+		name                      string
+		root                      *fwk.GenericPodGroup
+		cpgs                      []*schedulingv1alpha3.CompositePodGroup
+		pgs                       []*schedulingv1beta1.PodGroup
+		pods                      []*v1.Pod
+		placementFeasibleStatuses [][]fwk.Code
+		assumeErrorAt             string
+		placements                map[fwk.EntityKey]map[string][]string
+		placementScores           map[fwk.EntityKey]map[string]int64
+		wantStatus                fwk.Code
+		wantAssumeEvents          []string
+		wantChildStatus           map[fwk.EntityKey]fwk.Code
+	}{
+		{
+			name: "Root pod group is not assumed",
+			root: fwk.NewGenericPodGroup(rootPodGroup),
+			pgs:  []*schedulingv1beta1.PodGroup{rootPodGroup},
+			pods: []*v1.Pod{podGroupPod},
+			wantAssumeEvents: []string{
+				"assume pod@node1",
+				"revert pod@node1",
+			},
+		},
+		{
+			name: "Pod group child with subsequent siblings within hierarchy is assumed, last child and root are not",
+			root: fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs: []*schedulingv1alpha3.CompositePodGroup{rootCompositePodGroup},
+			pgs:  []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
+			pods: []*v1.Pod{pg1Pod1, pg2Pod1},
+			wantAssumeEvents: []string{
+				"assume pg1-pod1@node1",
+				"revert pg1-pod1@node1",
+				"assume pg1-pod1@node1",
+				"assume pg2-pod1@node1",
+				"revert pg2-pod1@node1",
+				"revert pg1-pod1@node1",
+			},
+		},
+		{
+			name: "Multi-pod child pod group followed by a sibling assumes and reverts pods in LIFO order",
+			root: fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs: []*schedulingv1alpha3.CompositePodGroup{rootCompositePodGroup},
+			pgs:  []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
+			pods: []*v1.Pod{pg1Pod1, pg1Pod2, pg1Pod3, pg2Pod1},
+			wantAssumeEvents: []string{
+				"assume pg1-pod1@node1",
+				"assume pg1-pod2@node1",
+				"assume pg1-pod3@node1",
+				"revert pg1-pod3@node1",
+				"revert pg1-pod2@node1",
+				"revert pg1-pod1@node1",
+				"assume pg1-pod1@node1",
+				"assume pg1-pod2@node1",
+				"assume pg1-pod3@node1",
+				"assume pg2-pod1@node1",
+				"revert pg2-pod1@node1",
+				"revert pg1-pod3@node1",
+				"revert pg1-pod2@node1",
+				"revert pg1-pod1@node1",
+			},
+		},
+		{
+			name: "Basic child pod group with a subsequent sibling skips subtree assume when it had no scheduled pods",
+			root: fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs: []*schedulingv1alpha3.CompositePodGroup{rootCompositePodGroup},
+			pgs:  []*schedulingv1beta1.PodGroup{childBasicPodGroup1, childPodGroup2},
+			pods: []*v1.Pod{pg2Pod1},
+			wantAssumeEvents: []string{
+				"assume pg2-pod1@node1",
+				"revert pg2-pod1@node1",
+			},
+		},
+		{
+			name: "Composite pod group child with subsequent siblings is assumed, last child and root are not",
+			root: fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs: []*schedulingv1alpha3.CompositePodGroup{rootCompositePodGroup, childCompositePodGroup1, childCompositePodGroup2},
+			pgs:  []*schedulingv1beta1.PodGroup{childPodGroup3, childPodGroup4, childPodGroup5},
+			pods: []*v1.Pod{pg3Pod1, pg4Pod1, pg5Pod1},
+			wantAssumeEvents: []string{
+				"assume pg3-pod1@node1",
+				"revert pg3-pod1@node1",
+				"assume pg3-pod1@node1",
+				"assume pg4-pod1@node1",
+				"revert pg4-pod1@node1",
+				"revert pg3-pod1@node1",
+				"assume pg3-pod1@node1",
+				"assume pg4-pod1@node1",
+				"assume pg5-pod1@node1",
+				"revert pg5-pod1@node1",
+				"revert pg4-pod1@node1",
+				"revert pg3-pod1@node1",
+			},
+		},
+		{
+			name:                      "Child is not assumed when PlacementFeasible rejects the parent",
+			root:                      fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs:                      []*schedulingv1alpha3.CompositePodGroup{rootCompositePodGroup},
+			pgs:                       []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
+			pods:                      []*v1.Pod{pg1Pod1, pg2Pod1},
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success, fwk.Unschedulable}},
+			wantStatus:                fwk.Unschedulable,
+			wantAssumeEvents: []string{
+				"assume pg1-pod1@node1",
+				"revert pg1-pod1@node1",
+			},
+		},
+		{
+			name: "Child is assumed on its best-scored placement, not the last evaluated one",
+			root: fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs: []*schedulingv1alpha3.CompositePodGroup{rootCompositePodGroup},
+			pgs:  []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
+			pods: []*v1.Pod{pg1Pod1, pg2Pod1},
+			placements: map[fwk.EntityKey]map[string][]string{
+				rootCompositePodGroupKey: {"all": {"node1", "node2"}},
+				childPodGroup1Key:        {"on-node1": {"node1"}, "on-node2": {"node2"}},
+			},
+			placementScores: map[fwk.EntityKey]map[string]int64{
+				childPodGroup1Key: {"on-node1": 100, "on-node2": 1},
+			},
+			wantAssumeEvents: []string{
+				"assume pg1-pod1@node1",
+				"revert pg1-pod1@node1",
+				"assume pg1-pod1@node2",
+				"revert pg1-pod1@node2",
+				"assume pg1-pod1@node1",
+				"assume pg2-pod1@node1",
+				"revert pg2-pod1@node1",
+				"revert pg1-pod1@node1",
+			},
+		},
+		{
+			name:          "Assume failure is attributed to the podgroup child",
+			root:          fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs:          []*schedulingv1alpha3.CompositePodGroup{rootCompositePodGroup},
+			pgs:           []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
+			pods:          []*v1.Pod{pg1Pod1, pg2Pod1},
+			assumeErrorAt: "pg1-pod1@node1",
+			wantStatus:    fwk.Error,
+			wantAssumeEvents: []string{
+				"assume pg1-pod1@node1",
+				"revert pg1-pod1@node1",
+				"assume pg1-pod1@node1",
+				"revert pg1-pod1@node1",
+			},
+			wantChildStatus: map[fwk.EntityKey]fwk.Code{childPodGroup1Key: fwk.Error},
+		},
+		{
+			name:          "Assume failure is attributed to the composite pod group child",
+			root:          fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs:          []*schedulingv1alpha3.CompositePodGroup{rootCompositePodGroup, childCompositePodGroup1, childCompositePodGroup2},
+			pgs:           []*schedulingv1beta1.PodGroup{childPodGroup3, childPodGroup4, childPodGroup5},
+			pods:          []*v1.Pod{pg3Pod1, pg4Pod1, pg5Pod1},
+			assumeErrorAt: "pg4-pod1@node1",
+			wantStatus:    fwk.Error,
+			wantAssumeEvents: []string{
+				"assume pg3-pod1@node1",
+				"revert pg3-pod1@node1",
+				"assume pg3-pod1@node1",
+				"assume pg4-pod1@node1",
+				"revert pg4-pod1@node1",
+				"revert pg3-pod1@node1",
+				"assume pg3-pod1@node1",
+				"assume pg4-pod1@node1",
+				"revert pg4-pod1@node1",
+				"revert pg3-pod1@node1",
+			},
+			wantChildStatus: map[fwk.EntityKey]fwk.Code{childCompositePodGroup1Key: fwk.Error},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var root *framework.QueuedPodGroupInfo
+			if rootCPG := tt.root.GetCompositePodGroup(); rootCPG != nil {
+				root = buildHierarchicalQueuedPodGroupInfo(rootCPG, tt.cpgs, tt.pgs, tt.pods)
+			} else {
+				root = newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: tt.root}, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: tt.pods[0]}})
+			}
+			nodes := []*v1.Node{st.MakeNode().Name("node1").Obj(), st.MakeNode().Name("node2").Obj()}
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nodes, tt.pgs, tt.cpgs)
+
+			placements := map[fwk.EntityKey]map[string][]string{}
+			for _, pg := range tt.pgs {
+				placements[fwk.PodGroupKey(pg.Namespace, pg.Name)] = map[string][]string{"placement1": {"node1"}}
+			}
+			for _, cpg := range tt.cpgs {
+				placements[fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name)] = map[string][]string{"placement1": {"node1"}}
+			}
+			maps.Copy(placements, tt.placements)
+			placementPlugin := &fakePlacementPlugin{
+				name:                     "FakeGeneratorPlugin",
+				generatePlacementsResult: placements,
+				scorePlacementsResult:    tt.placementScores,
+			}
+			orderedPlacementGeneratePlugin := &orderedPlacementPlugin{placementPlugin}
+			placementFeasiblePlugin := &fakePlacementFeasiblePlugin{placementFeasibleStatuses: tt.placementFeasibleStatuses}
+			assumeAndReservePlugin := &fakeAssumeAndReserveRecorderPlugin{assumeErrorAt: tt.assumeErrorAt}
+
+			queue := internalqueue.NewTestQueue(ctx, nil)
+			schedFwk, err := tf.NewFramework(ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterPlacementGeneratePlugin(orderedPlacementGeneratePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return orderedPlacementGeneratePlugin, nil
+					}),
+					tf.RegisterPlacementScorePlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return placementPlugin, nil
+					}, 1),
+					tf.RegisterPlacementFeasiblePlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return placementFeasiblePlugin, nil
+					}),
+					tf.RegisterReservePlugin(assumeAndReservePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return assumeAndReservePlugin, nil
+					}),
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				"test-scheduler",
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(queue),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create new framework: %v", err)
+			}
+
+			cache := internalcache.New(ctx, nil, true, true)
+			sched := &Scheduler{
+				Cache:            cache,
+				nodeInfoSnapshot: snapshot,
+			}
+			initTestAlgorithm(t, sched)
+
+			results := sched.runRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), root)
+
+			if got := results[root.GetKey()].status.Code(); got != tt.wantStatus {
+				t.Fatalf("Unexpected root status code: got %v, want %v (status: %v)", got, tt.wantStatus, results[root.GetKey()].status)
+			}
+			if diff := cmp.Diff(tt.wantAssumeEvents, assumeAndReservePlugin.events); diff != "" {
+				t.Errorf("Unexpected assume events (-want, +got):\n%s", diff)
+			}
+			for key, wantStatus := range tt.wantChildStatus {
+				childRes, ok := results[key]
+				if !ok {
+					t.Fatalf("Missing result for child %v", key)
+				}
+				if got := childRes.status.Code(); got != wantStatus {
+					t.Errorf("Unexpected status code for child %v: got %v, want %v", key, got, wantStatus)
+				}
 			}
 		})
 	}
