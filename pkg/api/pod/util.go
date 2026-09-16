@@ -438,6 +438,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowImageVolumeWithDigest:                              utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
 		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
 		AllowSysAdminWhenPrivilegeEscalationFalse:               false,
+		AllowMLDSAPodCertificateKeyTypes:                        utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateMLDSA),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -494,6 +495,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowEmptyImageVolumeReference = hasEmptyImageVolumeReference(oldPodSpec)
 
 		opts.AllowSysAdminWhenPrivilegeEscalationFalse = useAllowSysAdminWhenPrivilegeEscalationFalse(oldPodSpec)
+
+		// If old spec has a projected pod certificate requesting an ML-DSA key type, allow it
+		opts.AllowMLDSAPodCertificateKeyTypes = opts.AllowMLDSAPodCertificateKeyTypes || hasMLDSAPodCertificateProjection(oldPodSpec.Volumes)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -601,6 +605,20 @@ func hasSysAdminAndPrivilegeEscalationFalse(sc *api.SecurityContext) bool {
 			return true
 		}
 	}
+	return false
+}
+
+func hasMLDSAPodCertificateProjection(volumes []api.Volume) bool {
+	for _, volume := range volumes {
+		if volume.Projected != nil {
+			for _, source := range volume.Projected.Sources {
+				if source.PodCertificate != nil && (source.PodCertificate.KeyType == "MLDSA44" || source.PodCertificate.KeyType == "MLDSA65" || source.PodCertificate.KeyType == "MLDSA87") {
+					return true
+				}
+			}
+		}
+	}
+
 	return false
 }
 

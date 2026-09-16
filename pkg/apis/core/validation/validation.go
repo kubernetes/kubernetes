@@ -4632,6 +4632,8 @@ type PodValidationOptions struct {
 	AllowEmptyImageVolumeReference bool
 	// Allow containers to have CAP_SYS_ADMIN even if AllowPrivilegeEscalation is false
 	AllowSysAdminWhenPrivilegeEscalationFalse bool
+	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
+	AllowMLDSAPodCertificateKeyTypes bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
