@@ -53,6 +53,32 @@ func stagedVolume(name, pdName string) volume.GlobalVolume {
 	}
 }
 
+// stagedBlockVolume is what a plugin reports for a raw block volume still
+// staged on the node. The mode travels both on the entry, which is what decides
+// how it is registered, and on the spec, which is what UnmountDevice later
+// picks its branch from.
+func stagedBlockVolume(name, pdName string) volume.GlobalVolume {
+	gv := stagedVolume(name, pdName)
+	blockMode := v1.PersistentVolumeBlock
+	gv.Spec.PersistentVolume.Spec.VolumeMode = &blockMode
+	gv.DeviceMountPath = "/var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/" + name + "/dev"
+	gv.VolumeMode = v1.PersistentVolumeBlock
+	return gv
+}
+
+// listerWithoutMapper keeps global mounts but has no block mapper. The
+// interface a plugin implements to be listed requires device mounting, not
+// mapping, so a block entry from a plugin like this one has nothing to tear it
+// down and must not be registered.
+type listerWithoutMapper struct {
+	volume.DeviceMountableVolumePlugin
+	staged []volume.GlobalVolume
+}
+
+func (p *listerWithoutMapper) ListGlobalVolumes() ([]volume.GlobalVolume, error) {
+	return p.staged, nil
+}
+
 // TestReconstructGlobalVolumes covers reconstruction of a volume that is still
 // staged on the node but has no pod directory naming it, the state a node drain
 // and reboot leaves behind (issue #121937). Kubelet finds it by asking each
@@ -147,19 +173,53 @@ func TestReconstructGlobalVolumes(t *testing.T) {
 		}
 	})
 
-	t.Run("leaves a raw block volume to the block path", func(t *testing.T) {
+	t.Run("registers a raw block volume the same way", func(t *testing.T) {
 		logger, _ := ktesting.NewTestContext(t)
-		staged := stagedVolume("block-pv", "fake-device1")
-		staged.VolumeMode = v1.PersistentVolumeBlock
+		staged := stagedBlockVolume("block-pv", "fake-device1")
 		rc, plugin := setup(t, staged)
 
 		rc.reconstructGlobalVolumes(logger)
 
-		// A block volume reaches the actual state of world through the block
-		// mapper, not through a device mount, so registering it here would
-		// describe it with the wrong path.
-		if rc.actualStateOfWorld.VolumeExists(uniqueName(t, plugin, staged)) {
-			t.Errorf("a block volume was registered as a device mount")
+		volumeName := uniqueName(t, plugin, staged)
+		if !rc.actualStateOfWorld.VolumeExists(volumeName) {
+			t.Fatalf("block volume %q is not in the actual state of world", volumeName)
+		}
+		// Uncertain is what makes DeviceMayBeMounted true, which is what gets
+		// the volume to UnmountDevice, which sends a block volume to its unmap.
+		if got, want := rc.actualStateOfWorld.GetDeviceMountState(volumeName), operationexecutor.DeviceMountUncertain; got != want {
+			t.Errorf("device mount state: got %q, want %q", got, want)
+		}
+		// GenerateUnmapDeviceFunc takes this path as the global map path, so it
+		// has to be the one the plugin reported, not a device mount path.
+		found := false
+		for _, vol := range rc.actualStateOfWorld.GetAttachedVolumes() {
+			if vol.VolumeName != volumeName {
+				continue
+			}
+			found = true
+			if got, want := vol.DeviceMountPath, staged.DeviceMountPath; got != want {
+				t.Errorf("device mount path: got %q, want %q", got, want)
+			}
+		}
+		if !found {
+			t.Fatalf("block volume %q is not among the attached volumes", volumeName)
+		}
+		if !containsVolume(rc.volumesNeedUpdateFromNodeStatus, volumeName) {
+			t.Errorf("block volume %q was not queued for a device path update, got %v", volumeName, rc.volumesNeedUpdateFromNodeStatus)
+		}
+	})
+
+	t.Run("skips a block volume whose plugin has no mapper", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		staged := stagedBlockVolume("block-pv", "fake-device1")
+		rc, fakePlugin := setup(t)
+
+		// Reported by a plugin that can be listed and device mounted but has no
+		// mapper, so nothing would tear the volume down if it were registered.
+		rc.reconstructGlobalVolume(logger, &listerWithoutMapper{DeviceMountableVolumePlugin: fakePlugin}, staged)
+
+		if rc.actualStateOfWorld.VolumeExists(uniqueName(t, fakePlugin, staged)) {
+			t.Errorf("a block volume was registered by a plugin with no mapper")
 		}
 	})
 

@@ -143,19 +143,23 @@ func (rc *reconciler) reconstructGlobalVolumes(logger klog.Logger) {
 }
 
 func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumepkg.GlobalVolumeListerPlugin, globalVolume volumepkg.GlobalVolume) {
-	// Raw block volumes reach the actual state of world through the block
-	// mapper rather than through a device mount, so they are not handled here.
-	if globalVolume.VolumeMode == v1.PersistentVolumeBlock {
-		logger.V(4).Info("Skipping block volume reported as a global mount", "deviceMountPath", globalVolume.DeviceMountPath)
-		return
-	}
-
 	// The desired state of world names a volume by device when the plugin can
 	// device mount it, and by pod otherwise. Only the first kind can be matched
 	// against what is found on disk, since there is no pod here to name it
 	// with, and unstaging a volume under a name the desired state never
 	// produces would unstage one a pod still needs.
-	if canMount, err := plugin.CanDeviceMount(globalVolume.Spec); err != nil || !canMount {
+	//
+	// A raw block volume is named the same way but is torn down through the
+	// block mapper rather than through a device mount, so what it is gated on
+	// is the plugin having a mapper. That is why GlobalVolume carries a volume
+	// mode: the two reach the actual state of world by different paths, and
+	// UnmountDevice later picks its branch from the mode on the spec.
+	if globalVolume.VolumeMode == v1.PersistentVolumeBlock {
+		if _, canMap := plugin.(volumepkg.BlockVolumePlugin); !canMap {
+			logger.V(4).Info("Skipping global mount of a block volume whose plugin has no mapper", "deviceMountPath", globalVolume.DeviceMountPath)
+			return
+		}
+	} else if canMount, err := plugin.CanDeviceMount(globalVolume.Spec); err != nil || !canMount {
 		logger.V(4).Info("Skipping global mount of a volume that is not device mountable", "deviceMountPath", globalVolume.DeviceMountPath, "err", err)
 		return
 	}
