@@ -78,19 +78,26 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid: maxReplicas = 0 (required)": {
 			input: makeValidHPA(tweakMaxReplicas(0)),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "maxReplicas"), "").MarkBeta(),
+				field.Required(field.NewPath("spec", "maxReplicas"), ""),
 			},
 		},
 		"invalid: maxReplicas negative": {
 			input: makeValidHPA(tweakMaxReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum").MarkBeta(),
+				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum"),
 			},
 		},
 		"invalid: minReplicas = 0 (gate disabled)": {
 			input: makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "minReplicas"), int32(0), "must be greater than or equal to 1").WithOrigin("minimum").MarkBeta(),
+				field.Invalid(field.NewPath("spec", "minReplicas"), int32(0), "must be greater than or equal to 1").WithOrigin("minimum"),
+			},
+		},
+		"invalid: minReplicas negative (gate enabled)": {
+			input:             makeValidHPA(tweakMinReplicas(-1), tweakMetrics(validScaleToZeroMetrics...)),
+			enableScaleToZero: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "minReplicas"), int32(-1), "must be greater than or equal to 0").WithOrigin("minimum"),
 			},
 		},
 	}
@@ -160,21 +167,29 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    makeValidHPA(),
 			updateObj: makeValidHPA(tweakMaxReplicas(0)),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "maxReplicas"), "").MarkBeta(),
+				field.Required(field.NewPath("spec", "maxReplicas"), ""),
 			},
 		},
 		"invalid update: maxReplicas negative": {
 			oldObj:    makeValidHPA(),
 			updateObj: makeValidHPA(tweakMaxReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum").MarkBeta(),
+				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum"),
 			},
 		},
 		"invalid update: minReplicas 1 -> 0 (gate disabled)": {
 			oldObj:    makeValidHPA(tweakMinReplicas(1), tweakMetrics(validScaleToZeroMetrics...)),
 			updateObj: makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "minReplicas"), int32(0), "must be greater than or equal to 1").WithOrigin("minimum").MarkBeta(),
+				field.Invalid(field.NewPath("spec", "minReplicas"), int32(0), "must be greater than or equal to 1").WithOrigin("minimum"),
+			},
+		},
+		"invalid update: minReplicas 1 -> -1 (gate enabled)": {
+			oldObj:            makeValidHPA(tweakMinReplicas(1), tweakMetrics(validScaleToZeroMetrics...)),
+			updateObj:         makeValidHPA(tweakMinReplicas(-1), tweakMetrics(validScaleToZeroMetrics...)),
+			enableScaleToZero: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "minReplicas"), int32(-1), "must be greater than or equal to 0").WithOrigin("minimum"),
 			},
 		},
 		"valid update: ratcheting minReplicas=0 when gate disabled": {

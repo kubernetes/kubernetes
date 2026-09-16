@@ -28,9 +28,8 @@ import (
 )
 
 var (
-	hpaOpts = func(minReplica int32) HorizontalPodAutoscalerSpecValidationOptions {
+	hpaOpts = func() HorizontalPodAutoscalerSpecValidationOptions {
 		return HorizontalPodAutoscalerSpecValidationOptions{
-			MinReplicasLowerBound: minReplica,
 			ScaleTargetRefValidationOptions: CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false,
 				AllowEmptyAPIGroup:     false,
@@ -41,8 +40,7 @@ var (
 			},
 		}
 	}
-	hpaSpecValidationOpts            = hpaOpts(1)
-	hpaScaleToZeroSpecValidationOpts = hpaOpts(0)
+	hpaSpecValidationOpts = hpaOpts()
 )
 
 func TestValidateScale(t *testing.T) {
@@ -893,19 +891,6 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
 				ScaleTargetRef: autoscaling.CrossVersionObjectReference{},
-				MinReplicas:    ptr.To[int32](-1),
-				MaxReplicas:    5,
-			},
-		},
-		msg: "must be greater than or equal to 1",
-	}, {
-		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "myautoscaler",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{},
 				MinReplicas:    ptr.To[int32](7),
 				MaxReplicas:    5,
 			},
@@ -1633,144 +1618,6 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	}
 }
 
-func prepareMinReplicasCases(t *testing.T, minReplicas int32) []autoscaling.HorizontalPodAutoscaler {
-	metricLabelSelector, err := metav1.ParseToLabelSelector("label=value")
-	if err != nil {
-		t.Errorf("unable to parse label selector: %v", err)
-	}
-	minReplicasCases := []autoscaling.HorizontalPodAutoscaler{{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "myautoscaler",
-			Namespace:       metav1.NamespaceDefault,
-			ResourceVersion: "theversion",
-		},
-		Spec: autoscaling.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				Name:       "mydeployment",
-				APIVersion: "apps/v1",
-			},
-			MinReplicas: ptr.To[int32](minReplicas),
-			MaxReplicas: 5,
-			Metrics: []autoscaling.MetricSpec{{
-				Type: autoscaling.ObjectMetricSourceType,
-				Object: &autoscaling.ObjectMetricSource{
-					DescribedObject: autoscaling.CrossVersionObjectReference{
-						Kind: "ReplicationController",
-						Name: "myrc",
-					},
-					Metric: autoscaling.MetricIdentifier{
-						Name: "somemetric",
-					},
-					Target: autoscaling.MetricTarget{
-						Type:  autoscaling.ValueMetricType,
-						Value: resource.NewMilliQuantity(300, resource.DecimalSI),
-					},
-				},
-			}},
-		},
-	}, {
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "myautoscaler",
-			Namespace:       metav1.NamespaceDefault,
-			ResourceVersion: "theversion",
-		},
-		Spec: autoscaling.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				Name:       "mydeployment",
-				APIVersion: "apps/v1",
-			},
-			MinReplicas: ptr.To[int32](minReplicas),
-			MaxReplicas: 5,
-			Metrics: []autoscaling.MetricSpec{{
-				Type: autoscaling.ExternalMetricSourceType,
-				External: &autoscaling.ExternalMetricSource{
-					Metric: autoscaling.MetricIdentifier{
-						Name:     "somemetric",
-						Selector: metricLabelSelector,
-					},
-					Target: autoscaling.MetricTarget{
-						Type:         autoscaling.AverageValueMetricType,
-						AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
-					},
-				},
-			}},
-		},
-	}}
-	return minReplicasCases
-}
-
-func TestValidateHorizontalPodAutoscalerScaleToZeroEnabled(t *testing.T) {
-	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
-	for _, successCase := range zeroMinReplicasCases {
-		if errs := ValidateHorizontalPodAutoscaler(&successCase, hpaScaleToZeroSpecValidationOpts); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-}
-
-func TestValidateHorizontalPodAutoscalerScaleToZeroDisabled(t *testing.T) {
-	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
-	errorMsg := "must be greater than or equal to 1"
-
-	for _, errorCase := range zeroMinReplicasCases {
-		errs := ValidateHorizontalPodAutoscaler(&errorCase, hpaSpecValidationOpts)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %q", errorMsg)
-		} else if !strings.Contains(errs[0].Error(), errorMsg) {
-			t.Errorf("unexpected error: %q, expected: %q", errs[0], errorMsg)
-		}
-	}
-
-	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
-
-	for _, successCase := range nonZeroMinReplicasCases {
-		successCase.Spec.MinReplicas = ptr.To[int32](1)
-		if errs := ValidateHorizontalPodAutoscaler(&successCase, hpaSpecValidationOpts); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-}
-
-func TestValidateHorizontalPodAutoscalerUpdateScaleToZeroEnabled(t *testing.T) {
-	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
-	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
-
-	for i, zeroCase := range zeroMinReplicasCases {
-		nonZeroCase := nonZeroMinReplicasCases[i]
-
-		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase, hpaScaleToZeroSpecValidationOpts); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-
-		if errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &nonZeroCase, hpaScaleToZeroSpecValidationOpts); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-}
-
-func TestValidateHorizontalPodAutoscalerScaleToZeroUpdateDisabled(t *testing.T) {
-	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
-	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
-	errorMsg := "must be greater than or equal to 1"
-
-	for i, zeroCase := range zeroMinReplicasCases {
-		nonZeroCase := nonZeroMinReplicasCases[i]
-		errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &nonZeroCase, hpaSpecValidationOpts)
-
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %q", errorMsg)
-		} else if !strings.Contains(errs[0].Error(), errorMsg) {
-			t.Errorf("unexpected error: %q, expected: %q", errs[0], errorMsg)
-		}
-
-		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase, hpaSpecValidationOpts); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-}
-
 func TestValidateHorizontalPodAutoscalerConfigurableToleranceEnabled(t *testing.T) {
 	policiesList := []autoscaling.HPAScalingPolicy{{
 		Type:          autoscaling.PodsScalingPolicy,
@@ -1808,7 +1655,7 @@ func TestValidateHorizontalPodAutoscalerConfigurableToleranceEnabled(t *testing.
 			ScaleDown: &c,
 		}
 		hpa := prepareHPAWithBehavior(b)
-		if errs := ValidateHorizontalPodAutoscaler(&hpa, hpaScaleToZeroSpecValidationOpts); len(errs) != 0 {
+		if errs := ValidateHorizontalPodAutoscaler(&hpa, hpaSpecValidationOpts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -1854,7 +1701,7 @@ func TestValidateHorizontalPodAutoscalerConfigurableToleranceEnabled(t *testing.
 			ScaleUp: &c.rule,
 		}
 		hpa := prepareHPAWithBehavior(b)
-		errs := ValidateHorizontalPodAutoscaler(&hpa, hpaScaleToZeroSpecValidationOpts)
+		errs := ValidateHorizontalPodAutoscaler(&hpa, hpaSpecValidationOpts)
 		if len(errs) != 1 {
 			t.Fatalf("expected exactly one error, got: %v", errs)
 		}
@@ -1942,11 +1789,11 @@ func TestValidateHorizontalPodAutoscalerUpdateConfigurableToleranceEnabled(t *te
 			Policies: policiesList,
 		}})
 
-	if errs := ValidateHorizontalPodAutoscalerUpdate(&withToleranceHPA, &withoutToleranceHPA, hpaScaleToZeroSpecValidationOpts); len(errs) != 0 {
+	if errs := ValidateHorizontalPodAutoscalerUpdate(&withToleranceHPA, &withoutToleranceHPA, hpaSpecValidationOpts); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	if errs := ValidateHorizontalPodAutoscalerUpdate(&withoutToleranceHPA, &withToleranceHPA, hpaScaleToZeroSpecValidationOpts); len(errs) != 0 {
+	if errs := ValidateHorizontalPodAutoscalerUpdate(&withoutToleranceHPA, &withToleranceHPA, hpaSpecValidationOpts); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 }
@@ -1987,7 +1834,6 @@ func TestValidateHorizontalPodAutoscalerUpdateInvalidHPA(t *testing.T) {
 	}
 
 	opts := HorizontalPodAutoscalerSpecValidationOptions{
-		MinReplicasLowerBound: 0,
 		ScaleTargetRefValidationOptions: CrossVersionObjectReferenceValidationOptions{
 			AllowInvalidAPIVersion: true,
 		},
