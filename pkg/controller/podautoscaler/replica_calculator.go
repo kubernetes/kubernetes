@@ -514,7 +514,11 @@ func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, er
 	if !ok {
 		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
 	}
-	return podRequest.MilliValue(), nil
+	request, ok := podRequest.AsMilliInt64()
+	if !ok {
+		return 0, fmt.Errorf("pod-level request for %s in Pod %s exceeds the int64 milli-unit range", resource, pod.Name)
+	}
+	return request, nil
 }
 
 // calculatePodRequestsFromContainers computes the requests for the specified
@@ -535,7 +539,16 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 			if !ok {
 				return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
 			}
-			request += containerRequest.MilliValue()
+			containerValue, ok := containerRequest.AsMilliInt64()
+			if !ok {
+				return 0, fmt.Errorf("request for %s in container %s of Pod %s exceeds the int64 milli-unit range", resource, c.Name, pod.Name)
+			}
+			// Requests are non-negative. Check the sum as well as each conversion
+			// so an overflow cannot become a negative utilization denominator.
+			if containerValue > math.MaxInt64-request {
+				return 0, fmt.Errorf("total request for %s in Pod %s exceeds the int64 milli-unit range", resource, pod.Name)
+			}
+			request += containerValue
 		}
 		// container names are unique inside the pod
 		if container == c.Name {
