@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2018 gRPC authors.
+ * Copyright 2026 gRPC authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,5 +18,22 @@
 
 package grpc
 
-// Version is the current grpc version.
-const Version = "1.83.2"
+import (
+	"context"
+	"errors"
+	"os"
+)
+
+// disconnectErrorLabel returns the grpc.disconnect_error metric label for a
+// transport error, as specified by gRFC A94. syscall.Errno does not exist on
+// plan9, so only the portable classifications are available.
+func disconnectErrorLabel(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "subchannel shutdown"
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, os.ErrDeadlineExceeded):
+		return "connection timed out"
+	default:
+		return "unknown"
+	}
+}
