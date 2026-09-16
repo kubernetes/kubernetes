@@ -939,12 +939,6 @@ const (
 	// containers (aka containers in CrashLoopBackOff)
 	ReduceDefaultCrashLoopBackOffDecay featuregate.Feature = "ReduceDefaultCrashLoopBackOffDecay"
 
-	// owner: @HirazawaUi
-	// kep: https://kep.k8s.io/4369
-	//
-	// Allow almost all printable ASCII characters in environment variables
-	RelaxedEnvironmentVariableValidation featuregate.Feature = "RelaxedEnvironmentVariableValidation"
-
 	// owner: @adrianmoisey
 	// kep: https://kep.k8s.io/5311
 	//
@@ -1947,12 +1941,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	RelaxedEnvironmentVariableValidation: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
-	},
-
 	RelaxedServiceNameValidation: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -2677,8 +2665,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	RecursiveReadOnlyMounts: {},
 
 	ReduceDefaultCrashLoopBackOffDecay: {},
-
-	RelaxedEnvironmentVariableValidation: {},
 
 	RelaxedServiceNameValidation: {},
 
