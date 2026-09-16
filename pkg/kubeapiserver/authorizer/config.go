@@ -35,7 +35,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
 	certinformersv1 "k8s.io/client-go/informers/certificates/v1"
-	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -102,10 +101,6 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch configuredAuthorizer.Type {
 		case authzconfig.AuthorizerType(modes.ModeNode):
-			var slices resourceinformers.ResourceSliceInformer
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				slices = config.VersionedInformerFactory.Resource().V1().ResourceSlices()
-			}
 			var podCertificateRequestInformer certinformersv1.PodCertificateRequestInformer
 			if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
 				podCertificateRequestInformer = config.VersionedInformerFactory.Certificates().V1().PodCertificateRequests()
@@ -119,7 +114,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 				config.VersionedInformerFactory.Core().V1().Pods(),
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
-				slices, // Nil check in AddGraphEventHandlers can be removed when always creating this.
+				config.VersionedInformerFactory.Resource().V1().ResourceSlices(),
 				podCertificateRequestInformer,
 			)
 			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())

@@ -246,10 +246,6 @@ type PodSpecApplyConfiguration struct {
 	// and reserved before the Pod is allowed to start. The resources
 	// will be made available to those containers which consume them
 	// by name.
-	//
-	// This is a stable field but requires that the
-	// DynamicResourceAllocation feature gate is enabled.
-	//
 	// This field is immutable.
 	ResourceClaims []PodResourceClaimApplyConfiguration `json:"resourceClaims,omitempty"`
 	// Resources is the total amount of CPU and Memory resources required by all

@@ -3922,7 +3922,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "resourceClaims": {
-            "description": "ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which consume them by name.\n\nThis is a stable field but requires that the DynamicResourceAllocation feature gate is enabled.\n\nThis field is immutable.",
+            "description": "ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which consume them by name. This field is immutable.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.PodResourceClaim"
             },
@@ -4351,7 +4351,7 @@
         "description": "ResourceRequirements describes the compute resource requirements.",
         "properties": {
           "claims": {
-            "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis field depends on the DynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+            "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis field is immutable. It can only be set for containers.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceClaim"
             },
