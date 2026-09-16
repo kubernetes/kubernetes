@@ -83,9 +83,14 @@ func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
 // This type is used in the scheduler and autoscaler contract.
 // AllocatedState packs information of allocated devices which is gathered from allocated resource claims.
 type AllocatedState struct {
-	AllocatedDevices         sets.Set[DeviceID]
-	AllocatedSharedDeviceIDs sets.Set[SharedDeviceID]
-	AggregatedCapacity       ConsumedCapacityCollection
+	// AllocatedDevices contains device IDs that are exclusively allocated to a claim.
+	AllocatedDevices sets.Set[DeviceID]
+	// AllocatedSharedDeviceIDs contains device IDs that have one or more shared allocations
+	// when the DRAConsumableCapacity feature is enabled.
+	AllocatedSharedDeviceIDs sets.Set[DeviceID]
+	// AggregatedCapacity records the consumed capacity per device ID when
+	// the DRAConsumableCapacity feature is enabled.
+	AggregatedCapacity ConsumedCapacityCollection
 }
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.
