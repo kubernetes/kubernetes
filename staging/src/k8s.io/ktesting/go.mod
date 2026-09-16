@@ -7,7 +7,7 @@ go 1.27.0
 godebug default=go1.27
 
 require (
-	github.com/onsi/gomega v1.40.0
+	github.com/onsi/gomega v1.43.1
 	go.uber.org/goleak v1.3.0
 	k8s.io/klog/v2 v2.140.0
 	sigs.k8s.io/yaml v1.6.0
