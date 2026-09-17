@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -876,6 +877,14 @@ func (m *kubeGenericRuntimeManager) computeVolumeResizeAction(ctx context.Contex
 	}
 }
 
+// cpuQuotaForResizeOrdering ranks the unlimited CFS quota, -1, largest by mapping it to MaxInt64.
+func cpuQuotaForResizeOrdering(quota int64) int64 {
+	if quota == -1 {
+		return math.MaxInt64
+	}
+	return quota
+}
+
 func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podContainerChanges podActions) *kubecontainer.SyncResult {
 	logger := klog.FromContext(ctx)
 	start := time.Now()
@@ -1130,7 +1139,9 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		if podResources.CPUQuota == nil {
 			podResources.CPUQuota = currentPodCPUConfig.CPUQuota
 		}
-		if errResize := resizeContainers(v1.ResourceCPU, *currentPodCPUConfig.CPUQuota, *podResources.CPUQuota,
+		currentCPUQuota := cpuQuotaForResizeOrdering(*currentPodCPUConfig.CPUQuota)
+		desiredCPUQuota := cpuQuotaForResizeOrdering(*podResources.CPUQuota)
+		if errResize := resizeContainers(v1.ResourceCPU, currentCPUQuota, desiredCPUQuota,
 			int64(*currentPodCPUConfig.CPUShares), int64(*podResources.CPUShares)); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
 			return resizeResult
