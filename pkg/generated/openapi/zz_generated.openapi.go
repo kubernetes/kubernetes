@@ -1600,6 +1600,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		kubeletconfigv1beta1.MemorySwapConfiguration{}.OpenAPIModelName():                                               schema_k8sio_kubelet_config_v1beta1_MemorySwapConfiguration(ref),
 		kubeletconfigv1beta1.SerializedNodeConfigSource{}.OpenAPIModelName():                                            schema_k8sio_kubelet_config_v1beta1_SerializedNodeConfigSource(ref),
 		kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName():                                      schema_k8sio_kubelet_config_v1beta1_ShutdownGracePeriodByPodPriority(ref),
+		kubeletconfigv1beta1.SystemPartitionConfiguration{}.OpenAPIModelName():                                          schema_k8sio_kubelet_config_v1beta1_SystemPartitionConfiguration(ref),
 		kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName():                                                        schema_k8sio_kubelet_config_v1beta1_UserNamespaces(ref),
 		abacv1beta1.Policy{}.OpenAPIModelName():                                                                         schema_pkg_apis_abac_v1beta1_Policy(ref),
 		abacv1beta1.PolicySpec{}.OpenAPIModelName():                                                                     schema_pkg_apis_abac_v1beta1_PolicySpec(ref),
@@ -77089,6 +77090,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"systemPartition": {
+						SchemaProps: spec.SchemaProps{
+							Description: "systemPartition configures a dedicated \"system\" partition inside the cgroup hierarchy the kubelet creates for Pods. Pods in the listed namespaces are placed in that partition rather than alongside user Pods. The partition root carries its own memory limit and cpuset, which bounds the resources system Pods can take away from user Pods. Default: nil",
+							Ref:         ref(kubeletconfigv1beta1.SystemPartitionConfiguration{}.OpenAPIModelName()),
+						},
+					},
 					"showHiddenMetricsForVersion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "showHiddenMetricsForVersion is the previous version for which you want to show hidden metrics. Only the previous minor version is meaningful, other values will not be allowed. The format is `<major>.<minor>`, e.g.: `1.16`. The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, rather than being surprised when they are permanently removed in the release after that. Default: \"\"",
@@ -77341,7 +77348,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 			},
 		},
 		Dependencies: []string{
-			corev1.Taint{}.OpenAPIModelName(), metav1.Duration{}.OpenAPIModelName(), logsapiv1.LoggingConfiguration{}.OpenAPIModelName(), apiv1.TracingConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.CrashLoopBackOffConfig{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthentication{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthorization{}.OpenAPIModelName(), kubeletconfigv1beta1.MemoryReservation{}.OpenAPIModelName(), kubeletconfigv1beta1.MemorySwapConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName(), kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName()},
+			corev1.Taint{}.OpenAPIModelName(), metav1.Duration{}.OpenAPIModelName(), logsapiv1.LoggingConfiguration{}.OpenAPIModelName(), apiv1.TracingConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.CrashLoopBackOffConfig{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthentication{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthorization{}.OpenAPIModelName(), kubeletconfigv1beta1.MemoryReservation{}.OpenAPIModelName(), kubeletconfigv1beta1.MemorySwapConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName(), kubeletconfigv1beta1.SystemPartitionConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName()},
 	}
 }
 
@@ -77533,6 +77540,48 @@ func schema_k8sio_kubelet_config_v1beta1_ShutdownGracePeriodByPodPriority(ref co
 					},
 				},
 				Required: []string{"priority", "shutdownGracePeriodSeconds"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_SystemPartitionConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SystemPartitionConfiguration describes the node's system partition: a resource-bounded area of the node dedicated to running system Pods.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"memoryLimit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "memoryLimit is the hard memory limit applied to the system partition cgroup root. It covers system partition Pods only, and is separate from kubeReserved and systemReserved, which cover host processes. There is no corresponding request, so the limit is not subtracted from Node Allocatable. Default: \"\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"cpuset": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cpuset is the set of CPUs dedicated to system partition Pods, in Linux CPU list format (e.g. \"0-3\"). It should typically match reservedSystemCPUs so that system Pods and host system services share the same cores. Default: \"\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namespaces": {
+						SchemaProps: spec.SchemaProps{
+							Description: "namespaces lists the namespaces whose Pods are placed into the system partition. In alpha this is the sole mechanism for determining partition membership, so it must not be empty.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"namespaces"},
 			},
 		},
 	}

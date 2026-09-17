@@ -171,6 +171,10 @@ const (
 	MemoryQoSNodeMemoryMinBytesKey = "memory_qos_node_memory_min_bytes"
 	MemoryQoSNodeMemoryLowBytesKey = "memory_qos_node_memory_low_bytes"
 
+	// Metric keys for Node System Partition.
+	PartitionMemoryLimitBytesKey = "partition_memory_limit_bytes"
+	PartitionLabelKey            = "partition"
+
 	// Values used in metric labels
 	Container          = "container"
 	InitContainer      = "init_container"
@@ -990,6 +994,16 @@ var (
 		},
 	)
 
+	// PartitionMemoryLimitBytes tracks the memory limit a node partition is held to.
+	PartitionMemoryLimitBytes = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PartitionMemoryLimitBytesKey,
+			Help:           "Memory limit in bytes applied to the partition's cgroup.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{PartitionLabelKey},
+	)
 	// MemoryQoSNodeMemoryMinBytes tracks total cgroup v2 memory.min (hard protection) for Guaranteed pods.
 	MemoryQoSNodeMemoryMinBytes = metrics.NewGauge(
 		&metrics.GaugeOpts{
@@ -1522,6 +1536,9 @@ func Register() {
 		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
 			legacyregistry.MustRegister(MemoryQoSNodeMemoryMinBytes)
 			legacyregistry.MustRegister(MemoryQoSNodeMemoryLowBytes)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSystemPartition) {
+			legacyregistry.MustRegister(PartitionMemoryLimitBytes)
 		}
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)

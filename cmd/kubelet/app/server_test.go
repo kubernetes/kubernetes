@@ -29,8 +29,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/utils/cpuset"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
@@ -609,4 +612,103 @@ func TestMarshalKubeletConfigForLog(t *testing.T) {
 
 	// The helper must not mutate the caller's config when masking.
 	require.Equal(t, []string{"Bearer super-secret-token"}, kc.StaticPodURLHeader["Authorization"])
+}
+
+func TestParseSystemPartition(t *testing.T) {
+	gib := int64(1 << 30)
+
+	testCases := []struct {
+		name    string
+		input   *kubeletconfiginternal.SystemPartitionConfiguration
+		want    *cm.SystemPartitionConfig
+		wantErr string
+	}{
+		{
+			name:  "not configured",
+			input: nil,
+			want:  nil,
+		},
+		{
+			name: "namespaces only",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				Namespaces: []string{"kube-system"},
+			},
+			want: &cm.SystemPartitionConfig{
+				Namespaces: sets.New("kube-system"),
+			},
+		},
+		{
+			name: "all fields",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit: "1Gi",
+				CPUSet:      "0-1",
+				Namespaces:  []string{"kube-system", "monitoring"},
+			},
+			want: &cm.SystemPartitionConfig{
+				MemoryLimit: &gib,
+				CPUSet:      cpuset.New(0, 1),
+				Namespaces:  sets.New("kube-system", "monitoring"),
+			},
+		},
+		{
+			name: "memory limit only",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit: "1Gi",
+				Namespaces:  []string{"kube-system"},
+			},
+			want: &cm.SystemPartitionConfig{
+				MemoryLimit: &gib,
+				Namespaces:  sets.New("kube-system"),
+			},
+		},
+		{
+			name: "cpuset only",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				CPUSet:     "0-1",
+				Namespaces: []string{"kube-system"},
+			},
+			want: &cm.SystemPartitionConfig{
+				CPUSet:     cpuset.New(0, 1),
+				Namespaces: sets.New("kube-system"),
+			},
+		},
+		{
+			name: "duplicate namespaces collapse into the set",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				Namespaces: []string{"kube-system", "kube-system"},
+			},
+			want: &cm.SystemPartitionConfig{
+				Namespaces: sets.New("kube-system"),
+			},
+		},
+		{
+			name: "unparsable memory limit",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit: "4Gx",
+				Namespaces:  []string{"kube-system"},
+			},
+			wantErr: `memoryLimit "4Gx"`,
+		},
+		{
+			name: "unparsable cpuset",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				CPUSet:     "0-",
+				Namespaces: []string{"kube-system"},
+			},
+			wantErr: `cpuset "0-"`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseSystemPartition(tc.input)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				require.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
 }
