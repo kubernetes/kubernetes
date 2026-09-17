@@ -433,9 +433,9 @@ func terminationStatus(t *testing.T, ctx context.Context, m *kubeGenericRuntimeM
 }
 
 func TestSyncTerminatingPodRemovesPartialStartAtDeadline(t *testing.T) {
-	ctx, m, fakeRuntime, pod, status, _ := setupTerminationTest(t)
+	ctx, m, fakeRuntime, pod, _, _ := setupTerminationTest(t)
 	setSidecarStateExited(fakeRuntime, "sidecar")
-	status = terminationStatus(t, ctx, m, pod)
+	status := terminationStatus(t, ctx, m, pod)
 	fakeRuntime.InjectError("StartContainer", errors.New("start interrupted"))
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
 	_, err := m.SyncTerminatingPod(ctx, pod, status, nil, backOff, time.Now().Add(time.Minute))
