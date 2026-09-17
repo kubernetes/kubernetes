@@ -35,7 +35,7 @@ import (
 )
 
 func SetSysctls(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
-	return setSysctls(ctx, realConntrackConfigurer{}, config)
+	return setSysctls(ctx, realConntrackConfigurer{sys: sysctl.New()}, config)
 }
 
 // conntrackConfigurer is a mockable interface for setting conntrack sysctls.
@@ -43,6 +43,8 @@ func SetSysctls(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackCo
 // Descriptions of the various sysctl fields can be found here:
 // https://www.kernel.org/doc/Documentation/networking/nf_conntrack-sysctl.txt
 type conntrackConfigurer interface {
+	// GetMax gets the current value of nf_conntrack_max.
+	GetMax(ctx context.Context) (int, error)
 	// SetMax adjusts nf_conntrack_max.
 	SetMax(ctx context.Context, max int) error
 	// SetTCPEstablishedTimeout adjusts nf_conntrack_tcp_timeout_established.
@@ -55,17 +57,39 @@ type conntrackConfigurer interface {
 	SetUDPTimeout(ctx context.Context, seconds int) error
 	// SetUDPStreamTimeout adjusts nf_conntrack_udp_timeout_stream.
 	SetUDPStreamTimeout(ctx context.Context, seconds int) error
+
+	// GetHashsize gets the conntrack module "hashsize" parameter
+	GetHashsize(ctx context.Context) (int, error)
+	// SetHashsize sets the conntrack module "hashsize" parameter
+	SetHashsize(ctx context.Context, value int) error
+
+	// DetectNumCPU returns the number of CPU cores in the system
+	DetectNumCPU() int
 }
 
 func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
-	max, err := getConntrackMax(ctx, config, detectNumCPU())
+	max, err := getConntrackMax(ctx, config, ct.DetectNumCPU())
 	if err != nil {
 		return err
 	}
 	if max > 0 {
-		err := ct.SetMax(ctx, max)
+		if curMax, err := ct.GetMax(ctx); err != nil || curMax < max {
+			err := ct.SetMax(ctx, max)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Check if hashsize is large enough for the nf_conntrack_max value.
+		hashsize, err := ct.GetHashsize(ctx)
 		if err != nil {
 			return err
+		}
+		if hashsize < max/4 {
+			err = ct.SetHashsize(ctx, max/4)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -130,7 +154,11 @@ func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntr
 	return 0, nil
 }
 
-func detectNumCPU() int {
+type realConntrackConfigurer struct {
+	sys sysctl.Interface
+}
+
+func (rct realConntrackConfigurer) DetectNumCPU() int {
 	// try get numCPU from /sys firstly due to a known issue (https://github.com/kubernetes/kubernetes/issues/99225)
 	_, numCPU, err := machine.GetTopology(sysfs.NewRealSysFs())
 	if err != nil || numCPU < 1 {
@@ -139,27 +167,12 @@ func detectNumCPU() int {
 	return numCPU
 }
 
-type realConntrackConfigurer struct {
+func (rct realConntrackConfigurer) GetMax(_ context.Context) (int, error) {
+	return rct.sys.GetSysctl("net/netfilter/nf_conntrack_max")
 }
 
 func (rct realConntrackConfigurer) SetMax(ctx context.Context, max int) error {
-	logger := klog.FromContext(ctx)
-	logger.Info("Setting nf_conntrack_max", "nfConntrackMax", max)
-	if err := rct.setIntSysCtl(ctx, "nf_conntrack_max", max); err != nil {
-		return err
-	}
-
-	// Check if hashsize is large enough for the nf_conntrack_max value.
-	hashsize, err := readIntStringFile("/sys/module/nf_conntrack/parameters/hashsize")
-	if err != nil {
-		return err
-	}
-	if hashsize >= (max / 4) {
-		return nil
-	}
-
-	logger.Info("Setting conntrack hashsize", "conntrackHashsize", max/4)
-	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
+	return rct.setIntSysCtl(ctx, "nf_conntrack_max", max)
 }
 
 func (rct realConntrackConfigurer) SetTCPEstablishedTimeout(ctx context.Context, seconds int) error {
@@ -186,24 +199,24 @@ func (rct realConntrackConfigurer) setIntSysCtl(ctx context.Context, name string
 	logger := klog.FromContext(ctx)
 	entry := "net/netfilter/" + name
 
-	sys := sysctl.New()
-	if val, _ := sys.GetSysctl(entry); val != value {
+	if val, _ := rct.sys.GetSysctl(entry); val != value {
 		logger.Info("Set sysctl", "entry", entry, "value", value)
-		if err := sys.SetSysctl(entry, value); err != nil {
+		if err := rct.sys.SetSysctl(entry, value); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func readIntStringFile(filename string) (int, error) {
-	b, err := os.ReadFile(filename)
+func (rct realConntrackConfigurer) GetHashsize(_ context.Context) (int, error) {
+	b, err := os.ReadFile("/sys/module/nf_conntrack/parameters/hashsize")
 	if err != nil {
 		return -1, err
 	}
 	return strconv.Atoi(strings.TrimSpace(string(b)))
 }
 
-func writeIntStringFile(filename string, value int) error {
-	return os.WriteFile(filename, []byte(strconv.Itoa(value)), 0640)
+func (rct realConntrackConfigurer) SetHashsize(ctx context.Context, value int) error {
+	klog.FromContext(ctx).Info("Setting conntrack hashsize", "conntrackHashsize", value)
+	return os.WriteFile("/sys/module/nf_conntrack/parameters/hashsize", []byte(strconv.Itoa(value)), 0640)
 }
