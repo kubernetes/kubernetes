@@ -74,6 +74,7 @@ type PodTopologySpread struct {
 
 var _ fwk.PreFilterPlugin = &PodTopologySpread{}
 var _ fwk.FilterPlugin = &PodTopologySpread{}
+var _ fwk.CrossNodeFilterPlugin = &PodTopologySpread{}
 var _ fwk.PreScorePlugin = &PodTopologySpread{}
 var _ fwk.ScorePlugin = &PodTopologySpread{}
 var _ fwk.EnqueueExtensions = &PodTopologySpread{}
@@ -85,6 +86,11 @@ const Name = names.PodTopologySpread
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *PodTopologySpread) Name() string {
 	return Name
+}
+
+// IsCrossNode returns true because topology spread constraints depend on pod counts across nodes in topology domains.
+func (pl *PodTopologySpread) IsCrossNode() bool {
+	return true
 }
 
 // Pod topology spread is not localized to a pod and node, so we cannot

@@ -5668,3 +5668,122 @@ func newQueuedPodGroupInfoForTest(ns, name string) *framework.QueuedPodGroupInfo
 		},
 	}
 }
+
+type fakeNodeLocalFilterPlugin struct {
+	name      string
+	evalCount int
+}
+
+func (p *fakeNodeLocalFilterPlugin) Name() string { return p.name }
+func (p *fakeNodeLocalFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	p.evalCount++
+	return nil
+}
+
+type fakeCrossNodeFilterPlugin struct {
+	name        string
+	isCrossNode bool
+	evalCount   int
+	statusCode  fwk.Code
+}
+
+var _ fwk.CrossNodeFilterPlugin = &fakeCrossNodeFilterPlugin{}
+
+func (p *fakeCrossNodeFilterPlugin) Name() string      { return p.name }
+func (p *fakeCrossNodeFilterPlugin) IsCrossNode() bool { return p.isCrossNode }
+func (p *fakeCrossNodeFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	p.evalCount++
+	if p.statusCode != fwk.Success {
+		return fwk.NewStatus(p.statusCode, "cross-node filter failed")
+	}
+	return nil
+}
+
+func TestRunCrossNodeFilterPlugins(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	nodeLocalPl := &fakeNodeLocalFilterPlugin{name: "NodeLocalFilter"}
+	disabledCrossNodePl := &fakeCrossNodeFilterPlugin{name: "DisabledCrossNodeFilter", isCrossNode: false, statusCode: fwk.Success}
+	crossNodePl := &fakeCrossNodeFilterPlugin{name: "CrossNodeFilter", isCrossNode: true, statusCode: fwk.Success}
+
+	reg := Registry{
+		queueSortPlugin: newQueueSortPlugin,
+		bindPlugin:      newBindPlugin,
+		nodeLocalPl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return nodeLocalPl, nil
+		},
+		disabledCrossNodePl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return disabledCrossNodePl, nil
+		},
+		crossNodePl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return crossNodePl, nil
+		},
+	}
+
+	cfgPls := &config.Plugins{}
+	cfgPls.Filter.Enabled = append(
+		cfgPls.Filter.Enabled,
+		config.Plugin{Name: nodeLocalPl.Name()},
+		config.Plugin{Name: disabledCrossNodePl.Name()},
+		config.Plugin{Name: crossNodePl.Name()},
+	)
+	profile := config.KubeSchedulerProfile{
+		SchedulerName: "test-cross-node-profile",
+		Plugins:       cfgPls,
+	}
+
+	f, err := newFrameworkWithQueueSortAndBind(ctx, reg, profile, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+	if err != nil {
+		t.Fatalf("failed to create framework: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
+
+	// 1. RunFilterPlugins with SetRunOnlyCrossNodeFilterPlugins(true) executes only plugins implementing CrossNodeFilterPlugin with IsCrossNode() == true
+	state := framework.NewCycleState()
+	state.SetRunOnlyCrossNodeFilterPlugins(true)
+	status := f.RunFilterPlugins(ctx, state, pod, nodeInfo)
+	if !status.IsSuccess() {
+		t.Fatalf("expected success, got %v", status)
+	}
+	if nodeLocalPl.evalCount != 0 {
+		t.Errorf("expected nodeLocalPl not to be called, got %d", nodeLocalPl.evalCount)
+	}
+	if disabledCrossNodePl.evalCount != 0 {
+		t.Errorf("expected disabledCrossNodePl (IsCrossNode()=false) not to be called, got %d", disabledCrossNodePl.evalCount)
+	}
+	if crossNodePl.evalCount != 1 {
+		t.Errorf("expected crossNodePl to be called once, got %d", crossNodePl.evalCount)
+	}
+
+	// 2. SkipFilterPlugins is respected
+	state.SetSkipFilterPlugins(sets.New(crossNodePl.Name()))
+	status = f.RunFilterPlugins(ctx, state, pod, nodeInfo)
+	if !status.IsSuccess() {
+		t.Fatalf("expected success when skipped, got %v", status)
+	}
+	if crossNodePl.evalCount != 1 {
+		t.Errorf("expected crossNodePl to be skipped, got %d", crossNodePl.evalCount)
+	}
+
+	// 3. Setting SetRunOnlyCrossNodeFilterPlugins(false) runs all filter plugins
+	stateAll := framework.NewCycleState()
+	stateAll.SetRunOnlyCrossNodeFilterPlugins(false)
+	status = f.RunFilterPlugins(ctx, stateAll, pod, nodeInfo)
+	if !status.IsSuccess() {
+		t.Fatalf("expected success when running all filter plugins, got %v", status)
+	}
+	if nodeLocalPl.evalCount != 1 {
+		t.Errorf("expected nodeLocalPl evalCount=1, got %d", nodeLocalPl.evalCount)
+	}
+	if disabledCrossNodePl.evalCount != 1 {
+		t.Errorf("expected disabledCrossNodePl evalCount=1, got %d", disabledCrossNodePl.evalCount)
+	}
+	if crossNodePl.evalCount != 2 {
+		t.Errorf("expected crossNodePl evalCount=2, got %d", crossNodePl.evalCount)
+	}
+}

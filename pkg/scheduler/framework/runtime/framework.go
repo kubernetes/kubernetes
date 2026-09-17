@@ -55,29 +55,27 @@ const (
 // frameworkImpl is the component responsible for initializing and running scheduler
 // plugins.
 type frameworkImpl struct {
-	registry                          Registry
-	snapshotSharedLister              fwk.SharedLister
-	mutableSnapshotLister             fwk.MutableSnapshotSharedLister
-	waitingPods                       *waitingPodsMap
-	podsInPreBind                     *podsInPreBindMap
-	scorePluginWeight                 map[string]int
-	preEnqueuePlugins                 []fwk.PreEnqueuePlugin
-	enqueueExtensions                 []fwk.EnqueueExtensions
-	queueSortPlugins                  []fwk.QueueSortPlugin
-	preFilterPlugins                  []fwk.PreFilterPlugin
-	filterPlugins                     []fwk.FilterPlugin
-	crossNodeFilterPlugins            []fwk.FilterPlugin
-	crossNodeFilterPluginsInitialized bool
-	postFilterPlugins                 []fwk.PostFilterPlugin
-	preScorePlugins                   []fwk.PreScorePlugin
-	scorePlugins                      []fwk.ScorePlugin
-	reservePlugins                    []fwk.ReservePlugin
-	preBindPlugins                    []fwk.PreBindPlugin
-	bindPlugins                       []fwk.BindPlugin
-	postBindPlugins                   []fwk.PostBindPlugin
-	permitPlugins                     []fwk.PermitPlugin
-	batchablePlugins                  []fwk.SignPlugin
-	podGroupPostFilterPlugins         []fwk.PodGroupPostFilterPlugin
+	registry                  Registry
+	snapshotSharedLister      fwk.SharedLister
+	mutableSnapshotLister     fwk.MutableSnapshotSharedLister
+	waitingPods               *waitingPodsMap
+	podsInPreBind             *podsInPreBindMap
+	scorePluginWeight         map[string]int
+	preEnqueuePlugins         []fwk.PreEnqueuePlugin
+	enqueueExtensions         []fwk.EnqueueExtensions
+	queueSortPlugins          []fwk.QueueSortPlugin
+	preFilterPlugins          []fwk.PreFilterPlugin
+	filterPlugins             []fwk.FilterPlugin
+	postFilterPlugins         []fwk.PostFilterPlugin
+	preScorePlugins           []fwk.PreScorePlugin
+	scorePlugins              []fwk.ScorePlugin
+	reservePlugins            []fwk.ReservePlugin
+	preBindPlugins            []fwk.PreBindPlugin
+	bindPlugins               []fwk.BindPlugin
+	postBindPlugins           []fwk.PostBindPlugin
+	permitPlugins             []fwk.PermitPlugin
+	batchablePlugins          []fwk.SignPlugin
+	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
 	placementFeasiblePlugins   []fwk.PlacementFeasiblePlugin
@@ -532,23 +530,10 @@ func (f *frameworkImpl) setInstrumentedPlugins() {
 			metric:          metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), metrics.PreFilter, f.profileName),
 		}
 	}
-	f.crossNodeFilterPlugins = nil
-	f.crossNodeFilterPluginsInitialized = true
 	for i, pl := range f.filterPlugins {
-		isCrossNode := false
-		if preFilter, ok := pl.(fwk.PreFilterPlugin); ok && preFilter.PreFilterExtensions() != nil {
-			isCrossNode = true
-		} else if p, ok := f.pluginsMap[pl.Name()]; ok {
-			if preFilter, ok := p.(fwk.PreFilterPlugin); ok && preFilter.PreFilterExtensions() != nil {
-				isCrossNode = true
-			}
-		}
 		f.filterPlugins[i] = &instrumentedFilterPlugin{
 			FilterPlugin: f.filterPlugins[i],
 			metric:       metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), metrics.Filter, f.profileName),
-		}
-		if isCrossNode {
-			f.crossNodeFilterPlugins = append(f.crossNodeFilterPlugins, f.filterPlugins[i])
 		}
 	}
 
@@ -1125,53 +1110,13 @@ func (f *frameworkImpl) RunFilterPlugins(
 		logger = klog.LoggerWithName(logger, "Filter")
 	}
 
+	runOnlyCrossNode := state.ShouldRunOnlyCrossNodeFilterPlugins()
 	for _, pl := range f.filterPlugins {
-		if state.GetSkipFilterPlugins().Has(pl.Name()) {
-			continue
-		}
-		ctx := ctx
-		if verboseLogs {
-			logger := klog.LoggerWithName(logger, pl.Name())
-			ctx = klog.NewContext(ctx, logger)
-		}
-		if status := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo); !status.IsSuccess() {
-			if !status.IsRejected() {
-				// Filter plugins are not supposed to return any status other than
-				// Success or Unschedulable.
-				status = fwk.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), status.AsError()))
-			}
-			status.SetPlugin(pl.Name())
-			return status
-		}
-	}
-
-	return nil
-}
-
-// RunCrossNodeFilterPlugins runs the set of configured Filter plugins that depend on
-// cross-node state (i.e. implement PreFilterExtensions) for pod on the given node.
-func (f *frameworkImpl) RunCrossNodeFilterPlugins(
-	ctx context.Context,
-	state fwk.CycleState,
-	pod *v1.Pod,
-	nodeInfo fwk.NodeInfo,
-) *fwk.Status {
-	logger := klog.FromContext(ctx)
-	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
-		logger = klog.LoggerWithName(logger, "CrossNodeFilter")
-	}
-
-	pluginsToRun := f.crossNodeFilterPlugins
-	if !f.crossNodeFilterPluginsInitialized {
-		for _, pl := range f.filterPlugins {
-			if preFilter, ok := pl.(fwk.PreFilterPlugin); ok && preFilter.PreFilterExtensions() != nil {
-				pluginsToRun = append(pluginsToRun, pl)
+		if runOnlyCrossNode {
+			if c, ok := pl.(fwk.CrossNodeFilterPlugin); !ok || !c.IsCrossNode() {
+				continue
 			}
 		}
-	}
-
-	for _, pl := range pluginsToRun {
 		if state.GetSkipFilterPlugins().Has(pl.Name()) {
 			continue
 		}
@@ -1368,37 +1313,6 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 		}
 
 		status = f.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
-		if !status.IsSuccess() && !status.IsRejected() {
-			return status
-		}
-	}
-
-	return status
-}
-
-// RunCrossNodeFilterPluginsWithNominatedPods runs the set of configured cross-node filter plugins
-// for nominated pod on the given node.
-func (f *frameworkImpl) RunCrossNodeFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info fwk.NodeInfo) *fwk.Status {
-	var status *fwk.Status
-
-	podsAdded := false
-	logger := klog.FromContext(ctx)
-	logger = klog.LoggerWithName(logger, "CrossNodeFilterWithNominatedPods")
-	ctx = klog.NewContext(ctx, logger)
-	for i := 0; i < 2; i++ {
-		stateToUse := state
-		nodeInfoToUse := info
-		if i == 0 {
-			var err error
-			podsAdded, stateToUse, nodeInfoToUse, err = addGENominatedPods(ctx, f, pod, state, info)
-			if err != nil {
-				return fwk.AsStatus(err)
-			}
-		} else if !podsAdded || !status.IsSuccess() {
-			break
-		}
-
-		status = f.RunCrossNodeFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
 		if !status.IsSuccess() && !status.IsRejected() {
 			return status
 		}

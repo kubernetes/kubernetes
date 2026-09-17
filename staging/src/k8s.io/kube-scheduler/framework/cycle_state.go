@@ -76,6 +76,14 @@ type CycleState interface {
 	// ShouldSkipAllPostFilterPlugins returns whether all plugins should be skipped in the PostFilter extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	ShouldSkipAllPostFilterPlugins() bool
+	// ShouldRunOnlyCrossNodeFilterPlugins returns whether only Filter plugins that implement
+	// CrossNodeFilterPlugin (with IsCrossNode() returning true) should be executed in the Filter extension point.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldRunOnlyCrossNodeFilterPlugins() bool
+	// SetRunOnlyCrossNodeFilterPlugins sets whether only cross-node Filter plugins should be executed
+	// in the Filter extension point.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	SetRunOnlyCrossNodeFilterPlugins(flag bool)
 
 	// Read retrieves data with the given "key" from CycleState. If the key is not
 	// present, ErrNotFound is returned.

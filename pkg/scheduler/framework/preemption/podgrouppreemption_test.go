@@ -1781,7 +1781,11 @@ type trackingCrossNodeFilter struct {
 	conflictVictimOnNodeName map[string]string // victimName -> unaffectedNodeName where it causes conflict
 }
 
+var _ fwk.CrossNodeFilterPlugin = &trackingCrossNodeFilter{}
+
 func (f *trackingCrossNodeFilter) Name() string { return "TrackingCrossNodeFilter" }
+
+func (f *trackingCrossNodeFilter) IsCrossNode() bool { return true }
 
 func (f *trackingCrossNodeFilter) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	state.Write(crossNodeStateKey, &crossNodeStateData{addedVictims: sets.New[string]()})
@@ -1823,31 +1827,33 @@ func TestPodGroupEvaluator_ReprieveNodeIndexedAndCrossNodeFilters(t *testing.T) 
 		name                     string
 		nodeCapacities           map[string]int
 		conflictVictimOnNodeName map[string]string
+		initPods                 []*v1.Pod
+		initPodGroups            []*schedulingv1beta1.PodGroup
 		expectedVictims          []string
 		expectedNodeLocalEvals   map[string]int
 		expectedCrossNodeEvals   map[string]int
 	}{
 		{
-			name: "Fast-fail on affected node (node3) skips both node-local and cross-node filters on unaffected nodes (node1, node2)",
+			name: "Phase 1 fast-fail on affected node (node3) skips unaffected nodes (node1, node2)",
 			nodeCapacities: map[string]int{
 				"node1": 1,
 				"node2": 1,
-				"node3": 1, // v3 + p-c exceeds capacity 1 -> Phase 1 fast-fails on node3
+				"node3": 1, // v3 + p-c exceeds capacity on node3 -> fails in Phase 1
 			},
 			expectedVictims: []string{"v3"},
 			expectedNodeLocalEvals: map[string]int{
-				"node1": 0,
-				"node2": 0,
-				"node3": 1,
+				"node1": 0, // unaffected node skipped
+				"node2": 0, // unaffected node skipped
+				"node3": 1, // fails in Phase 1
 			},
 			expectedCrossNodeEvals: map[string]int{
 				"node1": 0,
 				"node2": 0,
-				"node3": 0, // short-circuited by TrackingNodeLocalFilter failure on node3
+				"node3": 0, // short-circuited by node-local filter failure on node3
 			},
 		},
 		{
-			name: "Reprieved victim runs cross-node filters on unaffected nodes (node1, node2) but skips node-local filters",
+			name: "Phase 2 reprieve success runs cross-node filters on unaffected nodes (node1, node2) and skips node-local filters",
 			nodeCapacities: map[string]int{
 				"node1": 1,
 				"node2": 1,
@@ -1855,8 +1861,8 @@ func TestPodGroupEvaluator_ReprieveNodeIndexedAndCrossNodeFilters(t *testing.T) 
 			},
 			expectedVictims: nil,
 			expectedNodeLocalEvals: map[string]int{
-				"node1": 0, // skipped on unaffected node!
-				"node2": 0, // skipped on unaffected node!
+				"node1": 0, // skipped on unaffected node
+				"node2": 0, // skipped on unaffected node
 				"node3": 1, // run on affected node
 			},
 			expectedCrossNodeEvals: map[string]int{
@@ -1866,25 +1872,32 @@ func TestPodGroupEvaluator_ReprieveNodeIndexedAndCrossNodeFilters(t *testing.T) 
 			},
 		},
 		{
-			name: "Cross-node conflict on unaffected node (node2) rejects victim in Phase 2 even when affected node (node3) has capacity",
+			name: "Phase 2 cross-node conflict on unaffected node (node1) rejects multi-node PodGroup victim spanning node2 and node3",
 			nodeCapacities: map[string]int{
 				"node1": 1,
-				"node2": 1,
-				"node3": 2, // Phase 1 passes on node3
+				"node2": 2, // v2 + p-b fits on node2 -> passes Phase 1
+				"node3": 2, // v3 + p-c fits on node3 -> passes Phase 1
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("v2").UID("v2").Namespace("default").Node("node2").Priority(lowPriority).PodGroupName("victim-pg").Obj(),
+				st.MakePod().Name("v3").UID("v3").Namespace("default").Node("node3").Priority(lowPriority).PodGroupName("victim-pg").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("victim-pg").Namespace("default").Priority(lowPriority).BasicPolicy().DisruptionModeAll().Obj(),
 			},
 			conflictVictimOnNodeName: map[string]string{
-				"v3": "node2", // adding v3 on node3 causes cross-node conflict for p-b on node2
+				"v3": "node1", // adding v3 causes cross-node conflict for p-a on unaffected node1 in Phase 2
 			},
-			expectedVictims: []string{"v3"},
+			expectedVictims: []string{"v2", "v3"},
 			expectedNodeLocalEvals: map[string]int{
-				"node1": 0,
-				"node2": 0,
-				"node3": 1,
+				"node1": 0, // unaffected node skips node-local filter
+				"node2": 1, // passes Phase 1
+				"node3": 1, // passes Phase 1
 			},
 			expectedCrossNodeEvals: map[string]int{
-				"node1": 1,
-				"node2": 1, // fails here in Phase 2
-				"node3": 1,
+				"node1": 1, // fails here in Phase 2
+				"node2": 1, // passes Phase 1
+				"node3": 1, // passes Phase 1
 			},
 		},
 	}
@@ -1908,9 +1921,11 @@ func TestPodGroupEvaluator_ReprieveNodeIndexedAndCrossNodeFilters(t *testing.T) 
 				st.MakeNode().Name("node2").Obj(),
 				st.MakeNode().Name("node3").Obj(),
 			}
-			// v3 is running on node3
-			victimPod := st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Obj()
-			initPods := []*v1.Pod{victimPod}
+			initPods := tt.initPods
+			if initPods == nil {
+				victimPod := st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Obj()
+				initPods = []*v1.Pod{victimPod}
+			}
 
 			preemptorPods := []*v1.Pod{
 				st.MakePod().Name("p-a").UID("p-a").Priority(highPriority).Obj(),
@@ -1933,7 +1948,7 @@ func TestPodGroupEvaluator_ReprieveNodeIndexedAndCrossNodeFilters(t *testing.T) 
 				}, "PreFilter", "Filter"),
 			}
 
-			snapshot := internalcache.NewTestSnapshotWithPodGroups(initPods, nodes, nil)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(initPods, nodes, tt.initPodGroups)
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -1952,13 +1967,14 @@ func TestPodGroupEvaluator_ReprieveNodeIndexedAndCrossNodeFilters(t *testing.T) 
 			}
 
 			pgLister := &mockPodGroupLister{podGroups: make(map[string]*schedulingv1beta1.PodGroup)}
+			for _, pg := range tt.initPodGroups {
+				pgLister.podGroups[pg.Name] = pg
+			}
 			evaluator := &PodGroupEvaluator{
 				Handle:           fh,
 				podGroupSnapshot: pgLister,
 			}
 
-			// Preemptor pods are assigned in order: p-a -> node1, p-b -> node2, p-c -> node3.
-			// Note that node1 and node2 appear BEFORE node3 in the proposed assignment sequence.
 			targetNodes := []string{"node1", "node2", "node3"}
 			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 				var assignments []fwk.ProposedAssignment
@@ -1977,12 +1993,11 @@ func TestPodGroupEvaluator_ReprieveNodeIndexedAndCrossNodeFilters(t *testing.T) 
 				return &fwk.PodGroupAssignments{ProposedAssignments: assignments}, fwk.NewStatus(fwk.Success)
 			}
 
-			domain, err := newDomainForWorkloadPreemption(logger, snapshot, pgLister, &mockCompositePodGroupLister{}, "cluster")
-			if err != nil {
+			if err := fh.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatal(err)
 			}
-
-			if err := fh.MutableSnapshotSharedLister().StartMutations(); err != nil {
+			domain, err := newDomainForWorkloadPreemption(logger, snapshot, pgLister, &mockCompositePodGroupLister{}, "cluster")
+			if err != nil {
 				t.Fatal(err)
 			}
 			res, status := evaluator.selectVictimsOnDomain(ctx, preemptor, domain, nil, mockSchedulingFunc)
@@ -1993,13 +2008,14 @@ func TestPodGroupEvaluator_ReprieveNodeIndexedAndCrossNodeFilters(t *testing.T) 
 				t.Fatalf("expected success status, got %v", status)
 			}
 
-			var gotVictims []string
+			gotVictims := sets.New[string]()
 			if res != nil && res.victims != nil {
 				for _, p := range res.victims.Pods {
-					gotVictims = append(gotVictims, p.Name)
+					gotVictims.Insert(p.Name)
 				}
 			}
-			if diff := cmp.Diff(tt.expectedVictims, gotVictims); diff != "" {
+			wantVictims := sets.New(tt.expectedVictims...)
+			if diff := cmp.Diff(wantVictims, gotVictims); diff != "" {
 				t.Errorf("unexpected victims (-want +got):\n%s", diff)
 			}
 

@@ -248,16 +248,12 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 
 	validAssignment := make([]fwk.ProposedAssignment, 0, len(podGroupAssignments.ProposedAssignments))
 	assignmentsByNode := make(map[string][]int)
-	var assignedNodes []string
 
 	// Prepare podInfos for each of the assigned preemptor pods and index by node
 	for _, assignment := range podGroupAssignments.ProposedAssignments {
 		if nodeName := assignment.GetNodeName(); nodeName != "" {
 			idx := len(validAssignment)
 			validAssignment = append(validAssignment, assignment)
-			if _, exists := assignmentsByNode[nodeName]; !exists {
-				assignedNodes = append(assignedNodes, nodeName)
-			}
 			assignmentsByNode[nodeName] = append(assignmentsByNode[nodeName], idx)
 		}
 	}
@@ -268,7 +264,7 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	// 1. Affected nodes (where v has pods): runs all Filter plugins and Reserve/Unreserve.
 	//    Since most conflicts occur on affected nodes, this enables fast-fail.
 	// 2. Unaffected nodes: runs only cross-node Filter plugins (those implementing
-	//    PreFilterExtensions) and skips Reserve/Unreserve, since node-local state
+	//    CrossNodeFilterPlugin) and skips Reserve/Unreserve, since node-local state
 	//    on unaffected nodes is unchanged by adding v.
 	reprieveVictim := func(v *DomainVictim, preemptorAssignments []fwk.ProposedAssignment) (fits bool, err error) {
 		if err = addVictimPodsWithPreFilter(v, preemptorAssignments); err != nil {
@@ -281,65 +277,54 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 					err = errors.Join(err, cleanupErr)
 				}
 			}
+			if !fits {
+				if rmErr := removeVictimPodsWithPreFilter(v, preemptorAssignments); rmErr != nil {
+					err = errors.Join(err, rmErr)
+				}
+				if err != nil {
+					return
+				}
+				if l := logger.V(6); l.Enabled() {
+					l.Info("Pods are potential preemption victims on domain", "pods", toPodNames(v.Pods()), "domain", domain.GetName())
+				}
+			}
 		}()
-
-		affectedNodeSet := v.AffectedNodes()
 
 		evaluateNodeAssignments := func(nodeName string, assignmentIndices []int, isAffectedNode bool) (bool, error) {
 			nodeInfo := nameToNode[nodeName]
 			for _, idx := range assignmentIndices {
 				assignment := preemptorAssignments[idx]
-				var s *fwk.Status
-				if isAffectedNode {
-					s = ev.Handle.RunFilterPluginsWithNominatedPods(ctx, assignment.GetCycleState(), assignment.GetPod(), nodeInfo)
-				} else {
-					s = ev.Handle.RunCrossNodeFilterPluginsWithNominatedPods(ctx, assignment.GetCycleState(), assignment.GetPod(), nodeInfo)
-				}
+				cs := assignment.GetCycleState()
+				cs.SetRunOnlyCrossNodeFilterPlugins(!isAffectedNode)
+				s := ev.Handle.RunFilterPluginsWithNominatedPods(ctx, cs, assignment.GetPod(), nodeInfo)
+				cs.SetRunOnlyCrossNodeFilterPlugins(false)
 				if !s.IsSuccess() {
-					if err := removeVictimPodsWithPreFilter(v, preemptorAssignments); err != nil {
-						return false, err
-					}
-					if l := logger.V(6); l.Enabled() {
-						l.Info("Pods are potential preemption victims on domain", "pods", toPodNames(v.Pods()), "domain", domain.GetName())
-					}
 					return false, nil
 				}
-				// Simulate assuming a preemptor pod on this node so subsequent preemptor pods
-				// on the same node see it in nodeInfo.
+				// Simulate assuming a preemptor pod and reserving stateful plugins resources.
 				if err := mutableLister.AddPod(assignment.GetPodInfo(), nodeName); err != nil {
 					return false, err
 				}
 				if isAffectedNode {
 					ev.Handle.RunReservePluginsReserve(ctx, assignment.GetCycleState(), assignment.GetPod(), nodeName)
-					cleanupFns = append(cleanupFns, func() error {
-						ev.Handle.RunReservePluginsUnreserve(ctx, assignment.GetCycleState(), assignment.GetPod(), nodeName)
-						return mutableLister.RemovePod(logger, assignment.GetPod(), nodeName)
-					})
-				} else {
-					cleanupFns = append(cleanupFns, func() error {
-						return mutableLister.RemovePod(logger, assignment.GetPod(), nodeName)
-					})
 				}
+				cleanupFns = append(cleanupFns, func() error {
+					if isAffectedNode {
+						ev.Handle.RunReservePluginsUnreserve(ctx, assignment.GetCycleState(), assignment.GetPod(), nodeName)
+					}
+					return mutableLister.RemovePod(logger, assignment.GetPod(), nodeName)
+				})
 			}
 			return true, nil
 		}
 
+		affectedNodeSet := v.AffectedNodes()
+
 		// Phase 1: Evaluate preemptor assignments on nodes where v has pods (Fast-Fail).
-		var evaluatedAffectedNodes sets.Set[string]
-		if len(v.Pods()) > 1 {
-			evaluatedAffectedNodes = sets.New[string]()
-		}
-		for _, pod := range v.Pods() {
-			nodeName := pod.GetPod().Spec.NodeName
+		for nodeName := range affectedNodeSet {
 			indices, hasAssignments := assignmentsByNode[nodeName]
 			if !hasAssignments {
 				continue
-			}
-			if evaluatedAffectedNodes != nil {
-				if evaluatedAffectedNodes.Has(nodeName) {
-					continue
-				}
-				evaluatedAffectedNodes.Insert(nodeName)
 			}
 			ok, evalErr := evaluateNodeAssignments(nodeName, indices, true)
 			if evalErr != nil || !ok {
@@ -348,11 +333,11 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		}
 
 		// Phase 2: Evaluate preemptor assignments on unaffected nodes (Cross-Node Filters only).
-		for _, nodeName := range assignedNodes {
+		for nodeName, indices := range assignmentsByNode {
 			if _, isAffected := affectedNodeSet[nodeName]; isAffected {
 				continue
 			}
-			ok, evalErr := evaluateNodeAssignments(nodeName, assignmentsByNode[nodeName], false)
+			ok, evalErr := evaluateNodeAssignments(nodeName, indices, false)
 			if evalErr != nil || !ok {
 				return false, evalErr
 			}

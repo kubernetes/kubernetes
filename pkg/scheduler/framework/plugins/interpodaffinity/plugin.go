@@ -38,6 +38,7 @@ const Name = names.InterPodAffinity
 
 var _ fwk.PreFilterPlugin = &InterPodAffinity{}
 var _ fwk.FilterPlugin = &InterPodAffinity{}
+var _ fwk.CrossNodeFilterPlugin = &InterPodAffinity{}
 var _ fwk.PreScorePlugin = &InterPodAffinity{}
 var _ fwk.ScorePlugin = &InterPodAffinity{}
 var _ fwk.EnqueueExtensions = &InterPodAffinity{}
@@ -56,6 +57,11 @@ type InterPodAffinity struct {
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *InterPodAffinity) Name() string {
 	return Name
+}
+
+// IsCrossNode returns true because inter-pod affinity/anti-affinity depends on pods scheduled on other nodes.
+func (pl *InterPodAffinity) IsCrossNode() bool {
+	return true
 }
 
 // Inter pod affinity make feasibility and scoring dependent on the placement of other
