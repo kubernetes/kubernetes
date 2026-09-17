@@ -49,10 +49,20 @@ func isDriveLetterorEmptyPath(path string) bool {
 	return false
 }
 
-// isVolumePrefix returns true if the given path name starts with "Volume" or volume prefix including
-// "\\.\", "\\?\" for device path or "UNC" or "\\" for UNC path. Otherwise, it returns false.
+// isDeviceOrUncPath returns true if the given path name starts with "Volume"
+// (a volume GUID path), "UNC" (a device-form UNC path with the "\\?\" prefix
+// stripped), or "\\" / "//" (any device-namespace path such as "\\?\", "\\.\"
+// or a UNC network path "\\server\share"). Otherwise, it returns false.
+//
+// Any path beginning with "\\" must not be resolved/followed: touching a remote
+// UNC target causes Windows to open an SMB session and automatically send the
+// node's credentials, enabling forced NTLM authentication (MITRE ATT&CK T1187).
+// The previous implementation only matched the "\\?\" and "\\.\" device forms
+// and let ordinary UNC paths like "\\attacker\share" through. The forward-slash
+// form is matched too so the check holds for callers that pass an unnormalized
+// path (e.g. a symlink target read before mount.NormalizeWindowsPath runs).
 func isDeviceOrUncPath(path string) bool {
-	if strings.HasPrefix(path, "Volume") || strings.HasPrefix(path, "\\\\?\\") || strings.HasPrefix(path, "\\\\.\\") || strings.HasPrefix(path, "UNC") {
+	if strings.HasPrefix(path, "Volume") || strings.HasPrefix(path, "UNC") || strings.HasPrefix(path, `\\`) || strings.HasPrefix(path, "//") {
 		return true
 	}
 	return false
