@@ -19,7 +19,25 @@ package generators
 import "k8s.io/gengo/v2/types"
 
 var (
-	apiScheme                                    = types.Name{Package: "k8s.io/kubernetes/pkg/api/legacyscheme", Name: "Scheme"}
+	// Kept in sorted package/type/function order, stdlib packages first
+	contextBackgroundFunc                        = types.Name{Package: "context", Name: "Background"}
+	contextCauseFunc                             = types.Name{Package: "context", Name: "Cause"}
+	contextContext                               = types.Name{Package: "context", Name: "Context"}
+	fmtErrorfFunc                                = types.Name{Package: "fmt", Name: "Errorf"}
+	reflectType                                  = types.Name{Package: "reflect", Name: "Type"}
+	reflectTypeOf                                = types.Name{Package: "reflect", Name: "TypeOf"}
+	stringsBuilder                               = types.Name{Package: "strings", Name: "Builder"}
+	syncMutex                                    = types.Name{Package: "sync", Name: "Mutex"}
+	syncWaitGroup                                = types.Name{Package: "sync", Name: "WaitGroup"}
+	timeDuration                                 = types.Name{Package: "time", Name: "Duration"}
+	v1ListOptions                                = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}
+	metav1NamespaceAll                           = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "NamespaceAll"}
+	metav1Object                                 = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "Object"}
+	runtimeObject                                = types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Object"}
+	schemaGroupResource                          = types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupResource"}
+	schemaGroupVersionResource                   = types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionResource"}
+	waitContextForChannelFunc                    = types.Name{Package: "k8s.io/apimachinery/pkg/util/wait", Name: "ContextForChannel"}
+	watchInterface                               = types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}
 	cacheDeletedObject                           = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "DeletedObject"}
 	cacheDoneChecker                             = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "DoneChecker"}
 	cacheGenericLister                           = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "GenericLister"}
@@ -33,34 +51,17 @@ var (
 	cacheNewSharedIndexInformerWithOptions       = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewSharedIndexInformerWithOptions"}
 	cacheNewTypedSharedIndexInformer             = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewTypedSharedIndexInformer"}
 	cacheSharedIndexInformer                     = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SharedIndexInformer"}
+	cacheSharedIndexInformerOptions              = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SharedIndexInformerOptions"}
+	cacheSyncResult                              = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SyncResult"}
+	cacheToListWatcherWithWatchListSemanticsFunc = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "ToListWatcherWithWatchListSemantics"}
+	cacheTransformFunc                           = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TransformFunc"}
 	cacheTypedFilteringResourceEventHandler      = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedFilteringResourceEventHandler"}
 	cacheTypedResourceEventHandlerDetailedFuncs  = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedResourceEventHandlerDetailedFuncs"}
 	cacheTypedResourceEventHandlerFuncs          = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedResourceEventHandlerFuncs"}
 	cacheTypedIndexers                           = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedIndexers"}
 	cacheTypedIndexersToIndexers                 = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedIndexersToIndexers"}
 	cacheTypedSharedIndexInformer                = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedSharedIndexInformer"}
-	cacheSharedIndexInformerOptions              = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SharedIndexInformerOptions"}
-	cacheSyncResult                              = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SyncResult"}
-	cacheTransformFunc                           = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TransformFunc"}
-	cacheToListWatcherWithWatchListSemanticsFunc = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "ToListWatcherWithWatchListSemantics"}
 	cacheWaitForFunc                             = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "WaitFor"}
-	contextBackgroundFunc                        = types.Name{Package: "context", Name: "Background"}
-	contextCauseFunc                             = types.Name{Package: "context", Name: "Cause"}
-	contextContext                               = types.Name{Package: "context", Name: "Context"}
-	fmtErrorfFunc                                = types.Name{Package: "fmt", Name: "Errorf"}
+	apiScheme                                    = types.Name{Package: "k8s.io/kubernetes/pkg/api/legacyscheme", Name: "Scheme"}
 	listOptions                                  = types.Name{Package: "k8s.io/kubernetes/pkg/apis/core", Name: "ListOptions"}
-	reflectType                                  = types.Name{Package: "reflect", Name: "Type"}
-	reflectTypeOf                                = types.Name{Package: "reflect", Name: "TypeOf"}
-	runtimeObject                                = types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Object"}
-	schemaGroupResource                          = types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupResource"}
-	schemaGroupVersionResource                   = types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionResource"}
-	stringsBuilder                               = types.Name{Package: "strings", Name: "Builder"}
-	syncMutex                                    = types.Name{Package: "sync", Name: "Mutex"}
-	syncWaitGroup                                = types.Name{Package: "sync", Name: "WaitGroup"}
-	timeDuration                                 = types.Name{Package: "time", Name: "Duration"}
-	v1ListOptions                                = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}
-	metav1NamespaceAll                           = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "NamespaceAll"}
-	metav1Object                                 = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "Object"}
-	waitContextForChannelFunc                    = types.Name{Package: "k8s.io/apimachinery/pkg/util/wait", Name: "ContextForChannel"}
-	watchInterface                               = types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}
 )

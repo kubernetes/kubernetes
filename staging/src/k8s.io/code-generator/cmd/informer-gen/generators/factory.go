@@ -74,23 +74,26 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		gvNewFuncs[groupPkgName] = c.Universe.Function(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "New"})
 	}
 	m := map[string]interface{}{
+		// Kept in sorted key order
 		"cacheDoneChecker":               c.Universe.Type(cacheDoneChecker),
 		"cacheInformerName":              c.Universe.Type(cacheInformerName),
 		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
 		"cacheSyncResult":                c.Universe.Type(cacheSyncResult),
 		"cacheTransformFunc":             c.Universe.Type(cacheTransformFunc),
 		"cacheWaitFor":                   c.Universe.Function(cacheWaitForFunc),
-		"contextContext":                 c.Universe.Type(contextContext),
+		"clientSetInterface":             c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
 		"contextCause":                   c.Universe.Function(contextCauseFunc),
+		"contextContext":                 c.Universe.Type(contextContext),
 		"fmtErrorf":                      c.Universe.Function(fmtErrorfFunc),
 		"groupVersions":                  g.groupVersions,
+		"gvGoNames":                      g.gvGoNames,
 		"gvInterfaces":                   gvInterfaces,
 		"gvNewFuncs":                     gvNewFuncs,
-		"gvGoNames":                      g.gvGoNames,
+		"informerFactoryInterface":       c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
 		"interfacesNewInformerFunc":      c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "NewInformerFunc"}),
 		"interfacesTweakListOptionsFunc": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
-		"informerFactoryInterface":       c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
-		"clientSetInterface":             c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
+		"namespaceAll":                   c.Universe.Type(metav1NamespaceAll),
+		"object":                         c.Universe.Type(metav1Object),
 		"reflectType":                    c.Universe.Type(reflectType),
 		"reflectTypeOf":                  c.Universe.Function(reflectTypeOf),
 		"runtimeObject":                  c.Universe.Type(runtimeObject),
@@ -99,8 +102,6 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"syncMutex":                      c.Universe.Type(syncMutex),
 		"syncWaitGroup":                  c.Universe.Type(syncWaitGroup),
 		"timeDuration":                   c.Universe.Type(timeDuration),
-		"namespaceAll":                   c.Universe.Type(metav1NamespaceAll),
-		"object":                         c.Universe.Type(metav1Object),
 		"waitContextForChannel":          c.Universe.Function(waitContextForChannelFunc),
 	}
 
