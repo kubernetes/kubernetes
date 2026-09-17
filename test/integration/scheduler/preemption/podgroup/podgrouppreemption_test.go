@@ -62,17 +62,19 @@ import (
 // TestPodGroupPreemption tests preemption scenarios involving pod groups.
 func TestPodGroupPreemption(t *testing.T) {
 	tests := []struct {
-		name          string
-		nodes         []*v1.Node
-		podGroups     []*schedulingv1beta1.PodGroup
-		initialPods   []*v1.Pod // pods that should be scheduled before preemption starts
-		preemptorPods []*v1.Pod // pods that belong to a group and should trigger preemption
+		name                   string
+		nodes                  []*v1.Node
+		podGroups              []*schedulingv1beta1.PodGroup
+		initialPods            []*v1.Pod // pods that should be scheduled before preemption starts
+		unscheduledPodsWithNNN []*v1.Pod // pods that should remain unscheduled with NNN set before preemption starts
+		preemptorPods          []*v1.Pod // pods that belong to a group and should trigger preemption
 		// the order may be important to ensure deterministic scheduling result, where only some of the preemptor pods will get scheduled.
 		preemptorPodsQueuedInCreationOrder bool
 		pdb                                *policyv1.PodDisruptionBudget
 		expectedScheduled                  []string
 		expectedCandidatesForPreemption    []string
 		expectedUnschedulable              []string
+		expectedNNNRemoved                 []string
 		expectedToHaveNNNInfo              []string
 		expectedPodsPreemptedByWAP         int
 		enablePodGroupPreemptionPolicy     bool
@@ -236,6 +238,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("low-3").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
 				st.MakePod().Name("low-4").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
 			},
+			unscheduledPodsWithNNN: []*v1.Pod{
+				st.MakePod().Name("nominated-1").NominatedNodeName("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
+				st.MakePod().Name("nominated-2").NominatedNodeName("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
+			},
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
@@ -244,6 +250,8 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:               []string{"high-1", "high-2", "high-3", "high-4"},
 			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3", "low-4"},
+			expectedUnschedulable:           []string{"nominated-1", "nominated-2"},
+			expectedNNNRemoved:              []string{"nominated-1", "nominated-2"},
 			expectedToHaveNNNInfo:           []string{"high-1", "high-2", "high-3", "high-4"},
 			expectedPodsPreemptedByWAP:      4,
 		},
@@ -1210,7 +1218,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				defer testCtx.SchedulerCloseFn()
 				cs, ns := testCtx.ClientSet, testCtx.NS.Name
 				t.Cleanup(func() {
-					cleanupSharedPodGroupPreemptionResources(t, testCtx.Ctx, cs, ns, tt.initialPods, tt.preemptorPods, tt.podGroups, nil, tt.pdb, tt.nodes)
+					cleanupSharedPodGroupPreemptionResources(t, testCtx.Ctx, cs, ns, append(tt.initialPods, tt.unscheduledPodsWithNNN...), tt.preemptorPods, tt.podGroups, nil, tt.pdb, tt.nodes)
 				})
 
 				// Create nodes
@@ -1250,6 +1258,50 @@ func TestPodGroupPreemption(t *testing.T) {
 					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
 						testutils.PodScheduled(cs, ns, p.Name)); err != nil {
 						t.Errorf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
+					}
+				}
+
+				logger, _ := ktesting.NewTestContext(t)
+
+				// 3b. Create unscheduled pods with NominatedNodeName and wait for nomination in queue
+				for _, p := range tt.unscheduledPodsWithNNN {
+					pod := p.DeepCopy()
+					pod.Namespace = ns
+					nnn := pod.Status.NominatedNodeName
+					if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create unscheduled pod %s: %v", p.Name, err)
+					}
+					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
+						testutils.PodUnschedulable(cs, ns, p.Name)); err != nil {
+						t.Fatalf("Failed to wait for pod %s to be unschedulable: %v", p.Name, err)
+					}
+					if nnn != "" {
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+							pod, err := cs.CoreV1().Pods(ns).Get(ctx, p.Name, metav1.GetOptions{})
+							if err != nil {
+								return false, err
+							}
+							pod.Status.NominatedNodeName = nnn
+							if _, err := cs.CoreV1().Pods(ns).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
+								if apierrors.IsConflict(err) {
+									return false, nil
+								}
+								return false, err
+							}
+							return true, nil
+						}); err != nil {
+							t.Fatalf("Failed to set NominatedNodeName on pod %s: %v", p.Name, err)
+						}
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+							for _, np := range testCtx.Scheduler.SchedulingQueue.NominatedPodsForNode(logger, nnn) {
+								if np.GetPod().Name == p.Name {
+									return true, nil
+								}
+							}
+							return false, nil
+						}); err != nil {
+							t.Fatalf("Failed to wait for pod %s to be nominated on node %s in scheduling queue: %v", p.Name, nnn, err)
+						}
 					}
 				}
 
@@ -1398,6 +1450,19 @@ func TestPodGroupPreemption(t *testing.T) {
 					}
 				}
 
+				// 9b. Verify nominated node name is removed from expected pods
+				for _, podName := range tt.expectedNNNRemoved {
+					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+						pod, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
+						if err != nil {
+							return false, err
+						}
+						return pod.Status.NominatedNodeName == "", nil
+					}); err != nil {
+						t.Errorf("Pod %s was expected to have NominatedNodeName removed but didn't: %v", podName, err)
+					}
+				}
+
 				// 10. Verify event order
 				if len(tt.expectedEventOrder) > 0 {
 					actualEvents := recorder.GetEvents()
@@ -1411,6 +1476,9 @@ func TestPodGroupPreemption(t *testing.T) {
 					t.Log("Dumping states of initial and preemptor pods:")
 					var allPods []string
 					for _, p := range tt.initialPods {
+						allPods = append(allPods, p.Name)
+					}
+					for _, p := range tt.unscheduledPodsWithNNN {
 						allPods = append(allPods, p.Name)
 					}
 					for _, p := range tt.preemptorPods {

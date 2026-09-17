@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 
@@ -89,11 +90,11 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInf
 	if !status.IsSuccess() {
 		return nil, status
 	}
-	candidate := &candidate{
-		victims:                res.victims,
-		numPodGroupDisruptions: res.numPodGroupDisruptions,
-		name:                   "cluster",
+	preemptorNodes := sets.New[string]()
+	for _, ni := range res.nominatedNodeNames {
+		preemptorNodes.Insert(ni.NominatedNodeName)
 	}
+	candidate := newCandidate(res.victims, "cluster", res.numPodGroupDisruptions, preemptorNodes.UnsortedList()...)
 	status = preemptionManager.Executor().ActuatePodGroupPreemption(ctx, candidate, pgInfo, names.DefaultPreemption)
 	if status.IsSuccess() {
 		status = fwk.NewStatus(fwk.Success, fmt.Sprintf("found a placement for podgroup, preempting %d victims", len(res.victims.Pods)))

@@ -164,18 +164,12 @@ func TestDryRunPreemption(t *testing.T) {
 			},
 			expected: [][]fwk.PreemptionCandidate{
 				{
-					&candidate{
-						victims: &extenderv1.Victims{
-							Pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj()},
-						},
-						name: "node1",
-					},
-					&candidate{
-						victims: &extenderv1.Victims{
-							Pods: []*v1.Pod{st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj()},
-						},
-						name: "node2",
-					},
+					newCandidate(&extenderv1.Victims{
+						Pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj()},
+					}, "node1", 0, "node1"),
+					newCandidate(&extenderv1.Victims{
+						Pods: []*v1.Pod{st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj()},
+					}, "node2", 0, "node2"),
 				},
 			},
 		},
@@ -195,20 +189,14 @@ func TestDryRunPreemption(t *testing.T) {
 			numViolatingVictim: 1,
 			expected: [][]fwk.PreemptionCandidate{
 				{
-					&candidate{
-						victims: &extenderv1.Victims{
-							Pods:             []*v1.Pod{st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj()},
-							NumPDBViolations: 1,
-						},
-						name: "node1",
-					},
-					&candidate{
-						victims: &extenderv1.Victims{
-							Pods:             []*v1.Pod{st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj()},
-							NumPDBViolations: 1,
-						},
-						name: "node2",
-					},
+					newCandidate(&extenderv1.Victims{
+						Pods:             []*v1.Pod{st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj()},
+						NumPDBViolations: 1,
+					}, "node1", 0, "node1"),
+					newCandidate(&extenderv1.Victims{
+						Pods:             []*v1.Pod{st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj()},
+						NumPDBViolations: 1,
+					}, "node2", 0, "node2"),
 				},
 			},
 		},
@@ -374,7 +362,7 @@ func TestSelectCandidate(t *testing.T) {
 				}
 				candidates, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				s := pe.SelectCandidate(ctx, candidates)
-				if s == nil || len(s.Name()) == 0 {
+				if s == nil || len(s.Name()) == 0 || len(s.Nodes()) == 0 {
 					t.Errorf("expect any node in %v, but no candidate selected", tt.expected)
 					return
 				}

@@ -1488,6 +1488,14 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			if mockPreemptionManager.candidate.Victims().NumPDBViolations != int64(tt.expectedNumPDBViolations) {
 				t.Errorf("NumPDBViolations mismatch. Want %d, Got %d", tt.expectedNumPDBViolations, mockPreemptionManager.candidate.Victims().NumPDBViolations)
 			}
+			wantCandidateNodes := sets.New[string]()
+			for _, ni := range res.NominatingInfos {
+				wantCandidateNodes.Insert(ni.NominatedNodeName)
+			}
+			gotCandidateNodes := sets.New(mockPreemptionManager.candidate.Nodes()...)
+			if diff := cmp.Diff(wantCandidateNodes, gotCandidateNodes); diff != "" {
+				t.Errorf("Candidate nodes mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
