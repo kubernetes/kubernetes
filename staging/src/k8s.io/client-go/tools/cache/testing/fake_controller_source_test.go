@@ -19,6 +19,7 @@ package framework
 import (
 	"sync"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -133,4 +134,45 @@ func TestResetWatch(t *testing.T) {
 	go consume(t, w, []string{"4"}, wg)
 	source.Shutdown()
 	wg.Wait()
+}
+
+// TestShutdownIdempotentAndUnblocksCallers verifies that Shutdown can be
+// called more than once and that other methods called after Shutdown return
+// promptly with an error instead of deadlocking on the held lock.
+func TestShutdownIdempotentAndUnblocksCallers(t *testing.T) {
+	pod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+		}
+	}
+
+	source := NewFakeControllerSource()
+	source.Add(pod("foo"))
+
+	source.Shutdown()
+	source.Shutdown() // must not deadlock or panic
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+
+		// None of these should block on the lock Shutdown used to hold
+		// forever; each should return the shutdown error (or no-op).
+		if _, err := source.List(metav1.ListOptions{}); err != errControllerSourceShutdown {
+			t.Errorf("List after Shutdown: got err %v, want %v", err, errControllerSourceShutdown)
+		}
+		if _, err := source.Watch(metav1.ListOptions{ResourceVersion: "1"}); err != errControllerSourceShutdown {
+			t.Errorf("Watch after Shutdown: got err %v, want %v", err, errControllerSourceShutdown)
+		}
+		source.Add(pod("bar"))   // no-op, must not hang
+		source.ResetWatch()      // no-op, must not hang
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("calls after Shutdown deadlocked")
+	}
 }
