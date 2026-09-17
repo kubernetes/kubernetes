@@ -1150,6 +1150,103 @@ func TestPIDPressure(t *testing.T) {
 	}
 }
 
+func TestPIDPressureUnaffectedByPerPodPIDLimits(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("PID pressure is not supported on Windows")
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, true)
+
+	tCtx := ktesting.Init(t)
+
+	podWithPIDLimit, podWithPIDLimitStats := makePodWithPIDStats("pod-with-pid-limit", defaultPriority, 600)
+	podWithPIDLimit.Spec.Resources = &v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourcePID: resource.MustParse("2048"),
+		},
+	}
+
+	podWithoutPIDLimit, podWithoutPIDLimitStats := makePodWithPIDStats("pod-without-pid-limit", defaultPriority, 400)
+
+	podLowPriority, podLowPriorityStats := makePodWithPIDStats("low-priority-pod", lowPriority, 800)
+	podLowPriority.Spec.Resources = &v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourcePID: resource.MustParse("1024"),
+		},
+	}
+
+	pods := []*v1.Pod{podWithPIDLimit, podWithoutPIDLimit, podLowPriority}
+	podStats := map[*v1.Pod]statsapi.PodStats{
+		podWithPIDLimit:    podWithPIDLimitStats,
+		podWithoutPIDLimit: podWithoutPIDLimitStats,
+		podLowPriority:     podLowPriorityStats,
+	}
+
+	activePodsFunc := func() []*v1.Pod { return pods }
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: new(bool)}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalPIDAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("500"),
+				},
+			},
+		},
+	}
+
+	// Node has 2000 max PIDs, 1500 running = 500 available (at threshold boundary)
+	summaryProvider := &fakeSummaryProvider{result: makePIDStats("2000", "1500", podStats)}
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+	}
+
+	// No pressure yet (500 available, threshold < 500)
+	_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+	if manager.IsUnderPIDPressure() {
+		t.Fatalf("Manager should not report PID pressure when available PIDs are at threshold boundary")
+	}
+
+	// Induce PID pressure: 1600 running = 400 available (below 500 threshold)
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = makePIDStats("2000", "1600", podStats)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	if !manager.IsUnderPIDPressure() {
+		t.Errorf("Manager should report PID pressure when node-level available PIDs drop below threshold")
+	}
+
+	// Eviction manager should evict the low-priority pod (highest process count
+	// among lowest priority), regardless of whether it has spec.resources.limits.pids
+	if podKiller.pod != podLowPriority {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v (lowest priority, highest PID usage)",
+			podKiller.pod.Name, podLowPriority.Name)
+	}
+}
+
 func TestAdmitUnderNodeConditions(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	manager := &managerImpl{}
