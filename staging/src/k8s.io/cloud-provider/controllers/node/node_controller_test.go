@@ -33,12 +33,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/controller-manager/pkg/features"
 	_ "k8s.io/controller-manager/pkg/features/register"
 
 	"github.com/google/go-cmp/cmp"
@@ -46,6 +50,9 @@ import (
 )
 
 func Test_syncNode(t *testing.T) {
+	// The gate must not change label assignment during node initialization.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CloudNodeAdditionalLabelsReconciliation, false)
+
 	tests := []struct {
 		name         string
 		fakeCloud    *fakecloud.Cloud
@@ -2144,14 +2151,18 @@ func TestReconcileAdditionalLabelsReturnsEarly(t *testing.T) {
 }
 
 func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.38"))
+
 	tests := []struct {
 		name             string
+		enableFeature    bool
 		existingLabels   map[string]string
 		additionalLabels map[string]string
 		expectedLabels   map[string]string
 	}{
 		{
-			name: "adds a missing label",
+			name:          "adds a missing label",
+			enableFeature: true,
 			existingLabels: map[string]string{
 				"example.com/existing": "preserved",
 			},
@@ -2164,7 +2175,8 @@ func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
 			},
 		},
 		{
-			name: "updates a changed label",
+			name:          "updates a changed label",
+			enableFeature: true,
 			existingLabels: map[string]string{
 				"topology.example.com/host-id": "host-a",
 			},
@@ -2176,7 +2188,8 @@ func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
 			},
 		},
 		{
-			name: "discards labels in reserved namespaces",
+			name:          "discards labels in reserved namespaces",
+			enableFeature: true,
 			additionalLabels: map[string]string{
 				"topology.kubernetes.io/zone": "zone-a",
 				"example.k8s.io/value":        "reserved",
@@ -2187,7 +2200,8 @@ func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
 			},
 		},
 		{
-			name: "adds a missing label with an empty value",
+			name:          "adds a missing label with an empty value",
+			enableFeature: true,
 			additionalLabels: map[string]string{
 				"example.com/empty": "",
 			},
@@ -2195,10 +2209,27 @@ func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
 				"example.com/empty": "",
 			},
 		},
+		{
+			name:          "does not add or update labels when disabled",
+			enableFeature: false,
+			existingLabels: map[string]string{
+				"example.com/existing":         "preserved",
+				"topology.example.com/host-id": "host-a",
+			},
+			additionalLabels: map[string]string{
+				"topology.example.com/host-id": "host-b",
+				"example.com/new":              "provider-value",
+			},
+			expectedLabels: map[string]string{
+				"example.com/existing":         "preserved",
+				"topology.example.com/host-id": "host-a",
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CloudNodeAdditionalLabelsReconciliation, test.enableFeature)
 			_, ctx := ktesting.NewTestContext(t)
 
 			node := &v1.Node{
@@ -2207,7 +2238,11 @@ func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
 				Spec: v1.NodeSpec{
 					ProviderID: "fake://node0",
 				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.0.1"}},
+				},
 			}
+			nodeAddresses := []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.0.2"}}
 
 			clientset := fake.NewSimpleClientset(node)
 			factory := informers.NewSharedInformerFactory(clientset, 0)
@@ -2225,11 +2260,20 @@ func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
 				cloud: &fakecloud.Cloud{
 					EnableInstancesV2: true,
 					AdditionalLabels:  test.additionalLabels,
+					Addresses:         nodeAddresses,
 				},
 			}
 
 			if err := cnc.UpdateNodeStatus(ctx); err != nil {
 				t.Fatalf("UpdateNodeStatus() returned an error: %v", err)
+			}
+
+			if !test.enableFeature {
+				for _, action := range clientset.Actions() {
+					if action.GetVerb() == "patch" || action.GetVerb() == "update" {
+						assert.Equal(t, "status", action.GetSubresource(), "disabled gate must only allow status writes")
+					}
+				}
 			}
 
 			updatedNode, err := clientset.CoreV1().Nodes().Get(
@@ -2242,8 +2286,83 @@ func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expectedLabels, updatedNode.Labels)
+			assert.Equal(t, nodeAddresses, updatedNode.Status.Addresses, "address updates must be independent of the label gate")
 		})
 	}
+}
+
+func TestUpdateNodeStatusReconcilesSharedAdditionalLabels(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.38"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CloudNodeAdditionalLabelsReconciliation, true)
+	_, ctx := ktesting.NewTestContext(t)
+
+	nodes := make([]*v1.Node, 8)
+	objects := make([]runtime.Object, len(nodes))
+	for i := range nodes {
+		name := fmt.Sprintf("node%d", i)
+		nodes[i] = &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					"example.com/existing":         name,
+					"topology.example.com/host-id": "host-a",
+					v1.LabelTopologyZone:           "node-zone",
+				},
+			},
+			Spec: v1.NodeSpec{ProviderID: "fake://" + name},
+		}
+		objects[i] = nodes[i]
+	}
+
+	clientset := fake.NewSimpleClientset(objects...)
+	factory := informers.NewSharedInformerFactory(clientset, 0)
+	nodeInformer := factory.Core().V1().Nodes()
+	for _, node := range nodes {
+		if err := nodeInformer.Informer().GetIndexer().Add(node); err != nil {
+			t.Fatalf("failed to add node %q to informer indexer: %v", node.Name, err)
+		}
+	}
+
+	// The fake provider returns the same labels map for every instance. Multiple
+	// status workers must be able to consume it without mutating provider data.
+	cloud := &fakecloud.Cloud{
+		EnableInstancesV2: true,
+		AdditionalLabels: map[string]string{
+			"topology.example.com/host-id": "host-b",
+			"example.com/empty":            "",
+			v1.LabelTopologyZone:           "provider-zone",
+		},
+	}
+	cnc := &CloudNodeController{
+		kubeClient:              clientset,
+		nodeInformer:            nodeInformer,
+		nodesLister:             nodeInformer.Lister(),
+		statusUpdateWorkerCount: 4,
+		cloud:                   cloud,
+	}
+
+	if err := cnc.UpdateNodeStatus(ctx); err != nil {
+		t.Fatalf("UpdateNodeStatus() returned an error: %v", err)
+	}
+
+	for _, node := range nodes {
+		updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed to get updated node %q: %v", node.Name, err)
+		}
+		assert.Equal(t, map[string]string{
+			"example.com/existing":         node.Name,
+			"topology.example.com/host-id": "host-b",
+			"example.com/empty":            "",
+			v1.LabelTopologyZone:           "node-zone",
+		}, updatedNode.Labels, "labels for node %q", node.Name)
+	}
+
+	assert.Equal(t, map[string]string{
+		"topology.example.com/host-id": "host-b",
+		"example.com/empty":            "",
+		v1.LabelTopologyZone:           "provider-zone",
+	}, cloud.AdditionalLabels, "provider labels must remain unchanged")
 }
 
 // Tests that node address changes are detected correctly

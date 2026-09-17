@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,6 +45,7 @@ import (
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
 )
 
@@ -293,8 +295,10 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) error {
 
 		cnc.updateNodeAddress(ctx, node, instanceMetadata)
 
-		if err := cnc.reconcileAdditionalLabels(node, instanceMetadata); err != nil {
-			klog.Errorf("Error reconciling additional labels for node %q: %v", node.Name, err)
+		if utilfeature.DefaultFeatureGate.Enabled(features.CloudNodeAdditionalLabelsReconciliation) {
+			if err := cnc.reconcileAdditionalLabels(node, instanceMetadata); err != nil {
+				klog.Errorf("Error reconciling additional labels for node %q: %v", node.Name, err)
+			}
 		}
 	}
 
@@ -373,6 +377,8 @@ func (cnc *CloudNodeController) reconcileAdditionalLabels(
 		return nil
 	}
 
+	// Keep provider-owned labels read-only: concurrent reconciliations may
+	// receive the same map from a provider.
 	labelsToUpdate := map[string]string{}
 	for key, value := range instanceMetadata.AdditionalLabels {
 		// Cloud providers should not use label namespaces reserved by Kubernetes.

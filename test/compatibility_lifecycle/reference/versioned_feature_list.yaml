@@ -139,6 +139,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.27"
+- name: CloudNodeAdditionalLabelsReconciliation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: ClusterTrustBundle
   versionedSpecs:
   - default: false
