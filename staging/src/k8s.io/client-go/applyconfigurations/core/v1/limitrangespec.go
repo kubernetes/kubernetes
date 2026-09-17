@@ -23,7 +23,7 @@ package v1
 //
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind.
 type LimitRangeSpecApplyConfiguration struct {
-	// Limits is the list of LimitRangeItem objects that are enforced.
+	// limits is the list of LimitRangeItem objects that are enforced.
 	Limits []LimitRangeItemApplyConfiguration `json:"limits,omitempty"`
 }
 

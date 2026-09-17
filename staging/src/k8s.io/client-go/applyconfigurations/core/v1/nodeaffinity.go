@@ -23,13 +23,13 @@ package v1
 //
 // Node affinity is a group of node affinity scheduling rules.
 type NodeAffinityApplyConfiguration struct {
-	// If the affinity requirements specified by this field are not met at
+	// requiredDuringSchedulingIgnoredDuringExecution specifies that if the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
 	// at some point during pod execution (e.g. due to an update), the system
 	// may or may not try to eventually evict the pod from its node.
 	RequiredDuringSchedulingIgnoredDuringExecution *NodeSelectorApplyConfiguration `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty"`
-	// The scheduler will prefer to schedule pods to nodes that satisfy
+	// preferredDuringSchedulingIgnoredDuringExecution specifies that the scheduler will prefer to schedule pods to nodes that satisfy
 	// the affinity expressions specified by this field, but it may choose
 	// a node that violates one or more of the expressions. The node that is
 	// most preferred is the one with the greatest sum of weights, i.e.

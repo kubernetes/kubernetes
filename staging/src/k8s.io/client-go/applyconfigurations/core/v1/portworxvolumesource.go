@@ -25,7 +25,7 @@ package v1
 type PortworxVolumeSourceApplyConfiguration struct {
 	// volumeID uniquely identifies a Portworx volume
 	VolumeID *string `json:"volumeID,omitempty"`
-	// fSType represents the filesystem type to mount
+	// fsType represents the filesystem type to mount
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType *string `json:"fsType,omitempty"`

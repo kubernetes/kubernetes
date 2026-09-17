@@ -28,10 +28,10 @@ import (
 //
 // PersistentVolumeClaimCondition contains details about state of pvc
 type PersistentVolumeClaimConditionApplyConfiguration struct {
-	// Type is the type of the condition.
+	// type is the type of the condition.
 	// More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about
 	Type *corev1.PersistentVolumeClaimConditionType `json:"type,omitempty"`
-	// Status is the status of the condition.
+	// status is the status of the condition.
 	// Can be True, False, Unknown.
 	// More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required
 	Status *corev1.ConditionStatus `json:"status,omitempty"`

@@ -27,10 +27,10 @@ import (
 //
 // ResourceQuotaStatus defines the enforced hard limits and observed use.
 type ResourceQuotaStatusApplyConfiguration struct {
-	// Hard is the set of enforced hard limits for each named resource.
+	// hard is the set of enforced hard limits for each named resource.
 	// More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
 	Hard *corev1.ResourceList `json:"hard,omitempty"`
-	// Used is the current observed total usage of the resource in the namespace.
+	// used is the current observed total usage of the resource in the namespace.
 	Used *corev1.ResourceList `json:"used,omitempty"`
 }
 
