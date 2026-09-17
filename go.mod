@@ -119,6 +119,7 @@ require (
 	k8s.io/streaming v0.0.0
 	k8s.io/system-validators v1.12.1
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
+	sigs.k8s.io/iptables-wrappers v0.0.0-00010101000000-000000000000
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/knftables v0.0.22
 	sigs.k8s.io/randfill v1.0.0
@@ -249,4 +250,5 @@ replace (
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 	k8s.io/streaming => ./staging/src/k8s.io/streaming
+	sigs.k8s.io/iptables-wrappers => github.com/danwinship/iptables-wrappers v0.0.0-20261015145407-4eb23974f7a5
 )

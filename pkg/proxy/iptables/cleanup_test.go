@@ -25,8 +25,7 @@ import (
 	"github.com/lithammer/dedent"
 
 	klogtesting "k8s.io/klog/v2/ktesting"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
+	iptablestest "sigs.k8s.io/iptables-wrappers/pkg/iptables/testing"
 )
 
 func TestCleanupLeftovers(t *testing.T) {
@@ -157,7 +156,7 @@ func TestCleanupLeftovers(t *testing.T) {
 		COMMIT
 		`)
 
-	err := ipt.RestoreAll([]byte(initial), utiliptables.NoFlushTables, utiliptables.NoRestoreCounters)
+	err := ipt.Restore(t.Context(), []byte(initial))
 	if err != nil {
 		t.Fatalf("Unexpected error setting up iptables state: %v", err)
 	}
@@ -168,7 +167,7 @@ func TestCleanupLeftovers(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err = ipt.SaveInto("", &buf)
+	err = ipt.SaveInto(t.Context(), "", &buf)
 	if err != nil {
 		t.Fatalf("Unexpected error reading filter table: %v", err)
 	}

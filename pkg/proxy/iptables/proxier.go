@@ -34,7 +34,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
@@ -48,7 +47,8 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/utils/set"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 const (
@@ -94,7 +94,7 @@ const sysctlNFConntrackTCPBeLiberal = "net/netfilter/nf_conntrack_tcp_be_liberal
 func NewDualStackProxier(
 	ctx context.Context,
 	config *kubeproxyconfig.KubeProxyConfiguration,
-	ipts map[v1.IPFamily]utiliptables.Interface,
+	ipts map[utiliptables.Protocol]utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	localDetectors map[v1.IPFamily]proxyutil.LocalTrafficDetector,
 	nodeName string,
@@ -104,14 +104,14 @@ func NewDualStackProxier(
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ctx, config, v1.IPv4Protocol, ipts[v1.IPv4Protocol], sysctl,
+	ipv4Proxier, err := NewProxier(ctx, config, v1.IPv4Protocol, ipts[utiliptables.ProtocolIPv4], sysctl,
 		localDetectors[v1.IPv4Protocol], nodeName, nodeIPs[v1.IPv4Protocol],
 		recorder, healthzServer, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ctx, config, v1.IPv6Protocol, ipts[v1.IPv6Protocol], sysctl,
+	ipv6Proxier, err := NewProxier(ctx, config, v1.IPv6Protocol, ipts[utiliptables.ProtocolIPv6], sysctl,
 		localDetectors[v1.IPv6Protocol], nodeName, nodeIPs[v1.IPv6Protocol],
 		recorder, healthzServer, initOnly)
 	if err != nil {
@@ -304,8 +304,8 @@ func NewProxier(ctx context.Context,
 	// time.Hour is arbitrary.
 	proxier.syncRunner = runner.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, proxyutil.FullSyncPeriod)
 
-	go ipt.Monitor(kubeProxyCanaryChain, []utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
-		proxier.forceSyncProxyRules, syncPeriod, wait.NeverStop)
+	go ipt.Monitor(ctx, kubeProxyCanaryChain, []utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
+		proxier.forceSyncProxyRules, syncPeriod)
 
 	return proxier, nil
 }
@@ -632,6 +632,8 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		return
 	}
 
+	ctx := context.TODO()
+
 	// Keep track of how long syncs take.
 	start := time.Now()
 
@@ -684,7 +686,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		// save us from having to invoke /sbin/iptables 20 times on each sync
 		// (which will be very slow on hosts with lots of iptables rules).
 		for _, jump := range append(iptablesJumpChains, iptablesKubeletJumpChains...) {
-			if _, err := proxier.iptables.EnsureChain(jump.table, jump.dstChain); err != nil {
+			if _, err := proxier.iptables.EnsureChain(ctx, jump.table, jump.dstChain); err != nil {
 				proxier.logger.Error(err, "Failed to ensure chain exists", "table", jump.table, "chain", jump.dstChain)
 				return
 			}
@@ -693,7 +695,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				args = append(args, "-m", "comment", "--comment", jump.comment)
 			}
 			args = append(args, "-j", string(jump.dstChain))
-			if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jump.table, jump.srcChain, args...); err != nil {
+			if _, err := proxier.iptables.EnsureRule(ctx, utiliptables.Prepend, jump.table, jump.srcChain, args...); err != nil {
 				proxier.logger.Error(err, "Failed to ensure chain jumps", "table", jump.table, "srcChain", jump.srcChain, "dstChain", jump.dstChain)
 				return
 			}
@@ -787,8 +789,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		)
 	}
 
-	// Accumulate NAT chains to keep.
-	activeNATChains := sets.New[utiliptables.Chain]()
+	// Accumulate NAT chains to keep; note that this uses "k8s.io/utils/set", not
+	// "k8s.io/apimachinery/pkg/util/sets", for compatibility with utiliptables.
+	activeNATChains := set.New[utiliptables.Chain]()
 
 	// To avoid growing this slice, we arbitrarily set its size to 64,
 	// there is never more than that many arguments for a single line.
@@ -1250,7 +1253,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	deletedChains := 0
 	if !proxier.largeClusterMode || time.Since(proxier.lastIPTablesCleanup) > proxier.syncPeriod {
 		proxier.iptablesData.Reset()
-		if err := proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData); err == nil {
+		if err := proxier.iptables.SaveInto(ctx, utiliptables.TableNAT, proxier.iptablesData); err == nil {
 			existingNATChains := utiliptables.GetChainsFromTable(proxier.iptablesData.Bytes())
 			for chain := range existingNATChains.Difference(activeNATChains) {
 				chainString := string(chain)
@@ -1381,7 +1384,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.logger.V(9).Info("Restoring iptables", "rules", proxier.iptablesData.Bytes())
 
 	// NOTE: NoFlushTables is used so we don't flush non-kubernetes chains in the table
-	err := proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	err := proxier.iptables.Restore(ctx, proxier.iptablesData.Bytes())
 	if err != nil {
 		if pErr, ok := err.(utiliptables.ParseError); ok {
 			lines := utiliptables.ExtractLines(proxier.iptablesData.Bytes(), pErr.Line(), 3)
