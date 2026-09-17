@@ -622,6 +622,30 @@ func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) bool {
 	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
 }
 
+// EqualIgnoreHashAndDroppedFields returns true if rsTemplate is equal to template ignoring
+// Labels[pod-template-hash], or if rsTemplate is template with fields removed by the API server.
+//
+// A pod template field whose feature gate is disabled is kept on a Deployment that already uses
+// it, but dropped from a ReplicaSet created from that Deployment, since a create has no previous
+// object in which the field could be in use. That ReplicaSet never satisfies EqualIgnoreHash.
+//
+// podTemplateHash is the pod-template-hash of template. It is computed before the API server drops
+// any field, so a ReplicaSet carrying it was created from template, unless the hash collides.
+// Requiring every field set in rsTemplate to match template guards against such a collision.
+func EqualIgnoreHashAndDroppedFields(rsTemplate, template *v1.PodTemplateSpec, podTemplateHash string) bool {
+	if EqualIgnoreHash(rsTemplate, template) {
+		return true
+	}
+	if rsTemplate.Labels[apps.DefaultDeploymentUniqueLabelKey] != podTemplateHash {
+		return false
+	}
+	rsCopy := rsTemplate.DeepCopy()
+	tCopy := template.DeepCopy()
+	delete(rsCopy.Labels, apps.DefaultDeploymentUniqueLabelKey)
+	delete(tCopy.Labels, apps.DefaultDeploymentUniqueLabelKey)
+	return apiequality.Semantic.DeepDerivative(rsCopy, tCopy)
+}
+
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
 func FindNewReplicaSet(deployment *apps.Deployment, rsList []*apps.ReplicaSet) *apps.ReplicaSet {
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(rsList))
@@ -631,6 +655,14 @@ func FindNewReplicaSet(deployment *apps.Deployment, rsList []*apps.ReplicaSet) *
 			// having more than one new ReplicaSets that have the same template as its template,
 			// see https://github.com/kubernetes/kubernetes/issues/40415
 			// We deterministically choose the oldest new ReplicaSet.
+			return rsList[i]
+		}
+	}
+	// The hash is only needed when nothing matches exactly, which is the uncommon case, so it is
+	// computed here rather than for every sync.
+	podTemplateHash := controller.ComputeHash(&deployment.Spec.Template, deployment.Status.CollisionCount)
+	for i := range rsList {
+		if EqualIgnoreHashAndDroppedFields(&rsList[i].Spec.Template, &deployment.Spec.Template, podTemplateHash) {
 			return rsList[i]
 		}
 	}
