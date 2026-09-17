@@ -109,29 +109,131 @@ func TestValidateContainerResourceRequirementsKeepsRoundedValues(t *testing.T) {
 	}
 }
 
-// ValidateResourceQuotaUpdate revalidates spec.hard without consulting the
-// stored value, so a quota already holding a whole number past the milli range
-// could not be updated at all, not even to change a label.
-func TestValidateResourceQuotaUpdateRevalidatesStoredQuantities(t *testing.T) {
-	quota := func(hard, label string) *core.ResourceQuota {
+// An update keeps a value the object already holds, even one the value check
+// would reject today; anything new is checked as on create.
+func TestValidateResourceQuotaUpdateKeepsStoredQuantities(t *testing.T) {
+	const fractional = "18446744073709551616m" // 2^64 milli-pods, not a whole number of pods
+	quota := func(hard core.ResourceList, label string) *core.ResourceQuota {
 		return &core.ResourceQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "quota", Namespace: "ns", ResourceVersion: "1",
 				Labels: map[string]string{"team": label},
 			},
-			Spec: core.ResourceQuotaSpec{
-				Hard: core.ResourceList{core.ResourcePods: resource.MustParse(hard)},
-			},
+			Spec: core.ResourceQuotaSpec{Hard: hard},
 		}
 	}
-	stored := quota("10000000000000000", "before")
-	if errs := ValidateResourceQuotaUpdate(quota("10000000000000000", "after"), stored); len(errs) != 0 {
-		t.Errorf("a label-only update to a quota holding 10^16 pods should pass, got %v", errs)
+	withStatus := func(q *core.ResourceQuota, hard, used core.ResourceList) *core.ResourceQuota {
+		q.Status = core.ResourceQuotaStatus{Hard: hard, Used: used}
+		return q
+	}
+	withScopes := func(q *core.ResourceQuota, scopes ...core.ResourceQuotaScope) *core.ResourceQuota {
+		q.Spec.Scopes = scopes
+		return q
+	}
+	pods := func(value string) core.ResourceList {
+		return core.ResourceList{core.ResourcePods: resource.MustParse(value)}
+	}
+	invalid := func(path *field.Path) field.ErrorList {
+		return field.ErrorList{field.Invalid(path, nil, "")}
+	}
+	specHardPods := field.NewPath("spec", "hard").Key("pods")
+	statusHardPods := field.NewPath("status", "hard").Key("pods")
+	statusUsedPods := field.NewPath("status", "used").Key("pods")
+	matcher := field.ErrorMatcher{}.ByType().ByField()
+
+	t.Run("create still rejects a fractional value", func(t *testing.T) {
+		matcher.Test(t, invalid(specHardPods), ValidateResourceQuota(quota(pods(fractional), "new")))
+	})
+
+	updates := []struct {
+		name         string
+		old          *core.ResourceQuota
+		new          *core.ResourceQuota
+		expectedErrs field.ErrorList
+	}{{
+		name: "label-only update keeps a stored whole number past the milli range",
+		old:  quota(pods("10000000000000000"), "before"),
+		new:  quota(pods("10000000000000000"), "after"),
+	}, {
+		name: "label-only update keeps a stored fractional value",
+		old:  quota(pods(fractional), "before"),
+		new:  quota(pods(fractional), "after"),
+	}, {
+		name: "the same stored value spelled differently is unchanged",
+		old:  quota(pods(fractional), "before"),
+		new:  quota(pods("18446744073709551.616"), "after"),
+	}, {
+		name: "adding another resource leaves the stored fractional value alone",
+		old:  quota(pods(fractional), "before"),
+		new: quota(core.ResourceList{
+			core.ResourcePods:     resource.MustParse(fractional),
+			core.ResourceServices: resource.MustParse("10"),
+		}, "before"),
+	}, {
+		name:         "changing the stored fractional value to another fractional value is rejected",
+		old:          quota(pods(fractional), "before"),
+		new:          quota(pods("18446744073709551617m"), "before"),
+		expectedErrs: invalid(specHardPods),
+	}, {
+		name:         "adding a fractional value is rejected",
+		old:          quota(core.ResourceList{}, "before"),
+		new:          quota(pods(fractional), "before"),
+		expectedErrs: invalid(specHardPods),
+	}, {
+		name:         "a fractional value stored under another key is not borrowed",
+		old:          quota(core.ResourceList{core.ResourceServices: resource.MustParse(fractional)}, "before"),
+		new:          quota(pods(fractional), "before"),
+		expectedErrs: invalid(specHardPods),
+	}, {
+		name:         "a scope change is still rejected while the stored fractional value passes",
+		old:          quota(pods(fractional), "before"),
+		new:          withScopes(quota(pods(fractional), "before"), core.ResourceQuotaScopeTerminating),
+		expectedErrs: invalid(field.NewPath("spec", "scopes")),
+	}}
+	for _, tc := range updates {
+		t.Run(tc.name, func(t *testing.T) {
+			matcher.Test(t, tc.expectedErrs, ValidateResourceQuotaUpdate(tc.new, tc.old))
+		})
 	}
 
-	fractional := quota("18446744073709551616m", "before")
-	if errs := ValidateResourceQuotaUpdate(quota("18446744073709551616m", "after"), fractional); len(errs) == 0 {
-		t.Errorf("18446744073709551616m is not a whole number of pods and should still be rejected")
+	statusUpdates := []struct {
+		name         string
+		old          *core.ResourceQuota
+		new          *core.ResourceQuota
+		expectedErrs field.ErrorList
+	}{{
+		name: "stored fractional hard and used pass a status update that keeps them",
+		old:  withStatus(quota(pods("10"), "x"), pods(fractional), pods(fractional)),
+		new:  withStatus(quota(pods("10"), "x"), pods(fractional), pods(fractional)),
+	}, {
+		name: "the controller may copy a stored fractional spec.hard into status.hard",
+		old:  withStatus(quota(pods(fractional), "x"), nil, nil),
+		new:  withStatus(quota(pods(fractional), "x"), pods(fractional), pods("0")),
+	}, {
+		name:         "a fractional status.hard that neither the stored status nor the spec holds is rejected",
+		old:          withStatus(quota(pods("10"), "x"), nil, nil),
+		new:          withStatus(quota(pods("10"), "x"), pods(fractional), nil),
+		expectedErrs: invalid(statusHardPods),
+	}, {
+		name:         "a stored fractional spec.hard does not excuse a new fractional used",
+		old:          withStatus(quota(pods(fractional), "x"), nil, nil),
+		new:          withStatus(quota(pods(fractional), "x"), nil, pods(fractional)),
+		expectedErrs: invalid(statusUsedPods),
+	}, {
+		name:         "a stored fractional hard does not excuse a new fractional used",
+		old:          withStatus(quota(pods("10"), "x"), pods(fractional), nil),
+		new:          withStatus(quota(pods("10"), "x"), pods(fractional), pods(fractional)),
+		expectedErrs: invalid(statusUsedPods),
+	}, {
+		name:         "changing a stored fractional used is rejected",
+		old:          withStatus(quota(pods("10"), "x"), pods("10"), pods(fractional)),
+		new:          withStatus(quota(pods("10"), "x"), pods("10"), pods("18446744073709551617m")),
+		expectedErrs: invalid(statusUsedPods),
+	}}
+	for _, tc := range statusUpdates {
+		t.Run(tc.name, func(t *testing.T) {
+			matcher.Test(t, tc.expectedErrs, ValidateResourceQuotaStatusUpdate(tc.new, tc.old))
+		})
 	}
 }
 

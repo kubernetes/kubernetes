@@ -8528,19 +8528,46 @@ func ValidateResourceQuotaStatus(status *core.ResourceQuotaStatus, fld *field.Pa
 }
 
 func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
+	return validateResourceQuotaSpec(resourceQuotaSpec, nil, fld)
+}
+
+// validateResourceQuotaSpec validates a spec against the hard limits the object
+// already stores, oldHard, which is nil on create. Nothing is mutated.
+func validateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, oldHard core.ResourceList, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	fldPath := fld.Child("hard")
-	for k, v := range resourceQuotaSpec.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
-	}
+	allErrs = append(allErrs, validateResourceQuotaResourceList(resourceQuotaSpec.Hard, fld.Child("hard"), oldHard)...)
 
 	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuotaSpec, fld)...)
 	allErrs = append(allErrs, validateScopeSelector(resourceQuotaSpec, fld)...)
 
 	return allErrs
+}
+
+// validateResourceQuotaResourceList validates every name in values, and every
+// value that none of the stored lists holds under the same key. Nothing is mutated.
+func validateResourceQuotaResourceList(values core.ResourceList, fldPath *field.Path, stored ...core.ResourceList) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for k, v := range values {
+		resPath := fldPath.Key(string(k))
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
+		// A value the object already holds was accepted when it was stored.
+		if isStoredQuantity(k, v, stored) {
+			continue
+		}
+		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
+	}
+	return allErrs
+}
+
+// isStoredQuantity reports whether one of the lists holds name with the same value.
+func isStoredQuantity(name core.ResourceName, value resource.Quantity, lists []core.ResourceList) bool {
+	for _, list := range lists {
+		if old, ok := list[name]; ok && old.Cmp(value) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // isIntegerResourceValue reports whether q may be used where whole units are
@@ -8570,7 +8597,7 @@ func ValidateResourceQuantityValue(resource core.ResourceName, value resource.Qu
 // ValidateResourceQuotaUpdate tests to see if the update is legal for an end user to make.
 func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateResourceQuotaSpec(&newResourceQuota.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateResourceQuotaSpec(&newResourceQuota.Spec, oldResourceQuota.Spec.Hard, field.NewPath("spec"))...)
 
 	// ensure scopes cannot change, and that resources are still valid for scope
 	fldPath := field.NewPath("spec", "scopes")
@@ -8595,18 +8622,9 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *core.
 	if len(newResourceQuota.ResourceVersion) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("resourceVersion"), ""))
 	}
-	fldPath := field.NewPath("status", "hard")
-	for k, v := range newResourceQuota.Status.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
-	}
-	fldPath = field.NewPath("status", "used")
-	for k, v := range newResourceQuota.Status.Used {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(k, resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
-	}
+	// The quota controller copies spec.hard into status.hard, so a stored spec value counts as stored here too.
+	allErrs = append(allErrs, validateResourceQuotaResourceList(newResourceQuota.Status.Hard, field.NewPath("status", "hard"), oldResourceQuota.Status.Hard, oldResourceQuota.Spec.Hard)...)
+	allErrs = append(allErrs, validateResourceQuotaResourceList(newResourceQuota.Status.Used, field.NewPath("status", "used"), oldResourceQuota.Status.Used)...)
 	return allErrs
 }
 
