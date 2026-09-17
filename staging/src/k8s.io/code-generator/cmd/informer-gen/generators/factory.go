@@ -191,7 +191,9 @@ func NewSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync 
 // Listers obtained via this SharedInformerFactory will be subject to the same filters
 // as specified here.
 //
-// Deprecated: Please use NewSharedInformerFactoryWithOptions instead
+// Deprecated: Please use NewSharedInformerFactoryWithOptions instead.
+//
+//go:fix inline
 func NewFilteredSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}, namespace string, tweakListOptions {{.interfacesTweakListOptionsFunc|raw}}) SharedInformerFactory {
 	return NewSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace), WithTweakListOptions(tweakListOptions))
 }
