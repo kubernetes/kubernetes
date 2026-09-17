@@ -50,12 +50,14 @@ var (
 	fmtErrorfFunc                                = types.Name{Package: "fmt", Name: "Errorf"}
 	listOptions                                  = types.Name{Package: "k8s.io/kubernetes/pkg/apis/core", Name: "ListOptions"}
 	reflectType                                  = types.Name{Package: "reflect", Name: "Type"}
+	reflectTypeOf                                = types.Name{Package: "reflect", Name: "TypeOf"}
 	runtimeObject                                = types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Object"}
 	schemaGroupResource                          = types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupResource"}
 	schemaGroupVersionResource                   = types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionResource"}
 	shardingSelector                             = types.Name{Package: "k8s.io/apimachinery/pkg/sharding", Name: "Selector"}
 	stringsBuilder                               = types.Name{Package: "strings", Name: "Builder"}
 	syncMutex                                    = types.Name{Package: "sync", Name: "Mutex"}
+	syncWaitGroup                                = types.Name{Package: "sync", Name: "WaitGroup"}
 	timeDuration                                 = types.Name{Package: "time", Name: "Duration"}
 	v1ListOptions                                = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}
 	metav1NamespaceAll                           = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "NamespaceAll"}
