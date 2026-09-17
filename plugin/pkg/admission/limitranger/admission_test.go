@@ -933,7 +933,7 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 	}
 	for i := range successCases {
 		test := successCases[i]
-		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc)
+		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc, nil)
 		if err != nil {
 			t.Errorf("Unexpected error for pvc: %s, %v", test.pvc.Name, err)
 		}
@@ -951,7 +951,7 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 	}
 	for i := range errorCases {
 		test := errorCases[i]
-		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc)
+		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc, nil)
 		if err == nil {
 			t.Errorf("Expected error for pvc: %s", test.pvc.Name)
 		}
@@ -1059,5 +1059,154 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 	}
 	if test1Count != 1 {
 		t.Errorf("Expected 1 limit range call, got %d", test1Count)
+	}
+}
+
+func TestLimitRangerValidatePersistentVolumeClaimUpdate(t *testing.T) {
+	storage := getStorageResourceList
+	pvc := func(name string, requests api.ResourceList) api.PersistentVolumeClaim {
+		return validPersistentVolumeClaim(name, getVolumeResourceRequirements(requests, api.ResourceList{}))
+	}
+	labeled := func(claim api.PersistentVolumeClaim) api.PersistentVolumeClaim {
+		claim.Labels = map[string]string{"touched": "true"}
+		return claim
+	}
+	oneToTen := createLimitRange(api.LimitTypePersistentVolumeClaim, storage("1Gi"), storage("10Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	atLeastOneTi := createLimitRange(api.LimitTypePersistentVolumeClaim, storage("1Ti"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	atLeastOneTi.Name = "min-only"
+	withFoo := createLimitRange(api.LimitTypePersistentVolumeClaim, api.ResourceList{}, api.ResourceList{
+		api.ResourceStorage: resource.MustParse("10Gi"),
+		"example.com/foo":   resource.MustParse("1"),
+	}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	// Both quantities round to 1073741824001m; compared exactly (#141348) the request is above the max.
+	fractionalMax := createLimitRange(api.LimitTypePersistentVolumeClaim, api.ResourceList{}, storage("1073741824.0001"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	fractionalMax.Name = "fractional-max"
+
+	tests := []struct {
+		name        string
+		limitRanges []corev1.LimitRange
+		old         *api.PersistentVolumeClaim
+		obj         api.PersistentVolumeClaim
+		wantErr     string
+	}{{
+		name:        "create above max",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		obj:         pvc("a", storage("100Gi")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 10Gi, but request is 100Gi",
+	}, {
+		name:        "create below min",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		obj:         pvc("a", storage("500Mi")),
+		wantErr:     "minimum storage usage per PersistentVolumeClaim is 1Gi, but request is 500Mi",
+	}, {
+		name:        "create within range",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		obj:         pvc("a", storage("5Gi")),
+	}, {
+		name:        "update keeps a stored request within range",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("5Gi"))),
+		obj:         pvc("a", storage("5Gi")),
+	}, {
+		name:        "update keeps a stored request above max",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         labeled(pvc("a", storage("100Gi"))),
+	}, {
+		name:        "create at a fractional request above a fractional max",
+		limitRanges: []corev1.LimitRange{fractionalMax},
+		obj:         pvc("a", storage("1073741824.0009")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 1073741824000100u, but request is 1073741824000900u",
+	}, {
+		name:        "update keeps a stored fractional request above a fractional max",
+		limitRanges: []corev1.LimitRange{fractionalMax},
+		old:         new(pvc("a", storage("1073741824.0009"))),
+		obj:         labeled(pvc("a", storage("1073741824.0009"))),
+	}, {
+		name:        "update moves a stored fractional request to another value above the max",
+		limitRanges: []corev1.LimitRange{fractionalMax},
+		old:         new(pvc("a", storage("1073741824.0009"))),
+		obj:         pvc("a", storage("1073741824.0010")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 1073741824000100u, but request is 1073741824001m",
+	}, {
+		name:        "update keeps a stored request below min",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("500Mi"))),
+		obj:         pvc("a", storage("500Mi")),
+	}, {
+		name:        "update spells the same stored request differently",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("20Gi"))),
+		obj:         pvc("a", storage("20480Mi")),
+	}, {
+		name:        "update changes the request to another value above max",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         pvc("a", storage("200Gi")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 10Gi, but request is 200Gi",
+	}, {
+		name:        "update changes the request to a value within range",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         pvc("a", storage("5Gi")),
+	}, {
+		name:        "update removes the request",
+		limitRanges: []corev1.LimitRange{atLeastOneTi},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         pvc("a", api.ResourceList{}),
+		wantErr:     "minimum storage usage per PersistentVolumeClaim is 1Ti.  No request is specified",
+	}, {
+		name:        "update adds a request above max",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", api.ResourceList{})),
+		obj:         pvc("a", storage("100Gi")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 10Gi, but request is 100Gi",
+	}, {
+		name:        "update adds another limited resource next to an unchanged one",
+		limitRanges: []corev1.LimitRange{withFoo},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj: pvc("a", api.ResourceList{
+			api.ResourceStorage: resource.MustParse("100Gi"),
+			"example.com/foo":   resource.MustParse("2"),
+		}),
+		wantErr: "maximum example.com/foo usage per PersistentVolumeClaim is 1, but request is 2",
+	}, {
+		name:        "update keeps a stored request outside two limit ranges",
+		limitRanges: []corev1.LimitRange{oneToTen, atLeastOneTi},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         pvc("a", storage("100Gi")),
+	}, {
+		name:        "update changes a request under two limit ranges",
+		limitRanges: []corev1.LimitRange{oneToTen, atLeastOneTi},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         pvc("a", storage("2Ti")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 10Gi, but request is 2Ti",
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler, informerFactory, err := newHandlerForTest(newMockClientForTest(tc.limitRanges))
+			if err != nil {
+				t.Fatalf("unexpected error initializing handler: %v", err)
+			}
+			informerFactory.Start(wait.NeverStop)
+
+			var oldObj runtime.Object
+			op, opts := admission.Create, runtime.Object(&metav1.CreateOptions{})
+			if tc.old != nil {
+				oldObj, op, opts = tc.old, admission.Update, &metav1.UpdateOptions{}
+			}
+			attrs := admission.NewAttributesRecord(&tc.obj, oldObj, api.Kind("PersistentVolumeClaim").WithVersion("version"), "test", tc.obj.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", op, opts, false, nil)
+			err = handler.Validate(t.Context(), attrs, nil)
+			var gotErr, wantErr string
+			if err != nil {
+				gotErr = err.Error()
+			}
+			if tc.wantErr != "" {
+				wantErr = `persistentvolumeclaims "a" is forbidden: ` + tc.wantErr
+			}
+			if gotErr != wantErr {
+				t.Errorf("Validate() error = %q, want %q", gotErr, wantErr)
+			}
+		})
 	}
 }

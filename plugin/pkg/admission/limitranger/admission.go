@@ -112,15 +112,19 @@ func (l *LimitRanger) ValidateInitialization() error {
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
 func (l *LimitRanger) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	return l.runLimitFunc(a, l.actions.MutateLimit)
+	return l.runLimitFunc(a, func(limitRange *corev1.LimitRange) error {
+		return l.actions.MutateLimit(limitRange, a.GetResource().Resource, a.GetObject())
+	})
 }
 
 // Validate admits resources into cluster that do not violate any defined LimitRange in the namespace
 func (l *LimitRanger) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	return l.runLimitFunc(a, l.actions.ValidateLimit)
+	return l.runLimitFunc(a, func(limitRange *corev1.LimitRange) error {
+		return l.actions.ValidateLimit(limitRange, a.GetResource().Resource, a.GetObject(), a.GetOldObject())
+	})
 }
 
-func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRange *corev1.LimitRange, kind string, obj runtime.Object) error) (err error) {
+func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRange *corev1.LimitRange) error) (err error) {
 	if !l.actions.SupportsAttributes(a) {
 		return nil
 	}
@@ -150,7 +154,7 @@ func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRan
 			continue
 		}
 
-		err = limitFn(limitRange, a.GetResource().Resource, a.GetObject())
+		err = limitFn(limitRange)
 		if err != nil {
 			return admission.NewForbidden(a, err)
 		}
@@ -402,12 +406,13 @@ func (d *DefaultLimitRangerActions) MutateLimit(limitRange *corev1.LimitRange, r
 // ValidateLimit verifies the resource requirements of incoming
 // resources against enumerated constraints on the LimitRange are
 // valid
-func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *corev1.LimitRange, resourceName string, obj runtime.Object) error {
+func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *corev1.LimitRange, resourceName string, obj, oldObj runtime.Object) error {
 	switch resourceName {
 	case "pods":
 		return PodValidateLimitFunc(limitRange, obj.(*api.Pod))
 	case "persistentvolumeclaims":
-		return PersistentVolumeClaimValidateLimitFunc(limitRange, obj.(*api.PersistentVolumeClaim))
+		oldPVC, _ := oldObj.(*api.PersistentVolumeClaim)
+		return PersistentVolumeClaimValidateLimitFunc(limitRange, obj.(*api.PersistentVolumeClaim), oldPVC)
 	}
 	return nil
 }
@@ -445,28 +450,50 @@ func (d *DefaultLimitRangerActions) SupportsLimit(limitRange *corev1.LimitRange)
 // Users request storage via pvc.Spec.Resources.Requests.  Min/Max is enforced by an admin with LimitRange.
 // Claims will not be modified with default values because storage is a required part of pvc.Spec.
 // All storage enforced values *only* apply to pvc.Spec.Resources.Requests.
-func PersistentVolumeClaimValidateLimitFunc(limitRange *corev1.LimitRange, pvc *api.PersistentVolumeClaim) error {
+// On update, oldPVC is the stored claim, and a request it already holds
+// is not checked again.  oldPVC is nil on create.
+func PersistentVolumeClaimValidateLimitFunc(limitRange *corev1.LimitRange, pvc, oldPVC *api.PersistentVolumeClaim) error {
 	var errs []error
+	requests := pvc.Spec.Resources.Requests
+	var oldRequests api.ResourceList
+	if oldPVC != nil {
+		oldRequests = oldPVC.Spec.Resources.Requests
+	}
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
 		limitType := limit.Type
 		if limitType == corev1.LimitTypePersistentVolumeClaim {
 			for k, v := range limit.Min {
+				// A stored request is valid as stored, so only a changed one is checked.
+				if unchangedRequest(api.ResourceName(k), requests, oldRequests) {
+					continue
+				}
 				// normal usage of minConstraint. pvc.Spec.Resources.Limits is not recognized as user input
-				if err := minConstraint(string(limitType), string(k), v, pvc.Spec.Resources.Requests, api.ResourceList{}); err != nil {
+				if err := minConstraint(string(limitType), string(k), v, requests, api.ResourceList{}); err != nil {
 					errs = append(errs, err)
 				}
 			}
 			for k, v := range limit.Max {
+				if unchangedRequest(api.ResourceName(k), requests, oldRequests) {
+					continue
+				}
 				// We want to enforce the max of the LimitRange against what
 				// the user requested.
-				if err := maxRequestConstraint(string(limitType), string(k), v, pvc.Spec.Resources.Requests); err != nil {
+				if err := maxRequestConstraint(string(limitType), string(k), v, requests); err != nil {
 					errs = append(errs, err)
 				}
 			}
 		}
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+// unchangedRequest reports whether resourceName is requested in both lists
+// with the same value.
+func unchangedRequest(resourceName api.ResourceName, requests, oldRequests api.ResourceList) bool {
+	req, reqExists := requests[resourceName]
+	old, oldExists := oldRequests[resourceName]
+	return reqExists && oldExists && req.Cmp(old) == 0
 }
 
 // PodMutateLimitFunc sets resource requirements enumerated by the pod against
