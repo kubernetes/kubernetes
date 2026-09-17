@@ -1040,6 +1040,10 @@ type PreemptionCandidate interface {
 	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
 	// This value is used for metrics and doesn't impact victim actuation.
 	NumPodGroupDisruptions() int
+	// Nodes returns a list of nodes where the preemptor pods get nominated to run.
+	// For a single pod preemption it's equal Name but for pod group preemption
+	// it contains a set of nodes for all preemptor pods.
+	Nodes() []string
 }
 
 // Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.

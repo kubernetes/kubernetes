@@ -239,16 +239,22 @@ type fakePodNominator struct {
 
 	// fakePodNominator doesn't respond to NominatedPodsForNode() until the channel is closed.
 	requestStopper chan struct{}
+
+	nominatedPods map[string][]fwk.PodInfo
 }
 
 func (f *fakePodNominator) NominatedPodsForNode(logger klog.Logger, nodeName string) []fwk.PodInfo {
-	<-f.requestStopper
-	return nil
+	if f.requestStopper != nil {
+		<-f.requestStopper
+	}
+	return f.nominatedPods[nodeName]
 }
 
 func TestPrepareCandidate(t *testing.T) {
 	var (
 		node1Name            = "node1"
+		node2Name            = "node2"
+		node3Name            = "node3"
 		defaultSchedulerName = "default-scheduler"
 	)
 	condition := v1.PodCondition{
@@ -303,12 +309,35 @@ func TestPrepareCandidate(t *testing.T) {
 								Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 								Obj()
 
+		nomPod1Node1 = st.MakePod().Name("nom-pod1-node1").UID("nom-pod1-node1").
+				Priority(lowPriority).NominatedNodeName(node1Name).
+				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+				Obj()
+
+		nomPod2Node2 = st.MakePod().Name("nom-pod2-node2").UID("nom-pod2-node2").
+				Priority(midPriority).NominatedNodeName(node2Name).
+				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+				Obj()
+
+		nomPod3Node3 = st.MakePod().Name("nom-pod3-node3").UID("nom-pod3-node3").
+				Priority(lowPriority).NominatedNodeName(node3Name).
+				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+				Obj()
+
+		nomPodHighPriNode1 = st.MakePod().Name("nom-pod-high-pri-node1").UID("nom-pod-high-pri-node1").
+					Priority(highPriority).NominatedNodeName(node1Name).
+					Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+					Obj()
+
 		preemptor = st.MakePod().Name("preemptor").UID("preemptor").
 				SchedulerName(defaultSchedulerName).Priority(highPriority).
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
 
-		podGroupPreemptor = &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
+		podGroupPreemptor = &schedulingv1beta1.PodGroup{
+			ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"},
+			Spec:       schedulingv1beta1.PodGroupSpec{Priority: &highPriority},
+		}
 
 		errDeletePodFailed   = errors.New("delete pod failed")
 		errPatchStatusFailed = errors.New("patch pod status failed")
@@ -331,14 +360,18 @@ func TestPrepareCandidate(t *testing.T) {
 		//
 		// You can set multiple pod name if there're multiple possibilities.
 		// Both empty and "" means no pod is expected to be deleted.
-		expectedDeletedPod    []string
-		expectedDeletionError bool
-		expectedPatchError    bool
+		expectedDeletedPod []string
+		// expectedClearedNominatedPods is the list of pod names that are expected to have
+		// their NominatedNodeName cleared during preemption.
+		expectedClearedNominatedPods []string
+		expectedDeletionError        bool
+		expectedPatchError           bool
 		// Only compared when async preemption is disabled.
 		expectedStatus *fwk.Status
 		// Only compared when async preemption is enabled.
-		expectedPreemptingMap sets.Set[types.UID]
-		expectedActivatedPods map[string]*v1.Pod
+		expectedPreemptingMap  sets.Set[types.UID]
+		expectedActivatedPods  map[string]*v1.Pod
+		skipPreemptingMapCheck bool
 	}{
 		{
 			name: "no victims",
@@ -362,6 +395,7 @@ func TestPrepareCandidate(t *testing.T) {
 						victim1,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor: preemptor,
 			testPods: []*v1.Pod{
@@ -382,6 +416,7 @@ func TestPrepareCandidate(t *testing.T) {
 						victim1,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor:                preemptor,
 			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
@@ -403,6 +438,7 @@ func TestPrepareCandidate(t *testing.T) {
 						victim1,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor:                preemptor,
 			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}),
@@ -424,6 +460,7 @@ func TestPrepareCandidate(t *testing.T) {
 						victimWithDeletionTimestamp,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor: preemptor,
 			testPods: []*v1.Pod{
@@ -442,6 +479,7 @@ func TestPrepareCandidate(t *testing.T) {
 						notFoundVictim1,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor:             preemptor,
 			testPods:              []*v1.Pod{},
@@ -459,6 +497,7 @@ func TestPrepareCandidate(t *testing.T) {
 						victim1WithMatchingCondition,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor: preemptor,
 			testPods: []*v1.Pod{
@@ -479,6 +518,7 @@ func TestPrepareCandidate(t *testing.T) {
 						victim1WithMatchingCondition,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor:             preemptor,
 			testPods:              []*v1.Pod{},
@@ -497,6 +537,7 @@ func TestPrepareCandidate(t *testing.T) {
 						failVictim1WithMatchingCondition,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor:             preemptor,
 			testPods:              []*v1.Pod{},
@@ -516,6 +557,7 @@ func TestPrepareCandidate(t *testing.T) {
 						failVictim1WithMatchingPodGroupCondition,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
 			preemptor:                preemptor,
@@ -536,6 +578,7 @@ func TestPrepareCandidate(t *testing.T) {
 						victim1,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor:             preemptor,
 			testPods:              []*v1.Pod{},
@@ -554,6 +597,7 @@ func TestPrepareCandidate(t *testing.T) {
 						failVictim,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor:             preemptor,
 			testPods:              []*v1.Pod{},
@@ -574,6 +618,7 @@ func TestPrepareCandidate(t *testing.T) {
 						victim2,
 					},
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor: preemptor,
 			testPods: []*v1.Pod{
@@ -600,6 +645,7 @@ func TestPrepareCandidate(t *testing.T) {
 						victim1,
 					},
 				},
+				nodes:                  []string{node1Name},
 				numPodGroupDisruptions: 2,
 			},
 			preemptor:                preemptor,
@@ -622,6 +668,7 @@ func TestPrepareCandidate(t *testing.T) {
 					},
 					NumPDBViolations: 3,
 				},
+				nodes: []string{node1Name},
 			},
 			preemptor: preemptor,
 			testPods: []*v1.Pod{
@@ -643,6 +690,7 @@ func TestPrepareCandidate(t *testing.T) {
 					NumPDBViolations: 1,
 				},
 				numPodGroupDisruptions: 1,
+				nodes:                  []string{node1Name},
 			},
 			preemptor:                preemptor,
 			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
@@ -653,6 +701,54 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("pg1")),
+		},
+		{
+			name: "podgroup preemptor, candidate with multiple nodes clears lower priority nominated pods across candidate nodes",
+			candidate: &candidate{
+				name:  node1Name,
+				nodes: []string{node1Name, node2Name},
+				victims: &extenderv1.Victims{
+					Pods: []*v1.Pod{
+						victim1,
+					},
+				},
+			},
+			preemptor:                preemptor,
+			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
+			testPods: []*v1.Pod{
+				victim1,
+				nomPod1Node1,
+				nomPod2Node2,
+				nomPod3Node3,
+				nomPodHighPriNode1,
+			},
+			nodeNames:                    []string{node1Name, node2Name, node3Name},
+			expectedDeletedPod:           []string{"victim1"},
+			expectedClearedNominatedPods: []string{"nom-pod1-node1", "nom-pod2-node2"},
+			expectedStatus:               nil,
+			expectedPreemptingMap:        sets.New(types.UID("pg1")),
+		},
+		{
+			name: "candidate without nodes does not clear nominated pods even if candidate name matches",
+			candidate: &candidate{
+				name: node1Name,
+				victims: &extenderv1.Victims{
+					Pods: []*v1.Pod{
+						victim1,
+					},
+				},
+			},
+			preemptor: preemptor,
+			testPods: []*v1.Pod{
+				victim1,
+				nomPod1Node1,
+			},
+			nodeNames:          []string{node1Name},
+			expectedDeletedPod: []string{"victim1"},
+			expectedStatus:     nil,
+			// We cannot rely on block on NominatedPodsForNode
+			// We can skip the check as we care only about cleared nominated pods being empty.
+			skipPreemptingMapCheck: true,
 		},
 	}
 
@@ -707,15 +803,21 @@ func TestPrepareCandidate(t *testing.T) {
 						return true, nil, nil
 					})
 
+					clearedNominatedPods := sets.New[string]()
 					cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 						mu.Lock()
 						defer mu.Unlock()
-						if action.(clienttesting.PatchAction).GetName() == "fail-victim" {
+						patchAction := action.(clienttesting.PatchAction)
+						name := patchAction.GetName()
+						if strings.Contains(string(patchAction.GetPatch()), "nominatedNodeName") {
+							clearedNominatedPods.Insert(name)
+						}
+						if name == "fail-victim" {
 							patchFailure = true
 							return true, nil, errPatchStatusFailed
 						}
 						// fake clientset does not return an error for not-found pods, so we simulate it here.
-						if action.(clienttesting.PatchAction).GetName() == "not-found-victim" {
+						if name == "not-found-victim" {
 							return true, nil, apierrors.NewNotFound(v1.Resource("pods"), "not-found-victim")
 						}
 						return true, nil, nil
@@ -725,19 +827,34 @@ func TestPrepareCandidate(t *testing.T) {
 					eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
 					fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu}
 
-					// Note: NominatedPodsForNode is called at the beginning of the goroutine in any case.
-					// fakePodNominator can delay the response of NominatedPodsForNode until the channel is closed,
-					// which allows us to test the preempting map before the goroutine does nothing yet.
-					requestStopper := make(chan struct{})
-					nominator := &fakePodNominator{
-						SchedulingQueue: internalqueue.NewSchedulingQueue(nil, informerFactory),
-						requestStopper:  requestStopper,
+					nominatedPods := make(map[string][]fwk.PodInfo)
+					for _, pod := range tt.testPods {
+						if pod.Status.NominatedNodeName != "" {
+							pInfo, err := framework.NewPodInfo(pod)
+							if err != nil {
+								t.Fatal(err)
+							}
+							nominatedPods[pod.Status.NominatedNodeName] = append(nominatedPods[pod.Status.NominatedNodeName], pInfo)
+						}
 					}
+
 					var apiDispatcher *apidispatcher.APIDispatcher
+					var queueOpts []internalqueue.Option
 					if asyncAPICallsEnabled {
 						apiDispatcher = apidispatcher.New(cs, 16, apicalls.Relevances)
 						apiDispatcher.Run(logger)
 						defer apiDispatcher.Close()
+						queueOpts = append(queueOpts, internalqueue.WithAPIDispatcher(apiDispatcher))
+					}
+
+					// Note: NominatedPodsForNode is called at the beginning of the goroutine if a canidate has any nodes set.
+					// fakePodNominator can delay the response of NominatedPodsForNode until the channel is closed,
+					// which allows us to test the preempting map before the goroutine does nothing yet.
+					requestStopper := make(chan struct{})
+					nominator := &fakePodNominator{
+						SchedulingQueue: internalqueue.NewSchedulingQueue(nil, informerFactory, queueOpts...),
+						requestStopper:  requestStopper,
+						nominatedPods:   nominatedPods,
 					}
 
 					schedFramework, err := tf.NewFramework(
@@ -761,7 +878,7 @@ func TestPrepareCandidate(t *testing.T) {
 					informerFactory.WaitForCacheSync(ctx.Done())
 					if asyncAPICallsEnabled {
 						cache := internalcache.New(ctx, apiDispatcher, false, false)
-						schedFramework.SetAPICacher(apicache.New(nil, cache))
+						schedFramework.SetAPICacher(apicache.New(nominator, cache))
 					}
 
 					executor := NewExecutor(schedFramework, feature.Features{EnableAsyncPreemption: asyncPreemptionEnabled})
@@ -783,7 +900,7 @@ func TestPrepareCandidate(t *testing.T) {
 
 						// The preempting map should be registered synchronously
 						// so we don't need wait.Poll.
-						if !expectedMap.Equal(executor.preempting) {
+						if !tt.skipPreemptingMapCheck && !expectedMap.Equal(executor.preempting) {
 							t.Errorf("expected preempting map %v, got %v", expectedMap, executor.preempting)
 							close(requestStopper)
 							executor.mu.Unlock()
@@ -825,6 +942,12 @@ func TestPrepareCandidate(t *testing.T) {
 						}
 						if tt.expectedPatchError != patchFailure {
 							lastErrMsg = fmt.Sprintf("expected patch error %v, got %v", tt.expectedPatchError, patchFailure)
+							return false, nil
+						}
+
+						expectedClearedPods := sets.New(tt.expectedClearedNominatedPods...)
+						if !expectedClearedPods.Equal(clearedNominatedPods) {
+							lastErrMsg = fmt.Sprintf("expected cleared nominated pods %v, got %v", expectedClearedPods.UnsortedList(), clearedNominatedPods.UnsortedList())
 							return false, nil
 						}
 
