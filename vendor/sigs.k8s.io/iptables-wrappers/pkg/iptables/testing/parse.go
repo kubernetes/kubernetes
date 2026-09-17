@@ -1,7 +1,7 @@
 //go:build linux
 
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util/iptables"
+	"sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 // IPTablesDump represents a parsed IPTables rules dump (ie, the output of
@@ -115,7 +115,7 @@ func ParseIPTablesDump(data string) (*IPTablesDump, error) {
 
 				c, err := dump.GetChain(t.Name, chain)
 				if err != nil {
-					return nil, fmt.Errorf("error parsing rule %q: %v", line, err)
+					return nil, fmt.Errorf("error parsing rule %q: %w", line, err)
 				}
 				if c.Deleted {
 					return nil, fmt.Errorf("cannot add rules to deleted chain %q", chain)
@@ -131,7 +131,7 @@ func ParseIPTablesDump(data string) (*IPTablesDump, error) {
 
 				c, err := dump.GetChain(t.Name, chain)
 				if err != nil {
-					return nil, fmt.Errorf("error parsing rule %q: %v", line, err)
+					return nil, fmt.Errorf("error parsing rule %q: %w", line, err)
 				}
 				if len(c.Rules) != 0 {
 					return nil, fmt.Errorf("cannot delete chain %q after adding rules", chain)

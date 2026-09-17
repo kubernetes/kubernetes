@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package iptables provides an interface and implementations for running iptables commands.
-package iptables
+// This is an empty file to avoid "build constraints exclude all Go files" error while running unit tests on non-linux platforms.
+
+package testing
