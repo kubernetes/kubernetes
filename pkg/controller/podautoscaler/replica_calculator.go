@@ -497,6 +497,14 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 // calculatePodLevelRequests computes the requests for the specific resource at
 // the pod level.
 func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
+	// A pod-level request for one resource must not bypass actuated container
+	// requests for a different resource that is only specified on containers.
+	if pod.Spec.Resources == nil || pod.Spec.Resources.Requests == nil {
+		return calculatePodRequestsFromContainers(pod, "", resource)
+	}
+	if _, ok := pod.Spec.Resources.Requests[resource]; !ok || !resourcehelpers.IsSupportedPodLevelResource(resource) {
+		return calculatePodRequestsFromContainers(pod, "", resource)
+	}
 	if feature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 		if pod.Status.Resources != nil && pod.Status.Resources.Requests != nil {
 			if podRequest, ok := pod.Status.Resources.Requests[resource]; ok {

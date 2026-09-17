@@ -114,11 +114,13 @@ type calcScenario struct {
 	// Per-pod state. When non-nil, each slice must be at least currentReplicas
 	// long (or longer if the fixture is also describing failed/deleted pods
 	// that aren't counted in currentReplicas).
-	podReadiness         []v1.ConditionStatus
-	podStartTime         []metav1.Time
+	podReadiness                []v1.ConditionStatus
+	podStartTime                []metav1.Time
 	podPhase                    []v1.PodPhase
 	podDeletionTimestamp        []bool
 	podContainerStatusResources []v1.ResourceRequirements
+	podResources                []v1.ResourceRequirements
+	podStatusResources          []v1.ResourceRequirements
 }
 
 // cpuRequests returns n identical CPU resource quantities parsed from val.
@@ -325,6 +327,12 @@ func buildFakePod(f *calcScenario, i int) v1.Pod {
 			},
 		}
 	}
+	if i < len(f.podResources) {
+		pod.Spec.Resources = &f.podResources[i]
+	}
+	if i < len(f.podStatusResources) {
+		pod.Status.Resources = &f.podStatusResources[i]
+	}
 	return pod
 }
 
@@ -479,7 +487,53 @@ func assertResourceReplicas(t *testing.T, wantReplicas int32, wantUtilization in
 
 // TestReplicaCalcResourceScale covers scale-up, scale-down, and no-scale scenarios for GetResourceReplicas.
 func TestReplicaCalcResourceScale(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                       true,
+		features.InPlacePodLevelResourcesVerticalScaling: true,
+	})
 	testCases := []resourceCase{
+		{
+			name: "scale up: pod-level in-flight resize uses actuated requests",
+			fixture: calcScenario{
+				currentReplicas: 1,
+				resource: &cpuResource{
+					levels: makePodMetricLevels(900),
+				},
+				podResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")}},
+				},
+				podStatusResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+				},
+			},
+			targetUtilization:   80,
+			expectedReplicas:    2,
+			expectedUtilization: 90,
+			expectedRawValue:    numContainersPerPod * 900,
+		},
+		{
+			name: "scale down: pod-level in-flight resize uses actuated requests",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				resource: &cpuResource{
+					levels: makePodMetricLevels(300, 300, 300),
+				},
+				podResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
+				},
+				podStatusResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+				},
+			},
+			targetUtilization:   60,
+			expectedReplicas:    2,
+			expectedUtilization: 30,
+			expectedRawValue:    numContainersPerPod * 300,
+		},
 		{
 			name: "scale up: in-flight resize evaluates actuated status.Resources instead of spec",
 			fixture: calcScenario{
@@ -3215,6 +3269,105 @@ func TestCalculateRequests_InPlacePodVerticalScaling(t *testing.T) {
 			requests, err := calculateRequests([]*v1.Pod{tc.pod}, tc.container, tc.resource)
 			assert.Equal(t, tc.expectedRequests, requests, "requests should be as expected")
 			assert.Equal(t, tc.expectedError, err, "error should be as expected")
+		})
+	}
+}
+
+func TestCalculateRequests_MixedPodAndContainerResources(t *testing.T) {
+	for _, podResizeEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("pod resize enabled=%t", podResizeEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PodLevelResources:                       true,
+				features.InPlacePodLevelResourcesVerticalScaling: podResizeEnabled,
+			})
+			for _, tc := range []struct {
+				name           string
+				specMemory     string
+				statusMemory   string
+				expectedMemory string
+			}{
+				{name: "container scale up", specMemory: "1Gi", statusMemory: "256Mi", expectedMemory: "256Mi"},
+				{name: "container scale down", specMemory: "256Mi", statusMemory: "1Gi", expectedMemory: "1Gi"},
+				{name: "missing container status", specMemory: "512Mi", expectedMemory: "512Mi"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					pod := &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+						Spec: v1.PodSpec{
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+							},
+							Containers: []v1.Container{{
+								Name: "container1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse(tc.specMemory)},
+								},
+							}},
+						},
+						Status: v1.PodStatus{
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+							},
+						},
+					}
+					if tc.statusMemory != "" {
+						pod.Status.ContainerStatuses = []v1.ContainerStatus{{
+							Name: "container1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse(tc.statusMemory)},
+							},
+						}}
+					}
+					requests, err := calculateRequests([]*v1.Pod{pod}, "", v1.ResourceMemory)
+					require.NoError(t, err)
+					expected := resource.MustParse(tc.expectedMemory)
+					assert.Equal(t, map[string]int64{pod.Name: expected.MilliValue()}, requests)
+
+					requests, err = calculateRequests([]*v1.Pod{pod}, "", v1.ResourceCPU)
+					require.NoError(t, err)
+					expectedCPU := int64(2000)
+					if podResizeEnabled {
+						expectedCPU = 1000
+					}
+					assert.Equal(t, map[string]int64{pod.Name: expectedCPU}, requests)
+				})
+			}
+		})
+	}
+}
+
+func TestCalculatePodLevelRequests_NilSpecResources(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		specResources *v1.ResourceRequirements
+	}{
+		{
+			name:          "nil Spec.Resources",
+			specResources: nil,
+		},
+		{
+			name: "nil Spec.Resources.Requests",
+			specResources: &v1.ResourceRequirements{
+				Requests: nil,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Spec: v1.PodSpec{
+					Resources: tc.specResources,
+					Containers: []v1.Container{{
+						Name: "container1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+						},
+					}},
+				},
+			}
+			req, err := calculatePodLevelRequests(pod, v1.ResourceCPU)
+			require.NoError(t, err)
+			assert.Equal(t, int64(500), req)
 		})
 	}
 }
