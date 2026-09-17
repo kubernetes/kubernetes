@@ -103,6 +103,10 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	statusStore := *store
 	statusStore.UpdateStrategy = registrypod.StatusStrategy
 	statusStore.ResetFieldsStrategy = registrypod.StatusStrategy
+	evictionStore := *store
+	evictionStore.UpdateStrategy = registrypod.StatusStrategy
+	evictionStore.ResetFieldsStrategy = registrypod.StatusStrategy
+	evictionStore.ReturnDeletedObject = false
 	ephemeralContainersStore := *store
 	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
 	resizeStore := *store
@@ -113,7 +117,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Pod:                 &REST{store, proxyTransport},
 		Binding:             &BindingREST{store: store},
 		LegacyBinding:       &LegacyBindingREST{bindingREST},
-		Eviction:            newEvictionStorage(&statusStore, podDisruptionBudgetClient),
+		Eviction:            newEvictionStorage(&evictionStore, podDisruptionBudgetClient),
 		Status:              &StatusREST{store: &statusStore},
 		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
 		Resize:              &ResizeREST{store: &resizeStore},
