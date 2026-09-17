@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
@@ -4465,6 +4466,19 @@ func TestGetImageVolumes(t *testing.T) {
 			require.NoError(t, err, desc)
 		}
 		assert.Equal(t, tc.expectedImageVolumePulls, imageVolumePulls)
+	}
+}
+
+func TestCPUQuotaForResizeOrdering(t *testing.T) {
+	// The CFS "no quota" sentinel must order as the largest value so a move to unlimited
+	// reads as an upsize; every other quota passes through unchanged.
+	if got := cpuQuotaForResizeOrdering(-1); got != math.MaxInt64 {
+		t.Errorf("cpuQuotaForResizeOrdering(-1) = %d, want MaxInt64", got)
+	}
+	for _, q := range []int64{0, 1, 100000, math.MaxInt64} {
+		if got := cpuQuotaForResizeOrdering(q); got != q {
+			t.Errorf("cpuQuotaForResizeOrdering(%d) = %d, want it unchanged", q, got)
+		}
 	}
 }
 
