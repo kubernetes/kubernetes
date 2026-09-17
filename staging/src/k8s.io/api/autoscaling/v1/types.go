@@ -45,9 +45,9 @@ type HorizontalPodAutoscalerSpec struct {
 	ScaleTargetRef CrossVersionObjectReference `json:"scaleTargetRef" protobuf:"bytes,1,opt,name=scaleTargetRef"`
 	// minReplicas is the lower limit for the number of replicas to which the autoscaler
 	// can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the
-	// alpha feature gate HPAScaleToZero is enabled and at least one Object or External
-	// metric is configured.  Scaling is active as long as at least one metric value is
-	// available.
+	// beta feature gate HPAScaleToZero is enabled (the default as of 1.37) and at
+	// least one Object or External metric is configured.  Scaling is active as long
+	// as at least one metric value is available.
 	// +optional
 	// +k8s:beta(since: "1.37")=+k8s:optional
 	// +k8s:beta(since: "1.37")=+k8s:ifEnabled(HPAScaleToZero)=+k8s:minimum=0
