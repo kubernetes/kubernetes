@@ -76,6 +76,13 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.restoreFrom": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.restoreFrom.name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},

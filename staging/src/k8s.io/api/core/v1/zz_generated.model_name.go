@@ -92,6 +92,11 @@ func (in CephFSVolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CheckpointReference) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.CheckpointReference"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CinderPersistentVolumeSource) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.CinderPersistentVolumeSource"
 }
@@ -819,6 +824,11 @@ func (in PodResourceClaim) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodResourceClaimStatus) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PodResourceClaimStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodRestoreStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.PodRestoreStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

@@ -500,3 +500,112 @@ func makePodWithNodeAllocatableResourceClaimStatuses(claimName string, statuses 
 	pod.Status.NodeAllocatableResourceClaimStatuses = statuses
 	return pod
 }
+
+// TestDeclarativeValidateRestoreFrom covers the declarative rules on
+// spec.restoreFrom (KEP-5823): the referenced PodCheckpoint name is required and
+// must be a valid long name. The feature gate is enabled because validation of a
+// present restoreFrom only happens with the gate on (the field is dropped in
+// PrepareForCreate otherwise).
+func TestDeclarativeValidateRestoreFrom(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIPrefix:         "api",
+			APIGroup:          "",
+			APIVersion:        apiVersion,
+			IsResourceRequest: true,
+			Verb:              "create",
+		})
+		testCases := map[string]struct {
+			input        *api.Pod
+			expectedErrs field.ErrorList
+		}{
+			"restoreFrom: valid name": {
+				input: podtest.MakePod("foo", podtest.SetRestoreFrom("valid-checkpoint")),
+			},
+			"restoreFrom: invalid name format": {
+				input: podtest.MakePod("foo", podtest.SetRestoreFrom("Invalid-Name")),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "restoreFrom", "name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+				},
+			},
+			"restoreFrom: empty name": {
+				input: podtest.MakePod("foo", podtest.SetRestoreFrom("")),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("spec", "restoreFrom", "name"), "").MarkAlpha(),
+				},
+			},
+		}
+		for k, tc := range testCases {
+			t.Run(k, func(t *testing.T) {
+				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
+			})
+		}
+	}
+}
+
+// TestDeclarativeValidateUpdateRestoreFrom covers the declarative immutability of
+// spec.restoreFrom (KEP-5823): a Pod cannot be re-pointed at a different
+// checkpoint after creation.
+func TestDeclarativeValidateUpdateRestoreFrom(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIPrefix:         "api",
+			APIGroup:          "",
+			APIVersion:        apiVersion,
+			Name:              "foo",
+			IsResourceRequest: true,
+			Verb:              "update",
+		})
+		testCases := map[string]struct {
+			old          *api.Pod
+			update       *api.Pod
+			expectedErrs field.ErrorList
+		}{
+			"restoreFrom: unchanged": {
+				old:    podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a")),
+				update: podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a")),
+			},
+			"restoreFrom: changed": {
+				old:    podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a")),
+				update: podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-b")),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "restoreFrom"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+			"restoreFrom: options changed": {
+				// The immutable rule compares the whole reference, so a change to
+				// only restoreFrom.options is rejected too.
+				old: podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a"),
+					podtest.SetRestoreOptions(map[string]string{"example.runtime/mode": "old"})),
+				update: podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a"),
+					podtest.SetRestoreOptions(map[string]string{"example.runtime/mode": "new"})),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "restoreFrom"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+			"restoreFrom: set from unset": {
+				old:    podtest.MakePod("foo"),
+				update: podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a")),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "restoreFrom"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+			"restoreFrom: unset from set": {
+				old:    podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a")),
+				update: podtest.MakePod("foo"),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "restoreFrom"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+		}
+		for k, tc := range testCases {
+			t.Run(k, func(t *testing.T) {
+				tc.old.ResourceVersion = "1"
+				tc.update.ResourceVersion = "1"
+				apitesting.VerifyUpdateValidationEquivalence(t, ctx, tc.update, tc.old, registry.Strategy, tc.expectedErrs)
+			})
+		}
+	}
+}

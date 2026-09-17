@@ -899,6 +899,10 @@ spec:
     requests:
       requestsKey: "0"
   restartPolicy: restartPolicyValue
+  restoreFrom:
+    name: nameValue
+    options:
+      optionsKey: optionsValue
   runtimeClassName: runtimeClassNameValue
   schedulerName: schedulerNameValue
   schedulingGates:
@@ -1527,6 +1531,10 @@ status:
       limitsKey: "0"
     requests:
       requestsKey: "0"
+  restoreStatus:
+    message: messageValue
+    reason: reasonValue
+    restoreState: restoreStateValue
   startTime: "2007-01-01T01:01:01Z"
   volumeHealth:
   - healthConditions:

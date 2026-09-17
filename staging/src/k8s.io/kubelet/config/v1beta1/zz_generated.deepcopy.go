@@ -429,6 +429,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	out.PodCheckpointTimeout = in.PodCheckpointTimeout
 	if in.PodPidsLimit != nil {
 		in, out := &in.PodPidsLimit, &out.PodPidsLimit
 		*out = new(int64)
