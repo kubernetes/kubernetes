@@ -48,6 +48,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
@@ -64,6 +65,7 @@ import (
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 	"k8s.io/kubernetes/test/utils/oidc/handlers"
@@ -2195,6 +2197,18 @@ func configureRBAC(t *testing.T, clientset kubernetes.Interface, role *rbacv1.Ro
 	require.NoError(t, err)
 	_, err = clientset.RbacV1().RoleBindings(defaultNamespace).Create(ctx, binding, metav1.CreateOptions{})
 	require.NoError(t, err)
+
+	authutil.WaitForNamedAuthorizationUpdate(
+		t,
+		ctx,
+		clientset.AuthorizationV1(),
+		defaultOIDCUsernamePrefix+defaultOIDCClaimedUsername,
+		defaultNamespace,
+		"list",
+		"",
+		schema.GroupResource{Group: "", Resource: "pods"},
+		true,
+	)
 }
 
 func configureClientConfigForOIDC(t *testing.T, config *rest.Config, clientID, caFilePath, idToken, refreshToken, oidcServerURL string) *rest.Config {
