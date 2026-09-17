@@ -108,9 +108,10 @@ func TestSaturatingAdd(t *testing.T) {
 	}
 }
 
-func TestNodeInfoAddPodSaturatesRequested(t *testing.T) {
+func TestNodeInfoSaturatesAndRecomputesEveryRequestedField(t *testing.T) {
 	// Two pods each project a field to math.MaxInt64; that field's total must
-	// saturate, not wrap negative. Every accumulated field is covered, built
+	// saturate, not wrap negative, and removing one of them must rebuild from the
+	// other instead of subtracting. Every accumulated field is covered, built
 	// directly so the table does not depend on the projection that #141305 flips.
 	const max = int64(math.MaxInt64)
 	dev := v1.ResourceName("example.com/dev")
@@ -131,10 +132,24 @@ func TestNodeInfoAddPodSaturatesRequested(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			ni := NewNodeInfo()
 			r1, r2 := c.res, c.res
-			addCachedResource(ni, "p1", &r1, c.non0CPU, c.non0Mem)
-			addCachedResource(ni, "p2", &r2, c.non0CPU, c.non0Mem)
+			p1 := addCachedResource(ni, "p1", &r1, c.non0CPU, c.non0Mem)
+			p2 := addCachedResource(ni, "p2", &r2, c.non0CPU, c.non0Mem)
 			if got := c.got(ni); got != max {
 				t.Errorf("%s = %d after two MaxInt64 adds, want MaxInt64 (wrapped instead of saturating)", c.name, got)
+			}
+			// Removing one pod must rebuild from the other, which still projects to MaxInt64;
+			// a plain subtract would drop the field to 0.
+			if err := ni.RemovePod(klog.Background(), p1); err != nil {
+				t.Fatal(err)
+			}
+			if got := c.got(ni); got != max {
+				t.Errorf("%s = %d after removing one of two MaxInt64 pods, want MaxInt64 (subtracted instead of rebuilding)", c.name, got)
+			}
+			if err := ni.RemovePod(klog.Background(), p2); err != nil {
+				t.Fatal(err)
+			}
+			if got := c.got(ni); got != 0 {
+				t.Errorf("%s = %d after removing both pods, want 0", c.name, got)
 			}
 		})
 	}
@@ -235,8 +250,8 @@ func TestNodeInfoSnapshotStaysSaturatedAfterRemoval(t *testing.T) {
 	if got := ni.Requested.MilliCPU; got != math.MaxInt64 {
 		t.Errorf("source Requested.MilliCPU = %d after a removal on its snapshot, want %d", got, int64(math.MaxInt64))
 	}
-	if len(ni.Pods) != 2 {
-		t.Errorf("source has %d pods after a removal on its snapshot, want 2", len(ni.Pods))
+	if len(ni.Pods) != 2 || ni.Pods[0].GetPod().Name != "a" || ni.Pods[1].GetPod().Name != "b" {
+		t.Errorf("source pods changed after a removal on its snapshot, want a and b")
 	}
 }
 
