@@ -409,7 +409,8 @@ func (d *DefaultLimitRangerActions) MutateLimit(limitRange *corev1.LimitRange, r
 func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *corev1.LimitRange, resourceName string, obj, oldObj runtime.Object) error {
 	switch resourceName {
 	case "pods":
-		return PodValidateLimitFunc(limitRange, obj.(*api.Pod))
+		oldPod, _ := oldObj.(*api.Pod)
+		return PodValidateLimitFunc(limitRange, obj.(*api.Pod), oldPod)
 	case "persistentvolumeclaims":
 		oldPVC, _ := oldObj.(*api.PersistentVolumeClaim)
 		return PersistentVolumeClaimValidateLimitFunc(limitRange, obj.(*api.PersistentVolumeClaim), oldPVC)
@@ -507,70 +508,65 @@ func PodMutateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 
 // PodValidateLimitFunc enforces resource requirements enumerated by the pod against
 // the specified LimitRange.
-func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
+//
+// On update, oldPod is the stored pod, and a request or limit that a container
+// or the pod as a whole already holds is not checked again: a stored value is
+// valid by definition, so a resize that leaves it unchanged is not rejected by a
+// constraint it no longer satisfies. Values the update changes are checked as on
+// create. oldPod is nil on create.
+func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod, oldPod *api.Pod) error {
 	var errs []error
+
+	var oldContainers, oldInitContainers []api.Container
+	if oldPod != nil {
+		oldContainers = oldPod.Spec.Containers
+		oldInitContainers = oldPod.Spec.InitContainers
+	}
 
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
 		limitType := limit.Type
 		// enforce container limits
 		if limitType == corev1.LimitTypeContainer {
-			for j := range pod.Spec.Containers {
-				container := &pod.Spec.Containers[j]
-				for k, v := range limit.Min {
-					if err := minConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
-						errs = append(errs, err)
-					}
-				}
-				for k, v := range limit.Max {
-					if err := maxConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
-						errs = append(errs, err)
-					}
-				}
-				for k, v := range limit.MaxLimitRequestRatio {
-					if err := limitRequestRatioConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
-						errs = append(errs, err)
-					}
-				}
-			}
-			for j := range pod.Spec.InitContainers {
-				container := &pod.Spec.InitContainers[j]
-				for k, v := range limit.Min {
-					if err := minConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
-						errs = append(errs, err)
-					}
-				}
-				for k, v := range limit.Max {
-					if err := maxConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
-						errs = append(errs, err)
-					}
-				}
-				for k, v := range limit.MaxLimitRequestRatio {
-					if err := limitRequestRatioConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
-						errs = append(errs, err)
-					}
-				}
-			}
+			errs = append(errs, validateContainerLimits(limit, pod.Spec.Containers, oldContainers)...)
+			errs = append(errs, validateContainerLimits(limit, pod.Spec.InitContainers, oldInitContainers)...)
 		}
 
-		// enforce pod limits on init containers
+		// enforce pod limits
 		if limitType == corev1.LimitTypePod {
 			opts := podResourcesOptions{
 				PodLevelResourcesEnabled: feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 			}
+			var oldPodRequests, oldPodLimits api.ResourceList
+			if oldPod != nil {
+				oldPodRequests = podRequests(oldPod, opts)
+				oldPodLimits = podLimits(oldPod, opts)
+			}
 			podRequests := podRequests(pod, opts)
 			podLimits := podLimits(pod, opts)
+			unchanged := func(resourceName corev1.ResourceName) bool {
+				return oldPod != nil && resourceUnchanged(api.ResourceName(resourceName), podRequests, oldPodRequests, podLimits, oldPodLimits)
+			}
 			for k, v := range limit.Min {
+				if unchanged(k) {
+					continue
+				}
 				if err := minConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
 					errs = append(errs, err)
 				}
 			}
 			for k, v := range limit.Max {
+				if unchanged(k) {
+					continue
+				}
 				if err := maxConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
 					errs = append(errs, err)
 				}
 			}
 			for k, v := range limit.MaxLimitRequestRatio {
+				if unchanged(k) {
+					continue
+				}
 				if err := limitRequestRatioConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
 					errs = append(errs, err)
 				}
@@ -578,6 +574,76 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 		}
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+// validateContainerLimits enforces the min, max and limit-to-request ratio of a
+// container-type LimitRangeItem on every container in containers. A value is
+// skipped when the container of the same name in oldContainers holds the same
+// request and limit for that resource; oldContainers is nil on create.
+func validateContainerLimits(limit corev1.LimitRangeItem, containers, oldContainers []api.Container) []error {
+	var errs []error
+	limitType := string(limit.Type)
+	for i := range containers {
+		container := &containers[i]
+		oldContainer := containerByName(oldContainers, container.Name)
+		unchanged := func(resourceName corev1.ResourceName) bool {
+			return oldContainer != nil && resourceUnchanged(api.ResourceName(resourceName), container.Resources.Requests, oldContainer.Resources.Requests, container.Resources.Limits, oldContainer.Resources.Limits)
+		}
+		for k, v := range limit.Min {
+			if unchanged(k) {
+				continue
+			}
+			if err := minConstraint(limitType, string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		for k, v := range limit.Max {
+			if unchanged(k) {
+				continue
+			}
+			if err := maxConstraint(limitType, string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		for k, v := range limit.MaxLimitRequestRatio {
+			if unchanged(k) {
+				continue
+			}
+			if err := limitRequestRatioConstraint(limitType, string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errs
+}
+
+// containerByName returns the container called name, or nil if there is none.
+func containerByName(containers []api.Container, name string) *api.Container {
+	for i := range containers {
+		if containers[i].Name == name {
+			return &containers[i]
+		}
+	}
+	return nil
+}
+
+// resourceUnchanged reports whether both the request and the limit for
+// resourceName are the same in the new and the old resource lists. Each of the
+// min, max and ratio constraints reads both the request and the limit, so a
+// value only counts as unchanged when neither moved.
+func resourceUnchanged(resourceName api.ResourceName, requests, oldRequests, limits, oldLimits api.ResourceList) bool {
+	return sameQuantity(resourceName, requests, oldRequests) && sameQuantity(resourceName, limits, oldLimits)
+}
+
+// sameQuantity reports whether resourceName is either absent from both lists or
+// present in both with an equal quantity.
+func sameQuantity(resourceName api.ResourceName, a, b api.ResourceList) bool {
+	qa, inA := a[resourceName]
+	qb, inB := b[resourceName]
+	if inA != inB {
+		return false
+	}
+	return !inA || qa.Cmp(qb) == 0
 }
 
 type podResourcesOptions struct {
@@ -606,7 +672,6 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	restartableInitCotnainerReqs := api.ResourceList{}
 	initContainerReqs := api.ResourceList{}
 	// init containers define the minimum of any resource
-	// Note: In-place resize is not allowed for InitContainers, so no need to check for ResizeStatus value
 	for _, container := range pod.Spec.InitContainers {
 		containerReqs := container.Resources.Requests
 
