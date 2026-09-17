@@ -18,6 +18,7 @@ package persistentvolume
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"k8s.io/klog/v2/ktesting"
@@ -671,9 +672,48 @@ func TestProvisionMultiSync(t *testing.T) {
 				}
 			}),
 		},
+		{
+			// A previous bind attempt failed halfway through: the claim got its
+			// volumeName and binding annotations saved, but its status update
+			// did not happen. Finishing the binding must consume the provision
+			// operation timestamp from the cache and record the end-to-end
+			// provision latency metric instead of leaving the entry behind.
+			name:            "12-5 - external provisioner with partially bound claim, finishing binding records provision metric",
+			initialVolumes:  newVolumeArray("pvc-uid12-5", "1Gi", "uid12-5", "claim12-5", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, volume.AnnBoundByController),
+			expectedVolumes: newVolumeArray("pvc-uid12-5", "1Gi", "uid12-5", "claim12-5", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, volume.AnnBoundByController),
+			initialClaims: claimWithAnnotation(volume.AnnBetaStorageProvisioner, "vendor.com/my-volume",
+				claimWithAnnotation(volume.AnnStorageProvisioner, "vendor.com/my-volume",
+					newClaimArray("claim12-5", "uid12-5", "1Gi", "pvc-uid12-5", v1.ClaimPending, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted))),
+			expectedClaims: claimWithAnnotation(volume.AnnBetaStorageProvisioner, "vendor.com/my-volume",
+				claimWithAnnotation(volume.AnnStorageProvisioner, "vendor.com/my-volume",
+					newClaimArray("claim12-5", "uid12-5", "1Gi", "pvc-uid12-5", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted))),
+			expectedEvents: noevents,
+			errors:         noerrors,
+			test:           wrapTestWithProvisionTimestampCache(testSyncClaim),
+		},
 	}
 
 	runMultisyncTests(t, ctx, tests, storageClasses, storageClasses[0].Name)
+}
+
+// wrapTestWithProvisionTimestampCache simulates a provision operation that
+// started (and stored its timestamp in the controller cache) but whose
+// binding did not complete in a single sync - the claim keeps the volumeName
+// saved by a previous, partially failed bind. The wrapper verifies the
+// timestamp entry is consumed by metric recording once the binding finishes,
+// instead of silently staying in the cache until the claim is deleted.
+func wrapTestWithProvisionTimestampCache(toWrap testCall) testCall {
+	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+		claimKey := claimToClaimKey(test.initialClaims[0])
+		ctrl.operationTimestamps.AddIfNotExist(claimKey, "vendor.com/my-volume", "provision")
+		if err := toWrap(ctrl, reactor, test); err != nil {
+			return err
+		}
+		if ctrl.operationTimestamps.Has(claimKey) {
+			return fmt.Errorf("provision timestamp entry for claim %q was not consumed by metric recording after the binding finished", claimKey)
+		}
+		return nil
+	}
 }
 
 // When provisioning is disabled, provisioning a claim should instantly return nil

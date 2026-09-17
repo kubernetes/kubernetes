@@ -543,6 +543,13 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(ctx context.Context, clai
 				// Objects not saved, next syncPV or syncClaim will try again
 				return err
 			}
+			// If a previous bind attempt failed halfway through, the claim
+			// got its volumeName and annotations saved but not the "Bound"
+			// status - the bind() call above finished it just now. In that
+			// case the provision operation timestamp is still in the cache:
+			// record the end-to-end provision latency and clean up the cache,
+			// the same way syncUnboundClaim does after a successful bind.
+			metrics.RecordMetric(claimToClaimKey(claim), &ctrl.operationTimestamps, nil)
 			return nil
 		} else {
 			// Claim is bound but volume has a different claimant.
