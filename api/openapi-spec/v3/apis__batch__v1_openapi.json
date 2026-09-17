@@ -2755,7 +2755,7 @@
             "type": "string"
           },
           "keyType": {
-            "description": "The type of keypair Kubelet will generate for the pod.\n\nValid values are \"RSA3072\", \"RSA4096\", \"ECDSAP256\", \"ECDSAP384\", \"ECDSAP521\", and \"ED25519\".",
+            "description": "The type of keypair Kubelet will generate for the pod.\n\nValid values are \"RSA3072\", \"RSA4096\", \"ECDSAP256\", \"ECDSAP384\", \"ECDSAP521\", \"ED25519\", \"MLDSA44\", \"MLDSA65\", and \"MLDSA87\".\n\nMLDSA key types are only allowed when the PodCertificateMLDSA feature gate is enabled.",
             "type": "string"
           },
           "maxExpirationSeconds": {

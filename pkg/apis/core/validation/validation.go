@@ -1320,8 +1320,17 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 			switch source.PodCertificate.KeyType {
 			case "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519":
 				// ok
+			case "MLDSA44", "MLDSA65", "MLDSA87":
+				if !opts.AllowMLDSAPodCertificateKeyTypes {
+					allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}))
+				}
 			default:
-				allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}))
+				supportedKeyTypes := []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}
+				if opts.AllowMLDSAPodCertificateKeyTypes {
+					supportedKeyTypes = append(supportedKeyTypes, "MLDSA44", "MLDSA65", "MLDSA87")
+				}
+
+				allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, supportedKeyTypes))
 			}
 
 			if source.PodCertificate.MaxExpirationSeconds != nil {
@@ -4632,6 +4641,8 @@ type PodValidationOptions struct {
 	AllowEmptyImageVolumeReference bool
 	// Allow containers to have CAP_SYS_ADMIN even if AllowPrivilegeEscalation is false
 	AllowSysAdminWhenPrivilegeEscalationFalse bool
+	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
+	AllowMLDSAPodCertificateKeyTypes bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,

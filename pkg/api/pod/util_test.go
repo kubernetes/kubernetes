@@ -8098,3 +8098,150 @@ func TestDisableEvictionResponders(t *testing.T) {
 		})
 	}
 }
+
+func TestGetValidationOptionsAllowMLDSAPodCertificateKeyTypes(t *testing.T) {
+	testCases := []struct {
+		name        string
+		oldPodSpec  *api.PodSpec
+		gateEnabled bool
+		wantOption  bool
+	}{
+		{
+			name:        "Create pod with gate disabled",
+			oldPodSpec:  nil,
+			gateEnabled: false,
+			wantOption:  false,
+		},
+		{
+			name:        "Create pod with gate enabled",
+			oldPodSpec:  nil,
+			gateEnabled: true,
+			wantOption:  true,
+		},
+		{
+			name: "Update pod with gate disabled but previously uses an MLDSA44 key type in pod certificate projected volume",
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "volume",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											KeyType: "MLDSA44",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			gateEnabled: false,
+			wantOption:  true,
+		},
+		{
+			name: "Update pod with gate disabled but previously uses an MLDSA65 key type in pod certificate projected volume",
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "volume",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											KeyType: "MLDSA65",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			gateEnabled: false,
+			wantOption:  true,
+		},
+		{
+			name: "Update pod with gate disabled but previously uses an MLDSA87 key type in pod certificate projected volume",
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "volume",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											KeyType: "MLDSA87",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			gateEnabled: false,
+			wantOption:  true,
+		},
+		{
+			name: "Update pod with gate disabled previously uses a non-MLDSA key type in pod certificate projected volume",
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "volume",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											KeyType: "RSA4096",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			gateEnabled: false,
+			wantOption:  false,
+		},
+		{
+			name: "Update pod with gate enabled, previously uses a non-MLDSA key type in pod certificate projected volume",
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "volume",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											KeyType: "RSA4096",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			gateEnabled: true,
+			wantOption:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodCertificateMLDSA, tc.gateEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowMLDSAPodCertificateKeyTypes {
+				t.Errorf("Got AllowMLDSAPodCertifcateKeyTypes=%t, want %t", gotOptions.AllowMLDSAPodCertificateKeyTypes, tc.wantOption)
+			}
+		})
+	}
+}

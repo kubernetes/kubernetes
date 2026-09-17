@@ -1384,6 +1384,17 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: PodCertificateMLDSA
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
+    minCompatibilityVersion: "1.38"
 - name: PodCertificateRequest
   versionedSpecs:
   - default: false
