@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
@@ -48,9 +49,11 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	crierror "k8s.io/cri-api/pkg/errors"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -4464,6 +4467,119 @@ func TestGetImageVolumes(t *testing.T) {
 			require.NoError(t, err, desc)
 		}
 		assert.Equal(t, tc.expectedImageVolumePulls, imageVolumePulls)
+	}
+}
+
+func TestCPUQuotaForResizeOrdering(t *testing.T) {
+	// Unlimited, -1, must rank largest so a move to it reads as an upsize. Every
+	// other quota passes through unchanged.
+	if got := cpuQuotaForResizeOrdering(-1); got != math.MaxInt64 {
+		t.Errorf("cpuQuotaForResizeOrdering(-1) = %d, want MaxInt64", got)
+	}
+	for _, q := range []int64{0, 1, 100000, math.MaxInt64} {
+		if got := cpuQuotaForResizeOrdering(q); got != q {
+			t.Errorf("cpuQuotaForResizeOrdering(%d) = %d, want it unchanged", q, got)
+		}
+	}
+}
+
+// recordingRuntimeService records container resource updates in call order, so a test can
+// interleave them with the pod cgroup writes it records from its mock.
+type recordingRuntimeService struct {
+	internalapi.RuntimeService
+	seq *[]string
+}
+
+func (r *recordingRuntimeService) UpdateContainerResources(ctx context.Context, id string, res *runtimeapi.ContainerResources) error {
+	*r.seq = append(*r.seq, "container:"+id)
+	return r.RuntimeService.UpdateContainerResources(ctx, id, res)
+}
+
+// TestDoPodResizeActionUnlimitedQuotaOrder pins the order of pod cgroup and
+// container updates when the pod quota crosses between a finite value and -1,
+// and that -1 is what the pod cgroup is given.
+func TestDoPodResizeActionUnlimitedQuotaOrder(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	for _, tc := range []struct {
+		name            string
+		currentPodQuota int64
+		limits          [3]string
+		wantSeq         []string
+	}{
+		{
+			// The sum of the new limits does not fit a quota, so the pod goes unlimited before its containers grow.
+			name:            "finite to unlimited updates the pod first",
+			currentPodQuota: 210000,
+			limits:          [3]string{"3", "92233720", "100m"},
+			wantSeq:         []string{"pod:-1", "container:id1", "container:id2"},
+		},
+		{
+			// The pod gets a finite quota again only after its containers shrink under it.
+			name:            "unlimited to finite updates the containers first",
+			currentPodQuota: -1,
+			limits:          [3]string{"1", "1", "100m"},
+			wantSeq:         []string{"container:id1", "container:id2", "pod:210000"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			m.cpuCFSQuota = true
+			var seq []string
+			m.runtimeService = &recordingRuntimeService{RuntimeService: fakeRuntime, seq: &seq}
+			mockCM := cmtesting.NewMockContainerManager(t)
+			mockCM.EXPECT().PodHasExclusiveCPUs(logger, mock.Anything).Return(false).Maybe()
+			mockCM.EXPECT().ContainerHasExclusiveCPUs(logger, mock.Anything, mock.Anything).Return(false).Maybe()
+			m.containerManager = mockCM
+			mockPCM := cmtesting.NewMockPodContainerManager(t)
+			mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{Memory: new(int64(300))}, nil).Maybe()
+			mockPCM.EXPECT().GetPodCgroupMemoryUsage(mock.Anything).Return(0, nil).Maybe()
+			// Requests stay at 100m per container, so only the pod limit moves.
+			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
+				CPUShares: new(cm.MilliCPUToShares(300)),
+				CPUQuota:  new(tc.currentPodQuota),
+				CPUPeriod: new(uint64(cm.QuotaPeriod)),
+			}, nil).Maybe()
+			mockPCM.EXPECT().SetPodCgroupConfig(logger, mock.Anything, mock.Anything).RunAndReturn(
+				func(_ klog.Logger, _ *v1.Pod, cfg *cm.ResourceConfig) error {
+					if cfg.CPUQuota != nil {
+						seq = append(seq, fmt.Sprintf("pod:%d", *cfg.CPUQuota))
+					} else {
+						seq = append(seq, "pod:other")
+					}
+					return nil
+				}).Times(1)
+
+			pod, kps := makeBasePodAndStatus()
+			var toUpdate []containerToUpdateInfo
+			for i := range pod.Spec.Containers {
+				pod.Spec.Containers[i].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse(tc.limits[i])},
+				}
+				if i < 2 {
+					toUpdate = append(toUpdate, containerToUpdateInfo{
+						container:                 &pod.Spec.Containers[i],
+						kubeContainerID:           kps.ContainerStatuses[i].ID,
+						desiredContainerResources: resourceRequirements{cpuRequest: 100, cpuLimit: pod.Spec.Containers[i].Resources.Limits.Cpu().MilliValue()},
+						currentContainerResources: &resourceRequirements{cpuRequest: 100, cpuLimit: 1000},
+					})
+				}
+			}
+			m.runtimeHelper = &containertest.FakeRuntimeHelper{}
+			result := m.doPodResizeAction(tCtx, pod, kps, podActions{
+				ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{v1.ResourceCPU: toUpdate},
+				SandboxID:          "sandbox-id",
+			})
+			require.NoError(t, result.Error, result.Message)
+			assert.Equal(t, tc.wantSeq, seq)
+			mock.AssertExpectationsForObjects(t, mockPCM)
+		})
 	}
 }
 
