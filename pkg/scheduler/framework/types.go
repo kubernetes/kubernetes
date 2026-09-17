@@ -526,7 +526,7 @@ func (n *NodeInfo) recomputeRequested() {
 	n.Requested.MilliCPU = 0
 	n.Requested.Memory = 0
 	n.Requested.EphemeralStorage = 0
-	n.Requested.ScalarResources = nil
+	clear(n.Requested.ScalarResources)
 	n.NonZeroRequested.MilliCPU = 0
 	n.NonZeroRequested.Memory = 0
 	for _, p := range n.Pods {

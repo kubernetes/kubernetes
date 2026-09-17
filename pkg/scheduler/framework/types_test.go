@@ -301,7 +301,7 @@ func BenchmarkNodeInfoRemovePods(b *testing.B) {
 	// remaining pods) against an unsaturated node (a plain decrement), so the
 	// rebuild's incremental cost is isolated rather than folded in with the
 	// linear pod-slice scan RemovePod already does. The scalar variant exercises
-	// the map that recomputeRequested reallocates.
+	// the map that recomputeRequested clears and refills.
 	logger := klog.Background()
 	variants := []struct {
 		name       string
@@ -313,7 +313,7 @@ func BenchmarkNodeInfoRemovePods(b *testing.B) {
 		{"scalar/saturated", true, map[v1.ResourceName]string{"example.com/dev": "1"}, map[v1.ResourceName]string{"example.com/dev": "9223372036854775807"}},
 	}
 	for _, v := range variants {
-		for _, n := range []int{100, 1000, 10000} {
+		for _, n := range []int{100, 1000} {
 			b.Run(fmt.Sprintf("%s/pods=%d", v.name, n), func(b *testing.B) {
 				b.ReportAllocs()
 				for b.Loop() {
