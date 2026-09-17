@@ -92,10 +92,12 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"informerFactoryInterface":       c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
 		"clientSetInterface":             c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
 		"reflectType":                    c.Universe.Type(reflectType),
+		"reflectTypeOf":                  c.Universe.Function(reflectTypeOf),
 		"runtimeObject":                  c.Universe.Type(runtimeObject),
 		"schemaGroupVersionResource":     c.Universe.Type(schemaGroupVersionResource),
 		"stringsBuilder":                 c.Universe.Type(stringsBuilder),
 		"syncMutex":                      c.Universe.Type(syncMutex),
+		"syncWaitGroup":                  c.Universe.Type(syncWaitGroup),
 		"timeDuration":                   c.Universe.Type(timeDuration),
 		"namespaceAll":                   c.Universe.Type(metav1NamespaceAll),
 		"object":                         c.Universe.Type(metav1Object),
@@ -127,7 +129,7 @@ type sharedInformerFactory struct {
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[{{.reflectType|raw}}]bool
 	// wg tracks how many goroutines were started.
-	wg sync.WaitGroup
+	wg {{.syncWaitGroup|raw}}
 	// shuttingDown is true when Shutdown has been called. It may still be running
 	// because it needs to wait for goroutines.
 	shuttingDown bool
@@ -137,14 +139,14 @@ type sharedInformerFactory struct {
 func WithCustomResyncConfig(resyncConfig map[{{.object|raw}}]{{.timeDuration|raw}}) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		for k, v := range resyncConfig {
-			factory.customResync[reflect.TypeOf(k)] = v
+			factory.customResync[{{.reflectTypeOf|raw}}(k)] = v
 		}
 		return factory
 	}
 }
 
 // WithTweakListOptions sets a custom filter on all listers of the configured SharedInformerFactory.
-func WithTweakListOptions(tweakListOptions internalinterfaces.TweakListOptionsFunc) SharedInformerOption {
+func WithTweakListOptions(tweakListOptions {{.interfacesTweakListOptionsFunc|raw}}) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.tweakListOptions = tweakListOptions
 		return factory
@@ -202,7 +204,7 @@ func NewFilteredSharedInformerFactory(client {{.clientSetInterface|raw}}, defaul
 func NewSharedInformerFactoryWithOptions(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}, options ...SharedInformerOption) SharedInformerFactory {
 	factory := &sharedInformerFactory{
 		client:           client,
-		namespace:        v1.NamespaceAll,
+		namespace:        {{.namespaceAll|raw}},
 		defaultResync:    defaultResync,
 		informers:        make(map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}),
 		startedInformers: make(map[{{.reflectType|raw}}]bool),
@@ -251,7 +253,7 @@ func (f *sharedInformerFactory) Shutdown() {
 }
 
 func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
-	result := f.WaitForCacheSyncWithContext(wait.ContextForChannel(stopCh))
+	result := f.WaitForCacheSyncWithContext({{.waitContextForChannel|raw}}(stopCh))
 	return result.Synced
 }
 
@@ -303,7 +305,7 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
   f.lock.Lock()
   defer f.lock.Unlock()
 
-  informerType := reflect.TypeOf(obj)
+  informerType := {{.reflectTypeOf|raw}}(obj)
   informer, exists := f.informers[informerType]
   if exists {
     return informer
