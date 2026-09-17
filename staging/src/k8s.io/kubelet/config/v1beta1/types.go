@@ -778,6 +778,15 @@ type KubeletConfiguration struct {
 	// CPU list rather than the "dynamic" list by systemReserved and kubeReserved.
 	// This option does not support systemReservedCgroup or kubeReservedCgroup.
 	ReservedSystemCPUs string `json:"reservedSystemCPUs,omitempty"`
+	// systemPartition configures a dedicated "system" partition inside the cgroup
+	// hierarchy the kubelet creates for Pods. Pods in the listed namespaces are
+	// placed in that partition rather than alongside user Pods.
+	// The partition root carries its own memory limit and cpuset, which bounds the
+	// resources system Pods can take away from user Pods.
+	// Default: nil
+	// +featureGate=NodeSystemPartition
+	// +optional
+	SystemPartition *SystemPartitionConfiguration `json:"systemPartition,omitempty"`
 	// showHiddenMetricsForVersion is the previous version for which you want to show
 	// hidden metrics.
 	// Only the previous minor version is meaningful, other values will not be allowed.
@@ -1113,6 +1122,28 @@ type ShutdownGracePeriodByPodPriority struct {
 	Priority int32 `json:"priority"`
 	// shutdownGracePeriodSeconds is the shutdown grace period in seconds
 	ShutdownGracePeriodSeconds int64 `json:"shutdownGracePeriodSeconds"`
+}
+
+// SystemPartitionConfiguration describes the node's system partition: a
+// resource-bounded area of the node dedicated to running system Pods.
+type SystemPartitionConfiguration struct {
+	// memoryLimit is the hard memory limit applied to the system partition cgroup
+	// root. It covers system partition Pods only, and is separate from kubeReserved
+	// and systemReserved, which cover host processes. There is no corresponding
+	// request, so the limit is not subtracted from Node Allocatable.
+	// Default: ""
+	// +optional
+	MemoryLimit string `json:"memoryLimit,omitempty"`
+	// cpuset is the set of CPUs dedicated to system partition Pods, in Linux CPU
+	// list format (e.g. "0-3"). It should typically match reservedSystemCPUs so
+	// that system Pods and host system services share the same cores.
+	// Default: ""
+	// +optional
+	CPUSet string `json:"cpuset,omitempty"`
+	// namespaces lists the namespaces whose Pods are placed into the system
+	// partition. In alpha this is the sole mechanism for determining partition
+	// membership, so it must not be empty.
+	Namespaces []string `json:"namespaces"`
 }
 
 type MemorySwapConfiguration struct {

@@ -21,6 +21,8 @@ package cm
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -33,13 +35,204 @@ import (
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
 	defaultNodeAllocatableCgroupName = "kubepods"
+	// systemPartitionCgroupName is the name of the system partition root, created
+	// as a direct child of the node allocatable cgroup.
+	systemPartitionCgroupName = "system"
 )
+
+// systemPartitionEnabled returns true if a system partition is configured on
+// this node.
+func systemPartitionEnabled(nodeConfig NodeConfig) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSystemPartition) {
+		return false
+	}
+	// The partition is a sub-hierarchy of the QoS hierarchy, so it cannot exist
+	// without it.
+	if !nodeConfig.CgroupsPerQOS {
+		return false
+	}
+	// The system partition is limited to cgroup v2 only.
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
+		return false
+	}
+	return nodeConfig.SystemPartition != nil && nodeConfig.SystemPartition.Namespaces.Len() > 0
+}
+
+// systemPartitionQOSContainersInfo returns the system partition's QoS container
+// roots under the given node allocatable cgroup root. The names are computed
+// even when no system partition is configured, so that cgroups left behind by an
+// earlier one stay visible to the orphan pod cgroup cleanup.
+func systemPartitionQOSContainersInfo(cgroupRoot CgroupName) QOSContainersInfo {
+	partitionRoot := NewCgroupName(cgroupRoot, systemPartitionCgroupName)
+	return QOSContainersInfo{
+		Guaranteed: partitionRoot,
+		Burstable:  NewCgroupName(partitionRoot, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(partitionRoot, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+}
+
+// cgroupPathExists reports whether the cgroup directory is present in any of the
+// mounted subsystems.
+func (cm *containerManagerImpl) cgroupPathExists(name CgroupName) bool {
+	cgroupfsName := cm.cgroupManager.Name(name)
+	for _, mountPoint := range cm.subsystems.MountPoints {
+		if _, err := os.Stat(path.Join(mountPoint, cgroupfsName)); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// cgroupHasChildren reports whether the cgroup has any child cgroup in any of the
+// mounted subsystems.
+func (cm *containerManagerImpl) cgroupHasChildren(name CgroupName) (bool, error) {
+	cgroupfsName := cm.cgroupManager.Name(name)
+	for _, mountPoint := range cm.subsystems.MountPoints {
+		entries, err := os.ReadDir(path.Join(mountPoint, cgroupfsName))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return false, err
+		}
+		for _, entry := range entries {
+			if entry.IsDir() {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// cleanupSystemPartitionCgroups removes the cgroups of a system partition that is
+// no longer configured, so that disabling the feature does not leak the hierarchy.
+// It only removes empty cgroups. Pod cgroups still inside the partition are left
+// to the orphan pod cgroup cleanup, which kills their processes and waits for
+// volume teardown first. That runs asynchronously, so this is a periodic task
+// that retries until the partition is empty.
+func (cm *containerManagerImpl) cleanupSystemPartitionCgroups(logger klog.Logger) {
+	qosContainersInfo := systemPartitionQOSContainersInfo(cm.cgroupRoot)
+	partitionRoot := qosContainersInfo.Guaranteed
+	if !cm.cgroupPathExists(partitionRoot) {
+		return
+	}
+
+	// The QoS roots have to go before the partition root that parents them.
+	for _, name := range []CgroupName{qosContainersInfo.Burstable, qosContainersInfo.BestEffort, partitionRoot} {
+		if !cm.cgroupPathExists(name) {
+			continue
+		}
+		hasChildren, err := cm.cgroupHasChildren(name)
+		if err != nil {
+			logger.Error(err, "Failed to inspect leftover system partition cgroup", "cgroupName", name)
+			return
+		}
+		if hasChildren {
+			logger.V(4).Info("Leftover system partition cgroup still has pod cgroups, deferring removal", "cgroupName", name)
+			return
+		}
+		if err := cm.cgroupManager.Destroy(logger, &CgroupConfig{Name: name}); err != nil {
+			logger.Error(err, "Failed to remove leftover system partition cgroup", "cgroupName", name)
+			return
+		}
+		logger.V(2).Info("Removed leftover system partition cgroup", "cgroupName", name)
+	}
+}
+
+// systemPartitionConfig returns the system partition configuration in effect, or
+// nil if no system partition is configured on this node.
+func (cm *containerManagerImpl) systemPartitionConfig() *SystemPartitionConfig {
+	if cm.systemPartitionQOSManager == nil {
+		return nil
+	}
+	return cm.NodeConfig.SystemPartition
+}
+
+// systemPartitionCgroupConfig returns the cgroup configuration of the system
+// partition root. The node allocatable cgroup derives its limits from node
+// capacity, but these are the fixed budget the administrator set aside for
+// system Pods.
+func (cm *containerManagerImpl) systemPartitionCgroupConfig() *CgroupConfig {
+	spc := cm.NodeConfig.SystemPartition
+	resourceParameters := &ResourceConfig{}
+	if spc.MemoryLimit != nil {
+		memoryLimit := *spc.MemoryLimit
+		resourceParameters.Memory = &memoryLimit
+	}
+	if !spc.CPUSet.IsEmpty() {
+		resourceParameters.CPUSet = spc.CPUSet
+	}
+	return &CgroupConfig{
+		Name:               cm.systemPartitionRoot,
+		ResourceParameters: resourceParameters,
+	}
+}
+
+// createSystemPartitionCgroups creates the system partition root cgroup so that
+// the partition's QoS hierarchy can be created underneath it.
+func (cm *containerManagerImpl) createSystemPartitionCgroups(logger klog.Logger) error {
+	cgroupConfig := cm.systemPartitionCgroupConfig()
+	if cm.cgroupManager.Exists(cgroupConfig.Name) {
+		return nil
+	}
+	logger.V(2).Info("Creating system partition cgroup", "cgroupName", cgroupConfig.Name)
+	if err := cm.cgroupManager.Create(logger, cgroupConfig); err != nil {
+		logger.Error(err, "Failed to create cgroup", "cgroupName", cgroupConfig.Name)
+		return err
+	}
+	return nil
+}
+
+// enforceSystemPartitionCgroups applies the configured partition limits to the
+// system partition root. createSystemPartitionCgroups is a no-op once the cgroup
+// exists, so on a kubelet restart this is what applies them.
+func (cm *containerManagerImpl) enforceSystemPartitionCgroups(logger klog.Logger) error {
+	cgroupConfig := cm.systemPartitionCgroupConfig()
+	spc := cm.NodeConfig.SystemPartition
+	logger.V(2).Info("Enforcing system partition limits", "cgroupName", cgroupConfig.Name,
+		"memoryLimit", spc.MemoryLimit, "cpuset", spc.CPUSet.String())
+	if err := cm.cgroupManager.Update(logger, cgroupConfig); err != nil {
+		return fmt.Errorf("failed to enforce system partition limits on %q: %w", cgroupConfig.Name, err)
+	}
+	// Report the limit from where it is written, so the gauge and the cgroup can
+	// never disagree.
+	if spc.MemoryLimit != nil {
+		metrics.PartitionMemoryLimitBytes.WithLabelValues(systemPartitionCgroupName).Set(float64(*spc.MemoryLimit))
+	}
+	return nil
+}
+
+// PartitionStats returns the current usage of each partition, keyed by
+// partition name.
+func (cm *containerManagerImpl) PartitionStats(logger klog.Logger) map[string]PartitionStats {
+	if cm.systemPartitionQOSManager == nil {
+		return nil
+	}
+	// This runs on every metrics scrape, so a failed read is left to the next
+	// scrape instead of being logged each time at a visible level.
+	var stats PartitionStats
+	if usage, err := cm.cgroupManager.MemoryUsage(cm.systemPartitionRoot); err == nil {
+		stats.MemoryUsageBytes = &usage
+	} else {
+		logger.V(4).Info("Failed to read the memory usage of the system partition", "cgroupName", cm.systemPartitionRoot, "err", err)
+	}
+	info := systemPartitionQOSContainersInfo(cm.cgroupRoot)
+	roots := []CgroupName{info.Guaranteed, info.Burstable, info.BestEffort}
+	if pods, err := podCgroupsUnder(logger, cm.subsystems, cm.cgroupManager, roots); err == nil {
+		count := int64(len(pods))
+		stats.Pods = &count
+	} else {
+		logger.V(4).Info("Failed to count the pods of the system partition", "cgroupName", cm.systemPartitionRoot, "err", err)
+	}
+	return map[string]PartitionStats{systemPartitionCgroupName: stats}
+}
 
 // createNodeAllocatableCgroups creates Node Allocatable Cgroup when CgroupsPerQOS flag is specified as true
 func (cm *containerManagerImpl) createNodeAllocatableCgroups(logger klog.Logger) error {

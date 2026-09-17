@@ -122,6 +122,11 @@ func (in ShutdownGracePeriodByPodPriority) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SystemPartitionConfiguration) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.SystemPartitionConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in UserNamespaces) OpenAPIModelName() string {
 	return "io.k8s.kubelet.config.v1beta1.UserNamespaces"
 }

@@ -163,6 +163,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 			cm.GetNodeAllocatableReservation(),
 			nodeConfig.KubeletRootDir,
 			cm.topologyManager,
+			nil, // The system partition is Linux only.
 		)
 		if err != nil {
 			logger.Error(err, "Failed to initialize cpu manager")
@@ -314,6 +315,14 @@ func (cm *containerManagerImpl) InternalContainerLifecycle(_ klog.Logger) Intern
 
 func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 	return ""
+}
+
+func (cm *containerManagerImpl) GetSystemPartitionCgroupRoot() string {
+	return ""
+}
+
+func (cm *containerManagerImpl) PartitionStats(_ klog.Logger) map[string]PartitionStats {
+	return nil
 }
 
 func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
