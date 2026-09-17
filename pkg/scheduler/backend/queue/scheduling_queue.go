@@ -1466,7 +1466,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 	if p.isPodGroupMember(newPod) {
 		if pInfo := p.pendingPodGroupPods.update(newPod); pInfo != nil {
 			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-			pInfo.PodSignature = p.signPod(ctx, newPod)
+			pInfo.PodSignature = newSignature
 			return
 		}
 	}

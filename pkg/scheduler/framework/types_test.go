@@ -1102,6 +1102,37 @@ func TestQueuedPodGroupInfo_Update(t *testing.T) {
 			},
 		},
 		{
+			name: "Update with signature change - new bucket created",
+			initialPods: []*QueuedPodInfo{
+				{
+					PodInfo:      &PodInfo{Pod: st.MakePod().Namespace("default").Name("p1").UID("p1").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					PodSignature: fwk.PodSignature("sig1"),
+				},
+				{
+					PodInfo:      &PodInfo{Pod: st.MakePod().Namespace("default").Name("p2").UID("p2").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					PodSignature: fwk.PodSignature("sig1"),
+				},
+			},
+			updatePod:    st.MakePod().Namespace("default").Name("p1").UID("p1").Priority(highPriority).PodGroupName("pg-test").Obj(),
+			newSignature: fwk.PodSignature("sig2"),
+			verifyState: func(t *testing.T, pgqi *QueuedPodGroupInfo) {
+				// sig1 bucket should have one element p2
+				bucket1, _ := pgqi.subGroupBuckets[fwk.PodGroupKey("default", "pg-test")]["sig1"]
+				if len(bucket1) != 1 || bucket1[0].Pod.Name != "p2" {
+					t.Errorf("sig1 bucket should have one element p2, got: %v", bucket1)
+				}
+				expectedSignatureOrder := []string{"sig2", "sig1"}
+				if diff := cmp.Diff(expectedSignatureOrder, pgqi.signatureOrder[fwk.PodGroupKey("default", "pg-test")]); diff != "" {
+					t.Errorf("Unexpected order in signatureOrder (-want, +got):\n%s", diff)
+				}
+				// sig2 bucket should contain p1
+				bucket2 := pgqi.subGroupBuckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]
+				if len(bucket2) != 1 || bucket2[0].Pod.Name != "p1" {
+					t.Errorf("expected 1 pod p1 in sig2 bucket, got: %v", bucket2)
+				}
+			},
+		},
+		{
 			name: "Update with signature change - insert in middle of existing bucket",
 			initialPods: []*QueuedPodInfo{
 				{
@@ -5093,6 +5124,14 @@ func TestQueuedPodGroupInfo_RemovePodGroup(t *testing.T) {
 				QueuedPodInfos: map[fwk.EntityKey][]*QueuedPodInfo{
 					podKeyChild: {{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod1").Namespace("ns1").PodGroupName("pg-child").Obj()}}},
 				},
+				signatureOrder: map[fwk.EntityKey][]string{
+					podKeyChild: {"sig1"},
+				},
+				subGroupBuckets: map[fwk.EntityKey]map[string][]*QueuedPodInfo{
+					podKeyChild: {
+						"sig1": {{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod1").Namespace("ns1").PodGroupName("pg-child").Obj()}}},
+					},
+				},
 			},
 			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo, removed []*QueuedPodInfo) {
 				if len(qpgi.PodGroupInfo.Children) != 0 {
@@ -5104,6 +5143,12 @@ func TestQueuedPodGroupInfo_RemovePodGroup(t *testing.T) {
 				if len(qpgi.QueuedPodInfos[podKeyChild]) != 0 {
 					t.Errorf("Pod not removed from QueuedPodInfos map")
 				}
+				if _, ok := qpgi.signatureOrder[podKeyChild]; ok {
+					t.Errorf("Signature order not removed from QueuedPodInfos map")
+				}
+				if _, ok := qpgi.subGroupBuckets[podKeyChild]; ok {
+					t.Errorf("Subgroup buckets not removed from QueuedPodInfos map")
+				}
 			},
 		},
 		{
@@ -5114,6 +5159,14 @@ func TestQueuedPodGroupInfo_RemovePodGroup(t *testing.T) {
 				QueuedPodInfos: map[fwk.EntityKey][]*QueuedPodInfo{
 					podKeyStandalone: {{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod2").Namespace("ns1").PodGroupName("pg-standalone").Obj()}}},
 				},
+				signatureOrder: map[fwk.EntityKey][]string{
+					podKeyStandalone: {"sig1"},
+				},
+				subGroupBuckets: map[fwk.EntityKey]map[string][]*QueuedPodInfo{
+					podKeyStandalone: {
+						"sig1": {{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod2").Namespace("ns1").PodGroupName("pg-standalone").Obj()}}},
+					},
+				},
 			},
 			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo, removed []*QueuedPodInfo) {
 				// For standalone PG, removing the root essentially clears the QueuedPodInfos because
@@ -5123,6 +5176,12 @@ func TestQueuedPodGroupInfo_RemovePodGroup(t *testing.T) {
 				}
 				if len(qpgi.QueuedPodInfos[podKeyStandalone]) != 0 {
 					t.Errorf("Pod not removed from QueuedPodInfos map")
+				}
+				if _, ok := qpgi.signatureOrder[podKeyStandalone]; ok {
+					t.Errorf("Signature order not removed from QueuedPodInfos map")
+				}
+				if _, ok := qpgi.subGroupBuckets[podKeyStandalone]; ok {
+					t.Errorf("Subgroup buckets not removed from QueuedPodInfos map")
 				}
 			},
 		},
@@ -5140,6 +5199,18 @@ func TestQueuedPodGroupInfo_RemovePodGroup(t *testing.T) {
 				QueuedPodInfos: map[fwk.EntityKey][]*QueuedPodInfo{
 					fwk.PodGroupKey("ns1", "pg-nested"):   {{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod-nested").Namespace("ns1").PodGroupName("pg-nested").Obj()}}},
 					fwk.PodGroupKey("ns1", "shared-name"): {{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod-sibling").Namespace("ns1").PodGroupName("shared-name").Obj()}}},
+				},
+				signatureOrder: map[fwk.EntityKey][]string{
+					fwk.PodGroupKey("ns1", "pg-nested"):   {"sig1"},
+					fwk.PodGroupKey("ns1", "shared-name"): {"sig2"},
+				},
+				subGroupBuckets: map[fwk.EntityKey]map[string][]*QueuedPodInfo{
+					fwk.PodGroupKey("ns1", "pg-nested"): {
+						"sig1": {{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod-nested").Namespace("ns1").PodGroupName("pg-nested").Obj()}}},
+					},
+					fwk.PodGroupKey("ns1", "shared-name"): {
+						"sig2": {{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod-sibling").Namespace("ns1").PodGroupName("shared-name").Obj()}}},
+					},
 				},
 			},
 			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo, removed []*QueuedPodInfo) {

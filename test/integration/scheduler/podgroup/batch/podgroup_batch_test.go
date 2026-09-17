@@ -88,11 +88,7 @@ func TestPodGroupBatching(t *testing.T) {
 	testCtx, getter := initScheduler(t, "pg-batch-shared")
 
 	// Pre-create shared templates.
-	workload := st.MakeWorkload().Name("workload").
-		PodGroupTemplate(st.MakePodGroupTemplate().Name("pg-tmpl").MinCount(2).Obj()).
-		Obj()
-	pg := st.MakePodGroup().Name("pg1").WorkloadRef("pg-tmpl", "workload").
-		Priority(100).MinCount(2).Obj()
+	pg := st.MakePodGroup().Name("pg1").Priority(100).MinCount(2).Obj()
 
 	// Pre-create shared templates for CompositePodGroup hierarchy.
 	// We require 2 PodGroups each with 2 Pods so multiple pods with identical signatures
@@ -125,10 +121,6 @@ func TestPodGroupBatching(t *testing.T) {
 					},
 				},
 				{
-					Name:            "Create Workload",
-					CreateWorkloads: []*schedulingapi.Workload{workload},
-				},
-				{
 					Name:           "Create PodGroup",
 					CreatePodGroup: pg,
 				},
@@ -158,10 +150,6 @@ func TestPodGroupBatching(t *testing.T) {
 						st.MakeNode().Name("dynamic-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).
 							Taints([]v1.Taint{{Key: "dedicated", Value: "group1", Effect: v1.TaintEffectNoSchedule}}).Obj(),
 					},
-				},
-				{
-					Name:            "Create Workload",
-					CreateWorkloads: []*schedulingapi.Workload{workload},
 				},
 				{
 					Name:           "Create PodGroup",

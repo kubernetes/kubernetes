@@ -820,9 +820,11 @@ type QueuedPodGroupInfo struct {
 	QueuedPodInfos map[fwk.EntityKey][]*QueuedPodInfo
 
 	// subGroupBuckets stores pods grouped by their PodSignature string representation.
+	// This map is keyed by pod group keys. Internal maps are keyed by pod sub group signatures.
 	subGroupBuckets map[fwk.EntityKey]map[string][]*QueuedPodInfo
 	// signatureOrder stores the deterministic ordering of pod signatures (sub-groups).
 	// Sorting is done based on the first pod in each sub-group using PodGroupMemberPodsOrderingFunc() and lexicographically.
+	// This map is keyed by pod group keys.
 	signatureOrder map[fwk.EntityKey][]string
 	// podsWithPendingPlugins stores pod names for pods in this pod group that have pending plugins.
 	podsWithPendingPlugins sets.Set[string]
@@ -1325,6 +1327,8 @@ func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedP
 				pgqi.removePodPendingPlugins(pInfo)
 			}
 			delete(pgqi.QueuedPodInfos, key)
+			delete(pgqi.subGroupBuckets, key)
+			delete(pgqi.signatureOrder, key)
 		}
 		return removedPods
 	}
