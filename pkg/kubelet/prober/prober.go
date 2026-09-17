@@ -165,6 +165,11 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 			logger.V(4).Info("HTTP-Probe failed to create request", "error", err)
 			return probe.Unknown, "", err
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) {
+			req = req.WithContext(ctx)
+		}
+
 		if loggerV4 := logger.V(4); logger.Enabled() {
 			port := req.URL.Port()
 			host := req.URL.Hostname()

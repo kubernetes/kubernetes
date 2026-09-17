@@ -18,8 +18,8 @@ package prober
 
 import (
 	"context"
-
 	"sync"
+	"sync/atomic"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,6 +34,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/utils/clock"
 )
@@ -68,14 +69,19 @@ var ProberDuration = metrics.NewHistogramVec(
 		"namespace"},
 )
 
-// Manager manages pod probing. It creates a probe "worker" for every container that specifies a
-// probe (AddPod). The worker periodically probes its assigned container and caches the results. The
-// manager use the cached probe results to set the appropriate Ready state in the PodStatus when
-// requested (UpdatePodStatus). Updating probe parameters is not currently supported.
+// Manager manages pod probing. It reconciles a probe "worker" for every container that specifies a
+// probe. The worker periodically probes its assigned container and caches the results. The manager
+// uses the cached probe results to set the appropriate Ready state in the PodStatus when requested.
 type Manager interface {
-	// AddPod creates new probe workers for every container probe. This should be called for every
-	// pod created.
+	// AddPod creates workers using the original add-only lifecycle.
 	AddPod(ctx context.Context, pod *v1.Pod)
+
+	// ReconcilePod makes the probe workers for a pod match its current spec. statusChanged is true
+	// when enabling or disabling a probe can change the derived Started or Ready state.
+	ReconcilePod(ctx context.Context, pod *v1.Pod) (statusChanged bool, err error)
+
+	// IsResultCurrent rejects updates superseded by a publication, probe removal, or container replacement.
+	IsResultCurrent(update results.Update, probeType ProbeType) bool
 
 	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
 	StopLivenessAndStartup(pod *v1.Pod)
@@ -94,10 +100,16 @@ type Manager interface {
 }
 
 type manager struct {
-	// Map of active workers for probes
+	// Feature gates are fixed for the lifetime of this manager.
+	mutable bool
+
+	// Workers include disabled probes so re-enabling cannot overlap an old in-flight call.
 	workers map[probeKey]*worker
 	// Lock for accessing & mutating workers
-	workerLock sync.RWMutex
+	workerLock      sync.RWMutex
+	nextProbeID     atomic.Uint64
+	reconciledPods  sets.Set[types.UID]
+	terminatingPods sets.Set[types.UID]
 
 	// The statusManager cache provides pod IP and container IDs for probing.
 	statusManager status.Manager
@@ -127,7 +139,8 @@ func NewManager(
 	recorder record.EventRecorderLogger) Manager {
 
 	prober := newProber(runner, recorder)
-	return &manager{
+	m := &manager{
+		mutable:          utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes),
 		statusManager:    statusManager,
 		prober:           prober,
 		readinessManager: readinessManager,
@@ -136,6 +149,13 @@ func NewManager(
 		workers:          make(map[probeKey]*worker),
 		start:            clock.RealClock{}.Now(),
 	}
+
+	if m.mutable {
+		m.reconciledPods = sets.New[types.UID]()
+		m.terminatingPods = sets.New[types.UID]()
+	}
+
+	return m
 }
 
 // Key uniquely identifying container probes
@@ -145,13 +165,22 @@ type probeKey struct {
 	probeType     probeType
 }
 
-// Type of probe (liveness, readiness or startup)
-type probeType int
+// ProbeType identifies a liveness, readiness, or startup probe.
+type ProbeType int
+
+type probeType = ProbeType
 
 const (
-	liveness probeType = iota
-	readiness
-	startup
+	// ProbeTypeLiveness identifies a liveness probe result.
+	ProbeTypeLiveness ProbeType = iota
+	// ProbeTypeReadiness identifies a readiness probe result.
+	ProbeTypeReadiness
+	// ProbeTypeStartup identifies a startup probe result.
+	ProbeTypeStartup
+
+	liveness  = ProbeTypeLiveness
+	readiness = ProbeTypeReadiness
+	startup   = ProbeTypeStartup
 
 	probeResultSuccessful string = "successful"
 	probeResultFailed     string = "failed"
@@ -159,7 +188,7 @@ const (
 )
 
 // For debugging.
-func (t probeType) String() string {
+func (t ProbeType) String() string {
 	switch t {
 	case readiness:
 		return "Readiness"
@@ -241,7 +270,168 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	}
 }
 
+type desiredProbe struct {
+	pod       *v1.Pod
+	container v1.Container
+	probeType probeType
+}
+
+func desiredProbeWorkers(pod *v1.Pod) map[probeKey]desiredProbe {
+	desired := make(map[probeKey]desiredProbe)
+	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
+		for _, probeType := range [...]probeType{startup, readiness, liveness} {
+			if probeForType(c, probeType) == nil {
+				continue
+			}
+
+			key := probeKey{podUID: pod.UID, containerName: c.Name, probeType: probeType}
+			desired[key] = desiredProbe{pod: pod, container: c, probeType: probeType}
+		}
+	}
+
+	return desired
+}
+
+// ReconcilePod applies mutable probe configuration only while MutableContainerProbes is enabled.
+func (m *manager) ReconcilePod(ctx context.Context, pod *v1.Pod) (bool, error) {
+	if !m.mutable {
+		m.AddPod(ctx, pod)
+		return false, nil
+	}
+
+	// Readiness must outlive the pod sync context during graceful termination. Explicit probe
+	// shutdown, rather than cancellation of this caller, owns the lifetime of each worker.
+	ctx = context.WithoutCancel(ctx)
+	if pod.DeletionTimestamp != nil || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+		return false, nil
+	}
+
+	status, found := m.statusManager.GetPodStatus(pod.UID)
+	if found && (status.Phase == v1.PodSucceeded || status.Phase == v1.PodFailed) {
+		return false, nil
+	}
+
+	// All workers may share this snapshot because neither reconciliation nor execution mutates it.
+	pod = pod.DeepCopy()
+	desired := desiredProbeWorkers(pod)
+	mutable := utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) && !kubetypes.IsStaticPod(pod) && !kubetypes.IsMirrorPod(pod)
+	var toStart, toWake []*worker
+	var cancellations []context.CancelFunc
+	statusChanged := false
+
+	m.workerLock.Lock()
+	if m.terminatingPods.Has(pod.UID) {
+		m.workerLock.Unlock()
+		return false, nil
+	}
+
+	previouslyReconciled := m.reconciledPods.Has(pod.UID)
+	m.reconciledPods.Insert(pod.UID)
+
+	for key, w := range m.workers {
+		if key.podUID != pod.UID {
+			continue
+		}
+
+		probe, wanted := desired[key]
+		delete(desired, key)
+		if !mutable {
+			continue
+		}
+
+		container := probe.container
+		if !wanted {
+			// Only the probe's absence matters here; keep the rest of its immutable snapshot.
+			cfg := w.configSnapshot()
+			container = *cfg.container.DeepCopy()
+			switch key.probeType {
+			case readiness:
+				container.ReadinessProbe = nil
+			case liveness:
+				container.LivenessProbe = nil
+			case startup:
+				container.StartupProbe = nil
+			}
+		}
+
+		changed, cancel := w.applyConfig(ctx, pod, container)
+		if cancel != nil {
+			cancellations = append(cancellations, cancel)
+		}
+
+		if changed && key.probeType != liveness {
+			statusChanged = true
+		}
+
+		toWake = append(toWake, w)
+	}
+
+	for key, probe := range desired {
+		w := newWorker(m, probe.probeType, probe.pod, probe.container)
+		if mutable {
+			w.initializeProbe(ctx, previouslyReconciled)
+			if key.probeType != liveness {
+				statusChanged = true
+			}
+		}
+
+		m.workers[key] = w
+		toStart = append(toStart, w)
+	}
+	m.workerLock.Unlock()
+
+	for _, cancel := range cancellations {
+		cancel()
+	}
+
+	for _, w := range toWake {
+		w.wake()
+	}
+
+	for _, w := range toStart {
+		go w.run(ctx)
+	}
+
+	return statusChanged, nil
+}
+
+func (m *manager) IsResultCurrent(update results.Update, probeType ProbeType) bool {
+	if !m.mutable {
+		return true
+	}
+
+	// Preserve callers that inject updates without going through the probe result cache.
+	if update.ProbeID == 0 {
+		return true
+	}
+
+	var cache results.Manager
+	switch probeType {
+	case liveness:
+		cache = m.livenessManager
+	case readiness:
+		cache = m.readinessManager
+	case startup:
+		cache = m.startupManager
+	default:
+		return false
+	}
+
+	status, ok := m.statusManager.GetPodStatus(update.PodUID)
+	if !ok {
+		return false
+	}
+
+	c, ok := containerStatusByName(status, update.ContainerName)
+	return ok && c.ContainerID == update.ContainerID.String() && cache.IsCurrent(update)
+}
+
 func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
+	if m.mutable {
+		m.stopPodWorkers(pod.UID, false)
+		return
+	}
+
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
@@ -258,6 +448,11 @@ func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
 }
 
 func (m *manager) RemovePod(pod *v1.Pod) {
+	if m.mutable {
+		m.stopPodWorkers(pod.UID, true)
+		return
+	}
+
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
@@ -273,7 +468,28 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 	}
 }
 
+func (m *manager) stopPodWorkers(uid types.UID, includeReadiness bool) {
+	var workers []*worker
+	m.workerLock.Lock()
+	m.terminatingPods.Insert(uid)
+	for key, w := range m.workers {
+		if key.podUID == uid && (includeReadiness || key.probeType != readiness) {
+			workers = append(workers, w)
+		}
+	}
+	m.workerLock.Unlock()
+
+	for _, w := range workers {
+		w.stop()
+	}
+}
+
 func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
+	if m.mutable {
+		m.cleanupMutablePods(desiredPods)
+		return
+	}
+
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
@@ -281,6 +497,36 @@ func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
 		if _, ok := desiredPods[key.podUID]; !ok {
 			worker.stop()
 		}
+	}
+}
+
+func (m *manager) cleanupMutablePods(desiredPods map[types.UID]sets.Empty) {
+	var workers []*worker
+	m.workerLock.Lock()
+	activePods := sets.New[types.UID]()
+	for key, w := range m.workers {
+		activePods.Insert(key.podUID)
+		if _, desired := desiredPods[key.podUID]; !desired {
+			m.terminatingPods.Insert(key.podUID)
+			workers = append(workers, w)
+		}
+	}
+
+	for uid := range m.terminatingPods {
+		if _, desired := desiredPods[uid]; !desired && !activePods.Has(uid) {
+			m.terminatingPods.Delete(uid)
+		}
+	}
+
+	for uid := range m.reconciledPods {
+		if _, desired := desiredPods[uid]; !desired && !activePods.Has(uid) {
+			m.reconciledPods.Delete(uid)
+		}
+	}
+	m.workerLock.Unlock()
+
+	for _, w := range workers {
+		w.stop()
 	}
 }
 
@@ -435,14 +681,26 @@ func (m *manager) getWorker(podUID types.UID, containerName string, probeType pr
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 	worker, ok := m.workers[probeKey{podUID, containerName, probeType}]
-	return worker, ok
+	if !m.mutable {
+		return worker, ok
+	}
+
+	return worker, ok && worker.isEnabled()
 }
 
-// Called by the worker after exiting.
-func (m *manager) removeWorker(podUID types.UID, containerName string, probeType probeType) {
+// Called by the worker after exiting. A worker replaced under the same key must not remove its
+// replacement or the replacement's cached result.
+func (m *manager) removeWorker(key probeKey, worker *worker) bool {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
-	delete(m.workers, probeKey{podUID, containerName, probeType})
+
+	if current, ok := m.workers[key]; !ok || current != worker {
+		return false
+	}
+
+	delete(m.workers, key)
+
+	return true
 }
 
 // workerCount returns the total number of probe workers. For testing.
@@ -459,4 +717,11 @@ func (m *manager) workerCount() int {
 // status changes for containers that were previously ready.
 func kubeletRestartGracePeriod(start time.Time) time.Time {
 	return start.Add(-time.Second * 10)
+}
+
+func (m *manager) removeLegacyWorker(podUID types.UID, containerName string, probeType probeType) {
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+
+	delete(m.workers, probeKey{podUID, containerName, probeType})
 }

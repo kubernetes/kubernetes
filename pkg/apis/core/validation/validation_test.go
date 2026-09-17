@@ -15606,6 +15606,155 @@ func TestValidatePodUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateMutableContainerProbesUpdate(t *testing.T) {
+	probe := func(command string) *core.Probe {
+		return &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				Exec: &core.ExecAction{Command: []string{command}},
+			},
+			InitialDelaySeconds: 1,
+			TimeoutSeconds:      1,
+			PeriodSeconds:       10,
+			SuccessThreshold:    1,
+			FailureThreshold:    3,
+		}
+	}
+
+	basePod := func() *core.Pod {
+		pod := podtest.MakePod("pod",
+			podtest.SetResourceVersion("1"),
+			podtest.SetContainers(podtest.MakeContainer("app")),
+			podtest.SetInitContainers(
+				podtest.MakeContainer("setup"),
+				podtest.MakeContainer("sidecar", podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways)),
+			),
+		)
+
+		pod.Spec.Containers[0].LivenessProbe = probe("old-liveness")
+		pod.Spec.Containers[0].StartupProbe = probe("old-startup")
+		pod.Spec.InitContainers[1].ReadinessProbe = probe("old-readiness")
+
+		return pod
+	}
+
+	tests := []struct {
+		name    string
+		enabled bool
+		mutate  func(newPod, oldPod *core.Pod)
+		wantErr string
+	}{
+		{
+			name:    "regular and restartable init container probes are mutable",
+			enabled: true,
+			mutate: func(newPod, oldPod *core.Pod) {
+				newPod.Spec.Containers[0].LivenessProbe = probe("new-liveness")
+				newPod.Spec.Containers[0].ReadinessProbe = probe("new-readiness")
+				newPod.Spec.Containers[0].StartupProbe = nil
+				newPod.Spec.InitContainers[1].LivenessProbe = probe("new-sidecar-liveness")
+				newPod.Spec.InitContainers[1].ReadinessProbe = probe("new-sidecar-readiness")
+				newPod.Spec.InitContainers[1].StartupProbe = probe("new-sidecar-startup")
+			},
+		},
+		{
+			name: "feature disabled",
+			mutate: func(newPod, oldPod *core.Pod) {
+				newPod.Spec.Containers[0].LivenessProbe = probe("new-liveness")
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name:    "non-restartable init container",
+			enabled: true,
+			mutate: func(newPod, oldPod *core.Pod) {
+				newPod.Spec.InitContainers[0].LivenessProbe = probe("new-liveness")
+			},
+			wantErr: "spec.initContainers[0].livenessProbe: Forbidden",
+		},
+		{
+			name:    "invalid updated probe",
+			enabled: true,
+			mutate: func(newPod, oldPod *core.Pod) {
+				newPod.Spec.Containers[0].LivenessProbe = probe("new-liveness")
+				newPod.Spec.Containers[0].LivenessProbe.SuccessThreshold = 2
+			},
+			wantErr: "spec.containers[0].livenessProbe.successThreshold: Invalid value: 2: must be 1",
+		},
+		{
+			name:    "probe and immutable field changed together",
+			enabled: true,
+			mutate: func(newPod, oldPod *core.Pod) {
+				newPod.Spec.Containers[0].ReadinessProbe = probe("new-readiness")
+				newPod.Spec.Containers[0].Command = []string{"new-command"}
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name:    "pod deletion started",
+			enabled: true,
+			mutate: func(newPod, oldPod *core.Pod) {
+				now := metav1.Now()
+				newPod.DeletionTimestamp = &now
+				oldPod.DeletionTimestamp = &now
+				newPod.Spec.Containers[0].ReadinessProbe = probe("new-readiness")
+			},
+			wantErr: "spec.containers[0].readinessProbe: Forbidden: may not be changed once pod deletion has started",
+		},
+		{
+			name:    "pod succeeded",
+			enabled: true,
+			mutate: func(newPod, oldPod *core.Pod) {
+				newPod.Status.Phase = core.PodSucceeded
+				oldPod.Status.Phase = core.PodSucceeded
+				newPod.Spec.Containers[0].ReadinessProbe = probe("new-readiness")
+			},
+			wantErr: "spec.containers[0].readinessProbe: Forbidden: may not be changed for a terminal pod",
+		},
+		{
+			name:    "pod failed",
+			enabled: true,
+			mutate: func(newPod, oldPod *core.Pod) {
+				newPod.Status.Phase = core.PodFailed
+				oldPod.Status.Phase = core.PodFailed
+				newPod.Spec.InitContainers[1].StartupProbe = probe("new-startup")
+			},
+			wantErr: "spec.initContainers[1].startupProbe: Forbidden: may not be changed for a terminal pod",
+		},
+		{
+			name:    "mirror pod",
+			enabled: true,
+			mutate: func(newPod, oldPod *core.Pod) {
+				newPod.Annotations = map[string]string{core.MirrorPodAnnotationKey: "hash"}
+				oldPod.Annotations = map[string]string{core.MirrorPodAnnotationKey: "hash"}
+				newPod.Spec.Containers[0].LivenessProbe = probe("new-liveness")
+			},
+			wantErr: "spec.containers[0].livenessProbe: Forbidden: may not be changed for a mirror pod; update the static pod source instead",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			oldPod := basePod()
+			newPod := oldPod.DeepCopy()
+			test.mutate(newPod, oldPod)
+
+			errs := ValidatePodUpdate(newPod, oldPod, PodValidationOptions{AllowMutableContainerProbes: test.enabled})
+			if test.wantErr == "" {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected errors: %v", errs)
+				}
+
+				return
+			}
+			if len(errs) == 0 {
+				t.Fatalf("expected error containing %q", test.wantErr)
+			}
+			if got := errs.ToAggregate().Error(); !strings.Contains(got, test.wantErr) {
+				t.Fatalf("expected error containing %q, got: %s", test.wantErr, got)
+			}
+		})
+	}
+}
+
 func TestValidatePodStatusUpdate(t *testing.T) {
 	linuxContainerUserMaxUID := int64(math.MaxUint32)
 	linuxContainerUserInvalidUID := linuxContainerUserMaxUID + 1

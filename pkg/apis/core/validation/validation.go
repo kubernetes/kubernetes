@@ -4632,6 +4632,8 @@ type PodValidationOptions struct {
 	AllowEmptyImageVolumeReference bool
 	// Allow containers to have CAP_SYS_ADMIN even if AllowPrivilegeEscalation is false
 	AllowSysAdminWhenPrivilegeEscalationFalse bool
+	// Allow probes on regular containers and restartable init containers to be updated.
+	AllowMutableContainerProbes bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -5854,6 +5856,15 @@ var updatablePodSpecFields = []string{
 	"`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)",
 }
 
+var mutableContainerProbeFields = []string{
+	"`spec.containers[*].livenessProbe`",
+	"`spec.containers[*].readinessProbe`",
+	"`spec.containers[*].startupProbe`",
+	"`spec.initContainers[*].livenessProbe` (for restartable init containers)",
+	"`spec.initContainers[*].readinessProbe` (for restartable init containers)",
+	"`spec.initContainers[*].startupProbe` (for restartable init containers)",
+}
+
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
 // that cannot be changed.
 func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
@@ -5939,6 +5950,9 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	mungedPodSpec.SchedulingGates = oldPod.Spec.SchedulingGates // +k8s:verify-mutation:reason=clone
 	// tolerations are checked before the deep copy, so munge those too
 	mungedPodSpec.Tolerations = oldPod.Spec.Tolerations // +k8s:verify-mutation:reason=clone
+	if opts.AllowMutableContainerProbes {
+		allErrs = append(allErrs, validateMutableContainerProbes(newPod, oldPod, &mungedPodSpec, specPath)...)
+	}
 
 	// Relax validation of immutable fields to allow it to be set to 1 if it was previously negative.
 	if oldPod.Spec.TerminationGracePeriodSeconds != nil && *oldPod.Spec.TerminationGracePeriodSeconds < 0 &&
@@ -5995,9 +6009,93 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		// This diff isn't perfect, but it's a helluva lot better an "I'm not going to tell you what the difference is".
 		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
 		specDiff := diff.Diff(oldPod.Spec, mungedPodSpec)
-		errs := field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than %s\n%v", strings.Join(updatablePodSpecFields, ","), specDiff))
+		allowedPodSpecFields := updatablePodSpecFields
+		if opts.AllowMutableContainerProbes {
+			allowedPodSpecFields = slices.Concat(updatablePodSpecFields, mutableContainerProbeFields)
+		}
+
+		errs := field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than %s\n%v", strings.Join(allowedPodSpecFields, ","), specDiff))
 		allErrs = append(allErrs, errs)
 	}
+	return allErrs
+}
+
+func validateMutableContainerProbes(newPod, oldPod *core.Pod, mungedPodSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	_, newPodIsMirror := newPod.Annotations[core.MirrorPodAnnotationKey]
+	_, oldPodIsMirror := oldPod.Annotations[core.MirrorPodAnnotationKey]
+	forbiddenReason := ""
+	switch {
+	case newPod.DeletionTimestamp != nil || oldPod.DeletionTimestamp != nil:
+		forbiddenReason = "may not be changed once pod deletion has started"
+	case newPod.Status.Phase == core.PodSucceeded || newPod.Status.Phase == core.PodFailed ||
+		oldPod.Status.Phase == core.PodSucceeded || oldPod.Status.Phase == core.PodFailed:
+		forbiddenReason = "may not be changed for a terminal pod"
+	case newPodIsMirror || oldPodIsMirror:
+		forbiddenReason = "may not be changed for a mirror pod; update the static pod source instead"
+	}
+
+	var allErrs field.ErrorList
+	for i := range newPod.Spec.Containers {
+		if newPod.Spec.Containers[i].Name != oldPod.Spec.Containers[i].Name {
+			continue
+		}
+
+		allErrs = append(allErrs, validateMutableProbes(
+			&newPod.Spec.Containers[i],
+			&oldPod.Spec.Containers[i],
+			&mungedPodSpec.Containers[i],
+			fldPath.Child("containers").Index(i),
+			forbiddenReason,
+		)...)
+	}
+
+	for i := range newPod.Spec.InitContainers {
+		newContainer := &newPod.Spec.InitContainers[i]
+		oldContainer := &oldPod.Spec.InitContainers[i]
+		if newContainer.Name != oldContainer.Name ||
+			newContainer.RestartPolicy == nil || *newContainer.RestartPolicy != core.ContainerRestartPolicyAlways ||
+			oldContainer.RestartPolicy == nil || *oldContainer.RestartPolicy != core.ContainerRestartPolicyAlways {
+			continue
+		}
+
+		allErrs = append(allErrs, validateMutableProbes(
+			newContainer,
+			oldContainer,
+			&mungedPodSpec.InitContainers[i],
+			fldPath.Child("initContainers").Index(i),
+			forbiddenReason,
+		)...)
+	}
+
+	return allErrs
+}
+
+func validateMutableProbes(newContainer, oldContainer, mungedContainer *core.Container, fldPath *field.Path, forbiddenReason string) field.ErrorList {
+	var allErrs field.ErrorList
+	if !apiequality.Semantic.DeepEqual(newContainer.LivenessProbe, oldContainer.LivenessProbe) {
+		if forbiddenReason != "" {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("livenessProbe"), forbiddenReason))
+		}
+
+		mungedContainer.LivenessProbe = oldContainer.LivenessProbe.DeepCopy()
+	}
+
+	if !apiequality.Semantic.DeepEqual(newContainer.ReadinessProbe, oldContainer.ReadinessProbe) {
+		if forbiddenReason != "" {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("readinessProbe"), forbiddenReason))
+		}
+
+		mungedContainer.ReadinessProbe = oldContainer.ReadinessProbe.DeepCopy()
+	}
+
+	if !apiequality.Semantic.DeepEqual(newContainer.StartupProbe, oldContainer.StartupProbe) {
+		if forbiddenReason != "" {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("startupProbe"), forbiddenReason))
+		}
+
+		mungedContainer.StartupProbe = oldContainer.StartupProbe.DeepCopy()
+	}
+
 	return allErrs
 }
 
