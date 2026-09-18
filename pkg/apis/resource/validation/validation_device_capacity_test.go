@@ -62,6 +62,7 @@ func TestValidateDeviceCapacity(t *testing.T) {
 	hundredMilli := apiresource.MustParse("100m")
 	twoHundredMilli := apiresource.MustParse("200m")
 	oneUnit := apiresource.MustParse("1")
+	oneUnitDecimalPoint := apiresource.MustParse("1.0")
 
 	one := apiresource.MustParse("1Gi")
 	two := apiresource.MustParse("2Gi")
@@ -162,6 +163,17 @@ func TestValidateDeviceCapacity(t *testing.T) {
 			wantFailures: field.ErrorList{
 				field.Duplicate(validValuesField.Index(1), "1024"),
 			},
+		},
+		"invalid-options-duplicate-decimal-point": {
+			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneUnit, []apiresource.Quantity{oneUnit, oneUnitDecimalPoint}, nil)),
+			wantFailures: field.ErrorList{
+				field.Duplicate(validValuesField.Index(1), "1"),
+			},
+		},
+		// TODO(#141166): Equal values are duplicates however they are spelled. Expect a duplicate at index 1.
+		"options-duplicate-decimal-point-fractional-gate": {
+			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneUnit, []apiresource.Quantity{oneUnit, oneUnitDecimalPoint}, nil)),
+			fractionalCapacityRangeGate: true,
 		},
 		// TODO(#141166): Distinct values above MaxInt64 are not duplicates. Expect no failures.
 		"options-int64-max-and-plus-one": {
