@@ -178,6 +178,17 @@ var (
 		[]string{"group", "resource"},
 	)
 
+	WatchCacheObjectSizeBudgetExceeded = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "object_size_budget_exceeded",
+			Help:           "Set to 1 for resources served without watch cache because their average object size exceeds --watch-cache-max-average-object-size, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
 	watchCacheCapacityIncreaseTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Subsystem:      subsystem,
@@ -314,6 +325,7 @@ func Register() {
 		legacyregistry.MustRegister(EventsCounter)
 		legacyregistry.MustRegister(TerminatedWatchersCounter)
 		legacyregistry.MustRegister(watchCacheResourceVersion)
+		legacyregistry.MustRegister(WatchCacheObjectSizeBudgetExceeded)
 		legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
 		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 		legacyregistry.MustRegister(WatchCacheCapacity)
@@ -329,6 +341,12 @@ func Register() {
 		}
 		legacyregistry.MustRegister(DispatchStageDuration)
 	})
+}
+
+// RecordObjectSizeBudgetExceeded records that a resource is served without
+// watch cache because its average object size exceeds the budget.
+func RecordObjectSizeBudgetExceeded(groupResource schema.GroupResource) {
+	WatchCacheObjectSizeBudgetExceeded.WithLabelValues(groupResource.Group, groupResource.Resource).Set(1)
 }
 
 // RecordListCacheMetrics notes various metrics of the cost to serve a LIST request
