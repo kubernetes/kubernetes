@@ -13388,6 +13388,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1.DeviceTaintSelector
   map:
     fields:
+    - name: all
+      type:
+        scalar: boolean
     - name: device
       type:
         scalar: string
@@ -13745,6 +13748,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.DeviceTaintSelector
   map:
     fields:
+    - name: all
+      type:
+        scalar: boolean
     - name: device
       type:
         scalar: string
@@ -15218,6 +15224,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta2.DeviceTaintSelector
   map:
     fields:
+    - name: all
+      type:
+        scalar: boolean
     - name: device
       type:
         scalar: string

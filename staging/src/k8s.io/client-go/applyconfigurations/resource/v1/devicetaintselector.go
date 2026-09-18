@@ -43,6 +43,15 @@ type DeviceTaintSelectorApplyConfiguration struct {
 	// Setting also driver and pool may be required to avoid ambiguity,
 	// but is not required.
 	Device *string `json:"device,omitempty"`
+	// all, if set to true, explicitly selects every device from every
+	// driver in the cluster. It must not be combined with driver, pool,
+	// or device: those must all be unset when all is true.
+	//
+	// Leaving driver, pool, and device all unset also selects every
+	// device, for historical reasons, but doing so without setting all
+	// is deprecated and may be rejected in a future release. Set all
+	// explicitly instead.
+	All *bool `json:"all,omitempty"`
 }
 
 // DeviceTaintSelectorApplyConfiguration constructs a declarative configuration of the DeviceTaintSelector type for use with
@@ -72,5 +81,13 @@ func (b *DeviceTaintSelectorApplyConfiguration) WithPool(value string) *DeviceTa
 // If called multiple times, the Device field is set to the value of the last call.
 func (b *DeviceTaintSelectorApplyConfiguration) WithDevice(value string) *DeviceTaintSelectorApplyConfiguration {
 	b.Device = &value
+	return b
+}
+
+// WithAll sets the All field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the All field is set to the value of the last call.
+func (b *DeviceTaintSelectorApplyConfiguration) WithAll(value bool) *DeviceTaintSelectorApplyConfiguration {
+	b.All = &value
 	return b
 }
