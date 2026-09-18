@@ -686,9 +686,9 @@ func TestCIDRAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Check initial metrics for first CIDR
+	// Check initial metrics for first CIDR: gauges seeded by EnableMetrics
 	em1 := testMetrics{
-		free:      0,
+		free:      2,
 		used:      0,
 		allocated: 0,
 		errors:    0,
@@ -745,9 +745,9 @@ func TestCIDRAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Check initial metrics for second CIDR
+	// Check initial metrics for second CIDR: gauges seeded by EnableMetrics
 	em2 := testMetrics{
-		free:      0,
+		free:      6,
 		used:      0,
 		allocated: 0,
 		errors:    0,
