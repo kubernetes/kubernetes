@@ -41,7 +41,10 @@ type CapacityRequirementsApplyConfiguration struct {
 	// "<driver>/bandwidth: 1Gi" for a device published by driver "<driver>", regardless of
 	// which other, differently-domained "bandwidth" capacities that device might also have.
 	// To request one of those, the domain must be given explicitly, for example
-	// "example.com/bandwidth".
+	// "example.com/bandwidth". If both "bandwidth: 1Gi" and "<driver>/bandwidth: 2Gi"
+	// are requested, then "<driver>/bandwidth: 2Gi" will be used for devices provided
+	// by that driver. Other devices must have both kinds of capacity. It's better
+	// to avoid such ambiguity.
 	//
 	// When a requestPolicy is defined, the requested amount is adjusted upward
 	// to the nearest valid value based on the policy.

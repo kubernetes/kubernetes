@@ -5825,6 +5825,92 @@ func TestAllocator(t *testing.T,
 			node:          node(node1, region1),
 			expectResults: nil,
 		},
+		// A device can, in principle, publish the same capacity both without a domain and
+		// explicitly qualified with its own driver as domain (nothing rejects that on
+		// admission). For consistency with attribute and capacity lookup the entry
+		// with domain wins.
+		"consumable-capacity-request-unqualified-and-device-with-unqualified-and-qualified-capacity-names-exclusive": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, two)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, one).withCapacity(driverA+"/"+capacity0, four),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		// Same as above, but with the values swapped: the explicitly qualified entry is now
+		// the too-small one, and takes precedence over the implicit one that would otherwise
+		// have satisfied the request.
+		"consumable-capacity-request-unqualified-and-device-with-qualified-and-unqualified-capacity-names-exclusive": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, two)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, four).withCapacity(driverA+"/"+capacity0, one),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// A claim's request can, in principle, name the same capacity both without a domain
+		// and explicitly qualified with the driver as domain (nothing rejects that on
+		// admission). The two are not merged: the explicitly qualified request takes
+		// precedence over the implicit one for the same identifier, just as it does for a
+		// device's published capacity above. Here the implicit request would be satisfiable,
+		// but the explicit one, which takes precedence, is not.
+		"consumable-capacity-request-with-unqualified-and-qualified-capacity-request-names-exclusive": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, one).withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), four)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, two),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// Same as above, but with the values swapped: the explicitly qualified request is now
+		// the satisfiable one, and takes precedence over the implicit one that would
+		// otherwise have been rejected as too large.
+		"consumable-capacity-request-with-qualified-and-unqualified-capacity-request-names-exclusive": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, four).withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), one)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, two),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
 		"consumable-capacity-request-unqualified-and-unqualified-device-shared": {
 			features: Features{
 				ConsumableCapacity: true,
@@ -5932,6 +6018,77 @@ func TestAllocator(t *testing.T,
 			),
 			node:          node(node1, region1),
 			expectResults: nil,
+		},
+		// See the exclusive-device variant above for why this is legal input.
+		"consumable-capacity-request-unqualified-and-device-with-unqualified-and-qualified-capacity-names-shared": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, two)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, one).withCapacity(driverA+"/"+capacity0, four).withAllowMultipleAllocations(),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+			)},
+		},
+		"consumable-capacity-request-unqualified-and-device-with-qualified-and-unqualified-capacity-names-shared": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, two)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, four).withCapacity(driverA+"/"+capacity0, one).withAllowMultipleAllocations(),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		"consumable-capacity-request-with-unqualified-and-qualified-capacity-request-names-shared": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, one).withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), four)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, two).withAllowMultipleAllocations(),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		"consumable-capacity-request-with-qualified-and-unqualified-capacity-request-names-shared": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, four).withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), one)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, two).withAllowMultipleAllocations(),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+			)},
 		},
 		"consumable-capacity-multi-allocatable-device-without-capacity-without-capacity-request": {
 			features: Features{
