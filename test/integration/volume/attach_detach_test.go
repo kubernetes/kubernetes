@@ -690,17 +690,14 @@ func waitForPodDeletionTimestampToSet(tCtx context.Context, t *testing.T, testin
 
 // Wait for VolumeAttach added to node
 func waitForVolumeToBeAttached(ctx context.Context, t *testing.T, testingClient *clientset.Clientset, podName, nodeName string) {
-	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 120*time.Second, false, func(context.Context) (bool, error) {
-		node, err := testingClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if len(node.Status.VolumesAttached) >= 1 {
-			return true, nil
-		}
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 120*time.Second, false, func(ctx context.Context) (bool, error) {
+		node, err := testingClient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
-			t.Fatalf("Failed to get the node : %v", err)
+			return false, err
 		}
-		return false, nil
+		return len(node.Status.VolumesAttached) >= 1, nil
 	}); err != nil {
-		t.Fatalf("Failed to attach volume to pod: %s for node: %s", podName, nodeName)
+		t.Fatalf("Failed to attach volume to pod: %s for node: %s: %v", podName, nodeName, err)
 	}
 }
 

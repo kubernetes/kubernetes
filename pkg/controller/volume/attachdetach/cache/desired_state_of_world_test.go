@@ -20,8 +20,10 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
+	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -1076,5 +1078,124 @@ func Test_GetPodsOnNodes(t *testing.T) {
 	}
 	if pods[0].Name != pod1Name {
 		t.Errorf("Expected pod %s/%s, got %s", pod1Name, pod1Name, pods[0].Name)
+	}
+}
+
+// Calls AddPod() for two pods that use different PersistentVolumes of one volume.
+// Verifies which PersistentVolume the volume ends up recording the spec of.
+func Test_AddPod_Positive_SeveralPVsOfOneVolume(t *testing.T) {
+	const (
+		diskName      = "shared-disk"
+		alivePV       = "pv-alive"
+		otherAlivePV  = "pv-alive-other"
+		terminatingPV = "pv-terminating"
+	)
+	// A PersistentVolume name does not take part in the unique volume name, so the
+	// specs below all map to one volume, as PersistentVolumes re-created for the same
+	// underlying volume do.
+	makePVSpec := func(name string, terminating bool) *volume.Spec {
+		pv := &v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: v1.PersistentVolumeSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: diskName},
+				},
+			},
+		}
+		if terminating {
+			pv.DeletionTimestamp = new(metav1.Now())
+		}
+		return volume.NewSpecFromPersistentVolume(pv, false)
+	}
+	makeInlineSpec := func() *volume.Spec {
+		return volume.NewSpecFromVolume(&v1.Volume{
+			Name: "inline-volume",
+			VolumeSource: v1.VolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: diskName},
+			},
+		})
+	}
+
+	testCases := []struct {
+		name string
+		// first is added before second, both for the same volume.
+		first, second *volume.Spec
+		// expectRecordedPV is the PersistentVolume the volume is expected to record the
+		// spec of. Empty means the inline volume spec.
+		expectRecordedPV string
+	}{
+		{
+			name:             "terminating PV, keep alive PV",
+			first:            makePVSpec(alivePV, false),
+			second:           makePVSpec(terminatingPV, true),
+			expectRecordedPV: alivePV,
+		},
+		{
+			name:             "alive PV, replace terminating PV",
+			first:            makePVSpec(terminatingPV, true),
+			second:           makePVSpec(alivePV, false),
+			expectRecordedPV: alivePV,
+		},
+		{
+			name:             "alive PV, replace alive PV",
+			first:            makePVSpec(alivePV, false),
+			second:           makePVSpec(otherAlivePV, false),
+			expectRecordedPV: otherAlivePV,
+		},
+		{
+			name:             "terminating PV, keep terminating PV",
+			first:            makePVSpec(terminatingPV, true),
+			second:           makePVSpec("pv-terminating-other", true),
+			expectRecordedPV: terminatingPV,
+		},
+		{
+			name:             "inline spec, replace terminating PV",
+			first:            makePVSpec(terminatingPV, true),
+			second:           makeInlineSpec(),
+			expectRecordedPV: "",
+		},
+		{
+			name:             "terminating PV, keep inline spec",
+			first:            makeInlineSpec(),
+			second:           makePVSpec(terminatingPV, true),
+			expectRecordedPV: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+			dsw := NewDesiredStateOfWorld(volumePluginMgr)
+			nodeName := k8stypes.NodeName("node-name")
+			dsw.AddNode(nodeName)
+
+			// Act
+			firstVolumeName, err := dsw.AddPod("first-pod", controllervolumetesting.NewPod("first-pod", "first-pod"), tc.first, nodeName)
+			if err != nil {
+				t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", err)
+			}
+			secondVolumeName, err := dsw.AddPod("second-pod", controllervolumetesting.NewPod("second-pod", "second-pod"), tc.second, nodeName)
+			if err != nil {
+				t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", err)
+			}
+
+			// Assert
+			if firstVolumeName != secondVolumeName {
+				t.Fatalf("Both specs must map to one volume. Expected: <%v> Actual: <%v>", firstVolumeName, secondVolumeName)
+			}
+			volumesToAttach := dsw.GetVolumesToAttach()
+			if len(volumesToAttach) != 1 {
+				t.Fatalf("len(volumesToAttach) Expected: <1> Actual: <%v>", len(volumesToAttach))
+			}
+			recordedPV := ""
+			if pv := volumesToAttach[0].VolumeSpec.PersistentVolume; pv != nil {
+				recordedPV = pv.Name
+			}
+			if recordedPV != tc.expectRecordedPV {
+				t.Errorf("Recorded PV Expected: <%q> Actual: <%q>", tc.expectRecordedPV, recordedPV)
+			}
+		})
 	}
 }
