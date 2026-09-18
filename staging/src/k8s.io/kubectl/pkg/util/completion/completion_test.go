@@ -299,6 +299,50 @@ func TestPodResourceNameCompletionFuncNoArgsResources(t *testing.T) {
 		directive, cobra.ShellCompDirectiveNoFileComp|cobra.ShellCompDirectiveNoSpace)
 }
 
+func TestDebugCompletionUseCase(t *testing.T) {
+	// kubectl debug takes a single positional (POD | TYPE/NAME). The get-style
+	// completion suggests bare resource types (the shell then appends a space)
+	// and expects space-separated names afterwards, which produces invalid
+	// commands such as "kubectl debug pods <name>". The pod-family completion
+	// instead produces pod names and <type>/<name> slash forms, which are valid
+	// single positionals for debug.
+	dc := cmdtesting.NewFakeCachedDiscoveryClient()
+	dc.PreferredResources = []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: []string{"get", "list"}},
+			},
+		},
+		{
+			GroupVersion: "apps/v1",
+			APIResources: []metav1.APIResource{
+				{Name: "deployments", Namespaced: true, Kind: "Deployment", Verbs: []string{"get", "list"}},
+			},
+		},
+	}
+
+	t.Run("get-style completion suggests a bare resource type", func(t *testing.T) {
+		tf, cmd := prepareCompletionTest()
+		tf.WithDiscoveryClient(dc)
+		pods, _, _ := cmdtesting.TestData()
+		addResourceToFactory(tf, pods)
+
+		comps, directive := ResourceTypeAndNameCompletionFunc(tf)(cmd, []string{}, "d")
+		checkCompletion(t, comps, []string{"deployments.apps"}, directive, cobra.ShellCompDirectiveNoFileComp)
+	})
+
+	t.Run("pod-family completion suggests a valid <type>/ form", func(t *testing.T) {
+		tf, cmd := prepareCompletionTest()
+		tf.WithDiscoveryClient(dc)
+		pods, _, _ := cmdtesting.TestData()
+		addResourceToFactory(tf, pods)
+
+		comps, directive := PodResourceNameCompletionFunc(tf)(cmd, []string{}, "d")
+		checkCompletion(t, comps, []string{"daemonsets/", "deployments/"}, directive, cobra.ShellCompDirectiveNoFileComp|cobra.ShellCompDirectiveNoSpace)
+	})
+}
+
 func TestPodResourceNameCompletionFuncTooManyArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
 	pods, _, _ := cmdtesting.TestData()
