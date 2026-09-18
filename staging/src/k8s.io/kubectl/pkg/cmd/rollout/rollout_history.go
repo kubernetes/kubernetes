@@ -193,7 +193,9 @@ func (o *RolloutHistoryOptions) Run() error {
 				}
 				slices.Sort(sortedKeys)
 				for _, k := range sortedKeys {
-					printer.PrintObj(historyInfo[k], o.Out)
+					if err := printer.PrintObj(historyInfo[k], o.Out); err != nil {
+						return err
+					}
 				}
 			}
 
