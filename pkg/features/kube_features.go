@@ -2395,6 +2395,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	kcmfeatures.CloudNodeAdditionalLabelsReconciliation: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	zpagesfeatures.ComponentFlagz: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -2860,6 +2864,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	kcmfeatures.CloudControllerManagerWatchBasedRoutesReconciliation: {},
 
 	kcmfeatures.CloudControllerManagerWebhook: {},
+
+	kcmfeatures.CloudNodeAdditionalLabelsReconciliation: {},
 
 	zpagesfeatures.ComponentFlagz: {},
 
