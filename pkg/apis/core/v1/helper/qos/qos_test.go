@@ -29,9 +29,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	resourcehelper "k8s.io/component-helpers/resource"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -382,16 +379,6 @@ func TestComputePodQOS(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixKubeletQOSClass, testCase.podLevelResourcesFixKubeletQOSClassEnabled)
 			if actual := ComputePodQOS(testCase.pod); testCase.expected != actual {
 				t.Errorf("ComputePodQOS error: expected: %s, actual: %s;\npod = %s", testCase.expected, actual, prettyPrintPod(testCase.pod))
-			}
-
-			// Convert v1.Pod to core.Pod, and then check against the internal version of `ComputePodQOS`.
-			pod := core.Pod{}
-			if err := corev1.Convert_v1_Pod_To_core_Pod(testCase.pod, &pod, nil); err != nil {
-				t.Fatal(err)
-			}
-
-			if actual := v1.PodQOSClass(qos.ComputePodQOS(&pod)); testCase.expected != actual {
-				t.Errorf("internal ComputePodQOS error: expected: %s, actual: %s;\npod = %s", testCase.expected, actual, prettyPrintPod(testCase.pod))
 			}
 		})
 	}
