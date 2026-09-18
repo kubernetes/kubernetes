@@ -1174,6 +1174,84 @@ func TestIsContainerRestartable(t *testing.T) {
 	}
 }
 
+func TestVisitContainersWithResourceHealthStatus(t *testing.T) {
+	restartAlways := v1.ContainerRestartPolicyAlways
+	testCases := []struct {
+		desc           string
+		spec           *v1.PodSpec
+		stopAfter      string
+		wantContainers []string
+		wantCompleted  bool
+	}{
+		{
+			desc:           "empty podspec",
+			spec:           &v1.PodSpec{},
+			wantContainers: []string{},
+			wantCompleted:  true,
+		},
+		{
+			desc: "restartable init and app containers",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "regular-init"},
+					{Name: "restartable-init", RestartPolicy: &restartAlways},
+				},
+				Containers: []v1.Container{
+					{Name: "app"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "ephemeral"}},
+				},
+			},
+			wantContainers: []string{"restartable-init", "app"},
+			wantCompleted:  true,
+		},
+		{
+			desc: "only regular init and ephemeral containers",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "regular-init"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "ephemeral"}},
+				},
+			},
+			wantContainers: []string{},
+			wantCompleted:  true,
+		},
+		{
+			desc: "short-circuits when visitor returns false",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "restartable-init", RestartPolicy: &restartAlways},
+				},
+				Containers: []v1.Container{
+					{Name: "app"},
+				},
+			},
+			stopAfter:      "restartable-init",
+			wantContainers: []string{"restartable-init"},
+			wantCompleted:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			gotContainers := []string{}
+			completed := VisitContainersWithResourceHealthStatus(tc.spec, func(c *v1.Container, _ ContainerType) bool {
+				gotContainers = append(gotContainers, c.Name)
+				return c.Name != tc.stopAfter
+			})
+			if completed != tc.wantCompleted {
+				t.Fatalf("VisitContainersWithResourceHealthStatus() = %v, want %v", completed, tc.wantCompleted)
+			}
+			if !cmp.Equal(gotContainers, tc.wantContainers) {
+				t.Errorf("VisitContainersWithResourceHealthStatus() visited %+v, want %+v", gotContainers, tc.wantContainers)
+			}
+		})
+	}
+}
+
 func TestContainerHasRestartablePolicy(t *testing.T) {
 	var (
 		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
