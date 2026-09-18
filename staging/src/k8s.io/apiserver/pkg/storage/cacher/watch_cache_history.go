@@ -125,12 +125,23 @@ func (w *watchCacheHistory) resizeCacheLocked(eventTime time.Time) {
 		}
 		return
 	}
-	if w.isCacheFullLocked() && eventTime.Sub(w.cache[(w.endIndex-w.capacity/4)%w.capacity].RecordTime) > w.eventFreshDuration {
-		capacity := max(w.capacity/2, w.lowerBoundCapacity)
-		if capacity < w.capacity {
-			w.doCacheResizeLocked(capacity)
+	// Shrink is decoupled from isCacheFullLocked so the ring can deflate after a burst
+	// even when not full and even during idle periods via the sweeper ticker.
+	if w.capacity > w.lowerBoundCapacity && w.endIndex > w.startIndex {
+		quarterIndex := w.endIndex - w.capacity/4
+		if quarterIndex < w.startIndex {
+			quarterIndex = w.startIndex
 		}
-		return
+		if quarterIndex < w.endIndex {
+			evt := w.cache[quarterIndex%w.capacity]
+			if evt != nil && eventTime.Sub(evt.RecordTime) > w.eventFreshDuration {
+				capacity := max(w.capacity/2, w.lowerBoundCapacity)
+				if capacity < w.capacity {
+					w.doCacheResizeLocked(capacity)
+				}
+				return
+			}
+		}
 	}
 }
 
@@ -145,8 +156,13 @@ func (w *watchCacheHistory) isCacheFullLocked() bool {
 func (w *watchCacheHistory) doCacheResizeLocked(capacity int) {
 	newCache := make([]*watchCacheEvent, capacity)
 	if capacity < w.capacity {
-		// adjust startIndex if cache capacity shrink.
-		w.startIndex = w.endIndex - capacity
+		// Adjust startIndex if cache capacity shrinks, but never move it backward.
+		// A partially filled ring holds fewer events than the new capacity, and
+		// pulling startIndex back would make events that a relist already
+		// discarded readable again. See ResetLocked.
+		if newStartIndex := w.endIndex - capacity; newStartIndex > w.startIndex {
+			w.startIndex = newStartIndex
+		}
 	}
 	for i := w.startIndex; i < w.endIndex; i++ {
 		newCache[i%capacity] = w.cache[i%w.capacity]
