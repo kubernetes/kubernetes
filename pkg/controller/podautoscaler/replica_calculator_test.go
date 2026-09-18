@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -2832,14 +2831,13 @@ func TestCalculateRequests_InPlacePodVerticalScaling(t *testing.T) {
 		pod                                    *v1.Pod
 		container                              string
 		resource                               v1.ResourceName
-		disableInPlacePodVerticalScaling       bool
 		enablePodLevelResources                bool
 		disableInPlacePodLevelResourcesScaling bool
 		expectedRequests                       map[string]int64
 		expectedError                          error
 	}{
 		{
-			name: "In-flight container scale-up: uses actuated status.Resources instead of spec when InPlacePodVerticalScaling enabled",
+			name: "In-flight container scale-up: uses actuated status.Resources instead of spec",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
 				Spec: v1.PodSpec{
@@ -2865,35 +2863,6 @@ func TestCalculateRequests_InPlacePodVerticalScaling(t *testing.T) {
 			},
 			resource:         v1.ResourceCPU,
 			expectedRequests: map[string]int64{testPod: 1000},
-		},
-		{
-			name:                             "In-flight container scale-up: uses spec when InPlacePodVerticalScaling disabled",
-			disableInPlacePodVerticalScaling: true,
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: testPod, Namespace: testNamespace},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: "container1",
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4000m")},
-							},
-						},
-					},
-				},
-				Status: v1.PodStatus{
-					ContainerStatuses: []v1.ContainerStatus{
-						{
-							Name: "container1",
-							Resources: &v1.ResourceRequirements{
-								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
-							},
-						},
-					},
-				},
-			},
-			resource:         v1.ResourceCPU,
-			expectedRequests: map[string]int64{testPod: 4000},
 		},
 		{
 			name: "In-flight container scale-down: uses actuated status.Resources instead of spec",
@@ -3255,10 +3224,6 @@ func TestCalculateRequests_InPlacePodVerticalScaling(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.disableInPlacePodVerticalScaling {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, false)
-			}
 			if tc.enablePodLevelResources {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
 				if tc.disableInPlacePodLevelResourcesScaling {

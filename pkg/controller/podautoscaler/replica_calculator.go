@@ -24,7 +24,6 @@ import (
 
 	autoscaling "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -540,7 +539,7 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 			if !ok {
 				return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
 			}
-			request += containerRequest.MilliValue()
+			request += containerRequest
 		}
 		// container names are unique inside the pod
 		if container == c.Name {
@@ -556,21 +555,22 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 	return request, nil
 }
 
-// getContainerRequest returns the request for the given container and resource.
-// If InPlacePodVerticalScaling is enabled and the container has actuated resources
-// reported in pod.Status, that actuated request is returned. Otherwise, it falls back
-// to the requested resources from container.Resources.Requests in pod.Spec.
-func getContainerRequest(pod *v1.Pod, c *v1.Container, resource v1.ResourceName) (resource.Quantity, bool) {
-	if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		cs := findContainerStatus(pod, c.Name)
-		if cs != nil && cs.Resources != nil && cs.Resources.Requests != nil {
-			if req, ok := cs.Resources.Requests[resource]; ok {
-				return req, true
-			}
+// getContainerRequest returns the request in millivalue for the given container and resource.
+// If the container has actuated resources reported in pod.Status, that actuated request
+// is returned. Otherwise, it falls back to the requested resources from container.Resources.Requests
+// in pod.Spec.
+func getContainerRequest(pod *v1.Pod, c *v1.Container, resource v1.ResourceName) (int64, bool) {
+	cs := findContainerStatus(pod, c.Name)
+	if cs != nil && cs.Resources != nil && cs.Resources.Requests != nil {
+		if req, ok := cs.Resources.Requests[resource]; ok {
+			return req.MilliValue(), true
 		}
 	}
 	req, ok := c.Resources.Requests[resource]
-	return req, ok
+	if !ok {
+		return 0, false
+	}
+	return req.MilliValue(), true
 }
 
 // findContainerStatus finds the container status for a given container name
