@@ -156,6 +156,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	}
 
 	var pod *api.Pod
+	var deletedPodRV string
 	deletedPod := false
 	// by default, retry conflict errors
 	shouldRetry := errors.IsConflict
@@ -189,7 +190,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 			deleteOptions = deleteOptions.DeepCopy()
 			setPreconditionsResourceVersion(deleteOptions, &pod.ResourceVersion)
 		}
-		err = addConditionAndDeletePod(r, ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
+		deletedPodRV, err = addConditionAndDeletePod(r, ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
 		if err != nil {
 			return err
 		}
@@ -204,7 +205,12 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 
 	case deletedPod:
 		// this happens when we successfully deleted the pod.  In this case, we're done executing because we've evicted/deleted the pod
-		return &metav1.Status{Status: metav1.StatusSuccess}, nil
+		return &metav1.Status{
+			Status: metav1.StatusSuccess,
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: deletedPodRV,
+			},
+		}, nil
 
 	default:
 		// this happens when we didn't have an error and we didn't delete the pod. The only branch that happens on is when
@@ -299,7 +305,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	}
 
 	// Try the delete
-	err = addConditionAndDeletePod(r, ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
+	deletedPodRV, err = addConditionAndDeletePod(r, ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
 	if err != nil {
 		if errors.IsConflict(err) && updateDeletionOptions &&
 			(originalDeleteOptions.Preconditions == nil || originalDeleteOptions.Preconditions.ResourceVersion == nil) {
@@ -312,10 +318,15 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	}
 
 	// Success!
-	return &metav1.Status{Status: metav1.StatusSuccess}, nil
+	return &metav1.Status{
+		Status: metav1.StatusSuccess,
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: deletedPodRV,
+		},
+	}, nil
 }
 
-func addConditionAndDeletePod(r *EvictionREST, ctx context.Context, name string, validation rest.ValidateObjectFunc, options *metav1.DeleteOptions) error {
+func addConditionAndDeletePod(r *EvictionREST, ctx context.Context, name string, validation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (string, error) {
 	if !dryrun.IsDryRun(options.DryRun) {
 		getLatestPod := func(_ context.Context, _, oldObj runtime.Object) (runtime.Object, error) {
 			// Throwaway the newObj. We care only about the latest pod obtained from etcd (oldObj).
@@ -355,21 +366,28 @@ func addConditionAndDeletePod(r *EvictionREST, ctx context.Context, name string,
 
 		updatedPodObject, _, err := r.store.Update(ctx, name, podUpdatedObjectInfo, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		if !resourceVersionIsUnset(options) {
 			newResourceVersion, err := meta.NewAccessor().ResourceVersion(updatedPodObject)
 			if err != nil {
-				return err
+				return "", err
 			}
 			// bump the resource version, since we are the one who modified it via the update
 			options = options.DeepCopy()
 			options.Preconditions.ResourceVersion = &newResourceVersion
 		}
 	}
-	_, _, err := r.store.Delete(ctx, name, rest.ValidateAllObjectFunc, options)
-	return err
+	deletedObj, _, err := r.store.Delete(ctx, name, rest.ValidateAllObjectFunc, options)
+	if err != nil {
+		return "", err
+	}
+	rv, err := meta.NewAccessor().ResourceVersion(deletedObj)
+	if err != nil {
+		return "", nil
+	}
+	return rv, nil
 }
 
 func getPod(r *EvictionREST, ctx context.Context, name string) (*api.Pod, error) {
