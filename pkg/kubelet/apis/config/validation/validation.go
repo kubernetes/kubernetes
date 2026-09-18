@@ -17,8 +17,10 @@ limitations under the License.
 package validation
 
 import (
+	"crypto/tls"
 	"fmt"
 	"regexp"
+	"slices"
 	"time"
 	"unicode"
 
@@ -27,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
@@ -34,6 +37,7 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/certificate/keyalgorithm"
 	imagepullmanager "k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -180,6 +184,18 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
+	}
+	if kc.ClientCertificateKeyAlgorithm != nil && !slices.Contains(kubeletconfig.ValidCertificateKeyAlgorithms, *kc.ClientCertificateKeyAlgorithm) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: clientCertificateKeyAlgorithm %q is not a supported algorithm", *kc.ClientCertificateKeyAlgorithm))
+	}
+	if kc.ServerCertificateKeyAlgorithm != nil && !slices.Contains(kubeletconfig.ValidCertificateKeyAlgorithms, *kc.ServerCertificateKeyAlgorithm) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverCertificateKeyAlgorithm %q is not a supported algorithm", *kc.ServerCertificateKeyAlgorithm))
+	}
+	if keyalgorithm.IsMLDSA(kc.ServerCertificateKeyAlgorithm) && kc.TLSMinVersion != "" {
+		// An unparsable tlsMinVersion is reported when the TLS options are initialized.
+		if minVersion, err := cliflag.TLSVersion(kc.TLSMinVersion); err == nil && minVersion < tls.VersionTLS13 {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: tlsMinVersion %q is incompatible with serverCertificateKeyAlgorithm %q, ML-DSA requires VersionTLS13", kc.TLSMinVersion, *kc.ServerCertificateKeyAlgorithm))
+		}
 	}
 	if kc.RunOnce {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: runOnce (--runOnce) %v, Runonce mode has been deprecated and should not be set", kc.RunOnce))
