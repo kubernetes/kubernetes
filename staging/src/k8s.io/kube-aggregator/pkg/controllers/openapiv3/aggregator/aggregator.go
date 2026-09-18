@@ -154,6 +154,23 @@ func getGroupVersionStringFromAPIService(apiService v1.APIService) string {
 	return "apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
 }
 
+// restrictDiscoveryToOwnGroupVersion drops every path from a remote APIService's downloaded
+// discovery document except its own group-version, since its backing server (like any server
+// built on the generic apiserver library) also advertises generic paths like "apis"/"version"
+// that would otherwise collide non-deterministically across APIServices.
+func restrictDiscoveryToOwnGroupVersion(discovery *handler3.OpenAPIV3Discovery, apiService v1.APIService) *handler3.OpenAPIV3Discovery {
+	if apiService.Spec.Service == nil || discovery == nil {
+		return discovery
+	}
+
+	restricted := &handler3.OpenAPIV3Discovery{Paths: make(map[string]handler3.OpenAPIV3DiscoveryGroupVersion)}
+	gvPath := getGroupVersionStringFromAPIService(apiService)
+	if item, ok := discovery.Paths[gvPath]; ok {
+		restricted.Paths[gvPath] = item
+	}
+	return restricted
+}
+
 // UpdateAPIServiceSpec updates all the OpenAPI v3 specs that the APIService serves.
 // It is thread safe.
 func (s *specProxier) UpdateAPIServiceSpec(apiServiceName string) error {
@@ -176,7 +193,7 @@ func (s *specProxier) updateAPIServiceSpecLocked(apiServiceName string) error {
 		if httpStatus == http.StatusNotFound {
 			apiService.isLegacyAPIService = true
 		} else {
-			s.apiServiceInfo[apiServiceName].discovery = gv
+			s.apiServiceInfo[apiServiceName].discovery = restrictDiscoveryToOwnGroupVersion(gv, apiService.apiService)
 			return nil
 		}
 	}
