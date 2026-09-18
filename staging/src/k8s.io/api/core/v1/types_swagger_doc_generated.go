@@ -2754,7 +2754,7 @@ var map_Taint = map[string]string{
 	"key":       "Required. The taint key to be applied to a node.",
 	"value":     "The taint value corresponding to the taint key.",
 	"effect":    "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule and NoExecute.",
-	"timeAdded": "TimeAdded represents the time at which the taint was added.",
+	"timeAdded": "TimeAdded represents the time at which the taint was added. It is populated at admission time by the NodeTaintTimeAddedDefaulting admission controller when it is not set: taints which have no counterpart with the same key and effect in the existing node get the current time, all other taints keep the time they already had.",
 }
 
 func (Taint) SwaggerDoc() map[string]string {
