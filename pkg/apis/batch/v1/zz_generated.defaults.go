@@ -90,20 +90,16 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 		}
 		if a.VolumeSource.AzureDisk != nil {
 			if a.VolumeSource.AzureDisk.CachingMode == nil {
-				ptrVar1 := corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite)
-				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
+				a.VolumeSource.AzureDisk.CachingMode = new(corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite))
 			}
 			if a.VolumeSource.AzureDisk.FSType == nil {
-				var ptrVar1 string = "ext4"
-				a.VolumeSource.AzureDisk.FSType = &ptrVar1
+				a.VolumeSource.AzureDisk.FSType = new(string("ext4"))
 			}
 			if a.VolumeSource.AzureDisk.ReadOnly == nil {
-				var ptrVar1 bool = false
-				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
+				a.VolumeSource.AzureDisk.ReadOnly = new(bool(false))
 			}
 			if a.VolumeSource.AzureDisk.Kind == nil {
-				ptrVar1 := corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk)
-				a.VolumeSource.AzureDisk.Kind = &ptrVar1
+				a.VolumeSource.AzureDisk.Kind = new(corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk))
 			}
 		}
 		if a.VolumeSource.Projected != nil {
@@ -156,8 +152,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 				}
 				if b.ValueFrom.FileKeyRef != nil {
 					if b.ValueFrom.FileKeyRef.Optional == nil {
-						var ptrVar1 bool = false
-						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						b.ValueFrom.FileKeyRef.Optional = new(bool(false))
 					}
 				}
 			}
@@ -171,8 +166,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.LivenessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -183,8 +177,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.ReadinessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -195,8 +188,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.StartupProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -230,8 +222,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 				}
 				if b.ValueFrom.FileKeyRef != nil {
 					if b.ValueFrom.FileKeyRef.Optional == nil {
-						var ptrVar1 bool = false
-						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						b.ValueFrom.FileKeyRef.Optional = new(bool(false))
 					}
 				}
 			}
@@ -245,8 +236,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.LivenessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -257,8 +247,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.ReadinessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -269,8 +258,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.StartupProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -304,8 +292,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 				}
 				if b.ValueFrom.FileKeyRef != nil {
 					if b.ValueFrom.FileKeyRef.Optional == nil {
-						var ptrVar1 bool = false
-						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						b.ValueFrom.FileKeyRef.Optional = new(bool(false))
 					}
 				}
 			}
@@ -319,8 +306,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			}
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -331,8 +317,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			}
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -343,8 +328,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			}
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -426,20 +410,16 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 		}
 		if a.VolumeSource.AzureDisk != nil {
 			if a.VolumeSource.AzureDisk.CachingMode == nil {
-				ptrVar1 := corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite)
-				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
+				a.VolumeSource.AzureDisk.CachingMode = new(corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite))
 			}
 			if a.VolumeSource.AzureDisk.FSType == nil {
-				var ptrVar1 string = "ext4"
-				a.VolumeSource.AzureDisk.FSType = &ptrVar1
+				a.VolumeSource.AzureDisk.FSType = new(string("ext4"))
 			}
 			if a.VolumeSource.AzureDisk.ReadOnly == nil {
-				var ptrVar1 bool = false
-				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
+				a.VolumeSource.AzureDisk.ReadOnly = new(bool(false))
 			}
 			if a.VolumeSource.AzureDisk.Kind == nil {
-				ptrVar1 := corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk)
-				a.VolumeSource.AzureDisk.Kind = &ptrVar1
+				a.VolumeSource.AzureDisk.Kind = new(corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk))
 			}
 		}
 		if a.VolumeSource.Projected != nil {
@@ -492,8 +472,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 				}
 				if b.ValueFrom.FileKeyRef != nil {
 					if b.ValueFrom.FileKeyRef.Optional == nil {
-						var ptrVar1 bool = false
-						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						b.ValueFrom.FileKeyRef.Optional = new(bool(false))
 					}
 				}
 			}
@@ -507,8 +486,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.LivenessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -519,8 +497,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.ReadinessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -531,8 +508,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.StartupProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -566,8 +542,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 				}
 				if b.ValueFrom.FileKeyRef != nil {
 					if b.ValueFrom.FileKeyRef.Optional == nil {
-						var ptrVar1 bool = false
-						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						b.ValueFrom.FileKeyRef.Optional = new(bool(false))
 					}
 				}
 			}
@@ -581,8 +556,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.LivenessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -593,8 +567,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.ReadinessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -605,8 +578,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.StartupProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -640,8 +612,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 				}
 				if b.ValueFrom.FileKeyRef != nil {
 					if b.ValueFrom.FileKeyRef.Optional == nil {
-						var ptrVar1 bool = false
-						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						b.ValueFrom.FileKeyRef.Optional = new(bool(false))
 					}
 				}
 			}
@@ -655,8 +626,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			}
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -667,8 +637,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			}
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
@@ -679,8 +648,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			}
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service == nil {
-					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = new(string(""))
 				}
 			}
 		}
