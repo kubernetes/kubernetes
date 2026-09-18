@@ -40,9 +40,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
 
@@ -88,18 +90,25 @@ type certificateValidationOptions struct {
 	allowUnknownUsages bool
 	// allow duplicate usages values
 	allowDuplicateUsages bool
+	// allow ML-DSA signed requests
+	allowMLDSASignedRequests bool
 }
 
 // validateCSR validates the signature and formatting of a base64-wrapped,
 // PEM-encoded PKCS#10 certificate signing request. If this is invalid, we must
 // not accept the CSR for further processing.
-func validateCSR(obj *certificates.CertificateSigningRequest) error {
+func validateCSR(obj *certificates.CertificateSigningRequest) (*x509.CertificateRequest, error) {
 	csr, err := certificates.ParseCSR(obj.Spec.Request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// check that the signature is valid
-	return csr.CheckSignature()
+	err = csr.CheckSignature()
+	if err != nil {
+		return nil, err
+	}
+
+	return csr, nil
 }
 
 func validateCertificate(pemData []byte) error {
@@ -176,6 +185,21 @@ var (
 		string(certificates.UsageMicrosoftSGC),
 		string(certificates.UsageNetscapeSGC),
 	)
+
+	mldsaDisallowedUsages = sets.NewString(
+		string(certificates.UsageKeyEncipherment),
+		string(certificates.UsageKeyAgreement),
+		string(certificates.UsageDataEncipherment),
+		string(certificates.UsageEncipherOnly),
+		string(certificates.UsageDecipherOnly),
+	)
+
+	mldsaAtLeastOneOfUsages = sets.NewString(
+		string(certificates.UsageDigitalSignature),
+		string(certificates.UsageContentCommitment),
+		string(certificates.UsageCertSign),
+		string(certificates.UsageCRLSign),
+	)
 )
 
 func validateCertificateSigningRequest(csr *certificates.CertificateSigningRequest, opts certificateValidationOptions) field.ErrorList {
@@ -183,7 +207,7 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	allErrs := apivalidation.ValidateObjectMeta(&csr.ObjectMeta, isNamespaced, ValidateCertificateRequestName, field.NewPath("metadata"))
 
 	specPath := field.NewPath("spec")
-	err := validateCSR(csr)
+	certReq, err := validateCSR(csr)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("request"), csr.Spec.Request, fmt.Sprintf("%v", err)))
 	}
@@ -206,6 +230,40 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 			seen[usage] = true
 		}
 	}
+
+	// As documented by https://www.rfc-editor.org/rfc/rfc9881.html#name-key-usage-bits
+	// ML-DSA certificates must contain at least one of the usages:
+	//     - digitalSignature
+	//     - nonRepudiation (also known as contentCommitment)
+	//     - keyCertSign
+	//     - cRLSign
+	// and must not contain any of the usages:
+	//     - keyEncipherment
+	//     - dataEncipherment
+	//     - keyAgreement
+	//     - encipherOnly
+	//     - decipherOnly
+	if certReq != nil && certReq.PublicKeyAlgorithm == x509.MLDSA {
+		if opts.allowMLDSASignedRequests {
+			hasAtLeastOneRequired := false
+			for i, usage := range csr.Spec.Usages {
+				if mldsaDisallowedUsages.Has(string(usage)) {
+					allErrs = append(allErrs, field.Invalid(specPath.Child("usages").Index(i), usage, fmt.Sprintf("When using ML-DSA keys, the usages %v are not allowed", mldsaDisallowedUsages.List())))
+				}
+
+				if !hasAtLeastOneRequired && mldsaAtLeastOneOfUsages.Has(string(usage)) {
+					hasAtLeastOneRequired = true
+				}
+			}
+
+			if !hasAtLeastOneRequired {
+				allErrs = append(allErrs, field.Invalid(specPath.Child("usages"), csr.Spec.Usages, fmt.Sprintf("When using ML-DSA keys, at least one of %v usages are required", mldsaAtLeastOneOfUsages.List())))
+			}
+		} else {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("request"), csr.Spec.Request, "ML-DSA keys cannot be used for requests"))
+		}
+	}
+
 	if !opts.allowLegacySignerName && csr.Spec.SignerName == certificates.LegacyUnknownSignerName {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("signerName"), csr.Spec.SignerName, "the legacy signerName is not allowed via this API version"))
 	} else {
@@ -360,6 +418,7 @@ func getValidationOptions(newCSR, oldCSR *certificates.CertificateSigningRequest
 		allowArbitraryCertificate:    allowArbitraryCertificate(newCSR, oldCSR),
 		allowDuplicateUsages:         allowDuplicateUsages(oldCSR),
 		allowUnknownUsages:           allowUnknownUsages(oldCSR),
+		allowMLDSASignedRequests:     allowMLDSASignedRequests(oldCSR),
 	}
 }
 
@@ -471,6 +530,25 @@ func hasDuplicateUsage(usages []certificates.KeyUsage) bool {
 		}
 		seen[usage] = true
 	}
+	return false
+}
+
+func allowMLDSASignedRequests(oldCSR *certificates.CertificateSigningRequest) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CertificateSigningRequestMLDSA) {
+		return true
+	}
+
+	if oldCSR != nil {
+		cr, err := certificates.ParseCSR(oldCSR.Spec.Request)
+		if err != nil {
+			return false
+		}
+
+		if cr.PublicKeyAlgorithm == x509.MLDSA {
+			return true
+		}
+	}
+
 	return false
 }
 
