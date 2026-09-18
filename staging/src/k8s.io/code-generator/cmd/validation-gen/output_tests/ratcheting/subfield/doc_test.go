@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestStruct(t *testing.T) {
@@ -32,7 +31,7 @@ func TestStruct(t *testing.T) {
 	st.Value(&Struct{
 		SubStructField: SubStruct{
 			IntField:    1,
-			IntPtrField: ptr.To(1),
+			IntPtrField: new(1),
 		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Invalid(field.NewPath("subStructField").Child("intField"), 1, "field IntField"),
@@ -41,10 +40,10 @@ func TestStruct(t *testing.T) {
 
 	st.Value(&StructWithSubfield{
 		IntField:    1,
-		IntPtrField: ptr.To(1),
+		IntPtrField: new(1),
 	}).OldValue(&StructWithSubfield{
 		IntField:    1,
-		IntPtrField: ptr.To(1),
+		IntPtrField: new(1),
 	}).ExpectValid()
 }
 
@@ -52,7 +51,7 @@ func TestStructWithSubfield(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 	st.Value(&StructWithSubfield{
 		IntField:    1,
-		IntPtrField: ptr.To(1),
+		IntPtrField: new(1),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Invalid(field.NewPath("intField"), 1, "field IntField"),
 		field.Invalid(field.NewPath("intPtrField"), 1, "field IntPtrField"),
@@ -61,10 +60,10 @@ func TestStructWithSubfield(t *testing.T) {
 	st.Value(&StructWithSubfield{
 		TypeMeta:    1,
 		IntField:    1,
-		IntPtrField: ptr.To(1),
+		IntPtrField: new(1),
 	}).OldValue(&StructWithSubfield{
 		TypeMeta:    1,
 		IntField:    1,
-		IntPtrField: ptr.To(1),
+		IntPtrField: new(1),
 	}).ExpectValid()
 }
