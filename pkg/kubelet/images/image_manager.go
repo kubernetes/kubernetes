@@ -207,7 +207,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	}
 
 	// wrap the lookup in a function to ensure that we only look up credentials once and no earlier than needed
-	lookupPullCredentials := m.makeLookupPullCredentialsFunc(spec.Image, pod, pullSecrets, podSandboxConfig)
+	lookupPullCredentials := m.makeLookupPullCredentialsFunc(ctx, spec.Image, pod, pullSecrets, podSandboxConfig)
 
 	getPodCredentials := func() ([]kubeletconfiginternal.ImagePullSecret, *kubeletconfiginternal.ImagePullServiceAccount, error) {
 		pullCredentials, err := lookupPullCredentials()
@@ -288,7 +288,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	return m.pullImage(ctx, logPrefix, objRef, pod.UID, requestedImage, spec, pullCredentials, podSandboxConfig)
 }
 
-func (m *imageManager) makeLookupPullCredentialsFunc(image string, pod *v1.Pod, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) func() ([]credentialprovider.TrackedAuthConfig, error) {
+func (m *imageManager) makeLookupPullCredentialsFunc(ctx context.Context, image string, pod *v1.Pod, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) func() ([]credentialprovider.TrackedAuthConfig, error) {
 	return sync.OnceValues(func() ([]credentialprovider.TrackedAuthConfig, error) {
 		repoToPull, _, _, err := parsers.ParseImageName(image)
 		if err != nil {
@@ -306,6 +306,7 @@ func (m *imageManager) makeLookupPullCredentialsFunc(image string, pod *v1.Pod, 
 		}
 
 		externalCredentialProviderKeyring := credentialproviderplugin.NewExternalCredentialProviderDockerKeyring(
+			ctx,
 			podNamespace,
 			podName,
 			podUID,
@@ -316,7 +317,7 @@ func (m *imageManager) makeLookupPullCredentialsFunc(image string, pod *v1.Pod, 
 			return nil, err
 		}
 
-		pullCredentials, _ := keyring.Lookup(repoToPull)
+		pullCredentials, _ := keyring.Lookup(ctx, repoToPull)
 		return pullCredentials, nil
 	})
 }

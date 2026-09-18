@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"reflect"
 	"strings"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	credentialproviderapi "k8s.io/kubelet/pkg/apis/credentialprovider"
 	credentialproviderv1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1"
 	credentialproviderv1alpha1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
@@ -125,7 +125,7 @@ func TestSingleflightProvide(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			result, _ := dynamicProvider.provideWithCoordinates(image)
+			result, _ := dynamicProvider.provideWithCoordinates(t.Context(), image)
 			results[i] = result
 		}(i)
 	}
@@ -158,7 +158,7 @@ func TestSingleflightProvide(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			result, _ := dynamicProvider.provideWithCoordinates(image)
+			result, _ := dynamicProvider.provideWithCoordinates(t.Context(), image)
 			results[i] = result
 		}(i)
 	}
@@ -179,7 +179,7 @@ func TestSingleflightProvide(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			result, _ := dynamicProvider.provideWithCoordinates(image)
+			result, _ := dynamicProvider.provideWithCoordinates(t.Context(), image)
 			results[i] = result
 		}(i)
 	}
@@ -192,12 +192,6 @@ func TestSingleflightProvide(t *testing.T) {
 }
 
 func Test_ProvideWithCoordinates(t *testing.T) {
-	klog.InitFlags(nil)
-	if err := flag.Set("v", "6"); err != nil {
-		t.Fatalf("failed to set log level: %v", err)
-	}
-	flag.Parse()
-
 	tclock := clock.RealClock{}
 	testcases := []struct {
 		name                   string
@@ -385,7 +379,7 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      `Service account name is empty" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid"`,
+			wantLog:      `Service account name is empty provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid"`,
 		},
 		{
 			name: "[service account mode] sa does not have required annotations",
@@ -416,7 +410,7 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      `"Failed to get service account data" err="required annotation domain.io/identity-id not found" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
+			wantLog:      `Failed to get service account data err="required annotation domain.io/identity-id not found" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
 		},
 		{
 			name: "[service account mode] failed to get service account token",
@@ -455,7 +449,7 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      `"Failed to provide credentials for image" err="failed to get service account token: failed to get token" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
+			wantLog:      `Failed to provide credentials for image err="failed to get service account token: failed to get token" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
 		},
 		{
 			name: "[service account mode] cache type not token but service account echoed back",
@@ -506,7 +500,7 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      `"Failed to provide credentials for image" err="credential provider plugin returned the service account token as the password which is not allowed when service account cache type is not set to 'Token'" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
+			wantLog:      `Failed to provide credentials for image err="credential provider plugin returned the service account token as the password which is not allowed when service account cache type is not set to 'Token'" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
 		},
 		{
 			name: "[service account mode] exact image match",
@@ -572,12 +566,10 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			klog.SetOutput(&buf)
-			klog.LogToStderr(false)
-			defer klog.LogToStderr(true)
+			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(5)))
+			ctx := klog.NewContext(t.Context(), logger)
 
-			gotConfig, gotCoordinates := testcase.pluginProvider.provideWithCoordinates(testcase.image)
+			gotConfig, gotCoordinates := testcase.pluginProvider.provideWithCoordinates(ctx, testcase.image)
 			if !reflect.DeepEqual(gotConfig, testcase.dockerconfig) {
 				t.Errorf("unexpected docker config from ProvideWithCoordinates: %v, expected: %v", gotConfig, testcase.dockerconfig)
 			}
@@ -590,9 +582,7 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 				t.Errorf("expected nil service account coordinates but got: %v", gotCoordinates)
 			}
 
-			klog.Flush()
-			klog.SetOutput(&bytes.Buffer{}) // prevent further writes into buf
-			capturedOutput := buf.String()
+			capturedOutput := logger.GetSink().(ktesting.Underlier).GetBuffer().String()
 
 			if len(testcase.wantLog) > 0 && !strings.Contains(capturedOutput, testcase.wantLog) {
 				t.Log("Captured output:", capturedOutput)
@@ -664,7 +654,7 @@ func Test_ProvideParallel(t *testing.T) {
 			for i := 0; i < 5; i++ {
 				go func(w *sync.WaitGroup) {
 					image := fmt.Sprintf(testcase.registry+"/%s", rand.String(5))
-					dockerconfigResponse, _ := pluginProvider.provideWithCoordinates(image)
+					dockerconfigResponse, _ := pluginProvider.provideWithCoordinates(t.Context(), image)
 					if !reflect.DeepEqual(dockerconfigResponse, dockerconfig) {
 						t.Errorf("unexpected docker config for image %s: %v, expected: %v", image, dockerconfigResponse, dockerconfig)
 					}
@@ -1131,7 +1121,7 @@ func Test_NoCacheResponse(t *testing.T) {
 		},
 	}
 
-	dockerConfig, _ := pluginProvider.provideWithCoordinates("test.registry.io/foo/bar")
+	dockerConfig, _ := pluginProvider.provideWithCoordinates(t.Context(), "test.registry.io/foo/bar")
 	if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
 		t.Logf("actual docker config: %v", dockerConfig)
 		t.Logf("expected docker config: %v", expectedDockerConfig)
@@ -1585,7 +1575,7 @@ func Test_CacheKeyGeneration(t *testing.T) {
 				cacheType:   cacheTypeValue,
 			}
 
-			dockerConfig, _ := pluginProvider.provideWithCoordinates(testImage)
+			dockerConfig, _ := pluginProvider.provideWithCoordinates(t.Context(), testImage)
 			verifyDockerConfig(t, dockerConfig)
 
 			// Verify the cache key is as expected
@@ -1598,7 +1588,7 @@ func Test_CacheKeyGeneration(t *testing.T) {
 
 			// Test cache hit (nil out plugin to ensure cache is used)
 			pluginProvider.provider.plugin = nil
-			cachedConfig, _ := pluginProvider.provideWithCoordinates(testImage)
+			cachedConfig, _ := pluginProvider.provideWithCoordinates(t.Context(), testImage)
 			verifyDockerConfig(t, cachedConfig)
 		})
 	}
