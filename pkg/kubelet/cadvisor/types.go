@@ -21,6 +21,7 @@ import (
 	"context"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -45,6 +46,22 @@ type Interface interface {
 
 	// Get filesystem information for the filesystem that contains the given file.
 	GetDirFsInfo(path string) (cadvisorapi.FsInfo, error)
+}
+
+// ContainerEnumerator lists live CRI containers so a cAdvisor client can build
+// per-container info where the underlying cAdvisor container discovery does not
+// (e.g. Windows). The kubelet's internalapi.RuntimeService satisfies it.
+type ContainerEnumerator interface {
+	ListContainers(ctx context.Context, filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error)
+}
+
+// ContainerEnumeratorSetter is implemented by cAdvisor clients that can accept
+// a CRI runtime to populate per-container info for the metrics collector (e.g.
+// container_oom_events_total on Windows). It is optional; Linux cAdvisor does
+// not implement it, and the kubelet skips the wiring when the interface is
+// absent.
+type ContainerEnumeratorSetter interface {
+	SetContainerEnumerator(ContainerEnumerator)
 }
 
 // ImageFsInfoProvider informs cAdvisor how to find imagefs for container images.

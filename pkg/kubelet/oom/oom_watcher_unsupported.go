@@ -1,4 +1,4 @@
-//go:build !linux
+//go:build !linux && !windows
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -29,8 +29,10 @@ type oomWatcherUnsupported struct{}
 
 var _ Watcher = new(oomWatcherUnsupported)
 
-// NewWatcher creates a fake one here
-func NewWatcher(_ record.EventRecorder) (Watcher, error) {
+// NewWatcher creates a fake one here. The recorder and container status getter
+// are unused on platforms without an OOM watcher but are kept in the signature
+// so callers compile unchanged across platforms.
+func NewWatcher(_ record.EventRecorder, _ containerStatusGetter) (Watcher, error) {
 	return &oomWatcherUnsupported{}, nil
 }
 

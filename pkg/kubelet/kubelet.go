@@ -589,7 +589,7 @@ func NewMainKubelet(ctx context.Context,
 		Namespace:  "",
 	}
 
-	oomWatcher, err := oomwatcher.NewWatcher(kubeDeps.Recorder)
+	oomWatcher, err := oomwatcher.NewWatcher(kubeDeps.Recorder, kubeDeps.RemoteRuntimeService)
 	if err != nil {
 		if inuserns.RunningInUserNS() {
 			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) {
