@@ -403,10 +403,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		store.Add(elem)
 	}
 
-	wci, err := newCacheIntervalFromStore(rv, store, "", false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	wci := newCacheIntervalFromLazySnapshot(rv, store.Clone())
 
 	for i := 0; i < numEvents; i++ {
 		event, err := wci.Next()
@@ -436,8 +433,6 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	}
 }
 
-// TestCacheIntervalFromStoreSorted verifies newCacheIntervalFromStore returns
-// events sorted by Key for both indexer backends.
 func TestCacheIntervalFromStoreSorted(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -459,10 +454,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 				}
 			}
 
-			wci, err := newCacheIntervalFromStore(n, tc.indexer, "", false)
-			if err != nil {
-				t.Fatal(err)
-			}
+			wci := newCacheIntervalFromLazySnapshot(n, tc.indexer.Clone())
 
 			got := make([]string, 0, n)
 			for range n {
@@ -479,52 +471,58 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 	}
 }
 
-// TestCacheIntervalSourceSelection verifies that getIntervalFromStoreLocked builds the
-// interval from the lazy snapshot source when snapshotting is enabled and falls back to the
-// eager snapshot source when it is disabled.
-func TestCacheIntervalSourceSelection(t *testing.T) {
-	cases := []struct {
-		name             string
-		snapshottingOn   bool
-		wantLazySnapshot bool
-	}{
-		{
-			name:             "snapshotting enabled serves from lazy snapshot",
-			snapshottingOn:   true,
-			wantLazySnapshot: true,
-		},
-		{
-			name:             "snapshotting disabled falls back to eager snapshot",
-			snapshottingOn:   false,
-			wantLazySnapshot: false,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, tc.snapshottingOn)
-			wc := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
-			defer wc.Stop()
-			if err := wc.Add(makeTestPod("pod1", 100)); err != nil {
-				t.Fatal(err)
-			}
-
-			wc.Lock()
-			wci, err := wc.getIntervalFromStoreLocked("", false)
-			wc.Unlock()
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if tc.wantLazySnapshot {
-				if _, ok := wci.source.(*lazySnapshotCacheIntervalSource); !ok {
-					t.Errorf("expected *lazySnapshotCacheIntervalSource, got %T", wci.source)
+func TestGetIntervalFromStoreLocked(t *testing.T) {
+	for _, snapshotting := range []bool{true, false} {
+		for _, tc := range []struct {
+			name          string
+			key           string
+			matchesSingle bool
+			expectKeys    []string
+		}{
+			{name: "all", expectKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2"}},
+			{name: "single existing", key: "/prefix/ns/pod2", matchesSingle: true, expectKeys: []string{"/prefix/ns/pod2"}},
+			{name: "single missing", key: "/prefix/ns/pod3", matchesSingle: true, expectKeys: nil},
+		} {
+			t.Run(fmt.Sprintf("ListFromCacheSnapshot=%v/%s", snapshotting, tc.name), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, snapshotting)
+				wc := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
+				defer wc.Stop()
+				for _, pod := range []*v1.Pod{makeTestPod("pod2", 100), makeTestPod("pod1", 101)} {
+					if err := wc.Add(pod); err != nil {
+						t.Fatal(err)
+					}
 				}
-			} else {
-				if _, ok := wci.source.(*snapshotCacheIntervalSource); !ok {
-					t.Errorf("expected *snapshotCacheIntervalSource, got %T", wci.source)
+
+				wc.Lock()
+				wci, err := wc.getIntervalFromStoreLocked(tc.key, tc.matchesSingle)
+				wc.Unlock()
+				if err != nil {
+					t.Fatal(err)
 				}
-			}
-		})
+				// The interval must not observe writes made after it was taken.
+				if err := wc.Add(makeTestPod("pod0", 102)); err != nil {
+					t.Fatal(err)
+				}
+
+				var keys []string
+				for {
+					event, err := wci.Next()
+					if err != nil {
+						t.Fatal(err)
+					}
+					if event == nil {
+						break
+					}
+					if event.ResourceVersion != 101 {
+						t.Errorf("event for %s has resourceVersion %d, want 101", event.Key, event.ResourceVersion)
+					}
+					keys = append(keys, event.Key)
+				}
+				if !reflect.DeepEqual(keys, tc.expectKeys) {
+					t.Errorf("got keys %v, want %v", keys, tc.expectKeys)
+				}
+			})
+		}
 	}
 }
 
