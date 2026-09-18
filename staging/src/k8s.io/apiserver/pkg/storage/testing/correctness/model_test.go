@@ -24,7 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 )
 
-func TestCorrectness(t *testing.T) {
+func TestCorrectnessModel(t *testing.T) {
 	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} })
 
 	for _, step := range correctnessTestSteps() {

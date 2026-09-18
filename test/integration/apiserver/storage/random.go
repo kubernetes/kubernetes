@@ -18,6 +18,9 @@ package storage
 
 import (
 	"math/rand"
+	"strconv"
+
+	"k8s.io/apiserver/pkg/storage/testing/correctness"
 )
 
 type ChoiceWeight[T any] struct {
@@ -38,4 +41,34 @@ func PickRandom[T any](choices []ChoiceWeight[T]) T {
 		roll -= op.Weight
 	}
 	panic("unexpected")
+}
+
+func randomWatchRequest(lastRV uint64) correctness.WatchRequest {
+	var startRV string
+	if lastRV == 0 {
+		if rand.Intn(100) < 50 {
+			startRV = "0"
+		} else {
+			startRV = "1"
+		}
+	} else {
+		rvChoice := rand.Intn(100)
+		switch {
+		case rvChoice < 30:
+			// Live stream from latest point in time
+			startRV = "0"
+		case rvChoice < 40:
+			// Replay from beginning
+			startRV = "1"
+		default:
+			// Concrete RV with +/- 10 offset from last observed RV
+			offset := rand.Intn(21) - 10 // [-10, +10]
+			targetRV := max(int64(lastRV)+int64(offset), 1)
+			startRV = strconv.FormatUint(uint64(targetRV), 10)
+		}
+	}
+
+	return correctness.WatchRequest{
+		ResourceVersion: startRV,
+	}
 }
