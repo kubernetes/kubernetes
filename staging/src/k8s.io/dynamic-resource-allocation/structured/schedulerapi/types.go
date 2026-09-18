@@ -95,8 +95,12 @@ type AllocatedState struct {
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.
 // This type is used in consumable capacity features and the scheduler.
-// ConsumedCapacity defines consumable capacity values
-type ConsumedCapacity map[resourceapi.QualifiedName]*resource.Quantity
+// ConsumedCapacity defines consumable capacity values.
+//
+// Keys are fully-qualified names, so capacity in different domains is never conflated
+// regardless of whether a name's domain was given explicitly or left implicit.
+// Values are pointers to support in-place updates, for example via Add.
+type ConsumedCapacity map[draapi.FullyQualifiedName]*resource.Quantity
 
 // NewConsumedCapacity creates a new ConsumedCapacity.
 // This function is used in consumable capacity features and the scheduler.
@@ -197,17 +201,25 @@ type DeviceConsumedCapacity struct {
 	ConsumedCapacity
 }
 
-// NewDeviceConsumedCapacity creates a new DeviceConsumedCapacity.
-// This function is used in consumable capacity features and the scheduler.
-// NewDeviceConsumedCapacity creates DeviceConsumedCapacity instance from device ID and its consumed capacity.
+// NewDeviceConsumedCapacity creates a new DeviceConsumedCapacity for deviceID from
+// consumedCapacity as found in a DeviceRequestAllocationResult, i.e. keyed by
+// QualifiedName with the domain omitted iff it equals deviceID.Driver (for downgrade
+// compatibility with Kubernetes 1.37, see DeviceRequestAllocationResult.ConsumedCapacity).
+// Each key is normalized against deviceID.Driver so that the returned
+// DeviceConsumedCapacity, like the rest of the internal ConsumedCapacity tracking, is
+// always keyed by fully-qualified names.
+//
+// Callers that already have a ConsumedCapacity (for example, the allocators
+// themselves, while computing what a request would consume) do not need this
+// conversion and can construct a DeviceConsumedCapacity directly instead.
 func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	allocatedCapacity := NewConsumedCapacity()
-	for name, quantity := range consumedCapacity {
-		allocatedCapacity[name] = &quantity
+	normalized := make(ConsumedCapacity, len(consumedCapacity))
+	for name, val := range consumedCapacity {
+		normalized[draapi.MakeFullyQualifiedName(name, deviceID.Driver.String())] = new(val)
 	}
 	return DeviceConsumedCapacity{
 		DeviceID:         deviceID,
-		ConsumedCapacity: allocatedCapacity,
+		ConsumedCapacity: normalized,
 	}
 }
 

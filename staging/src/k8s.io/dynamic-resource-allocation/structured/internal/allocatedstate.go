@@ -20,8 +20,6 @@ package internal
 // See https://github.com/kubernetes/kubernetes/issues/133161.
 
 import (
-	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
@@ -47,10 +45,6 @@ func NewConsumedCapacity() ConsumedCapacity {
 
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 	return schedulerapi.NewConsumedCapacityCollection()
-}
-
-func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
 // IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices
