@@ -147,6 +147,32 @@ func newPodLevelResourcesPod(pod *v1.Pod, podResources v1.ResourceRequirements) 
 	return pod
 }
 
+func TestFitsSaturatedNodeStaysFailClosed(t *testing.T) {
+	// Two MaxInt64 memory requests: an unchecked sum wraps to -2 and the node
+	// reads as spare capacity, so a 1-byte request would be admitted. The checked
+	// add saturates the total to MaxInt64 instead, and the request must be rejected.
+	hugeMem := func(s string) *v1.Pod {
+		return &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse(s)}}}}}}
+	}
+	nodeInfo := framework.NewNodeInfo(
+		hugeMem("9223372036854775807"), // MaxInt64
+		hugeMem("9223372036854775807"), // MaxInt64; the two sum past int64 and wrap without the fix
+	)
+	nodeInfo.SetNode(&v1.Node{Status: v1.NodeStatus{Allocatable: makeAllocatableResources(0, 100, 32, 0, 0, 0)}})
+
+	got := Fits(newResourcePod(framework.Resource{Memory: 1}), nodeInfo, nil, ResourceRequestsOptions{})
+	insufficientMemory := false
+	for _, r := range got {
+		if r.ResourceName == v1.ResourceMemory {
+			insufficientMemory = true
+		}
+	}
+	if !insufficientMemory {
+		t.Errorf("a saturated node admitted a 1-byte memory request (fail-open); insufficient resources = %v", got)
+	}
+}
+
 func TestEnoughRequests(t *testing.T) { testEnoughRequests(ktesting.Init(t)) }
 func testEnoughRequests(tCtx ktesting.TContext) {
 	enoughPodsTests := []struct {
