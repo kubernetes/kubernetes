@@ -7911,3 +7911,157 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 		}
 	}
 }
+
+func TestReconcilePodGroupWithSnapshot(t *testing.T) {
+	podGroup := st.MakePodGroup().Name("pg").MinCount(2).Obj()
+	updatedPodGroup := st.MakePodGroup().Name("pg").MinCount(5).Obj()
+	podGroupWithParent := st.MakePodGroup().Name("pg").ParentCompositePodGroup("cpg-old").MinCount(2).Obj()
+	podGroupWithOtherParent := st.MakePodGroup().Name("pg").ParentCompositePodGroup("cpg-new").MinCount(5).Obj()
+
+	compositePodGroup := st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).Obj()
+	updatedCompositePodGroup := st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(3).Obj()
+
+	childCompositePodGroup := st.MakeCompositePodGroup().Name("cpg-nested").ParentCompositePodGroup("cpg-root").MinGroupCount(1).Obj()
+	childCompositePodGroupUpdated := st.MakeCompositePodGroup().Name("cpg-nested").ParentCompositePodGroup("cpg-root").MinGroupCount(4).Obj()
+	childCompositePodGroupOtherParent := st.MakeCompositePodGroup().Name("cpg-nested").ParentCompositePodGroup("cpg-other").Obj()
+
+	childPodGroup1 := st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-nested").MinCount(2).Obj()
+	childPodGroup1Updated := st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-nested").MinCount(6).Obj()
+	childPodGroup2 := st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-nested").Obj()
+
+	tests := []struct {
+		name                       string
+		queuedPodGroup             *schedulingv1beta1.PodGroup
+		rootCompositePodGroup      *schedulingv1alpha3.CompositePodGroup
+		queuedCompositePodGroups   []*schedulingv1alpha3.CompositePodGroup
+		queuedPodGroups            []*schedulingv1beta1.PodGroup
+		snapshotPodGroups          []*schedulingv1beta1.PodGroup
+		snapshotCompositePodGroups []*schedulingv1alpha3.CompositePodGroup
+		enableCompositePodGroup    bool
+		wantErr                    bool
+	}{
+		{
+			name:                    "podgroup update",
+			queuedPodGroup:          podGroup,
+			snapshotPodGroups:       []*schedulingv1beta1.PodGroup{updatedPodGroup},
+			enableCompositePodGroup: true,
+			wantErr:                 false,
+		},
+		{
+			name:                    "podgroup is missing from the snapshot",
+			queuedPodGroup:          podGroup,
+			snapshotPodGroups:       nil,
+			enableCompositePodGroup: true,
+			wantErr:                 true,
+		},
+		{
+			name:                    "podgroup parent mismatch",
+			queuedPodGroup:          podGroupWithParent,
+			snapshotPodGroups:       []*schedulingv1beta1.PodGroup{podGroupWithOtherParent},
+			enableCompositePodGroup: true,
+			wantErr:                 true,
+		},
+		{
+			name:                    "podgroup parent mismatch but CompositePodGroup feature disabled",
+			queuedPodGroup:          podGroupWithParent,
+			snapshotPodGroups:       []*schedulingv1beta1.PodGroup{podGroupWithOtherParent},
+			enableCompositePodGroup: false,
+			wantErr:                 false,
+		},
+		{
+			name:                       "multi-level hierarchy composite podgroup update",
+			rootCompositePodGroup:      compositePodGroup,
+			queuedCompositePodGroups:   []*schedulingv1alpha3.CompositePodGroup{compositePodGroup, childCompositePodGroup},
+			queuedPodGroups:            []*schedulingv1beta1.PodGroup{childPodGroup1},
+			snapshotCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{updatedCompositePodGroup, childCompositePodGroupUpdated},
+			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1Updated},
+			enableCompositePodGroup:    true,
+			wantErr:                    false,
+		},
+		{
+			name:                       "composite podgroup is missing from the snapshot",
+			rootCompositePodGroup:      compositePodGroup,
+			queuedCompositePodGroups:   []*schedulingv1alpha3.CompositePodGroup{compositePodGroup},
+			snapshotCompositePodGroups: nil,
+			enableCompositePodGroup:    true,
+			wantErr:                    true,
+		},
+		{
+			name:                       "composite podgroup child count mismatch within hierarchy",
+			rootCompositePodGroup:      compositePodGroup,
+			queuedCompositePodGroups:   []*schedulingv1alpha3.CompositePodGroup{compositePodGroup, childCompositePodGroup},
+			queuedPodGroups:            []*schedulingv1beta1.PodGroup{childPodGroup1},
+			snapshotCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{updatedCompositePodGroup, childCompositePodGroupUpdated},
+			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
+			enableCompositePodGroup:    true,
+			wantErr:                    true,
+		},
+		{
+			name:                       "composite podgroup parent mismatch within hierarchy",
+			rootCompositePodGroup:      compositePodGroup,
+			queuedCompositePodGroups:   []*schedulingv1alpha3.CompositePodGroup{compositePodGroup, childCompositePodGroup},
+			snapshotCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{updatedCompositePodGroup, childCompositePodGroupOtherParent},
+			enableCompositePodGroup:    true,
+			wantErr:                    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.CompositePodGroup:               tt.enableCompositePodGroup,
+				features.TopologyAwareWorkloadScheduling: tt.enableCompositePodGroup,
+			})
+
+			var pgi *framework.PodGroupInfo
+			if tt.rootCompositePodGroup != nil {
+				pgi = buildHierarchicalQueuedPodGroupInfo(tt.rootCompositePodGroup, tt.queuedCompositePodGroups, tt.queuedPodGroups, nil).PodGroupInfo
+			} else {
+				pgi = &framework.PodGroupInfo{
+					GenericPodGroup: fwk.NewGenericPodGroup(tt.queuedPodGroup),
+				}
+			}
+
+			snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(nil, nil, tt.snapshotPodGroups, tt.snapshotCompositePodGroups)
+			sched := &Scheduler{
+				nodeInfoSnapshot:       snapshot,
+				genericWorkloadEnabled: true,
+			}
+
+			err := sched.reconcilePodGroupWithSnapshot(pgi)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("reconcilePodGroupWithSnapshot() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if err != nil {
+				return
+			}
+
+			var verifyUpdatedPodGroupInfo func(info *framework.PodGroupInfo)
+			verifyUpdatedPodGroupInfo = func(info *framework.PodGroupInfo) {
+				if info.GetType() == fwk.CompositePodGroupKeyType {
+					snapshotCompositePodGroup, err := snapshot.CompositePodGroups().Get(info.GetNamespace(), info.GetName())
+					if err != nil {
+						t.Fatalf("unexpected error getting CompositePodGroup from snapshot: %v", err)
+					}
+					if diff := cmp.Diff(snapshotCompositePodGroup, info.CompositePodGroup); diff != "" {
+						t.Errorf("CompositePodGroup %s not updated to snapshot version (-want +got):\n%s", info.GetName(), diff)
+					}
+					for _, child := range info.Children {
+						verifyUpdatedPodGroupInfo(child)
+					}
+				} else {
+					snapshotPodGroup, err := snapshot.PodGroups().Get(info.GetNamespace(), info.GetName())
+					if err != nil {
+						t.Fatalf("unexpected error getting PodGroup from snapshot: %v", err)
+					}
+					if diff := cmp.Diff(snapshotPodGroup, info.PodGroup); diff != "" {
+						t.Errorf("PodGroup %s not updated to snapshot version (-want +got):\n%s", info.GetName(), diff)
+					}
+				}
+			}
+			verifyUpdatedPodGroupInfo(pgi)
+		})
+	}
+}
