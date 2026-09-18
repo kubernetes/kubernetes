@@ -412,6 +412,7 @@ type IngressClassParametersReference struct {
 	// Note: unlike networking.k8s.io/v1, this API version has no defaulting
 	// for this field, so it must be set explicitly.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Scope *string `json:"scope" protobuf:"bytes,4,opt,name=scope"`
 
 	// namespace is the namespace of the resource being referenced. This field is

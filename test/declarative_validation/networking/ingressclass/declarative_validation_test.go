@@ -26,6 +26,7 @@ import (
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 	registry "k8s.io/kubernetes/pkg/registry/networking/ingressclass"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
+	"k8s.io/utils/ptr"
 )
 
 func TestDeclarativeValidateParameter(t *testing.T) {
@@ -69,6 +70,20 @@ func TestDeclarativeValidateParameter(t *testing.T) {
 					expectedErrs: field.ErrorList{
 						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkBeta(),
 					},
+				},
+				"missing parameter scope": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Parameters.Scope = nil
+					}),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "parameters", "scope"), "").MarkAlpha(),
+					},
+				},
+				"valid parameters with namespace scope": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Parameters.Scope = ptr.To(networking.IngressClassParametersReferenceScopeNamespace)
+						obj.Spec.Parameters.Namespace = ptr.To("default")
+					}),
 				},
 			}
 			for name, tc := range testCases {
@@ -135,6 +150,18 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkBeta(),
+					},
+				},
+				"update fails when parameters scope is cleared": {
+					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.ResourceVersion = "1"
+					}),
+					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.ResourceVersion = "1"
+						obj.Spec.Parameters.Scope = nil
+					}),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "parameters", "scope"), "").MarkAlpha(),
 					},
 				},
 			}
