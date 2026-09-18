@@ -3213,7 +3213,6 @@ type ContainerStatus struct {
 	// +optional
 	VolumeMounts []VolumeMountStatus
 	// User represents user identity information initially attached to the first process of the container
-	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	User *ContainerUser
 	// AllocatedResourcesStatus represents the status of various resources
@@ -4459,11 +4458,9 @@ type PodSecurityContext struct {
 	SupplementalGroups []int64
 	// Defines how supplemental groups of the first container processes are calculated.
 	// Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
-	// (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
-	// and the container runtime must implement support for this feature.
+	// The container runtime must implement support for this feature.
 	// Note that this field cannot be set when spec.os.name is windows.
-	// TODO: update the default value to "Merge" when spec.os.name is not windows in v1.34
-	// +featureGate=SupplementalGroupsPolicy
+	// TODO: update the default value to "Merge" when spec.os.name is not windows
 	// +optional
 	SupplementalGroupsPolicy *SupplementalGroupsPolicy
 	// A special supplemental group that applies to all containers in a pod.
@@ -5975,7 +5972,6 @@ type NodeStatus struct {
 	// +optional
 	RuntimeHandlers []NodeRuntimeHandler
 	// Features describes the set of features implemented by the CRI implementation.
-	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	Features *NodeFeatures
 	// DeclaredFeatures represents the declared features of a node.

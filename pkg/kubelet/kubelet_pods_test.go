@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
@@ -7333,41 +7332,17 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 
 	for tdesc, tc := range map[string]struct {
 		testPodStatus           *kubecontainer.PodStatus
-		featureEnabled          bool
 		expectedContainerStatus []v1.ContainerStatus
 	}{
-		"nil user, SupplementalGroupsPolicy is disabled": {
+		"nil user": {
 			testPodStaus(nil),
-			false,
 			expectedContainerStatuses(nil),
 		},
-		"empty user, SupplementalGroupsPolicy is disabled": {
+		"empty user": {
 			testPodStaus(&kubecontainer.ContainerUser{}),
-			false,
-			expectedContainerStatuses(nil),
-		},
-		"linux user, SupplementalGroupsPolicy is disabled": {
-			testPodStaus(&kubecontainer.ContainerUser{
-				Linux: &kubecontainer.LinuxContainerUser{
-					UID:                0,
-					GID:                0,
-					SupplementalGroups: []int64{10},
-				},
-			}),
-			false,
-			expectedContainerStatuses(nil),
-		},
-		"nil user, SupplementalGroupsPolicy is enabled": {
-			testPodStaus(nil),
-			true,
-			expectedContainerStatuses(nil),
-		},
-		"empty user, SupplementalGroupsPolicy is enabled": {
-			testPodStaus(&kubecontainer.ContainerUser{}),
-			true,
 			expectedContainerStatuses(&v1.ContainerUser{}),
 		},
-		"linux user, SupplementalGroupsPolicy is enabled": {
+		"linux user": {
 			testPodStaus(&kubecontainer.ContainerUser{
 				Linux: &kubecontainer.LinuxContainerUser{
 					UID:                0,
@@ -7375,7 +7350,6 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 					SupplementalGroups: []int64{10},
 				},
 			}),
-			true,
 			expectedContainerStatuses(&v1.ContainerUser{
 				Linux: &v1.LinuxContainerUser{
 					UID:                0,
@@ -7385,9 +7359,6 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 			}),
 		},
 	} {
-		// Set emulation version so that the feature gate can be disabled in the test
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, tc.featureEnabled)
 		tPod := testPod.DeepCopy()
 		t.Logf("TestCase: %q", tdesc)
 

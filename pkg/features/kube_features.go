@@ -1151,12 +1151,6 @@ const (
 	// Requires stricter validation of IP addresses and CIDR values in API objects.
 	StrictIPCIDRValidation featuregate.Feature = "StrictIPCIDRValidation"
 
-	// owner: @everpeace
-	// kep: https://kep.k8s.io/3619
-	//
-	// Enable SupplementalGroupsPolicy feature in PodSecurityContext
-	SupplementalGroupsPolicy featuregate.Feature = "SupplementalGroupsPolicy"
-
 	// owner: @zhifei92
 	//
 	// Enables the systemd watchdog for the kubelet. When enabled, the kubelet will
@@ -2109,12 +2103,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	SupplementalGroupsPolicy: {
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.38
-	},
-
 	SystemdWatchdog: {
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remov in 1.37
@@ -2744,8 +2732,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	StorageVersionMigrator: {},
 
 	StrictIPCIDRValidation: {},
-
-	SupplementalGroupsPolicy: {},
 
 	SystemdWatchdog: {},
 

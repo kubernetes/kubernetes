@@ -2737,9 +2737,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-			status.User = convertContainerStatusUser(cStatus)
-		}
+		status.User = convertContainerStatusUser(cStatus)
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
 			status.StopSignal = cStatus.StopSignal
 		}

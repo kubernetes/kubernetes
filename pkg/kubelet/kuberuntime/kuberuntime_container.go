@@ -719,10 +719,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 		imageID = status.ImageId
 	}
 
-	var cStatusUser *kubecontainer.ContainerUser
-	if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-		cStatusUser = toKubeContainerUser(status.User)
-	}
+	cStatusUser := toKubeContainerUser(status.User)
 
 	var cStatusStopSignal *v1.Signal
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
