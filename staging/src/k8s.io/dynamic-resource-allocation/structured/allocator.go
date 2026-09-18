@@ -62,6 +62,7 @@ type Features = internal.Features
 type DeviceID = schedulerapi.DeviceID
 type AllocatedState = schedulerapi.AllocatedState
 type SharedDeviceID = schedulerapi.SharedDeviceID
+type NormalizedName = schedulerapi.NormalizedName
 type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
 type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
 type ConsumedCapacity = schedulerapi.ConsumedCapacity
@@ -74,12 +75,15 @@ func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
 	return schedulerapi.MakeSharedDeviceID(deviceID, shareID)
 }
 
+func NormalizeQualifiedName(name resourceapi.QualifiedName, defaultDomain string) NormalizedName {
+	return schedulerapi.NormalizeQualifiedName(name, defaultDomain)
+}
+
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 	return schedulerapi.NewConsumedCapacityCollection()
 }
 
-func NewDeviceConsumedCapacity(deviceID DeviceID,
-	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
+func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
 	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 

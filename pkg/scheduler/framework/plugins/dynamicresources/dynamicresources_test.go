@@ -472,6 +472,27 @@ var (
 			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
 		}(),
 	}
+	// allocationResultWithQualifiedConsumedCapacity stores ConsumedCapacity keyed with the
+	// driver name as an explicit domain prefix, unlike allocationResultWithConsumedCapacity
+	// above which uses the unqualified form. Both must be recognized as the same capacity
+	// once normalized against the driver.
+	allocationResultWithQualifiedConsumedCapacity = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  sharedDeviceName,
+				Request: "req-1",
+				ShareID: ptr.To(types.UID("share-789")), // Shared device allocation
+				ConsumedCapacity: map[resourceapi.QualifiedName]apiresource.Quantity{
+					resourceapi.QualifiedName(driver + "/" + string(capacityName)): apiresource.MustParse("1"),
+				},
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
 	allocationResult2 = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
@@ -742,6 +763,9 @@ var (
 	allocatedClaimWithConsumedCapacity2 = st.FromResourceClaim(pendingClaim).
 						Allocation(allocationResultWithConsumedCapacity2).
 						Obj()
+	allocatedClaimWithQualifiedConsumedCapacity = st.FromResourceClaim(pendingClaim).
+							Allocation(allocationResultWithQualifiedConsumedCapacity).
+							Obj()
 	allocatedClaimWithSkipNodeOperations = st.FromResourceClaim(pendingClaim).
 						Allocation(allocationResultWithSkipNodeOperations).
 						Obj()
@@ -5770,6 +5794,19 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 			expectedAllocatedSharedDeviceIDs: 1,
 			expectedConsumedCapacity:         "1",
 		},
+		"single-allocated-claim-with-qualified-capacity-name": {
+			// The persisted ConsumedCapacity key is qualified with the driver name
+			// (as it would be written by an older scheduler, or a driver that used
+			// to publish qualified capacity names). It must be recognized as the
+			// same capacity as the unqualified form used elsewhere in this test.
+			enabledConsumableCapacity: true,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithQualifiedConsumedCapacity,
+			},
+			expectedAllocatedDeviceIDs:       0,
+			expectedAllocatedSharedDeviceIDs: 1,
+			expectedConsumedCapacity:         "1",
+		},
 		"disabled-single-allocated-claim-with-capacity": {
 			enabledConsumableCapacity: false,
 			allocatedResourceClaims: []*resourceapi.ResourceClaim{
@@ -5898,13 +5935,14 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 					tCtx.Errorf("expected aggregated capacity of %s, got nil", deviceID)
 					return
 				}
-				value := capacity[capacityName]
+				normalizedName := schedulerapi.NormalizeQualifiedName(capacityName, driver)
+				value := capacity[normalizedName]
 				if value == nil {
-					tCtx.Errorf("expected value of %s, got nil", capacityName)
+					tCtx.Errorf("expected value of %s, got nil", normalizedName)
 					return
 				}
 				if value.Cmp(apiresource.MustParse(tc.expectedConsumedCapacity)) != 0 {
-					tCtx.Errorf("expected value of %s to be %s, got %s", capacityName, tc.expectedConsumedCapacity, value)
+					tCtx.Errorf("expected value of %s to be %s, got %s", normalizedName, tc.expectedConsumedCapacity, value)
 				}
 			} else if len(aggregatedCapacity) > 0 {
 				tCtx.Errorf("got unexpected consumed capacity")

@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
 const (
@@ -55,10 +56,10 @@ var (
 )
 
 func deviceConsumedCapacity(deviceID DeviceID) DeviceConsumedCapacity {
-	capaicty := map[resourceapi.QualifiedName]resource.Quantity{
-		capacity0: one,
+	capacity := ConsumedCapacity{
+		NormalizedName{Identifier: capacity0}: new(one),
 	}
-	return NewDeviceConsumedCapacity(deviceID, capaicty)
+	return DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: capacity}
 }
 
 func TestConsumableCapacity(t *testing.T) {
@@ -68,7 +69,7 @@ func TestConsumableCapacity(t *testing.T) {
 		allocatedCapacity := NewConsumedCapacity()
 		g.Expect(allocatedCapacity.Empty()).To(BeTrueBecause("allocated capacity should start from zero"))
 		oneAllocated := ConsumedCapacity{
-			capacity0: &one,
+			NormalizedName{Identifier: capacity0}: &one,
 		}
 		allocatedCapacity.Add(oneAllocated)
 		g.Expect(allocatedCapacity.Empty()).To(BeFalseBecause("capacity is added"))
@@ -84,9 +85,9 @@ func TestConsumableCapacity(t *testing.T) {
 		aggregatedCapacity.Insert(deviceConsumedCapacity(deviceID))
 		allocatedCapacity, found := aggregatedCapacity[deviceID]
 		g.Expect(found).To(BeTrueBecause("expected deviceID to be found"))
-		g.Expect(allocatedCapacity[capacity0].Cmp(two)).To(BeZero())
+		g.Expect(allocatedCapacity[NormalizedName{Identifier: capacity0}].Cmp(two)).To(BeZero())
 		aggregatedCapacity.Remove(deviceConsumedCapacity(deviceID))
-		g.Expect(allocatedCapacity[capacity0].Cmp(one)).To(BeZero())
+		g.Expect(allocatedCapacity[NormalizedName{Identifier: capacity0}].Cmp(one)).To(BeZero())
 	})
 
 	t.Run("get-consumed-capacity-from-request", func(t *testing.T) {
@@ -116,11 +117,12 @@ func TestConsumableCapacity(t *testing.T) {
 			},
 		}
 		g := NewWithT(t)
-		consumedCapacity, err := GetConsumedCapacityFromRequest(requestedCapacity, consumableCapacity, false)
+		consumedCapacity, err := GetConsumedCapacityFromRequest(requestedCapacity, draapi.MakeUniqueString(driverA), consumableCapacity, false)
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(consumedCapacity).To(HaveLen(3))
 		for name, val := range consumedCapacity {
-			g.Expect(string(name)).Should(BeElementOf([]string{capacity0, capacity1, "dummy"}))
+			g.Expect(name.Domain).To(BeEmpty(), "domain should be omitted since it equals the driver")
+			g.Expect(name.Identifier).Should(BeElementOf([]string{capacity0, capacity1, "dummy"}))
 			g.Expect(val.Cmp(one)).To(BeZero())
 		}
 	})
@@ -160,7 +162,7 @@ func testCmpRequestOverCapacityFatalBeatsSoft(t *testing.T) {
 	// Go's map order is unspecified, so run the check repeatedly to make an
 	// order-dependent regression very likely to surface rather than to rely on one order.
 	for range 64 {
-		ok, err := CmpRequestOverCapacity(NewConsumedCapacity(), request, nil, capacity, NewConsumedCapacity(), false)
+		ok, err := CmpRequestOverCapacity(NewConsumedCapacity(), request, draapi.MakeUniqueString(driverA), nil, capacity, NewConsumedCapacity(), false)
 		g.Expect(ok).To(BeFalseBecause("an unrepresentable request must not be considered satisfiable"))
 		g.Expect(err).To(MatchError(errCapacityRequestNotRepresentable), "a representability error must take precedence over the soft over-capacity mismatch")
 	}
