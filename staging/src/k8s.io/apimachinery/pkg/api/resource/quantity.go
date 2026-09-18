@@ -326,10 +326,11 @@ func ParseQuantity(str string) (Quantity, error) {
 	}
 
 	if precision >= 0 {
-		// if we have a denominator, shift the entire value to the left by the number of places in the
-		// denominator
-		scale -= int32(len(denom))
-		if scale >= int32(Nano) {
+		// Shift left by the denominator's digit count in int64: a large negative
+		// exponent overflows int32 here.
+		adjustedScale := int64(scale) - int64(len(denom))
+		if adjustedScale >= int64(Nano) {
+			scale = int32(adjustedScale)
 			shifted := num + denom
 
 			uvalue, err := strconv.ParseUint(shifted, 10, 64)
@@ -377,7 +378,16 @@ func ParseQuantity(str string) (Quantity, error) {
 
 	// So that no one but us has to think about suffixes, remove it.
 	if base == 10 {
-		amount.SetScale(amount.Scale() + Scale(exponent).infScale())
+		// A large negative exponent can push the scale past inf.Scale (int32). That
+		// magnitude is below the minimum unit and rounds to 1n, set here where it fits.
+		if newScale := int64(amount.Scale()) + int64(Scale(exponent).infScale()); newScale > math.MaxInt32 {
+			if s := amount.Sign(); s != 0 {
+				amount.SetUnscaled(int64(s))
+			}
+			amount.SetScale(Nano.infScale())
+		} else {
+			amount.SetScale(inf.Scale(newScale))
+		}
 	} else if base == 2 {
 		// numericSuffix = 2 ** exponent
 		numericSuffix := big.NewInt(1).Lsh(bigOne, uint(exponent))

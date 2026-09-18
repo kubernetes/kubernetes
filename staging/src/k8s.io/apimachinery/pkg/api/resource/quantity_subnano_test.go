@@ -35,6 +35,12 @@ func TestParseQuantitySubNanoRoundsUp(t *testing.T) {
 		// magnitude below 1n rounds away from zero to the minimum unit
 		{"1e-2147483647", "1n"},
 		{"-1e-2147483647", "-1n"},
+		// a fractional mantissa with an extreme exponent still rounds to 1n; the scale must not overflow int32
+		{"1.5e-2147483647", "1n"},
+		{"1.55e-2147483647", "1n"},
+		{"1.9999e-2147483647", "1n"},
+		{"-1.5e-2147483647", "-1n"},
+		{"0.5e-2147483647", "1n"},
 		{"1e-100", "1n"},
 		{"-1e-100", "-1n"},
 		{"1e-10", "1n"},
