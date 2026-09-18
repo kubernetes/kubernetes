@@ -172,13 +172,15 @@ func (pl *InterPodAffinity) PreScore(
 		return fwk.AsStatus(fmt.Errorf("failed to parse pod: %w", err))
 	}
 
-	for i := range state.podInfo.GetPreferredAffinityTerms() {
-		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(state.podInfo.GetPreferredAffinityTerms()[i].AffinityTerm); err != nil {
+	preferredAffinityTerms := state.podInfo.GetPreferredAffinityTerms()
+	for i := range preferredAffinityTerms {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&preferredAffinityTerms[i].AffinityTerm); err != nil {
 			return fwk.AsStatus(fmt.Errorf("updating PreferredAffinityTerms: %w", err))
 		}
 	}
-	for i := range state.podInfo.GetPreferredAntiAffinityTerms() {
-		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(state.podInfo.GetPreferredAntiAffinityTerms()[i].AffinityTerm); err != nil {
+	preferredAntiAffinityTerms := state.podInfo.GetPreferredAntiAffinityTerms()
+	for i := range preferredAntiAffinityTerms {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&preferredAntiAffinityTerms[i].AffinityTerm); err != nil {
 			return fwk.AsStatus(fmt.Errorf("updating PreferredAntiAffinityTerms: %w", err))
 		}
 	}
