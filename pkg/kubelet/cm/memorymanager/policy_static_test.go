@@ -19,6 +19,7 @@ package memorymanager
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -155,6 +156,7 @@ func areContainerMemoryAssignmentsEqual(t *testing.T, cma1, cma2 state.Container
 }
 
 type testStaticPolicy struct {
+	policyOptions                   map[string]string
 	description                     string
 	assignments                     state.ContainerMemoryAssignments
 	expectedAssignments             state.ContainerMemoryAssignments
@@ -186,7 +188,7 @@ func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.T
 		manager = topologymanager.NewFakeManagerWithHint(logger, hint)
 	}
 
-	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager)
+	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager, testCase.policyOptions)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -774,7 +776,7 @@ func TestStaticPolicyStart(t *testing.T) {
 						{
 							NUMAAffinity: []int{0},
 							Type:         v1.ResourceMemory,
-							Size:         gb,
+							Size:         256 * mb,
 						},
 						{
 							NUMAAffinity: []int{0},
@@ -836,7 +838,7 @@ func TestStaticPolicyStart(t *testing.T) {
 						{
 							NUMAAffinity: []int{0},
 							Type:         v1.ResourceMemory,
-							Size:         gb,
+							Size:         256 * mb,
 						},
 						{
 							NUMAAffinity: []int{0},
@@ -1219,6 +1221,441 @@ func TestStaticPolicyStart(t *testing.T) {
 				t.Fatalf("The actual machine state: %v is different from the expected one: %v", machineState, testCase.expectedMachineState)
 			}
 		})
+	}
+}
+
+const testMemoryDriftBound uint64 = 256 * mb
+
+func TestStaticPolicyStartWithMemoryDrift(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+	hugepages := func() *state.MemoryTable {
+		return &state.MemoryTable{Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb}
+	}
+	oneNodeMachineInfo := func(memory uint64) *cadvisorapi.MachineInfo {
+		return &cadvisorapi.MachineInfo{
+			Topology: []cadvisorapi.Node{
+				{
+					Id:        0,
+					Memory:    memory,
+					HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}},
+				},
+			},
+		}
+	}
+	systemReserved := systemReservedMemory{
+		0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb},
+	}
+
+	testCases := []testStaticPolicy{
+		{
+			description:         "should tolerate a small NUMA node memory drift when there are no assignments",
+			assignments:         state.ContainerMemoryAssignments{},
+			expectedAssignments: state.ContainerMemoryAssignments{},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 512 * mb, Free: 512 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 508 * mb, Free: 508 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2*gb - 4*mb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+			},
+			systemReserved: systemReserved,
+			machineInfo:    oneNodeMachineInfo(2*gb - 4*mb),
+			expectedError:  nil,
+		},
+		{
+			description: "should tolerate a small NUMA node memory drift when the assignments still fit",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 200 * mb}},
+				},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 200 * mb}},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 512 * mb, Free: 312 * mb, Reserved: 200 * mb, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 1,
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 508 * mb, Free: 308 * mb, Reserved: 200 * mb, SystemReserved: 512 * mb, TotalMemSize: 2*gb - 4*mb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 1,
+				},
+			},
+			systemReserved: systemReserved,
+			machineInfo:    oneNodeMachineInfo(2*gb - 4*mb),
+			expectedError:  nil,
+		},
+		{
+			description: "should still fail when a NUMA node memory reduction no longer fits the assignments",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 500 * mb}},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 512 * mb, Free: 12 * mb, Reserved: 500 * mb, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 1,
+				},
+			},
+			systemReserved: systemReserved,
+			machineInfo:    oneNodeMachineInfo(1600 * mb),
+			expectedError:  fmt.Errorf("[memorymanager] (pod: pod1, container: container1) the memory assignment does not fit the machine state"),
+		},
+		{
+			description: "should fail when the NUMA node memory drift exceeds the tolerated bound",
+			assignments: state.ContainerMemoryAssignments{},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 512 * mb, Free: 512 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+						hugepages1Gi:      hugepages(),
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+			},
+			systemReserved: systemReserved,
+			machineInfo:    oneNodeMachineInfo(2*gb - 300*mb),
+			expectedError:  fmt.Errorf("[memorymanager] the expected machine state is different from the real one"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			p, s, err := initTests(t, &testCase, nil, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			p.(*staticPolicy).maxMemoryDrift = testMemoryDriftBound
+
+			err = p.Start(logger, s)
+			if !reflect.DeepEqual(err, testCase.expectedError) {
+				t.Fatalf("The actual error: %v is different from the expected one: %v", err, testCase.expectedError)
+			}
+
+			if err != nil {
+				return
+			}
+
+			assignments := s.GetMemoryAssignments()
+			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
+				t.Fatalf("Actual assignments: %v is different from the expected one: %v", assignments, testCase.expectedAssignments)
+			}
+
+			machineState := s.GetMachineState()
+			if !areMachineStatesEqual(logger, machineState, testCase.expectedMachineState) {
+				t.Fatalf("The actual machine state: %v is different from the expected one: %v", machineState, testCase.expectedMachineState)
+			}
+		})
+	}
+}
+
+func TestStaticPolicyStartMemoryDriftBound(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+	const total = 8 * gb
+	driftError := fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+	makeCase := func(description string, drift uint64, expectedError error) testStaticPolicy {
+		return testStaticPolicy{
+			description: description,
+			assignments: state.ContainerMemoryAssignments{},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: total - 2*gb, Free: total - 2*gb, Reserved: 0, SystemReserved: gb, TotalMemSize: total},
+						hugepages1Gi:      {Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb},
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+			},
+			systemReserved: systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: gb}},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{Id: 0, Memory: total - drift, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+				},
+			},
+			expectedError: expectedError,
+		}
+	}
+	testCases := []testStaticPolicy{
+		makeCase("no drift", 0, nil),
+		makeCase("a few MiB is tolerated", 4*mb, nil),
+		makeCase("well below the bound is tolerated", 200*mb, nil),
+		makeCase("exactly at the bound is tolerated", testMemoryDriftBound, nil),
+		makeCase("just past the bound is rejected", testMemoryDriftBound+mb, driftError),
+		makeCase("a whole GiB is rejected", gb, driftError),
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			p, s, err := initTests(t, &testCase, nil, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			p.(*staticPolicy).maxMemoryDrift = testMemoryDriftBound
+			if err := p.Start(logger, s); !reflect.DeepEqual(err, testCase.expectedError) {
+				t.Fatalf("Start error = %v, want %v", err, testCase.expectedError)
+			}
+		})
+	}
+}
+
+func TestStaticPolicyStartCrossNUMAMemoryDrift(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+	hugepage := func() *state.MemoryTable {
+		return &state.MemoryTable{Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb}
+	}
+	tc := testStaticPolicy{
+		description: "cross-NUMA assignment tolerates a per-node drift that reshuffles the split",
+		assignments: state.ContainerMemoryAssignments{
+			"pod1": map[string][]state.Block{
+				"container1": {{NUMAAffinity: []int{0, 1}, Type: v1.ResourceMemory, Size: 7 * gb}},
+			},
+		},
+		machineState: state.NUMANodeMap{
+			0: &state.NUMANodeState{
+				MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+					v1.ResourceMemory: {Allocatable: 6 * gb, Free: 0, Reserved: 6 * gb, SystemReserved: gb, TotalMemSize: 8 * gb},
+					hugepages1Gi:      hugepage(),
+				},
+				Cells:               []int{0, 1},
+				NumberOfAssignments: 1,
+			},
+			1: &state.NUMANodeState{
+				MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+					v1.ResourceMemory: {Allocatable: 6 * gb, Free: 5 * gb, Reserved: gb, SystemReserved: gb, TotalMemSize: 8 * gb},
+					hugepages1Gi:      hugepage(),
+				},
+				Cells:               []int{0, 1},
+				NumberOfAssignments: 1,
+			},
+		},
+		systemReserved: systemReservedMemory{
+			0: map[v1.ResourceName]uint64{v1.ResourceMemory: gb},
+			1: map[v1.ResourceName]uint64{v1.ResourceMemory: gb},
+		},
+		machineInfo: &cadvisorapi.MachineInfo{
+			Topology: []cadvisorapi.Node{
+				{Id: 0, Memory: 8*gb - 4*mb, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+				{Id: 1, Memory: 8 * gb, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+			},
+		},
+		expectedError: nil,
+	}
+
+	p, s, err := initTests(t, &tc, nil, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	p.(*staticPolicy).maxMemoryDrift = testMemoryDriftBound
+	if err := p.Start(logger, s); !reflect.DeepEqual(err, tc.expectedError) {
+		t.Fatalf("Start error = %v, want %v", err, tc.expectedError)
+	}
+	blocks := s.GetMemoryBlocks("pod1", "container1")
+	if len(blocks) != 1 || blocks[0].Size != 7*gb {
+		t.Fatalf("cross-NUMA assignment not preserved after restart: %+v", blocks)
+	}
+}
+
+func TestStaticPolicyNewWithPolicyOptions(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("memory manager policy options are only supported on linux")
+	}
+	systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+	t.Run("options are rejected while the feature gate is disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, false)
+		tc := testStaticPolicy{systemReserved: systemReserved, policyOptions: map[string]string{MemoryDriftTolerance: "off"}}
+		if _, _, err := initTests(t, &tc, nil, nil); err == nil {
+			t.Fatalf("expected an error for policy options without the feature gate")
+		}
+	})
+	t.Run("unknown option is rejected", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+		tc := testStaticPolicy{systemReserved: systemReserved, policyOptions: map[string]string{"no-such-option": "1"}}
+		if _, _, err := initTests(t, &tc, nil, nil); err == nil {
+			t.Fatalf("expected an error for an unknown policy option")
+		}
+	})
+	t.Run("explicit bound is applied", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+		tc := testStaticPolicy{systemReserved: systemReserved, policyOptions: map[string]string{MemoryDriftTolerance: "8Mi"}}
+		p, _, err := initTests(t, &tc, nil, nil)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if got := p.(*staticPolicy).maxMemoryDrift; got != 8*mb {
+			t.Fatalf("maxMemoryDrift = %d, want %d", got, 8*mb)
+		}
+	})
+}
+
+func TestStaticPolicyStartWithMemoryDriftOption(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("memory manager policy options are only supported on linux")
+	}
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+	driftError := fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+	makeCase := func(description string, option string, drift uint64, expectedError error) testStaticPolicy {
+		return testStaticPolicy{
+			description:   description,
+			policyOptions: map[string]string{MemoryDriftTolerance: option},
+			assignments:   state.ContainerMemoryAssignments{},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 512 * mb, Free: 512 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+						hugepages1Gi:      {Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb},
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+			},
+			systemReserved: systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{Id: 0, Memory: 2*gb - drift, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+				},
+			},
+			expectedError: expectedError,
+		}
+	}
+	testCases := []testStaticPolicy{
+		makeCase("off rejects any drift", "off", 4*mb, driftError),
+		makeCase("explicit bound tolerates a drift below it", "8Mi", 4*mb, nil),
+		makeCase("explicit bound rejects a drift above it", "8Mi", 12*mb, driftError),
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			p, s, err := initTests(t, &testCase, nil, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if err := p.Start(logger, s); !reflect.DeepEqual(err, testCase.expectedError) {
+				t.Fatalf("Start error = %v, want %v", err, testCase.expectedError)
+			}
+		})
+	}
+}
+
+func TestStaticPolicyStartMemoryDriftMetrics(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+	metrics.MemoryManagerDriftToleranceBytes.Create(nil)
+	metrics.MemoryManagerMemoryDriftBytes.Create(nil)
+	metrics.MemoryManagerMemoryDriftBytes.Reset()
+	tc := testStaticPolicy{
+		assignments: state.ContainerMemoryAssignments{},
+		machineState: state.NUMANodeMap{
+			0: &state.NUMANodeState{
+				MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+					v1.ResourceMemory: {Allocatable: 512 * mb, Free: 512 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+					hugepages1Gi:      {Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb},
+				},
+				Cells:               []int{0},
+				NumberOfAssignments: 0,
+			},
+		},
+		systemReserved: systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}},
+		machineInfo: &cadvisorapi.MachineInfo{
+			Topology: []cadvisorapi.Node{
+				{Id: 0, Memory: 2*gb - 4*mb, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+			},
+		},
+	}
+
+	p, s, err := initTests(t, &tc, nil, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	p.(*staticPolicy).maxMemoryDrift = testMemoryDriftBound
+	if err := p.Start(logger, s); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	tolerance, err := testutil.GetGaugeMetricValue(metrics.MemoryManagerDriftToleranceBytes)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if tolerance != float64(testMemoryDriftBound) {
+		t.Fatalf("drift tolerance metric = %v, want %d", tolerance, testMemoryDriftBound)
+	}
+	drift, err := testutil.GetGaugeMetricValue(metrics.MemoryManagerMemoryDriftBytes.WithLabelValues("0"))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if drift != float64(4*mb) {
+		t.Fatalf("memory drift metric = %v, want %d", drift, 4*mb)
+	}
+}
+
+func TestStaticPolicyStartMemoryDriftGateDisabled(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, false)
+	tc := testStaticPolicy{
+		description: "a small NUMA node memory drift is rejected while the feature gate is disabled",
+		assignments: state.ContainerMemoryAssignments{},
+		machineState: state.NUMANodeMap{
+			0: &state.NUMANodeState{
+				MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+					v1.ResourceMemory: {Allocatable: 512 * mb, Free: 512 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+					hugepages1Gi:      {Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb},
+				},
+				Cells:               []int{0},
+				NumberOfAssignments: 0,
+			},
+		},
+		systemReserved: systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}},
+		machineInfo: &cadvisorapi.MachineInfo{
+			Topology: []cadvisorapi.Node{
+				{Id: 0, Memory: 2*gb - 4*mb, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+			},
+		},
+		expectedError: fmt.Errorf("[memorymanager] the expected machine state is different from the real one"),
+	}
+
+	p, s, err := initTests(t, &tc, nil, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if err := p.Start(logger, s); !reflect.DeepEqual(err, tc.expectedError) {
+		t.Fatalf("Start error = %v, want %v", err, tc.expectedError)
+	}
+	if got := s.GetMachineState(); !areMachineStatesEqual(logger, got, tc.machineState) {
+		t.Fatalf("machine state changed although the feature gate is disabled: %v", got)
 	}
 }
 
@@ -4948,7 +5385,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 					v1.ResourceMemory: 256 * mb,
 				},
 			}
-			policy, err := NewPolicyStatic(logger, machineInfo, systemReserved, topologymanager.NewFakeManagerWithScope(tc.scope))
+			policy, err := NewPolicyStatic(logger, machineInfo, systemReserved, topologymanager.NewFakeManagerWithScope(tc.scope), nil)
 			if err != nil {
 				t.Fatalf("NewPolicyStatic() failed: %v", err)
 			}
@@ -5749,7 +6186,7 @@ func TestStaticPolicyLifecycleAllocate(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), nil)
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)
@@ -5828,7 +6265,7 @@ func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), nil)
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)
@@ -5907,7 +6344,7 @@ func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), nil)
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)
@@ -5989,7 +6426,7 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), nil)
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)

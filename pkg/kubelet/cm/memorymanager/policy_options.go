@@ -1,0 +1,55 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package memorymanager
+
+import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog/v2"
+)
+
+const (
+	MemoryDriftTolerance string = "memory-drift-tolerance"
+
+	memoryDriftToleranceAuto = "auto"
+	memoryDriftToleranceOff  = "off"
+)
+
+func maxMemoryDriftFromOptions(logger klog.Logger, policyOptions map[string]string) (uint64, error) {
+	for name := range policyOptions {
+		if name != MemoryDriftTolerance {
+			return 0, fmt.Errorf("[memorymanager] unknown policy option: %q", name)
+		}
+	}
+	switch value := policyOptions[MemoryDriftTolerance]; value {
+	case "", memoryDriftToleranceAuto:
+		drift, _ := memoryDriftFromKernelImage(logger, procIomemPath)
+		return drift, nil
+	case memoryDriftToleranceOff:
+		return 0, nil
+	default:
+		quantity, err := resource.ParseQuantity(value)
+		if err != nil {
+			return 0, fmt.Errorf("[memorymanager] bad value for option %q: %w", MemoryDriftTolerance, err)
+		}
+		if quantity.Sign() < 0 {
+			return 0, fmt.Errorf("[memorymanager] bad value for option %q: %q is negative", MemoryDriftTolerance, value)
+		}
+		return uint64(quantity.Value()), nil
+	}
+}
