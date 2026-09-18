@@ -222,8 +222,25 @@ type PodGroupManager interface {
 	CompositePodGroups() CompositePodGroupLister
 	// BuildHierarchySnapshotFromPod builds a hierarchy snapshot from the given pod.
 	BuildHierarchySnapshotFromPod(pod *v1.Pod) (PodGroupManager, error)
-	// GetRootKeyForGroup returns the root key of the given EntityKey.
-	GetRootKeyForGroup(key EntityKey) (EntityKey, bool, error)
+	// FindRootKeyForGroup returns the root *EntityKey of the hierarchy for the given EntityKey,
+	// or nil if the root group was not found (i.e. does not exist).
+	FindRootKeyForGroup(key EntityKey) (*EntityKey, error)
+	// FindRootGroup traverses parent links from key to locate the top-most root entity in the hierarchy.
+	// It returns a *RootGroup containing the root's EntityKey alongside its authoritative API object and cache state,
+	// or nil if the root group was not found.
+	FindRootGroup(key EntityKey) (*RootGroup, error)
+}
+
+// RootGroup represents the apex of a scheduling hierarchy for a given entity (Pod, PodGroup, or CompositePodGroup).
+// In a nested gang-scheduling tree, the root is the top-most ancestor with no parent CompositePodGroup.
+// It embeds GenericPodGroup alongside the corresponding cache state (PodGroupState or CompositePodGroupState).
+type RootGroup struct {
+	// GenericPodGroup provides unified access to the underlying root PodGroup or CompositePodGroup object.
+	*GenericPodGroup
+	// PodGroupState holds the scheduler cache state corresponding to PodGroup when the root is a PodGroup.
+	PodGroupState PodGroupState
+	// CompositePodGroupState holds the scheduler cache state corresponding to CompositePodGroup when the root is a CompositePodGroup.
+	CompositePodGroupState CompositePodGroupState
 }
 
 // PodGroupState provides an interface to view the state of a single pod group.
@@ -251,4 +268,23 @@ type PodGroupState interface {
 type CompositePodGroupState interface {
 	// GetChildren returns the keys of child groups.
 	GetChildren() []EntityKey
+}
+
+// RootGroupReadiness holds the resolved root GenericPodGroup and its ready children count.
+type RootGroupReadiness struct {
+	// RootGroup provides unified access to the underlying root PodGroup or CompositePodGroup object.
+	RootGroup *GenericPodGroup
+	// ReadyChildren is the number of ready child groups/pods directly under this root group.
+	ReadyChildren int
+}
+
+// PodGroupHierarchyTracker provides read access to readiness quorum counts aggregated across
+// PodGroup and CompositePodGroup hierarchies. The tracker is kept up to date by the scheduler's
+// event handlers; plugins only consume it.
+type PodGroupHierarchyTracker interface {
+	// FindRootGroupReadiness traverses parent links from key to locate the top-most root GenericPodGroup in the hierarchy
+	// and returns a *RootGroupReadiness containing the root GenericPodGroup and its ready children count.
+	// If key already identifies the root, the RootGroupReadiness corresponding to key is returned.
+	// If the root group cannot be resolved (or does not exist), nil is returned without an error.
+	FindRootGroupReadiness(key EntityKey) (*RootGroupReadiness, error)
 }

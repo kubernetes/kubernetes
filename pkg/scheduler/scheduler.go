@@ -46,6 +46,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/gangscheduling"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -110,6 +111,7 @@ type Scheduler struct {
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
 	podGroupPreemptionPolicyEnabled                     bool
+	podGroupHierarchyTracker                            *gangscheduling.HierarchyTracker
 
 	algorithm *SchedulingAlgorithm
 }
@@ -384,6 +386,7 @@ func New(ctx context.Context,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
 		podGroupPreemptionPolicyEnabled:                     feature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
+		podGroupHierarchyTracker:                            comps.podGroupHierarchyTracker,
 	}
 	sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore))
 	sched.NextEntity = podQueue.Pop
