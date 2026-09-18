@@ -3953,6 +3953,26 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: memory_manager_drift_tolerance_bytes
+  subsystem: kubelet
+  help: The per-NUMA-node memory drift in bytes the memory manager tolerates across
+    a restart. 0 means the persisted state has to match the machine exactly.
+  type: Gauge
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: memory_manager_memory_drift_bytes
+  subsystem: kubelet
+  help: The difference in bytes between the memory recorded for a NUMA node and the
+    memory the node reports, as seen at the last memory manager start.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - numa_node
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: memory_manager_pinning_errors_total
   subsystem: kubelet
   help: The number of memory pages allocations which required pinning that failed.
