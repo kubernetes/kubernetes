@@ -874,7 +874,7 @@ func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
 		func(ctx context.Context) (bool, error) {
 			for _, p := range pods {
 				st, ok := kl.statusManager.GetPodStatus(p.UID)
-				if !ok || st.Phase != v1.PodFailed && st.Reason != "VolumeAttachmentLimitExceeded" {
+				if !ok || st.Phase != v1.PodFailed || st.Reason != "VolumeAttachmentLimitExceeded" {
 					return false, nil
 				}
 			}
@@ -1553,16 +1553,138 @@ func TestCreateMirrorPod(t *testing.T) {
 			pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 			pods := []*v1.Pod{pod}
 			kl.podManager.SetPods(pods)
-			isTerminal, _, err := kl.SyncPod(tCtx, tt.updateType, pod, nil, &kubecontainer.PodStatus{})
+			isTerminal, postSync, err := kl.SyncPod(tCtx, tt.updateType, pod, nil, &kubecontainer.PodStatus{})
 			assert.NoError(t, err)
 			if isTerminal {
 				t.Fatalf("pod should not be terminal: %#v", pod)
+			}
+			if postSync != nil {
+				postSync()
 			}
 			podFullName := kubecontainer.GetPodFullName(pod)
 			assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
 			assert.Equal(t, 1, manager.NumOfPods(), "Expected only 1 mirror pod %q, got %+v", podFullName, manager.GetPods())
 		})
 	}
+}
+
+func TestCreateMirrorPodWithRuntimePostSync(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorClient
+	testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{
+		SyncResults: []*kubecontainer.SyncResult{{
+			Action: kubecontainer.StartContainer,
+			Target: "container",
+		}},
+	}
+
+	pod := podWithUIDNameNs("12345678", "bar", "foo")
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	isTerminal, postSync, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	require.NoError(t, err)
+	if isTerminal {
+		t.Fatalf("pod should not be terminal: %#v", pod)
+	}
+	require.NotNil(t, postSync)
+
+	postSync()
+
+	podFullName := kubecontainer.GetPodFullName(pod)
+	assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
+}
+
+func TestCreateMirrorPodWithEarlySyncPodReturn(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorClient
+	kl.volumeManager = kubeletvolume.NewFakeVolumeManager(nil, 0, nil, true /* volumeAttachLimitExceeded */)
+
+	pod := podWithUIDNameNs("12345678", "bar", "foo")
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	isTerminal, postSync, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	require.NoError(t, err)
+	if !isTerminal {
+		t.Fatalf("pod should be terminal after admission rejection: %#v", pod)
+	}
+	require.NotNil(t, postSync)
+
+	postSync()
+
+	podFullName := kubecontainer.GetPodFullName(pod)
+	assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
+}
+
+func TestMirrorPodDeletionTimeout(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorClient
+
+	// Simulate an unreachable API server (e.g. etcd down on single-master).
+	manager.DeleteDelay = 30 * time.Second
+
+	pod := podWithUIDNameNsSpec("12345678", "foo", "ns", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "1234", Image: "foo"},
+		},
+	})
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
+
+	// Mirror pod has an outdated spec — triggers delete+recreate.
+	mirrorPod := podWithUIDNameNsSpec("11111111", "foo", "ns", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "1234", Image: "bar"},
+		},
+	})
+	mirrorPod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "api"
+	mirrorPod.Annotations[kubetypes.ConfigMirrorAnnotationKey] = "mirror"
+
+	pods := []*v1.Pod{pod, mirrorPod}
+	kl.podManager.SetPods(pods)
+	isTerminal, postSync, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
+	require.NoError(t, err)
+	if isTerminal {
+		t.Fatalf("pod should not be terminal: %#v", pod)
+	}
+	require.NotNil(t, postSync, "postSync must not be nil for static pods")
+
+	// postSync should complete within mirrorPodAPITimeout, not hang for
+	// the full 30s DeleteDelay.
+	done := make(chan struct{})
+	go func() {
+		postSync()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// OK — postSync returned within the timeout.
+	case <-time.After(mirrorPodAPITimeout + 2*time.Second):
+		t.Fatal("postSync blocked longer than mirrorPodAPITimeout; timeout did not cap the API call")
+	}
+
+	// Delete timed out, so the old mirror pod was not removed. But the
+	// function should still attempt to create a new mirror pod on the
+	// next sync. In this run the delete failed, so no create was issued.
+	podFullName := kubecontainer.GetPodFullName(pod)
+	creates, deletes := manager.GetCounts(podFullName)
+	// Delete was called but timed out (counted by fake), create was not
+	// reached because delete didn't succeed.
+	assert.Equal(t, 0, creates, "expected 0 creates since delete timed out")
+	assert.Equal(t, 0, deletes, "expected 0 completed deletes since the call timed out")
 }
 
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
@@ -1590,10 +1712,13 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*v1.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	isTerminal, _, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
+	isTerminal, postSync, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
 	assert.NoError(t, err)
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
+	}
+	if postSync != nil {
+		postSync()
 	}
 	name := kubecontainer.GetPodFullName(pod)
 	creates, deletes := manager.GetCounts(name)
