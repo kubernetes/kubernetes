@@ -8502,7 +8502,7 @@ func TestAllocator(t *testing.T,
 			classes: objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(
 				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
-					device(device1, nil, nil).withDeviceCounterConsumption(
+					device(device1).withDeviceCounterConsumption(
 						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
 							"memory": resource.MustParse("-8Gi"),
 						}),
