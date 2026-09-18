@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	cadvisormetrics "github.com/google/cadvisor/lib/metrics"
 	"k8s.io/component-base/metrics"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -31,14 +32,24 @@ type criMetricsCollector struct {
 	// The descriptors structure will be populated by one call to ListMetricDescriptors from the runtime.
 	// They will be saved in this map, where the key is the Name and the value is the Desc.
 	descriptors             map[string]*metrics.Desc
+	labelKeys               map[string][]string
 	listPodSandboxMetricsFn func(context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
+	nodeGatherer            *nodeMetricsGatherer
 }
 
 // Check if criMetricsCollector implements necessary interface
 var _ metrics.StableCollector = &criMetricsCollector{}
 
-// NewCRIMetricsCollector implements the metrics.Collector interface
-func NewCRIMetricsCollector(ctx context.Context, listPodSandboxMetricsFn func(context.Context) ([]*runtimeapi.PodSandboxMetrics, error), listMetricDescriptorsFn func(context.Context) ([]*runtimeapi.MetricDescriptor, error)) metrics.StableCollector {
+// NewCRIMetricsCollector creates a collector for CRI pod/container metrics.
+// If infoProvider is non-nil, it also collects node-level (root cgroup)
+// metrics from cAdvisor using the same CRI metric descriptors.
+func NewCRIMetricsCollector(
+	ctx context.Context,
+	listPodSandboxMetricsFn func(context.Context) ([]*runtimeapi.PodSandboxMetrics, error),
+	listMetricDescriptorsFn func(context.Context) ([]*runtimeapi.MetricDescriptor, error),
+	infoProvider nodeInfoProvider,
+	containerLabelsFunc cadvisormetrics.ContainerLabelsFunc,
+) metrics.StableCollector {
 	descs, err := listMetricDescriptorsFn(ctx)
 	if err != nil {
 		logger := klog.FromContext(ctx)
@@ -47,13 +58,22 @@ func NewCRIMetricsCollector(ctx context.Context, listPodSandboxMetricsFn func(co
 			listPodSandboxMetricsFn: listPodSandboxMetricsFn,
 		}
 	}
-	c := &criMetricsCollector{
-		listPodSandboxMetricsFn: listPodSandboxMetricsFn,
-		descriptors:             make(map[string]*metrics.Desc, len(descs)),
+
+	descriptors := make(map[string]*metrics.Desc, len(descs))
+	labelKeys := make(map[string][]string, len(descs))
+	for _, desc := range descs {
+		descriptors[desc.Name] = criDescToProm(desc)
+		labelKeys[desc.Name] = desc.LabelKeys
 	}
 
-	for _, desc := range descs {
-		c.descriptors[desc.Name] = criDescToProm(desc)
+	c := &criMetricsCollector{
+		descriptors:             descriptors,
+		labelKeys:               labelKeys,
+		listPodSandboxMetricsFn: listPodSandboxMetricsFn,
+	}
+
+	if infoProvider != nil {
+		c.nodeGatherer = newNodeMetricsGatherer(ctx, descriptors, labelKeys, infoProvider, containerLabelsFunc)
 	}
 
 	return c
@@ -94,6 +114,10 @@ func (c *criMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
 				}
 			}
 		}
+	}
+
+	if c.nodeGatherer != nil {
+		c.nodeGatherer.collectNodeMetrics(ch)
 	}
 }
 
