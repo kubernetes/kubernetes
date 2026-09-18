@@ -102,6 +102,7 @@ func (m *fakeManager) GetMemory(logger klog.Logger, podUID, containerName string
 func (m *fakeManager) GetPodMemory(podUID string) []state.Block {
 	logger := klog.LoggerWithValues(klog.TODO(), "podUID", podUID)
 	logger.Info("Get Pod Memory")
+	// See https://github.com/kubernetes/kubernetes/issues/115491 for tracking.
 	return []state.Block{}
 }
 
