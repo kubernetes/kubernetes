@@ -45,6 +45,9 @@ import (
 
 var directDialer utilnet.DialFunc = http.DefaultTransport.(*http.Transport).DialContext
 
+// defaultDialTimeout matches http.DefaultTransport dial timeout
+const defaultDialTimeout = 30 * time.Second
+
 func init() {
 	client.Metrics.RegisterMetrics(legacyregistry.Registerer())
 }
@@ -110,7 +113,10 @@ func lookupServiceName(name string) (EgressType, error) {
 }
 
 func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn, error) {
-	fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, "127.0.0.1")
+	if _, err := fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, "127.0.0.1"); err != nil {
+		_ = proxyConn.Close()
+		return nil, fmt.Errorf("writing CONNECT to %s via proxy %s failed: %w", addr, proxyAddress, err)
+	}
 
 	// As described in https://go.dev/issue/74633 a misbehaving proxy server
 	// can cause memory exhaustion in the client. The fix in https://go.dev/cl/698915
@@ -121,12 +127,13 @@ func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn,
 
 	res, err := http.ReadResponse(br, nil)
 	if err != nil {
-		proxyConn.Close()
+		_ = proxyConn.Close()
 		return nil, fmt.Errorf("reading HTTP response from CONNECT to %s via proxy %s failed: %v",
 			addr, proxyAddress, err)
 	}
 	if res.StatusCode != 200 {
-		proxyConn.Close()
+		_ = proxyConn.Close()
+		_ = res.Body.Close()
 		return nil, fmt.Errorf("proxy error from %s while dialing %s, code %d: %v",
 			proxyAddress, addr, res.StatusCode, res.Status)
 	}
@@ -136,7 +143,8 @@ func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn,
 	// TLS, and in TLS the client speaks first, so we know there's
 	// no unbuffered data. But we can double-check.
 	if br.Buffered() > 0 {
-		proxyConn.Close()
+		_ = proxyConn.Close()
+		_ = res.Body.Close()
 		return nil, fmt.Errorf("unexpected %d bytes of buffered data from CONNECT proxy %q",
 			br.Buffered(), proxyAddress)
 	}
@@ -145,6 +153,10 @@ func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn,
 
 type proxier interface {
 	// proxy returns a connection to addr.
+	//
+	// The provided Context must be non-nil and is used only while connecting to addr.
+	// If the context expires before the connection is established, an error is returned.
+	// Once successfully connected, expiration of the context will not affect the connection.
 	proxy(ctx context.Context, addr string) (net.Conn, error)
 }
 
@@ -156,17 +168,61 @@ type httpConnectProxier struct {
 }
 
 func (t *httpConnectProxier) proxy(ctx context.Context, addr string) (net.Conn, error) {
-	return tunnelHTTPConnect(t.conn, t.proxyAddress, addr)
+	var (
+		connectDone = make(chan struct{})
+		connectConn net.Conn
+		connectErr  error
+	)
+
+	go func() {
+		connectConn, connectErr = tunnelHTTPConnect(t.conn, t.proxyAddress, addr)
+		close(connectDone)
+	}()
+
+	select {
+	case <-connectDone:
+		return connectConn, connectErr
+
+	case <-ctx.Done():
+		// The CONNECT handshake may have completed concurrently with
+		// cancellation. Prefer the completed result before closing the
+		// connection.
+		select {
+		case <-connectDone:
+			return connectConn, connectErr
+		default:
+		}
+
+		_ = t.conn.Close()
+		return nil, fmt.Errorf("proxy CONNECT to %s failed: %w", addr, context.Cause(ctx))
+	}
 }
 
 var _ proxier = &grpcProxier{}
 
 type grpcProxier struct {
 	tunnel client.Tunnel
+	cancel context.CancelCauseFunc
 }
 
 func (g *grpcProxier) proxy(ctx context.Context, addr string) (net.Conn, error) {
-	return g.tunnel.DialContext(ctx, "tcp", addr)
+	c, err := g.tunnel.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		g.cancel(err)
+		return nil, err
+	}
+	return &grpcConn{Conn: c, cancel: g.cancel}, nil
+}
+
+type grpcConn struct {
+	net.Conn
+	cancel context.CancelCauseFunc
+}
+
+func (g *grpcConn) Close() error {
+	err := g.Conn.Close()
+	g.cancel(err)
+	return err
 }
 
 type proxyServerConnector interface {
@@ -213,31 +269,27 @@ type udsGRPCConnector struct {
 }
 
 // connect establishes a connection to a proxy over gRPC.
-// TODO At the moment, it does not use the provided context.
-func (u *udsGRPCConnector) connect(_ context.Context) (proxier, error) {
+func (u *udsGRPCConnector) connect(connectCtx context.Context) (proxier, error) {
 	udsName := u.udsName
-	dialOption := grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+	dialOption := grpc.WithContextDialer(func(_ context.Context, addr string) (net.Conn, error) {
 		var d net.Dialer
-		c, err := d.DialContext(ctx, "unix", udsName)
+		c, err := d.DialContext(connectCtx, "unix", udsName)
 		if err != nil {
 			klog.Errorf("failed to create connection to uds name %s, error: %v", udsName, err)
 		}
 		return c, err
 	})
 
-	// CreateSingleUseGrpcTunnel() unfortunately couples dial and connection contexts. Because of that,
-	// we cannot use ctx just for dialing and control the connection lifetime separately.
-	// See https://github.com/kubernetes-sigs/apiserver-network-proxy/issues/357.
-	tunnelCtx := context.TODO()
-	tunnel, err := client.CreateSingleUseGrpcTunnel(tunnelCtx, udsName, dialOption,
+	tunnelCtx, cancel := context.WithCancelCause(context.Background())
+	tunnel, err := client.CreateSingleUseGrpcTunnelWithContext(connectCtx, tunnelCtx, udsName, dialOption,
 		grpc.WithBlock(),
 		grpc.WithReturnConnectionError(),
-		grpc.WithTimeout(30*time.Second), // matches http.DefaultTransport dial timeout
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
+		cancel(err)
 		return nil, err
 	}
-	return &grpcProxier{tunnel: tunnel}, nil
+	return &grpcProxier{tunnel: tunnel, cancel: cancel}, nil
 }
 
 type dialerCreator struct {
@@ -256,6 +308,14 @@ func (d *dialerCreator) createDialer() utilnet.DialFunc {
 		return directDialer
 	}
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if _, ok := ctx.Deadline(); !ok {
+			// Match the http default transport's dial timeout for
+			// callers without a deadline.
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, defaultDialTimeout)
+			defer cancel()
+		}
+
 		ctx, span := tracing.Start(ctx, fmt.Sprintf("Proxy via %s protocol over %s", d.options.protocol, d.options.transport), attribute.String("address", addr))
 		defer span.End(500 * time.Millisecond)
 		start := egressmetrics.Metrics.Clock().Now()
