@@ -383,6 +383,16 @@ message CephFSVolumeSource {
   optional bool readOnly = 6;
 }
 
+// CgroupOptions defines options for cgroup filesystem access.
+message CgroupOptions {
+  // mountMode controls how the cgroup filesystem is mounted in the container.
+  // Valid values are "ReadOnly" and "Writable". If not specified, the
+  // container runtime's default mount mode is used.
+  // "ReadOnly" cannot be set when the container's privileged field is true.
+  // +optional
+  optional string mountMode = 1;
+}
+
 // Represents a cinder volume resource in Openstack.
 // A Cinder volume must exist before mounting to a container.
 // The volume must also be in the same region as the kubelet.
@@ -4991,6 +5001,7 @@ message PodSpec {
   // - spec.containers[*].securityContext.procMount
   // - spec.containers[*].securityContext.runAsUser
   // - spec.containers[*].securityContext.runAsGroup
+  // - spec.containers[*].securityContext.cgroupOptions
   // +optional
   optional PodOS os = 36;
 
@@ -6426,6 +6437,15 @@ message SecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional AppArmorProfile appArmorProfile = 12;
+
+  // cgroupOptions controls how the cgroup filesystem is mounted in the container.
+  // If mountMode is specified, the scheduler only places the pod on a node
+  // whose status.declaredFeatures includes CgroupOptions.
+  // (Alpha) This field requires the CgroupOptions feature gate to be enabled.
+  // This field cannot be set for ephemeral containers or when spec.os.name is windows.
+  // +featureGate=CgroupOptions
+  // +optional
+  optional CgroupOptions cgroupOptions = 13;
 }
 
 // SerializedReference is a reference to serialized object.

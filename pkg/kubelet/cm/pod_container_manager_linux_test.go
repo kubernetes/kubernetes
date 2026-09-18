@@ -22,10 +22,15 @@ import (
 	"strings"
 	"testing"
 
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -292,6 +297,135 @@ func TestGetPodContainerName(t *testing.T) {
 			actualCgroupName, actualLiteralCgroupfs := pcm.GetPodContainerName(tt.args.pod)
 			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
+		})
+	}
+}
+
+func TestPodRequestsWritableCgroups(t *testing.T) {
+	writable := v1.CgroupMountModeWritable
+	readOnly := v1.CgroupMountModeReadOnly
+	scWith := func(mode *v1.CgroupMountMode) *v1.SecurityContext {
+		return &v1.SecurityContext{CgroupOptions: &v1.CgroupOptions{MountMode: mode}}
+	}
+
+	tests := []struct {
+		name string
+		pod  *v1.Pod
+		want bool
+	}{
+		{
+			name: "no security context",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c"}}}},
+			want: false,
+		},
+		{
+			name: "read-only mount mode",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c", SecurityContext: scWith(&readOnly)}}}},
+			want: false,
+		},
+		{
+			name: "writable on a container",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c", SecurityContext: scWith(&writable)}}}},
+			want: true,
+		},
+		{
+			name: "writable on an init container",
+			pod:  &v1.Pod{Spec: v1.PodSpec{InitContainers: []v1.Container{{Name: "i", SecurityContext: scWith(&writable)}}}},
+			want: true,
+		},
+		{
+			name: "ephemeral containers are ignored",
+			pod: &v1.Pod{Spec: v1.PodSpec{EphemeralContainers: []v1.EphemeralContainer{{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug", SecurityContext: scWith(&writable)},
+			}}}},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, podRequestsWritableCgroups(tt.pod))
+		})
+	}
+}
+
+func TestEnsureExists(t *testing.T) {
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
+		t.Skip("skipping cgroup v2 test on a cgroup v1 system")
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: types.UID("123")},
+		Spec: v1.PodSpec{Containers: []v1.Container{{
+			Name: "c",
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+				Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			},
+		}}},
+	}
+	tests := []struct {
+		name                 string
+		cgroupOptionsEnabled bool
+		memoryQoSEnabled     bool
+		mountMode            v1.CgroupMountMode
+		wantUnified          map[string]string
+	}{
+		{
+			name:                 "preserves existing resource settings with writable cgroups",
+			cgroupOptionsEnabled: true,
+			memoryQoSEnabled:     true,
+			mountMode:            v1.CgroupMountModeWritable,
+			wantUnified: map[string]string{
+				Cgroup2MemoryLow:      "134217728",
+				Cgroup2MaxDescendants: defaultWritableCgroupMaxDescendants,
+				Cgroup2MaxDepth:       defaultWritableCgroupMaxDepth,
+			},
+		},
+		{
+			name:                 "sets writable cgroup limits with MemoryQoS disabled",
+			cgroupOptionsEnabled: true,
+			memoryQoSEnabled:     false,
+			mountMode:            v1.CgroupMountModeWritable,
+			wantUnified: map[string]string{
+				Cgroup2MaxDescendants: defaultWritableCgroupMaxDescendants,
+				Cgroup2MaxDepth:       defaultWritableCgroupMaxDepth,
+			},
+		},
+		{
+			name:                 "omits writable cgroup limits with CgroupOptions disabled",
+			cgroupOptionsEnabled: false,
+			memoryQoSEnabled:     true,
+			mountMode:            v1.CgroupMountModeWritable,
+			wantUnified:          map[string]string{Cgroup2MemoryLow: "134217728"},
+		},
+		{
+			name:                 "omits writable cgroup limits for a read-only mount",
+			cgroupOptionsEnabled: true,
+			memoryQoSEnabled:     true,
+			mountMode:            v1.CgroupMountModeReadOnly,
+			wantUnified:          map[string]string{Cgroup2MemoryLow: "134217728"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CgroupOptions, tt.cgroupOptionsEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.MemoryQoS, tt.memoryQoSEnabled)
+			testPod := pod.DeepCopy()
+			testPod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &tt.mountMode},
+			}
+			logger, _ := ktesting.NewTestContext(t)
+			fake := &fakeCgroupManager{}
+			m := &podContainerManagerImpl{
+				cgroupManager:           fake,
+				podContainerManager:     NewFakeContainerManager(logger),
+				memoryReservationPolicy: kubeletconfig.TieredReservationMemoryReservationPolicy,
+			}
+
+			require.NoError(t, m.EnsureExists(logger, testPod))
+			require.Len(t, fake.created, 1)
+			require.Equal(t, tt.wantUnified, fake.created[0].ResourceParameters.Unified)
 		})
 	}
 }

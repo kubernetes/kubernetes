@@ -66,6 +66,10 @@ type FeatureRequirements struct {
 	// RequiredRuntimeFeatures lists runtime capabilities that must be true for the
 	// feature to be declared. Nil means the feature has no runtime requirements.
 	RequiredRuntimeFeatures *RuntimeFeatures
+	// RequiredStaticConfig lists the node static configuration that must match for
+	// the feature to be declared. Nil means the feature has no static configuration
+	// requirements.
+	RequiredStaticConfig *StaticConfiguration
 }
 
 // FeatureGate is an interface that abstracts feature gate checking.
@@ -80,11 +84,21 @@ type RuntimeFeatures struct {
 	UserNamespacesHostNetwork bool
 	// MountOptions indicates if the runtime supports additional bind mount options on container mounts.
 	MountOptions bool
+	// CgroupMountMode indicates if the runtime supports the cgroup_mount_mode
+	// field of LinuxContainerSecurityContext.
+	CgroupMountMode bool
 }
 
 // StaticConfiguration provides a view of a node's static configuration required for feature discovery.
 type StaticConfiguration struct {
-	// Add configuration fields here as required by registered features.
+	// Cgroup2UnifiedMode indicates if the node runs in cgroup v2 unified mode.
+	Cgroup2UnifiedMode bool
+	// CgroupsPerQOS indicates if the kubelet creates a cgroup hierarchy per QoS
+	// class, and with it a cgroup per pod.
+	CgroupsPerQOS bool
+	// CgroupNsdelegate indicates if the node's cgroup v2 hierarchy is mounted with
+	// the nsdelegate option.
+	CgroupNsdelegate bool
 }
 
 // NodeConfiguration provides a generic view of a node's static configuration.

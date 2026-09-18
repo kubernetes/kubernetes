@@ -23,9 +23,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -175,5 +181,157 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		} else {
 			assert.NoError(t, err, test.desc)
 		}
+	}
+}
+
+func TestDetermineEffectiveSecurityContextCgroupOptions(t *testing.T) {
+	writable := v1.CgroupMountModeWritable
+	readOnly := v1.CgroupMountModeReadOnly
+
+	testCases := []struct {
+		desc                    string
+		cgroupOptionsGate       bool
+		cgroupVersion           int
+		noNsdelegate            bool
+		noCgroupsPerQOS         bool
+		podSc                   *v1.PodSecurityContext
+		sc                      *v1.SecurityContext
+		expectedCgroupMountMode runtimeapi.CgroupMountMode
+		expectedErr             string
+	}{
+		{
+			desc:                    "nil SecurityContext",
+			cgroupOptionsGate:       true,
+			cgroupVersion:           2,
+			sc:                      nil,
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
+		},
+		{
+			desc:                    "no CgroupOptions",
+			cgroupOptionsGate:       true,
+			cgroupVersion:           2,
+			sc:                      &v1.SecurityContext{},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
+		},
+		{
+			desc:              "CgroupOptions with nil MountMode",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
+		},
+		{
+			desc:              "CgroupOptions Writable",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE,
+		},
+		{
+			desc:              "CgroupOptions ReadOnly",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &readOnly},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+		},
+		{
+			// A pod-level securityContext sends the effective context through the
+			// field-by-field merge, which has to carry cgroupOptions across.
+			desc:              "CgroupOptions Writable with a pod-level security context",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			podSc:             &v1.PodSecurityContext{RunAsNonRoot: new(true)},
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE,
+		},
+		{
+			// The feature gate controls writable mounts and their descendant and depth limits.
+			desc:              "CgroupOptions Writable with the feature gate disabled",
+			cgroupOptionsGate: false,
+			cgroupVersion:     2,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
+		},
+		{
+			desc:              "CgroupOptions Writable on cgroup v1",
+			cgroupOptionsGate: true,
+			cgroupVersion:     1,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedErr: "require cgroup v2",
+		},
+		{
+			desc:              "CgroupOptions Writable without nsdelegate",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			noNsdelegate:      true,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedErr: "nsdelegate",
+		},
+		{
+			// Without a pod cgroup there is nowhere to write the descendant limits.
+			desc:              "CgroupOptions Writable without a pod cgroup",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			noCgroupsPerQOS:   true,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedErr: "cgroup per pod",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupOptions, tc.cgroupOptionsGate)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "bar",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					SecurityContext: tc.podSc,
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "busybox",
+							SecurityContext: tc.sc,
+						},
+					},
+				},
+			}
+
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			m.containerManager = cm.NewFakeContainerManagerWithNodeConfig(cm.NodeConfig{
+				CgroupVersion:    tc.cgroupVersion,
+				CgroupsPerQOS:    !tc.noCgroupsPerQOS,
+				CgroupNsdelegate: !tc.noNsdelegate,
+			})
+
+			result, err := m.determineEffectiveSecurityContext(tCtx, pod, &pod.Spec.Containers[0], nil, "")
+			if tc.expectedErr != "" {
+				require.ErrorContains(t, err, tc.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedCgroupMountMode, result.CgroupMountMode)
+		})
 	}
 }
