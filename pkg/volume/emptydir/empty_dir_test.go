@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1479,5 +1480,150 @@ func TestEmptyDirVolumeModeFeatureGateDisabled(t *testing.T) {
 
 	if fileinfo.Mode().Perm() != perm.Perm() {
 		t.Errorf("expected default permissions %v when feature gate is disabled, got %v", perm.Perm(), fileinfo.Mode().Perm())
+	}
+}
+
+// TestUnmountNestedMounts verifies that unmountNestedMounts unmounts exactly
+// the nested mounts, deepest first, leaving the directory itself and unrelated
+// mounts untouched.
+func TestUnmountNestedMounts(t *testing.T) {
+	testCases := map[string]struct {
+		path             string
+		mountPoints      []string
+		unmountFailsAt   string
+		expectedUnmounts []string
+	}{
+		"no mounts": {
+			path: "/mnt/dir",
+		},
+		"no nested mounts": {
+			path:        "/mnt/dir",
+			mountPoints: []string{"/mnt", "/mnt/dir-unrelated-a", "/mnt/dir-unrelated-b"},
+		},
+		"path itself is a mount point": {
+			path:        "/mnt/dir",
+			mountPoints: []string{"/mnt/dir"},
+		},
+		"nested mount": {
+			path:             "/mnt/dir",
+			mountPoints:      []string{"/mnt/dir/a"},
+			expectedUnmounts: []string{"/mnt/dir/a"},
+		},
+		"all nested mounts are unmounted deepest first, then alphabetically": {
+			path:             "/mnt/dir",
+			mountPoints:      []string{"/mnt/dir/d", "/mnt/dir/a/b", "/mnt/dir/a/b/c", "/mnt/dir/a", "/mnt/unrelated"},
+			expectedUnmounts: []string{"/mnt/dir/a/b/c", "/mnt/dir/a/b", "/mnt/dir/a", "/mnt/dir/d"},
+		},
+		"first failure propagates the error and aborts the unmount sequence": {
+			path:             "/mnt/dir",
+			mountPoints:      []string{"/mnt/dir/a", "/mnt/dir/a/b", "/mnt/dir/a/b/c"},
+			unmountFailsAt:   "/mnt/dir/a/b",
+			expectedUnmounts: []string{"/mnt/dir/a/b/c"},
+		},
+	}
+
+	for testCaseName, testCase := range testCases {
+		t.Run(testCaseName, func(t *testing.T) {
+			physicalMounter := &mount.FakeMounter{}
+			for _, p := range testCase.mountPoints {
+				physicalMounter.MountPoints = append(physicalMounter.MountPoints, mount.MountPoint{Path: p})
+			}
+			physicalMounter.UnmountFunc = func(path string) error {
+				if path == testCase.unmountFailsAt {
+					return fmt.Errorf("device busy")
+				}
+				return nil
+			}
+
+			err := unmountNestedMounts(physicalMounter, testCase.path)
+			wantErr := testCase.unmountFailsAt != ""
+			if (err != nil) != wantErr {
+				t.Errorf("expected error: %v, got: %v", wantErr, err)
+			}
+
+			var unmounts []string
+			for _, action := range physicalMounter.GetLog() {
+				if action.Action == mount.FakeActionUnmount {
+					unmounts = append(unmounts, action.Target)
+				}
+			}
+			if !slices.Equal(unmounts, testCase.expectedUnmounts) {
+				t.Errorf("expected unmount sequence: %v, got: %v", testCase.expectedUnmounts, unmounts)
+			}
+		})
+	}
+}
+
+// TestTeardownUnmountsNestedMounts verifies that TearDown unmounts the
+// nested mounts before removing the directory recursively.
+func TestTeardownUnmountsNestedMounts(t *testing.T) {
+	testCases := map[string]struct {
+		nestedMounts      []string
+		unmountShouldFail bool
+	}{
+		"no nested mounts": {},
+		"with nested mounts": {
+			nestedMounts: []string{"nested/a", "nested/b"},
+		},
+		"unmount fails": {
+			nestedMounts:      []string{"nested/a"},
+			unmountShouldFail: true,
+		},
+	}
+
+	for testCaseName, testCase := range testCases {
+		t.Run(testCaseName, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+
+			physicalMounter := &mount.FakeMounter{}
+			if testCase.unmountShouldFail {
+				physicalMounter.UnmountFunc = func(path string) error {
+					return fmt.Errorf("device busy")
+				}
+			}
+
+			unmounter, err := plug.(*emptyDirPlugin).newUnmounterInternal(
+				"test-volume",
+				types.UID("poduid"),
+				physicalMounter,
+				&fakeMountDetector{},
+			)
+			if err != nil {
+				t.Fatalf("failed to make a new Unmounter: %v", err)
+			}
+
+			volPath := unmounter.GetPath()
+			if err := os.MkdirAll(volPath, perm); err != nil {
+				t.Fatalf("failed to create volume dir: %v", err)
+			}
+			for _, m := range testCase.nestedMounts {
+				physicalMounter.MountPoints = append(
+					physicalMounter.MountPoints,
+					mount.MountPoint{Path: filepath.Join(volPath, m)},
+				)
+			}
+
+			err = unmounter.TearDown()
+			if (err != nil) != testCase.unmountShouldFail {
+				t.Errorf("expected error: %v, got: %v", testCase.unmountShouldFail, err)
+			}
+
+			_, err = os.Stat(volPath)
+			if testCase.unmountShouldFail {
+				// A failed unmount aborts teardown, so the directory must still exist
+				if err != nil {
+					t.Errorf("expected volume path to still exist after failed teardown")
+				}
+			} else {
+				if mps, _ := physicalMounter.List(); len(mps) != 0 {
+					t.Errorf("expected all nested mounts to be unmounted, still mounted: %v", mps)
+				}
+				if !os.IsNotExist(err) {
+					t.Errorf("expected volume path to be removed after teardown")
+				}
+			}
+		})
 	}
 }
