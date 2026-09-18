@@ -160,7 +160,61 @@ type crdInfo struct {
 	// storageVersion is the CRD version used when storing the object in etcd.
 	storageVersion string
 
+	// generation is the metadata.generation of the CRD this info was built from. The API server
+	// advances it on every spec change (see customresourcedefinition.strategy.PrepareForUpdate),
+	// which makes it a cheap way to accept an unchanged spec without comparing it field by field.
+	generation int64
+
 	waitGroup *utilwaitgroup.SafeWaitGroup
+}
+
+// isUpToDateFor reports whether this info can serve crd. It is directional: an info built from a
+// state newer than crd satisfies it, because callers may hold a CRD read earlier in their sync
+// (CRDFinalizer does) and must not force a rebuild.
+//
+// acceptedNames is compared directly because it lives in status, which generation never covers: the
+// naming controller can move an accepted name from one non-empty value to another when a conflicting
+// CRD in the group goes away, without any write to this CRD's spec.
+//
+// A generation at least as new as crd's proves the spec is unchanged, so the common case costs an
+// integer compare and no allocations. The reverse does not hold, which is why a bump falls through to
+// matchesSpecAndNames rather than rebuilding: PrepareForUpdate increments the generation before
+// dropDisabledFields strips fields behind disabled feature gates, so a write that sets such a field
+// bumps the generation while leaving the stored spec untouched.
+func (i *crdInfo) isUpToDateFor(crd *apiextensionsv1.CustomResourceDefinition) bool {
+	if !namesEqual(&crd.Status.AcceptedNames, i.acceptedNames) {
+		return false
+	}
+	return i.generation >= crd.Generation || apiequality.Semantic.DeepEqual(&crd.Spec, i.spec)
+}
+
+// matchesSpecAndNames reports whether this info was built from crd's spec and accepted names. The
+// informer handlers use it to decide whether an event invalidates existing storage. Unlike
+// isUpToDateFor it is exact rather than directional, so it still tears down storage that no longer
+// matches the CRD even when the cached generation runs ahead of the event being processed.
+func (i *crdInfo) matchesSpecAndNames(crd *apiextensionsv1.CustomResourceDefinition) bool {
+	return apiequality.Semantic.DeepEqual(&crd.Spec, i.spec) &&
+		namesEqual(&crd.Status.AcceptedNames, i.acceptedNames)
+}
+
+func namesEqual(a, b *apiextensionsv1.CustomResourceDefinitionNames) bool {
+	if a.Plural != b.Plural || a.Singular != b.Singular || a.Kind != b.Kind || a.ListKind != b.ListKind {
+		return false
+	}
+	if len(a.ShortNames) != len(b.ShortNames) || len(a.Categories) != len(b.Categories) {
+		return false
+	}
+	for i := range a.ShortNames {
+		if a.ShortNames[i] != b.ShortNames[i] {
+			return false
+		}
+	}
+	for i := range a.Categories {
+		if a.Categories[i] != b.Categories[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // crdStorageMap goes from customresourcedefinition to its storage
@@ -297,7 +351,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	terminating := !crd.DeletionTimestamp.IsZero() || apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
 
-	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	crdInfo, err := r.getOrCreateServingInfoFor(crd)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -466,7 +520,7 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 	if !found {
 		return
 	}
-	if apiequality.Semantic.DeepEqual(&crd.Spec, oldInfo.spec) && apiequality.Semantic.DeepEqual(&crd.Status.AcceptedNames, oldInfo.acceptedNames) {
+	if oldInfo.matchesSpecAndNames(crd) {
 		klog.V(6).Infof("Ignoring customresourcedefinition %s create event because a storage with the same spec and accepted names exists",
 			crd.Name)
 		return
@@ -504,7 +558,7 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	if !found {
 		return
 	}
-	if apiequality.Semantic.DeepEqual(&newCRD.Spec, oldInfo.spec) && apiequality.Semantic.DeepEqual(&newCRD.Status.AcceptedNames, oldInfo.acceptedNames) {
+	if oldInfo.matchesSpecAndNames(newCRD) {
 		klog.V(6).Infof("Ignoring customresourcedefinition %s update because neither spec, nor accepted names changed", oldCRD.Name)
 		return
 	}
@@ -604,18 +658,19 @@ func (r *crdHandler) destroy() {
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter of
 // the given crd.
 func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensionsv1.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
-	info, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	info, err := r.getOrCreateServingInfoFor(crd)
 	if err != nil {
 		return nil, err
 	}
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
-// getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
-// Otherwise the function fetches the up-to-date CRD using the given CRD name and creates CRD serving info.
-func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crdInfo, error) {
+// getOrCreateServingInfoFor returns the serving info for crd, building it if the cache is empty or
+// holds an entry built from an older CRD state. crd is used only for the lock-free freshness check.
+// a crd newer than the lister is tolerated.
+func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensionsv1.CustomResourceDefinition) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
-	if ret, ok := storageMap[uid]; ok {
+	if ret, ok := storageMap[crd.UID]; ok && ret.isUpToDateFor(crd) {
 		return ret, nil
 	}
 
@@ -626,12 +681,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	// If updateCustomResourceDefinition sees an update and happens later, the storage will be deleted and
 	// we will re-create the updated storage on demand. If updateCustomResourceDefinition happens before,
 	// we make sure that we observe the same up-to-date CRD.
-	crd, err := r.crdLister.Get(name)
+	crd, err := r.crdLister.Get(crd.Name)
 	if err != nil {
 		return nil, err
 	}
 	storageMap = r.customStorage.Load().(crdStorageMap)
-	if ret, ok := storageMap[crd.UID]; ok {
+	if ret, ok := storageMap[crd.UID]; ok && ret.isUpToDateFor(crd) {
 		return ret, nil
 	}
 
@@ -1061,6 +1116,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		deprecated:          deprecated,
 		warnings:            warnings,
 		storageVersion:      storageVersion,
+		generation:          crd.Generation,
 		waitGroup:           &utilwaitgroup.SafeWaitGroup{},
 	}
 
@@ -1070,6 +1126,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 	storageMap2[crd.UID] = ret
 	r.customStorage.Store(storageMap2)
+	// Only tear down a previous info; on a cold cache the map has no entry for this UID and the
+	// lookup yields a nil *crdInfo, which tearDown dereferences.
+	if oldInfo := storageMap[crd.UID]; oldInfo != nil {
+		go r.tearDown(oldInfo)
+	}
 
 	return ret, nil
 }
