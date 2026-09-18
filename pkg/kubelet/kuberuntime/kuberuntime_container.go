@@ -763,6 +763,22 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 		cStatus.Message = status.Message
 		cStatus.ExitCode = int(status.ExitCode)
 		cStatus.FinishedAt = time.Unix(0, status.FinishedAt)
+
+		if cStatus.Reason == "OOMKilled" && cStatus.ExitCode == 143 {
+			// The kernel OOM killer terminates processes with SIGKILL, so a
+			// container whose main process was OOM-killed exits with 137,
+			// never 143 (SIGTERM). Runtimes derive OOMKilled from the
+			// container cgroup's cumulative oom_kill counter, so a child
+			// process OOM-killed earlier in the container's life marks every
+			// later exit as OOMKilled — including a graceful SIGTERM
+			// termination from a node drain, an eviction, or a
+			// probe-triggered restart. Keep the termination reason consistent
+			// with the signal that actually ended the container so OOMKilled
+			// reliably means the terminated process was OOM-killed.
+			klog.FromContext(ctx).V(2).Info("Runtime reported OOMKilled for a container that exited with SIGTERM, reporting termination reason as Error",
+				"podUID", podUID, "containerName", labeledInfo.ContainerName, "exitCode", cStatus.ExitCode)
+			cStatus.Reason = "Error"
+		}
 	}
 
 	for _, mount := range status.Mounts {
