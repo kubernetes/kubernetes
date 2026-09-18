@@ -388,6 +388,17 @@ func TestContainerGC(t *testing.T) {
 			evictTerminatingPods: true,
 			allSourcesReady:      false,
 		},
+		{
+			description: "duplicate running containers should be removed",
+			containers: []containerTemplate{
+				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_RUNNING),
+				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_RUNNING),
+				makeGCContainer("foo1", "bar1", 0, 0, runtimeapi.ContainerState_CONTAINER_RUNNING),
+			},
+			remain:               []int{1, 2},
+			evictTerminatingPods: true,
+			allSourcesReady:      false,
+		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
