@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -31,6 +32,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -62,7 +64,13 @@ func NewCommandStartAggregator(ctx context.Context, defaults *AggregatorOptions)
 		Short: "Launch a API aggregator and proxy server",
 		Long:  "Launch a API aggregator and proxy server",
 		PersistentPreRunE: func(*cobra.Command, []string) error {
-			return o.ServerRunOptions.ComponentGlobalsRegistry.Set()
+			if err := o.ServerRunOptions.ComponentGlobalsRegistry.Set(); err != nil {
+				return err
+			}
+			if err := utilfeature.DefaultMutableFeatureGate.Freeze(); err != nil {
+				return err
+			}
+			return nil
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(); err != nil {
