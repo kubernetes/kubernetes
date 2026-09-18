@@ -1103,7 +1103,7 @@ type mockPodGroupManager struct {
 
 func (m *mockPodGroupManager) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
 	currentKey := key
-	for {
+	for range schedulingv1alpha3.WorkloadMaxTreeDepth {
 		switch currentKey.Type {
 		case fwk.PodKeyType:
 			return currentKey, true, nil
@@ -1129,4 +1129,5 @@ func (m *mockPodGroupManager) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityK
 			return currentKey, true, nil
 		}
 	}
+	return fwk.EntityKey{}, false, fmt.Errorf("hierarchy exceeded maximum tree depth at %s, possibly caused by cycle or deep hierarchy", currentKey.String())
 }

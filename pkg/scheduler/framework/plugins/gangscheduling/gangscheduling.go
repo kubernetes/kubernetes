@@ -287,13 +287,16 @@ func (pl *GangScheduling) checkCPGHierarchyReadiness(snapshot fwk.PodGroupManage
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("failed to build hierarchy snapshot: composite pod group object not found in state for %s", cpgKey.String()))
 	}
 
-	if !pl.isCPGTreeReady(snapshot, rootKey.Namespace, rootKey.Name, readinessCountFn) {
+	if !pl.isCPGTreeReady(snapshot, rootKey.Namespace, rootKey.Name, 0, readinessCountFn) {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for composite pod group %q tree to meet quorum", rootKey.Name))
 	}
 	return nil
 }
 
-func (pl *GangScheduling) isCPGTreeReady(snapshot fwk.PodGroupManager, namespace, cpgName string, readinessCountFn func(fwk.PodGroupState) int) bool {
+func (pl *GangScheduling) isCPGTreeReady(snapshot fwk.PodGroupManager, namespace, cpgName string, depth int, readinessCountFn func(fwk.PodGroupState) int) bool {
+	if depth >= schedulingapi.WorkloadMaxTreeDepth {
+		return false
+	}
 	cpgState, err := snapshot.CompositePodGroupStates().Get(namespace, cpgName)
 	if err != nil {
 		return false
@@ -313,7 +316,7 @@ func (pl *GangScheduling) isCPGTreeReady(snapshot fwk.PodGroupManager, namespace
 	for _, childKey := range cpgState.GetChildren() {
 		childType, _, childName := childKey.Type, childKey.Namespace, childKey.Name
 		if childType == fwk.CompositePodGroupKeyType {
-			if pl.isCPGTreeReady(snapshot, namespace, childName, readinessCountFn) {
+			if pl.isCPGTreeReady(snapshot, namespace, childName, depth+1, readinessCountFn) {
 				successfulChildren++
 			}
 		} else {
