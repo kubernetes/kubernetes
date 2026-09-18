@@ -316,7 +316,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	}
 
 	// Prepare kube clients.
-	client, eventClient, err := createClients(c.KubeConfig)
+	client, eventClient, asyncClient, err := createClients(c.KubeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -339,6 +339,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	}
 
 	c.Client = client
+	c.AsyncClient = asyncClient
 	c.InformerFactory = scheduler.NewInformerFactory(client, 0, o.InformerName)
 	dynClient := dynamic.NewForConfigOrDie(c.KubeConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
@@ -399,17 +400,22 @@ func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, 
 	return kubeConfig, nil
 }
 
-// createClients creates a kube client and an event client from the given kubeConfig
-func createClients(kubeConfig *restclient.Config) (clientset.Interface, clientset.Interface, error) {
+// createClients creates a kube client, an event client, and an async client from the given kubeConfig
+func createClients(kubeConfig *restclient.Config) (clientset.Interface, clientset.Interface, clientset.Interface, error) {
 	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler"))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	eventClient, err := clientset.NewForConfig(kubeConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return client, eventClient, nil
+	asyncClient, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler-async"))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return client, eventClient, asyncClient, nil
 }
