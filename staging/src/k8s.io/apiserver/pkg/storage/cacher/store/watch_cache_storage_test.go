@@ -17,6 +17,8 @@ limitations under the License.
 package store
 
 import (
+	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -69,7 +71,7 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestLatestSnapshotLocked(t *testing.T) {
+func TestLatestSnapshot(t *testing.T) {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return obj.(*mockObject).key, nil
 	}
@@ -78,18 +80,84 @@ func TestLatestSnapshotLocked(t *testing.T) {
 	indexers := &cache.Indexers{}
 	s := NewWatchCacheStorage(keyFunc, indexers)
 
-	_, ok := s.LatestSnapshotLocked()
+	_, ok := s.LatestSnapshot()
 	assert.False(t, ok, "expected no snapshot before any writes")
 
 	elem := &Element{Key: "foo", Object: &mockObject{key: "foo", val: "100"}}
 	require.NoError(t, s.UpdateStoreLocked(watch.Added, elem, 100))
 
-	snap, ok := s.LatestSnapshotLocked()
+	snap, ok := s.LatestSnapshot()
 	require.True(t, ok, "expected snapshot after write")
 	items, err := snap.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, &mockObject{key: "foo", val: "100"}, items[0].(*Element).Object)
+}
+
+func TestGetByKeyLatestSnapshot(t *testing.T) {
+	s := NewWatchCacheStorage(func(obj runtime.Object) (string, error) {
+		return obj.(*mockObject).key, nil
+	}, &cache.Indexers{})
+	update := func(et watch.EventType, key, val string, rv uint64) {
+		t.Helper()
+		require.NoError(t, s.UpdateStoreLocked(et, &Element{Key: key, Object: &mockObject{key: key, val: val}}, rv))
+	}
+
+	update(watch.Added, "a", "1", 100)
+	update(watch.Added, "b", "2", 101)
+	update(watch.Deleted, "a", "1", 102)
+
+	for _, key := range []string{"a", "b", "missing"} {
+		wantObj, wantOK, err := s.GetByKey(key)
+		require.NoError(t, err)
+		gotObj, gotOK, err := s.GetByKeyLatestSnapshot(key)
+		require.NoError(t, err)
+		require.Equal(t, wantOK, gotOK, "existence mismatch for %q", key)
+		if wantOK {
+			assert.Equal(t, wantObj.(*Element).Object, gotObj.(*Element).Object, "value mismatch for %q", key)
+		}
+	}
+
+	// Diverge the live store from the snapshot to prove which one is served.
+	require.NoError(t, s.store.Update(&Element{Key: "b", Object: &mockObject{key: "b", val: "999"}}))
+	got, ok, err := s.GetByKeyLatestSnapshot("b")
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "2", got.(*Element).Object.(*mockObject).val, "expected the snapshot, not the live store")
+
+	// An inconsistent cache releases its snapshots while the store stays populated.
+	s.MarkConsistent(false)
+	update(watch.Modified, "b", "3", 103)
+	got, ok, err = s.GetByKeyLatestSnapshot("b")
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "3", got.(*Element).Object.(*mockObject).val, "expected the live store")
+}
+
+func TestGetByKeyLatestSnapshotConcurrentWithIngest(t *testing.T) {
+	s := NewWatchCacheStorage(func(obj runtime.Object) (string, error) {
+		return obj.(*mockObject).key, nil
+	}, &cache.Indexers{})
+	require.NoError(t, s.UpdateStoreLocked(watch.Added, &Element{Key: "foo", Object: &mockObject{key: "foo", val: "0"}}, 100))
+
+	var wg sync.WaitGroup
+	for r := 0; r < 4; r++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 1000; i++ {
+				if _, ok, err := s.GetByKeyLatestSnapshot("foo"); err != nil || !ok {
+					t.Errorf("GetByKeyLatestSnapshot(foo) = %v, %v; want found, nil", ok, err)
+					return
+				}
+			}
+		}()
+	}
+	for rv := uint64(101); rv < 1101; rv++ {
+		elem := &Element{Key: "foo", Object: &mockObject{key: "foo", val: strconv.FormatUint(rv, 10)}}
+		require.NoError(t, s.UpdateStoreLocked(watch.Modified, elem, rv))
+	}
+	wg.Wait()
 }
 
 func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
