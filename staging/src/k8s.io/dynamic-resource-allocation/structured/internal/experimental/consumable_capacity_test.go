@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
 const (
@@ -54,11 +55,15 @@ var (
 	tooBigForMilli = resource.MustParse("9224372036854776E3") // ~9.22e21, well above MaxInt64 (9.22e18)
 )
 
+func fullyQualifiedName(domain, id string) draapi.FullyQualifiedName {
+	return draapi.FullyQualifiedName{Domain: domain, Identifier: id}
+}
+
 func deviceConsumedCapacity(deviceID DeviceID) DeviceConsumedCapacity {
-	capaicty := map[resourceapi.QualifiedName]resource.Quantity{
-		capacity0: one,
+	capacity := ConsumedCapacity{
+		fullyQualifiedName(deviceID.Driver.String(), capacity0): new(one),
 	}
-	return NewDeviceConsumedCapacity(deviceID, capaicty)
+	return DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: capacity}
 }
 
 func TestConsumableCapacity(t *testing.T) {
@@ -68,7 +73,7 @@ func TestConsumableCapacity(t *testing.T) {
 		allocatedCapacity := NewConsumedCapacity()
 		g.Expect(allocatedCapacity.Empty()).To(BeTrueBecause("allocated capacity should start from zero"))
 		oneAllocated := ConsumedCapacity{
-			capacity0: &one,
+			fullyQualifiedName(driverA, capacity0): &one,
 		}
 		allocatedCapacity.Add(oneAllocated)
 		g.Expect(allocatedCapacity.Empty()).To(BeFalseBecause("capacity is added"))
@@ -84,19 +89,17 @@ func TestConsumableCapacity(t *testing.T) {
 		aggregatedCapacity.Insert(deviceConsumedCapacity(deviceID))
 		allocatedCapacity, found := aggregatedCapacity[deviceID]
 		g.Expect(found).To(BeTrueBecause("expected deviceID to be found"))
-		g.Expect(allocatedCapacity[capacity0].Cmp(two)).To(BeZero())
+		g.Expect(allocatedCapacity[fullyQualifiedName(driverA, capacity0)].Cmp(two)).To(BeZero())
 		aggregatedCapacity.Remove(deviceConsumedCapacity(deviceID))
-		g.Expect(allocatedCapacity[capacity0].Cmp(one)).To(BeZero())
+		g.Expect(allocatedCapacity[fullyQualifiedName(driverA, capacity0)].Cmp(one)).To(BeZero())
 	})
 
 	t.Run("get-consumed-capacity-from-request", func(t *testing.T) {
-		requestedCapacity := &resourceapi.CapacityRequirements{
-			Requests: map[resourceapi.QualifiedName]resource.Quantity{
-				capacity0: one,
-				"dummy":   one,
-			},
+		requestedCapacity := map[draapi.FullyQualifiedName]resource.Quantity{
+			draapi.MakeFullyQualifiedName(capacity0, driverA): one,
+			draapi.MakeFullyQualifiedName("dummy", driverA):   one,
 		}
-		consumableCapacity := map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+		capacity := map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
 			capacity0: { // with request and with default, expect requested value
 				Value: two,
 				RequestPolicy: &resourceapi.CapacityRequestPolicy{
@@ -115,12 +118,21 @@ func TestConsumableCapacity(t *testing.T) {
 				Value: one, // no request and no policy (no default), expect capacity value
 			},
 		}
+		device := deviceWithID{
+			Device: &draapi.Device{
+				Capacity: capacity,
+			},
+			id: DeviceID{
+				Driver: draapi.MakeUniqueString(driverA),
+			},
+		}
 		g := NewWithT(t)
-		consumedCapacity, err := GetConsumedCapacityFromRequest(requestedCapacity, consumableCapacity, false)
+		consumedCapacity, err := getConsumedCapacityFromRequest(requestedCapacity, device, false)
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(consumedCapacity).To(HaveLen(3))
 		for name, val := range consumedCapacity {
-			g.Expect(string(name)).Should(BeElementOf([]string{capacity0, capacity1, "dummy"}))
+			g.Expect(name.Domain).To(Equal(driverA), "domain should be omitted since it equals the driver")
+			g.Expect(name.Identifier).Should(BeElementOf([]string{capacity0, capacity1, "dummy"}))
 			g.Expect(val.Cmp(one)).To(BeZero())
 		}
 	})
@@ -151,6 +163,14 @@ func testCmpRequestOverCapacityFatalBeatsSoft(t *testing.T) {
 			},
 		},
 	}
+	device := deviceWithID{
+		Device: &draapi.Device{
+			Capacity: capacity,
+		},
+		id: DeviceID{
+			Driver: draapi.MakeUniqueString(driverA),
+		},
+	}
 	request := &resourceapi.CapacityRequirements{
 		Requests: map[resourceapi.QualifiedName]resource.Quantity{
 			capacity0: two,       // over capacity0's value of 1: soft, skip this device
@@ -160,7 +180,7 @@ func testCmpRequestOverCapacityFatalBeatsSoft(t *testing.T) {
 	// Go's map order is unspecified, so run the check repeatedly to make an
 	// order-dependent regression very likely to surface rather than to rely on one order.
 	for range 64 {
-		ok, err := CmpRequestOverCapacity(NewConsumedCapacity(), request, nil, capacity, NewConsumedCapacity(), false)
+		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false)
 		g.Expect(ok).To(BeFalseBecause("an unrepresentable request must not be considered satisfiable"))
 		g.Expect(err).To(MatchError(errCapacityRequestNotRepresentable), "a representability error must take precedence over the soft over-capacity mismatch")
 	}
@@ -480,6 +500,11 @@ func testCalculateConsumedCapacity(t *testing.T) {
 		},
 		// A milli-representable request whose rounded value passes the milli-value range is
 		// rejected with a fatal error rather than silently capped.
+		// min=100m, step=100m, request=MaxInt64-1 milli:
+		//   added = MaxInt64-1 - 100 = MaxInt64-101
+		//   n     = (MaxInt64-101) / 100 = 92233720368547757  (added%100 == 6, so n++)
+		//   n     = 92233720368547758
+		//   guard = (MaxInt64-100)/100 = 92233720368547757  → n > guard → not representable
 		"fractional-step-rounded-value-passes-milli-range-is-rejected": {
 			requestedVal: func() *resource.Quantity {
 				q := resource.NewMilliQuantity(math.MaxInt64-1, resource.DecimalSI)
