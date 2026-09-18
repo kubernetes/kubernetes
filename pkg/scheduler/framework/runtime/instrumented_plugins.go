@@ -31,10 +31,18 @@ type instrumentedFilterPlugin struct {
 }
 
 var _ fwk.FilterPlugin = &instrumentedFilterPlugin{}
+var _ fwk.CrossNodeFilterPlugin = &instrumentedFilterPlugin{}
 
 func (p *instrumentedFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	p.metric.Inc()
 	return p.FilterPlugin.Filter(ctx, state, pod, nodeInfo)
+}
+
+func (p *instrumentedFilterPlugin) IsCrossNode() bool {
+	if c, ok := p.FilterPlugin.(fwk.CrossNodeFilterPlugin); ok {
+		return c.IsCrossNode()
+	}
+	return false
 }
 
 type instrumentedPreFilterPlugin struct {

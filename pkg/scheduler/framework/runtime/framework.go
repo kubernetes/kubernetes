@@ -1110,7 +1110,13 @@ func (f *frameworkImpl) RunFilterPlugins(
 		logger = klog.LoggerWithName(logger, "Filter")
 	}
 
+	runOnlyCrossNode := state.ShouldRunOnlyCrossNodeFilterPlugins()
 	for _, pl := range f.filterPlugins {
+		if runOnlyCrossNode {
+			if c, ok := pl.(fwk.CrossNodeFilterPlugin); !ok || !c.IsCrossNode() {
+				continue
+			}
+		}
 		if state.GetSkipFilterPlugins().Has(pl.Name()) {
 			continue
 		}

@@ -1750,3 +1750,287 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 		})
 	}
 }
+
+type trackingNodeLocalFilter struct {
+	nodeCapacities  map[string]int
+	evalCountByNode map[string]int
+}
+
+func (f *trackingNodeLocalFilter) Name() string { return "TrackingNodeLocalFilter" }
+
+func (f *trackingNodeLocalFilter) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	nodeName := nodeInfo.Node().Name
+	f.evalCountByNode[nodeName]++
+	cap := f.nodeCapacities[nodeName]
+	if len(nodeInfo.GetPods())+1 > cap {
+		return fwk.NewStatus(fwk.Unschedulable, "node-local capacity exceeded")
+	}
+	return fwk.NewStatus(fwk.Success)
+}
+
+type crossNodeStateData struct {
+	addedVictims sets.Set[string]
+}
+
+func (d *crossNodeStateData) Clone() fwk.StateData {
+	return &crossNodeStateData{addedVictims: d.addedVictims.Clone()}
+}
+
+const crossNodeStateKey fwk.StateKey = "TrackingCrossNodeState"
+
+type trackingCrossNodeFilter struct {
+	evalCountByNode          map[string]int
+	conflictVictimOnNodeName map[string]string // victimName -> unaffectedNodeName where it causes conflict
+}
+
+var _ fwk.CrossNodeFilterPlugin = &trackingCrossNodeFilter{}
+
+func (f *trackingCrossNodeFilter) Name() string { return "TrackingCrossNodeFilter" }
+
+func (f *trackingCrossNodeFilter) IsCrossNode() bool { return true }
+
+func (f *trackingCrossNodeFilter) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	state.Write(crossNodeStateKey, &crossNodeStateData{addedVictims: sets.New[string]()})
+	return nil, fwk.NewStatus(fwk.Success)
+}
+
+func (f *trackingCrossNodeFilter) PreFilterExtensions() fwk.PreFilterExtensions { return f }
+
+func (f *trackingCrossNodeFilter) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if s, err := state.Read(crossNodeStateKey); err == nil {
+		s.(*crossNodeStateData).addedVictims.Insert(podInfoToAdd.GetPod().Name)
+	}
+	return fwk.NewStatus(fwk.Success)
+}
+
+func (f *trackingCrossNodeFilter) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if s, err := state.Read(crossNodeStateKey); err == nil {
+		s.(*crossNodeStateData).addedVictims.Delete(podInfoToRemove.GetPod().Name)
+	}
+	return fwk.NewStatus(fwk.Success)
+}
+
+func (f *trackingCrossNodeFilter) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	nodeName := nodeInfo.Node().Name
+	f.evalCountByNode[nodeName]++
+	if s, err := state.Read(crossNodeStateKey); err == nil {
+		data := s.(*crossNodeStateData)
+		for victimName, conflictNode := range f.conflictVictimOnNodeName {
+			if data.addedVictims.Has(victimName) && conflictNode == nodeName {
+				return fwk.NewStatus(fwk.Unschedulable, "cross-node constraint violated")
+			}
+		}
+	}
+	return fwk.NewStatus(fwk.Success)
+}
+
+func TestPodGroupEvaluator_ReprieveNodeIndexedAndCrossNodeFilters(t *testing.T) {
+	tests := []struct {
+		name                     string
+		nodeCapacities           map[string]int
+		conflictVictimOnNodeName map[string]string
+		initPods                 []*v1.Pod
+		initPodGroups            []*schedulingv1beta1.PodGroup
+		expectedVictims          []string
+		expectedNodeLocalEvals   map[string]int
+		expectedCrossNodeEvals   map[string]int
+	}{
+		{
+			name: "Phase 1 fast-fail on affected node (node3) skips unaffected nodes (node1, node2)",
+			nodeCapacities: map[string]int{
+				"node1": 1,
+				"node2": 1,
+				"node3": 1, // v3 + p-c exceeds capacity on node3 -> fails in Phase 1
+			},
+			expectedVictims: []string{"v3"},
+			expectedNodeLocalEvals: map[string]int{
+				"node1": 0, // unaffected node skipped
+				"node2": 0, // unaffected node skipped
+				"node3": 1, // fails in Phase 1
+			},
+			expectedCrossNodeEvals: map[string]int{
+				"node1": 0,
+				"node2": 0,
+				"node3": 0, // short-circuited by node-local filter failure on node3
+			},
+		},
+		{
+			name: "Phase 2 reprieve success runs cross-node filters on unaffected nodes (node1, node2) and skips node-local filters",
+			nodeCapacities: map[string]int{
+				"node1": 1,
+				"node2": 1,
+				"node3": 2, // v3 + p-c fits on node3 -> Phase 1 succeeds
+			},
+			expectedVictims: nil,
+			expectedNodeLocalEvals: map[string]int{
+				"node1": 0, // skipped on unaffected node
+				"node2": 0, // skipped on unaffected node
+				"node3": 1, // run on affected node
+			},
+			expectedCrossNodeEvals: map[string]int{
+				"node1": 1, // run on unaffected node
+				"node2": 1, // run on unaffected node
+				"node3": 1, // run on affected node
+			},
+		},
+		{
+			name: "Phase 2 cross-node conflict on unaffected node (node1) rejects multi-node PodGroup victim spanning node2 and node3",
+			nodeCapacities: map[string]int{
+				"node1": 1,
+				"node2": 2, // v2 + p-b fits on node2 -> passes Phase 1
+				"node3": 2, // v3 + p-c fits on node3 -> passes Phase 1
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("v2").UID("v2").Namespace("default").Node("node2").Priority(lowPriority).PodGroupName("victim-pg").Obj(),
+				st.MakePod().Name("v3").UID("v3").Namespace("default").Node("node3").Priority(lowPriority).PodGroupName("victim-pg").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("victim-pg").Namespace("default").Priority(lowPriority).BasicPolicy().DisruptionModeAll().Obj(),
+			},
+			conflictVictimOnNodeName: map[string]string{
+				"v3": "node1", // adding v3 causes cross-node conflict for p-a on unaffected node1 in Phase 2
+			},
+			expectedVictims: []string{"v2", "v3"},
+			expectedNodeLocalEvals: map[string]int{
+				"node1": 0, // unaffected node skips node-local filter
+				"node2": 1, // passes Phase 1
+				"node3": 1, // passes Phase 1
+			},
+			expectedCrossNodeEvals: map[string]int{
+				"node1": 1, // fails here in Phase 2
+				"node2": 1, // passes Phase 1
+				"node3": 1, // passes Phase 1
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+			logger, ctx := ktesting.NewTestContext(t)
+
+			nodeLocalPlugin := &trackingNodeLocalFilter{
+				nodeCapacities:  tt.nodeCapacities,
+				evalCountByNode: make(map[string]int),
+			}
+			crossNodePlugin := &trackingCrossNodeFilter{
+				evalCountByNode:          make(map[string]int),
+				conflictVictimOnNodeName: tt.conflictVictimOnNodeName,
+			}
+
+			nodes := []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+				st.MakeNode().Name("node2").Obj(),
+				st.MakeNode().Name("node3").Obj(),
+			}
+			initPods := tt.initPods
+			if initPods == nil {
+				victimPod := st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Obj()
+				initPods = []*v1.Pod{victimPod}
+			}
+
+			preemptorPods := []*v1.Pod{
+				st.MakePod().Name("p-a").UID("p-a").Priority(highPriority).Obj(),
+				st.MakePod().Name("p-b").UID("p-b").Priority(highPriority).Obj(),
+				st.MakePod().Name("p-c").UID("p-c").Priority(highPriority).Obj(),
+			}
+			preemptor := makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).BasicPolicy().Obj(),
+				preemptorPods,
+			)
+
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterFilterPlugin(nodeLocalPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return nodeLocalPlugin, nil
+				}),
+				tf.RegisterPluginAsExtensions(crossNodePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return crossNodePlugin, nil
+				}, "PreFilter", "Filter"),
+			}
+
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(initPods, nodes, tt.initPodGroups)
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			fh, err := tf.NewFramework(
+				ctx,
+				registeredPlugins, "",
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithParallelism(parallelize.DefaultParallelism),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
+				frameworkruntime.WithLogger(logger),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			pgLister := &mockPodGroupLister{podGroups: make(map[string]*schedulingv1beta1.PodGroup)}
+			for _, pg := range tt.initPodGroups {
+				pgLister.podGroups[pg.Name] = pg
+			}
+			evaluator := &PodGroupEvaluator{
+				Handle:           fh,
+				podGroupSnapshot: pgLister,
+			}
+
+			targetNodes := []string{"node1", "node2", "node3"}
+			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+				var assignments []fwk.ProposedAssignment
+				for i, p := range preemptorPods {
+					cs := framework.NewCycleState()
+					_, status, _ := fh.RunPreFilterPlugins(ctx, cs, p)
+					if !status.IsSuccess() {
+						return nil, status
+					}
+					assignments = append(assignments, &mockProposedAssignment{
+						pod:        p,
+						nodeName:   targetNodes[i],
+						cycleState: cs,
+					})
+				}
+				return &fwk.PodGroupAssignments{ProposedAssignments: assignments}, fwk.NewStatus(fwk.Success)
+			}
+
+			if err := fh.MutableSnapshotSharedLister().StartMutations(); err != nil {
+				t.Fatal(err)
+			}
+			domain, err := newDomainForWorkloadPreemption(logger, snapshot, pgLister, &mockCompositePodGroupLister{}, "cluster")
+			if err != nil {
+				t.Fatal(err)
+			}
+			res, status := evaluator.selectVictimsOnDomain(ctx, preemptor, domain, nil, mockSchedulingFunc)
+			if err := fh.MutableSnapshotSharedLister().EndMutations(); err != nil {
+				t.Fatal(err)
+			}
+			if !status.IsSuccess() {
+				t.Fatalf("expected success status, got %v", status)
+			}
+
+			gotVictims := sets.New[string]()
+			if res != nil && res.victims != nil {
+				for _, p := range res.victims.Pods {
+					gotVictims.Insert(p.Name)
+				}
+			}
+			wantVictims := sets.New(tt.expectedVictims...)
+			if diff := cmp.Diff(wantVictims, gotVictims); diff != "" {
+				t.Errorf("unexpected victims (-want +got):\n%s", diff)
+			}
+
+			for node, wantCount := range tt.expectedNodeLocalEvals {
+				if got := nodeLocalPlugin.evalCountByNode[node]; got != wantCount {
+					t.Errorf("nodeLocalPlugin eval count on %s: want %d, got %d", node, wantCount, got)
+				}
+			}
+			for node, wantCount := range tt.expectedCrossNodeEvals {
+				if got := crossNodePlugin.evalCountByNode[node]; got != wantCount {
+					t.Errorf("crossNodePlugin eval count on %s: want %d, got %d", node, wantCount, got)
+				}
+			}
+		})
+	}
+}

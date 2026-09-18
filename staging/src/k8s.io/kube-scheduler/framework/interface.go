@@ -576,6 +576,15 @@ type FilterPlugin interface {
 	Filter(ctx context.Context, state CycleState, pod *v1.Pod, nodeInfo NodeInfo) *Status
 }
 
+// CrossNodeFilterPlugin is an interface for Filter plugins whose Filter evaluation
+// on a candidate node can depend on pods assigned to or removed from other nodes.
+type CrossNodeFilterPlugin interface {
+	FilterPlugin
+	// IsCrossNode returns true if the plugin's Filter evaluation on a node
+	// depends on cross-node pod state.
+	IsCrossNode() bool
+}
+
 // PostFilterPlugin is an interface for "PostFilter" plugins. These plugins are called
 // after a pod cannot be scheduled.
 type PostFilterPlugin interface {

@@ -38,6 +38,8 @@ type CycleState struct {
 	skipPreBindPlugins sets.Set[string]
 	// skipAllPostFilterPlugins indicates whether to skip all plugins in the PostFilter extension point.
 	skipAllPostFilterPlugins bool
+	// runOnlyCrossNodeFilterPlugins indicates whether only cross-node Filter plugins should run in the Filter extension point.
+	runOnlyCrossNodeFilterPlugins bool
 	// GetParallelPreBindPlugins returns plugins that can be run in parallel with other plugins
 	// in the PreBind extension point.
 	parallelPreBindPlugins sets.Set[string]
@@ -140,6 +142,20 @@ func (c *CycleState) ShouldSkipAllPostFilterPlugins() bool {
 	return c.skipAllPostFilterPlugins
 }
 
+func (c *CycleState) SetRunOnlyCrossNodeFilterPlugins(flag bool) {
+	if c == nil {
+		return
+	}
+	c.runOnlyCrossNodeFilterPlugins = flag
+}
+
+func (c *CycleState) ShouldRunOnlyCrossNodeFilterPlugins() bool {
+	if c == nil {
+		return false
+	}
+	return c.runOnlyCrossNodeFilterPlugins
+}
+
 // Clone creates a copy of CycleState and returns its pointer. Clone returns
 // nil if the context being cloned is nil.
 func (c *CycleState) Clone() fwk.CycleState {
@@ -161,6 +177,7 @@ func (c *CycleState) Clone() fwk.CycleState {
 	copy.podGroupCycleState = c.podGroupCycleState
 	copy.placementCycleState = c.placementCycleState
 	copy.skipAllPostFilterPlugins = c.skipAllPostFilterPlugins
+	copy.runOnlyCrossNodeFilterPlugins = c.runOnlyCrossNodeFilterPlugins
 
 	return copy
 }
