@@ -637,6 +637,269 @@ func TestCPGScheduling(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "TestCPGSiblingAwareSnapshotAssumptionSeparateNodes",
+			// TestCPGSiblingAwareSnapshotAssumptionSeparateNodes verifies that during CPG scheduling,
+			// a sibling PodGroup with subsequent siblings assumes its pods into the snapshot,
+			// forcing the subsequent sibling to schedule on a separate node when per-node capacity is limited.
+			//
+			// Tree structure:
+			//
+			//	   cpg-root (Gang, MinGroupCount: 2)
+			//	  /                                \
+			//	pg1 (Basic)                       pg2 (Basic)
+			//	(S - node1)                       (S - node2)
+			//
+			// (S) = Success
+			steps: []stepsframework.Step{
+				{
+					Name: "Create Nodes",
+					CreateNodes: []*v1.Node{
+						st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10"}).Obj(),
+						st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10"}).Obj(),
+					},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-sibling-nodes").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakePodGroupTemplate().Name("basic-t").BasicPolicy().Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-sibling-nodes", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-sibling-nodes", "basic-t").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-sibling-nodes", "basic-t").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "10"),
+						makeTestPods("pg2", "10"),
+					),
+				},
+				{
+					Name: "Wait for both sibling pods to be scheduled",
+					WaitForPodsScheduled: podNames(concatPods(
+						makeTestPods("pg1", "10"),
+						makeTestPods("pg2", "10"),
+					)),
+				},
+			},
+		},
+		{
+			name: "TestCPGSiblingAwareSnapshotAssumptionInsufficientCapacity",
+			// TestCPGSiblingAwareSnapshotAssumptionInsufficientCapacity verifies that when two sibling
+			// PodGroups contend for the same node and insufficient capacity exists for both, the first
+			// sibling assumes the node during simulation, causing the second sibling to fail feasibility,
+			// thereby failing the parent Gang quorum and keeping both pods unscheduled.
+			//
+			// Tree structure:
+			//
+			//	   cpg-root (Gang, MinGroupCount: 2)
+			//	  /                                \
+			//	pg1 (Basic)                       pg2 (Basic)
+			//	(F)                               (F)
+			//
+			// (F) = Fail (quorum not met)
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10"}).Obj()},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-sibling-insufficient").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakePodGroupTemplate().Name("basic-t").BasicPolicy().Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-sibling-insufficient", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-sibling-insufficient", "basic-t").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-sibling-insufficient", "basic-t").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "10"),
+						makeTestPods("pg2", "10"),
+					),
+				},
+				{
+					Name: "Wait for pods to remain unschedulable due to quorum failure",
+					WaitForPodsUnschedulable: podNames(concatPods(
+						makeTestPods("pg1", "10"),
+						makeTestPods("pg2", "10"),
+					)),
+				},
+			},
+		},
+		{
+			name: "TestCPGSubCPGSiblingAwareSnapshotAssumptionSeparateNodes",
+			// TestCPGSubCPGSiblingAwareSnapshotAssumptionSeparateNodes verifies that when sibling sub-CPGs
+			// are scheduled, the first sub-CPG assumes its entire subtree into the snapshot, forcing the
+			// second sub-CPG's pods onto separate nodes when per-node capacity is limited.
+			//
+			// Tree structure:
+			//
+			//	                    cpg-root (Gang, MinGroupCount: 2)
+			//	                   /                                 \
+			//	      cpg-sub1 (Gang, Min: 1)              cpg-sub2 (Gang, Min: 1)
+			//	             |                                    |
+			//	            pg1 (Basic)                          pg2 (Basic)
+			//	          (S - node1)                          (S - node2)
+			//
+			// (S) = Success
+			steps: []stepsframework.Step{
+				{
+					Name: "Create Nodes",
+					CreateNodes: []*v1.Node{
+						st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10"}).Obj(),
+						st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10"}).Obj(),
+					},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-subcpg-nodes").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakeCompositePodGroupTemplate().Name("sub-t").MinGroupCount(1).Priority(100).Children(
+										st.MakePodGroupTemplate().Name("basic-t").BasicPolicy().Priority(100),
+									),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-subcpg-nodes", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create cpg-sub1",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-sub1").WorkloadRef("workload-cpg-subcpg-nodes", "sub-t").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create cpg-sub2",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-sub2").WorkloadRef("workload-cpg-subcpg-nodes", "sub-t").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-subcpg-nodes", "basic-t").ParentCompositePodGroup("cpg-sub1").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-subcpg-nodes", "basic-t").ParentCompositePodGroup("cpg-sub2").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "10"),
+						makeTestPods("pg2", "10"),
+					),
+				},
+				{
+					Name: "Wait for both sub-CPG pods to be scheduled",
+					WaitForPodsScheduled: podNames(concatPods(
+						makeTestPods("pg1", "10"),
+						makeTestPods("pg2", "10"),
+					)),
+				},
+			},
+		},
+		{
+			name: "TestCPGSubCPGSiblingAwareSnapshotAssumptionInsufficientCapacity",
+			// TestCPGSubCPGSiblingAwareSnapshotAssumptionInsufficientCapacity verifies that when sibling
+			// sub-CPGs contend for the same node and capacity is insufficient, the first sub-CPG assumes
+			// its subtree, causing the second sub-CPG to fail feasibility and preventing all pods from scheduling.
+			//
+			// Tree structure:
+			//
+			//	                    cpg-root (Gang, MinGroupCount: 2)
+			//	                   /                                 \
+			//	      cpg-sub1 (Gang, Min: 1)              cpg-sub2 (Gang, Min: 1)
+			//	             |                                    |
+			//	            pg1 (Basic)                          pg2 (Basic)
+			//	            (F)                                  (F)
+			//
+			// (F) = Fail (quorum not met)
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10"}).Obj()},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-subcpg-insufficient").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakeCompositePodGroupTemplate().Name("sub-t").MinGroupCount(1).Priority(100).Children(
+										st.MakePodGroupTemplate().Name("basic-t").BasicPolicy().Priority(100),
+									),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-subcpg-insufficient", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create cpg-sub1",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-sub1").WorkloadRef("workload-cpg-subcpg-insufficient", "sub-t").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create cpg-sub2",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-sub2").WorkloadRef("workload-cpg-subcpg-insufficient", "sub-t").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-subcpg-insufficient", "basic-t").ParentCompositePodGroup("cpg-sub1").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-subcpg-insufficient", "basic-t").ParentCompositePodGroup("cpg-sub2").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "10"),
+						makeTestPods("pg2", "10"),
+					),
+				},
+				{
+					Name: "Wait for pods to remain unschedulable due to quorum failure",
+					WaitForPodsUnschedulable: podNames(concatPods(
+						makeTestPods("pg1", "10"),
+						makeTestPods("pg2", "10"),
+					)),
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
