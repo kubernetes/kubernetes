@@ -29,14 +29,37 @@ import (
 const (
 	PreferClosestNUMANodes string = "prefer-closest-numa-nodes"
 	MaxAllowableNUMANodes  string = "max-allowable-numa-nodes"
+	NUMAAllocationStrategy string = "numa-allocation-strategy"
+)
+
+// Values accepted by the NUMAAllocationStrategy policy option.
+const (
+	// NUMAAllocationStrategyNone keeps the pre-existing hint selection, which
+	// disregards how much of each NUMA node is already allocated. This is the
+	// default.
+	NUMAAllocationStrategyNone string = "none"
+	// NUMAAllocationStrategyMostAllocated prefers the NUMA nodes which are
+	// already the most allocated, packing workloads together.
+	NUMAAllocationStrategyMostAllocated string = "most-allocated"
+	// NUMAAllocationStrategyLeastAllocated prefers the NUMA nodes which are
+	// the least allocated, spreading workloads apart.
+	NUMAAllocationStrategyLeastAllocated string = "least-allocated"
 )
 
 var (
-	alphaOptions  = sets.New[string]()
+	alphaOptions = sets.New[string](
+		NUMAAllocationStrategy,
+	)
 	betaOptions   = sets.New[string]()
 	stableOptions = sets.New[string](
 		PreferClosestNUMANodes,
 		MaxAllowableNUMANodes,
+	)
+
+	numaAllocationStrategies = sets.New[string](
+		NUMAAllocationStrategyNone,
+		NUMAAllocationStrategyMostAllocated,
+		NUMAAllocationStrategyLeastAllocated,
 	)
 )
 
@@ -57,8 +80,9 @@ func CheckPolicyOptionAvailable(option string) error {
 }
 
 type PolicyOptions struct {
-	PreferClosestNUMA     bool
-	MaxAllowableNUMANodes int
+	PreferClosestNUMA      bool
+	MaxAllowableNUMANodes  int
+	NUMAAllocationStrategy string
 }
 
 func NewPolicyOptions(logger klog.Logger, policyOptions map[string]string) (PolicyOptions, error) {
@@ -66,6 +90,9 @@ func NewPolicyOptions(logger klog.Logger, policyOptions map[string]string) (Poli
 		// Set MaxAllowableNUMANodes to the default. This will be overwritten
 		// if the user has specified a policy option for MaxAllowableNUMANodes.
 		MaxAllowableNUMANodes: defaultMaxAllowableNUMANodes,
+		// Likewise, allocation state does not take part in hint selection
+		// unless the user asks for it.
+		NUMAAllocationStrategy: NUMAAllocationStrategyNone,
 	}
 
 	for name, value := range policyOptions {
@@ -94,6 +121,16 @@ func NewPolicyOptions(logger klog.Logger, policyOptions map[string]string) (Poli
 				logger.Info("WARNING: the value of max-allowable-numa-nodes is more than the default recommended value", "max-allowable-numa-nodes", optValue, "defaultMaxAllowableNUMANodes", defaultMaxAllowableNUMANodes)
 			}
 			opts.MaxAllowableNUMANodes = optValue
+		case NUMAAllocationStrategy:
+			// an empty value means the same as "none", so the option can be
+			// neutralized without removing the key.
+			if value == "" {
+				value = NUMAAllocationStrategyNone
+			}
+			if !numaAllocationStrategies.Has(value) {
+				return opts, fmt.Errorf("bad value for option %q: %q must be one of %q", name, value, sets.List(numaAllocationStrategies))
+			}
+			opts.NUMAAllocationStrategy = value
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.

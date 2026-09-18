@@ -51,8 +51,9 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 		{
 			description: "return TopologyManagerOptions with PreferClosestNUMA set to true",
 			expectedOptions: PolicyOptions{
-				PreferClosestNUMA:     true,
-				MaxAllowableNUMANodes: 8,
+				PreferClosestNUMA:      true,
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
 			},
 			policyOptions: map[string]string{
 				PreferClosestNUMANodes: "true",
@@ -62,7 +63,8 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 		{
 			description: "return TopologyManagerOptions with MaxAllowableNUMANodes set to 12",
 			expectedOptions: PolicyOptions{
-				MaxAllowableNUMANodes: 12,
+				MaxAllowableNUMANodes:  12,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
 			},
 			policyOptions: map[string]string{
 				MaxAllowableNUMANodes: "12",
@@ -71,7 +73,8 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 		{
 			description: "return empty TopologyManagerOptions",
 			expectedOptions: PolicyOptions{
-				MaxAllowableNUMANodes: 8,
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
 			},
 		},
 		{
@@ -97,8 +100,9 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 				fancyBetaOption: "true",
 			},
 			expectedOptions: PolicyOptions{
-				PreferClosestNUMA:     false,
-				MaxAllowableNUMANodes: 8,
+				PreferClosestNUMA:      false,
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
 			},
 		},
 		{
@@ -117,14 +121,80 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 				fancyAlphaOption: "true",
 			},
 			expectedOptions: PolicyOptions{
-				PreferClosestNUMA:     false,
-				MaxAllowableNUMANodes: 8,
+				PreferClosestNUMA:      false,
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
 			},
 		},
 		{
 			description: "test alpha options fail",
 			policyOptions: map[string]string{
 				fancyAlphaOption: "true",
+			},
+			expectedErr: fmt.Errorf("topology manager policy alpha-level options not enabled,"),
+		},
+		{
+			description:       "return TopologyManagerOptions with NUMAAllocationStrategy set to most-allocated",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
+			},
+		},
+		{
+			description:       "return TopologyManagerOptions with NUMAAllocationStrategy set to least-allocated",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+			},
+		},
+		{
+			description:       "return TopologyManagerOptions with NUMAAllocationStrategy set to none",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+			},
+		},
+		{
+			description:       "an empty NUMAAllocationStrategy means none",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: "",
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+			},
+		},
+		{
+			description:       "fail to parse options with unknown NUMAAllocationStrategy",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: "most-allocated-ish",
+			},
+			expectedErr: fmt.Errorf("bad value for option"),
+		},
+		{
+			description: "NUMAAllocationStrategy is rejected unless the alpha options gate is on",
+			featureGate: pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
 			},
 			expectedErr: fmt.Errorf("topology manager policy alpha-level options not enabled,"),
 		},
@@ -178,6 +248,10 @@ func TestPolicyDefaultsAvailable(t *testing.T) {
 		{
 			option:            MaxAllowableNUMANodes,
 			expectedAvailable: true,
+		},
+		{
+			option:            NUMAAllocationStrategy,
+			expectedAvailable: false,
 		},
 	}
 	for _, testCase := range testCases {
@@ -250,6 +324,18 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 		{
 			option:            fancyBetaOption,
 			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
+			featureGateEnable: false,
+			expectedAvailable: false,
+		},
+		{
+			option:            NUMAAllocationStrategy,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            NUMAAllocationStrategy,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
 			featureGateEnable: false,
 			expectedAvailable: false,
 		},
