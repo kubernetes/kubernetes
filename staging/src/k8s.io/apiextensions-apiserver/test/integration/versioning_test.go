@@ -231,6 +231,18 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+	storageWatcher, err := newNamespacedCustomResourceVersionedClient(ns, dynamicClient, crd, "v1beta1").Watch(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer storageWatcher.Stop()
+	watchClosed := make(chan struct{})
+	go func() {
+		for range storageWatcher.ResultChan() {
+		}
+		close(watchClosed)
+	}()
+
 	// Changing CRD storage version should be reflected immediately
 	crd.Spec.Versions = versionsV1Beta2Storage
 	_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
@@ -243,6 +255,18 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 	}
 	if e, a := []string{"v1beta1", "v1beta2"}, crd.Status.StoredVersions; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	// Changing the storage version recreates the REST storage asynchronously. Wait for the old storage's
+	// watch to close before priming the new watch cache so the finalizer can reliably list remaining instances.
+	select {
+	case <-watchClosed:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for the old storage watch to close")
+	}
+	crd, err = fixtures.WaitForCRDWatchCacheReady(crd, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
