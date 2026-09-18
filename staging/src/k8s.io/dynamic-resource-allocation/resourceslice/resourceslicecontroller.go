@@ -740,7 +740,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	c.mutex.RLock()
 	resources = c.resources
 	c.mutex.RUnlock()
-	if err := validateDriverResources(resources); err != nil {
+	if err := validateDriverResources(c.driverName, resources); err != nil {
 		c.errorHandler(ctx, err, "pool validation failed")
 		// We only report the error through the error handler to prevent
 		// the controller from retrying.

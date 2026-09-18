@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package resourceslice
 
 import (
 	"fmt"
+	"strings"
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,9 +29,9 @@ import (
 // ResourceSlices, like incorrect cross-references. We do validation here
 // so any issues can be discovered as early as possible. This is also
 // checked in the allocator before allocating any devices.
-func validateDriverResources(resources *DriverResources) error {
+func validateDriverResources(driverName string, resources *DriverResources) error {
 	for poolName, pool := range resources.Pools {
-		if err := validatePool(poolName, pool); err != nil {
+		if err := validatePool(driverName, poolName, pool); err != nil {
 			return err
 		}
 	}
@@ -43,7 +44,7 @@ func validateDriverResources(resources *DriverResources) error {
 // This logic is very similar to what we do in the allocator when we
 // gather the pools. We might want to see if there is a good way to
 // put this logic in one place.
-func validatePool(name string, pool Pool) error {
+func validatePool(driverName, name string, pool Pool) error {
 	counterSets := make(map[string]resourceapi.CounterSet)
 	for _, slice := range pool.Slices {
 		for _, counterSet := range slice.SharedCounters {
@@ -62,6 +63,17 @@ func validatePool(name string, pool Pool) error {
 			}
 			devices.Insert(device.Name)
 
+			for attrName := range device.Attributes {
+				if err := validateUnqualifiedName(driverName, attrName); err != nil {
+					return fmt.Errorf("device %q: attribute %s: %w", device.Name, attrName, err)
+				}
+			}
+			for capName := range device.Capacity {
+				if err := validateUnqualifiedName(driverName, capName); err != nil {
+					return fmt.Errorf("device %q: capacity %s: %w", device.Name, capName, err)
+				}
+			}
+
 			for _, dcc := range device.ConsumesCounters {
 				counterSet, found := counterSets[dcc.CounterSet]
 				if !found {
@@ -74,6 +86,22 @@ func validatePool(name string, pool Pool) error {
 				}
 			}
 		}
+	}
+	return nil
+}
+
+// validateUnqualifiedName rejects an attribute or capacity name that is explicitly
+// qualified with the driver's own domain (e.g. "<driverName>/foo"). Such a name is
+// always equivalent to the same name given without a domain ("foo"), because the
+// driver's domain is implicit for its own ResourceSlices. Publishing both forms, or
+// only the qualified form, is redundant and at worst creates two conflicting entries.
+//
+// The apiserver does not validate this. The scheduling code prefers the fully-qualified
+// one in case of a conflict. Nonetheless DRA drivers shouldn't do this.
+func validateUnqualifiedName(driverName string, name resourceapi.QualifiedName) error {
+	domain, _, hasDomain := strings.Cut(string(name), "/")
+	if hasDomain && domain == driverName {
+		return fmt.Errorf("should not be qualified with the driver name %q, which is implicit for a driver's own ResourceSlices", driverName)
 	}
 	return nil
 }
