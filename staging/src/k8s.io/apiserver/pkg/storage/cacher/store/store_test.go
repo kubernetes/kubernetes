@@ -50,7 +50,7 @@ func testStoreSingleKey(t *testing.T, store Indexer) {
 	require.NoError(t, store.Update(testStorageElement("foo", "baz", 3)))
 	assertStoreSingleKey(t, store, "foo", "baz", 3)
 
-	require.NoError(t, store.Replace([]interface{}{testStorageElement("foo", "bar", 4)}, ""))
+	require.NoError(t, store.Replace([]*Element{testStorageElement("foo", "bar", 4)}))
 	assertStoreSingleKey(t, store, "foo", "bar", 4)
 
 	require.NoError(t, store.Delete(testStorageElement("foo", "", 0)))
@@ -78,7 +78,7 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	require.NoError(t, store.Add(testStorageElement("foo", "bar", 1)))
 	items, err = store.ByIndex("by_val", "bar")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "bar", 1),
 	}, items)
 
@@ -88,7 +88,7 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	assert.Empty(t, items)
 	items, err = store.ByIndex("by_val", "baz")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "baz", 2),
 	}, items)
 
@@ -98,16 +98,16 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	assert.Empty(t, items)
 	items, err = store.ByIndex("by_val", "baz")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "baz", 3),
 	}, items)
 
-	require.NoError(t, store.Replace([]interface{}{
+	require.NoError(t, store.Replace([]*Element{
 		testStorageElement("foo", "bar", 4),
-	}, ""))
+	}))
 	items, err = store.ByIndex("by_val", "bar")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "bar", 4),
 	}, items)
 	items, err = store.ByIndex("by_val", "baz")
@@ -123,33 +123,21 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 }
 
 func assertStoreEmpty(t *testing.T, store Indexer, nonExistingKey string) {
-	item, ok, err := store.Get(testStorageElement(nonExistingKey, "", 0))
-	require.NoError(t, err)
+	elem, ok := store.GetByKey(nonExistingKey)
 	assert.False(t, ok)
-	assert.Nil(t, item)
-
-	item, ok, err = store.GetByKey(nonExistingKey)
-	require.NoError(t, err)
-	assert.False(t, ok)
-	assert.Nil(t, item)
+	assert.Nil(t, elem)
 
 	items := store.List()
 	assert.Empty(t, items)
 }
 
 func assertStoreSingleKey(t *testing.T, store Indexer, expectKey, expectValue string, expectRV int) {
-	item, ok, err := store.Get(testStorageElement(expectKey, "", expectRV))
-	require.NoError(t, err)
+	elem, ok := store.GetByKey(expectKey)
 	assert.True(t, ok)
-	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
-
-	item, ok, err = store.GetByKey(expectKey)
-	require.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
+	assert.Equal(t, expectValue, elem.Object.(fakeObj).value)
 
 	items := store.List()
-	assert.Equal(t, []interface{}{testStorageElement(expectKey, expectValue, expectRV)}, items)
+	assert.Equal(t, []*Element{testStorageElement(expectKey, expectValue, expectRV)}, items)
 }
 
 func testStorageElement(key, value string, rv int) *Element {

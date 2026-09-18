@@ -211,7 +211,7 @@ func TestWatchCacheBasic(t *testing.T) {
 	if err := s.Add(pod1); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if item, ok, _ := s.storage.Get(pod1); !ok {
+	if item, ok := s.storage.GetByKey("/prefix/ns/pod"); !ok {
 		t.Errorf("didn't find pod")
 	} else {
 		expected := makeTestStoreElement(makeTestPod("pod", 1))
@@ -223,7 +223,7 @@ func TestWatchCacheBasic(t *testing.T) {
 	if err := s.Update(pod2); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if item, ok, _ := s.storage.Get(pod2); !ok {
+	if item, ok := s.storage.GetByKey("/prefix/ns/pod"); !ok {
 		t.Errorf("didn't find pod")
 	} else {
 		expected := makeTestStoreElement(makeTestPod("pod", 2))
@@ -235,7 +235,7 @@ func TestWatchCacheBasic(t *testing.T) {
 	if err := s.Delete(pod3); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if _, ok, _ := s.storage.Get(pod3); ok {
+	if _, ok := s.storage.GetByKey("/prefix/ns/pod"); ok {
 		t.Errorf("found pod")
 	}
 
@@ -250,8 +250,7 @@ func TestWatchCacheBasic(t *testing.T) {
 			"/prefix/ns/pod3": *makeTestStoreElement(makeTestPod("pod3", 6)),
 		}
 		items := make(map[string]store.Element)
-		for _, item := range s.storage.List() {
-			elem := item.(*store.Element)
+		for _, elem := range s.storage.List() {
 			items[elem.Key] = *elem
 		}
 		if !apiequality.Semantic.DeepEqual(expected, items) {
@@ -270,8 +269,7 @@ func TestWatchCacheBasic(t *testing.T) {
 			"/prefix/ns/pod5": *makeTestStoreElement(makeTestPod("pod5", 8)),
 		}
 		items := make(map[string]store.Element)
-		for _, item := range s.storage.List() {
-			elem := item.(*store.Element)
+		for _, elem := range s.storage.List() {
 			items[elem.Key] = *elem
 		}
 		if !apiequality.Semantic.DeepEqual(expected, items) {
@@ -478,7 +476,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	if resp.ResourceVersion != 5 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(itemsFromListResp(t, resp)) != 3 {
+	if len(itemsFromListResp(resp)) != 3 {
 		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "" {
@@ -501,7 +499,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	if resp.ResourceVersion != 5 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(itemsFromListResp(t, resp)) != 2 {
+	if len(itemsFromListResp(resp)) != 2 {
 		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "l:label" {
@@ -524,7 +522,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	if resp.ResourceVersion != 5 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(itemsFromListResp(t, resp)) != 1 {
+	if len(itemsFromListResp(resp)) != 1 {
 		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "f:spec.nodeName" {
@@ -545,7 +543,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	if resp.ResourceVersion != 5 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(itemsFromListResp(t, resp)) != 3 {
+	if len(itemsFromListResp(resp)) != 3 {
 		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "" {
@@ -572,7 +570,7 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	if resp.ResourceVersion != 3 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 6", resp.ResourceVersion)
 	}
-	if len(itemsFromListResp(t, resp)) != 1 {
+	if len(itemsFromListResp(resp)) != 1 {
 		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "" {
@@ -1395,7 +1393,7 @@ func testWatchCacheSnapshotConcurrency(t *testing.T, s *testWatchCache, resource
 			t.Errorf("Expected list ResourceVersion %d, got %d", targetRV, resp.ResourceVersion)
 		}
 		if expectItemRVLessOrEqualListRV {
-			maxItemRV := getMaxItemRV(t, s.config.versioner, itemsFromListResp(t, resp))
+			maxItemRV := getMaxItemRV(t, s.config.versioner, itemsFromListResp(resp))
 			if maxItemRV > resp.ResourceVersion {
 				t.Errorf("Violated consistency: max item resource version %d is greater than list resource version %d", maxItemRV, resp.ResourceVersion)
 			}
@@ -1406,13 +1404,9 @@ func testWatchCacheSnapshotConcurrency(t *testing.T, s *testWatchCache, resource
 	wg.Wait()
 }
 
-func itemsFromListResp(t *testing.T, resp listResp) []interface{} {
-	t.Helper()
+func itemsFromListResp(resp listResp) []interface{} {
 	var items []interface{}
-	for elem, err := range resp.All() {
-		if err != nil {
-			t.Fatal(err)
-		}
+	for elem := range resp.All() {
 		items = append(items, elem)
 	}
 	return items
