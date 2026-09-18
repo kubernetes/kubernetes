@@ -76,6 +76,8 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapi.ContainerInfo) (*statsapi
 			availableBytes := info.Spec.Memory.Limit - cstat.Memory.WorkingSet
 			memoryStats.AvailableBytes = &availableBytes
 		}
+		memoryStats.HighEvents = &cstat.Memory.Events.High
+		memoryStats.MaxEvents = &cstat.Memory.Events.Max
 		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 			memoryStats.PSI = cadvisorPSIToStatsPSI(&cstat.Memory.PSI)
 		}
