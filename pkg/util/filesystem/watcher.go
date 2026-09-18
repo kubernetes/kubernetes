@@ -36,6 +36,10 @@ type FSWatcher interface {
 
 	// Add a filesystem path to watch
 	AddWatch(path string) error
+
+	// Ready returns a channel closed once the watcher's event loop is running,
+	// allowing callers to synchronize before sending filesystem events in tests.
+	Ready() <-chan struct{}
 }
 
 // FSEventHandler is called when a fsnotify event occurs.
@@ -48,6 +52,7 @@ type fsnotifyWatcher struct {
 	watcher      *fsnotify.Watcher
 	eventHandler FSEventHandler
 	errorHandler FSErrorHandler
+	readyChan    chan struct{}
 }
 
 var _ FSWatcher = &fsnotifyWatcher{}
@@ -71,12 +76,14 @@ func (w *fsnotifyWatcher) Init(eventHandler FSEventHandler, errorHandler FSError
 
 	w.eventHandler = eventHandler
 	w.errorHandler = errorHandler
+	w.readyChan = make(chan struct{})
 	return nil
 }
 
 func (w *fsnotifyWatcher) Run(ctx context.Context) {
 	go func() {
 		defer w.watcher.Close()
+		close(w.readyChan)
 		for {
 			select {
 			case <-ctx.Done():
@@ -92,4 +99,8 @@ func (w *fsnotifyWatcher) Run(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (w *fsnotifyWatcher) Ready() <-chan struct{} {
+	return w.readyChan
 }
