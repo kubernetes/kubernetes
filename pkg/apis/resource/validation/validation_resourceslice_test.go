@@ -2192,6 +2192,28 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				return slice
 			},
 		},
+		"invalid-update-sets-per-device-node-selection-next-to-stored-attribute-name-with-extra-slash": {
+			// perDeviceNodeSelection changes how each device is validated, so
+			// changing it revalidates the devices even though the list is the same.
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes"), "x.example.com/y/z", "must not contain more than one slash"),
+				field.Required(field.NewPath("spec", "devices").Index(0), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set to true in the ResourceSlice spec"),
+			},
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := validResourceSlice.DeepCopy()
+				slice.Spec.NodeName = nil
+				slice.Spec.AllNodes = ptr.To(true)
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("x.example.com/y/z"): {StringValue: ptr.To("v")},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.AllNodes = nil
+				slice.Spec.PerDeviceNodeSelection = ptr.To(true)
+				return slice
+			},
+		},
 		// The handwritten validation only consults the name format to decide
 		// whether looking for the attribute on each device is worthwhile, so a
 		// stored malformed name produces no error here. The declarative side

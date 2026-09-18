@@ -861,17 +861,16 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		allErrs = append(allErrs, field.Invalid(fldPath, "", "only one of `sharedCounters` or `devices` is allowed"))
 	}
 
-	maxDevices := resource.ResourceSliceMaxDevices
-	if haveDeviceTaints(spec) || haveConsumesCounters(spec) || haveListAttributes(spec) {
-		maxDevices = resource.ResourceSliceMaxDevicesWithAdvancedFeatures
-	}
 	// An unchanged device list is accepted as it is stored. Validation which
 	// was added after the object was written does not have to be satisfied
-	// retroactively, as long as the list is left alone. Because the list is
-	// atomic, any change to it, including merely reordering devices, validates
-	// every device in it. The generated validation ratchets at the same level.
-	if oldSpec == nil || !apiequality.Semantic.DeepEqual(spec.Devices, oldSpec.Devices) {
-		allErrs = append(allErrs, validateSet(spec.Devices, maxDevices,
+	// retroactively, as long as the list and everything else validateSet
+	// reads from are left alone. Because the list is atomic, any change to
+	// it, including merely reordering devices, validates every device in it.
+	// The generated validation ratchets at the same level.
+	if oldSpec == nil ||
+		!apiequality.Semantic.DeepEqual(spec.Devices, oldSpec.Devices) ||
+		!apiequality.Semantic.DeepEqual(spec.PerDeviceNodeSelection, oldSpec.PerDeviceNodeSelection) {
+		allErrs = append(allErrs, validateSet(spec.Devices, maxDevicesFor(spec.Devices),
 			func(device resource.Device, fldPath *field.Path) field.ErrorList {
 				return validateDevice(device, fldPath, spec.PerDeviceNodeSelection)
 			},
@@ -904,7 +903,7 @@ func validatePartitionTypeAttribute(spec *resource.ResourceSliceSpec, fldPath *f
 	var allErrs field.ErrorList
 	name := string(*spec.PartitionTypeAttribute)
 
-	if !haveConsumesCounters(spec) {
+	if !haveConsumesCounters(spec.Devices) {
 		return append(allErrs, field.Invalid(fldPath.Child("partitionTypeAttribute"), name,
 			"may only be set on a slice which declares devices that consume counters"))
 	}
@@ -975,12 +974,17 @@ func lookupQualifiedAttribute(attributes map[resource.QualifiedName]resource.Dev
 	return resource.DeviceAttribute{}, false
 }
 
-func haveListAttributes(spec *resource.ResourceSliceSpec) bool {
-	if spec == nil {
-		return false
+// maxDevicesFor returns how many devices a ResourceSlice may hold. It depends
+// only on the devices themselves.
+func maxDevicesFor(devices []resource.Device) int {
+	if haveDeviceTaints(devices) || haveConsumesCounters(devices) || haveListAttributes(devices) {
+		return resource.ResourceSliceMaxDevicesWithAdvancedFeatures
 	}
+	return resource.ResourceSliceMaxDevices
+}
 
-	for _, device := range spec.Devices {
+func haveListAttributes(devices []resource.Device) bool {
+	for _, device := range devices {
 		for _, attribute := range device.Attributes {
 			if attribute.BoolValues != nil ||
 				attribute.IntValues != nil ||
@@ -993,12 +997,8 @@ func haveListAttributes(spec *resource.ResourceSliceSpec) bool {
 	return false
 }
 
-func haveDeviceTaints(spec *resource.ResourceSliceSpec) bool {
-	if spec == nil {
-		return false
-	}
-
-	for _, device := range spec.Devices {
+func haveDeviceTaints(devices []resource.Device) bool {
+	for _, device := range devices {
 		if len(device.Taints) > 0 {
 			return true
 		}
@@ -1006,12 +1006,8 @@ func haveDeviceTaints(spec *resource.ResourceSliceSpec) bool {
 	return false
 }
 
-func haveConsumesCounters(spec *resource.ResourceSliceSpec) bool {
-	if spec == nil {
-		return false
-	}
-
-	for _, device := range spec.Devices {
+func haveConsumesCounters(devices []resource.Device) bool {
+	for _, device := range devices {
 		if len(device.ConsumesCounters) > 0 {
 			return true
 		}
@@ -1601,7 +1597,7 @@ func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.
 
 func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	parts := strings.Split(string(name), "/")
+	parts := strings.SplitN(string(name), "/", 3)
 	switch len(parts) {
 	case 1:
 		allErrs = append(allErrs, validateCIdentifier(parts[0], fldPath)...)

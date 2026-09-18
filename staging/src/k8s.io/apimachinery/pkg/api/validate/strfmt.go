@@ -273,7 +273,7 @@ func resourcesQualifiedName[T ~string](ctx context.Context, op operation.Operati
 	}
 	var allErrs field.ErrorList
 	s := string(*value)
-	parts := strings.Split(s, "/")
+	parts := strings.SplitN(s, "/", 3)
 	switch len(parts) {
 	case 1:
 		allErrs = append(allErrs, validateCIdentifier(parts[0], resourceDeviceMaxLength, fldPath)...)
