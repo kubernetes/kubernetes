@@ -478,7 +478,7 @@ func (m *cgroupCommon) ReduceCPULimits(logger klog.Logger, cgroupName CgroupName
 func readCgroupMemoryConfig(cgroupPath string, memLimitFile string) (*ResourceConfig, error) {
 	memLimit, err := fscommon.GetCgroupParamUint(cgroupPath, memLimitFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", memLimitFile, cgroupPath, err)
+		return nil, fmt.Errorf("failed to read %s for cgroup %v: %w", memLimitFile, cgroupPath, err)
 	}
 	mLim := int64(memLimit)
 	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
