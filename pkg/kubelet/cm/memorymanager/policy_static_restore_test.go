@@ -18,6 +18,7 @@ package memorymanager
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -30,10 +31,22 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
+	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
+
+type crashAfterPodCheckpointState struct {
+	state.State
+}
+
+const simulatedProcessInterruption = "simulated process interruption after pod allocation checkpoint"
+
+func (s *crashAfterPodCheckpointState) SetPodMemoryBlocks(podUID string, blocks []state.Block) {
+	s.State.SetPodMemoryBlocks(podUID, blocks)
+	panic(simulatedProcessInterruption)
+}
 
 // For the scope of the test, any pod that has pod-level resources and the
 // PodLevelResourceManagers feature is enabled, will be processed by AllocatePod
@@ -277,5 +290,114 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMemoryManagerRestorePartialPodCheckpoint(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Memory Manager static policy is not available on Windows")
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, true)
+
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+	machineInfo := returnMachineInfo()
+	nodeAllocatableReservation := v1.ResourceList{
+		v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI),
+	}
+	systemReservedMemory := []kubeletconfig.MemoryReservation{
+		{
+			NumaNode: 0,
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI),
+			},
+		},
+		{
+			NumaNode: 1,
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI),
+			},
+		},
+	}
+	pod := getPodWithContainersAndPodLevelResources("pod1", "128Mi", "128Mi", nil, []containerSpec{
+		{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
+	})
+	pod.UID = "podUID"
+	activePods := func() []*v1.Pod { return []*v1.Pod{pod} }
+
+	stateDir := t.TempDir()
+	topologyMgr, err := topologymanager.NewManager(logger, machineInfo.Topology, topologymanager.PolicyBestEffort, topologymanager.PodTopologyScope, nil)
+	if err != nil {
+		t.Fatalf("could not create topology manager: %v", err)
+	}
+	mgr, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, stateDir, topologyMgr)
+	if err != nil {
+		t.Fatalf("could not create manager: %v", err)
+	}
+	topologyMgr.AddHintProvider(logger, mgr)
+	if err := mgr.Start(tCtx, activePods, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap()); err != nil {
+		t.Fatalf("could not start manager: %v", err)
+	}
+
+	preAllocationMachineState := mgr.State().GetMachineState()
+	managerImpl := mgr.(*manager)
+	func() {
+		defer func() {
+			if recovered := recover(); recovered == nil {
+				t.Fatal("expected simulated process interruption")
+			} else if recovered != simulatedProcessInterruption {
+				t.Fatalf("unexpected panic: %v", recovered)
+			}
+		}()
+		managerImpl.state = &crashAfterPodCheckpointState{State: managerImpl.state}
+		topologyMgr.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod, Operation: lifecycle.AddOperation})
+	}()
+
+	if blocks := mgr.State().GetPodMemoryBlocks(string(pod.UID)); len(blocks) == 0 {
+		t.Fatal("expected pod memory blocks to be persisted before interruption")
+	}
+	if assignments := mgr.State().GetMemoryAssignments(); len(assignments) != 0 {
+		t.Fatalf("expected no container memory assignments before interruption, got %v", assignments)
+	}
+	if diff := cmp.Diff(preAllocationMachineState, mgr.State().GetMachineState()); diff != "" {
+		t.Fatalf("machine state changed before interruption (-want +got):\n%s", diff)
+	}
+
+	topologyMgr2, err := topologymanager.NewManager(logger, machineInfo.Topology, topologymanager.PolicyBestEffort, topologymanager.PodTopologyScope, nil)
+	if err != nil {
+		t.Fatalf("could not create restored topology manager: %v", err)
+	}
+	mgr2, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, stateDir, topologyMgr2)
+	if err != nil {
+		t.Fatalf("could not create restored manager: %v", err)
+	}
+	topologyMgr2.AddHintProvider(logger, mgr2)
+	if err := mgr2.Start(tCtx, activePods, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap()); err != nil {
+		// Rejecting an incomplete checkpoint is a valid recovery outcome.
+		if !strings.Contains(err.Error(), "has a pod memory assignment but no container memory assignments") {
+			t.Fatalf("unexpected restore error: %v", err)
+		}
+		return
+	}
+
+	result := topologyMgr2.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod, Operation: lifecycle.AddOperation})
+	if !result.Admit {
+		// Failing allocation instead of accepting incomplete state is also safe.
+		return
+	}
+	affinity := topologyMgr2.GetAffinity(logger, string(pod.UID), pod.Spec.Containers[0].Name)
+	if !affinity.Preferred || !affinity.NUMANodeAffinity.IsEqual(newNUMAAffinity(0)) {
+		t.Fatalf("expected restored pod hint for NUMA node 0, got %v", affinity)
+	}
+
+	for _, container := range pod.Spec.Containers {
+		if blocks := mgr2.State().GetMemoryBlocks(string(pod.UID), container.Name); len(blocks) == 0 {
+			t.Errorf("successful restored pod allocation left container %q without memory blocks", container.Name)
+		}
+	}
+	if diff := cmp.Diff(preAllocationMachineState, mgr2.State().GetMachineState()); diff == "" {
+		t.Error("successful restored pod allocation left machine state without the pod reservation")
 	}
 }
