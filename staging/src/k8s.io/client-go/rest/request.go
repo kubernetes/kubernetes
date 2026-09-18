@@ -838,6 +838,12 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 	}
 	objectDecoder, streamingSerializer, framer, err := r.contentConfig.Negotiator.StreamDecoder(mediaType, params)
 	if err != nil {
+		// The response body must be closed here to avoid leaking the
+		// connection. Unlike the error paths in Watch, do not drain the body
+		// before closing: this can be a streaming response held open by the
+		// server, so draining could block indefinitely, and the connection
+		// cannot be reused anyway.
+		_ = resp.Body.Close()
 		return nil, err
 	}
 
