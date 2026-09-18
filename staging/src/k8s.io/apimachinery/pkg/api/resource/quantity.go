@@ -566,13 +566,23 @@ func (q *Quantity) AsFloat64Slow() float64 {
 	return result
 }
 
-// AsInt64 returns a representation of the current value as an int64 if a fast conversion
-// is possible. If false is returned, callers must use the inf.Dec form of this quantity.
+// AsInt64 returns the value as an int64 when the quantity is stored without
+// fractional digits and the value fits in an int64.
+//
+// A quantity stored with fractional digits returns false even when its value is
+// whole, such as 1000m. Otherwise a value outside the int64 range returns false
+// and saturates to math.MinInt64 or math.MaxInt64. To get the value rounded to a
+// whole number use Value or ScaledValue. To get the exact value use AsDec.
 func (q *Quantity) AsInt64() (int64, bool) {
-	if q.d.Dec != nil {
+	if q.d.Dec == nil {
+		return q.i.AsInt64()
+	}
+	// We do not convert fractional digits to match int64Amount.AsInt64. Note that
+	// the below scaledValue call will not round, so we check it here.
+	if q.d.Dec.Scale() > 0 {
 		return 0, false
 	}
-	return q.i.AsInt64()
+	return scaledValue(q.d.Dec.UnscaledBig(), int64(q.d.Dec.Scale()), 0)
 }
 
 // ToDec promotes the quantity in place to use an inf.Dec representation and returns itself.
