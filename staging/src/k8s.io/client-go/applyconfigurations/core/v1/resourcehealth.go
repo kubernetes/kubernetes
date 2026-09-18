@@ -28,9 +28,9 @@ import (
 // ResourceHealth represents the health of a resource. It has the latest device health information.
 // This is a part of KEP https://kep.k8s.io/4680.
 type ResourceHealthApplyConfiguration struct {
-	// ResourceID is the unique identifier of the resource. See the ResourceID type for more information.
+	// resourceID is the unique identifier of the resource. See the ResourceID type for more information.
 	ResourceID *corev1.ResourceID `json:"resourceID,omitempty"`
-	// Health of the resource.
+	// health of the resource.
 	// can be one of:
 	// - Healthy: operates as normal
 	// - Unhealthy: reported unhealthy. We consider this a temporary health issue
@@ -41,7 +41,7 @@ type ResourceHealthApplyConfiguration struct {
 	//
 	// In future we may want to introduce the PermanentlyUnhealthy Status.
 	Health *corev1.ResourceHealthStatus `json:"health,omitempty"`
-	// Message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
+	// message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
 	// This field is populated by the kubelet when ResourceHealthStatusMessage is enabled if the DRA plugin returns a message, and is null otherwise.
 	Message *string `json:"message,omitempty"`
 }
