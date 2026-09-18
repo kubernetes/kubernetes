@@ -244,6 +244,17 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 					ginkgo.By("Creating a stress pod with stress size: " + stressSize.String())
 					stressPod := getStressPod(stressSize)
 
+					// Ensure the allocation step does not exceed the 50Mi limit cushion on nodes with large memory
+					maxAllocChunk := resource.MustParse("10Mi")
+					if stressMemAllocSize.Cmp(maxAllocChunk) > 0 {
+						stressPod.Spec.Containers[0].Args = []string{
+							"stress",
+							"--mem-alloc-size", maxAllocChunk.String(),
+							"--mem-alloc-sleep", "1000ms",
+							"--mem-total", strconv.Itoa(int(stressSize.Value())),
+						}
+					}
+
 					memoryLimit := cloneQuantity(stressSize)
 					memoryLimit.Sub(resource.MustParse("50Mi"))
 					memoryRequest := divideQuantity(memoryLimit, 2)
@@ -261,7 +272,9 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 					ginkgo.By("Expecting the pod exceed limits and avoid an OOM kill since it would use swap")
 					gomega.Eventually(func() error {
 						stressPod = getUpdatedPod(f, stressPod)
-						gomega.Expect(stressPod.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod should be running")
+						if stressPod.Status.Phase != v1.PodRunning {
+							return fmt.Errorf("pod %s is not running yet, current phase: %s", stressPod.Name, stressPod.Status.Phase)
+						}
 
 						var err error
 						swapUsage, err = getSwapUsage(f, stressPod)
