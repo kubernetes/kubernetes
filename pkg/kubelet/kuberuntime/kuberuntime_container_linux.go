@@ -516,7 +516,8 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 		if runtimeStatusResources.MemoryLimitInBytes > 0 {
 			memLimit = resource.NewQuantity(runtimeStatusResources.MemoryLimitInBytes, resource.BinarySI)
 		}
-		if cpuLimit != nil || memLimit != nil || cpuRequest != nil {
+		// A read CPU period means the runtime reported resources, so a nil CPULimit here is "no limit", not "unread".
+		if cpuLimit != nil || memLimit != nil || cpuRequest != nil || runtimeStatusResources.CpuPeriod > 0 {
 			cStatusResources = &kubecontainer.ContainerResources{
 				CPULimit:    cpuLimit,
 				CPURequest:  cpuRequest,
