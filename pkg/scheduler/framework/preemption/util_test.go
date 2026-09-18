@@ -1249,3 +1249,179 @@ func TestTraverseHierarchyUp(t *testing.T) {
 		})
 	}
 }
+
+func TestCompareVictimSets(t *testing.T) {
+	now := time.Now()
+	makeDV := func(name string, priority int32, keyType fwk.EntityKeyType, podCount int, startOffset time.Duration, nodes ...string) *DomainVictim {
+		var pods []fwk.PodInfo
+		affected := make(map[string]fwk.NodeInfo)
+		for i := 0; i < podCount; i++ {
+			nodeName := "node1"
+			if i < len(nodes) {
+				nodeName = nodes[i]
+			}
+			pod := st.MakePod().Name(name).UID(name).Priority(priority).StartTime(metav1.NewTime(now.Add(startOffset))).Node(nodeName).Obj()
+			pi, _ := framework.NewPodInfo(pod)
+			pods = append(pods, pi)
+			if _, ok := affected[nodeName]; !ok {
+				ni := framework.NewNodeInfo()
+				ni.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}})
+				affected[nodeName] = ni
+			}
+		}
+		v, err := NewVictim(pods, priority, keyType)
+		if err != nil {
+			t.Fatalf("NewVictim failed: %v", err)
+		}
+		return &DomainVictim{
+			Victim:        v,
+			affectedNodes: affected,
+		}
+	}
+
+	lowPrioPod := makeDV("low-pod", 10, fwk.PodKeyType, 1, -10*time.Minute)
+	highPrioPod := makeDV("high-pod", 20, fwk.PodKeyType, 1, -10*time.Minute)
+	podGroupSize2 := makeDV("pg-2", 10, fwk.PodGroupKeyType, 2, -10*time.Minute)
+	podGroupSize4 := makeDV("pg-4", 10, fwk.PodGroupKeyType, 4, -10*time.Minute)
+	youngerLowPrioPod := makeDV("young-low-pod", 10, fwk.PodKeyType, 1, -1*time.Minute)
+
+	tests := []struct {
+		name      string
+		set1      []*DomainVictim
+		pdb1      int
+		set2      []*DomainVictim
+		pdb2      int
+		wantOrder int // -1 if set1 is strictly better to preempt than set2, 1 if worse, 0 if equal
+	}{
+		{
+			name:      "empty set strictly preferred over non-empty set",
+			set1:      nil,
+			pdb1:      0,
+			set2:      []*DomainVictim{lowPrioPod},
+			pdb2:      0,
+			wantOrder: -1,
+		},
+		{
+			name:      "fewer PDB violations strictly preferred",
+			set1:      []*DomainVictim{highPrioPod},
+			pdb1:      0,
+			set2:      []*DomainVictim{lowPrioPod},
+			pdb2:      1,
+			wantOrder: -1,
+		},
+		{
+			name:      "lower priority victim preferred over higher priority victim",
+			set1:      []*DomainVictim{lowPrioPod},
+			pdb1:      0,
+			set2:      []*DomainVictim{highPrioPod},
+			pdb2:      0,
+			wantOrder: -1,
+		},
+		{
+			name:      "standalone pod preferred over PodGroup of same priority",
+			set1:      []*DomainVictim{lowPrioPod},
+			pdb1:      0,
+			set2:      []*DomainVictim{podGroupSize2},
+			pdb2:      0,
+			wantOrder: -1,
+		},
+		{
+			name:      "smaller PodGroup preferred over larger PodGroup of same priority",
+			set1:      []*DomainVictim{podGroupSize2},
+			pdb1:      0,
+			set2:      []*DomainVictim{podGroupSize4},
+			pdb2:      0,
+			wantOrder: -1,
+		},
+		{
+			name:      "fewer victim units preferred when structural importance ties",
+			set1:      []*DomainVictim{lowPrioPod},
+			pdb1:      0,
+			set2:      []*DomainVictim{lowPrioPod, youngerLowPrioPod},
+			pdb2:      0,
+			wantOrder: -1,
+		},
+		{
+			name:      "younger victim preferred over older victim when structural importance and counts tie",
+			set1:      []*DomainVictim{youngerLowPrioPod},
+			pdb1:      0,
+			set2:      []*DomainVictim{lowPrioPod},
+			pdb2:      0,
+			wantOrder: -1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CompareVictimSets(tt.set1, tt.set2, tt.pdb1, tt.pdb2)
+			if got != tt.wantOrder {
+				t.Errorf("CompareVictimSets(set1, set2) = %d, want %d", got, tt.wantOrder)
+			}
+			gotRev := CompareVictimSets(tt.set2, tt.set1, tt.pdb2, tt.pdb1)
+			if gotRev != -tt.wantOrder {
+				t.Errorf("CompareVictimSets(set2, set1) = %d, want %d", gotRev, -tt.wantOrder)
+			}
+		})
+	}
+}
+
+func TestPodGroupPreemptionState(t *testing.T) {
+	makeMultiNodeDV := func(name string, nodes ...string) *DomainVictim {
+		var pods []fwk.PodInfo
+		affected := make(map[string]fwk.NodeInfo)
+		for _, n := range nodes {
+			pod := st.MakePod().Name(name + "-" + n).UID(name + "-" + n).Priority(10).Node(n).Obj()
+			pi, _ := framework.NewPodInfo(pod)
+			pods = append(pods, pi)
+			ni := framework.NewNodeInfo()
+			ni.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: n}})
+			affected[n] = ni
+		}
+		v, err := NewVictim(pods, 10, fwk.PodGroupKeyType)
+		if err != nil {
+			t.Fatalf("NewVictim failed: %v", err)
+		}
+		return &DomainVictim{
+			Victim:        v,
+			affectedNodes: affected,
+		}
+	}
+
+	multiNodePG := makeMultiNodeDV("pg-multi", "node1", "node2")
+	singleNodePod := makeMultiNodeDV("pod-node1", "node1")
+
+	state := NewPodGroupPreemptionState([]fwk.PreemptionVictim{multiNodePG, singleNodePod})
+
+	if got := len(state.SurvivingVictimsOnNode("node1")); got != 2 {
+		t.Fatalf("expected 2 surviving victims on node1 initially, got %d", got)
+	}
+	if got := len(state.SurvivingVictimsOnNode("node2")); got != 1 {
+		t.Fatalf("expected 1 surviving victim on node2 initially, got %d", got)
+	}
+
+	// Condemn multiNodePG once (e.g., pod1 placed on node1).
+	state.AddCondemned([]fwk.PreemptionVictim{multiNodePG})
+	if got := len(state.SurvivingVictimsOnNode("node1")); got != 1 {
+		t.Fatalf("expected 1 surviving victim (singleNodePod) on node1 after condemning multiNodePG, got %d", got)
+	}
+	if got := len(state.SurvivingVictimsOnNode("node2")); got != 0 {
+		t.Fatalf("expected 0 surviving victims on node2 after condemning multiNodePG on node1, got %d", got)
+	}
+
+	// Condemn multiNodePG a second time (refcount = 2) and then unreserve once (refcount = 1).
+	state.AddCondemned([]fwk.PreemptionVictim{multiNodePG})
+	state.RemoveCondemned([]fwk.PreemptionVictim{multiNodePG})
+	if got := len(state.SurvivingVictimsOnNode("node2")); got != 0 {
+		t.Fatalf("expected 0 surviving victims on node2 while refcount > 0, got %d", got)
+	}
+
+	// Unreserve the second time (refcount = 0) -> multiNodePG should survive again on both nodes.
+	state.RemoveCondemned([]fwk.PreemptionVictim{multiNodePG})
+	if got := len(state.SurvivingVictimsOnNode("node1")); got != 2 {
+		t.Fatalf("expected 2 surviving victims on node1 after full rollback, got %d", got)
+	}
+	if got := len(state.SurvivingVictimsOnNode("node2")); got != 1 {
+		t.Fatalf("expected 1 surviving victim on node2 after full rollback, got %d", got)
+	}
+}
+

@@ -107,6 +107,109 @@ func victimRank(vi Victim) int {
 	}
 }
 
+// compareVictimStructuralImportance compares two victims on structural importance:
+// Priority, Workload Type Rank (CompositePodGroup > PodGroup > Pod), and Group Size.
+// Returns > 0 if vi1 is more important, < 0 if vi2 is more important, and 0 if equal.
+func compareVictimStructuralImportance(vi1, vi2 Victim) int {
+	if vi1.Priority() != vi2.Priority() {
+		if vi1.Priority() > vi2.Priority() {
+			return 1
+		}
+		return -1
+	}
+
+	rank1 := victimRank(vi1)
+	rank2 := victimRank(vi2)
+	if rank1 != rank2 {
+		if rank1 > rank2 {
+			return 1
+		}
+		return -1
+	}
+
+	if len(vi1.Pods()) != len(vi2.Pods()) {
+		if len(vi1.Pods()) > len(vi2.Pods()) {
+			return 1
+		}
+		return -1
+	}
+
+	return 0
+}
+
+// CompareVictimSets compares the preemption cost of two sets of victims (each sorted
+// descending by MoreImportantVictim).
+// Returns < 0 if set1 is less costly (better to preempt) than set2,
+// > 0 if set1 is more costly (worse to preempt) than set2,
+// and 0 if both sets have equal preemption cost.
+func CompareVictimSets[T fwk.PreemptionVictim](set1, set2 []T, numPDBViolations1, numPDBViolations2 int) int {
+	if len(set1) == 0 && len(set2) == 0 {
+		return 0
+	}
+	if len(set1) == 0 {
+		return -1
+	}
+	if len(set2) == 0 {
+		return 1
+	}
+
+	if numPDBViolations1 != numPDBViolations2 {
+		if numPDBViolations1 < numPDBViolations2 {
+			return -1
+		}
+		return 1
+	}
+
+	minLen := min(len(set1), len(set2))
+	for i := 0; i < minLen; i++ {
+		vi1, ok1 := any(set1[i]).(Victim)
+		vi2, ok2 := any(set2[i]).(Victim)
+		if ok1 && ok2 {
+			if cmp := compareVictimStructuralImportance(vi1, vi2); cmp != 0 {
+				return cmp
+			}
+		}
+	}
+
+	if len(set1) != len(set2) {
+		if len(set1) < len(set2) {
+			return -1
+		}
+		return 1
+	}
+
+	var totalPods1, totalPods2 int
+	for _, v := range set1 {
+		totalPods1 += len(v.Pods())
+	}
+	for _, v := range set2 {
+		totalPods2 += len(v.Pods())
+	}
+	if totalPods1 != totalPods2 {
+		if totalPods1 < totalPods2 {
+			return -1
+		}
+		return 1
+	}
+
+	for i := 0; i < minLen; i++ {
+		vi1, ok1 := any(set1[i]).(Victim)
+		vi2, ok2 := any(set2[i]).(Victim)
+		if ok1 && ok2 {
+			t1, t2 := vi1.EarliestStartTime(), vi2.EarliestStartTime()
+			if t1 != nil && t2 != nil && !t1.Equal(t2) {
+				if t1.After(t2.Time) {
+					// set1[i] started more recently (shorter runtime), so it is less costly to preempt.
+					return -1
+				}
+				return 1
+			}
+		}
+	}
+
+	return 0
+}
+
 // traverseHierarchyUp traverses the hierarchy of PodGroups/CompositePodGroups upward from startKey.
 // If the next parent is missing, or cannot be listed, the traversal stops.
 // This method assumes that GenericWorkload feature gate is enabled.

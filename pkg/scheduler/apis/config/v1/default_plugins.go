@@ -81,6 +81,12 @@ func applyFeatureGates(config *v1.Plugins) {
 }
 
 func applyGangScheduling(config *v1.Plugins) {
+	for i := range config.MultiPoint.Enabled {
+		if config.MultiPoint.Enabled[i].Name == names.DefaultPreemption && config.MultiPoint.Enabled[i].Weight == nil {
+			config.MultiPoint.Enabled[i].Weight = ptr.To[int32](1000)
+			break
+		}
+	}
 	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.GangScheduling})
 }
 
@@ -141,7 +147,19 @@ func mergePluginSet(logger klog.Logger, defaultPluginSet, customPluginSet v1.Plu
 		disabledPlugins.Insert(disabledPlugin.Name)
 	}
 
+	defaultPluginWeights := make(map[string]*int32, len(defaultPluginSet.Enabled))
+	for _, defaultEnabledPlugin := range defaultPluginSet.Enabled {
+		if defaultEnabledPlugin.Weight != nil {
+			defaultPluginWeights[defaultEnabledPlugin.Name] = defaultEnabledPlugin.Weight
+		}
+	}
+
 	for index, enabledPlugin := range customPluginSet.Enabled {
+		if enabledPlugin.Weight == nil {
+			if defaultWeight, ok := defaultPluginWeights[enabledPlugin.Name]; ok {
+				enabledPlugin.Weight = ptr.To(*defaultWeight)
+			}
+		}
 		enabledCustomPlugins[enabledPlugin.Name] = pluginIndex{index, enabledPlugin}
 	}
 	var enabledPlugins []v1.Plugin
@@ -166,6 +184,11 @@ func mergePluginSet(logger klog.Logger, defaultPluginSet, customPluginSet v1.Plu
 	// If so, the instantiation of scheduler framework will detect it and abort.
 	for index, plugin := range customPluginSet.Enabled {
 		if !replacedPluginIndex.Has(index) {
+			if plugin.Weight == nil {
+				if defaultWeight, ok := defaultPluginWeights[plugin.Name]; ok {
+					plugin.Weight = ptr.To(*defaultWeight)
+				}
+			}
 			enabledPlugins = append(enabledPlugins, plugin)
 		}
 	}

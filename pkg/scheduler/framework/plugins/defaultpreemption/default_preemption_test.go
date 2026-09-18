@@ -4625,3 +4625,189 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 		})
 	}
 }
+
+func TestWorkloadAwarePreemptionScoring(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	// 5 nodes, each with 4 CPU capacity:
+	// - node-free: 4 CPU free
+	// - node-pod: 4 CPU used by standalone pod (priority 10)
+	// - node-pg-1: 4 CPU used by PodGroup pg-victim pod 1 (priority 10, size 2)
+	// - node-pg-2: 4 CPU used by PodGroup pg-victim pod 2 (priority 10, size 2)
+	// - node-high: 4 CPU used by standalone pod (priority 20)
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node-free").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+		st.MakeNode().Name("node-pod").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+		st.MakeNode().Name("node-pg-1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+		st.MakeNode().Name("node-pg-2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+		st.MakeNode().Name("node-high").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+	}
+
+	victimPodStandalone := st.MakePod().Name("victim-pod").UID("victim-pod").Node("node-pod").Priority(10).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+	victimPGPod1 := st.MakePod().Name("victim-pg-1").UID("victim-pg-1").Node("node-pg-1").Priority(10).PodGroupName("pg-victim").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+	victimPGPod2 := st.MakePod().Name("victim-pg-2").UID("victim-pg-2").Node("node-pg-2").Priority(10).PodGroupName("pg-victim").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+	victimPodHigh := st.MakePod().Name("victim-high").UID("victim-high").Node("node-high").Priority(20).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+
+	pgVictim := st.MakePodGroup().Name("pg-victim").Priority(10).MinCount(2).Obj()
+	client := clientsetfake.NewClientset(pgVictim)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+	}
+
+	cache := internalcache.New(ctx, nil, true, false)
+	cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pgVictim))
+
+	fts := feature.Features{EnableGenericWorkload: true}
+	// In PodGroup preemption, potential victims are removed from NodeInfos before podGroupSchedulingFunc runs.
+	snapshot := internalcache.NewSnapshot(nil, nodes)
+	f, err := tf.NewFramework(ctx, registeredPlugins, "",
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithPodGroupManager(cache),
+		frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return preemption.NewPreemptionManager(fh, fts)
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, fts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var nodeInfos []fwk.NodeInfo
+	nodeInfoMap := make(map[string]fwk.NodeInfo)
+	for _, n := range nodes {
+		ni, err := snapshot.NodeInfos().Get(n.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		nodeInfos = append(nodeInfos, ni)
+		nodeInfoMap[n.Name] = ni
+	}
+
+	preemptor1 := st.MakePod().Name("preemptor-1").UID("preemptor-1").Priority(100).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+	preemptor2 := st.MakePod().Name("preemptor-2").UID("preemptor-2").Priority(100).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+
+	// 1. Verify normal scheduling cycle (no PodGroupPreemptionState in ctx) returns fwk.Skip.
+	normalState := framework.NewCycleState()
+	if status := pl.PreScore(ctx, normalState, preemptor1, nodeInfos); status.Code() != fwk.Skip {
+		t.Fatalf("expected PreScore in normal cycle to return Skip, got %v", status)
+	}
+
+	// Build DomainVictims for PodGroupPreemptionState.
+	piStandalone, _ := framework.NewPodInfo(victimPodStandalone)
+	piPG1, _ := framework.NewPodInfo(victimPGPod1)
+	piPG2, _ := framework.NewPodInfo(victimPGPod2)
+	piHigh, _ := framework.NewPodInfo(victimPodHigh)
+
+	snapshotWithVictims := internalcache.NewSnapshot(
+		[]*v1.Pod{victimPodStandalone, victimPGPod1, victimPGPod2, victimPodHigh},
+		nodes,
+	)
+	allVictims := make([]*preemption.DomainVictim, 0, 3)
+	for _, entry := range []struct {
+		pods     []fwk.PodInfo
+		priority int32
+		keyType  fwk.EntityKeyType
+	}{
+		{[]fwk.PodInfo{piStandalone}, 10, fwk.PodKeyType},
+		{[]fwk.PodInfo{piPG1, piPG2}, 10, fwk.PodGroupKeyType},
+		{[]fwk.PodInfo{piHigh}, 20, fwk.PodKeyType},
+	} {
+		v, err := preemption.NewVictim(entry.pods, entry.priority, entry.keyType)
+		if err != nil {
+			t.Fatal(err)
+		}
+		affected := make(map[string]fwk.NodeInfo)
+		for _, p := range entry.pods {
+			ni, _ := snapshotWithVictims.NodeInfos().Get(p.GetPod().Spec.NodeName)
+			affected[p.GetPod().Spec.NodeName] = ni
+		}
+		allVictims = append(allVictims, preemption.NewDomainVictimForTest(v, affected))
+	}
+
+	preemptState := preemption.NewPodGroupPreemptionState(allVictims)
+	preemptCtx := preemption.WithPodGroupPreemptionState(ctx, preemptState)
+
+	// 2. Run PreScore and Score for preemptor1 across all 5 nodes.
+	state1 := framework.NewCycleState()
+	if _, status, _ := f.RunPreFilterPlugins(preemptCtx, state1, preemptor1); !status.IsSuccess() {
+		t.Fatalf("RunPreFilterPlugins failed: %v", status)
+	}
+	if status := pl.PreScore(preemptCtx, state1, preemptor1, nodeInfos); !status.IsSuccess() {
+		t.Fatalf("PreScore failed: %v", status)
+	}
+
+	scores1 := make(map[string]int64)
+	for _, ni := range nodeInfos {
+		score, status := pl.Score(preemptCtx, state1, preemptor1, ni)
+		if !status.IsSuccess() {
+			t.Fatalf("Score failed for node %s: %v", ni.Node().Name, status)
+		}
+		scores1[ni.Node().Name] = score
+	}
+
+	// Verify ordering:
+	// node-free (0 preemptions) == 100 > node-pod (standalone prio 10) > node-pg-1 (PodGroup prio 10) > node-high (standalone prio 20)
+	if scores1["node-free"] != fwk.MaxNodeScore {
+		t.Errorf("expected score for node-free to be %d, got %d", fwk.MaxNodeScore, scores1["node-free"])
+	}
+	if scores1["node-pod"] >= scores1["node-free"] {
+		t.Errorf("expected score(node-pod)=%d < score(node-free)=%d", scores1["node-pod"], scores1["node-free"])
+	}
+	if scores1["node-pg-1"] >= scores1["node-pod"] {
+		t.Errorf("expected score(node-pg-1)=%d < score(node-pod)=%d (PodGroup should be more important than standalone Pod)", scores1["node-pg-1"], scores1["node-pod"])
+	}
+	if scores1["node-high"] >= scores1["node-pg-1"] {
+		t.Errorf("expected score(node-high)=%d < score(node-pg-1)=%d (higher priority Pod should be more important)", scores1["node-high"], scores1["node-pg-1"])
+	}
+
+	// 3. Simulate preemptor1 being reserved on node-pg-1 (which condemns pg-victim across node-pg-1 AND node-pg-2).
+	if status := pl.Reserve(preemptCtx, state1, preemptor1, "node-pg-1"); !status.IsSuccess() {
+		t.Fatalf("Reserve failed: %v", status)
+	}
+
+	// 4. Score preemptor2: node-pg-2 should now require 0 new preemptions because pg-victim is already condemned!
+	state2 := framework.NewCycleState()
+	if _, status, _ := f.RunPreFilterPlugins(preemptCtx, state2, preemptor2); !status.IsSuccess() {
+		t.Fatalf("RunPreFilterPlugins failed: %v", status)
+	}
+	if status := pl.PreScore(preemptCtx, state2, preemptor2, nodeInfos); !status.IsSuccess() {
+		t.Fatalf("PreScore for preemptor2 failed: %v", status)
+	}
+	scorePG2AfterReserve, status := pl.Score(preemptCtx, state2, preemptor2, nodeInfoMap["node-pg-2"])
+	if !status.IsSuccess() {
+		t.Fatalf("Score failed for node-pg-2: %v", status)
+	}
+	if scorePG2AfterReserve != fwk.MaxNodeScore {
+		t.Errorf("expected node-pg-2 score for preemptor2 to be MaxNodeScore (%d) after pg-victim was condemned on node-pg-1, got %d", fwk.MaxNodeScore, scorePG2AfterReserve)
+	}
+
+	// 5. Unreserve preemptor1 from node-pg-1 and verify rollback.
+	pl.Unreserve(preemptCtx, state1, preemptor1, "node-pg-1")
+	state3 := framework.NewCycleState()
+	if _, status, _ := f.RunPreFilterPlugins(preemptCtx, state3, preemptor2); !status.IsSuccess() {
+		t.Fatalf("RunPreFilterPlugins failed: %v", status)
+	}
+	if status := pl.PreScore(preemptCtx, state3, preemptor2, nodeInfos); !status.IsSuccess() {
+		t.Fatalf("PreScore after Unreserve failed: %v", status)
+	}
+	scorePG2AfterUnreserve, status := pl.Score(preemptCtx, state3, preemptor2, nodeInfoMap["node-pg-2"])
+	if !status.IsSuccess() {
+		t.Fatalf("Score after Unreserve failed: %v", status)
+	}
+	if scorePG2AfterUnreserve >= fwk.MaxNodeScore {
+		t.Errorf("expected node-pg-2 score to drop below MaxNodeScore (%d) after Unreserve rolled back condemnation, got %d", fwk.MaxNodeScore, scorePG2AfterUnreserve)
+	}
+}
