@@ -496,7 +496,9 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 // calculatePodLevelRequests computes the requests for the specific resource at
 // the pod level.
 func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
-	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{})
+	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
+		ExcludeOverhead: true,
+	})
 	podRequest, ok := podLevelRequests[resource]
 	if !ok {
 		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
