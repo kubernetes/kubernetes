@@ -1791,9 +1791,8 @@
     endpoint: /metrics
 - name: apiserver_resource_size_estimate_bytes
   help: Estimated size of stored objects in database. Estimate is based on sum of
-    last observed sizes of serialized objects. In case of a fetching error, the value
-    will be -1.
-  type: Gauge
+    last observed sizes of serialized objects.
+  type: Custom
   stabilityLevel: ALPHA
   labels:
   - group
