@@ -272,7 +272,11 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 			}
 			return nil
 		})
-		return err
+		if err != nil {
+			return err
+		}
+		updateDeletionOptions = true
+		return nil
 	}()
 	if wait.Interrupted(err) {
 		err = errors.NewTimeoutError(fmt.Sprintf("couldn't update PodDisruptionBudget %q due to conflicts", pdbName), 10)
@@ -291,9 +295,9 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	deleteOptions := originalDeleteOptions
 
 	// Set deleteOptions.Preconditions.ResourceVersion to ensure
-	// the pod hasn't been considered healthy (ready) since we calculated
-	if updateDeletionOptions {
-		// Take a copy so we can compare to client-provied Options later.
+	// the pod hasn't changed since we verified PDB constraints
+	if updateDeletionOptions && resourceVersionIsUnset(originalDeleteOptions) {
+		// Take a copy so we can compare to client-provided Options later.
 		deleteOptions = deleteOptions.DeepCopy()
 		setPreconditionsResourceVersion(deleteOptions, &pod.ResourceVersion)
 	}
@@ -301,8 +305,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	// Try the delete
 	err = addConditionAndDeletePod(r, ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
 	if err != nil {
-		if errors.IsConflict(err) && updateDeletionOptions &&
-			(originalDeleteOptions.Preconditions == nil || originalDeleteOptions.Preconditions.ResourceVersion == nil) {
+		if errors.IsConflict(err) && updateDeletionOptions && resourceVersionIsUnset(originalDeleteOptions) {
 			// If we encounter a resource conflict error, we updated the deletion options to include them,
 			// and the original deletion options did not specify ResourceVersion, we send back
 			// TooManyRequests so clients will retry.

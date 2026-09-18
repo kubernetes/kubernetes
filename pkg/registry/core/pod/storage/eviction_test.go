@@ -412,6 +412,28 @@ func TestEviction(t *testing.T) {
 			},
 		},
 		{
+			name: "matching pdbs with disruptions allowed, pod running, pod healthy, healthy pod ours, resource version conflict",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: 1,
+					CurrentHealthy:     3,
+					DesiredHealthy:     3,
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t13", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         "Cannot evict pod as it would violate the pod's disruption budget.: TooManyRequests: The disruption budget foo is still being processed by the server.",
+			podName:             "t13",
+			expectedDeleteCount: 1,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionTrue,
+			},
+		},
+		{
 			name: "matching pdbs with no disruptions allowed, pod running, pod unhealthy, unhealthy pod ours",
 			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
@@ -968,7 +990,8 @@ func (ms *mockStore) mutatorDeleteFunc(count int, options *metav1.DeleteOptions)
 		// Always return error for this pod
 		return nil, false, apierrors.NewConflict(resource("tests"), "2", errors.New("message"))
 	}
-	if ms.pod.Name == "t6" || ms.pod.Name == "t8" {
+	if (ms.pod.Name == "t3" && count > 1) || ms.pod.Name == "t6" || ms.pod.Name == "t8" {
+		// t3: This pod should not have a resource conflict after continuing to PDBs.
 		// t6: This pod has a deletionTimestamp and should not raise conflict on delete
 		// t8: This pod should not have a resource conflict.
 		return nil, true, nil
