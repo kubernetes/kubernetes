@@ -20,7 +20,9 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	coordination "k8s.io/kubernetes/pkg/apis/coordination"
 	registry "k8s.io/kubernetes/pkg/registry/coordination/leasecandidate"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -52,6 +54,27 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		Verb:              "create",
 	}), metav1.NamespaceDefault)
 
+	testCases := map[string]struct {
+		input        coordination.LeaseCandidate
+		expectedErrs field.ErrorList
+	}{
+		"valid": {
+			input: mkValidLeaseCandidate(),
+		},
+		"missing leaseName": {
+			input: mkValidLeaseCandidate(tweakLeaseName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec").Child("leaseName"), "").MarkBeta(),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
 	obj := mkValidLeaseCandidate()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy)
 }
@@ -71,8 +94,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy)
 }
 
-func mkValidLeaseCandidate() coordination.LeaseCandidate {
-	return coordination.LeaseCandidate{
+func mkValidLeaseCandidate(tweaks ...func(*coordination.LeaseCandidate)) coordination.LeaseCandidate {
+	lc := coordination.LeaseCandidate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "valid-obj",
 			Namespace: metav1.NamespaceDefault,
@@ -83,5 +106,15 @@ func mkValidLeaseCandidate() coordination.LeaseCandidate {
 			EmulationVersion: "1.0.0",
 			Strategy:         coordination.OldestEmulationVersion,
 		},
+	}
+	for _, tweak := range tweaks {
+		tweak(&lc)
+	}
+	return lc
+}
+
+func tweakLeaseName(name string) func(*coordination.LeaseCandidate) {
+	return func(lc *coordination.LeaseCandidate) {
+		lc.Spec.LeaseName = name
 	}
 }
