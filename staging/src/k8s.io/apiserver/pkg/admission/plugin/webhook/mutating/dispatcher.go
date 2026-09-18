@@ -28,6 +28,7 @@ import (
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -82,6 +83,10 @@ type versionedAttributeAccessor struct {
 	versionedAttr    *admission.VersionedAttributes
 	attr             admission.Attributes
 	objectInterfaces admission.ObjectInterfaces
+	// The serialized objects are reused by sequential webhooks that request the same GVK.
+	// versionedObjectJSON is invalidated after a mutation; both are invalidated after conversion.
+	versionedObjectJSON    []byte
+	versionedOldObjectJSON []byte
 }
 
 func (v *versionedAttributeAccessor) VersionedAttribute(gvk schema.GroupVersionKind) (*admission.VersionedAttributes, error) {
@@ -91,13 +96,58 @@ func (v *versionedAttributeAccessor) VersionedAttribute(gvk schema.GroupVersionK
 		if v.versionedAttr, err = admission.NewVersionedAttributes(v.attr, gvk, v.objectInterfaces); err != nil {
 			return nil, apierrors.NewInternalError(err)
 		}
-	} else {
+	} else if v.versionedAttr.VersionedKind != gvk {
 		// Subsequent call, convert existing versioned attributes to the requested version
 		if err := admission.ConvertVersionedAttributes(v.versionedAttr, gvk, v.objectInterfaces); err != nil {
 			return nil, apierrors.NewInternalError(err)
 		}
+		v.versionedObjectJSON = nil
+		v.versionedOldObjectJSON = nil
 	}
 	return v.versionedAttr, nil
+}
+
+func (v *versionedAttributeAccessor) serializedObjects() (objectJSON, oldObjectJSON []byte, err error) {
+	if v.versionedAttr.VersionedObject.Object() != nil && v.versionedObjectJSON == nil {
+		v.versionedObjectJSON, err = utiljson.Marshal(v.versionedAttr.VersionedObject.Object())
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	if v.versionedAttr.VersionedOldObject.Object() != nil && v.versionedOldObjectJSON == nil {
+		v.versionedOldObjectJSON, err = utiljson.Marshal(v.versionedAttr.VersionedOldObject.Object())
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return v.versionedObjectJSON, v.versionedOldObjectJSON, nil
+}
+
+func (v *versionedAttributeAccessor) updateObject(object runtime.Object) {
+	v.versionedAttr.UpdateObject(object)
+	v.versionedObjectJSON = nil
+}
+
+// setAdmissionReviewObjects replaces object-backed RawExtensions with their pre-serialized JSON.
+// The webhook client always uses JSON, so this preserves the wire format without re-marshaling the objects.
+func setAdmissionReviewObjects(request runtime.Object, objectJSON, oldObjectJSON []byte) error {
+	setRaw := func(dst *runtime.RawExtension, raw []byte) {
+		if raw != nil {
+			*dst = runtime.RawExtension{Raw: raw}
+		}
+	}
+
+	switch review := request.(type) {
+	case *admissionv1.AdmissionReview:
+		setRaw(&review.Request.Object, objectJSON)
+		setRaw(&review.Request.OldObject, oldObjectJSON)
+	case *admissionv1beta1.AdmissionReview:
+		setRaw(&review.Request.Object, objectJSON)
+		setRaw(&review.Request.OldObject, oldObjectJSON)
+	default:
+		return fmt.Errorf("unexpected admission review type %T", request)
+	}
+	return nil
 }
 
 var _ generic.Dispatcher = &mutatingDispatcher{}
@@ -163,7 +213,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		}
 
 		annotator := newWebhookAnnotator(versionedAttr, round, i, hook.Name, invocation.Webhook.GetConfigurationName())
-		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, annotator, o, round, i)
+		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, v, annotator, o, round, i)
 		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == admissionregistrationv1.Ignore
 		rejected := false
 		if err != nil {
@@ -241,7 +291,8 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 
 // note that callAttrMutatingHook updates attr
 
-func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admissionregistrationv1.MutatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes, annotator *webhookAnnotator, o admission.ObjectInterfaces, round, idx int) (bool, error) {
+func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admissionregistrationv1.MutatingWebhook, invocation *generic.WebhookInvocation, attrAccessor *versionedAttributeAccessor, annotator *webhookAnnotator, o admission.ObjectInterfaces, round, idx int) (bool, error) {
+	attr := attrAccessor.versionedAttr
 	configurationName := invocation.Webhook.GetConfigurationName()
 	changed := false
 	defer func() { annotator.addMutationAnnotation(changed) }()
@@ -257,6 +308,13 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	uid, request, response, err := webhookrequest.CreateAdmissionObjects(attr, invocation)
 	if err != nil {
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not create admission objects: %w", err), Status: apierrors.NewBadRequest("error creating admission objects")}
+	}
+	objectJSON, oldObjectJSON, err := attrAccessor.serializedObjects()
+	if err != nil {
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not serialize admission objects: %w", err), Status: apierrors.NewServiceUnavailable("error calling webhook")}
+	}
+	if err := setAdmissionReviewObjects(request, objectJSON, oldObjectJSON); err != nil {
+		return false, apierrors.NewInternalError(err)
 	}
 	// Make the webhook request
 	client, err := invocation.Webhook.GetRESTClient(a.cm)
@@ -352,11 +410,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	switch result.PatchType {
 	// VerifyAdmissionResponse normalizes to v1 patch types, regardless of the AdmissionReview version used
 	case admissionv1.PatchTypeJSONPatch:
-		objJS, err := runtime.Encode(jsonSerializer, attr.VersionedObject.Object())
-		if err != nil {
-			return false, apierrors.NewInternalError(err)
-		}
-		patchedJS, err = patchObj.Apply(objJS)
+		patchedJS, err = patchObj.Apply(objectJSON)
 		if err != nil {
 			return false, apierrors.NewInternalError(err)
 		}
@@ -376,8 +430,6 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		}
 	}
 
-	// TODO: if we have multiple mutating webhooks, we can remember the json
-	// instead of encoding and decoding for each one.
 	if newVersionedObject, _, err = jsonSerializer.Decode(patchedJS, nil, newVersionedObject); err != nil {
 		return false, apierrors.NewInternalError(err)
 	}
@@ -385,8 +437,8 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	changed = !apiequality.Semantic.DeepEqual(attr.VersionedObject.Object(), newVersionedObject)
 	span.AddEvent("Patch applied")
 	annotator.addPatchAnnotation(patchObj, result.PatchType)
-	attr.UpdateObject(newVersionedObject)
-	o.GetObjectDefaulter().Default(attr.VersionedObject.Object())
+	o.GetObjectDefaulter().Default(newVersionedObject)
+	attrAccessor.updateObject(newVersionedObject)
 	return changed, nil
 }
 
