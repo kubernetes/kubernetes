@@ -59,6 +59,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	trueVal := true
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
 		APIGroup:          "storage.k8s.io",
@@ -99,6 +100,28 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "volumeLifecycleModes"), nil, "").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
+		"invalid update attachRequired changed": {
+			oldObj:    mkCSIDriver(),
+			updateObj: mkCSIDriver(TweakAttachRequired(true)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "attachRequired"), &trueVal, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"invalid update attachRequired set from unset": {
+			oldObj:    mkCSIDriver(ClearAttachRequired),
+			updateObj: mkCSIDriver(TweakAttachRequired(true)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "attachRequired"), &trueVal, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"invalid update attachRequired unset from set": {
+			oldObj:    mkCSIDriver(),
+			updateObj: mkCSIDriver(ClearAttachRequired),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "attachedRequired"), "").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec", "attachRequired"), (*bool)(nil), "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -136,4 +159,14 @@ func TweakVolumeLifecycleModes(modes ...storage.VolumeLifecycleMode) func(csi *s
 	return func(csi *storage.CSIDriver) {
 		csi.Spec.VolumeLifecycleModes = modes
 	}
+}
+
+func TweakAttachRequired(val bool) func(csi *storage.CSIDriver) {
+	return func(csi *storage.CSIDriver) {
+		csi.Spec.AttachRequired = &val
+	}
+}
+
+func ClearAttachRequired(csi *storage.CSIDriver) {
+	csi.Spec.AttachRequired = nil
 }
