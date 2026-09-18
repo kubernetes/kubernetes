@@ -309,6 +309,19 @@ func newDomainVictim(snapshot fwk.SharedLister, pods []fwk.PodInfo, priority int
 	}, nil
 }
 
+// NumPDBViolations returns 0 for DomainVictim.
+func (dv *DomainVictim) NumPDBViolations() int {
+	return 0
+}
+
+// NewDomainVictimForTest creates a DomainVictim with explicit affected nodes for unit testing.
+func NewDomainVictimForTest(victim Victim, affectedNodes map[string]fwk.NodeInfo) *DomainVictim {
+	return &DomainVictim{
+		Victim:        victim,
+		affectedNodes: affectedNodes,
+	}
+}
+
 // candidate represents a nominated node on which the preemptor can be scheduled,
 // along with the list of victims that should be evicted for the preemptor to fit the node.
 type candidate struct {
