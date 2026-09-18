@@ -72,15 +72,6 @@ var ValidateHorizontalPodAutoscalerName = apimachineryvalidation.NameIsDNSSubdom
 func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path, opts HorizontalPodAutoscalerSpecValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < opts.MinReplicasLowerBound {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("minReplicas"), *autoscaler.MinReplicas,
-			fmt.Sprintf("must be greater than or equal to %d", opts.MinReplicasLowerBound)).WithOrigin("minimum").MarkCoveredByDeclarative())
-	}
-	if autoscaler.MaxReplicas == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("maxReplicas"), "must be set and greater than 0").MarkCoveredByDeclarative())
-	} else if autoscaler.MaxReplicas < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxReplicas"), autoscaler.MaxReplicas, "must be greater than or equal to 1").WithOrigin("minimum").MarkCoveredByDeclarative())
-	}
 	if autoscaler.MinReplicas != nil && autoscaler.MaxReplicas < *autoscaler.MinReplicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxReplicas"), autoscaler.MaxReplicas, "must be greater than or equal to `minReplicas`"))
 	}
@@ -191,8 +182,6 @@ type CrossVersionObjectReferenceValidationOptions struct {
 // HorizontalPodAutoscalerSpecValidationOptions contains the different settings for
 // HorizontalPodAutoscaler spec validation.
 type HorizontalPodAutoscalerSpecValidationOptions struct {
-	// The minimum value for minReplicas.
-	MinReplicasLowerBound           int32
 	ScaleTargetRefValidationOptions CrossVersionObjectReferenceValidationOptions
 	ObjectMetricsValidationOptions  CrossVersionObjectReferenceValidationOptions
 }
