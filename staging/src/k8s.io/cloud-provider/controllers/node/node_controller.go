@@ -394,6 +394,14 @@ func (cnc *CloudNodeController) reconcileAdditionalLabels(
 		currentValue, exists := node.Labels[key]
 		if !exists || currentValue != value {
 			labelsToUpdate[key] = value
+			klog.V(6).InfoS(
+				"Reconciling additional node label",
+				"node", klog.KObj(node),
+				"label", key,
+				"previouslyPresent", exists,
+				"oldValue", currentValue,
+				"newValue", value,
+			)
 		}
 	}
 
