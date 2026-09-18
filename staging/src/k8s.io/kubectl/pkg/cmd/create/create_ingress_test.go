@@ -142,6 +142,12 @@ func TestCreateIngressValidation(t *testing.T) {
 			},
 			expected: "rule foo.com/=svc:http,tls,garbage is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
 		},
+		"invalid tls secret without separator": {
+			rules: []string{
+				"foo.com/=svc:http,tlssecret123",
+			},
+			expected: "rule foo.com/=svc:http,tlssecret123 is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
+		},
 	}
 
 	for name, tc := range tests {
