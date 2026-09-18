@@ -6691,6 +6691,92 @@ func TestDescribeNodeWithPodLevelResources(t *testing.T) {
 	}
 }
 
+func TestDescribeNodeResource(t *testing.T) {
+	newPod := func(requests, limits corev1.ResourceList, status *corev1.ResourceRequirements) corev1.Pod {
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "foo"},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:      "container-1",
+					Resources: corev1.ResourceRequirements{Requests: requests, Limits: limits},
+				}},
+			},
+		}
+		if status != nil {
+			pod.Status = corev1.PodStatus{
+				Phase:             corev1.PodRunning,
+				ContainerStatuses: []corev1.ContainerStatus{{Name: "container-1", Resources: status}},
+			}
+		}
+		return pod
+	}
+
+	tests := []struct {
+		name     string
+		node     *corev1.Node
+		pods     []corev1.Pod
+		expected []string
+	}{
+		{
+			name: "node with allocatable resources",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Status:     corev1.NodeStatus{Allocatable: getResourceList("1", "1Gi")},
+			},
+			pods: []corev1.Pod{newPod(getResourceList("250m", "256Mi"), getResourceList("500m", "512Mi"), nil)},
+			expected: []string{
+				"foo\tpod-1\t\t250m (25%)\t500m (50%)\t256Mi (25%)\t512Mi (50%)\t",
+				"cpu\t250m (25%)\t500m (50%)\n",
+				"memory\t256Mi (25%)\t512Mi (50%)\n",
+			},
+		},
+		{
+			// A node that has not reported capacity or allocatable yet, for
+			// example one registered by hand or whose kubelet has not posted
+			// its status. Percentages must be 0 instead of a division by zero.
+			name: "node without allocatable resources",
+			node: &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+			pods: []corev1.Pod{newPod(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi"), nil)},
+			expected: []string{
+				"foo\tpod-1\t\t100m (0%)\t200m (0%)\t100Mi (0%)\t200Mi (0%)\t",
+				"cpu\t100m (0%)\t200m (0%)\n",
+				"memory\t100Mi (0%)\t200Mi (0%)\n",
+			},
+		},
+		{
+			// A pod in the middle of an in-place resize: the spec still asks
+			// for 100m but the container status already reports 500m. The
+			// per-pod row and the "Allocated resources" totals must agree.
+			name: "pod being resized in place",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Status:     corev1.NodeStatus{Allocatable: getResourceList("1", "1Gi")},
+			},
+			pods: []corev1.Pod{newPod(getResourceList("100m", ""), getResourceList("100m", ""), &corev1.ResourceRequirements{
+				Requests: getResourceList("500m", ""),
+				Limits:   getResourceList("500m", ""),
+			})},
+			expected: []string{
+				"foo\tpod-1\t\t500m (50%)\t500m (50%)\t0 (0%)\t0 (0%)\t",
+				"cpu\t500m (50%)\t500m (50%)\n",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			describeNodeResource(&corev1.PodList{Items: tt.pods}, tt.node, NewPrefixWriter(buf))
+			out := buf.String()
+			for _, expected := range tt.expected {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output:\n%s", expected, out)
+				}
+			}
+		})
+	}
+}
+
 func TestDescribeNodeWithResourceSlice(t *testing.T) {
 	nodeCapacity := mergeResourceLists(
 		getHugePageResourceList("2Mi", "4Gi"),

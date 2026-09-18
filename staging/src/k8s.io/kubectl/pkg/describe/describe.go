@@ -4054,6 +4054,15 @@ func describeHorizontalPodAutoscalerV1(hpa *autoscalingv1.HorizontalPodAutoscale
 	})
 }
 
+// percentOf returns value as a truncated percentage of total, or 0 when total
+// is 0 (for example, a node that has not reported allocatable resources yet).
+func percentOf(value, total int64) int64 {
+	if total == 0 {
+		return 0
+	}
+	return int64(float64(value) / float64(total) * 100)
+}
+
 func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev1.Node, w PrefixWriter) {
 	w.Write(LEVEL_0, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
 	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\tAge\n")
@@ -4067,13 +4076,13 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 		req := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
 		limit := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
 		cpuReq, cpuLimit, memoryReq, memoryLimit := req[corev1.ResourceCPU], limit[corev1.ResourceCPU], req[corev1.ResourceMemory], limit[corev1.ResourceMemory]
-		fractionCpuReq := float64(cpuReq.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-		fractionMemoryReq := float64(memoryReq.Value()) / float64(allocatable.Memory().Value()) * 100
-		fractionMemoryLimit := float64(memoryLimit.Value()) / float64(allocatable.Memory().Value()) * 100
+		fractionCpuReq := percentOf(cpuReq.MilliValue(), allocatable.Cpu().MilliValue())
+		fractionCpuLimit := percentOf(cpuLimit.MilliValue(), allocatable.Cpu().MilliValue())
+		fractionMemoryReq := percentOf(memoryReq.Value(), allocatable.Memory().Value())
+		fractionMemoryLimit := percentOf(memoryLimit.Value(), allocatable.Memory().Value())
 		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s\n", pod.Namespace, pod.Name,
-			cpuReq.String(), int64(fractionCpuReq), cpuLimit.String(), int64(fractionCpuLimit),
-			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit), translateTimestampSince(pod.CreationTimestamp))
+			cpuReq.String(), fractionCpuReq, cpuLimit.String(), fractionCpuLimit,
+			memoryReq.String(), fractionMemoryReq, memoryLimit.String(), fractionMemoryLimit, translateTimestampSince(pod.CreationTimestamp))
 	}
 
 	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n")
@@ -4082,30 +4091,12 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	cpuReqs, cpuLimits, memoryReqs, memoryLimits, ephemeralstorageReqs, ephemeralstorageLimits :=
 		reqs[corev1.ResourceCPU], limits[corev1.ResourceCPU], reqs[corev1.ResourceMemory], limits[corev1.ResourceMemory], reqs[corev1.ResourceEphemeralStorage], limits[corev1.ResourceEphemeralStorage]
-	fractionCpuReqs := float64(0)
-	fractionCpuLimits := float64(0)
-	if allocatable.Cpu().MilliValue() != 0 {
-		fractionCpuReqs = float64(cpuReqs.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-		fractionCpuLimits = float64(cpuLimits.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-	}
-	fractionMemoryReqs := float64(0)
-	fractionMemoryLimits := float64(0)
-	if allocatable.Memory().Value() != 0 {
-		fractionMemoryReqs = float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
-		fractionMemoryLimits = float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
-	}
-	fractionEphemeralStorageReqs := float64(0)
-	fractionEphemeralStorageLimits := float64(0)
-	if allocatable.StorageEphemeral().Value() != 0 {
-		fractionEphemeralStorageReqs = float64(ephemeralstorageReqs.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
-		fractionEphemeralStorageLimits = float64(ephemeralstorageLimits.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
-	}
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceCPU, cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits))
+		corev1.ResourceCPU, cpuReqs.String(), percentOf(cpuReqs.MilliValue(), allocatable.Cpu().MilliValue()), cpuLimits.String(), percentOf(cpuLimits.MilliValue(), allocatable.Cpu().MilliValue()))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
+		corev1.ResourceMemory, memoryReqs.String(), percentOf(memoryReqs.Value(), allocatable.Memory().Value()), memoryLimits.String(), percentOf(memoryLimits.Value(), allocatable.Memory().Value()))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
+		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), percentOf(ephemeralstorageReqs.Value(), allocatable.StorageEphemeral().Value()), ephemeralstorageLimits.String(), percentOf(ephemeralstorageLimits.Value(), allocatable.StorageEphemeral().Value()))
 
 	extResources := make([]string, 0, len(allocatable))
 	hugePageResources := make([]string, 0, len(allocatable))
@@ -4122,14 +4113,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 
 	for _, resource := range hugePageResources {
 		hugePageSizeRequests, hugePageSizeLimits, hugePageSizeAllocable := reqs[corev1.ResourceName(resource)], limits[corev1.ResourceName(resource)], allocatable[corev1.ResourceName(resource)]
-		fractionHugePageSizeRequests := float64(0)
-		fractionHugePageSizeLimits := float64(0)
-		if hugePageSizeAllocable.Value() != 0 {
-			fractionHugePageSizeRequests = float64(hugePageSizeRequests.Value()) / float64(hugePageSizeAllocable.Value()) * 100
-			fractionHugePageSizeLimits = float64(hugePageSizeLimits.Value()) / float64(hugePageSizeAllocable.Value()) * 100
-		}
 		w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-			resource, hugePageSizeRequests.String(), int64(fractionHugePageSizeRequests), hugePageSizeLimits.String(), int64(fractionHugePageSizeLimits))
+			resource, hugePageSizeRequests.String(), percentOf(hugePageSizeRequests.Value(), hugePageSizeAllocable.Value()), hugePageSizeLimits.String(), percentOf(hugePageSizeLimits.Value(), hugePageSizeAllocable.Value()))
 	}
 
 	for _, ext := range extResources {
@@ -4141,8 +4126,10 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.ResourceName]resource.Quantity, limits map[corev1.ResourceName]resource.Quantity) {
 	reqs, limits = map[corev1.ResourceName]resource.Quantity{}, map[corev1.ResourceName]resource.Quantity{}
 	for _, pod := range podList.Items {
-		podReqs := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false})
-		podLimits := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false})
+		// Use the same accounting as the per-pod rows above so that the totals
+		// agree with them while a pod is being resized in place.
+		podReqs := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
+		podLimits := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
 		for podReqName, podReqValue := range podReqs {
 			if value, ok := reqs[podReqName]; !ok {
 				reqs[podReqName] = podReqValue.DeepCopy()
