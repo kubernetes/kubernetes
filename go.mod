@@ -242,6 +242,7 @@ replace (
 	k8s.io/endpointslice => ./staging/src/k8s.io/endpointslice
 	k8s.io/externaljwt => ./staging/src/k8s.io/externaljwt
 	k8s.io/kms => ./staging/src/k8s.io/kms
+	k8s.io/ktesting => ./staging/src/k8s.io/ktesting
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy

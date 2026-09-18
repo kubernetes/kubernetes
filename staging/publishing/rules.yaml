@@ -113,6 +113,8 @@ rules:
       branch: master
     - repository: api
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -242,6 +244,8 @@ rules:
       branch: master
     - repository: client-go
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -310,6 +314,8 @@ rules:
     - repository: api
       branch: master
     - repository: client-go
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -427,6 +433,8 @@ rules:
       branch: master
     - repository: kms
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -519,6 +527,8 @@ rules:
     - repository: kms
       branch: master
     - repository: code-generator
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -627,6 +637,8 @@ rules:
     - repository: kms
       branch: master
     - repository: component-base
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -755,6 +767,8 @@ rules:
       branch: master
     - repository: code-generator
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -863,6 +877,8 @@ rules:
     - repository: component-base
       branch: master
     - repository: kms
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -976,6 +992,8 @@ rules:
       branch: master
     - repository: code-generator
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -1053,6 +1071,8 @@ rules:
       branch: master
     - repository: client-go
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -1123,6 +1143,8 @@ rules:
     - repository: cli-runtime
       branch: master
     - repository: client-go
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -1520,6 +1542,8 @@ rules:
       branch: master
     - repository: kms
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -1622,6 +1646,8 @@ rules:
     - repository: component-helpers
       branch: master
     - repository: kms
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -2017,6 +2043,8 @@ rules:
       branch: master
     - repository: metrics
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -2132,6 +2160,8 @@ rules:
       branch: master
     - repository: kms
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -2234,6 +2264,8 @@ rules:
     - repository: kms
       branch: master
     - repository: kubelet
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -2359,6 +2391,8 @@ rules:
       branch: master
     - repository: kubelet
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -2454,6 +2488,14 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-scheduler
   library: true
+- destination: ktesting
+  branches:
+  - name: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/ktesting
+  library: true
 - destination: endpointslice
   branches:
   - name: master
@@ -2467,6 +2509,8 @@ rules:
     - repository: client-go
       branch: master
     - repository: component-base
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master

@@ -89,6 +89,7 @@ replace (
 	k8s.io/component-helpers => ../component-helpers
 	k8s.io/dynamic-resource-allocation => ../dynamic-resource-allocation
 	k8s.io/kms => ../kms
+	k8s.io/ktesting => ../ktesting
 	k8s.io/kubelet => ../kubelet
 	k8s.io/streaming => ../streaming
 )
