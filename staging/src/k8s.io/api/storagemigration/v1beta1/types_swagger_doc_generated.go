@@ -29,9 +29,9 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_StorageVersionMigration = map[string]string{
 	"":         "StorageVersionMigration represents a migration of stored data to the latest storage version.",
-	"metadata": "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"spec":     "Specification of the migration.",
-	"status":   "Status of the migration.",
+	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification of the migration.",
+	"status":   "status is the status of the migration.",
 }
 
 func (StorageVersionMigration) SwaggerDoc() map[string]string {
@@ -50,7 +50,7 @@ func (StorageVersionMigrationList) SwaggerDoc() map[string]string {
 
 var map_StorageVersionMigrationSpec = map[string]string{
 	"":         "Spec of the storage version migration.",
-	"resource": "The resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
+	"resource": "resource is the resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
 }
 
 func (StorageVersionMigrationSpec) SwaggerDoc() map[string]string {
@@ -59,8 +59,8 @@ func (StorageVersionMigrationSpec) SwaggerDoc() map[string]string {
 
 var map_StorageVersionMigrationStatus = map[string]string{
 	"":                "Status of the storage version migration.",
-	"conditions":      "The latest available observations of the migration's current state.",
-	"resourceVersion": "ResourceVersion to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
+	"conditions":      "conditions is the latest available observations of the migration's current state.",
+	"resourceVersion": "resourceVersion to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
 }
 
 func (StorageVersionMigrationStatus) SwaggerDoc() map[string]string {
