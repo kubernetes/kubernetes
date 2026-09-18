@@ -418,10 +418,18 @@ func TestIsFractionalQuantity(t *testing.T) {
 			}
 		})
 	}
+}
 
-	// TODO(#141166): A whole value must not be rescaled. Expect at most 2 allocations.
-	whole := apiresource.MustParse("1e100000")
-	if got := testing.AllocsPerRun(5, func() { isFractionalQuantity(whole) }); got < 10 {
-		t.Errorf("isFractionalQuantity(1e100000) = %v allocs/run, want >= 10", got)
+// TODO(#141166): A whole value must not be rescaled. The large-exponent case
+// should cost about as much as the integer case.
+func BenchmarkIsFractionalQuantity(b *testing.B) {
+	for _, quantity := range []string{"1", "1.5", "1e100000"} {
+		q := apiresource.MustParse(quantity)
+		b.Run(quantity, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				isFractionalQuantity(q)
+			}
+		})
 	}
 }
