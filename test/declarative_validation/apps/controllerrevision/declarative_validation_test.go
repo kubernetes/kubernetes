@@ -21,7 +21,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	"k8s.io/kubernetes/pkg/registry/apps/controllerrevision"
@@ -60,9 +62,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				IsResourceRequest: true,
 				Verb:              "create",
 			})
-			obj := mkControllerRevision(func(o *apps.ControllerRevision) {
-				o.Namespace = namespace
-			})
+			obj := mkControllerRevision(tweakNamespace(namespace))
 			meta.RunObjectMetaTestCases(t, ctx, &obj, strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
@@ -86,10 +86,63 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				IsResourceRequest: true,
 				Verb:              "update",
 			})
-			obj := mkControllerRevision(func(o *apps.ControllerRevision) {
-				o.Namespace = namespace
-			})
+			obj := mkControllerRevision(tweakNamespace(namespace))
 			meta.RunObjectMetaUpdateTestCases(t, ctx, &obj, strategy, meta.WithStringentFinalizerValidation())
+
+			testCases := map[string]struct {
+				old          apps.ControllerRevision
+				update       apps.ControllerRevision
+				expectedErrs field.ErrorList
+			}{
+				"valid update": {
+					old:    mkControllerRevision(tweakNamespace(namespace)),
+					update: mkControllerRevision(tweakNamespace(namespace)),
+				},
+				"data empty -> some value": {
+					old:    mkControllerRevision(tweakNamespace(namespace), tweakData("")),
+					update: mkControllerRevision(tweakNamespace(namespace)),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("data"), nil, "").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"data some value -> empty": {
+					old:    mkControllerRevision(tweakNamespace(namespace)),
+					update: mkControllerRevision(tweakNamespace(namespace), tweakData("")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("data"), nil, "").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"data some value -> changed value": {
+					old:    mkControllerRevision(tweakNamespace(namespace)),
+					update: mkControllerRevision(tweakNamespace(namespace), tweakData(`{"kind":"Bar"}`)),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("data"), nil, "").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+			}
+			for k, tc := range testCases {
+				t.Run(k, func(t *testing.T) {
+					tc.old.ResourceVersion = "1"
+					tc.update.ResourceVersion = "2"
+					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs)
+				})
+			}
 		})
+	}
+}
+
+func tweakData(raw string) func(*apps.ControllerRevision) {
+	return func(o *apps.ControllerRevision) {
+		if raw == "" {
+			o.Data = runtime.RawExtension{}
+		} else {
+			o.Data = runtime.RawExtension{Raw: []byte(raw)}
+		}
+	}
+}
+
+func tweakNamespace(namespace string) func(*apps.ControllerRevision) {
+	return func(o *apps.ControllerRevision) {
+		o.Namespace = namespace
 	}
 }
