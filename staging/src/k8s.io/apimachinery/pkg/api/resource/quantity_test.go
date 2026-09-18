@@ -1879,8 +1879,8 @@ func TestQuantityAsInt64(t *testing.T) {
 		{"binary cap far past 8Ei", MustParse("100Ei"), math.MaxInt64, true, math.MaxInt64, true},
 		{"binary cap from Ti", MustParse("8388608Ti"), math.MaxInt64, true, math.MaxInt64, true},
 		{"binary cap from Ki", MustParse("9223372036854775807Ki"), math.MaxInt64, true, math.MaxInt64, true},
-		{"binary whole with decimal point", MustParse("1.5Gi"), 0, false, 0, false},
-		{"binary whole with trailing fraction zeros", MustParse("1.5000Gi"), 0, false, 0, false},
+		{"binary whole with decimal point", MustParse("1.5Gi"), 1610612736, true, 1610612736, true},
+		{"binary whole with trailing fraction zeros", MustParse("1.5000Gi"), 1610612736, true, 1610612736, true},
 		{"binary fractional", MustParse("1.5555555555555555Gi"), 0, false, 0, false},
 	}
 
@@ -1943,7 +1943,7 @@ func TestQuantityAsInt64Stability(t *testing.T) {
 		{"1.5 is fractional", MustParse("1.5"), 0, false, 0, false},
 		{"1000m is whole but stored with fractional digits", MustParse("1000m"), 0, false, 0, false},
 		{"1.0 is whole but stored with fractional digits", MustParse("1.0"), 0, false, 0, false},
-		{"1.5Gi is whole", MustParse("1.5Gi"), 0, false, 0, false},
+		{"1.5Gi is whole", MustParse("1.5Gi"), 1610612736, true, 1610612736, true},
 		{"1E parsed from 22 digits is whole", MustParse("1000000000000000000000m"), 0, false, 0, false},
 		{"2^63 parses to nano scale", MustParse("9223372036854775808"), 0, false, 0, false},
 	}
@@ -2003,17 +2003,17 @@ func TestQuantityRoundUpAsInt64(t *testing.T) {
 		decOK    bool
 	}{
 		// nothing to round
-		{"0", -3, 0, true, 0, false},
-		{"5", -3, 5, true, 0, false},
+		{"0", -3, 0, true, 0, true},
+		{"5", -3, 5, true, 5, true},
 		{"5", 0, 5, true, 5, true},
-		{"-5", -3, -5, true, 0, false},
-		{"50k", -3, 50000, true, 0, false},
+		{"-5", -3, -5, true, -5, true},
+		{"50k", -3, 50000, true, 50000, true},
 		{"50k", 0, 50000, true, 50000, true},
 		{"1000m", -3, 0, false, 0, false},
 		{"1.5", -3, 0, false, 0, false},
-		{"9223372036854775807", -3, math.MaxInt64, true, 0, false},
-		{"-9223372036854775808", -9, math.MinInt64, true, 0, false},
-		{"2Gi", -3, 2147483648, true, 0, false},
+		{"9223372036854775807", -3, math.MaxInt64, true, math.MaxInt64, true},
+		{"-9223372036854775808", -9, math.MinInt64, true, math.MinInt64, true},
+		{"2Gi", -3, 2147483648, true, 2147483648, true},
 
 		// rounds to a whole number
 		{"5", 3, 1000, true, 1000, true},
@@ -2025,7 +2025,7 @@ func TestQuantityRoundUpAsInt64(t *testing.T) {
 		{"9223372036854775807", 3, math.MaxInt64, false, math.MaxInt64, false},
 
 		// parsed straight to inf.Dec
-		{"1.5Gi", -3, 0, false, 0, false},
+		{"1.5Gi", -3, 1610612736, true, 1610612736, true},
 		{"1.5Gi", 0, 1610612736, true, 1610612736, true},
 		{"1.5555555555555555Gi", -3, 0, false, 0, false},
 		{"1.5555555555555555Gi", 0, 1670265060, true, 1670265060, true},

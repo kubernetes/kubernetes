@@ -416,6 +416,12 @@ func ParseQuantity(str string) (Quantity, error) {
 		// This avoids rounding and hopefully confusion, too.
 		format = DecimalSI
 	}
+	if format == BinarySI {
+		// Store binary suffix values without fractional digits when possible.
+		if whole := new(inf.Dec).Round(amount, 0, inf.RoundExact); whole != nil {
+			amount = whole
+		}
+	}
 	if sign == -1 {
 		amount.Neg(amount)
 	}
@@ -646,6 +652,10 @@ func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 func (q *Quantity) RoundUp(scale Scale) bool {
 	if q.d.Dec != nil {
 		q.s = ""
+		// return early if no rounding is necessary
+		if -int64(q.d.Dec.Scale()) >= int64(scale) {
+			return true
+		}
 		d, exact := q.d.AsScale(scale)
 		q.d = d
 		return exact
