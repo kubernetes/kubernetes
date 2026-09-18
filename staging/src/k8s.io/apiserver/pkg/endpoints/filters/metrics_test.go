@@ -29,6 +29,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 )
@@ -172,7 +175,8 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 
 	testCases := []struct {
 		desc       string
-		authorizer fakeAuthorizer
+		authorizer authorizer.Authorizer
+		classifier ConditionalAuthorizationRequestClassifier
 		want       string
 	}{
 		{
@@ -183,7 +187,7 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 				nil,
 			},
 			want: `
-			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
 			# TYPE authorization_attempts_total counter
 			authorization_attempts_total{result="allowed"} 1
 				`,
@@ -196,7 +200,7 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 				nil,
 			},
 			want: `
-			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
 			# TYPE authorization_attempts_total counter
 			authorization_attempts_total{result="denied"} 1
 				`,
@@ -209,7 +213,7 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 				errors.New("can't parse user info"),
 			},
 			want: `
-			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
 			# TYPE authorization_attempts_total counter
 			authorization_attempts_total{result="error"} 1
 				`,
@@ -222,7 +226,7 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 				errors.New("can't parse user info"),
 			},
 			want: `
-			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
 			# TYPE authorization_attempts_total counter
 			authorization_attempts_total{result="allowed"} 1
 				`,
@@ -235,9 +239,77 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 				nil,
 			},
 			want: `
-			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
 			# TYPE authorization_attempts_total counter
 			authorization_attempts_total{result="no-opinion"} 1
+				`,
+		},
+		{
+			desc: "conditional allow with error (CanBecomeAllowed() == true and classifier true)",
+			authorizer: &conditionsAwareFakeAuthorizer{
+				makeDecision: func() authorizer.ConditionsAwareDecision {
+					return authorizer.ConditionsAwareDecisionConditionsMap(
+						nil, nil,
+						[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/cond", Condition: "maybe", Type: "example.com/foo-type"}},
+					)
+				},
+			},
+			classifier: func(attrs authorizer.Attributes) bool { return true },
+			want: `
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
+			# TYPE authorization_attempts_total counter
+			authorization_attempts_total{result="conditional"} 1
+				`,
+		},
+		{
+			desc: "conditional allow with error (CanBecomeAllowed() == true and classifier false)",
+			authorizer: &conditionsAwareFakeAuthorizer{
+				makeDecision: func() authorizer.ConditionsAwareDecision {
+					return authorizer.ConditionsAwareDecisionConditionsMap(
+						nil, nil,
+						[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/cond", Condition: "maybe", Type: "example.com/foo-type"}},
+					)
+				},
+			},
+			classifier: func(attrs authorizer.Attributes) bool { return false },
+			want: `
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
+			# TYPE authorization_attempts_total counter
+			authorization_attempts_total{result="no-opinion"} 1
+				`,
+		},
+		{
+			desc: "conditional allow with error (CanBecomeAllowed() == true and classifier nil)",
+			authorizer: &conditionsAwareFakeAuthorizer{
+				makeDecision: func() authorizer.ConditionsAwareDecision {
+					return authorizer.ConditionsAwareDecisionConditionsMap(
+						nil, nil,
+						[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/cond", Condition: "maybe", Type: "example.com/foo-type"}},
+					)
+				},
+			},
+			want: `
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
+			# TYPE authorization_attempts_total counter
+			authorization_attempts_total{result="no-opinion"} 1
+				`,
+		},
+		{
+			desc: "conditional deny (CanBecomeAllowed() == false)",
+			// Technically the authorizer did not give the Deny response, but because CanBecomeAllowed() == false,
+			// we practically deny the response, and thus does this go under the "denied" label (not NoOpinion, as the authorizer did have an opinion).
+			authorizer: &conditionsAwareFakeAuthorizer{
+				makeDecision: func() authorizer.ConditionsAwareDecision {
+					return authorizer.ConditionsAwareDecisionConditionsMap(
+						[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/cond", Condition: "maybe-not", Type: "example.com/foo-type"}},
+						nil, nil,
+					)
+				},
+			},
+			want: `
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
+			# TYPE authorization_attempts_total counter
+			authorization_attempts_total{result="denied"} 1
 				`,
 		},
 	}
@@ -250,13 +322,18 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 	scheme := runtime.NewScheme()
 	negotiatedSerializer := serializer.NewCodecFactory(scheme).WithoutConversion()
 
+	// Allow creating conditional decisions in the test
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			ctx := t.Context()
 			defer authorizationAttemptsCounter.Reset()
 
 			audit := &auditinternal.Event{Level: auditinternal.LevelMetadata}
-			handler := WithAuthorization(&fakeHTTPHandler{}, tt.authorizer, negotiatedSerializer)
+			// Match the signature of WithConditionsAwareAuthorization: the test enables the enforcer plugin
+			// so that the conditions-aware dispatch is exercised whenever the classifier is non-nil.
+			handler := WithConditionsAwareAuthorization(&fakeHTTPHandler{}, tt.authorizer, negotiatedSerializer, true /* conditionsEnforcerEnabled */, tt.classifier)
 			// TODO: fake audit injector
 
 			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/namespaces/default/pods", nil)

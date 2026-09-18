@@ -17,10 +17,12 @@ limitations under the License.
 package request
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 // TestNamespaceContext validates that a namespace can be get/set on a context object
@@ -89,5 +91,69 @@ func TestUserContext(t *testing.T) {
 	} else if actualExtra[expectedExtraKey][0] != expectedExtraValue {
 		t.Fatalf("Get user extra map value error, Expected: %s, Actual: %s", expectedExtraValue, actualExtra[expectedExtraKey])
 	}
+}
 
+// mockAuthorizer is a minimal authorizer used as an identity in context tests.
+type mockAuthorizer struct{ name string }
+
+func (m *mockAuthorizer) Authorize(_ context.Context, _ authorizer.Attributes) (authorizer.Decision, string, error) {
+	return authorizer.DecisionNoOpinion, "", nil
+}
+func (m *mockAuthorizer) ConditionsAwareAuthorize(_ context.Context, _ authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionNoOpinion("", nil)
+}
+func (m *mockAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "not implemented", authorizer.ErrorConditionEvaluationNotSupported
+}
+
+func TestConditionallyAuthorizedDecisionContext(t *testing.T) {
+	t.Run("empty context returns false", func(t *testing.T) {
+		ctx := NewContext()
+		authz, dec, ok := ConditionallyAuthorizedDecisionFrom(ctx)
+		if authz != nil {
+			t.Fatal("expected authz=nil for empty context")
+		}
+		if dec.String() != "Deny" {
+			t.Fatal("expected zero valued Deny decision for empty context")
+		}
+		if ok {
+			t.Fatal("expected ok=false for empty context")
+		}
+
+	})
+
+	t.Run("decision round-trips", func(t *testing.T) {
+		ctx := NewContext()
+		authz := &mockAuthorizer{name: "authz1"}
+		decision := authorizer.ConditionsAwareDecisionAllow("test-reason", nil)
+
+		ctx = WithConditionallyAuthorizedDecision(ctx, authz, decision)
+
+		gotAuthz, gotDec, ok := ConditionallyAuthorizedDecisionFrom(ctx)
+		if !ok {
+			t.Fatal("expected ok=true after storing a decision")
+		}
+
+		if gotAuthz != authz {
+			t.Error("authorizer pointer mismatch")
+		}
+		if gotDec.String() != `Allow(reason="test-reason")` {
+			t.Error("expected Allow decision")
+		}
+
+		// this should override the value in ctx
+		ctx = WithConditionallyAuthorizedDecision(ctx, authz, authorizer.ConditionsAwareDecisionDeny("deny-reason", nil))
+
+		gotAuthz, gotDec, ok = ConditionallyAuthorizedDecisionFrom(ctx)
+		if !ok {
+			t.Fatal("expected ok=true after storing a decision")
+		}
+
+		if gotAuthz != authz {
+			t.Error("authorizer pointer mismatch")
+		}
+		if gotDec.String() != `Deny(reason="deny-reason")` {
+			t.Error("expected Deny decision")
+		}
+	})
 }
