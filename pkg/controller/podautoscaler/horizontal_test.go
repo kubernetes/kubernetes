@@ -3716,8 +3716,9 @@ func TestMetricsEdgeCases(t *testing.T) {
 				specReplicas:   4,
 				statusReplicas: 5,
 				CPUTarget:      50,
-				reportedLevels: []uint64{500, 500, 500, 500, 500},
+				reportedLevels: []uint64{500, 500, 500, 500, 500, 500},
 				reportedCPURequests: []resource.Quantity{
+					resource.MustParse("1"),
 					resource.MustParse("1"),
 					resource.MustParse("1"),
 					resource.MustParse("1"),
@@ -3734,11 +3735,12 @@ func TestMetricsEdgeCases(t *testing.T) {
 			expectedScaleUpdated:    false,
 			expectedActionLabel:     monitor.ActionLabelNone,
 			expectedErrorLabel:      monitor.ErrorLabelNone,
-			expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-				Type:   autoscalingv2.AbleToScale,
-				Status: v1.ConditionTrue,
-				Reason: "ReadyForNewScale",
-			}),
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "ReadyForNewScale"},
+				{Type: autoscalingv2.SelectorMatchesExtraPods, Status: v1.ConditionTrue, Reason: "SelectorOverlap"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
+				{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionFalse, Reason: "DesiredWithinRange"},
+			},
 			expectedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 				autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
 			},
