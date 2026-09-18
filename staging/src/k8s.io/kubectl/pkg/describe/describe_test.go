@@ -1678,6 +1678,25 @@ func TestDescribeContainers(t *testing.T) {
 			},
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap\tOptional: false"},
 		},
+		// Env from a file key (fileKeyRef).
+		{
+			container: corev1.Container{Name: "test", Image: "image", Env: []corev1.EnvVar{{Name: "envname", ValueFrom: &corev1.EnvVarSource{FileKeyRef: &corev1.FileKeySelector{VolumeName: "config", Path: "app.env", Key: "TOKEN"}}}}},
+			status: corev1.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname:\t<set to the key 'TOKEN' of file 'app.env' in volume 'config'>\tOptional: false"},
+		},
+		{
+			container: corev1.Container{Name: "test", Image: "image", Env: []corev1.EnvVar{{Name: "envname", ValueFrom: &corev1.EnvVarSource{FileKeyRef: &corev1.FileKeySelector{VolumeName: "config", Path: "app.env", Key: "TOKEN", Optional: &trueVal}}}}},
+			status: corev1.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname:\t<set to the key 'TOKEN' of file 'app.env' in volume 'config'>\tOptional: true"},
+		},
 		{
 			container: corev1.Container{Name: "test", Image: "image", Env: []corev1.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []corev1.EnvFromSource{{Prefix: "p_", ConfigMapRef: &corev1.ConfigMapEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "a123"}}}}},
 			status: corev1.ContainerStatus{
