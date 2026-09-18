@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
@@ -273,6 +274,80 @@ func ResetObjectMetaForStatus(meta, existingMeta Object) {
 	// managedFields must be preserved since it's been modified to
 	// track changed fields in the status update.
 	//meta.SetManagedFields(existingMeta.GetManagedFields())
+}
+
+// WithAPIVersion sets the apiVersion and returns obj, which allows an object with
+// type information to be constructed in a single expression:
+//
+//	obj := (&metav1.PartialObjectMetadata{}).WithAPIVersion("v1").WithKind("Pod")
+func (obj *PartialObjectMetadata) WithAPIVersion(version string) *PartialObjectMetadata {
+	obj.APIVersion = version
+	return obj
+}
+
+// WithKind sets the kind and returns obj, which allows an object with type
+// information to be constructed in a single expression:
+//
+//	obj := (&metav1.PartialObjectMetadata{}).WithAPIVersion("v1").WithKind("Pod")
+func (obj *PartialObjectMetadata) WithKind(kind string) *PartialObjectMetadata {
+	obj.Kind = kind
+	return obj
+}
+
+// WithName sets the name and returns obj, which allows an object with type and
+// identity information to be constructed in a single expression:
+//
+//	obj := (&metav1.PartialObjectMetadata{}).WithGroupVersionKind(gvk).WithNamespace("ns").WithName("n")
+func (obj *PartialObjectMetadata) WithName(name string) *PartialObjectMetadata {
+	obj.Name = name
+	return obj
+}
+
+// WithNamespace sets the namespace and returns obj, which allows an object with type
+// and identity information to be constructed in a single expression:
+//
+//	obj := (&metav1.PartialObjectMetadata{}).WithGroupVersionKind(gvk).WithNamespace("ns").WithName("n")
+func (obj *PartialObjectMetadata) WithNamespace(namespace string) *PartialObjectMetadata {
+	obj.Namespace = namespace
+	return obj
+}
+
+// WithGroupVersionKind sets the apiVersion and kind from gvk and returns obj, which
+// allows an object with type information to be constructed in a single expression:
+//
+//	obj := (&metav1.PartialObjectMetadata{}).WithGroupVersionKind(gvk)
+func (obj *PartialObjectMetadata) WithGroupVersionKind(gvk schema.GroupVersionKind) *PartialObjectMetadata {
+	obj.APIVersion = gvk.GroupVersion().String()
+	obj.Kind = gvk.Kind
+	return obj
+}
+
+// WithAPIVersion sets the apiVersion and returns obj, which allows a list object with
+// type information to be constructed in a single expression:
+//
+//	list := (&metav1.PartialObjectMetadataList{}).WithAPIVersion("v1").WithKind("PodList")
+func (obj *PartialObjectMetadataList) WithAPIVersion(version string) *PartialObjectMetadataList {
+	obj.APIVersion = version
+	return obj
+}
+
+// WithKind sets the kind and returns obj, which allows a list object with type
+// information to be constructed in a single expression:
+//
+//	list := (&metav1.PartialObjectMetadataList{}).WithAPIVersion("v1").WithKind("PodList")
+func (obj *PartialObjectMetadataList) WithKind(kind string) *PartialObjectMetadataList {
+	obj.Kind = kind
+	return obj
+}
+
+// WithGroupVersionKind sets the apiVersion and kind from gvk and returns obj, which
+// allows a list object with type information to be constructed in a single expression:
+//
+//	list := (&metav1.PartialObjectMetadataList{}).WithGroupVersionKind(gvk)
+func (obj *PartialObjectMetadataList) WithGroupVersionKind(gvk schema.GroupVersionKind) *PartialObjectMetadataList {
+	obj.APIVersion = gvk.GroupVersion().String()
+	obj.Kind = gvk.Kind
+	return obj
 }
 
 // MarshalJSON implements json.Marshaler
