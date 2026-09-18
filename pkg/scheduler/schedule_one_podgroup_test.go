@@ -740,13 +740,14 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 	}
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
-		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.PodGroupKey("default", "pg"): {qInfo1, qInfo2, qInfo3}},
 		PodGroupInfo: &framework.PodGroupInfo{
 			GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup),
-			UnscheduledPods: []*v1.Pod{p1, p2, p3},
+			UnscheduledPods: []*v1.Pod{},
 		},
 	}
-
+	podGroupInfo.AddPod(qInfo1)
+	podGroupInfo.AddPod(qInfo2)
+	podGroupInfo.AddPod(qInfo3)
 	logger, ctx := ktesting.NewTestContext(t)
 
 	cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
