@@ -42,6 +42,7 @@ func (kl *Kubelet) getCachedNode(ctx context.Context) (*v1.Node, error) {
 	if err != nil {
 		if kl.cachedNode != nil {
 			logger.Error(err, "failed to list node; using cached node")
+			kl.cachedNode = kl.ensureNodeStatusInitialized(ctx, kl.cachedNode)
 			return kl.cachedNode, nil
 		}
 		return kl.initialNode(ctx)
@@ -49,18 +50,18 @@ func (kl *Kubelet) getCachedNode(ctx context.Context) (*v1.Node, error) {
 
 	if kl.cachedNode == nil {
 		kl.cachedNode = informerNode
-		return informerNode, nil
+	} else {
+		isNewer, err := isNewer(informerNode, kl.cachedNode)
+		if err != nil {
+			// In error cases, default to the informer node.
+			logger.Error(err, "failed to check if node is newer; using informer node")
+		}
+		if err != nil || isNewer {
+			kl.cachedNode = informerNode
+		}
 	}
 
-	isNewer, err := isNewer(informerNode, kl.cachedNode)
-	if err != nil {
-		// In error cases, default to the informer node.
-		logger.Error(err, "failed to check if node is newer; using informer node")
-		kl.cachedNode = informerNode
-	}
-	if isNewer {
-		kl.cachedNode = informerNode
-	}
+	kl.cachedNode = kl.ensureNodeStatusInitialized(ctx, kl.cachedNode)
 	return kl.cachedNode, nil
 }
 
@@ -74,8 +75,21 @@ func (kl *Kubelet) getNodeSync(ctx context.Context) (*v1.Node, error) {
 	if err != nil {
 		return nil, err
 	}
+	node = kl.ensureNodeStatusInitialized(ctx, node)
 	kl.cachedNode = node
 	return node, nil
+}
+
+// ensureNodeStatusInitialized overlays local node status (capacity, allocatable, addresses, etc.)
+// onto a copy of the node if Status.Allocatable is uninitialized.
+func (kl *Kubelet) ensureNodeStatusInitialized(ctx context.Context, node *v1.Node) *v1.Node {
+	if node == nil || len(node.Status.Allocatable) > 0 {
+		return node
+	}
+	klog.FromContext(ctx).V(2).Info("Node has uninitialized Allocatable, overlaying local capacity", "node", klog.KObj(node))
+	nodeCopy := node.DeepCopy()
+	kl.setNodeStatus(ctx, nodeCopy)
+	return nodeCopy
 }
 
 // isNewer checks if the informer node is newer than the cached node based on the ResourceVersion.
