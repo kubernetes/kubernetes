@@ -410,6 +410,7 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 		"drop-fields-device-taints": {
 			obj:              objWithDeviceTaints,
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false},
+			emulatedVersion:  "1.37",
 			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -433,7 +434,8 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithPrioritizedList,
+			emulatedVersion: "1.37",
+			expectObj:       objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -828,7 +830,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: obj,
+			emulatedVersion: "1.37",
+			expectObj:       obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -870,7 +873,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithDeviceTaints,
+			emulatedVersion: "1.37",
+			expectObj:       objWithDeviceTaints,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -884,7 +888,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithPrioritizedList,
+			emulatedVersion: "1.37",
+			expectObj:       objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -926,7 +931,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithDeviceTaintsInPrioritizedList,
+			emulatedVersion: "1.37",
+			expectObj:       objWithDeviceTaintsInPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
