@@ -67,7 +67,7 @@ type MockManager_AddPod_Call struct {
 
 // AddPod is a helper method to define mock.On call
 //   - pod *v1.Pod
-func (_e *MockManager_Expecter) AddPod(pod interface{}) *MockManager_AddPod_Call {
+func (_e *MockManager_Expecter) AddPod(pod any) *MockManager_AddPod_Call {
 	return &MockManager_AddPod_Call{Call: _e.mock.On("AddPod", pod)}
 }
 
@@ -129,7 +129,7 @@ type MockManager_GetMirrorPodByPod_Call struct {
 
 // GetMirrorPodByPod is a helper method to define mock.On call
 //   - pod *v1.Pod
-func (_e *MockManager_Expecter) GetMirrorPodByPod(pod interface{}) *MockManager_GetMirrorPodByPod_Call {
+func (_e *MockManager_Expecter) GetMirrorPodByPod(pod any) *MockManager_GetMirrorPodByPod_Call {
 	return &MockManager_GetMirrorPodByPod_Call{Call: _e.mock.On("GetMirrorPodByPod", pod)}
 }
 
@@ -199,7 +199,7 @@ type MockManager_GetPodAndMirrorPod_Call struct {
 
 // GetPodAndMirrorPod is a helper method to define mock.On call
 //   - pod *v1.Pod
-func (_e *MockManager_Expecter) GetPodAndMirrorPod(pod interface{}) *MockManager_GetPodAndMirrorPod_Call {
+func (_e *MockManager_Expecter) GetPodAndMirrorPod(pod any) *MockManager_GetPodAndMirrorPod_Call {
 	return &MockManager_GetPodAndMirrorPod_Call{Call: _e.mock.On("GetPodAndMirrorPod", pod)}
 }
 
@@ -261,7 +261,7 @@ type MockManager_GetPodByFullName_Call struct {
 
 // GetPodByFullName is a helper method to define mock.On call
 //   - podFullName string
-func (_e *MockManager_Expecter) GetPodByFullName(podFullName interface{}) *MockManager_GetPodByFullName_Call {
+func (_e *MockManager_Expecter) GetPodByFullName(podFullName any) *MockManager_GetPodByFullName_Call {
 	return &MockManager_GetPodByFullName_Call{Call: _e.mock.On("GetPodByFullName", podFullName)}
 }
 
@@ -323,7 +323,7 @@ type MockManager_GetPodByMirrorPod_Call struct {
 
 // GetPodByMirrorPod is a helper method to define mock.On call
 //   - pod *v1.Pod
-func (_e *MockManager_Expecter) GetPodByMirrorPod(pod interface{}) *MockManager_GetPodByMirrorPod_Call {
+func (_e *MockManager_Expecter) GetPodByMirrorPod(pod any) *MockManager_GetPodByMirrorPod_Call {
 	return &MockManager_GetPodByMirrorPod_Call{Call: _e.mock.On("GetPodByMirrorPod", pod)}
 }
 
@@ -386,7 +386,7 @@ type MockManager_GetPodByName_Call struct {
 // GetPodByName is a helper method to define mock.On call
 //   - namespace string
 //   - name string
-func (_e *MockManager_Expecter) GetPodByName(namespace interface{}, name interface{}) *MockManager_GetPodByName_Call {
+func (_e *MockManager_Expecter) GetPodByName(namespace any, name any) *MockManager_GetPodByName_Call {
 	return &MockManager_GetPodByName_Call{Call: _e.mock.On("GetPodByName", namespace, name)}
 }
 
@@ -453,7 +453,7 @@ type MockManager_GetPodByUID_Call struct {
 
 // GetPodByUID is a helper method to define mock.On call
 //   - uID types.UID
-func (_e *MockManager_Expecter) GetPodByUID(uID interface{}) *MockManager_GetPodByUID_Call {
+func (_e *MockManager_Expecter) GetPodByUID(uID any) *MockManager_GetPodByUID_Call {
 	return &MockManager_GetPodByUID_Call{Call: _e.mock.On("GetPodByUID", uID)}
 }
 
@@ -707,7 +707,7 @@ type MockManager_RemovePod_Call struct {
 
 // RemovePod is a helper method to define mock.On call
 //   - pod *v1.Pod
-func (_e *MockManager_Expecter) RemovePod(pod interface{}) *MockManager_RemovePod_Call {
+func (_e *MockManager_Expecter) RemovePod(pod any) *MockManager_RemovePod_Call {
 	return &MockManager_RemovePod_Call{Call: _e.mock.On("RemovePod", pod)}
 }
 
@@ -747,7 +747,7 @@ type MockManager_SetPods_Call struct {
 
 // SetPods is a helper method to define mock.On call
 //   - pods []*v1.Pod
-func (_e *MockManager_Expecter) SetPods(pods interface{}) *MockManager_SetPods_Call {
+func (_e *MockManager_Expecter) SetPods(pods any) *MockManager_SetPods_Call {
 	return &MockManager_SetPods_Call{Call: _e.mock.On("SetPods", pods)}
 }
 
@@ -798,7 +798,7 @@ type MockManager_TranslatePodUID_Call struct {
 
 // TranslatePodUID is a helper method to define mock.On call
 //   - uid types.UID
-func (_e *MockManager_Expecter) TranslatePodUID(uid interface{}) *MockManager_TranslatePodUID_Call {
+func (_e *MockManager_Expecter) TranslatePodUID(uid any) *MockManager_TranslatePodUID_Call {
 	return &MockManager_TranslatePodUID_Call{Call: _e.mock.On("TranslatePodUID", uid)}
 }
 
@@ -838,7 +838,7 @@ type MockManager_UpdatePod_Call struct {
 
 // UpdatePod is a helper method to define mock.On call
 //   - pod *v1.Pod
-func (_e *MockManager_Expecter) UpdatePod(pod interface{}) *MockManager_UpdatePod_Call {
+func (_e *MockManager_Expecter) UpdatePod(pod any) *MockManager_UpdatePod_Call {
 	return &MockManager_UpdatePod_Call{Call: _e.mock.On("UpdatePod", pod)}
 }
 
