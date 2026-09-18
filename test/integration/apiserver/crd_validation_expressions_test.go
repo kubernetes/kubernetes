@@ -714,23 +714,29 @@ func TestCustomResourceValidatorsWithSchemaConversion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Make an unrelated update to the previous persisted CR instance to make sure CRD handler doesn't panic
-	// It may take some time for the CRD schema update to be processed by the API Server's internal validation cache.
+	// Make an unrelated update to the previous persisted CR instance in a loop to wait for the CRD handler update to propagate
 	var lastErr error
-	err = wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 		oldCR, err := crClient.Get(ctx, name1, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-
-		oldCR.Object["metadata"].(map[string]interface{})["labels"] = map[string]interface{}{"key": "value"}
-		_, err = crClient.Update(ctx, oldCR, metav1.UpdateOptions{})
-		lastErr = err
-
-		if err != nil && strings.Contains(err.Error(), "rule compiler initialization error: failed to convert to declType for CEL validation rules") {
+		if oldCR.Object["metadata"].(map[string]interface{})["labels"] == nil {
+			oldCR.Object["metadata"].(map[string]interface{})["labels"] = map[string]interface{}{}
+		}
+		oldCR.Object["metadata"].(map[string]interface{})["labels"].(map[string]interface{})["key"] = names.SimpleNameGenerator.GenerateName("value-")
+		_, updateErr := crClient.Update(ctx, oldCR, metav1.UpdateOptions{})
+		if updateErr == nil {
+			// CRD update hasn't propagated yet
+			return false, nil
+		}
+		if strings.Contains(updateErr.Error(), "rule compiler initialization error: failed to convert to declType for CEL validation rules") {
+			// CRD update successfully propagated
+			lastErr = updateErr
 			return true, nil
 		}
-
+		// Unexpected error, but we'll retry
+		lastErr = updateErr
 		return false, nil
 	})
 	if err != nil {
