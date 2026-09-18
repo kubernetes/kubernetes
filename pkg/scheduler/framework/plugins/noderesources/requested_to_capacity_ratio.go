@@ -18,6 +18,7 @@ package noderesources
 
 import (
 	"math"
+	"math/bits"
 
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -25,6 +26,25 @@ import (
 )
 
 const maxUtilization = 100
+
+// scaledUtilization returns requested * max / capacity, exact in integer
+// arithmetic, with requested clamped to [0, capacity] so the quotient stays
+// within [0, max]. The 128-bit intermediate via math/bits keeps the result
+// exact where the direct int64 product would overflow.
+func scaledUtilization(requested, capacity, max int64) int64 {
+	if capacity <= 0 || requested <= 0 {
+		return 0
+	}
+	if requested >= capacity {
+		return max
+	}
+	if requested <= math.MaxInt64/max {
+		return (requested * max) / capacity
+	}
+	hi, lo := bits.Mul64(uint64(requested), uint64(max))
+	quo, _ := bits.Div64(hi, lo, uint64(capacity))
+	return int64(quo)
+}
 
 // buildRequestedToCapacityRatioScorerFunction allows users to apply bin packing
 // on core resources like CPU, Memory as well as extended resources like accelerators.
@@ -34,8 +54,7 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.Fun
 		if capacity == 0 || requested > capacity {
 			return rawScoringFunction(maxUtilization)
 		}
-
-		return rawScoringFunction(requested * maxUtilization / capacity)
+		return rawScoringFunction(scaledUtilization(requested, capacity, maxUtilization))
 	}
 	return func(requested, _, allocable []int64) int64 {
 		var nodeScore, weightSum int64

@@ -120,7 +120,7 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 			return fwk.UpdatePodScaleDown
 		}
 
-		if oldReq.MilliValue() > newReq.MilliValue() {
+		if oldReq.Cmp(newReq) > 0 {
 			// The resource request of rName is scaled down.
 			return fwk.UpdatePodScaleDown
 		}
@@ -145,7 +145,7 @@ func extractPodScaleUp(newPod, oldPod *v1.Pod) fwk.ActionType {
 			return fwk.UpdatePodScaleUp
 		}
 
-		if newReq.MilliValue() > oldReq.MilliValue() {
+		if newReq.Cmp(oldReq) > 0 {
 			// The resource request of rName is scaled up.
 			return fwk.UpdatePodScaleUp
 		}
