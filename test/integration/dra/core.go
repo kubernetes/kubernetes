@@ -742,7 +742,6 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 	// Start the controller (this will run in background and stop when tCtx is cancelled)
 	var wg sync.WaitGroup
 	tCtx.Cleanup(func() {
-		tCtx.Cancel("test is done")
 		wg.Wait()
 	})
 	wg.Go(runResourceClaimController)

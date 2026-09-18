@@ -323,7 +323,6 @@ func TestManager(t *testing.T) {
 
 	for _, tc := range tests {
 		tCtx.SyncTest(tc.desc, func(tCtx ktesting.TContext) {
-			defer tCtx.Cancel("test completed")
 			t := tCtx.TB()
 			logger := tCtx.Logger()
 
@@ -486,7 +485,6 @@ func TestRestart(t *testing.T) {
 }
 
 func testRestart(tCtx ktesting.TContext) {
-	defer tCtx.Cancel("test completed")
 	logger := tCtx.Logger()
 	t := tCtx.TB()
 	systemDbusTmp := systemDbus
@@ -564,7 +562,6 @@ func TestStartDoesNotReconnectAfterContextCancel(t *testing.T) {
 }
 
 func testStartDoesNotReconnectAfterContextCancel(tCtx ktesting.TContext) {
-	defer tCtx.Cancel("test completed")
 	logger := tCtx.Logger()
 	t := tCtx.TB()
 
@@ -865,7 +862,6 @@ func TestRestartClosesOldConnection(t *testing.T) {
 }
 
 func testRestartClosesOldConnection(tCtx ktesting.TContext) {
-	defer tCtx.Cancel("test completed")
 	logger := tCtx.Logger()
 	t := tCtx.TB()
 
