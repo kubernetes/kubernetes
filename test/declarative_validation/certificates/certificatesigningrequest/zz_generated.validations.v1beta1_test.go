@@ -61,6 +61,9 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.expirationSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"spec.usages": {
 				{ErrorType: "FieldValueRequired"},
 			},
