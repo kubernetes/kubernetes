@@ -5259,15 +5259,11 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 	}
 	var list []string
 	max := 3
-	more := false
 	count := 0
 	for i := range endpointSlices {
 		if len(endpointSlices[i].Ports) == 0 {
 			// It's possible to have headless services with no ports.
 			for j := range endpointSlices[i].Endpoints {
-				if len(list) == max {
-					more = true
-				}
 				isReady := endpointSlices[i].Endpoints[j].Conditions.Ready == nil || *endpointSlices[i].Endpoints[j].Conditions.Ready
 				if !isReady {
 					// ready indicates that this endpoint is prepared to receive traffic,
@@ -5277,7 +5273,7 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 					// More info: vendor/k8s.io/api/discovery/v1/types.go
 					continue
 				}
-				if !more {
+				if len(list) < max {
 					list = append(list, endpointSlices[i].Endpoints[j].Addresses[0])
 				}
 				count++
@@ -5288,9 +5284,6 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 				port := endpointSlices[i].Ports[j]
 				if ports == nil || ports.Has(*port.Name) {
 					for k := range endpointSlices[i].Endpoints {
-						if len(list) == max {
-							more = true
-						}
 						addr := endpointSlices[i].Endpoints[k].Addresses[0]
 						isReady := endpointSlices[i].Endpoints[k].Conditions.Ready == nil || *endpointSlices[i].Endpoints[k].Conditions.Ready
 						if !isReady {
@@ -5301,7 +5294,7 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 							// More info: vendor/k8s.io/api/discovery/v1/types.go
 							continue
 						}
-						if !more {
+						if len(list) < max {
 							hostPort := net.JoinHostPort(addr, strconv.Itoa(int(*port.Port)))
 							list = append(list, hostPort)
 						}
@@ -5312,7 +5305,10 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 		}
 	}
 	ret := strings.Join(list, ",")
-	if more {
+	// Only ready endpoints are listed and counted, so the "more" suffix must be
+	// derived from the ready count rather than from having visited an endpoint
+	// past the display limit, which may have been skipped as not ready.
+	if count > max {
 		return fmt.Sprintf("%s + %d more...", ret, count-max)
 	}
 	return ret
