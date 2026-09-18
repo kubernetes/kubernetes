@@ -321,6 +321,33 @@ func TestExtractResourceValue(t *testing.T) {
 
 			expectedValue: "104857600",
 		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.cpu",
+				Divisor:  resource.MustParse("1n"),
+			},
+			cName:         containerName,
+			pod:           getPod(containerName, resources{cpuRequest: "1m"}),
+			expectedValue: "1000000",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.cpu",
+				Divisor:  resource.MustParse("1u"),
+			},
+			cName:         containerName,
+			pod:           getPod(containerName, resources{cpuRequest: "1m"}),
+			expectedValue: "1000",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.memory",
+				Divisor:  resource.MustParse("0"),
+			},
+			cName:         containerName,
+			pod:           getPod(containerName, resources{memoryRequest: "100Mi"}),
+			expectedValue: "104857600",
+		},
 	}
 	as := assert.New(t)
 	for idx, tc := range cases {

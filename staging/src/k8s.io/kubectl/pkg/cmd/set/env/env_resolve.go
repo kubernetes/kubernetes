@@ -19,8 +19,7 @@ package env
 import (
 	"context"
 	"fmt"
-	"math"
-	"strconv"
+	"math/big"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -216,32 +215,69 @@ func extractContainerResourceValue(fs *corev1.ResourceFieldSelector, container *
 	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
 }
 
+// convertQuantityToString converts a quantity value to the format of divisor and returns
+// the ceiling of the value as a decimal string.
+func convertQuantityToString(q *resource.Quantity, divisor resource.Quantity) (string, error) {
+	if q == nil || q.IsZero() || q.Sign() <= 0 {
+		return "0", nil
+	}
+	if divisor.IsZero() || divisor.Sign() <= 0 {
+		return "0", nil
+	}
+
+	qDec := q.AsDec()
+	divDec := divisor.AsDec()
+
+	qBig := new(big.Int).Set(qDec.UnscaledBig())
+	divBig := new(big.Int).Set(divDec.UnscaledBig())
+
+	qScale := int(qDec.Scale())
+	divScale := int(divDec.Scale())
+
+	sDiff := divScale - qScale
+
+	if sDiff > 0 {
+		exp := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(sDiff)), nil)
+		qBig.Mul(qBig, exp)
+	} else if sDiff < 0 {
+		exp := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-sDiff)), nil)
+		divBig.Mul(divBig, exp)
+	}
+
+	if divBig.Sign() <= 0 {
+		return "0", nil
+	}
+
+	// ceil(N / D) = (N + D - 1) / D
+	tmp := new(big.Int).Add(qBig, divBig)
+	tmp.Sub(tmp, big.NewInt(1))
+	res := new(big.Int).Quo(tmp, divBig)
+
+	return res.String(), nil
+}
+
 // convertResourceCPUToString converts cpu value to the format of divisor and returns
 // ceiling of the value.
 func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantity) (string, error) {
-	c := int64(math.Ceil(float64(cpu.MilliValue()) / float64(divisor.MilliValue())))
-	return strconv.FormatInt(c, 10), nil
+	return convertQuantityToString(cpu, divisor)
 }
 
 // convertResourceMemoryToString converts memory value to the format of divisor and returns
 // ceiling of the value.
 func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Quantity) (string, error) {
-	m := int64(math.Ceil(float64(memory.Value()) / float64(divisor.Value())))
-	return strconv.FormatInt(m, 10), nil
+	return convertQuantityToString(memory, divisor)
 }
 
 // convertResourceHugePagesToString converts hugepages value to the format of divisor and returns
 // ceiling of the value.
 func convertResourceHugePagesToString(hugePages *resource.Quantity, divisor resource.Quantity) (string, error) {
-	m := int64(math.Ceil(float64(hugePages.Value()) / float64(divisor.Value())))
-	return strconv.FormatInt(m, 10), nil
+	return convertQuantityToString(hugePages, divisor)
 }
 
 // convertResourceEphemeralStorageToString converts ephemeral storage value to the format of divisor and returns
 // ceiling of the value.
 func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity, divisor resource.Quantity) (string, error) {
-	m := int64(math.Ceil(float64(ephemeralStorage.Value()) / float64(divisor.Value())))
-	return strconv.FormatInt(m, 10), nil
+	return convertQuantityToString(ephemeralStorage, divisor)
 }
 
 // GetEnvVarRefValue returns the value referenced by the supplied EnvVarSource given the other supplied information.
