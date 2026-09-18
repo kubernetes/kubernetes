@@ -66,6 +66,11 @@ func (in *AnonymousAuthConfig) DeepCopy() *AnonymousAuthConfig {
 func (in *AuthenticationConfiguration) DeepCopyInto(out *AuthenticationConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.UserValidationRules != nil {
+		in, out := &in.UserValidationRules, &out.UserValidationRules
+		*out = make([]UserValidationRule, len(*in))
+		copy(*out, *in)
+	}
 	if in.JWT != nil {
 		in, out := &in.JWT, &out.JWT
 		*out = make([]JWTAuthenticator, len(*in))
