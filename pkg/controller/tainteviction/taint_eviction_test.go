@@ -37,6 +37,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/kubernetes/pkg/controller/tainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
@@ -1001,4 +1003,57 @@ func TestPodDeletionEvent(t *testing.T) {
 			t.Errorf("emitPodDeletionEvent() returned data (-want,+got):\n%s", diff)
 		}
 	})
+}
+
+// podDeletionLatencySum returns the current sum of the pod deletion latency
+// histogram, or 0 if it has not been observed yet.
+func podDeletionLatencySum(t *testing.T) float64 {
+	t.Helper()
+	families, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+	for _, family := range families {
+		if family.GetName() != "taint_eviction_controller_pod_deletion_duration_seconds" {
+			continue
+		}
+		if len(family.GetMetric()) == 0 {
+			break
+		}
+		return family.GetMetric()[0].GetHistogram().GetSampleSum()
+	}
+	return 0
+}
+
+func TestPodDeletionsLatencyObservedInSeconds(t *testing.T) {
+	metrics.Register()
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "default"},
+		Spec:       corev1.PodSpec{NodeName: "node1"},
+	}
+	fakeClientset := fake.NewSimpleClientset(pod)
+
+	before := podDeletionLatencySum(t)
+
+	elapsed := 2 * time.Second
+	handler := deletePodHandler(fakeClientset, nil, "test")
+	args := &WorkArgs{Object: NamespacedObject{
+		NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+	}}
+	if err := handler(context.Background(), time.Now().Add(-elapsed), args); err != nil {
+		t.Fatalf("deletePodHandler failed: %v", err)
+	}
+
+	// The observation must be the elapsed time expressed in seconds. Multiplying a
+	// time.Duration by time.Second instead of calling Seconds() yields nanoseconds
+	// scaled by 1e9, which puts every sample in the +Inf bucket and overflows to a
+	// negative value once the latency exceeds roughly 9.2 seconds.
+	observed := podDeletionLatencySum(t) - before
+	if observed < 0 {
+		t.Errorf("observed latency is negative: %v", observed)
+	}
+	if diff := observed - elapsed.Seconds(); diff < -1 || diff > 1 {
+		t.Errorf("observed latency = %v seconds, want approximately %v", observed, elapsed.Seconds())
+	}
 }
