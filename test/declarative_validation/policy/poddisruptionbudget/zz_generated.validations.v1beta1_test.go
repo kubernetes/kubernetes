@@ -39,6 +39,9 @@ func init() {
 			"metadata.deletionTimestamp": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"metadata.finalizers[*]": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
