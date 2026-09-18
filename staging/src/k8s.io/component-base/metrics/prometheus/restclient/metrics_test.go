@@ -18,12 +18,21 @@ package restclient
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/metrics"
+	cbmetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TestMain ensures the deferred restclient registration callback (installed
@@ -53,7 +62,7 @@ func TestClientGOMetrics(t *testing.T) {
 				metrics.RequestResult.Increment(context.TODO(), "200", "POST", "www.foo.com")
 			},
 			want: `
-			            # HELP rest_client_requests_total [ALPHA] Number of HTTP requests, partitioned by status code, method, and host.
+			            # HELP rest_client_requests_total [BETA] Number of HTTP requests, partitioned by status code, method, and host.
 			            # TYPE rest_client_requests_total counter
 			            rest_client_requests_total{code="200",host="www.foo.com",method="POST"} 1
 				`,
@@ -120,6 +129,70 @@ func TestClientGOMetrics(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestRequestLatencyMetric(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	registry := cbmetrics.NewKubeRegistry()
+	defer registry.Reset()
+	registry.MustRegister(requestLatency)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	cfg := &rest.Config{
+		Host: srv.URL,
+		ContentConfig: rest.ContentConfig{
+			NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+			GroupVersion:         &schema.GroupVersion{Version: "v1"},
+		},
+	}
+
+	client, err := rest.RESTClientFor(cfg)
+	if err != nil {
+		t.Fatalf("RESTClientFor: %v", err)
+	}
+
+	if _, err := client.Get().AbsPath("/api").DoRaw(ctx); err != nil {
+		t.Fatalf("request: %v", err)
+	}
+
+	srvURL, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse srv.URL: %v", err)
+	}
+
+	// The real request above drives metrics.RequestLatency.Observe via the
+	// registered latencyAdapter. Strip timing-dependent histogram fields so the
+	// comparison only verifies _count (bucket/sum depend on real wall-clock latency).
+	want := fmt.Sprintf(`# HELP rest_client_request_duration_seconds [BETA] Request latency in seconds. Broken down by verb, and host.
+# TYPE rest_client_request_duration_seconds histogram
+rest_client_request_duration_seconds_count{host=%q,verb="GET"} 1
+`, srvURL.Host)
+
+	if err := testutil.GatherAndCompare(gatherWithoutDurations(registry), strings.NewReader(want), "rest_client_request_duration_seconds"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// gatherWithoutDurations wraps a gatherer and strips timing-dependent fields
+// (SampleSum and Bucket) from histograms so tests only verify _count.
+func gatherWithoutDurations(registry cbmetrics.KubeRegistry) testutil.GathererFunc {
+	return func() ([]*testutil.MetricFamily, error) {
+		got, err := registry.Gather()
+		for _, mf := range got {
+			for _, m := range mf.Metric {
+				if m.Histogram == nil {
+					continue
+				}
+				m.Histogram.SampleSum = nil
+				m.Histogram.Bucket = nil
+			}
+		}
+		return got, err
 	}
 }
 
