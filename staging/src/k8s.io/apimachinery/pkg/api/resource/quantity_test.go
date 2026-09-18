@@ -400,7 +400,7 @@ func TestQuantityParse(t *testing.T) {
 				t.Errorf("%v: unexpected error: %v", item.input, err)
 				continue
 			}
-			wantValue, wantOK := int64(0), false
+			wantValue, wantOK := got.AsInt64()
 			if asDec {
 				got.AsDec()
 			}
@@ -1733,37 +1733,37 @@ func TestQuantityAsInt64(t *testing.T) {
 		decOK    bool
 	}{
 		// Scale 0
-		{"zero", Quantity{Format: DecimalSI}, 0, true, 0, false},
-		{"small integer", MustParse("5"), 5, true, 0, false},
-		{"negative integer", MustParse("-5"), -5, true, 0, false},
-		{"max int64", MustParse("9223372036854775807"), math.MaxInt64, true, 0, false},
-		{"min int64", MustParse("-9223372036854775808"), math.MinInt64, true, 0, false},
-		{"19 digits with decimal point", MustParse("1234567890.123456789G"), 1234567890123456789, true, 0, false},
-		{"overflows after negation", negatedMostNegative, 0, false, 0, false},
-		{"mantissa past max", dec(twoTo63, 0), 0, false, 0, false},
-		{"mantissa past min", dec(new(big.Int).Neg(new(big.Int).Add(twoTo63, big.NewInt(1))), 0), 0, false, 0, false},
+		{"zero", Quantity{Format: DecimalSI}, 0, true, 0, true},
+		{"small integer", MustParse("5"), 5, true, 5, true},
+		{"negative integer", MustParse("-5"), -5, true, -5, true},
+		{"max int64", MustParse("9223372036854775807"), math.MaxInt64, true, math.MaxInt64, true},
+		{"min int64", MustParse("-9223372036854775808"), math.MinInt64, true, math.MinInt64, true},
+		{"19 digits with decimal point", MustParse("1234567890.123456789G"), 1234567890123456789, true, 1234567890123456789, true},
+		{"overflows after negation", negatedMostNegative, math.MaxInt64, false, math.MaxInt64, false},
+		{"mantissa past max", dec(twoTo63, 0), math.MaxInt64, false, math.MaxInt64, false},
+		{"mantissa past min", dec(new(big.Int).Neg(new(big.Int).Add(twoTo63, big.NewInt(1))), 0), math.MinInt64, false, math.MinInt64, false},
 
 		// Scale > 0
-		{"scaled integer", MustParse("50k"), 50000, true, 0, false},
-		{"negative scaled integer", MustParse("-50k"), -50000, true, 0, false},
-		{"decimal point absorbed by the suffix", MustParse("1.5k"), 1500, true, 0, false},
-		{"negative decimal point absorbed by the suffix", MustParse("-1.5k"), -1500, true, 0, false},
-		{"decimal point absorbed by a large suffix", MustParse("1.5G"), 1500000000, true, 0, false},
-		{"decimal point absorbed by the exponent", MustParse("1.5e3"), 1500, true, 0, false},
-		{"zero at kilo scale", *NewScaledQuantity(0, Kilo), 0, true, 0, false},
-		{"zero at huge scale", *NewScaledQuantity(0, 500), 0, true, 0, false},
-		{"largest scaled value that fits", MustParse("9223372036854775k"), 9223372036854775000, true, 0, false},
-		{"smallest scaled overflow", MustParse("9223372036854776k"), math.MaxInt64, false, 0, false},
-		{"smallest negative scaled overflow", MustParse("-9223372036854776k"), math.MinInt64, false, 0, false},
-		{"overflows positive", MustParse("100E"), math.MaxInt64, false, 0, false},
-		{"overflows negative", MustParse("-100E"), math.MinInt64, false, 0, false},
-		{"overflows by exponent", MustParse("1e30"), math.MaxInt64, false, 0, false},
-		{"overflows negative by exponent", MustParse("-1e30"), math.MinInt64, false, 0, false},
-		{"mantissa past max scaled up", dec(twoTo70, -3), 0, false, 0, false},
-		{"mantissa past min scaled up", dec(new(big.Int).Neg(twoTo70), -3), 0, false, 0, false},
-		{"zero at most negative scale", dec(big.NewInt(0), math.MinInt32), 0, false, 0, false},
-		{"one at most negative scale", dec(big.NewInt(1), math.MinInt32), 0, false, 0, false},
-		{"minus one at most negative scale", dec(big.NewInt(-1), math.MinInt32), 0, false, 0, false},
+		{"scaled integer", MustParse("50k"), 50000, true, 50000, true},
+		{"negative scaled integer", MustParse("-50k"), -50000, true, -50000, true},
+		{"decimal point absorbed by the suffix", MustParse("1.5k"), 1500, true, 1500, true},
+		{"negative decimal point absorbed by the suffix", MustParse("-1.5k"), -1500, true, -1500, true},
+		{"decimal point absorbed by a large suffix", MustParse("1.5G"), 1500000000, true, 1500000000, true},
+		{"decimal point absorbed by the exponent", MustParse("1.5e3"), 1500, true, 1500, true},
+		{"zero at kilo scale", *NewScaledQuantity(0, Kilo), 0, true, 0, true},
+		{"zero at huge scale", *NewScaledQuantity(0, 500), 0, true, 0, true},
+		{"largest scaled value that fits", MustParse("9223372036854775k"), 9223372036854775000, true, 9223372036854775000, true},
+		{"smallest scaled overflow", MustParse("9223372036854776k"), math.MaxInt64, false, math.MaxInt64, false},
+		{"smallest negative scaled overflow", MustParse("-9223372036854776k"), math.MinInt64, false, math.MinInt64, false},
+		{"overflows positive", MustParse("100E"), math.MaxInt64, false, math.MaxInt64, false},
+		{"overflows negative", MustParse("-100E"), math.MinInt64, false, math.MinInt64, false},
+		{"overflows by exponent", MustParse("1e30"), math.MaxInt64, false, math.MaxInt64, false},
+		{"overflows negative by exponent", MustParse("-1e30"), math.MinInt64, false, math.MinInt64, false},
+		{"mantissa past max scaled up", dec(twoTo70, -3), math.MaxInt64, false, math.MaxInt64, false},
+		{"mantissa past min scaled up", dec(new(big.Int).Neg(twoTo70), -3), math.MinInt64, false, math.MinInt64, false},
+		{"zero at most negative scale", dec(big.NewInt(0), math.MinInt32), 0, true, 0, true},
+		{"one at most negative scale", dec(big.NewInt(1), math.MinInt32), math.MaxInt64, false, math.MaxInt64, false},
+		{"minus one at most negative scale", dec(big.NewInt(-1), math.MinInt32), math.MinInt64, false, math.MinInt64, false},
 
 		// Fractional digits
 		{"integral but fractionally scaled", MustParse("1000m"), 0, false, 0, false},
@@ -1782,12 +1782,12 @@ func TestQuantityAsInt64(t *testing.T) {
 		{"20 digits with decimal point", MustParse("1234567890.1234567890G"), 0, false, 0, false},
 
 		// Binary suffix
-		{"binary cap", MustParse("8Ei"), 0, false, 0, false},
-		{"negative binary cap", MustParse("-8Ei"), 0, false, 0, false},
-		{"binary cap past 8Ei", MustParse("9Ei"), 0, false, 0, false},
-		{"binary cap far past 8Ei", MustParse("100Ei"), 0, false, 0, false},
-		{"binary cap from Ti", MustParse("8388608Ti"), 0, false, 0, false},
-		{"binary cap from Ki", MustParse("9223372036854775807Ki"), 0, false, 0, false},
+		{"binary cap", MustParse("8Ei"), math.MaxInt64, true, math.MaxInt64, true},
+		{"negative binary cap", MustParse("-8Ei"), -math.MaxInt64, true, -math.MaxInt64, true},
+		{"binary cap past 8Ei", MustParse("9Ei"), math.MaxInt64, true, math.MaxInt64, true},
+		{"binary cap far past 8Ei", MustParse("100Ei"), math.MaxInt64, true, math.MaxInt64, true},
+		{"binary cap from Ti", MustParse("8388608Ti"), math.MaxInt64, true, math.MaxInt64, true},
+		{"binary cap from Ki", MustParse("9223372036854775807Ki"), math.MaxInt64, true, math.MaxInt64, true},
 		{"binary whole with decimal point", MustParse("1.5Gi"), 0, false, 0, false},
 		{"binary whole with trailing fraction zeros", MustParse("1.5000Gi"), 0, false, 0, false},
 		{"binary fractional", MustParse("1.5555555555555555Gi"), 0, false, 0, false},
@@ -1836,18 +1836,18 @@ func TestQuantityAsInt64Stability(t *testing.T) {
 		decValue int64
 		decOK    bool
 	}{
-		{"50k", MustParse("50k"), 50000, true, 0, false},
-		{"5", MustParse("5"), 5, true, 0, false},
-		{"0", MustParse("0"), 0, true, 0, false},
-		{"1.5k", MustParse("1.5k"), 1500, true, 0, false},
-		{"2Gi", MustParse("2Gi"), 2147483648, true, 0, false},
-		{"8Ei caps at max", MustParse("8Ei"), 0, false, 0, false},
-		{"-8Ei caps at -max", MustParse("-8Ei"), 0, false, 0, false},
-		{"max int64", MustParse("9223372036854775807"), math.MaxInt64, true, 0, false},
-		{"min int64", MustParse("-9223372036854775808"), math.MinInt64, true, 0, false},
-		{"100E saturates", MustParse("100E"), math.MaxInt64, false, 0, false},
-		{"-100E saturates", MustParse("-100E"), math.MinInt64, false, 0, false},
-		{"max int64 + 1 saturates", maxPlusOne, 0, false, 0, false},
+		{"50k", MustParse("50k"), 50000, true, 50000, true},
+		{"5", MustParse("5"), 5, true, 5, true},
+		{"0", MustParse("0"), 0, true, 0, true},
+		{"1.5k", MustParse("1.5k"), 1500, true, 1500, true},
+		{"2Gi", MustParse("2Gi"), 2147483648, true, 2147483648, true},
+		{"8Ei caps at max", MustParse("8Ei"), math.MaxInt64, true, math.MaxInt64, true},
+		{"-8Ei caps at -max", MustParse("-8Ei"), -math.MaxInt64, true, -math.MaxInt64, true},
+		{"max int64", MustParse("9223372036854775807"), math.MaxInt64, true, math.MaxInt64, true},
+		{"min int64", MustParse("-9223372036854775808"), math.MinInt64, true, math.MinInt64, true},
+		{"100E saturates", MustParse("100E"), math.MaxInt64, false, math.MaxInt64, false},
+		{"-100E saturates", MustParse("-100E"), math.MinInt64, false, math.MinInt64, false},
+		{"max int64 + 1 saturates", maxPlusOne, math.MaxInt64, false, math.MaxInt64, false},
 		{"1500m is fractional", MustParse("1500m"), 0, false, 0, false},
 		{"1.5 is fractional", MustParse("1.5"), 0, false, 0, false},
 		{"1000m is whole but stored with fractional digits", MustParse("1000m"), 0, false, 0, false},
@@ -1914,10 +1914,10 @@ func TestQuantityRoundUpAsInt64(t *testing.T) {
 		// nothing to round
 		{"0", -3, 0, true, 0, false},
 		{"5", -3, 5, true, 0, false},
-		{"5", 0, 5, true, 0, false},
+		{"5", 0, 5, true, 5, true},
 		{"-5", -3, -5, true, 0, false},
 		{"50k", -3, 50000, true, 0, false},
-		{"50k", 0, 50000, true, 0, false},
+		{"50k", 0, 50000, true, 50000, true},
 		{"1000m", -3, 0, false, 0, false},
 		{"1.5", -3, 0, false, 0, false},
 		{"9223372036854775807", -3, math.MaxInt64, true, 0, false},
@@ -1925,22 +1925,22 @@ func TestQuantityRoundUpAsInt64(t *testing.T) {
 		{"2Gi", -3, 2147483648, true, 0, false},
 
 		// rounds to a whole number
-		{"5", 3, 1000, true, 0, false},
-		{"50k", 6, 1000000, true, 0, false},
-		{"1000m", 0, 1, true, 0, false},
-		{"1500m", 0, 2, true, 0, false},
-		{"9.01", 0, 10, true, 0, false},
-		{"-9.01", 0, -10, true, 0, false},
-		{"9223372036854775807", 3, math.MaxInt64, false, 0, false},
+		{"5", 3, 1000, true, 1000, true},
+		{"50k", 6, 1000000, true, 1000000, true},
+		{"1000m", 0, 1, true, 1, true},
+		{"1500m", 0, 2, true, 2, true},
+		{"9.01", 0, 10, true, 10, true},
+		{"-9.01", 0, -10, true, -10, true},
+		{"9223372036854775807", 3, math.MaxInt64, false, math.MaxInt64, false},
 
 		// parsed straight to inf.Dec
 		{"1.5Gi", -3, 0, false, 0, false},
-		{"1.5Gi", 0, 0, false, 0, false},
+		{"1.5Gi", 0, 1610612736, true, 1610612736, true},
 		{"1.5555555555555555Gi", -3, 0, false, 0, false},
-		{"1.5555555555555555Gi", 0, 0, false, 0, false},
-		{"9223372036854775808", 0, 0, false, 0, false},
+		{"1.5555555555555555Gi", 0, 1670265060, true, 1670265060, true},
+		{"9223372036854775808", 0, math.MaxInt64, false, math.MaxInt64, false},
 		{"1000000000000000000000m", -3, 0, false, 0, false},
-		{"1000000000000000000000m", 0, 0, false, 0, false},
+		{"1000000000000000000000m", 0, 1000000000000000000, true, 1000000000000000000, true},
 	}
 
 	for _, item := range table {
