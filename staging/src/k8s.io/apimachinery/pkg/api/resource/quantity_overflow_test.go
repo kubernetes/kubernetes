@@ -298,7 +298,7 @@ func quantityAccessorCases() []accessorCase {
 			wantValue:      -10200547328,
 			wantMilli:      -10200547328000,
 			wantScaledKilo: -10200548,
-			wantAsInt64:    0, wantAsInt64OK: false,
+			wantAsInt64:    -10200547328, wantAsInt64OK: true,
 			wantFloat:  -1.0200547328e+10,
 			wantString: "-9728Mi",
 		},
