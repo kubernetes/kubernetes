@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func newTestCache() *cache {
@@ -132,6 +133,7 @@ func TestGetPodNewerThanWhenPodDoesNotExist(t *testing.T) {
 }
 
 func TestCacheSetAndGet(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cache := NewCache()
 	cases := []struct {
 		numContainers int
@@ -146,34 +148,36 @@ func TestCacheSetAndGet(t *testing.T) {
 		cache.Set(podID, status, c.error, time.Time{})
 		// Read back the status and error stored in cache and make sure they
 		// match the original ones.
-		actualStatus, actualErr := cache.Get(podID)
+		actualStatus, actualErr := cache.Get(tCtx, podID)
 		assert.Equal(t, status, actualStatus, "test[%d]", i)
 		assert.Equal(t, c.error, actualErr, "test[%d]", i)
 	}
 }
 
 func TestCacheGetPodDoesNotExist(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cache := NewCache()
 	podID, status := getTestPodIDAndStatus(0)
 	// If the pod does not exist in cache, cache should return an status
 	// object with id filled.
-	actualStatus, actualErr := cache.Get(podID)
+	actualStatus, actualErr := cache.Get(tCtx, podID)
 	assert.Equal(t, status, actualStatus)
 	assert.NoError(t, actualErr)
 }
 
 func TestDelete(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cache := &cache{pods: map[types.UID]*data{}}
 	// Write a new pod status into the cache.
 	podID, status := getTestPodIDAndStatus(3)
 	cache.Set(podID, status, nil, time.Time{})
-	actualStatus, actualErr := cache.Get(podID)
+	actualStatus, actualErr := cache.Get(tCtx, podID)
 	assert.Equal(t, status, actualStatus)
 	assert.NoError(t, actualErr)
 	// Delete the pod from cache, and verify that we get an empty status.
 	cache.Delete(podID)
 	expectedStatus := &PodStatus{ID: podID}
-	actualStatus, actualErr = cache.Get(podID)
+	actualStatus, actualErr = cache.Get(tCtx, podID)
 	assert.Equal(t, expectedStatus, actualStatus)
 	assert.NoError(t, actualErr)
 }
@@ -212,6 +216,7 @@ func TestRegisterNotification(t *testing.T) {
 }
 
 func TestGetNewerThan(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	podID := types.UID("test-pod")
 	status := &PodStatus{ID: podID}
 
@@ -265,7 +270,7 @@ func TestGetNewerThan(t *testing.T) {
 				// First call to GetNewerThan - should block initially.
 				resCh := make(chan *PodStatus, 1)
 				go func() {
-					s, err := c.GetNewerThan(podID, minTime)
+					s, err := c.GetNewerThan(tCtx, podID, minTime)
 					assert.NoError(t, err)
 					resCh <- s
 				}()
@@ -284,7 +289,7 @@ func TestGetNewerThan(t *testing.T) {
 				// Verify a subsequent call returns immediately.
 				resCh2 := make(chan *PodStatus, 1)
 				go func() {
-					s, err := c.GetNewerThan(podID, minTime)
+					s, err := c.GetNewerThan(tCtx, podID, minTime)
 					assert.NoError(t, err)
 					resCh2 <- s
 				}()
