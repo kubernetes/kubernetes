@@ -237,31 +237,39 @@ type ClientConn struct {
 }
 
 func (cc *ClientConn) roundTrip(req *http.Request) (*http.Response, error) {
-	err := func() error {
+	haveReservation, err := func() (bool, error) {
 		cc.mu.Lock()
 		defer cc.mu.Unlock()
 		if cc.doNotReuse {
-			return errClientConnUnusable
+			return false, errClientConnUnusable
 		}
-		cc.roundTrips++
-		if cc.reserved > 0 {
-			// We've already reserved a concurrency slot for this request.
-			cc.reserved--
-		} else if cc.cc.Reserve() != nil {
-			// We don't seem to have an available concurrency slot,
-			// so bump the pending count (requests waiting for a slot).
-			cc.pending++
-		}
+
 		// ClientConn.Shutdown will not shut down the conn while
 		// cc.starting > 0 or cc.cc.InFlight() > 0.
 		//
 		// The starting state covers the gap between us deciding to
 		// start sending the request, and actually sending it.
 		cc.starting++
-		return nil
+
+		cc.roundTrips++
+		if cc.reserved == 0 {
+			// We do not have a concurrency slot reserved for this request.
+			return false, nil
+		}
+		cc.reserved--
+		return true, nil
 	}()
 	if err != nil {
 		return nil, err
+	}
+	// If we have no reservation, try to acquire one.
+	// (This must be done without cc.mu held, since Reserve may call back to the state hook.)
+	if !haveReservation && cc.cc.Reserve() != nil {
+		// We could not acquire a concurrency slot, so bump the pending count
+		// (requests waiting for a slot).
+		cc.mu.Lock()
+		cc.pending++
+		cc.mu.Unlock()
 	}
 	resp, err := cc.cc.RoundTrip(req)
 	cc.mu.Lock()
@@ -293,16 +301,21 @@ func (cc *ClientConn) ping(ctx context.Context) error {
 }
 
 func (cc *ClientConn) reserveNewRequest() bool {
-	cc.mu.Lock()
-	defer cc.mu.Unlock()
-	if cc.doNotReuse {
-		return false
-	}
 	if err := cc.cc.Reserve(); err != nil {
 		return false
 	}
-	cc.reserved++
-	return true
+	reserved := true
+	cc.mu.Lock()
+	if cc.doNotReuse {
+		reserved = false
+	} else {
+		cc.reserved++
+	}
+	cc.mu.Unlock()
+	if !reserved {
+		cc.cc.Release()
+	}
+	return reserved
 }
 
 func (cc *ClientConn) setDoNotReuse() {

@@ -5,7 +5,7 @@
 //
 // This package has no OTel dependencies, allowing it to be imported by any
 // package in the module without creating import cycles.
-package errorhandler // import "go.opentelemetry.io/otel/internal/errorhandler"
+package errorhandler
 
 import (
 	"errors"
