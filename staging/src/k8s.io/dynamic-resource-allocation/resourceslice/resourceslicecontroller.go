@@ -283,7 +283,10 @@ type Options struct {
 
 	// ErrorHandler will get called whenever the controller encounters
 	// a problem while trying to publish ResourceSlices. The controller
-	// will retry once the handler returns. What the handler does with
+	// will retry transient errors once the handler returns. Publishing
+	// of invalid ResourceSlices stops until the slices are replaced.
+	//
+	// What the handler does with
 	// that information is up to the handler. It could log the error,
 	// replace the slices if they cannot be published (see below),
 	// or force the program running the controller to fail by exiting.
@@ -294,6 +297,19 @@ type Options struct {
 	// type:
 	//    var droppedFields *resourceslice.DroppedFieldsError
 	//    if errors.As(err, &droppedFields) { ... do something with droppedFields ... }
+	//
+	// Such truncated ResourceSlices do not get published automatically
+	// again. That such a situation occurred shows that the driver was not
+	// configured correctly or depends on features not supported by the
+	// cluster. The right solution would be to reconfigure or redeploy
+	// the driver. Upgrading a cluster to enable new features should be done
+	// in this order:
+	//
+	//  - apiserver with new feature enabled
+	//  - rest of control plane
+	//  - DRA driver using new feature
+	//
+	// Downgrading must follow the reverse order.
 	//
 	// The default is [utilruntime.HandleErrorWithContext] which just logs
 	// the problem.
@@ -740,7 +756,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	c.mutex.RLock()
 	resources = c.resources
 	c.mutex.RUnlock()
-	if err := validateDriverResources(resources); err != nil {
+	if err := validateDriverResources(c.driverName, resources); err != nil {
 		c.errorHandler(ctx, err, "pool validation failed")
 		// We only report the error through the error handler to prevent
 		// the controller from retrying.

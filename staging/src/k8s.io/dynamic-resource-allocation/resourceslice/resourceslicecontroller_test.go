@@ -1509,6 +1509,32 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedErrors: []string{`pool validation failed: counter "cpu" referenced by device "device" not found in counter set "counterset"`},
 		},
+		"detect-device-attribute-qualified-with-driver-name": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								Devices: []resourceapi.Device{
+									{
+										Name: deviceName,
+										Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+											resourceapi.QualifiedName(driverName + "/foo"): {StringValue: new("bar")},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 0,
+			},
+			expectedErrors: []string{`pool validation failed: pool "pool": device "device": attribute "driver/foo": use unqualified "foo", the driver name is added implicitly`},
+		},
 		"migration-from-random-naming-to-index-based-naming": {
 			nodeUID: nodeUID,
 			initialObjects: []runtime.Object{
