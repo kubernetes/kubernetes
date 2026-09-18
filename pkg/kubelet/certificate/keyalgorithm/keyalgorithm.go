@@ -58,3 +58,18 @@ func KeyGeneratorFunc(algorithm *kubeletconfig.CertificateKeyAlgorithmType) func
 		}
 	}
 }
+
+// IsMLDSA reports whether algorithm is an ML-DSA variant. TLS only defines the
+// ML-DSA signature schemes for TLS 1.3.
+func IsMLDSA(algorithm *kubeletconfig.CertificateKeyAlgorithmType) bool {
+	if algorithm == nil {
+		return false
+	}
+	switch *algorithm {
+	case kubeletconfig.CertificateKeyAlgorithmMLDSA44,
+		kubeletconfig.CertificateKeyAlgorithmMLDSA65,
+		kubeletconfig.CertificateKeyAlgorithmMLDSA87:
+		return true
+	}
+	return false
+}
