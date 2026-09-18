@@ -520,6 +520,31 @@ type WebhookConfiguration struct {
 	//      - If failurePolicy=Deny, then the webhook rejects the request
 	//      - If failurePolicy=NoOpinion, then the error is ignored and the webhook is skipped
 	MatchConditions []WebhookMatchCondition `json:"matchConditions"`
+
+	// conditionsReview defines the configuration for evaluating authorization
+	// conditions via AuthorizationConditionsReview. When set, enables
+	// conditional authorization support for this webhook authorizer.
+	// +optional
+	ConditionsReview *ConditionsReviewConfiguration `json:"conditionsReview,omitempty"`
+}
+
+// ConditionsReviewConfiguration configures the connection to the conditions
+// review endpoint for conditional authorization.
+type ConditionsReviewConfiguration struct {
+	// version is the API version of AuthorizationConditionsReview to use.
+	// Valid values: v1alpha1
+	// Required.
+	Version string `json:"version"`
+
+	// kubeConfigContextName is the name of the context within the webhook's kubeconfig
+	// kubeconfig file to use for conditions review requests.
+	// Can only be specified when connectionInfo.type = KubeConfigFile.
+	// If unset and connectionInfo.type = KubeConfigFile, the default kubeconfig
+	// context is used, which means the API server sends both SubjectAccessReview and
+	// AuthorizationConditionsReview payloads to the same HTTP endpoint, and the
+	// caller must distinguish between these through TypeMeta information.
+	// Optional.
+	KubeConfigContextName string `json:"kubeConfigContextName"`
 }
 
 type WebhookConnectionInfo struct {
