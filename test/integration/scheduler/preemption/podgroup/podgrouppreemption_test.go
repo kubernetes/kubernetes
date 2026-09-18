@@ -1272,7 +1272,7 @@ func TestPodGroupPreemption(t *testing.T) {
 					if !tt.tempRemovePG && tt.preemptorPodsQueuedInCreationOrder {
 						podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
 						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-							_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
+							_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(ctx, p.Name, p.Namespace, p.Spec.SchedulingGroup)
 							if ok {
 								return true, nil
 							}

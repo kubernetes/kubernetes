@@ -290,7 +290,7 @@ func TestAssumeAndReserveWithRevert(t *testing.T) {
 			if tt.pod.Spec.NodeName != "" {
 				t.Errorf("input pod Spec.NodeName mutated = %q, want empty", tt.pod.Spec.NodeName)
 			}
-			if nominated != "" && len(f.fwk.NominatedPodsForNode(nominated)) != 0 {
+			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) != 0 {
 				t.Error("expected the nomination to be dropped once the pod was assumed")
 			}
 
@@ -302,7 +302,7 @@ func TestAssumeAndReserveWithRevert(t *testing.T) {
 			if !plugin.unreserved {
 				t.Error("expected Unreserve to be called on revert")
 			}
-			if nominated != "" && len(f.fwk.NominatedPodsForNode(nominated)) == 0 {
+			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) == 0 {
 				t.Error("expected the nomination to be restored on revert")
 			}
 		})

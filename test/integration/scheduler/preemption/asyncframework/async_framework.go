@@ -412,7 +412,7 @@ func podGatedInQueue(testCtx *testutils.TestContext, t *testing.T, podName strin
 			t.Fatalf("Expected the pod %s (pod group %s) to be gated", podName, podGroupName)
 		}
 	} else {
-		if pInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPod(podName, testCtx.NS.Name, pod.Spec.SchedulingGroup); pInfo == nil || !pInfo.Gated() {
+		if pInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPod(testCtx.Ctx, podName, testCtx.NS.Name, pod.Spec.SchedulingGroup); pInfo == nil || !pInfo.Gated() {
 			t.Fatalf("Expected the pod %s to be gated", podName)
 		}
 	}
