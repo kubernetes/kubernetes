@@ -77,7 +77,7 @@ type staticPolicy struct {
 var _ Policy = &staticPolicy{}
 
 // NewPolicyStatic returns new static policy instance
-func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
+func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store, policyOptions map[string]string) (Policy, error) {
 	var totalSystemReserved uint64
 	for _, node := range reserved {
 		if _, ok := node[v1.ResourceMemory]; !ok {
@@ -97,9 +97,20 @@ func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, r
 		affinity:                     affinity,
 		initContainersReusableMemory: reusableMemory{},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManagerDriftTolerance) && runtime.GOOS == "linux" {
-		p.maxMemoryDrift, _ = memoryDriftFromKernelImage(logger, procIomemPath)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MemoryManagerDriftTolerance) {
+		if len(policyOptions) > 0 {
+			return nil, fmt.Errorf("[memorymanager] policy options %v require the %s feature gate", policyOptions, features.MemoryManagerDriftTolerance)
+		}
+		return p, nil
 	}
+	if runtime.GOOS != "linux" {
+		return p, nil
+	}
+	maxMemoryDrift, err := maxMemoryDriftFromOptions(logger, policyOptions)
+	if err != nil {
+		return nil, err
+	}
+	p.maxMemoryDrift = maxMemoryDrift
 	return p, nil
 }
 

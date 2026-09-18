@@ -19,6 +19,7 @@ package memorymanager
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -155,6 +156,7 @@ func areContainerMemoryAssignmentsEqual(t *testing.T, cma1, cma2 state.Container
 }
 
 type testStaticPolicy struct {
+	policyOptions                   map[string]string
 	description                     string
 	assignments                     state.ContainerMemoryAssignments
 	expectedAssignments             state.ContainerMemoryAssignments
@@ -186,7 +188,7 @@ func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.T
 		manager = topologymanager.NewFakeManagerWithHint(logger, hint)
 	}
 
-	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager)
+	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager, testCase.policyOptions)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1486,6 +1488,87 @@ func TestStaticPolicyStartCrossNUMAMemoryDrift(t *testing.T) {
 	blocks := s.GetMemoryBlocks("pod1", "container1")
 	if len(blocks) != 1 || blocks[0].Size != 7*gb {
 		t.Fatalf("cross-NUMA assignment not preserved after restart: %+v", blocks)
+	}
+}
+
+func TestStaticPolicyNewWithPolicyOptions(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("memory manager policy options are only supported on linux")
+	}
+	systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+	t.Run("options are rejected while the feature gate is disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, false)
+		tc := testStaticPolicy{systemReserved: systemReserved, policyOptions: map[string]string{MemoryDriftTolerance: "off"}}
+		if _, _, err := initTests(t, &tc, nil, nil); err == nil {
+			t.Fatalf("expected an error for policy options without the feature gate")
+		}
+	})
+	t.Run("unknown option is rejected", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+		tc := testStaticPolicy{systemReserved: systemReserved, policyOptions: map[string]string{"no-such-option": "1"}}
+		if _, _, err := initTests(t, &tc, nil, nil); err == nil {
+			t.Fatalf("expected an error for an unknown policy option")
+		}
+	})
+	t.Run("explicit bound is applied", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+		tc := testStaticPolicy{systemReserved: systemReserved, policyOptions: map[string]string{MemoryDriftTolerance: "8Mi"}}
+		p, _, err := initTests(t, &tc, nil, nil)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if got := p.(*staticPolicy).maxMemoryDrift; got != 8*mb {
+			t.Fatalf("maxMemoryDrift = %d, want %d", got, 8*mb)
+		}
+	})
+}
+
+func TestStaticPolicyStartWithMemoryDriftOption(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("memory manager policy options are only supported on linux")
+	}
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, true)
+	driftError := fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+	makeCase := func(description string, option string, drift uint64, expectedError error) testStaticPolicy {
+		return testStaticPolicy{
+			description:   description,
+			policyOptions: map[string]string{MemoryDriftTolerance: option},
+			assignments:   state.ContainerMemoryAssignments{},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {Allocatable: 512 * mb, Free: 512 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+						hugepages1Gi:      {Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb},
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+			},
+			systemReserved: systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{Id: 0, Memory: 2*gb - drift, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+				},
+			},
+			expectedError: expectedError,
+		}
+	}
+	testCases := []testStaticPolicy{
+		makeCase("off rejects any drift", "off", 4*mb, driftError),
+		makeCase("explicit bound tolerates a drift below it", "8Mi", 4*mb, nil),
+		makeCase("explicit bound rejects a drift above it", "8Mi", 12*mb, driftError),
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			p, s, err := initTests(t, &testCase, nil, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if err := p.Start(logger, s); !reflect.DeepEqual(err, testCase.expectedError) {
+				t.Fatalf("Start error = %v, want %v", err, testCase.expectedError)
+			}
+		})
 	}
 }
 
@@ -5302,7 +5385,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 					v1.ResourceMemory: 256 * mb,
 				},
 			}
-			policy, err := NewPolicyStatic(logger, machineInfo, systemReserved, topologymanager.NewFakeManagerWithScope(tc.scope))
+			policy, err := NewPolicyStatic(logger, machineInfo, systemReserved, topologymanager.NewFakeManagerWithScope(tc.scope), nil)
 			if err != nil {
 				t.Fatalf("NewPolicyStatic() failed: %v", err)
 			}
@@ -6103,7 +6186,7 @@ func TestStaticPolicyLifecycleAllocate(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), nil)
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)
@@ -6182,7 +6265,7 @@ func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), nil)
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)
@@ -6261,7 +6344,7 @@ func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), nil)
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)
@@ -6343,7 +6426,7 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), nil)
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)

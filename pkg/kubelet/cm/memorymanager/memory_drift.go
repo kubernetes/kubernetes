@@ -33,7 +33,7 @@ const procIomemPath = "/proc/iomem"
 func memoryDriftFromKernelImage(logger klog.Logger, iomemPath string) (uint64, bool) {
 	f, err := os.Open(iomemPath)
 	if err != nil {
-		logger.Info("Could not read the kernel image size, memory drift tolerance stays off", "path", iomemPath, "err", err)
+		logger.Info("Could not read the kernel image size, memory drift tolerance stays off; set the memory-drift-tolerance policy option to enable it", "path", iomemPath, "err", err)
 		return 0, false
 	}
 	defer func() {
@@ -42,7 +42,7 @@ func memoryDriftFromKernelImage(logger klog.Logger, iomemPath string) (uint64, b
 
 	size, ok := parseKernelImageSize(f)
 	if !ok {
-		logger.Info("Could not determine the kernel image size, memory drift tolerance stays off", "path", iomemPath)
+		logger.Info("Could not determine the kernel image size, memory drift tolerance stays off; set the memory-drift-tolerance policy option to enable it", "path", iomemPath)
 		return 0, false
 	}
 	drift := size + memoryDriftGraceBytes

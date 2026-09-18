@@ -49,7 +49,7 @@ type bestEffortPolicy struct {
 var _ Policy = &bestEffortPolicy{}
 
 func NewPolicyBestEffort(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.AuthoritativeStore) (Policy, error) {
-	p, err := NewPolicyStatic(logger, machineInfo, reserved, affinity)
+	p, err := NewPolicyStatic(logger, machineInfo, reserved, affinity, nil)
 
 	if err != nil {
 		return nil, err

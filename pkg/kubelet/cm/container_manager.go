@@ -192,6 +192,7 @@ type NodeConfig struct {
 	TopologyManagerScope         string
 	CPUManagerReconcilePeriod    time.Duration
 	MemoryManagerPolicy          string
+	MemoryManagerPolicyOptions   map[string]string
 	MemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
 	MemoryReservationPolicy      kubeletconfig.MemoryReservationPolicy
 	MemoryThrottlingFactor       *float64
