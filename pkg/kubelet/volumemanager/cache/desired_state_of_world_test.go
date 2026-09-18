@@ -1608,7 +1608,7 @@ func verifyDesiredSizeLimitInVolumeDsw(
 		}
 		for _, v := range volumesToMount {
 			if v.VolumeSpec.Name() == volumeName && v.PodName == expectedPodName {
-				if v.DesiredSizeLimit == nil || v.DesiredSizeLimit.Value() != expectedDesiredSize.Value() {
+				if v.DesiredSizeLimit == nil || v.DesiredSizeLimit.Cmp(*expectedDesiredSize) != 0 {
 					t.Fatalf(
 						"Found volume %v in the list of VolumesToMount, but DesiredSizeLimit incorrect. Expected: <%v> Actual: <%v>",
 						volumeName,
