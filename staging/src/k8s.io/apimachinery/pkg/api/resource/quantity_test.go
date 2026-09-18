@@ -655,6 +655,14 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 		{intQuantity(mostNegative, -18, DecimalSI), intQuantity(-1, 0, DecimalSI), -1},
 		{intQuantity(mostNegative, -19, DecimalSI), intQuantity(-1, 0, DecimalSI), 1},
 
+		// TODO(#141166): 1e-2147483648 is below 1, so this must be -1.
+		{intQuantity(1, math.MinInt32, DecimalSI), intQuantity(1, 0, DecimalSI), 1},
+		// TODO(#141166): -1e-2147483648 is above -1, so this must be 1.
+		{intQuantity(-1, math.MinInt32, DecimalSI), intQuantity(-1, 0, DecimalSI), -1},
+		// TODO(#141166): 1e-2147483648 is below 1e-2147483630, so this must be -1.
+		{intQuantity(1, math.MinInt32, DecimalSI), intQuantity(1, math.MinInt32+18, DecimalSI), 1},
+		{intQuantity(1, math.MinInt32+1, DecimalSI), intQuantity(1, 0, DecimalSI), -1},
+
 		{intQuantity(1*1000000*1000000*1000000, -17, DecimalSI), intQuantity(1, 1, DecimalSI), 0},
 		{intQuantity(1*1000000*1000000*1000000, -17, DecimalSI), intQuantity(-10, 0, DecimalSI), 1},
 		{intQuantity(-1*1000000*1000000*1000000, -17, DecimalSI), intQuantity(-10, 0, DecimalSI), 0},
@@ -704,6 +712,34 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 		}
 		if cmp := b.Cmp(a); cmp != -item.cmp {
 			t.Errorf("%#v: unexpected inverted Cmp: %d", item, cmp)
+		}
+	}
+}
+
+func TestQuantityCmpInt64(t *testing.T) {
+	table := []struct {
+		a   Quantity
+		b   int64
+		cmp int
+	}{
+		{intQuantity(901, -2, DecimalSI), 9, 1},
+		{intQuantity(901, -2, DecimalSI), 10, -1},
+		{intQuantity(1000, -3, DecimalSI), 1, 0},
+		{intQuantity(mostPositive, 0, DecimalSI), mostPositive, 0},
+		{intQuantity(mostNegative, 0, DecimalSI), mostNegative, 0},
+		{decQuantity(901, -2, DecimalSI), 9, 1},
+		{decQuantity(901, -2, DecimalSI), 10, -1},
+
+		// TODO(#141166): 1e-2147483648 is below 1, so this must be -1.
+		{intQuantity(1, math.MinInt32, DecimalSI), 1, 1},
+		// TODO(#141166): -1e-2147483648 is above -1, so this must be 1.
+		{intQuantity(-1, math.MinInt32, DecimalSI), -1, -1},
+		{intQuantity(1, math.MinInt32+1, DecimalSI), 1, -1},
+	}
+
+	for _, item := range table {
+		if cmp := item.a.CmpInt64(item.b); cmp != item.cmp {
+			t.Errorf("%#v: unexpected CmpInt64(%d): %d", item, item.b, cmp)
 		}
 	}
 }
@@ -903,6 +939,17 @@ func TestQuantityStringBelowNano(t *testing.T) {
 	}{
 		{decQuantity(1, -12, DecimalSI), "1e-12"},
 		{decQuantity(1, -10, DecimalSI), "100e-12"},
+		{intQuantity(1, math.MinInt32+2, BinarySI), "1e-2147483646"},
+		{intQuantity(1024, math.MinInt32+2, BinarySI), "1024e-2147483646"},
+		{intQuantity(math.MaxInt64, math.MinInt32+2, BinarySI), "9223372036854775807e-2147483646"},
+		// TODO(#141166): Must print the exact value, 1024e-2147483647.
+		{intQuantity(1024, math.MinInt32+1, BinarySI), "102400e2147483647"},
+		// TODO(#141166): Must print the exact value, 1e-2147483648.
+		{intQuantity(1, math.MinInt32, BinarySI), "1"},
+		// TODO(#141166): Must print the exact value, 1024e-2147483648.
+		{intQuantity(1024, math.MinInt32, BinarySI), "1Ki"},
+		// TODO(#141166): Must print the exact value, 9223372036854775807e-2147483648.
+		{intQuantity(math.MaxInt64, math.MinInt32, BinarySI), "9223372036854775807"},
 	}
 	for _, item := range table {
 		if e, a := item.expect, item.in.String(); e != a {

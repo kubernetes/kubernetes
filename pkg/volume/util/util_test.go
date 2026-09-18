@@ -144,6 +144,20 @@ func TestCalculateTimeoutForVolume(t *testing.T) {
 	if timeout != 4500 {
 		t.Errorf("Expected 4500 for timeout but got %v", timeout)
 	}
+
+	// TODO(#141166): The timeout must be at most math.MaxInt32.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("100E")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 257698037730 {
+		t.Errorf("Expected 257698037730 for timeout but got %v", timeout)
+	}
+
+	// TODO(#141166): The timeout must be at most math.MaxInt32.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("18446744073709551616")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 257698037730 {
+		t.Errorf("Expected 257698037730 for timeout but got %v", timeout)
+	}
 }
 
 func TestFsUserFrom(t *testing.T) {

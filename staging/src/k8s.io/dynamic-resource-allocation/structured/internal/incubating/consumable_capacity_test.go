@@ -48,6 +48,18 @@ var (
 	pointThree   = resource.MustParse("300m")
 	pointTwo     = resource.MustParse("200m")
 	pointOne     = resource.MustParse("100m")
+	pointFive    = resource.MustParse("500m")
+
+	onePlusMilli    = resource.MustParse("1.001")
+	onePlusSubMilli = resource.MustParse("1.0000001")
+
+	five          = resource.MustParse("5")
+	ten           = resource.MustParse("10")
+	fifteen       = resource.MustParse("15")
+	negativeOne   = resource.MustParse("-1")
+	oneGi         = resource.MustParse("1Gi")
+	threeGi       = resource.MustParse("3Gi")
+	negativeOneGi = resource.MustParse("-1Gi")
 
 	// tooBigForMilli is a value whose MilliValue() overflows int64 (> MaxInt64/1000).
 	// resource.MustParse uses DecimalSI by default for large integers.
@@ -352,6 +364,7 @@ func testCalculateConsumedCapacity(t *testing.T) {
 		fractionalCapacityRange bool
 		expectResult            resource.Quantity
 		expectErr               bool
+		expectErrMessage        string
 	}{
 		"empty": {requestedVal: nil, capacityValue: one, requestPolicy: &resourceapi.CapacityRequestPolicy{}, expectResult: one},
 		// A request above MaxInt64 cannot be read with Value() without wrapping, so
@@ -445,6 +458,87 @@ func testCalculateConsumedCapacity(t *testing.T) {
 			fractionalCapacityRange: true,
 			expectResult:            resource.MustParse("400m"),
 		},
+		// TODO(#141166): An in-range sub-milli request must round up to the next step, here 2, instead of failing.
+		"integer-step-sub-milli-request": {
+			requestedVal:            &onePlusSubMilli,
+			capacityValue:           three,
+			requestPolicy:           &resourceapi.CapacityRequestPolicy{Default: &one, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one, Step: &one}},
+			fractionalCapacityRange: true,
+			expectErr:               true,
+		},
+		"integer-step-milli-request-rounds-up": {
+			requestedVal:            &onePlusMilli,
+			capacityValue:           three,
+			requestPolicy:           &resourceapi.CapacityRequestPolicy{Default: &one, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one, Step: &one}},
+			fractionalCapacityRange: true,
+			expectResult:            two,
+		},
+		"integer-step-sub-milli-request-rounds-up-without-fractional-range": {
+			requestedVal:  &onePlusSubMilli,
+			capacityValue: three,
+			requestPolicy: &resourceapi.CapacityRequestPolicy{Default: &one, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one, Step: &one}},
+			expectResult:  two,
+		},
+		// TODO(#141166): An in-range sub-milli request must round up to the next step, here 1.5, instead of failing.
+		"fractional-step-sub-milli-request": {
+			requestedVal:            &onePlusSubMilli,
+			capacityValue:           two,
+			requestPolicy:           &resourceapi.CapacityRequestPolicy{Default: &pointFive, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &pointFive, Step: &pointFive}},
+			fractionalCapacityRange: true,
+			expectErr:               true,
+		},
+		"fractional-step-milli-request-rounds-up": {
+			requestedVal:            &onePlusMilli,
+			capacityValue:           two,
+			requestPolicy:           &resourceapi.CapacityRequestPolicy{Default: &pointFive, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &pointFive, Step: &pointFive}},
+			fractionalCapacityRange: true,
+			expectResult:            resource.MustParse("1500m"),
+		},
+		// TODO(#141166): A non-positive step must fail with a message about the step, not the MaxInt64 overflow message.
+		"negative-step-request-above-min-is-rejected": {
+			requestedVal:     &fifteen,
+			capacityValue:    fifteen,
+			requestPolicy:    &resourceapi.CapacityRequestPolicy{Default: &ten, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &ten, Step: &negativeOne}},
+			expectErr:        true,
+			expectErrMessage: "rounding request 15 up to the next step passes MaxInt64",
+		},
+		// TODO(#141166): A non-positive step must fail with a message about the step, not the MaxInt64 overflow message.
+		"negative-step-request-above-min-is-rejected-with-fractional-range": {
+			requestedVal:            &fifteen,
+			capacityValue:           fifteen,
+			requestPolicy:           &resourceapi.CapacityRequestPolicy{Default: &ten, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &ten, Step: &negativeOne}},
+			fractionalCapacityRange: true,
+			expectErr:               true,
+			expectErrMessage:        "rounding request 15 up to the next step passes MaxInt64",
+		},
+		// TODO(#141166): A non-positive step must fail with a message about the step, not the MaxInt64 overflow message.
+		"negative-step-request-equal-to-min-is-rejected": {
+			requestedVal:     &ten,
+			capacityValue:    fifteen,
+			requestPolicy:    &resourceapi.CapacityRequestPolicy{Default: &ten, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &ten, Step: &negativeOne}},
+			expectErr:        true,
+			expectErrMessage: "rounding request 10 up to the next step passes MaxInt64",
+		},
+		"negative-step-request-below-min-returns-min": {
+			requestedVal:  &five,
+			capacityValue: fifteen,
+			requestPolicy: &resourceapi.CapacityRequestPolicy{Default: &ten, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &ten, Step: &negativeOne}},
+			expectResult:  ten,
+		},
+		// TODO(#141166): A non-positive step must fail with a message about the step, not the MaxInt64 overflow message.
+		"negative-binary-step-request-above-min-is-rejected": {
+			requestedVal:     &threeGi,
+			capacityValue:    threeGi,
+			requestPolicy:    &resourceapi.CapacityRequestPolicy{Default: &oneGi, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &oneGi, Step: &negativeOneGi}},
+			expectErr:        true,
+			expectErrMessage: "rounding request 3Gi up to the next step passes MaxInt64",
+		},
+		"positive-binary-step-request-above-min-rounds-to-itself": {
+			requestedVal:  &threeGi,
+			capacityValue: threeGi,
+			requestPolicy: &resourceapi.CapacityRequestPolicy{Default: &oneGi, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &oneGi, Step: &oneGi}},
+			expectResult:  threeGi,
+		},
 		"valid value in set": {
 			requestedVal:  &two,
 			capacityValue: three,
@@ -512,6 +606,9 @@ func testCalculateConsumedCapacity(t *testing.T) {
 			consumedCapacity, err := calculateConsumedCapacity(tc.requestedVal, capacity, tc.fractionalCapacityRange)
 			if tc.expectErr {
 				g.Expect(err).To(MatchError(errCapacityRequestNotRepresentable))
+				if tc.expectErrMessage != "" {
+					g.Expect(err).To(MatchError(ContainSubstring(tc.expectErrMessage)))
+				}
 			} else {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(consumedCapacity.Cmp(tc.expectResult)).To(BeZero())

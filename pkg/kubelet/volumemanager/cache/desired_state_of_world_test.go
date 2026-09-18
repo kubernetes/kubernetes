@@ -18,6 +18,7 @@ package cache
 
 import (
 	"maps"
+	"math"
 	"slices"
 	"testing"
 
@@ -547,6 +548,7 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 	quantity1Gi := resource.MustParse("1Gi")
 	quantity2Gi := resource.MustParse("2Gi")
 	quantity3Gi := resource.MustParse("3Gi")
+	quantity100E := resource.MustParse("100E")
 
 	pod1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -658,6 +660,36 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 		"emptyDir7": &quantity3Gi,
 		"emptyDir8": resource.NewQuantity(0, resource.BinarySI),
 	}
+	pod3 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod3",
+			UID:  "pod3uid",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: quantity100E,
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "emptyDir9",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+	pod3Name := util.GetUniquePodName(pod3)
+	pod3DesiredSizeLimitMap := map[string]*resource.Quantity{
+		// TODO(#141166): A limit past int64 means no tmpfs size limit. Expect a zero size limit.
+		"emptyDir9": resource.NewQuantity(math.MaxInt64, resource.BinarySI),
+	}
 	for i := range pod1.Spec.Volumes {
 		volumeSpec := &volume.Spec{Volume: &pod1.Spec.Volumes[i]}
 		_, err := dsw.AddPodToVolume(logger, pod1Name, pod1, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxContainerContexts */)
@@ -672,8 +704,16 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 			t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 		}
 	}
+	for i := range pod3.Spec.Volumes {
+		volumeSpec := &volume.Spec{Volume: &pod3.Spec.Volumes[i]}
+		_, err := dsw.AddPodToVolume(logger, pod3Name, pod3, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxContainerContexts */)
+		if err != nil {
+			t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+		}
+	}
 	verifyDesiredSizeLimitInVolumeDsw(t, pod1Name, pod1DesiredSizeLimitMap, dsw)
 	verifyDesiredSizeLimitInVolumeDsw(t, pod2Name, pod2DesiredSizeLimitMap, dsw)
+	verifyDesiredSizeLimitInVolumeDsw(t, pod3Name, pod3DesiredSizeLimitMap, dsw)
 }
 
 // Calls AddPodToVolume() in an empty DSW with various SELinux settings / access modes.

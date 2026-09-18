@@ -143,6 +143,27 @@ func TestCalculateCPUMaximum(t *testing.T) {
 			cpuCount: 100,
 			want:     1,
 		},
+		{
+			// TODO(#141166): A limit past int64 must clamp to 10000.
+			name:     "limit past int64",
+			cpuLimit: resource.MustParse("100E"),
+			cpuCount: 4,
+			want:     1,
+		},
+		{
+			// TODO(#141166): A limit past int64 must clamp to 10000.
+			name:     "limit of MaxInt64 plus one milli",
+			cpuLimit: resource.MustParse("9223372036854775808m"),
+			cpuCount: 4,
+			want:     1,
+		},
+		{
+			// TODO(#141166): A limit past int64 must clamp to 10000.
+			name:     "limit of 2^64 plus 4000 milli",
+			cpuLimit: resource.MustParse("18446744073709555616m"),
+			cpuCount: 4,
+			want:     1,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

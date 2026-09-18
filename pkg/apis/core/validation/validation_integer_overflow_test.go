@@ -47,6 +47,9 @@ func TestValidateResourceQuantityValueIntegerOverflow(t *testing.T) {
 		// still fractions, still rejected
 		{"huge-fractional-past-the-int64-range", "18446744073709551616500m", true}, // 2^64 + 0.5
 		{"fractional-past-the-milli-range", "1000000000000000500m", true},          // 10^15 + 0.5
+		{"fractional-two-to-64-milli", "18446744073709551616m", true},
+		{"fractional-two-to-65-milli", "36893488147419103232m", true},
+		{"fractional-two-to-64-plus-1000-milli", "18446744073709552616m", true},
 		// the milli projection rounds these onto a whole number, so they pass
 		{"within-one-milli-below-an-integer", "1.9999", false},
 		{"within-one-milli-below-one", "0.9999", false},
