@@ -17,7 +17,9 @@ limitations under the License.
 package topologymanager
 
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
@@ -168,16 +170,75 @@ type HintMerger struct {
 	CompareNUMAAffinityMasks      func(candidate *TopologyHint, current *TopologyHint) (best *TopologyHint)
 }
 
+// compareHintScores returns the hint preferred by the given NUMA allocation
+// strategy, or nil if the strategy expresses no preference between the two
+// hints. Callers are expected to fall back to the structural comparison in
+// that case.
+func compareHintScores(strategy string, current, candidate *TopologyHint) *TopologyHint {
+	// A Score of 0 means unscored: no provider reported a utilization signal
+	// for the hint. Scored hints sit in [1,100], so reading 0 as a value would
+	// rate an unscored hint as a completely empty NUMA node and hand it every
+	// least-allocated comparison. Leave those to the structural comparison.
+	if current.Score == 0 || candidate.Score == 0 {
+		return nil
+	}
+
+	if current.Score == candidate.Score {
+		return nil
+	}
+
+	switch strategy {
+	case NUMAAllocationStrategyMostAllocated:
+		// Packing: the NUMA nodes which are already the busiest score the
+		// highest, so the higher score wins.
+		if candidate.Score > current.Score {
+			return candidate
+		}
+		return current
+	case NUMAAllocationStrategyLeastAllocated:
+		// Spreading: the NUMA nodes which are the emptiest score the lowest,
+		// so the lower score wins.
+		if candidate.Score < current.Score {
+			return candidate
+		}
+		return current
+	}
+
+	return nil
+}
+
 func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string, opts PolicyOptions) HintMerger {
+	preferClosest := (policyName != PolicySingleNumaNode) && opts.PreferClosestNUMA
+
+	// The allocation strategy is an alpha-level policy option. NewPolicyOptions
+	// already refuses it while the alpha options are disabled; check the gate
+	// here as well so PolicyOptions values built by other means cannot turn the
+	// feature on behind the gate's back.
+	allocationStrategy := NUMAAllocationStrategyNone
+	if opts.NUMAAllocationStrategy != "" && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManagerPolicyAlphaOptions) {
+		allocationStrategy = opts.NUMAAllocationStrategy
+	}
+
 	compareNumaAffinityMasks := func(current, candidate *TopologyHint) *TopologyHint {
 		// If current and candidate bitmasks are the same, prefer current hint.
 		if candidate.NUMANodeAffinity.IsEqual(current.NUMANodeAffinity) {
 			return current
 		}
 
+		// The structural comparison below comes first: the allocation strategy
+		// only gets to decide between masks which Narrowest, respectively
+		// Closest, considers equally good and would otherwise separate with an
+		// arbitrary fallback.
+		if allocationStrategy != NUMAAllocationStrategyNone &&
+			numaInfo.equallyFit(current.NUMANodeAffinity, candidate.NUMANodeAffinity, preferClosest) {
+			if best := compareHintScores(allocationStrategy, current, candidate); best != nil {
+				return best
+			}
+		}
+
 		// Otherwise compare the hints, based on the policy options provided
 		var best bitmask.BitMask
-		if (policyName != PolicySingleNumaNode) && opts.PreferClosestNUMA {
+		if preferClosest {
 			best = numaInfo.Closest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)
 		} else {
 			best = numaInfo.Narrowest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)

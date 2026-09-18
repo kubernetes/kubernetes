@@ -21,6 +21,9 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -1732,5 +1735,388 @@ func TestCompareWinnerUnchangedByScore(t *testing.T) {
 	result := merger.compare(narrower, wider)
 	if !result.NUMANodeAffinity.IsEqual(narrower.NUMANodeAffinity) {
 		t.Errorf("expected narrower hint to win regardless of score, got %v", result.NUMANodeAffinity)
+	}
+}
+
+func TestCompareNUMAAffinityMasksWithAllocationStrategy(t *testing.T) {
+	numaInfo := commonNUMAInfoTwoNodes()
+
+	// Both masks are a single node, so the structural comparison rates them
+	// equally and the allocation strategy decides. Narrowest resolves such a
+	// tie in favour of the mask with the lower-numbered bits set, which is
+	// what the strategy has to override to be observable here.
+	current := &TopologyHint{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 20}
+	candidate := &TopologyHint{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 80}
+
+	tcases := []struct {
+		description string
+		strategy    string
+		gateEnabled bool
+		expected    string
+	}{
+		{
+			description: "most-allocated packs onto the higher scoring hint",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			gateEnabled: true,
+			expected:    "candidate",
+		},
+		{
+			description: "the allocation strategy is ignored while the alpha options are disabled",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			gateEnabled: false,
+			expected:    "current",
+		},
+		{
+			description: "the none strategy leaves the structural comparison alone",
+			strategy:    NUMAAllocationStrategyNone,
+			gateEnabled: true,
+			expected:    "current",
+		},
+		{
+			description: "an unset strategy leaves the structural comparison alone",
+			gateEnabled: true,
+			expected:    "current",
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.TopologyManagerPolicyAlphaOptions, tc.gateEnabled)
+
+			opts := PolicyOptions{NUMAAllocationStrategy: tc.strategy}
+			merger := NewHintMerger(numaInfo, [][]TopologyHint{}, PolicySingleNumaNode, opts)
+
+			result := merger.CompareNUMAAffinityMasks(current, candidate)
+			if tc.expected == "current" && result != current {
+				t.Errorf("Expected result to be %v, got %v", current, result)
+			}
+			if tc.expected == "candidate" && result != candidate {
+				t.Errorf("Expected result to be %v, got %v", candidate, result)
+			}
+		})
+	}
+}
+
+func TestCompareHintScores(t *testing.T) {
+	tcases := []struct {
+		description string
+		strategy    string
+		current     int64
+		candidate   int64
+		expected    string
+	}{
+		{
+			description: "most-allocated prefers the higher score",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			current:     40,
+			candidate:   80,
+			expected:    "candidate",
+		},
+		{
+			description: "most-allocated keeps the higher scoring incumbent",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			current:     80,
+			candidate:   40,
+			expected:    "current",
+		},
+		{
+			description: "least-allocated prefers the lower score",
+			strategy:    NUMAAllocationStrategyLeastAllocated,
+			current:     80,
+			candidate:   40,
+			expected:    "candidate",
+		},
+		{
+			description: "least-allocated keeps the lower scoring incumbent",
+			strategy:    NUMAAllocationStrategyLeastAllocated,
+			current:     40,
+			candidate:   80,
+			expected:    "current",
+		},
+		{
+			description: "equal scores express no preference",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			current:     50,
+			candidate:   50,
+			expected:    "none",
+		},
+		{
+			description: "an unscored candidate expresses no preference",
+			strategy:    NUMAAllocationStrategyLeastAllocated,
+			current:     50,
+			candidate:   0,
+			expected:    "none",
+		},
+		{
+			description: "an unscored current expresses no preference",
+			strategy:    NUMAAllocationStrategyLeastAllocated,
+			current:     0,
+			candidate:   50,
+			expected:    "none",
+		},
+		{
+			description: "the none strategy expresses no preference",
+			strategy:    NUMAAllocationStrategyNone,
+			current:     40,
+			candidate:   80,
+			expected:    "none",
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.description, func(t *testing.T) {
+			current := &TopologyHint{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: tc.current}
+			candidate := &TopologyHint{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: tc.candidate}
+
+			result := compareHintScores(tc.strategy, current, candidate)
+			switch tc.expected {
+			case "current":
+				if result != current {
+					t.Errorf("Expected result to be %v, got %v", current, result)
+				}
+			case "candidate":
+				if result != candidate {
+					t.Errorf("Expected result to be %v, got %v", candidate, result)
+				}
+			case "none":
+				if result != nil {
+					t.Errorf("Expected no preference, got %v", result)
+				}
+			}
+		})
+	}
+}
+
+func TestCompareNUMAAffinityMasksStrategyDoesNotBeatStructure(t *testing.T) {
+	numaInfo := commonNUMAInfoTwoNodes()
+
+	// The wider mask scores higher, but most-allocated must not widen the
+	// affinity: the structural comparison keeps the last word.
+	current := &TopologyHint{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 20}
+	candidate := &TopologyHint{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true, Score: 90}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.TopologyManagerPolicyAlphaOptions, true)
+
+	opts := PolicyOptions{NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated}
+	merger := NewHintMerger(numaInfo, [][]TopologyHint{}, PolicyBestEffort, opts)
+
+	if result := merger.CompareNUMAAffinityMasks(current, candidate); result != current {
+		t.Errorf("Expected the narrowest hint %v to win, got %v", current, result)
+	}
+}
+
+// TestHintMergerWithAllocationStrategy exercises the allocation strategy
+// through a whole merge rather than through CompareNUMAAffinityMasks directly,
+// so that what drives the selection is the aggregated score of a permutation
+// rather than the score of an individual provider hint.
+//
+// Each fixture below deliberately makes the strategy pull against the
+// structural tiebreak. Both Narrowest and Closest resolve equally wide,
+// equally distant masks in favour of the one with the lower-numbered bits set,
+// so a case whose expected winner is also the lower-numbered mask would come
+// out the same with and without the strategy applied and would prove nothing.
+func TestHintMergerWithAllocationStrategy(t *testing.T) {
+	tcases := []struct {
+		description string
+		// numaInfo defaults to commonNUMAInfoTwoNodes, policyName to
+		// PolicySingleNumaNode.
+		numaInfo         *NUMAInfo
+		policyName       string
+		preferClosest    bool
+		strategy         string
+		gateEnabled      bool
+		hints            [][]TopologyHint
+		expectedAffinity bitmask.BitMask
+	}{
+		{
+			description: "most-allocated packs onto the higher scoring node",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			gateEnabled: true,
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 20},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 80},
+				},
+			},
+			expectedAffinity: NewTestBitMask(1),
+		},
+		{
+			description: "least-allocated spreads onto the lower scoring node",
+			strategy:    NUMAAllocationStrategyLeastAllocated,
+			gateEnabled: true,
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 80},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 20},
+				},
+			},
+			expectedAffinity: NewTestBitMask(1),
+		},
+		{
+			description: "the aggregated score of the permutation decides, not a single provider's",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			gateEnabled: true,
+			// The first provider rates node0 above node1, but the average over
+			// both providers rates node1 higher, and that is what has to win.
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 50},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 90},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 10},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 70},
+				},
+			},
+			expectedAffinity: NewTestBitMask(1),
+		},
+		{
+			description: "equal scores leave the structural tiebreak in charge",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			gateEnabled: true,
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 50},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 50},
+				},
+			},
+			expectedAffinity: NewTestBitMask(0),
+		},
+		{
+			description: "an unscored hint does not win least-allocated by default",
+			strategy:    NUMAAllocationStrategyLeastAllocated,
+			gateEnabled: true,
+			// Score 0 means unscored, not empty. Were it read as a value, node1
+			// would look like the emptiest node and take every least-allocated
+			// comparison.
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 50},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 0},
+				},
+			},
+			expectedAffinity: NewTestBitMask(0),
+		},
+		{
+			description: "the strategy never widens the affinity mask",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			gateEnabled: true,
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 20},
+					{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true, Score: 90},
+				},
+			},
+			expectedAffinity: NewTestBitMask(0),
+		},
+		{
+			description: "a preferred hint beats a higher scoring non-preferred one",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			gateEnabled: true,
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 20},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: false, Score: 90},
+				},
+			},
+			expectedAffinity: NewTestBitMask(0),
+		},
+		{
+			description: "the strategy is inert while the alpha options are disabled",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			gateEnabled: false,
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 20},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 80},
+				},
+			},
+			expectedAffinity: NewTestBitMask(0),
+		},
+		{
+			description: "the none strategy is inert",
+			strategy:    NUMAAllocationStrategyNone,
+			gateEnabled: true,
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 20},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 80},
+				},
+			},
+			expectedAffinity: NewTestBitMask(0),
+		},
+		{
+			description: "an unset strategy is inert",
+			gateEnabled: true,
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 20},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 80},
+				},
+			},
+			expectedAffinity: NewTestBitMask(0),
+		},
+		{
+			description:   "most-allocated decides between equally distant masks under prefer-closest",
+			numaInfo:      commonNUMAInfoFourNodes(),
+			policyName:    PolicyBestEffort,
+			preferClosest: true,
+			strategy:      NUMAAllocationStrategyMostAllocated,
+			gateEnabled:   true,
+			// Both masks pair two nodes at distance 11, so Closest rates them
+			// equally and falls back to the lower-numbered mask.
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true, Score: 20},
+					{NUMANodeAffinity: NewTestBitMask(2, 3), Preferred: true, Score: 80},
+				},
+			},
+			expectedAffinity: NewTestBitMask(2, 3),
+		},
+		{
+			description:   "prefer-closest keeps the last word over the strategy",
+			numaInfo:      commonNUMAInfoFourNodes(),
+			policyName:    PolicyBestEffort,
+			preferClosest: true,
+			strategy:      NUMAAllocationStrategyMostAllocated,
+			gateEnabled:   true,
+			// Nodes 1 and 2 sit further apart (average 11) than nodes 0 and 1
+			// (average 10.5), so Closest separates the two masks on its own and
+			// the higher score must not override it.
+			hints: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true, Score: 20},
+					{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: true, Score: 80},
+				},
+			},
+			expectedAffinity: NewTestBitMask(0, 1),
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.TopologyManagerPolicyAlphaOptions, tc.gateEnabled)
+
+			numaInfo := tc.numaInfo
+			if numaInfo == nil {
+				numaInfo = commonNUMAInfoTwoNodes()
+			}
+			policyName := tc.policyName
+			if policyName == "" {
+				policyName = PolicySingleNumaNode
+			}
+
+			opts := PolicyOptions{
+				NUMAAllocationStrategy: tc.strategy,
+				PreferClosestNUMA:      tc.preferClosest,
+			}
+			merger := NewHintMerger(numaInfo, tc.hints, policyName, opts)
+
+			result := merger.Merge(logger)
+			if !result.NUMANodeAffinity.IsEqual(tc.expectedAffinity) {
+				t.Errorf("Expected affinity %v, got %v", tc.expectedAffinity, result.NUMANodeAffinity)
+			}
+		})
 	}
 }
