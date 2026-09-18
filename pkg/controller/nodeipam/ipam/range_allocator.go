@@ -136,7 +136,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 		}
 	}
 
-	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, err := nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
@@ -170,6 +170,9 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 			}
 		},
 	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, err
+	}
 
 	return ra, nil
 }
