@@ -652,14 +652,18 @@ func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
 
 func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bool, string)) error {
 	client := c.Discovery().RESTClient().(*rest.RESTClient).Client
-	url := c.Discovery().RESTClient().Get().AbsPath("openapi", "v2").URL()
+	url := c.Discovery().RESTClient().Get().AbsPath("openapi", "v2").URL().String()
+	return waitForOpenAPISchemaWithClient(client, url, 500*time.Millisecond, 60*time.Second, pred)
+}
+
+func waitForOpenAPISchemaWithClient(client *http.Client, url string, pollInterval, pollTimeout time.Duration, pred func(*spec.Swagger) (bool, string)) error {
 	lastMsg := ""
 	etag := ""
 	var etagSpec *spec.Swagger
-	if err := wait.Poll(500*time.Millisecond, 60*time.Second, mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
 		// download spec with etag support
 		spec := &spec.Swagger{}
-		req, err := http.NewRequest("GET", url.String(), nil)
+		req, err := http.NewRequest(http.MethodGet, url, nil)
 		if err != nil {
 			return false, err
 		}
@@ -669,7 +673,8 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			return false, err
+			lastMsg = fmt.Sprintf("failed to get OpenAPI spec: %v", err)
+			return false, nil
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusNotModified {
