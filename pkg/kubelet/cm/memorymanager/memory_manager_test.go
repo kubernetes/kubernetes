@@ -2145,28 +2145,34 @@ func TestGetTopologyHints(t *testing.T) {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				string(hugepages1Gi): {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},

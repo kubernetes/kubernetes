@@ -3643,28 +3643,34 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 					{
 						NUMANodeAffinity: newNUMAAffinity(2),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(3),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(2, 3),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				string(hugepages1Gi): {
 					{
 						NUMANodeAffinity: newNUMAAffinity(2),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(3),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(2, 3),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -3830,12 +3836,14 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            66,
 					},
 				},
 				hugepages2M: {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            60,
 					},
 				},
 			},
@@ -3931,28 +3939,34 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				string(hugepages1Gi): {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -4073,28 +4087,34 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				string(hugepages1Gi): {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -4179,14 +4199,17 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -4247,14 +4270,17 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 					{
 						NUMANodeAffinity: newNUMAAffinity(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -4300,6 +4326,252 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 			topologyHints := p.GetPodTopologyHints(logger, s, testCase.pod, lifecycle.AddOperation)
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
+			}
+		})
+	}
+}
+
+func TestCalculateHintsScore(t *testing.T) {
+	findHint := func(hints []topologymanager.TopologyHint, mask bitmask.BitMask) *topologymanager.TopologyHint {
+		for i := range hints {
+			if hints[i].NUMANodeAffinity.IsEqual(mask) {
+				return &hints[i]
+			}
+		}
+		return nil
+	}
+
+	pod := getPod("pod1", "container1", requirementsGuaranteed)
+
+	testCases := []struct {
+		description        string
+		machineState       state.NUMANodeMap
+		requestedResources map[v1.ResourceName]uint64
+		expectedScores     map[string]map[string]int64
+	}{
+		{
+			description: "nothing assigned, symmetric NUMA, all scores are 1",
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable: 2 * gb,
+							Free:        2 * gb,
+							Reserved:    0,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable: 2 * gb,
+							Free:        2 * gb,
+							Reserved:    0,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			requestedResources: map[v1.ResourceName]uint64{
+				v1.ResourceMemory: gb,
+			},
+			expectedScores: map[string]map[string]int64{
+				string(v1.ResourceMemory): {
+					"0":   1,
+					"1":   1,
+					"0-1": 1,
+				},
+			},
+		},
+		{
+			description: "half assigned on NUMA 0, score reflects utilization",
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable: 2 * gb,
+							Free:        gb,
+							Reserved:    gb,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable: 2 * gb,
+							Free:        2 * gb,
+							Reserved:    0,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			requestedResources: map[v1.ResourceName]uint64{
+				v1.ResourceMemory: gb,
+			},
+			// NUMA 0: alloc=2GB, free=1GB, assigned=1GB → 1*100/2 = 50
+			// NUMA 1: alloc=2GB, free=2GB, assigned=0   → max(1,0) = 1
+			// NUMA {0,1}: alloc=4GB, free=3GB, assigned=1GB → 1*100/4 = 25
+			expectedScores: map[string]map[string]int64{
+				string(v1.ResourceMemory): {
+					"0":   50,
+					"1":   1,
+					"0-1": 25,
+				},
+			},
+		},
+		{
+			// NUMA 0 has less allocatable than NUMA 1 and is partially used.
+			// Free must be >= requested, otherwise calculateHints skips the
+			// NUMA combination, so we request 512MB (not 1GB) to keep NUMA 0
+			// eligible.
+			description: "asymmetric allocatable, partial assignment",
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable: gb,
+							Free:        512 * mb,
+							Reserved:    512 * mb,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable: 3 * gb,
+							Free:        3 * gb,
+							Reserved:    0,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			requestedResources: map[v1.ResourceName]uint64{
+				v1.ResourceMemory: 512 * mb,
+			},
+			// NUMA 0: alloc=1GB, free=512MB, assigned=512MB → 512*100/1024 = 50
+			// NUMA 1: alloc=3GB, free=3GB, assigned=0 → max(1,0) = 1
+			// NUMA {0,1}: alloc=4GB, free=3584MB, assigned=512MB → 512*100/4096 = 12
+			expectedScores: map[string]map[string]int64{
+				string(v1.ResourceMemory): {
+					"0":   50,
+					"1":   1,
+					"0-1": 12,
+				},
+			},
+		},
+		{
+			description: "allocatable zero leaves score 0",
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable: 0,
+							Free:        0,
+							Reserved:    0,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable: 2 * gb,
+							Free:        2 * gb,
+							Reserved:    0,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			requestedResources: map[v1.ResourceName]uint64{
+				v1.ResourceMemory: gb,
+			},
+			// NUMA 0: allocatable=0 → skipped (can't satisfy request)
+			// NUMA 1: alloc=2GB, free=2GB, assigned=0 → max(1,0) = 1
+			// NUMA {0,1}: alloc=2GB, free=2GB, assigned=0 → max(1,0) = 1
+			expectedScores: map[string]map[string]int64{
+				string(v1.ResourceMemory): {
+					"1":   1,
+					"0-1": 1,
+				},
+			},
+		},
+		{
+			description: "multi-resource scores computed independently",
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable: 4 * gb,
+							Free:        gb,
+							Reserved:    3 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable: 2 * gb,
+							Free:        gb,
+							Reserved:    gb,
+						},
+					},
+					Cells: []int{0},
+				},
+			},
+			requestedResources: map[v1.ResourceName]uint64{
+				v1.ResourceMemory: gb,
+				hugepages1Gi:      gb,
+			},
+			// NUMA 0 memory: alloc=4GB, free=1GB, assigned=3GB → 3*100/4 = 75
+			// NUMA 0 hugepages: alloc=2GB, free=1GB, assigned=1GB → 1*100/2 = 50
+			expectedScores: map[string]map[string]int64{
+				string(v1.ResourceMemory): {
+					"0": 75,
+				},
+				string(hugepages1Gi): {
+					"0": 50,
+				},
+			},
+		},
+	}
+
+	mustMask := func(bits ...int) bitmask.BitMask {
+		mask, _ := bitmask.NewBitMask(bits...)
+		return mask
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			p := &staticPolicy{}
+			hints := p.calculateHints(tc.machineState, pod, tc.requestedResources)
+
+			for resourceName, expectedMasks := range tc.expectedScores {
+				resourceHints, ok := hints[resourceName]
+				if !ok {
+					t.Errorf("expected hints for resource %s but none found", resourceName)
+					continue
+				}
+				for maskStr, expectedScore := range expectedMasks {
+					var mask bitmask.BitMask
+					switch maskStr {
+					case "0":
+						mask = mustMask(0)
+					case "1":
+						mask = mustMask(1)
+					case "0-1":
+						mask = mustMask(0, 1)
+					}
+					hint := findHint(resourceHints, mask)
+					if hint == nil {
+						t.Errorf("resource %s: expected hint for NUMA %s but not found", resourceName, maskStr)
+						continue
+					}
+					if hint.Score != expectedScore {
+						t.Errorf("resource %s NUMA %s: expected Score %d, got %d", resourceName, maskStr, expectedScore, hint.Score)
+					}
+				}
 			}
 		})
 	}
