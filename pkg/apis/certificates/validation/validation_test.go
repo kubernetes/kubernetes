@@ -431,6 +431,42 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 		},
+		"valid csr spec with request signed by an ML-DSA key": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:     []capi.KeyUsage{capi.UsageDigitalSignature},
+					Request:    newCSRPEMWithMLDSA(t),
+					SignerName: validSignerName,
+				},
+			},
+		},
+		"invalid csr spec with request signed by an ML-DSA key, missing one of the at least one of key usages required for ML-DSA": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:     []capi.KeyUsage{capi.UsageClientAuth},
+					Request:    newCSRPEMWithMLDSA(t),
+					SignerName: validSignerName,
+				},
+			},
+			errs: field.ErrorList{
+				field.Invalid(specPath.Child("usages"), []capi.KeyUsage{capi.UsageClientAuth}, fmt.Sprintf("When using ML-DSA keys, at least one of %v usages are required", mldsaAtLeastOneOfUsages.List())),
+			},
+		},
+		"invalid csr spec with request signed by an ML-DSA key, contains a forbidden key usage": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:     []capi.KeyUsage{capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
+					Request:    newCSRPEMWithMLDSA(t),
+					SignerName: validSignerName,
+				},
+			},
+			errs: field.ErrorList{
+				field.Invalid(specPath.Child("usages").Index(1), capi.UsageKeyEncipherment, fmt.Sprintf("When using ML-DSA keys, the usages %v are not allowed", mldsaDisallowedUsages.List())),
+			},
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -450,6 +486,36 @@ func newCSRPEM(t *testing.T) []byte {
 	}
 
 	_, key, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	csrPemBlock := &pem.Block{
+		Type:  "CERTIFICATE REQUEST",
+		Bytes: csrDER,
+	}
+
+	p := pem.EncodeToMemory(csrPemBlock)
+	if p == nil {
+		t.Fatal("invalid pem block")
+	}
+
+	return p
+}
+
+func newCSRPEMWithMLDSA(t *testing.T) []byte {
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			Organization: []string{"testing-org"},
+		},
+	}
+
+	key, err := mldsa.GenerateKey(mldsa.MLDSA44())
 	if err != nil {
 		t.Fatal(err)
 	}
