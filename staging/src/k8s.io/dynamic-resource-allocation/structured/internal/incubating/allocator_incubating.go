@@ -51,19 +51,19 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 type DeviceConsumedCapacity = internal.DeviceConsumedCapacity
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
+type NormalizedName = internal.NormalizedName
 type AllocatedState = internal.AllocatedState
 
 func GenerateNewShareID() *types.UID {
 	return internal.GenerateShareID()
 }
 
-func NewConsumedCapacity() ConsumedCapacity {
-	return internal.NewConsumedCapacity()
+func NormalizeQualifiedName(name resourceapi.QualifiedName, defaultDomain string) NormalizedName {
+	return internal.NormalizeQualifiedName(name, defaultDomain)
 }
 
-func NewDeviceConsumedCapacity(deviceID DeviceID,
-	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	return internal.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
+func NewConsumedCapacity() ConsumedCapacity {
+	return internal.NewConsumedCapacity()
 }
 
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
@@ -365,9 +365,13 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		for i, internal := range internalResult.devices {
 			var consumedCapacity map[resourceapi.QualifiedName]resource.Quantity
 			if internal.consumedCapacity != nil {
+				// The API field drops the driver name when used as domain to emulate
+				// the behavior in Kubernetes 1.37 and support downgrades. The internal
+				// tracking above uses NormalizedName, whose String form already omits
+				// the domain when it equals the default (the driver), to avoid ambiguity.
 				consumedCapacity = make(map[resourceapi.QualifiedName]resource.Quantity, len(internal.consumedCapacity))
 				for key, val := range internal.consumedCapacity {
-					consumedCapacity[key] = val.DeepCopy()
+					consumedCapacity[resourceapi.QualifiedName(key.String())] = val.DeepCopy()
 				}
 			}
 			allocationResult.Devices.Results[i] = resourceapi.DeviceRequestAllocationResult{
@@ -595,7 +599,7 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 							// so capacity-blocked matching devices stay in allDevices and All fails.
 							apiDevice := slice.Spec.Devices[deviceIndex]
 							success, err := CmpRequestOverCapacity(emptyConsumedCapacity, requestData.request.capacities(),
-								apiDevice.AllowMultipleAllocations, apiDevice.Capacity, emptyConsumedCapacity, alloc.features.FractionalCapacityRange)
+								slice.Spec.Driver, apiDevice.AllowMultipleAllocations, apiDevice.Capacity, emptyConsumedCapacity, alloc.features.FractionalCapacityRange)
 							if err != nil {
 								return requestData, fmt.Errorf("claim %s, request %s: checking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), apiDevice.Name, err)
 							}
@@ -737,7 +741,7 @@ type internalDeviceResult struct {
 	id               DeviceID
 	shareID          *types.UID
 	slice            *draapi.ResourceSlice
-	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity
+	consumedCapacity ConsumedCapacity
 	adminAccess      *bool
 }
 
@@ -1261,9 +1265,9 @@ func (alloc *allocator) CmpRequestOverCapacity(request requestAccessor, slice *d
 	allowMultipleAllocations := device.AllowMultipleAllocations
 	capacities := device.Capacity
 	if allocatedCapacity, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
-		return CmpRequestOverCapacity(allocatedCapacity, request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+		return CmpRequestOverCapacity(allocatedCapacity, request.capacities(), slice.Spec.Driver, allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
 	}
-	return CmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+	return CmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), slice.Spec.Driver, allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
 }
 
 func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
@@ -1434,7 +1438,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		state.deviceMarked = true
 	}
 
-	consumedCapacity := make(map[resourceapi.QualifiedName]resource.Quantity, 0)
+	consumedCapacity := NewConsumedCapacity()
 	var shareID *types.UID
 	if alloc.features.ConsumableCapacity {
 		// Validate whether resource request over capacity
@@ -1452,7 +1456,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		}
 
 		if allowMultipleAllocations {
-			consumedCapacity, err = GetConsumedCapacityFromRequest(request.capacities(), device.Capacity, alloc.features.FractionalCapacityRange)
+			consumedCapacity, err = GetConsumedCapacityFromRequest(request.capacities(), device.id.Driver, device.Capacity, alloc.features.FractionalCapacityRange)
 			if err != nil {
 				alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
 				return false, nil, fmt.Errorf("claim %s, request %s: computing consumed capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), device.id, err)
@@ -1465,7 +1469,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 			// share skip the counter check, so record whether it predated this
 			// share; rollback must not delete it while another share still needs it.
 			_, state.capacityEntryExisted = alloc.allocatingCapacity[device.id]
-			alloc.allocatingCapacity.Insert(NewDeviceConsumedCapacity(device.id, consumedCapacity))
+			alloc.allocatingCapacity.Insert(DeviceConsumedCapacity{DeviceID: device.id, ConsumedCapacity: consumedCapacity})
 			state.capacityInserted = true
 			state.consumedCapacity = consumedCapacity
 		}
@@ -1508,7 +1512,7 @@ type deviceRollbackState struct {
 	capacityEntryExisted bool
 	resultAdded          bool
 	previousNumResults   int
-	consumedCapacity     map[resourceapi.QualifiedName]resource.Quantity
+	consumedCapacity     ConsumedCapacity
 }
 
 // rollbackDevice reverses the mutations recorded in state, in the opposite order
@@ -1519,7 +1523,7 @@ func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, bas
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:state.previousNumResults]
 	}
 	if state.capacityInserted {
-		alloc.allocatingCapacity.Remove(NewDeviceConsumedCapacity(device.id, state.consumedCapacity))
+		alloc.allocatingCapacity.Remove(DeviceConsumedCapacity{DeviceID: device.id, ConsumedCapacity: state.consumedCapacity})
 		if state.capacityEntryExisted {
 			// Remove drops the entry once it becomes empty, which also erases the
 			// shared marker that the earlier share still relies on. Restore an empty

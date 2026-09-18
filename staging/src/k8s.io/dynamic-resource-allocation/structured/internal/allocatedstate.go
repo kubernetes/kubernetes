@@ -21,7 +21,6 @@ package internal
 
 import (
 	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
@@ -32,6 +31,7 @@ import (
 // require autoscaler approval.
 type DeviceID = schedulerapi.DeviceID
 type AllocatedState = schedulerapi.AllocatedState
+type NormalizedName = schedulerapi.NormalizedName
 type ConsumedCapacity = schedulerapi.ConsumedCapacity
 type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
 type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
@@ -41,16 +41,16 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 	return schedulerapi.MakeDeviceID(driver, pool, device)
 }
 
+func NormalizeQualifiedName(name resourceapi.QualifiedName, defaultDomain string) NormalizedName {
+	return schedulerapi.NormalizeQualifiedName(name, defaultDomain)
+}
+
 func NewConsumedCapacity() ConsumedCapacity {
 	return schedulerapi.NewConsumedCapacity()
 }
 
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 	return schedulerapi.NewConsumedCapacityCollection()
-}
-
-func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
 // IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices

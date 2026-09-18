@@ -17,6 +17,8 @@ limitations under the License.
 package schedulerapi
 
 import (
+	"strings"
+
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -93,10 +95,51 @@ type AllocatedState struct {
 	AggregatedCapacity ConsumedCapacityCollection
 }
 
+// NormalizedName represents a capacity name normalized against a default domain,
+// which for capacity names is always the driver that published the device: Domain is
+// left empty when the name's domain equals that default, and set explicitly otherwise.
+//
+// Keeping the domain and identifier as two separate string fields, rather than as a
+// single concatenated "domain/identifier" string, means two NormalizedName values can
+// never be confused with each other due to an ambiguous domain/identifier boundary (for
+// example, a domain that happens to be a prefix or suffix of another domain).
+type NormalizedName struct {
+	Domain     string
+	Identifier string
+}
+
+// String returns name in the same form used by the DeviceRequestAllocationResult API
+// field: the domain is included only when it is non-empty, i.e. when it differs from
+// the default domain that name was normalized against.
+func (n NormalizedName) String() string {
+	if n.Domain == "" {
+		return n.Identifier
+	}
+	return n.Domain + "/" + n.Identifier
+}
+
+// NormalizeQualifiedName splits name into a NormalizedName. name may or may not have an
+// explicit domain; if it doesn't, or if its explicit domain equals defaultDomain, Domain
+// is left empty in the result.
+func NormalizeQualifiedName(name resourceapi.QualifiedName, defaultDomain string) NormalizedName {
+	domain, identifier, hasDomain := strings.Cut(string(name), "/")
+	if !hasDomain {
+		return NormalizedName{Identifier: string(name)}
+	}
+	if domain == defaultDomain {
+		domain = ""
+	}
+	return NormalizedName{Domain: domain, Identifier: identifier}
+}
+
 // ConsumedCapacity represents the consumed capacity of a specific resource.
 // This type is used in consumable capacity features and the scheduler.
-// ConsumedCapacity defines consumable capacity values
-type ConsumedCapacity map[resourceapi.QualifiedName]*resource.Quantity
+// ConsumedCapacity defines consumable capacity values.
+//
+// Keys are NormalizedName, so that capacity in different domains is never conflated
+// regardless of whether a name's domain was given explicitly or left implicit.
+// Values are pointers to support in-place updates, for example via Add.
+type ConsumedCapacity map[NormalizedName]*resource.Quantity
 
 // NewConsumedCapacity creates a new ConsumedCapacity.
 // This function is used in consumable capacity features and the scheduler.
@@ -197,17 +240,25 @@ type DeviceConsumedCapacity struct {
 	ConsumedCapacity
 }
 
-// NewDeviceConsumedCapacity creates a new DeviceConsumedCapacity.
-// This function is used in consumable capacity features and the scheduler.
-// NewDeviceConsumedCapacity creates DeviceConsumedCapacity instance from device ID and its consumed capacity.
+// NewDeviceConsumedCapacity creates a new DeviceConsumedCapacity for deviceID from
+// consumedCapacity as found in a DeviceRequestAllocationResult, i.e. keyed by
+// QualifiedName with the domain omitted iff it equals deviceID.Driver (for downgrade
+// compatibility with Kubernetes 1.37, see DeviceRequestAllocationResult.ConsumedCapacity).
+// Each key is normalized against deviceID.Driver so that the returned
+// DeviceConsumedCapacity, like the rest of the internal ConsumedCapacity tracking, is
+// always keyed by NormalizedName.
+//
+// Callers that already have a NormalizedName-keyed ConsumedCapacity (for example, the
+// allocators themselves, while computing what a request would consume) do not need this
+// conversion and can construct a DeviceConsumedCapacity directly instead.
 func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	allocatedCapacity := NewConsumedCapacity()
-	for name, quantity := range consumedCapacity {
-		allocatedCapacity[name] = &quantity
+	normalized := make(ConsumedCapacity, len(consumedCapacity))
+	for name, val := range consumedCapacity {
+		normalized[NormalizeQualifiedName(name, deviceID.Driver.String())] = new(val)
 	}
 	return DeviceConsumedCapacity{
 		DeviceID:         deviceID,
-		ConsumedCapacity: allocatedCapacity,
+		ConsumedCapacity: normalized,
 	}
 }
 
