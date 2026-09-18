@@ -29,17 +29,11 @@ import (
 	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/lifecycle"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/apis/storagemigration"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -69,28 +63,15 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 // NewStorageFactoryConfigEffectiveVersion returns a new StorageFactoryConfig set up with necessary resource overrides for a given EffectiveVersion.
 func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.EffectiveVersion) *StorageFactoryConfig {
 	resources := []schema.GroupVersionResource{
-		// If a resource has to be stored in a version that is not the
-		// latest, then it can be listed here. Usually this is the case
-		// when a new version for a resource gets introduced and a
-		// downgrade to an older apiserver that doesn't know the new
-		// version still needs to be supported for one release.
+		// The storage version is picked automatically:
 		//
-		// Example from Kubernetes 1.24 where csistoragecapacities had just
-		// graduated to GA:
+		//   - a new beta replacing an alpha takes over right away
+		//   - a new GA (or a beta replacing an older beta) waits one release, so a
+		//     downgrade to the previous apiserver can still read what was written
 		//
-		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
-		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
-		coordination.Resource("leasecandidates").WithVersion("v1beta1"),
-		certificates.Resource("clustertrustbundles").WithVersion("v1beta1"), // TODO: remove in 1.38
-		certificates.Resource("podcertificaterequests").WithVersion("v1beta1"),
-		storagemigration.Resource("storageversionmigrations").WithVersion("v1beta1"),
-		resource.Resource("devicetaintrules").WithVersion("v1beta2"),
-		resource.Resource("resourcepoolstatusrequests").WithVersion("v1alpha3"),
-		scheduling.Resource("workloads").WithVersion("v1beta1"),
-		scheduling.Resource("podgroups").WithVersion("v1beta1"),
-		scheduling.Resource("compositepodgroups").WithVersion("v1alpha3"),
-		lifecycle.Resource("evictions").WithVersion("v1alpha1"),
-		lifecycle.Resource("evictionrequests").WithVersion("v1alpha1"),
+		// Almost every resource wants that. If a resource has to be stored in a
+		// version that is not the one picked automatically, then it can be
+		// listed here.
 	}
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,
