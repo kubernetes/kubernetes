@@ -617,8 +617,14 @@ func CreatePodsPerNodeForSimpleApp(ctx context.Context, c clientset.Interface, n
 // RemoveTaintsOffNode removes a list of taints from the given node
 // It is simply a helper wrapper for RemoveTaintOffNode
 func RemoveTaintsOffNode(ctx context.Context, c clientset.Interface, nodeName string, taints []v1.Taint) {
+	taintPtrs := make([]*v1.Taint, len(taints))
+	for i := range taints {
+		taintPtrs[i] = &taints[i]
+	}
+	err := removeNodeTaint(ctx, c, nodeName, nil, taintPtrs...)
+	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
 	for _, taint := range taints {
-		RemoveTaintOffNode(ctx, c, nodeName, taint)
+		verifyThatTaintIsGone(ctx, c, nodeName, &taint)
 	}
 }
 
