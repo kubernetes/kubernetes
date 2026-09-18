@@ -508,7 +508,7 @@ type ResourceMetricStatus struct {
 	// present if `targetAverageValue` was set in the corresponding metric
 	// specification.
 	// +optional
-	CurrentAverageUtilization *int32 `json:"currentAverageUtilization,omitempty" protobuf:"bytes,2,opt,name=currentAverageUtilization"`
+	CurrentAverageUtilization *int32 `json:"currentAverageUtilization,omitempty" protobuf:"varint,2,opt,name=currentAverageUtilization"`
 
 	// currentAverageValue is the current value of the average of the
 	// resource metric across all relevant pods, as a raw value (instead of as
@@ -532,7 +532,7 @@ type ContainerResourceMetricStatus struct {
 	// present if `targetAverageValue` was set in the corresponding metric
 	// specification.
 	// +optional
-	CurrentAverageUtilization *int32 `json:"currentAverageUtilization,omitempty" protobuf:"bytes,2,opt,name=currentAverageUtilization"`
+	CurrentAverageUtilization *int32 `json:"currentAverageUtilization,omitempty" protobuf:"varint,2,opt,name=currentAverageUtilization"`
 
 	// currentAverageValue is the current value of the average of the
 	// resource metric across all relevant pods, as a raw value (instead of as

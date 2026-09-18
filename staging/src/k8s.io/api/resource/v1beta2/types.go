@@ -150,7 +150,7 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +oneOf=NodeSelection
-	AllNodes *bool `json:"allNodes,omitempty" protobuf:"bytes,5,opt,name=allNodes"`
+	AllNodes *bool `json:"allNodes,omitempty" protobuf:"varint,5,opt,name=allNodes"`
 
 	// devices lists some or all of the devices in this pool.
 	//
@@ -174,7 +174,7 @@ type ResourceSliceSpec struct {
 	// +optional
 	// +oneOf=NodeSelection
 	// +featureGate=DRAPartitionableDevices
-	PerDeviceNodeSelection *bool `json:"perDeviceNodeSelection,omitempty" protobuf:"bytes,7,name=perDeviceNodeSelection"`
+	PerDeviceNodeSelection *bool `json:"perDeviceNodeSelection,omitempty" protobuf:"varint,7,name=perDeviceNodeSelection"`
 
 	// sharedCounters defines a list of counter sets, each of which
 	// has a name and a list of counters available.
@@ -307,7 +307,7 @@ type ResourcePool struct {
 	// in an incomplete state.
 	//
 	// +required
-	Generation int64 `json:"generation" protobuf:"bytes,2,name=generation"`
+	Generation int64 `json:"generation" protobuf:"varint,2,name=generation"`
 
 	// resourceSliceCount is the total number of ResourceSlices in the pool at this
 	// generation number. Must be greater than zero.
@@ -316,7 +316,7 @@ type ResourcePool struct {
 	// belonging to the same pool.
 	//
 	// +required
-	ResourceSliceCount int64 `json:"resourceSliceCount" protobuf:"bytes,3,name=resourceSliceCount"`
+	ResourceSliceCount int64 `json:"resourceSliceCount" protobuf:"varint,3,name=resourceSliceCount"`
 }
 
 const ResourceSliceMaxSharedCapacity = 128
@@ -429,7 +429,7 @@ type Device struct {
 	// +optional
 	// +oneOf=DeviceNodeSelection
 	// +featureGate=DRAPartitionableDevices
-	AllNodes *bool `json:"allNodes,omitempty" protobuf:"bytes,7,opt,name=allNodes"`
+	AllNodes *bool `json:"allNodes,omitempty" protobuf:"varint,7,opt,name=allNodes"`
 
 	// taints if specified, these are the driver-defined taints.
 	//
@@ -502,7 +502,7 @@ type Device struct {
 	//
 	// +optional
 	// +featureGate=DRAConsumableCapacity
-	AllowMultipleAllocations *bool `json:"allowMultipleAllocations,omitempty" protobuf:"bytes,12,opt,name=allowMultipleAllocations"`
+	AllowMultipleAllocations *bool `json:"allowMultipleAllocations,omitempty" protobuf:"varint,12,opt,name=allowMultipleAllocations"`
 
 	// NodeAllocatableResourceMappings is tombstoned as it got replaced with NodeAllocatableResources.
 	// NodeAllocatableResourceMappings map[v1.ResourceName]NodeAllocatableResourceMapping `json:"nodeAllocatableResourceMappings,omitempty" protobuf:"bytes,13,opt,name=nodeAllocatableResourceMappings"`
@@ -1374,7 +1374,7 @@ type ExactDeviceRequest struct {
 	//
 	// +optional
 	// +oneOf=AllocationMode
-	Count int64 `json:"count,omitempty" protobuf:"bytes,4,opt,name=count"`
+	Count int64 `json:"count,omitempty" protobuf:"varint,4,opt,name=count"`
 
 	// adminAccess indicates that this is a claim for administrative access
 	// to the device(s). Claims with AdminAccess are expected to be used for
@@ -1388,7 +1388,7 @@ type ExactDeviceRequest struct {
 	//
 	// +optional
 	// +featureGate=DRAAdminAccess
-	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,5,opt,name=adminAccess"`
+	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"varint,5,opt,name=adminAccess"`
 
 	// tolerations if specified, the request's tolerations.
 	//
@@ -1533,7 +1533,7 @@ type DeviceSubRequest struct {
 	//
 	// +optional
 	// +oneOf=AllocationMode
-	Count int64 `json:"count,omitempty" protobuf:"bytes,5,opt,name=count"`
+	Count int64 `json:"count,omitempty" protobuf:"varint,5,opt,name=count"`
 
 	// tolerations if specified, the request's tolerations.
 	//
@@ -2240,7 +2240,7 @@ type DeviceRequestAllocationResult struct {
 	//
 	// +optional
 	// +featureGate=DRAAdminAccess
-	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,5,opt,name=adminAccess"`
+	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"varint,5,opt,name=adminAccess"`
 
 	// tolerations is a copy of all tolerations specified in the request at the time
 	// when the device got allocated.
