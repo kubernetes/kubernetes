@@ -193,119 +193,12 @@ func TestGetHighestAllAncestor(t *testing.T) {
 	}
 }
 
-func TestNewPodGroupPreemptorResolvesPreemptionPolicy(t *testing.T) {
-	preemptNeverPod := st.MakePod().Name("p-never").PreemptionPolicy(v1.PreemptNever).Obj()
-	preemptLowerPriorityPod := st.MakePod().Name("p-lower").PreemptionPolicy(v1.PreemptLowerPriority).Obj()
-	noPolicyPod := st.MakePod().Name("p-nil").Obj()
-
-	tests := []struct {
-		name                           string
-		pg                             *schedulingv1beta1.PodGroup
-		cpg                            *schedulingv1alpha3.CompositePodGroup
-		pods                           []*v1.Pod
-		enablePodGroupPreemptionPolicy bool
-		wantPolicy                     v1.PreemptionPolicy
-	}{
-		{
-			name:                           "PreemptionPolicy PreemptNever is resolved from PodGroup, ignoring policy in pod, with PodGroupPreemptionPolicy enabled",
-			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod},
-			enablePodGroupPreemptionPolicy: true,
-			wantPolicy:                     v1.PreemptNever,
-		},
-		{
-			name:                           "PreemptionPolicy PreemptLowerPriority is resolved from PodGroup, ignoring different policies in pods, with PodGroupPreemptionPolicy enabled",
-			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod, noPolicyPod},
-			enablePodGroupPreemptionPolicy: true,
-			wantPolicy:                     v1.PreemptLowerPriority,
-		},
-		{
-			name:                           "PreemptionPolicy is resolved from pods with PodGroupPreemptionPolicy disabled",
-			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod},
-			enablePodGroupPreemptionPolicy: false,
-			wantPolicy:                     v1.PreemptLowerPriority,
-		},
-		{
-			name:                           "PreemptionPolicy is resolved from pods when multiple pods have different policies, with PodGroupPreemptionPolicy disabled",
-			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
-			pods:                           []*v1.Pod{preemptNeverPod, preemptLowerPriorityPod, noPolicyPod},
-			enablePodGroupPreemptionPolicy: false,
-			wantPolicy:                     v1.PreemptNever,
-		},
-		{
-			name:       "PreemptionPolicy is resolved from pods when CompositePodGroup is active: PreemptLowerPriority when no pod is PreemptNever",
-			cpg:        st.MakeCompositePodGroup().Name("cpg1").Obj(),
-			pods:       []*v1.Pod{preemptLowerPriorityPod, noPolicyPod},
-			wantPolicy: v1.PreemptLowerPriority,
-		},
-		{
-			name:       "PreemptionPolicy is resolved from pods when CompositePodGroup is active: PreemptNever when any pod is PreemptNever",
-			cpg:        st.MakeCompositePodGroup().Name("cpg1").Obj(),
-			pods:       []*v1.Pod{preemptNeverPod, preemptLowerPriorityPod},
-			wantPolicy: v1.PreemptNever,
-		},
-		{
-			name:                           "PreemptionPolicy PreemptNever is resolved from CompositePodGroup, ignoring policy in pod, with PodGroupPreemptionPolicy enabled",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod},
-			enablePodGroupPreemptionPolicy: true,
-			wantPolicy:                     v1.PreemptNever,
-		},
-		{
-			name:                           "PreemptionPolicy PreemptLowerPriority is resolved from CompositePodGroup, ignoring different policies in pods, with PodGroupPreemptionPolicy enabled",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1alpha3.PreemptLowerPriority).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod, preemptNeverPod},
-			enablePodGroupPreemptionPolicy: true,
-			wantPolicy:                     v1.PreemptLowerPriority,
-		},
-		{
-			name:                           "PreemptionPolicy is resolved from pods when CompositePodGroup has policy but PodGroupPreemptionPolicy is disabled",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod, noPolicyPod},
-			enablePodGroupPreemptionPolicy: false,
-			wantPolicy:                     v1.PreemptLowerPriority,
-		},
-		{
-			name:                           "PreemptionPolicy defaults to PreemptLowerPriority when CompositePodGroup has no policy set with PodGroupPreemptionPolicy enabled, even if pods are PreemptNever",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").Obj(),
-			pods:                           []*v1.Pod{preemptNeverPod},
-			enablePodGroupPreemptionPolicy: true,
-			wantPolicy:                     v1.PreemptLowerPriority,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pgInfo := &framework.PodGroupInfo{}
-			if tt.pg != nil {
-				pgInfo.GenericPodGroup = fwk.NewGenericPodGroup(tt.pg)
-				pgInfo.UnscheduledPods = tt.pods
-			} else if tt.cpg != nil {
-				pgInfo.GenericPodGroup = fwk.NewGenericCompositePodGroup(tt.cpg)
-				pgInfo.Children = []*framework.PodGroupInfo{
-					{
-						GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
-						UnscheduledPods: tt.pods,
-					},
-				}
-			}
-			preemptor := newPodGroupPreemptor(pgInfo, tt.enablePodGroupPreemptionPolicy)
-			if preemptor.preemptionPolicy != tt.wantPolicy {
-				t.Errorf("expected preemption policy %q, got %q", tt.wantPolicy, preemptor.preemptionPolicy)
-			}
-		})
-	}
-}
-
 type expectedVictim struct {
-	pods          sets.Set[string]
-	affectedNodes sets.Set[string]
-	priority      int32
+	pods     sets.Set[string]
+	priority int32
 }
 
-func TestNewDomainForWorkloadPreemption(t *testing.T) {
+func TestGetWorkloadPreemptionVictims(t *testing.T) {
 	tests := []struct {
 		name                    string
 		nodes                   []*v1.Node
@@ -313,7 +206,6 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 		podGroups               map[string]*schedulingv1beta1.PodGroup
 		compositePodGroups      map[string]*schedulingv1alpha3.CompositePodGroup
 		enableCompositePodGroup bool
-		domainName              string
 		wantVictims             []expectedVictim
 	}{
 		{
@@ -323,7 +215,6 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 			},
 			pods:        nil,
 			podGroups:   nil,
-			domainName:  "test-domain",
 			wantVictims: nil,
 		},
 		{
@@ -336,11 +227,10 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(10).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(20).Obj(),
 			},
-			podGroups:  nil,
-			domainName: "test-domain",
+			podGroups: nil,
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2"), affectedNodes: sets.New("node2"), priority: 20},
+				{pods: sets.New("p1"), priority: 10},
+				{pods: sets.New("p2"), priority: 20},
 			},
 		},
 		{
@@ -356,9 +246,8 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 			podGroups: map[string]*schedulingv1beta1.PodGroup{
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().Priority(50).Obj(),
 			},
-			domainName: "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1", "p2"), affectedNodes: sets.New("node1", "node2"), priority: 50},
+				{pods: sets.New("p1", "p2"), priority: 50},
 			},
 		},
 		{
@@ -374,10 +263,9 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 			podGroups: map[string]*schedulingv1beta1.PodGroup{
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().Priority(50).Obj(),
 			},
-			domainName: "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1"), affectedNodes: sets.New("node1"), priority: 50},
-				{pods: sets.New("p2"), affectedNodes: sets.New("node2"), priority: 50},
+				{pods: sets.New("p1"), priority: 50},
+				{pods: sets.New("p2"), priority: 50},
 			},
 		},
 		{
@@ -396,11 +284,10 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().Priority(50).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeSingle().Priority(60).Obj(),
 			},
-			domainName: "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1", "p2"), affectedNodes: sets.New("node1", "node2"), priority: 50},
-				{pods: sets.New("p3"), affectedNodes: sets.New("node1"), priority: 60},
-				{pods: sets.New("p4"), affectedNodes: sets.New("node2"), priority: 30},
+				{pods: sets.New("p1", "p2"), priority: 50},
+				{pods: sets.New("p3"), priority: 60},
+				{pods: sets.New("p4"), priority: 30},
 			},
 		},
 		{
@@ -413,10 +300,9 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(10).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(10).Obj(),
 			},
-			domainName: "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2"), affectedNodes: sets.New("node2"), priority: 10},
+				{pods: sets.New("p1"), priority: 10},
+				{pods: sets.New("p2"), priority: 10},
 			},
 		},
 		{
@@ -439,9 +325,8 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1", "p2_pg1", "p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1", "p2_pg1", "p1_pg2", "p2_pg2"), priority: 10},
 			},
 		},
 		{
@@ -464,10 +349,9 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1", "p2_pg1"), affectedNodes: sets.New("node1", "node2"), priority: 10},
-				{pods: sets.New("p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1", "p2_pg1"), priority: 10},
+				{pods: sets.New("p1_pg2", "p2_pg2"), priority: 10},
 			},
 		},
 		{
@@ -490,11 +374,10 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg1"), affectedNodes: sets.New("node2"), priority: 10},
-				{pods: sets.New("p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1"), priority: 10},
+				{pods: sets.New("p2_pg1"), priority: 10},
+				{pods: sets.New("p1_pg2", "p2_pg2"), priority: 10},
 			},
 		},
 		{
@@ -517,11 +400,10 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg1"), affectedNodes: sets.New("node2"), priority: 10},
-				{pods: sets.New("p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1"), priority: 10},
+				{pods: sets.New("p2_pg1"), priority: 10},
+				{pods: sets.New("p1_pg2", "p2_pg2"), priority: 10},
 			},
 		},
 		{
@@ -552,9 +434,8 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg3": st.MakeCompositePodGroup().Name("cpg3").UID("cpg3").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1", "p2_pg1", "p1_pg2", "p2_pg2", "p1_pg3", "p2_pg3", "p1_pg4", "p2_pg4"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1", "p2_pg1", "p1_pg2", "p2_pg2", "p1_pg3", "p2_pg3", "p1_pg4", "p2_pg4"), priority: 10},
 			},
 		},
 		{
@@ -585,12 +466,11 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg3": st.MakeCompositePodGroup().Name("cpg3").UID("cpg3").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1", "p2_pg1"), affectedNodes: sets.New("node1", "node2"), priority: 10},
-				{pods: sets.New("p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
-				{pods: sets.New("p1_pg3", "p2_pg3"), affectedNodes: sets.New("node1", "node2"), priority: 10},
-				{pods: sets.New("p1_pg4", "p2_pg4"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1", "p2_pg1"), priority: 10},
+				{pods: sets.New("p1_pg2", "p2_pg2"), priority: 10},
+				{pods: sets.New("p1_pg3", "p2_pg3"), priority: 10},
+				{pods: sets.New("p1_pg4", "p2_pg4"), priority: 10},
 			},
 		},
 		{
@@ -621,13 +501,12 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg3": st.MakeCompositePodGroup().Name("cpg3").UID("cpg3").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1", "p2_pg1", "p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
-				{pods: sets.New("p1_pg3"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg3"), affectedNodes: sets.New("node2"), priority: 10},
-				{pods: sets.New("p1_pg4"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg4"), affectedNodes: sets.New("node2"), priority: 10},
+				{pods: sets.New("p1_pg1", "p2_pg1", "p1_pg2", "p2_pg2"), priority: 10},
+				{pods: sets.New("p1_pg3"), priority: 10},
+				{pods: sets.New("p2_pg3"), priority: 10},
+				{pods: sets.New("p1_pg4"), priority: 10},
+				{pods: sets.New("p2_pg4"), priority: 10},
 			},
 		},
 		{
@@ -658,14 +537,13 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg3": st.MakeCompositePodGroup().Name("cpg3").UID("cpg3").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1", "p2_pg1"), affectedNodes: sets.New("node1", "node2"), priority: 10},
-				{pods: sets.New("p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
-				{pods: sets.New("p1_pg3"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg3"), affectedNodes: sets.New("node2"), priority: 10},
-				{pods: sets.New("p1_pg4"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg4"), affectedNodes: sets.New("node2"), priority: 10},
+				{pods: sets.New("p1_pg1", "p2_pg1"), priority: 10},
+				{pods: sets.New("p1_pg2", "p2_pg2"), priority: 10},
+				{pods: sets.New("p1_pg3"), priority: 10},
+				{pods: sets.New("p2_pg3"), priority: 10},
+				{pods: sets.New("p1_pg4"), priority: 10},
+				{pods: sets.New("p2_pg4"), priority: 10},
 			},
 		},
 		{
@@ -688,9 +566,8 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().MinGroupCount(2).Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1", "p2_pg1", "p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1", "p2_pg1", "p1_pg2", "p2_pg2"), priority: 10},
 			},
 		},
 		{
@@ -713,10 +590,9 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().MinGroupCount(2).Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1", "p2_pg1"), affectedNodes: sets.New("node1", "node2"), priority: 10},
-				{pods: sets.New("p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1", "p2_pg1"), priority: 10},
+				{pods: sets.New("p1_pg2", "p2_pg2"), priority: 10},
 			},
 		},
 		{
@@ -739,12 +615,11 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().MinGroupCount(2).Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg1"), affectedNodes: sets.New("node2"), priority: 10},
-				{pods: sets.New("p1_pg2"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg2"), affectedNodes: sets.New("node2"), priority: 10},
+				{pods: sets.New("p1_pg1"), priority: 10},
+				{pods: sets.New("p2_pg1"), priority: 10},
+				{pods: sets.New("p1_pg2"), priority: 10},
+				{pods: sets.New("p2_pg2"), priority: 10},
 			},
 		},
 		{
@@ -767,12 +642,11 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().MinGroupCount(2).Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg1"), affectedNodes: sets.New("node2"), priority: 10},
-				{pods: sets.New("p1_pg2"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg2"), affectedNodes: sets.New("node2"), priority: 10},
+				{pods: sets.New("p1_pg1"), priority: 10},
+				{pods: sets.New("p2_pg1"), priority: 10},
+				{pods: sets.New("p1_pg2"), priority: 10},
+				{pods: sets.New("p2_pg2"), priority: 10},
 			},
 		},
 		{
@@ -795,9 +669,8 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1", "p2_pg1", "p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1", "p2_pg1", "p1_pg2", "p2_pg2"), priority: 10},
 			},
 		},
 		{
@@ -820,11 +693,10 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2_pg1"), affectedNodes: sets.New("node2"), priority: 10},
-				{pods: sets.New("p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1"), priority: 10},
+				{pods: sets.New("p2_pg1"), priority: 10},
+				{pods: sets.New("p1_pg2", "p2_pg2"), priority: 10},
 			},
 		},
 		{
@@ -854,11 +726,10 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				"cpg-mid2": st.MakeCompositePodGroup().Name("cpg-mid2").UID("cpg-mid2").DisruptionModeAll().ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
-			domainName:              "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1_pg1", "p2_pg1"), affectedNodes: sets.New("node1", "node2"), priority: 10},
-				{pods: sets.New("p1_pg2", "p2_pg2"), affectedNodes: sets.New("node1", "node2"), priority: 10},
-				{pods: sets.New("p1_pg3", "p2_pg3", "p1_pg4", "p2_pg4"), affectedNodes: sets.New("node1", "node2"), priority: 10},
+				{pods: sets.New("p1_pg1", "p2_pg1"), priority: 10},
+				{pods: sets.New("p1_pg2", "p2_pg2"), priority: 10},
+				{pods: sets.New("p1_pg3", "p2_pg3", "p1_pg4", "p2_pg4"), priority: 10},
 			},
 		},
 	}
@@ -888,19 +759,6 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				snapshot = internalcache.NewTestSnapshotWithPodGroups(tt.pods, tt.nodes, pgs)
 			}
 			cache := internalcache.New(ctx, nil, true, tt.enableCompositePodGroup)
-
-			nodeInfos := make(map[string]fwk.NodeInfo)
-			for _, node := range tt.nodes {
-				ni := framework.NewNodeInfo()
-				ni.SetNode(node)
-				nodeInfos[node.Name] = ni
-			}
-			for _, p := range tt.pods {
-				if ni, ok := nodeInfos[p.Spec.NodeName]; ok {
-					pi, _ := framework.NewPodInfo(p)
-					ni.AddPodInfo(pi)
-				}
-			}
 
 			for _, node := range tt.nodes {
 				cache.AddNode(logger, node)
@@ -932,41 +790,19 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 			if tt.enableCompositePodGroup {
 				cpgLister = &mockCompositePodGroupLister{compositePodGroups: tt.compositePodGroups}
 			}
-			domain, err := newDomainForWorkloadPreemption(logger, snapshot, pgLister, cpgLister, tt.domainName)
+			victims, err := getWorkloadPreemptionVictims(logger, snapshot, pgLister, cpgLister)
 			if err != nil {
-				t.Fatalf("Failed to create domain: %v", err)
+				t.Fatalf("Failed to create victims: %v", err)
 			}
-
-			if domain.GetName() != tt.domainName {
-				t.Errorf("expected domain name %q, got %q", tt.domainName, domain.GetName())
-			}
-
-			gotNodeNames := sets.New[string]()
-			for _, ni := range domain.Nodes() {
-				gotNodeNames.Insert(ni.Node().Name)
-			}
-			wantNodeNames := sets.New[string]()
-			for _, n := range tt.nodes {
-				wantNodeNames.Insert(n.Name)
-			}
-			if diff := cmp.Diff(wantNodeNames, gotNodeNames); diff != "" {
-				t.Errorf("Nodes() mismatch (-want +got):\n%s", diff)
-			}
-
-			victims := domain.GetAllPossibleVictims()
 
 			var gotVictims []expectedVictim
-			for _, v := range victims {
+			for _, dv := range victims {
 				ev := expectedVictim{
-					pods:          sets.New[string](),
-					affectedNodes: sets.New[string](),
-					priority:      v.Priority(),
+					pods:     sets.New[string](),
+					priority: dv.Priority(),
 				}
-				for _, p := range v.Pods() {
+				for _, p := range dv.Pods() {
 					ev.pods.Insert(p.GetPod().Name)
-				}
-				for n := range v.AffectedNodes() {
-					ev.affectedNodes.Insert(n)
 				}
 				gotVictims = append(gotVictims, ev)
 			}
