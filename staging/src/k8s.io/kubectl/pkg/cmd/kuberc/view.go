@@ -132,6 +132,9 @@ func (o *ViewOptions) Run() error {
 			pref := kuberc.CreateDefaultPreference()
 			return kuberc.SavePreference(pref, o.KubeRCFile, o.Out)
 		}
+		// The user declined to generate a default kuberc file,
+		// so there is nothing to print.
+		return nil
 	}
 
 	if pref.Aliases == nil {
