@@ -19,16 +19,49 @@ package kubelet
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
+	goruntime "runtime"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
+	kubeletapis "k8s.io/kubelet/pkg/apis"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
+func defaultNodeLabels() map[string]string {
+	defaultLabels := map[string]string{
+		v1.LabelOSStable:      goruntime.GOOS,
+		v1.LabelArchStable:    goruntime.GOARCH,
+		kubeletapis.LabelOS:   goruntime.GOOS,
+		kubeletapis.LabelArch: goruntime.GOARCH,
+	}
+	osLabels, _ := getOSSpecificLabels()
+	maps.Copy(defaultLabels, osLabels)
+	return defaultLabels
+}
+
+func withDefaultLabels(customLabels map[string]string) map[string]string {
+	defaults := defaultNodeLabels()
+	m := make(map[string]string, len(defaults)+len(customLabels))
+	maps.Copy(m, defaults)
+	maps.Copy(m, customLabels)
+	return m
+}
+
 func TestGetCachedNode(t *testing.T) {
+	nodeStatus := v1.NodeStatus{
+		Capacity: v1.ResourceList{},
+		Allocatable: v1.ResourceList{
+			v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+		},
+	}
+
 	tests := []struct {
 		name               string
 		informerNode       *v1.Node
@@ -40,61 +73,90 @@ func TestGetCachedNode(t *testing.T) {
 	}{
 		{
 			name:         "informer node is newer",
-			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}, Status: nodeStatus},
+			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
 
-			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}, Status: nodeStatus},
+			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}, Status: nodeStatus},
 		},
 		{
 			name:         "cached node is newer",
-			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}, Status: nodeStatus},
 
-			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}, Status: nodeStatus},
+			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}, Status: nodeStatus},
 		},
 		{
 			name:         "resource versions are the same",
-			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
 
-			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
 		},
 		{
 			name:         "informer node cannot be parsed, default to informer node",
-			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "abc"}},
-			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "abc"}, Status: nodeStatus},
+			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
 
-			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "abc"}},
-			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "abc"}},
+			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "abc"}, Status: nodeStatus},
+			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "abc"}, Status: nodeStatus},
 		},
 		{
 			name:         "cached node cannot be parsed, default to informer node",
-			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "abc"}},
+			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "abc"}, Status: nodeStatus},
 
-			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
 		},
 		{
 			name:         "cached node is nil, use informer node",
-			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
 			cachedNode:   nil,
 
-			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+		},
+		{
+			name: "informer node has initial and user labels with uninitialized allocatable, labels must be preserved and allocatable overlaid",
+			informerNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "2",
+					Labels: map[string]string{
+						"custom.io/tenant": "frontend",
+						v1.LabelOSStable:   "linux",
+					},
+				},
+				Status: v1.NodeStatus{Allocatable: nil},
+			},
+			cachedNode: nil,
+
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "2",
+					Labels:          withDefaultLabels(map[string]string{"custom.io/tenant": "frontend"}),
+				},
+				Status: nodeStatus,
+			},
+			expectedCachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "2",
+					Labels:          withDefaultLabels(map[string]string{"custom.io/tenant": "frontend"}),
+				},
+				Status: nodeStatus,
+			},
 		},
 		{
 			name:          "node lister returns error, use cached node",
 			informerNode:  nil,
-			cachedNode:    &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+			cachedNode:    &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
 			nodeListerErr: fmt.Errorf("test error"),
 
-			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
 			expectedErr:        false,
-			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
 		},
 		{
 			name:          "node lister returns error, cached node is nil, default to initialNode",
@@ -106,6 +168,30 @@ func TestGetCachedNode(t *testing.T) {
 			expectedErr:        false,
 			expectedCachedNode: nil,
 		},
+		{
+			name:         "informer node is uninitialized and older/same RV, cached node is initialized",
+			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: v1.NodeStatus{Allocatable: nil}},
+			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+
+			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+		},
+		{
+			name:         "informer node is uninitialized but newer RV, should overlay status onto newer informer node",
+			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2", Labels: map[string]string{"new": "label"}}, Status: v1.NodeStatus{Allocatable: nil}},
+			cachedNode:   &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}, Status: nodeStatus},
+
+			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2", Labels: withDefaultLabels(map[string]string{"new": "label"})}, Status: nodeStatus},
+			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2", Labels: withDefaultLabels(map[string]string{"new": "label"})}, Status: nodeStatus},
+		},
+		{
+			name:         "informer node is uninitialized and cached node is nil, should overlay status and cache",
+			informerNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}, Status: v1.NodeStatus{Allocatable: nil}},
+			cachedNode:   nil,
+
+			expectedNode:       &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2", Labels: withDefaultLabels(nil)}, Status: nodeStatus},
+			expectedCachedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2", Labels: withDefaultLabels(nil)}, Status: nodeStatus},
+		},
 	}
 
 	for _, test := range tests {
@@ -114,6 +200,12 @@ func TestGetCachedNode(t *testing.T) {
 				cachedNode: test.cachedNode,
 				nodeLister: newFakeNodeLister(test.nodeListerErr, test.informerNode),
 				kubeClient: &fake.Clientset{},
+				setNodeStatusFuncs: []func(context.Context, *v1.Node) error{
+					func(ctx context.Context, node *v1.Node) error {
+						node.Status = nodeStatus
+						return nil
+					},
+				},
 			}
 			if test.expectedNode == nil {
 				var err error
@@ -135,6 +227,75 @@ func TestGetCachedNode(t *testing.T) {
 				t.Errorf("kl.cachedNode after GetCachedNode() = %v, expected %v", kl.cachedNode, test.expectedCachedNode)
 			}
 		})
+	}
+}
+
+func TestGetNodeSync(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	nodeName := "test-node"
+	nodeStatus := v1.NodeStatus{
+		Capacity: v1.ResourceList{},
+		Allocatable: v1.ResourceList{
+			v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+		},
+	}
+
+	// Case 1: API server node is initialized
+	initializedNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: nodeName, ResourceVersion: "1"},
+		Status:     nodeStatus,
+	}
+	fakeClient1 := fake.NewSimpleClientset(initializedNode)
+	kl1 := Kubelet{
+		nodeName:   types.NodeName(nodeName),
+		kubeClient: fakeClient1,
+	}
+	actualNode1, err := kl1.GetCachedNode(tCtx, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(actualNode1, initializedNode) {
+		t.Errorf("expected node %v, got %v", initializedNode, actualNode1)
+	}
+	if !reflect.DeepEqual(kl1.cachedNode, initializedNode) {
+		t.Errorf("expected cached node %v, got %v", initializedNode, kl1.cachedNode)
+	}
+
+	// Case 2: API server node is uninitialized, should overlay status and cache
+	uninitializedNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: nodeName, ResourceVersion: "2"},
+		Status: v1.NodeStatus{
+			Allocatable: nil,
+		},
+	}
+	fakeClient2 := fake.NewSimpleClientset(uninitializedNode)
+	kl2 := Kubelet{
+		nodeName:   types.NodeName(nodeName),
+		kubeClient: fakeClient2,
+		setNodeStatusFuncs: []func(context.Context, *v1.Node) error{
+			func(ctx context.Context, node *v1.Node) error {
+				node.Status = nodeStatus
+				return nil
+			},
+		},
+	}
+	actualNode2, err := kl2.GetCachedNode(tCtx, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedNode2 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            nodeName,
+			ResourceVersion: "2",
+			Labels:          withDefaultLabels(nil),
+		},
+		Status: nodeStatus,
+	}
+	if !reflect.DeepEqual(actualNode2, expectedNode2) {
+		t.Errorf("expected node %v, got %v", expectedNode2, actualNode2)
+	}
+	if !reflect.DeepEqual(kl2.cachedNode, expectedNode2) {
+		t.Errorf("expected cached node %v, got %v", expectedNode2, kl2.cachedNode)
 	}
 }
 
