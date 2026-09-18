@@ -88,7 +88,7 @@ type TypedQueueConfig[T comparable] struct {
 	Name string
 
 	// MetricsProvider optionally allows specifying a metrics provider to use for the queue
-	// instead of the global provider.
+	// instead of the global providers.
 	MetricsProvider MetricsProvider
 
 	// Clock ability to inject real or fake clock for testing purposes.
@@ -139,9 +139,9 @@ func NewNamed(name string) *Type {
 // newQueueWithConfig constructs a new named workqueue
 // with the ability to customize different properties for testing purposes
 func newQueueWithConfig[T comparable](config TypedQueueConfig[T], updatePeriod time.Duration) *Typed[T] {
-	metricsProvider := globalMetricsProvider
-	if config.MetricsProvider != nil {
-		metricsProvider = config.MetricsProvider
+	metricsProvider := config.MetricsProvider
+	if metricsProvider == nil {
+		metricsProvider = globalMetricsFactory.getProvider()
 	}
 
 	if config.Clock == nil {
