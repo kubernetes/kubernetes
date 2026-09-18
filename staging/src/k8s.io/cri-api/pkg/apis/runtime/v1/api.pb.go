@@ -1941,7 +1941,13 @@ type PodSandboxConfig struct {
 	// Optional configurations specific to Linux hosts.
 	Linux *LinuxPodSandboxConfig `protobuf:"bytes,8,opt,name=linux,proto3" json:"linux,omitempty"`
 	// Optional configurations specific to Windows hosts.
-	Windows       *WindowsPodSandboxConfig `protobuf:"bytes,9,opt,name=windows,proto3" json:"windows,omitempty"`
+	Windows *WindowsPodSandboxConfig `protobuf:"bytes,9,opt,name=windows,proto3" json:"windows,omitempty"`
+	// hermetic indicates that the sandbox must be created in strict isolation.
+	// When set to true, the container runtime must provision the sandbox
+	// (based on the NamespaceOption) but MUST bypass all default network plumbing
+	// and external interface attachment (e.g., bypassing CNI execution).
+	// The sandbox will only possess a loopback interface.
+	Hermetic      bool `protobuf:"varint,10,opt,name=hermetic,proto3" json:"hermetic,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2037,6 +2043,13 @@ func (x *PodSandboxConfig) GetWindows() *WindowsPodSandboxConfig {
 		return x.Windows
 	}
 	return nil
+}
+
+func (x *PodSandboxConfig) GetHermetic() bool {
+	if x != nil {
+		return x.Hermetic
+	}
+	return false
 }
 
 type RunPodSandboxRequest struct {
@@ -11995,7 +12008,7 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\tR\x03uid\x12\x1c\n" +
 	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12\x18\n" +
-	"\aattempt\x18\x04 \x01(\rR\aattempt\"\x89\x05\n" +
+	"\aattempt\x18\x04 \x01(\rR\aattempt\"\xa5\x05\n" +
 	"\x10PodSandboxConfig\x12:\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1e.runtime.v1.PodSandboxMetadataR\bmetadata\x12\x1a\n" +
 	"\bhostname\x18\x02 \x01(\tR\bhostname\x12#\n" +
@@ -12006,7 +12019,9 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x06labels\x18\x06 \x03(\v2(.runtime.v1.PodSandboxConfig.LabelsEntryR\x06labels\x12O\n" +
 	"\vannotations\x18\a \x03(\v2-.runtime.v1.PodSandboxConfig.AnnotationsEntryR\vannotations\x127\n" +
 	"\x05linux\x18\b \x01(\v2!.runtime.v1.LinuxPodSandboxConfigR\x05linux\x12=\n" +
-	"\awindows\x18\t \x01(\v2#.runtime.v1.WindowsPodSandboxConfigR\awindows\x1a9\n" +
+	"\awindows\x18\t \x01(\v2#.runtime.v1.WindowsPodSandboxConfigR\awindows\x12\x1a\n" +
+	"\bhermetic\x18\n" +
+	" \x01(\bR\bhermetic\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a>\n" +
