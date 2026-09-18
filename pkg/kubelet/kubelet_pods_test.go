@@ -7469,6 +7469,133 @@ func TestConvertToAPIPodLevelResourcesStatusUnlimitedQuota(t *testing.T) {
 	assert.Equal(t, 0, gotLimit.Cmp(resource.MustParse("1")), "unexpected pod cpu limit %s", gotLimit.String())
 }
 
+// An unavailable report must not resurrect a limit that a prior report dropped.
+func TestConvertToAPIContainerStatusesUnlimitedSurvivesUnavailable(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	const name = "ctr0"
+	id := kubecontainer.ContainerID{Type: "test", ID: name}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "unlimited", Name: "foo", Namespace: "bar"},
+		Spec: v1.PodSpec{Containers: []v1.Container{{
+			Name:  name,
+			Image: "img",
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			},
+		}}},
+	}
+	require.NoError(t, kubelet.allocationManager.SetAllocatedResources(tCtx.Logger(), pod))
+	running := func(res *kubecontainer.ContainerResources) *kubecontainer.PodStatus {
+		return &kubecontainer.PodStatus{
+			ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace,
+			ContainerStatuses: []*kubecontainer.Status{{
+				Name: name, ID: id, Image: "img", ImageID: "1234", ImageRef: "img1234",
+				State: kubecontainer.ContainerStateRunning, StartedAt: time.Now(),
+				Resources: res,
+			}},
+		}
+	}
+	noLimit := &kubecontainer.ContainerResources{CPURequest: resource.NewMilliQuantity(100, resource.DecimalSI)}
+	convert := func(podStatus *kubecontainer.PodStatus, prev []v1.ContainerStatus) []v1.ContainerStatus {
+		return kubelet.convertToAPIContainerStatuses(tCtx, pod, podStatus, prev, pod.Spec.Containers, nil, false, false, false)
+	}
+	cpuLimit := func(cs []v1.ContainerStatus) (resource.Quantity, bool) {
+		v, ok := cs[0].Resources.Limits[v1.ResourceCPU]
+		return v, ok
+	}
+	stored := func(cpu *resource.Quantity) []v1.ContainerStatus {
+		limits := v1.ResourceList{}
+		if cpu != nil {
+			limits[v1.ResourceCPU] = *cpu
+		}
+		return []v1.ContainerStatus{{
+			Name: name, ContainerID: id.String(), Image: "img", ImageID: "img1234",
+			State:     v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")}, Limits: limits},
+		}}
+	}
+	one := resource.MustParse("1")
+
+	// A no-limit report drops the limit, and an unavailable report keeps the absence.
+	got := convert(running(noLimit), stored(&one))
+	if _, found := cpuLimit(got); found {
+		t.Fatalf("a reported no-limit status should drop the cpu limit")
+	}
+	got = convert(running(nil), got)
+	if _, found := cpuLimit(got); found {
+		t.Errorf("an unavailable status must not resurrect the cpu limit")
+	}
+
+	// Unknown old resources are not read as a known absence.
+	unknown := []v1.ContainerStatus{{
+		Name: name, ContainerID: id.String(), Image: "img", ImageID: "img1234",
+		State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+	}}
+	got = convert(running(nil), unknown)
+	if v, found := cpuLimit(got); !found || v.Cmp(one) != 0 {
+		t.Errorf("unknown old resources should keep the allocated cpu limit, got found=%v value=%v", found, v.String())
+	}
+
+	// A different container id does not inherit the absence.
+	other := stored(nil)
+	otherID := kubecontainer.ContainerID{Type: "test", ID: "other"}
+	other[0].ContainerID = otherID.String()
+	got = convert(running(nil), other)
+	if v, found := cpuLimit(got); !found || v.Cmp(one) != 0 {
+		t.Errorf("a different container id should keep the allocated cpu limit, got found=%v value=%v", found, v.String())
+	}
+}
+
+// The pod-level path keeps the absence when the cgroup config is unavailable.
+func TestConvertToAPIPodLevelResourcesStatusSurvivesUnavailable(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("pod cgroup resource reporting is only supported on Linux")
+	}
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	fakeCM := kubelet.containerManager.(*cm.FakeContainerManager)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "podlevel", Name: "foo", Namespace: "bar"},
+		Spec: v1.PodSpec{Resources: &v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+			Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		}},
+		Status: v1.PodStatus{Phase: v1.PodRunning},
+	}
+	shares, quota, period := uint64(102), int64(-1), uint64(100000)
+	fakeCM.PodContainerManager.PodCgroupConfig = map[v1.ResourceName]*cm.ResourceConfig{
+		v1.ResourceCPU: {CPUShares: &shares, CPUQuota: &quota, CPUPeriod: &period},
+	}
+	old := v1.PodStatus{Phase: v1.PodRunning, Resources: &v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+		Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+	}}
+	got := kubelet.convertToAPIPodLevelResourcesStatus(tCtx.Logger(), pod, old)
+	require.NotNil(t, got)
+	if _, found := got.Limits[v1.ResourceCPU]; found {
+		t.Fatalf("an unlimited quota should drop the pod cpu limit")
+	}
+
+	fakeCM.PodContainerManager.PodCgroupConfig = nil
+	old.Resources = got
+	got = kubelet.convertToAPIPodLevelResourcesStatus(tCtx.Logger(), pod, old)
+	require.NotNil(t, got)
+	if _, found := got.Limits[v1.ResourceCPU]; found {
+		t.Errorf("an unavailable pod cgroup config must not resurrect the cpu limit")
+	}
+}
+
 func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	nowTime := time.Now()

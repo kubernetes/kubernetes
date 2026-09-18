@@ -2253,6 +2253,7 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 
 	resources := allocatedPod.Spec.Resources.DeepCopy()
 
+	oldResourcesPresent := oldPodStatus.Resources != nil
 	if oldPodStatus.Resources == nil {
 		oldPodStatus.Resources = &v1.ResourceRequirements{}
 	}
@@ -2315,9 +2316,15 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	} else if cpuQuotaUnlimited && podHasCPULimit {
 		// No finite limit is enforced, which the API states by omitting it.
 		delete(resources.Limits, v1.ResourceCPU)
+	} else if podHasCPULimit && oldResourcesPresent && oldPodStatus.Phase == v1.PodRunning {
+		// An unread config keeps the last reported limit, absence included.
+		if oldLimit, found := oldPodStatus.Resources.Limits[v1.ResourceCPU]; found {
+			resources.Limits[v1.ResourceCPU] = oldLimit.DeepCopy()
+		} else {
+			delete(resources.Limits, v1.ResourceCPU)
+		}
 	} else {
 		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits)
-
 	}
 
 	if memoryLimit != nil {
@@ -2480,6 +2487,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			// If the container isn't running, just use the allocated resources.
 			return allocatedContainer.Resources.DeepCopy()
 		}
+		oldResourcesPresent := oldStatus.Resources != nil
 		if oldStatus.Resources == nil {
 			oldStatus.Resources = &v1.ResourceRequirements{}
 		}
@@ -2519,10 +2527,16 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				if kl.containerManager.ContainerHasExclusiveCPUs(logger, pod, allocatedContainer) {
 					resources.Limits[v1.ResourceCPU] = resources.Requests[v1.ResourceCPU].DeepCopy()
 				} else if cStatus.Resources != nil {
-					// A reported status without a CPU limit means no limit; a nil (unread) status falls back.
+					// A reported status without a CPU limit means no limit.
 					delete(resources.Limits, v1.ResourceCPU)
-				} else {
-					preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
+				} else if oldStatusFound && oldStatus.State.Running != nil &&
+					status.ContainerID == oldStatus.ContainerID && oldResourcesPresent {
+					// An unread status keeps the last reported limit, absence included.
+					if oldLimit, found := oldStatus.Resources.Limits[v1.ResourceCPU]; found {
+						resources.Limits[v1.ResourceCPU] = oldLimit.DeepCopy()
+					} else {
+						delete(resources.Limits, v1.ResourceCPU)
+					}
 				}
 			}
 			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {

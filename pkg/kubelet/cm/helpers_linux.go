@@ -128,8 +128,7 @@ func MilliCPUToQuota(milliCPU int64, period int64) int64 {
 		return 0
 	}
 	if milliCPU < 0 {
-		// A negative can only be an overflowed limit, so treat it as unlimited rather
-		// than wrap positive in the multiply below.
+		// Treat a negative as unlimited rather than wrap positive in the multiply below.
 		logCPUConversionAnomaly("negative milliCPU limit treated as unlimited", milliCPU, period)
 		return -1
 	}
@@ -175,8 +174,7 @@ func MilliCPUToQuota(milliCPU int64, period int64) int64 {
 var cpuConversionLog = logreduction.NewLogReduction(1 * time.Minute)
 
 // logCPUConversionAnomaly records a CPU conversion anomaly at most once a minute.
-// These inputs are unreachable through API validation, so an entry means an
-// oversized or malformed limit slipped through upstream.
+// An oversized limit next to a small request reaches this through valid input.
 func logCPUConversionAnomaly(reason string, milliCPU, period int64) {
 	// A constant message and key keep every reason in one once-a-minute window; the
 	// reason is logged for detail without resetting that window.
