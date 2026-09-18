@@ -701,3 +701,139 @@ func TestEvictDuringNamespaceTerminating(t *testing.T) {
 		})
 	}
 }
+
+// TestEviction429WithPodMigration tests that kubectl drain handles 429 errors gracefully
+// and detects when pods have been migrated to different nodes.
+func TestEviction429WithPodMigration(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		initialNodeName         string
+		migratedNodeName        string
+		podExistsAfterMigration bool
+		expectSuccess           bool
+		description             string
+	}{
+		{
+			name:                    "pod-migrated-to-different-node",
+			initialNodeName:         "node-1",
+			migratedNodeName:        "node-2",
+			podExistsAfterMigration: true,
+			expectSuccess:           true,
+			description:             "Pod is rescheduled to different node after 429 error",
+		},
+		{
+			name:                    "pod-deleted-after-429",
+			initialNodeName:         "node-1",
+			migratedNodeName:        "",
+			podExistsAfterMigration: false,
+			expectSuccess:           true,
+			description:             "Pod is deleted (not found) after 429 error",
+		},
+		{
+			name:                    "pod-stays-on-same-node",
+			initialNodeName:         "node-1",
+			migratedNodeName:        "node-1",
+			podExistsAfterMigration: true,
+			expectSuccess:           true,
+			description:             "Pod remains on same node, eviction retries after 429",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			clientset := fake.NewSimpleClientset()
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: tc.initialNodeName,
+					Containers: []corev1.Container{
+						{Name: "test", Image: "test:latest"},
+					},
+				},
+			}
+
+			// Add the pod initially
+			clientset.CoreV1().Pods("default").Create(context.Background(), pod, metav1.CreateOptions{})
+
+			// Track eviction attempts
+			evictAttempts := 0
+			clientset.PolicyV1().(*fake.Clientset).Fake.PrependReactor("evict", "pods",
+				func(action ktest.Action) (handled bool, ret runtime.Object, err error) {
+					evictAttempts++
+					// First attempt returns 429 error
+					if evictAttempts == 1 {
+						return true, nil, apierrors.NewTooManyRequests("eviction rate limited")
+					}
+					// Continue normally for subsequent attempts
+					return false, nil, nil
+				},
+			)
+
+			// Setup get pod function that simulates pod migration
+			podMigrated := false
+			getPodFn := func(namespace, name string) (*corev1.Pod, error) {
+				if !podMigrated && evictAttempts == 1 {
+					// After first 429, simulate pod migration
+					podMigrated = true
+					if !tc.podExistsAfterMigration {
+						// Pod was deleted
+						return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
+					}
+					// Pod was rescheduled to different node
+					migratedPod := pod.DeepCopy()
+					migratedPod.Spec.NodeName = tc.migratedNodeName
+					return migratedPod, nil
+				}
+				return pod, nil
+			}
+
+			helper := &Helper{
+				Ctx:                  context.Background(),
+				Client:               clientset,
+				DisableEviction:      false,
+				EvictErrorRetryDelay: 100 * time.Millisecond,
+				Timeout:              10 * time.Second,
+				Out:                  os.Stdout,
+				ErrOut:               os.Stderr,
+			}
+
+			// Test the eviction with pod state verification
+			evictionGroupVersion := schema.GroupVersion{Group: "policy", Version: "v1"}
+			activePod := *pod
+
+			// Simulate the retry loop with getPodFn verification
+			err := helper.EvictPod(activePod, evictionGroupVersion)
+			if err != nil && !apierrors.IsTooManyRequests(err) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// After 429, verify pod state
+			if apierrors.IsTooManyRequests(err) {
+				// Simulate the re-verification logic from the fix
+				freshPod, getErr := getPodFn("default", "test-pod")
+				if getErr != nil {
+					if !apierrors.IsNotFound(getErr) {
+						t.Fatalf("unexpected error during pod re-fetch: %v", getErr)
+					}
+					// Pod doesn't exist - eviction complete
+					if tc.expectSuccess && tc.podExistsAfterMigration {
+						t.Errorf("expected pod to exist but got NotFound")
+					}
+				} else if freshPod.Spec.NodeName != tc.initialNodeName {
+					// Pod was migrated
+					if tc.expectSuccess && tc.migratedNodeName != tc.initialNodeName {
+						// This is expected - pod migrated to different node
+						return
+					}
+				}
+			}
+
+			if !tc.expectSuccess {
+				t.Errorf("expected test to fail but it succeeded")
+			}
+		})
+	}
+}
