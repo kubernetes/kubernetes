@@ -210,6 +210,15 @@ func TestValidateResourceQuotaUpdateKeepsStoredQuantities(t *testing.T) {
 		old:  withStatus(quota(pods(fractional), "x"), nil, nil),
 		new:  withStatus(quota(pods(fractional), "x"), pods(fractional), pods("0")),
 	}, {
+		name: "a stale status.hard is replaced from the stored spec.hard while usage advances",
+		old:  withStatus(quota(pods(fractional), "x"), pods("10"), pods("1")),
+		new:  withStatus(quota(pods(fractional), "x"), pods(fractional), pods("2")),
+	}, {
+		name:         "a spec.hard carried in this request does not excuse a new fractional status.hard",
+		old:          withStatus(quota(pods("10"), "x"), pods("10"), pods("1")),
+		new:          withStatus(quota(pods(fractional), "x"), pods(fractional), pods("1")),
+		expectedErrs: invalid(statusHardPods),
+	}, {
 		name:         "a fractional status.hard that neither the stored status nor the spec holds is rejected",
 		old:          withStatus(quota(pods("10"), "x"), nil, nil),
 		new:          withStatus(quota(pods("10"), "x"), pods(fractional), nil),
