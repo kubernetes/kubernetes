@@ -19,6 +19,8 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"net/http"
+	"net/url"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	httprobe "k8s.io/kubernetes/pkg/probe/http"
 )
 
 // worker handles the periodic probing of its assigned container. Each worker has a go-routine
@@ -69,6 +72,10 @@ type worker struct {
 	// How many times in a row the probe has returned the same result.
 	resultRun int
 
+	// Cached probe http request
+	httpProbeRequest *httpProbeRequestHolder
+	probeAttributes  *probeAttributes
+
 	// If set, skip probing.
 	onHold bool
 
@@ -83,6 +90,27 @@ type worker struct {
 	proberDurationUnknownMetricLabels    metrics.Labels
 }
 
+type probeAttributes struct {
+	HttpRequestCacheHolder *httpProbeRequestHolder
+}
+
+func (p *probeAttributes) setHttpRequestHolder(httpHolder *httpProbeRequestHolder) {
+	p.HttpRequestCacheHolder = httpHolder
+}
+
+// httpProbeRequestHolder caches the http.Request object to minimize allocations during repeated probes.
+// It invalidates the cache if the Pod's IP address changes.
+type httpProbeRequestHolder struct {
+	httpGet      *v1.HTTPGetAction
+	container    *v1.Container
+	podIP        string
+	cachedURL    *url.URL
+	cachedHeader http.Header
+	cachedMethod string
+	cachedProto  string
+	requestRoot  *http.Request
+}
+
 // isInitContainer checks if the worker's container is in the pod's init containers
 func (w *worker) isInitContainer() bool {
 	for _, initContainer := range w.pod.Spec.InitContainers {
@@ -91,6 +119,70 @@ func (w *worker) isInitContainer() bool {
 		}
 	}
 	return false
+}
+
+// Initialize new http probe request holder with remove old object
+func (w *worker) initHttpProbeHolder(container *v1.Container) {
+	w.httpProbeRequest = &httpProbeRequestHolder{
+		container: container,
+		httpGet:   w.spec.HTTPGet,
+		podIP:     "", // Empty Initially because we are not sure if the pod IP is available yet (better to dynamically set in worker loop)
+	}
+}
+
+// Set request cache holder values for reuse in future requests.
+func (h *httpProbeRequestHolder) setCacheRequestValues(req *http.Request) {
+	h.cachedHeader = req.Header
+	h.cachedMethod = req.Method
+	h.cachedProto = req.Proto
+	h.cachedURL = req.URL
+}
+
+// getRequest returns a cached http.Request or creates a new one if the Pod IP has changed
+// or if the request hasn't been initialized yet.
+func (h *httpProbeRequestHolder) getRequest(currentPodIP string) (*http.Request, error) {
+
+	if h.podIP != currentPodIP {
+		h.podIP = currentPodIP
+		h.reset()
+	}
+
+	if h.requestRoot == nil {
+		req, err := httprobe.NewRequestForHTTPGetAction(h.httpGet, h.container, h.podIP, "probe")
+		if err != nil {
+			return nil, err
+		}
+		h.requestRoot = req
+		h.setCacheRequestValues(req)
+	}
+
+	// Use values from cache holder, without making new values
+	return h.buildRequestFromCache(), nil
+}
+
+// Build request from cached values
+func (h *httpProbeRequestHolder) buildRequestFromCache() *http.Request {
+	clear(h.cachedHeader)
+	return &http.Request{
+		Method:     h.cachedMethod,
+		URL:        h.cachedURL,
+		Proto:      h.cachedProto,
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header:     h.cachedHeader,
+		Host:       h.cachedURL.Host,
+		Body:       nil,
+	}
+
+}
+
+// reset clears the cached request, forcing a re-initialization on the next probe cycle.
+func (h *httpProbeRequestHolder) reset() {
+	h.requestRoot = nil
+	h.cachedHeader = nil
+	h.cachedMethod = ""
+	h.cachedProto = ""
+	h.cachedURL = nil
 }
 
 // Creates and starts a new probe worker.
@@ -150,6 +242,10 @@ func newWorker(
 
 	w.proberDurationSuccessfulMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 	w.proberDurationUnknownMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
+
+	if w.spec != nil && w.spec.HTTPGet != nil {
+		w.initHttpProbeHolder(&container)
+	}
 
 	return w
 }
@@ -345,8 +441,22 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 	}
 
+	var err error
+
+	// Use the cached request holder to reduce GC pressure on the hot path.
+	// If it's not initialized yet (e.g., first run or spec just loaded), set it up.
+	if w.httpProbeRequest != nil && w.spec != nil && w.spec.HTTPGet != nil {
+		w.initHttpProbeHolder(&w.container)
+	}
+
+	// Instantly create probe attributes object.
+	if w.probeAttributes == nil {
+		w.probeAttributes = &probeAttributes{}
+		w.probeAttributes.setHttpRequestHolder(w.httpProbeRequest)
+	}
+
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID, w.probeAttributes)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
