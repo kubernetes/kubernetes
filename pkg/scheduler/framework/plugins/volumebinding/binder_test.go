@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -147,6 +148,7 @@ type testEnv struct {
 type apiUpdateError struct {
 	resource string
 	name     string
+	err      error
 }
 
 func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
@@ -270,7 +272,7 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 	}
 }
 
-func (env *testEnv) addAPIUpdateConflictReactor(t *testing.T, updateError *apiUpdateError) {
+func (env *testEnv) addAPIUpdateReactor(t *testing.T, updateError *apiUpdateError) {
 	t.Helper()
 	if updateError == nil {
 		return
@@ -289,11 +291,7 @@ func (env *testEnv) addAPIUpdateConflictReactor(t *testing.T, updateError *apiUp
 		if !objectOK || object.GetName() != updateError.name {
 			return false, nil, nil
 		}
-		return true, nil, apierrors.NewConflict(
-			action.GetResource().GroupResource(),
-			updateError.name,
-			fmt.Errorf("simulated resource version conflict"),
-		)
+		return true, nil, updateError.err
 	})
 }
 
@@ -588,9 +586,7 @@ func (env *testEnv) validateBind(
 			t.Errorf("Get PV %q returned error: %v", pv.Name, err)
 		}
 		// Cache may be overridden by API object with higher version, compare but ignore resource version.
-		newCachedPV := cachedPV.DeepCopy()
-		newCachedPV.ResourceVersion = pv.ResourceVersion
-		if diff := cmp.Diff(pv, newCachedPV); diff != "" {
+		if diff := cmp.Diff(pv, cachedPV, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion")); diff != "" {
 			t.Errorf("cached PV check failed (-want, +got):\n%s", diff)
 		}
 	}
@@ -604,27 +600,18 @@ func (env *testEnv) validateBind(
 
 	expectedMap := make(map[string]*v1.PersistentVolume, len(expectedAPIPVs))
 	for _, pv := range expectedAPIPVs {
-		pv := pv.DeepCopy()
-		pv.ResourceVersion = ""
-		pv.ManagedFields = nil
-		if pv.Spec.ClaimRef != nil {
-			pv.Spec.ClaimRef.ResourceVersion = ""
-		}
 		expectedMap[pv.Name] = pv
 	}
 
 	gotMap := make(map[string]*v1.PersistentVolume, len(apiPVs.Items))
 	for i := range apiPVs.Items {
-		pv := apiPVs.Items[i].DeepCopy()
-		pv.ResourceVersion = ""
-		pv.ManagedFields = nil
-		if pv.Spec.ClaimRef != nil {
-			pv.Spec.ClaimRef.ResourceVersion = ""
-		}
-		gotMap[pv.Name] = pv
+		gotMap[apiPVs.Items[i].Name] = &apiPVs.Items[i]
 	}
 
-	if diff := cmp.Diff(expectedMap, gotMap); diff != "" {
+	if diff := cmp.Diff(expectedMap, gotMap,
+		cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion", "ManagedFields"),
+		cmpopts.IgnoreFields(v1.ObjectReference{}, "ResourceVersion"),
+	); diff != "" {
 		t.Errorf("API PersistentVolume check failed (-want, +got):\n%s", diff)
 	}
 }
@@ -643,9 +630,7 @@ func (env *testEnv) validateProvision(
 			t.Errorf("Get PVC %q returned error: %v", getPVCName(pvc), err)
 		}
 		// Cache may be overridden by API object with higher version, compare but ignore resource version.
-		newCachedPVC := cachedPVC.DeepCopy()
-		newCachedPVC.ResourceVersion = pvc.ResourceVersion
-		if diff := cmp.Diff(pvc, newCachedPVC); diff != "" {
+		if diff := cmp.Diff(pvc, cachedPVC, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion")); diff != "" {
 			t.Errorf("cached PVC check failed (-want, +got):\n%s", diff)
 		}
 	}
@@ -659,21 +644,17 @@ func (env *testEnv) validateProvision(
 
 	expectedMap := make(map[string]*v1.PersistentVolumeClaim, len(expectedAPIPVCs))
 	for _, pvc := range expectedAPIPVCs {
-		pvc := pvc.DeepCopy()
-		pvc.ResourceVersion = ""
-		pvc.ManagedFields = nil
 		expectedMap[getPVCName(pvc)] = pvc
 	}
 
 	gotMap := make(map[string]*v1.PersistentVolumeClaim, len(apiPVCs.Items))
 	for i := range apiPVCs.Items {
-		pvc := apiPVCs.Items[i].DeepCopy()
-		pvc.ResourceVersion = ""
-		pvc.ManagedFields = nil
-		gotMap[getPVCName(pvc)] = pvc
+		gotMap[getPVCName(&apiPVCs.Items[i])] = &apiPVCs.Items[i]
 	}
 
-	if diff := cmp.Diff(expectedMap, gotMap); diff != "" {
+	if diff := cmp.Diff(expectedMap, gotMap,
+		cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion", "ManagedFields"),
+	); diff != "" {
 		t.Errorf("API PersistentVolumeClaim check failed (-want, +got):\n%s", diff)
 	}
 }
@@ -1536,15 +1517,11 @@ func TestRevertAssumedPodVolumes(t *testing.T) {
 func TestBindAPIUpdate(t *testing.T) {
 	type scenarioType struct {
 		// Inputs
-		bindings  []*BindingInfo
-		cachedPVs []*v1.PersistentVolume
-		// if nil, use cachedPVs
-		apiPVs []*v1.PersistentVolume
+		bindings []*BindingInfo
+		pvs      []*v1.PersistentVolume
+		pvcs     []*v1.PersistentVolumeClaim
 
 		provisionedPVCs []*v1.PersistentVolumeClaim
-		cachedPVCs      []*v1.PersistentVolumeClaim
-		// if nil, use cachedPVCs
-		apiPVCs []*v1.PersistentVolumeClaim
 
 		// API update error to inject, if any.
 		apiUpdateError *apiUpdateError
@@ -1552,12 +1529,8 @@ func TestBindAPIUpdate(t *testing.T) {
 		// Expected return values
 		shouldFail  bool
 		expectedPVs []*v1.PersistentVolume
-		// if nil, use expectedPVs
-		expectedAPIPVs []*v1.PersistentVolume
 
 		expectedPVCs []*v1.PersistentVolumeClaim
-		// if nil, use expectedPVCs
-		expectedAPIPVCs []*v1.PersistentVolumeClaim
 	}
 	scenarios := map[string]scenarioType{
 		"nothing-to-bind-nil": {
@@ -1577,19 +1550,19 @@ func TestBindAPIUpdate(t *testing.T) {
 		},
 		"one-binding": {
 			bindings:        []*BindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
-			cachedPVs:       []*v1.PersistentVolume{pvNode1a},
+			pvs:             []*v1.PersistentVolume{pvNode1a},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
 		},
 		"two-bindings": {
 			bindings:        []*BindingInfo{makeBinding(unboundPVC, pvNode1aBound), makeBinding(unboundPVC2, pvNode1bBound)},
-			cachedPVs:       []*v1.PersistentVolume{pvNode1a, pvNode1b},
+			pvs:             []*v1.PersistentVolume{pvNode1a, pvNode1b},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound, pvNode1bBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
 		},
 		"api-already-updated": {
 			bindings:        []*BindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
-			cachedPVs:       []*v1.PersistentVolume{pvNode1aBound},
+			pvs:             []*v1.PersistentVolume{pvNode1aBound},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
 		},
@@ -1597,9 +1570,10 @@ func TestBindAPIUpdate(t *testing.T) {
 			apiUpdateError: &apiUpdateError{
 				resource: "persistentvolumes",
 				name:     "pv-node1b",
+				err:      fmt.Errorf("simulated resource version conflict"),
 			},
 			bindings:        []*BindingInfo{makeBinding(unboundPVC, pvNode1aBound), makeBinding(unboundPVC2, pvNode1bBound)},
-			cachedPVs:       []*v1.PersistentVolume{pvNode1a, pvNode1b},
+			pvs:             []*v1.PersistentVolume{pvNode1a, pvNode1b},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound, pvNode1b},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
 			shouldFail:      true,
@@ -1607,17 +1581,18 @@ func TestBindAPIUpdate(t *testing.T) {
 		"one-provisioned-pvc": {
 			bindings:        []*BindingInfo{},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
-			cachedPVCs:      []*v1.PersistentVolumeClaim{provisionedPVC},
+			pvcs:            []*v1.PersistentVolumeClaim{provisionedPVC},
 			expectedPVCs:    []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
 		},
 		"provision-api-update-failed": {
 			apiUpdateError: &apiUpdateError{
 				resource: "persistentvolumeclaims",
 				name:     "provisioned-pvc2",
+				err:      fmt.Errorf("simulated resource version conflict"),
 			},
 			bindings:        []*BindingInfo{},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), addProvisionAnn(provisionedPVC2)},
-			cachedPVCs:      []*v1.PersistentVolumeClaim{provisionedPVC, provisionedPVC2},
+			pvcs:            []*v1.PersistentVolumeClaim{provisionedPVC, provisionedPVC2},
 			expectedPVCs:    []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), provisionedPVC2},
 			shouldFail:      true,
 		},
@@ -1625,12 +1600,13 @@ func TestBindAPIUpdate(t *testing.T) {
 			apiUpdateError: &apiUpdateError{
 				resource: "persistentvolumeclaims",
 				name:     "provisioned-pvc2",
+				err:      fmt.Errorf("simulated resource version conflict"),
 			},
 			bindings:        []*BindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
-			cachedPVs:       []*v1.PersistentVolume{pvNode1a},
+			pvs:             []*v1.PersistentVolume{pvNode1a},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), addProvisionAnn(provisionedPVC2)},
-			cachedPVCs:      []*v1.PersistentVolumeClaim{provisionedPVC, provisionedPVC2},
+			pvcs:            []*v1.PersistentVolumeClaim{provisionedPVC, provisionedPVC2},
 			expectedPVCs:    []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), provisionedPVC2},
 			shouldFail:      true,
 		},
@@ -1646,16 +1622,10 @@ func TestBindAPIUpdate(t *testing.T) {
 		pod := makePod("test-pod").
 			withNamespace("testns").
 			withNodeName("node1").Pod
-		if scenario.apiPVs == nil {
-			scenario.apiPVs = scenario.cachedPVs
-		}
-		if scenario.apiPVCs == nil {
-			scenario.apiPVCs = scenario.cachedPVCs
-		}
-		testEnv.initVolumes(t, scenario.cachedPVs, scenario.apiPVs)
-		testEnv.initClaims(t, scenario.cachedPVCs, scenario.apiPVCs)
+		testEnv.initVolumes(t, scenario.pvs, scenario.pvs)
+		testEnv.initClaims(t, scenario.pvcs, scenario.pvcs)
 		testEnv.assumeVolumes(t, "node1", pod, scenario.bindings, scenario.provisionedPVCs)
-		testEnv.addAPIUpdateConflictReactor(t, scenario.apiUpdateError)
+		testEnv.addAPIUpdateReactor(t, scenario.apiUpdateError)
 
 		// Execute
 		err := testEnv.internalBinder.bindAPIUpdate(ctx, pod, scenario.bindings, scenario.provisionedPVCs)
@@ -1667,14 +1637,8 @@ func TestBindAPIUpdate(t *testing.T) {
 		if scenario.shouldFail && err == nil {
 			t.Error("returned success but expected error")
 		}
-		if scenario.expectedAPIPVs == nil {
-			scenario.expectedAPIPVs = scenario.expectedPVs
-		}
-		if scenario.expectedAPIPVCs == nil {
-			scenario.expectedAPIPVCs = scenario.expectedPVCs
-		}
-		testEnv.validateBind(t, pod, scenario.expectedPVs, scenario.expectedAPIPVs)
-		testEnv.validateProvision(t, pod, scenario.expectedPVCs, scenario.expectedAPIPVCs)
+		testEnv.validateBind(t, pod, scenario.expectedPVs, scenario.expectedPVs)
+		testEnv.validateProvision(t, pod, scenario.expectedPVCs, scenario.expectedPVCs)
 	}
 
 	for name, scenario := range scenarios {
@@ -2097,6 +2061,7 @@ func TestBindPodVolumes(t *testing.T) {
 			apiUpdateError: &apiUpdateError{
 				resource: "persistentvolumes",
 				name:     pvNode1a.Name,
+				err:      fmt.Errorf("simulated resource version conflict"),
 			},
 			shouldFail: true, // bindAPIUpdate will fail because API conflict
 		},
@@ -2200,7 +2165,7 @@ func TestBindPodVolumes(t *testing.T) {
 				t.Fatalf("failed to update PVC %q", getPVCName(scenario.apiPVC))
 			}
 		}
-		testEnv.addAPIUpdateConflictReactor(t, scenario.apiUpdateError)
+		testEnv.addAPIUpdateReactor(t, scenario.apiUpdateError)
 
 		if scenario.delayFunc != nil {
 			go func(scenario scenarioType) {
