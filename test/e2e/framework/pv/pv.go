@@ -320,7 +320,7 @@ func createPV(ctx context.Context, c clientset.Interface, timeouts *framework.Ti
 	})
 	// if we have an error from creating the PV, use that instead of a timeout error
 	if lastCreateErr != nil {
-		return nil, fmt.Errorf("PV Create API error: %w", err)
+		return nil, fmt.Errorf("PV Create API error: %w", lastCreateErr)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("PV Create API error: %w", err)
