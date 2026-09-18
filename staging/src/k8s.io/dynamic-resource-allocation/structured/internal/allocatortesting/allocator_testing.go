@@ -8421,6 +8421,33 @@ func TestAllocator(t *testing.T,
 			node:        node(node1, region1),
 			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
 		},
+		"partitionable-devices-device-counter-consumption-negative-value": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					deviceRequest(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("-8Gi"),
+						}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+		},
 		"different-resourceslices-in-pool-can-target-different-nodes": {
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
