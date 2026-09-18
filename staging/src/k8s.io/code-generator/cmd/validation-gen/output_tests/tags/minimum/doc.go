@@ -122,3 +122,17 @@ type NegativeMinimumStruct struct {
 
 // +k8s:minimum=1
 type IntType int
+
+type SymbolicStruct struct {
+	TypeMeta int
+
+	// +k8s:minimum=MIN
+	Int32MinField int32 `json:"int32MinField"`
+	// +k8s:minimum=MAX
+	Int32MaxField int32 `json:"int32MaxField"`
+
+	// +k8s:minimum=MIN
+	Uint32MinField uint32 `json:"uint32MinField"`
+	// +k8s:minimum=MAX
+	Uint32MaxField uint32 `json:"uint32MaxField"`
+}
