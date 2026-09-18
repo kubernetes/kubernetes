@@ -631,6 +631,28 @@ func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, node
 	}
 }
 
+// makeInsecureIDEventRecorder sets up kubeDeps.InsecureIDEventRecorder if it's
+// nil, using a broadcaster throttled to at most one event per hour. It's a
+// no-op otherwise.
+func makeInsecureIDEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, nodeName types.NodeName) {
+	if kubeDeps.InsecureIDEventRecorder != nil {
+		return
+	}
+	logger := klog.FromContext(ctx)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx), record.WithCorrelatorOptions(record.CorrelatorOptions{
+		BurstSize: 1,
+		QPS:       1.0 / 3600.0,
+	}))
+	kubeDeps.InsecureIDEventRecorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: server.ComponentKubelet, Host: string(nodeName)})
+	eventBroadcaster.StartStructuredLogging(3)
+	if kubeDeps.EventClient != nil {
+		logger.V(4).Info("Sending InsecureUserID/InsecureGroupID events to api server")
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
+	} else {
+		logger.Info("No api server defined - no InsecureUserID/InsecureGroupID events will be sent to API server")
+	}
+}
+
 func getReservedCPUs(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.CPUSet, error) {
 	emptyCPUSet := cpuset.New()
 
@@ -852,6 +874,9 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	// Setup event recorder if required.
 	makeEventRecorder(ctx, kubeDeps, nodeName)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InsecurePodWarnings) {
+		makeInsecureIDEventRecorder(ctx, kubeDeps, nodeName)
+	}
 
 	if kubeDeps.ContainerManager == nil {
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
@@ -1292,6 +1317,9 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 	nodeName := types.NodeName(hostname)
 	// Setup event recorder if required.
 	makeEventRecorder(ctx, kubeDeps, nodeName)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InsecurePodWarnings) {
+		makeInsecureIDEventRecorder(ctx, kubeDeps, nodeName)
+	}
 
 	nodeIPs, invalidNodeIps, err := nodeutil.ParseNodeIPArgument(kubeServer.NodeIP, kubeServer.CloudProvider)
 	if err != nil {
