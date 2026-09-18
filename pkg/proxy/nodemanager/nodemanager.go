@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proxy
+package nodemanager
 
 import (
 	"context"
@@ -37,44 +37,74 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
+	netutils "k8s.io/utils/net"
 )
 
 // NodeManager handles the life cycle of kube-proxy based on the NodeIPs and PodCIDRs handles
 // node watch events and crashes kube-proxy if there are any changes in NodeIPs or PodCIDRs.
 // Note: It only crashes on change on PodCIDR when watchPodCIDRs is set to true.
-type NodeManager struct {
+type NodeManager interface {
+	proxyconfig.NodeHandler
+
+	// Name returns the node's name
+	Name() string
+
+	// PrimaryIPFamily returns the node's primary IP Family.
+	PrimaryIPFamily() v1.IPFamily
+
+	// NodeIPs returns the node's IPs. (This may be empty if New() timed out without
+	// getting any IPs.)
+	NodeIPs() map[v1.IPFamily]net.IP
+
+	// PodCIDRs returns the node's PodCIDRs.
+	PodCIDRs() []string
+
+	// Node returns a copy of the latest node object, or nil if the Node has not yet
+	// been seen.
+	Node() *v1.Node
+
+	// NodeInformer returns the NodeInformer.
+	NodeInformer() v1informers.NodeInformer
+}
+
+type nodeManager struct {
 	nodeInformer  v1informers.NodeInformer
 	nodeLister    corelisters.NodeLister
 	exitFunc      func(exitCode int)
 	watchPodCIDRs bool
 
 	// These are constant after construct time
-	nodeIPs  []net.IP
-	podCIDRs []string
+	nodeName        string
+	rawNodeIPs      []net.IP
+	primaryIPFamily v1.IPFamily
+	nodeIPs         map[v1.IPFamily]net.IP
+	podCIDRs        []string
 
 	mu   sync.Mutex
 	node *v1.Node
 }
 
-// NewNodeManager initializes node informer that selects for the given node, waits for cache sync
+// New initializes node informer that selects for the given node, waits for cache sync
 // and returns NodeManager after waiting some amount of time for the node object to exist
 // and have NodeIPs (and PodCIDRs if watchPodCIDRs is true). Note: for backward compatibility,
-// NewNodeManager doesn't return any error if it failed to retrieve NodeIPs and watchPodCIDRs
+// it doesn't return any error if it failed to retrieve NodeIPs and watchPodCIDRs
 // is false.
-func NewNodeManager(ctx context.Context, client clientset.Interface,
+func New(ctx context.Context, client clientset.Interface,
 	nodeName string, config *kubeproxyconfig.KubeProxyConfiguration,
-) (*NodeManager, error) {
+) (*nodeManager, error) {
 	resyncInterval := config.ConfigSyncPeriod.Duration
 	watchPodCIDRs := config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR
-	return newNodeManager(ctx, client, resyncInterval, nodeName, watchPodCIDRs, os.Exit, time.Second, 30*time.Second, 5*time.Minute)
+	nodeIPOverride := config.BindAddress
+	return newNodeManager(ctx, client, resyncInterval, nodeName, nodeIPOverride, watchPodCIDRs, os.Exit, time.Second, 30*time.Second, 5*time.Minute)
 }
 
-// newNodeManager implements NewNodeManager with configurable exit function, poll interval and timeouts.
+// newNodeManager implements New with configurable exit function, poll interval and timeouts.
 func newNodeManager(ctx context.Context, client clientset.Interface, resyncInterval time.Duration,
-	nodeName string, watchPodCIDRs bool, exitFunc func(int),
+	nodeName, nodeIPOverride string, watchPodCIDRs bool, exitFunc func(int),
 	pollInterval, nodeIPsTimeout, podCIDRsTimeout time.Duration,
-) (*NodeManager, error) {
+) (*nodeManager, error) {
 	// make an informer that selects for the given node
 	thisNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(client, resyncInterval,
 		informers.WithTransform(func(obj interface{}) (interface{}, error) {
@@ -97,15 +127,15 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		return nil, fmt.Errorf("can not sync node informer")
 	}
 
-	node, nodeIPs, podCIDRs := getNodeInfo(nodeLister, nodeName)
+	node, rawNodeIPs, podCIDRs := getNodeInfo(nodeLister, nodeName)
 
-	if len(nodeIPs) == 0 {
+	if len(rawNodeIPs) == 0 {
 		// wait for the node object to exist and have NodeIPs.
 		ctx, cancel := context.WithTimeout(ctx, nodeIPsTimeout)
 		defer cancel()
 		_ = wait.PollUntilContextCancel(ctx, pollInterval, false, func(context.Context) (bool, error) {
-			node, nodeIPs, podCIDRs = getNodeInfo(nodeLister, nodeName)
-			return len(nodeIPs) != 0, nil
+			node, rawNodeIPs, podCIDRs = getNodeInfo(nodeLister, nodeName)
+			return len(rawNodeIPs) != 0, nil
 		})
 	}
 
@@ -114,7 +144,7 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		ctx, cancel := context.WithTimeout(ctx, podCIDRsTimeout)
 		defer cancel()
 		_ = wait.PollUntilContextCancel(ctx, pollInterval, false, func(context.Context) (bool, error) {
-			node, nodeIPs, podCIDRs = getNodeInfo(nodeLister, nodeName)
+			node, rawNodeIPs, podCIDRs = getNodeInfo(nodeLister, nodeName)
 			return len(podCIDRs) != 0, nil
 		})
 
@@ -131,19 +161,24 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 	// non-watchPodCIDRs mode) or it didn't have IPs.
 	if node == nil {
 		klog.FromContext(ctx).Error(nil, "Timed out waiting for node to exist", "node", klog.KRef("", nodeName))
-	} else if len(nodeIPs) == 0 {
+	} else if len(rawNodeIPs) == 0 {
 		klog.FromContext(ctx).Error(nil, "Timed out waiting for node to be assigned IPs", "node", klog.KRef("", nodeName))
 	}
 
-	return &NodeManager{
+	primaryIPFamily, nodeIPs := detectNodeIPs(rawNodeIPs, nodeIPOverride)
+
+	return &nodeManager{
 		nodeInformer:  nodeInformer,
 		nodeLister:    nodeLister,
 		exitFunc:      exitFunc,
 		watchPodCIDRs: watchPodCIDRs,
 
-		node:     node,
-		nodeIPs:  nodeIPs,
-		podCIDRs: podCIDRs,
+		node:            node,
+		nodeName:        nodeName,
+		rawNodeIPs:      rawNodeIPs,
+		primaryIPFamily: primaryIPFamily,
+		nodeIPs:         nodeIPs,
+		podCIDRs:        podCIDRs,
 	}, nil
 }
 
@@ -156,19 +191,67 @@ func getNodeInfo(nodeLister corelisters.NodeLister, nodeName string) (*v1.Node, 
 	return node, nodeIPs, node.Spec.PodCIDRs
 }
 
-// NodeIPs returns the NodeIPs polled in NewNodeManager(). (This may be empty if
-// NewNodeManager timed out without getting any IPs.)
-func (n *NodeManager) NodeIPs() []net.IP {
+func detectNodeIPs(rawNodeIPs []net.IP, nodeIPOverride string) (v1.IPFamily, map[v1.IPFamily]net.IP) {
+	primaryFamily := v1.IPv4Protocol
+	nodeIPs := map[v1.IPFamily]net.IP{
+		// default values if rawNodeIPs has no IP for either family
+		v1.IPv4Protocol: net.IPv4(127, 0, 0, 1),
+		v1.IPv6Protocol: net.IPv6loopback,
+	}
+
+	if len(rawNodeIPs) > 0 {
+		if netutils.IsIPv6(rawNodeIPs[0]) {
+			primaryFamily = v1.IPv6Protocol
+		}
+		nodeIPs[primaryFamily] = rawNodeIPs[0]
+		if len(rawNodeIPs) > 1 {
+			// If more than one address is returned, they are guaranteed to be
+			// of different families
+			secondaryFamily := v1.IPv4Protocol
+			if netutils.IsIPv6(rawNodeIPs[1]) {
+				secondaryFamily = v1.IPv6Protocol
+			}
+			nodeIPs[secondaryFamily] = rawNodeIPs[1]
+		}
+	}
+
+	// If nodeIPOverride is passed, it overrides the primary IP
+	bindIP := netutils.ParseIPSloppy(nodeIPOverride)
+	if bindIP != nil && !bindIP.IsUnspecified() {
+		if netutils.IsIPv4(bindIP) {
+			primaryFamily = v1.IPv4Protocol
+		} else {
+			primaryFamily = v1.IPv6Protocol
+		}
+		nodeIPs[primaryFamily] = bindIP
+	}
+
+	return primaryFamily, nodeIPs
+}
+
+// Name returns the node's name
+func (n *nodeManager) Name() string {
+	return n.nodeName
+}
+
+// PrimaryIPFamily returns the node's primary IP Family.
+func (n *nodeManager) PrimaryIPFamily() v1.IPFamily {
+	return n.primaryIPFamily
+}
+
+// NodeIPs returns the node's IPs. (This may be empty if New() timed out without
+// getting any IPs.)
+func (n *nodeManager) NodeIPs() map[v1.IPFamily]net.IP {
 	return n.nodeIPs
 }
 
-// PodCIDRs returns the PodCIDRs polled in NewNodeManager().
-func (n *NodeManager) PodCIDRs() []string {
+// PodCIDRs returns the node's PodCIDRs.
+func (n *nodeManager) PodCIDRs() []string {
 	return n.podCIDRs
 }
 
 // Node returns a copy of the latest node object, or nil if the Node has not yet been seen.
-func (n *NodeManager) Node() *v1.Node {
+func (n *nodeManager) Node() *v1.Node {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -179,12 +262,12 @@ func (n *NodeManager) Node() *v1.Node {
 }
 
 // NodeInformer returns the NodeInformer.
-func (n *NodeManager) NodeInformer() v1informers.NodeInformer {
+func (n *nodeManager) NodeInformer() v1informers.NodeInformer {
 	return n.nodeInformer
 }
 
 // OnNodeChange is a handler for Node creation and update.
-func (n *NodeManager) OnNodeChange(node *v1.Node) {
+func (n *nodeManager) OnNodeChange(node *v1.Node) {
 	// update the node object
 	n.mu.Lock()
 	n.node = node
@@ -205,20 +288,20 @@ func (n *NodeManager) OnNodeChange(node *v1.Node) {
 
 	// We exit whenever there is a change in NodeIPs detected initially, and NodeIPs received
 	// on node watch event.
-	if !reflect.DeepEqual(n.nodeIPs, nodeIPs) {
+	if !reflect.DeepEqual(n.rawNodeIPs, nodeIPs) {
 		klog.InfoS("NodeIPs changed for the node",
-			"node", klog.KObj(node), "newNodeIPs", nodeIPs, "oldNodeIPs", n.nodeIPs)
+			"node", klog.KObj(node), "newNodeIPs", nodeIPs, "oldNodeIPs", n.rawNodeIPs)
 		klog.Flush()
 		n.exitFunc(1)
 	}
 }
 
 // OnNodeDelete is a handler for Node deletes.
-func (n *NodeManager) OnNodeDelete(node *v1.Node) {
+func (n *nodeManager) OnNodeDelete(node *v1.Node) {
 	klog.InfoS("Node is being deleted", "node", klog.KObj(node))
 	klog.Flush()
 	n.exitFunc(1)
 }
 
 // OnNodeSynced is called after the cache is synced and all pre-existing Nodes have been reported
-func (n *NodeManager) OnNodeSynced() {}
+func (n *nodeManager) OnNodeSynced() {}
