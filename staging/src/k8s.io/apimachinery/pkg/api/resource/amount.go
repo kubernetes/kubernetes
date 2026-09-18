@@ -352,7 +352,16 @@ func (a int64Amount) AsCanonicalBytes(out []byte) (result []byte, exponent int32
 	exponent = int32(a.scale)
 
 	amount, times := removeInt64Factors(mantissa, 10)
-	exponent += int32(times)
+	// Keep the exponent representable by shifting any excess back into the mantissa.
+	for int64(times) > int64(math.MaxInt32)-int64(exponent) {
+		var ok bool
+		amount, ok = int64MultiplyScale10(amount)
+		if !ok {
+			return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
+		}
+		times--
+	}
+	exponent += times
 
 	// make sure exponent is a multiple of 3
 	var ok bool
@@ -408,6 +417,11 @@ func (a infDecAmount) AsCanonicalBytes(out []byte) (result []byte, exponent int3
 	amount := big.NewInt(0).Set(mantissa)
 	// move all factors of 10 into the exponent for easy reasoning
 	amount, times := removeBigIntFactors(amount, bigTen)
+	// Keep the exponent representable by shifting any excess back into the mantissa.
+	for int64(times) > int64(math.MaxInt32)-int64(exponent) {
+		amount.Mul(amount, bigTen)
+		times--
+	}
 	exponent += times
 
 	// make sure exponent is a multiple of 3
