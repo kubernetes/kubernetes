@@ -85,6 +85,10 @@ func capacityNameForStatus(name draapi.FullyQualifiedName, driver draapi.UniqueS
 // capacity names that a request specifies without their domain prefix (see
 // resolveCapacityRequests) and as the default domain for normalization.
 func cmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, requestedCapacity *resourceapi.CapacityRequirements, device deviceWithID, allocatingCapacity ConsumedCapacity, fractionalCapacityRange bool) (map[draapi.FullyQualifiedName]resource.Quantity, bool, error) {
+	// Resolve deviceCapacity once, so that a device advertising a capacity both
+	// explicitly (with the driver as domain) and implicitly (without a domain) is
+	// only ever accounted for once. See resolveDeviceCapacity.
+	capacity := resolveDeviceCapacity(device)
 	resolvedRequests, ok := resolveCapacityRequests(requestedCapacity, device)
 	if !ok {
 		// This device does not define a requested capacity. A different device may,
@@ -98,8 +102,7 @@ func cmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, requestedC
 	// Interleaving the two in one loop would let the outcome, skip or abort, depend on
 	// which capacity the map happens to visit first.
 	consumed := make(map[draapi.FullyQualifiedName]resource.Quantity, len(device.Capacity))
-	for name, cap := range device.Capacity {
-		name := draapi.MakeFullyQualifiedName(name, device.id.Driver.String())
+	for name, cap := range capacity {
 		var requestedValPtr *resource.Quantity
 		if requestedVal, requestedFound := resolvedRequests[name]; requestedFound {
 			requestedValPtr = &requestedVal
@@ -122,8 +125,7 @@ func cmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, requestedC
 	}
 	// The policy and capacity checks are soft: they skip this device rather than abort.
 	clone := currentConsumedCapacity.Clone()
-	for name, cap := range device.Capacity {
-		name := draapi.MakeFullyQualifiedName(name, device.id.Driver.String())
+	for name, cap := range capacity {
 		consumedCapacity := consumed[name]
 		if violatesPolicy(consumedCapacity, cap.RequestPolicy, fractionalCapacityRange) {
 			return nil, false, nil
@@ -146,19 +148,79 @@ func cmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, requestedC
 	return resolvedRequests, true, nil
 }
 
+// resolveDeviceCapacity resolves a device's raw, published Capacity map into one keyed by
+// fully-qualified names, with each capacity accounted for exactly once.
+//
+// A device's Capacity map is not guaranteed to be free of conflicting names:
+// nothing prevents a device from publishing both an implicit entry
+// (e.g. "bandwidth") and one explicitly qualified with its own driver as domain (e.g.
+// "<driver>/bandwidth").
+//
+// Such conflicts are handled using the same precedence as for individual attribute lookups (see
+// lookupStaticAttribute): an entry explicitly qualified with the driver's own domain
+// takes precedence over an implicit entry for the same identifier.
+func resolveDeviceCapacity(device deviceWithID) map[draapi.FullyQualifiedName]resourceapi.DeviceCapacity {
+	resolved := make(map[draapi.FullyQualifiedName]resourceapi.DeviceCapacity, len(device.Capacity))
+	driverPrefix := device.id.Driver.String() + "/"
+	for name, cap := range device.Capacity {
+		if identifier, ok := strings.CutPrefix(string(name), driverPrefix); ok {
+			resolved[draapi.FullyQualifiedName{Domain: device.id.Driver.String(), Identifier: identifier}] = cap
+		}
+	}
+	for name, cap := range device.Capacity {
+		if strings.HasPrefix(string(name), driverPrefix) {
+			continue // already handled above
+		}
+		key := draapi.MakeFullyQualifiedName(name, device.id.Driver.String())
+		if _, alreadyResolved := resolved[key]; alreadyResolved {
+			// An entry explicitly qualified with the driver's own domain takes
+			// precedence over this implicit one for the same identifier.
+			continue
+		}
+		resolved[key] = cap
+	}
+	return resolved
+}
+
 // resolveCapacityRequests resolves every request in deviceRequestCapacity against capacity,
 // returning the requested quantities keyed by the fully-qualified name of the capacity entry
 // they refer to. ok is false if any request does not match a capacity entry, in which case
 // the device does not satisfy the request.
+//
+// A claim's requests are not guaranteed to be free of names that resolve to the same
+// fully-qualified name either: nothing prevents a request from naming a capacity both
+// implicitly (e.g. "bandwidth") and explicitly qualified with the driver as domain (e.g.
+// "<driver>/bandwidth"). As with a device's published capacity (see resolveDeviceCapacity),
+// the explicitly qualified request takes precedence over the implicit one for the same
+// identifier.
 func resolveCapacityRequests(deviceRequestCapacity *resourceapi.CapacityRequirements, device deviceWithID) (map[draapi.FullyQualifiedName]resource.Quantity, bool) {
 	if deviceRequestCapacity == nil || deviceRequestCapacity.Requests == nil {
 		return nil, true
 	}
 	resolved := make(map[draapi.FullyQualifiedName]resource.Quantity, len(deviceRequestCapacity.Requests))
+	driverPrefix := device.id.Driver.String() + "/"
 	for reqName, reqVal := range deviceRequestCapacity.Requests {
+		if !strings.HasPrefix(string(reqName), driverPrefix) {
+			continue
+		}
 		key, ok := resolveCapacityName(reqName, device.id.Driver, device.Capacity)
 		if !ok {
 			return nil, false
+		}
+		resolved[key] = reqVal
+	}
+	for reqName, reqVal := range deviceRequestCapacity.Requests {
+		if strings.HasPrefix(string(reqName), driverPrefix) {
+			continue // already handled above
+		}
+		key, ok := resolveCapacityName(reqName, device.id.Driver, device.Capacity)
+		if !ok {
+			return nil, false
+		}
+		if _, alreadyResolved := resolved[key]; alreadyResolved {
+			// An explicitly qualified request for this identifier already takes
+			// precedence over this implicit one.
+			continue
 		}
 		resolved[key] = reqVal
 	}
@@ -321,21 +383,21 @@ func roundUpValidValues(requestedVal *resource.Quantity, validValues []resource.
 // getConsumedCapacityFromRequest returns valid consumed capacity,
 // according to claim request and defined capacity.
 func getConsumedCapacityFromRequest(resolvedRequests map[draapi.FullyQualifiedName]resource.Quantity, device deviceWithID, fractionalCapacityRange bool) (ConsumedCapacity, error) {
+	capacity := resolveDeviceCapacity(device)
 	consumedCapacity := NewConsumedCapacity()
-	for name, cap := range device.Capacity {
-		name := draapi.MakeFullyQualifiedName(name, device.id.Driver.String())
+	for name, cap := range capacity {
 		var requestedValPtr *resource.Quantity
 		if requestedVal, requestedFound := resolvedRequests[name]; requestedFound {
 			requestedValPtr = &requestedVal
 		}
-		capacity, err := calculateConsumedCapacity(requestedValPtr, cap, fractionalCapacityRange)
+		consumed, err := calculateConsumedCapacity(requestedValPtr, cap, fractionalCapacityRange)
 		if err != nil {
 			// Feasibility already ran, so this should not happen. Return the error
 			// rather than a raw request so a future caller cannot record an
 			// unrepresentable value as consumed capacity.
 			return nil, fmt.Errorf("capacity %q: %w", name, err)
 		}
-		consumedCapacity[name] = new(capacity)
+		consumedCapacity[name] = new(consumed)
 	}
 	return consumedCapacity, nil
 }
