@@ -687,7 +687,7 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 	}
 	pod3Name := util.GetUniquePodName(pod3)
 	pod3DesiredSizeLimitMap := map[string]*resource.Quantity{
-		// TODO(#141166): A limit past int64 means no tmpfs size limit. Expect a zero size limit.
+		// TODO(#141166): This is the pod ephemeral-storage limit handed to the disk project quota, not a tmpfs size. A limit past int64 must mean no limit. Expect a zero size limit.
 		"emptyDir9": resource.NewQuantity(math.MaxInt64, resource.BinarySI),
 	}
 	for i := range pod1.Spec.Volumes {

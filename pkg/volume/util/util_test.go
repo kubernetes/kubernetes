@@ -145,6 +145,20 @@ func TestCalculateTimeoutForVolume(t *testing.T) {
 		t.Errorf("Expected 4500 for timeout but got %v", timeout)
 	}
 
+	// Largest size whose timeout fits the activeDeadlineSeconds ceiling.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("71582788Gi")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 2147483640 {
+		t.Errorf("Expected 2147483640 for timeout but got %v", timeout)
+	}
+
+	// TODO(#141166): The size fits int64 but the product does not fit int32; the timeout must be at most math.MaxInt32.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("71582789Gi")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 2147483670 {
+		t.Errorf("Expected 2147483670 for timeout but got %v", timeout)
+	}
+
 	// TODO(#141166): The timeout must be at most math.MaxInt32.
 	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("100E")
 	timeout = CalculateTimeoutForVolume(50, 30, pv)

@@ -144,6 +144,20 @@ func TestCalculateCPUMaximum(t *testing.T) {
 			want:     1,
 		},
 		{
+			// 10 * MilliValue() fits int64 up to and including this value.
+			name:     "largest limit whose product fits int64",
+			cpuLimit: resource.MustParse("922337203685477580m"),
+			cpuCount: 4,
+			want:     10000,
+		},
+		{
+			// TODO(#141166): MilliValue() fits int64 but 10 * MilliValue() does not; must clamp to 10000.
+			name:     "smallest limit whose product overflows int64",
+			cpuLimit: resource.MustParse("922337203685477581m"),
+			cpuCount: 4,
+			want:     1,
+		},
+		{
 			// TODO(#141166): A limit past int64 must clamp to 10000.
 			name:     "limit past int64",
 			cpuLimit: resource.MustParse("100E"),
