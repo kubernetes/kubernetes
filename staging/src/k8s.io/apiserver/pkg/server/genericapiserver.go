@@ -445,9 +445,18 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.delegationTarget.PrepareRun()
 
 	if s.openAPIConfig != nil && !s.skipOpenAPIInstallation {
-		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
-			Config: s.openAPIConfig,
-		}.InstallV2(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV2LazyBuild) {
+			// Defer building the spec until the first request;
+			// StaticOpenAPISpec remains nil so no parsed spec is retained
+			// for the lifetime of an unexercised endpoint.
+			s.OpenAPIVersionedService = routes.OpenAPI{
+				Config: s.openAPIConfig,
+			}.InstallV2Lazy(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		} else {
+			s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
+				Config: s.openAPIConfig,
+			}.InstallV2(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		}
 	}
 
 	if s.openAPIV3Config != nil && !s.skipOpenAPIInstallation {
