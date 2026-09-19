@@ -1374,11 +1374,11 @@ func TestWorkerStopCancelsInFlightExecProbe(t *testing.T) {
 // called, so tests can assert a container was never probed at all.
 type countingExecProber struct {
 	fakeExecProber
-	calls int32
+	calls atomic.Int32
 }
 
 func (p *countingExecProber) Probe(c exec.Cmd) (probe.Result, string, error) {
-	atomic.AddInt32(&p.calls, 1)
+	p.calls.Add(1)
 	return p.fakeExecProber.Probe(c)
 }
 
@@ -1415,7 +1415,7 @@ func TestWorkerStopBeforeRunPreventsProbing(t *testing.T) {
 		t.Fatal("run() did not return after stop() was called before it started")
 	}
 
-	if calls := atomic.LoadInt32(&prober.calls); calls != 0 {
+	if calls := prober.calls.Load(); calls != 0 {
 		t.Errorf("expected the container to never be probed, but the prober was called %d time(s)", calls)
 	}
 	if err := waitForWorkerExit(t, m, []probeKey{key}); err != nil {
