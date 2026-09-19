@@ -3211,3 +3211,52 @@ func replicationControllersScaleSubresourceTableObjBody(codec runtime.Codec, rep
 	}
 	return cmdtesting.ObjBody(codec, table)
 }
+
+// errWriter is an io.Writer that always returns an error, used to simulate
+// a broken-pipe or closed-writer scenario in printer tests.
+type errWriter struct{ err error }
+
+func (e *errWriter) Write(p []byte) (int, error) { return 0, e.err }
+
+// TestRunHumanReadablePrinterPropagatesPrintObjError is a regression test for
+// the bug where errors returned by printer.PrintObj were silently discarded in
+// the human-readable output loop of Run(), causing kubectl to exit 0 even when
+// output to the writer had failed (e.g. broken pipe).
+func TestRunHumanReadablePrinterPropagatesPrintObjError(t *testing.T) {
+	pods, _, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
+	}
+
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
+
+	// Replace the standard Out with a writer that always fails, simulating a
+	// closed pipe or any IO error that occurs while writing output.
+	writeErr := fmt.Errorf("simulated write error: broken pipe")
+	streams.Out = &errWriter{err: writeErr}
+
+	o := NewGetOptions("kubectl", streams)
+	// Force human-readable (table) output — the code path under test.
+	outputFmt := ""
+	o.PrintFlags.OutputFormat = &outputFmt
+	o.IsHumanReadablePrinter = true
+
+	cmd := NewCmdGet("kubectl", tf, streams)
+	if err := o.Complete(tf, cmd, []string{"pods", "foo"}); err != nil {
+		t.Fatalf("Complete() returned unexpected error: %v", err)
+	}
+
+	err := o.Run(tf, []string{"pods", "foo"})
+	if err == nil {
+		t.Fatal("expected Run() to return an error when PrintObj fails, but got nil")
+	}
+	if !strings.Contains(err.Error(), writeErr.Error()) {
+		t.Errorf("expected error to contain %q, got: %v", writeErr.Error(), err)
+	}
+}
