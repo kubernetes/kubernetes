@@ -223,11 +223,7 @@ func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []
 	s := NewSnapshot(pods, nodes)
 	for _, podGroup := range podGroups {
 		key := fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)
-		pgs, ok := s.podGroupStates[key]
-		if !ok {
-			pgs = &podGroupStateSnapshot{podGroupStateData: newPodGroupStateData()}
-			s.podGroupStates[key] = pgs
-		}
+		pgs := s.getOrCreatePodGroupState(key)
 		pgs.podGroup = podGroup
 	}
 	return s
@@ -239,11 +235,7 @@ func NewTestSnapshotWithCompositePodGroups(pods []*v1.Pod, nodes []*v1.Node, pod
 	s := NewTestSnapshotWithPodGroups(pods, nodes, podGroups)
 	for _, cpg := range compositePodGroups {
 		key := fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name)
-		cpgs, ok := s.compositePodGroupStates[key]
-		if !ok {
-			cpgs = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
-			s.compositePodGroupStates[key] = cpgs
-		}
+		cpgs := s.getOrCreateCompositePodGroupState(key)
 		cpgs.compositePodGroup = cpg
 	}
 	for entityKey, cpgs := range s.compositePodGroupStates {
@@ -251,11 +243,7 @@ func NewTestSnapshotWithCompositePodGroups(pods []*v1.Pod, nodes []*v1.Node, pod
 			continue
 		}
 		parentKey := fwk.CompositePodGroupKey(cpgs.compositePodGroup.Namespace, *cpgs.compositePodGroup.Spec.ParentCompositePodGroupName)
-		parentState, ok := s.compositePodGroupStates[parentKey]
-		if !ok {
-			parentState = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
-			s.compositePodGroupStates[parentKey] = parentState
-		}
+		parentState := s.getOrCreateCompositePodGroupState(parentKey)
 		parentState.addChild(entityKey)
 	}
 	for entityKey, pgs := range s.podGroupStates {
@@ -263,11 +251,7 @@ func NewTestSnapshotWithCompositePodGroups(pods []*v1.Pod, nodes []*v1.Node, pod
 			continue
 		}
 		parentKey := fwk.CompositePodGroupKey(pgs.podGroup.Namespace, *pgs.podGroup.Spec.ParentCompositePodGroupName)
-		parentState, ok := s.compositePodGroupStates[parentKey]
-		if !ok {
-			parentState = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
-			s.compositePodGroupStates[parentKey] = parentState
-		}
+		parentState := s.getOrCreateCompositePodGroupState(parentKey)
 		parentState.addChild(entityKey)
 	}
 	return s
@@ -976,4 +960,121 @@ func (s *Snapshot) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, e
 
 func (s *Snapshot) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error) {
 	return s, nil
+}
+
+// AddGenericPodGroups adds generic pod group objects to the snapshot,
+// linking each to its parent composite pod group if CompositePodGroup is enabled.
+// In case of failure while adding any pod group, all previously added pod groups
+// from this call are rolled back and an error is returned.
+// NOTE: this function is meant to be use by simulation library ONLY.
+func (s *Snapshot) AddGenericPodGroups(genericPodGroups []*fwk.GenericPodGroup) error {
+	added := make([]*fwk.GenericPodGroup, 0, len(genericPodGroups))
+	rollback := func() {
+		for _, a := range slices.Backward(added) {
+			_ = s.RemoveGenericPodGroup(a)
+		}
+	}
+
+	for _, gpg := range genericPodGroups {
+		if gpg == nil {
+			rollback()
+			return fmt.Errorf("cannot add nil GenericPodGroup to snapshot")
+		}
+		key := gpg.GetKey()
+
+		switch gpg.GetType() {
+		case fwk.PodGroupKeyType:
+			pgs := s.getOrCreatePodGroupState(key)
+			if pgs.podGroup != nil {
+				rollback()
+				return fmt.Errorf("pod group %s already exists in snapshot", key)
+			}
+			pgs.setPodGroup(gpg.PodGroup)
+		case fwk.CompositePodGroupKeyType:
+			cpgs := s.getOrCreateCompositePodGroupState(key)
+			if cpgs.compositePodGroup != nil {
+				rollback()
+				return fmt.Errorf("composite pod group %s already exists in snapshot", key)
+			}
+			cpgs.setCompositePodGroup(gpg.CompositePodGroup)
+		default:
+			rollback()
+			return fmt.Errorf("unsupported generic pod group type %q for %s", gpg.GetType(), key)
+		}
+
+		if s.compositePodGroupEnabled {
+			if parentKey, hasParent := gpg.GetParentKey(); hasParent {
+				parent := s.getOrCreateCompositePodGroupState(parentKey)
+				parent.addChild(key)
+			}
+		}
+
+		added = append(added, gpg)
+	}
+
+	return nil
+}
+
+// RemoveGenericPodGroup removes a generic pod group object from the snapshot,
+// unlinking it from its parent composite pod group if CompositePodGroup is enabled.
+// NOTE: this function is meant to be use by simulation library ONLY.
+func (s *Snapshot) RemoveGenericPodGroup(gpg *fwk.GenericPodGroup) error {
+	if gpg == nil {
+		return fmt.Errorf("cannot remove nil GenericPodGroup from snapshot")
+	}
+	key := gpg.GetKey()
+
+	switch gpg.GetType() {
+	case fwk.PodGroupKeyType:
+		pgs, exists := s.podGroupStates[key]
+		if !exists || pgs.podGroup == nil {
+			return fmt.Errorf("pod group %s not found in snapshot", key)
+		}
+		pgs.removePodGroup()
+		if pgs.empty() {
+			delete(s.podGroupStates, key)
+		}
+	case fwk.CompositePodGroupKeyType:
+		cpgs, exists := s.compositePodGroupStates[key]
+		if !exists || cpgs.compositePodGroup == nil {
+			return fmt.Errorf("composite pod group %s not found in snapshot", key)
+		}
+		cpgs.removeCompositePodGroup()
+		if cpgs.empty() {
+			delete(s.compositePodGroupStates, key)
+		}
+	default:
+		return fmt.Errorf("unsupported generic pod group type %q for %s", gpg.GetType(), key)
+	}
+
+	if s.compositePodGroupEnabled {
+		if parentKey, hasParent := gpg.GetParentKey(); hasParent {
+			if parent, exists := s.compositePodGroupStates[parentKey]; exists {
+				parent.removeChild(key)
+				if parent.empty() {
+					delete(s.compositePodGroupStates, parentKey)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Snapshot) getOrCreatePodGroupState(key fwk.EntityKey) *podGroupStateSnapshot {
+	pgs, exists := s.podGroupStates[key]
+	if !exists {
+		pgs = &podGroupStateSnapshot{podGroupStateData: newPodGroupStateData()}
+		s.podGroupStates[key] = pgs
+	}
+	return pgs
+}
+
+func (s *Snapshot) getOrCreateCompositePodGroupState(key fwk.EntityKey) *compositePodGroupStateSnapshot {
+	cpgs, exists := s.compositePodGroupStates[key]
+	if !exists {
+		cpgs = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
+		s.compositePodGroupStates[key] = cpgs
+	}
+	return cpgs
 }
