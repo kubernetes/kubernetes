@@ -178,15 +178,22 @@ func TestCacheBasedConfigMapManager(t *testing.T) {
 type stubObjectManager struct {
 	object runtime.Object
 	err    error
+
+	registeredPod   *v1.Pod
+	unregisteredPod *v1.Pod
 }
 
 func (s *stubObjectManager) GetObject(namespace, name string) (runtime.Object, error) {
 	return s.object, s.err
 }
 
-func (s *stubObjectManager) RegisterPod(pod *v1.Pod) {}
+func (s *stubObjectManager) RegisterPod(pod *v1.Pod) {
+	s.registeredPod = pod
+}
 
-func (s *stubObjectManager) UnregisterPod(pod *v1.Pod) {}
+func (s *stubObjectManager) UnregisterPod(pod *v1.Pod) {
+	s.unregisteredPod = pod
+}
 
 func TestSimpleConfigMapManager(t *testing.T) {
 	configMap := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "cm1"}}
@@ -280,11 +287,16 @@ func TestConfigMapManagerRegisterPodDelegates(t *testing.T) {
 	stub := &stubObjectManager{object: &v1.ConfigMap{}}
 	configMapManager := &configMapManager{manager: stub}
 
-	// Delegation only, so the assertion is simply that these reach the
-	// underlying manager without panicking.
 	pod := podWithConfigMaps("ns1", "name1", configMapsToAttach{volumes: []string{"cm1"}})
 	configMapManager.RegisterPod(pod)
+	if stub.registeredPod != pod {
+		t.Errorf("expected RegisterPod to delegate to the underlying manager with %v, got %v", pod, stub.registeredPod)
+	}
+
 	configMapManager.UnregisterPod(pod)
+	if stub.unregisteredPod != pod {
+		t.Errorf("expected UnregisterPod to delegate to the underlying manager with %v, got %v", pod, stub.unregisteredPod)
+	}
 }
 
 func TestCachingAndWatchingConfigMapManagers(t *testing.T) {

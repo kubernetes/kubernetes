@@ -162,15 +162,22 @@ func TestCacheBasedSecretManager(t *testing.T) {
 type stubObjectManager struct {
 	object runtime.Object
 	err    error
+
+	registeredPod   *v1.Pod
+	unregisteredPod *v1.Pod
 }
 
 func (s *stubObjectManager) GetObject(namespace, name string) (runtime.Object, error) {
 	return s.object, s.err
 }
 
-func (s *stubObjectManager) RegisterPod(pod *v1.Pod) {}
+func (s *stubObjectManager) RegisterPod(pod *v1.Pod) {
+	s.registeredPod = pod
+}
 
-func (s *stubObjectManager) UnregisterPod(pod *v1.Pod) {}
+func (s *stubObjectManager) UnregisterPod(pod *v1.Pod) {
+	s.unregisteredPod = pod
+}
 
 func TestSimpleSecretManager(t *testing.T) {
 	secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "s1"}}
@@ -264,11 +271,16 @@ func TestSecretManagerRegisterPodDelegates(t *testing.T) {
 	stub := &stubObjectManager{object: &v1.Secret{}}
 	secretManager := &secretManager{manager: stub}
 
-	// Delegation only, so the assertion is simply that these reach the
-	// underlying manager without panicking.
 	pod := podWithSecrets("ns1", "name1", secretsToAttach{imagePullSecretNames: []string{"s1"}})
 	secretManager.RegisterPod(pod)
+	if stub.registeredPod != pod {
+		t.Errorf("expected RegisterPod to delegate to the underlying manager with %v, got %v", pod, stub.registeredPod)
+	}
+
 	secretManager.UnregisterPod(pod)
+	if stub.unregisteredPod != pod {
+		t.Errorf("expected UnregisterPod to delegate to the underlying manager with %v, got %v", pod, stub.unregisteredPod)
+	}
 }
 
 func TestCachingAndWatchingSecretManagers(t *testing.T) {
