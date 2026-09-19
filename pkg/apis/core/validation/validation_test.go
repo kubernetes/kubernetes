@@ -55,7 +55,6 @@ import (
 const (
 	dnsLabelErrMsg                    = "a lowercase RFC 1123 label must consist of"
 	dnsSubdomainLabelErrMsg           = "a lowercase RFC 1123 subdomain"
-	envVarNameErrMsg                  = "a valid environment variable name must consist of"
 	relaxedEnvVarNameFmtErrMsg string = "a valid environment variable name must consist only of printable ASCII characters other than '='"
 	noUserNamespace                   = false
 )
@@ -6806,7 +6805,7 @@ func TestRelaxedValidateEnv(t *testing.T) {
 			},
 		},
 	}
-	if errs := ValidateEnv(successCase, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) != 0 {
+	if errs := ValidateEnv(successCase, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success, got: %v", errs)
 	}
 
@@ -7037,7 +7036,7 @@ func TestRelaxedValidateEnv(t *testing.T) {
 	},
 	}
 	for _, tc := range errorCases {
-		if errs := ValidateEnv(tc.envs, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) == 0 {
+		if errs := ValidateEnv(tc.envs, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
@@ -7172,56 +7171,8 @@ func TestValidateEnv(t *testing.T) {
 		{Name: "[\\]^_`{}|~", Value: "value"},
 	}
 
-	if errs := ValidateEnv(updateSuccessCase, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) != 0 {
+	if errs := ValidateEnv(updateSuccessCase, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success, got: %v", errs)
-	}
-
-	updateErrorCase := []struct {
-		name          string
-		envs          []core.EnvVar
-		expectedError string
-	}{
-		{
-			name: "invalid name a",
-			envs: []core.EnvVar{
-				{Name: "!\"#$%&'()", Value: "value"},
-			},
-			expectedError: `field[0].name: Invalid value: ` + "\"!\\\"#$%&'()\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name b",
-			envs: []core.EnvVar{
-				{Name: "* +,-./0123456789", Value: "value"},
-			},
-			expectedError: `field[0].name: Invalid value: ` + "\"* +,-./0123456789\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name c",
-			envs: []core.EnvVar{
-				{Name: ":;<>?@", Value: "value"},
-			},
-			expectedError: `field[0].name: Invalid value: ` + "\":;<>?@\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name d",
-			envs: []core.EnvVar{
-				{Name: "[\\]^_{}|~", Value: "value"},
-			},
-			expectedError: `field[0].name: Invalid value: ` + "\"[\\\\]^_{}|~\": " + envVarNameErrMsg,
-		},
-	}
-
-	for _, tc := range updateErrorCase {
-		if errs := ValidateEnv(tc.envs, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
-			t.Errorf("expected failure for %s", tc.name)
-		} else {
-			for i := range errs {
-				str := errs[i].Error()
-				if str != "" && !strings.Contains(str, tc.expectedError) {
-					t.Errorf("%s: expected error detail either empty or %q, got %q", tc.name, tc.expectedError, str)
-				}
-			}
-		}
 	}
 
 	errorCases := []struct {
@@ -7525,76 +7476,8 @@ func TestValidateEnvFrom(t *testing.T) {
 		},
 	}}
 
-	if errs := ValidateEnvFrom(updateSuccessCase, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) != 0 {
+	if errs := ValidateEnvFrom(updateSuccessCase, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success, got: %v", errs)
-	}
-
-	updateErrorCase := []struct {
-		name          string
-		envs          []core.EnvFromSource
-		expectedError string
-	}{
-		{
-			name: "invalid name a",
-			envs: []core.EnvFromSource{
-				{
-					Prefix: "!\"#$%&'()",
-					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-					},
-				},
-			},
-			expectedError: `field[0].prefix: Invalid value: ` + "\"!\\\"#$%&'()\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name b",
-			envs: []core.EnvFromSource{
-				{
-					Prefix: "* +,-./0123456789",
-					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-					},
-				},
-			},
-			expectedError: `field[0].prefix: Invalid value: ` + "\"* +,-./0123456789\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name c",
-			envs: []core.EnvFromSource{
-				{
-					Prefix: ":;<>?@",
-					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-					},
-				},
-			},
-			expectedError: `field[0].prefix: Invalid value: ` + "\":;<>?@\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name d",
-			envs: []core.EnvFromSource{
-				{
-					Prefix: "[\\]^_{}|~",
-					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-					},
-				},
-			},
-			expectedError: `field[0].prefix: Invalid value: ` + "\"[\\\\]^_{}|~\": " + envVarNameErrMsg,
-		},
-	}
-
-	for _, tc := range updateErrorCase {
-		if errs := ValidateEnvFrom(tc.envs, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
-			t.Errorf("expected failure for %s", tc.name)
-		} else {
-			for i := range errs {
-				str := errs[i].Error()
-				if str != "" && !strings.Contains(str, tc.expectedError) {
-					t.Errorf("%s: expected error detail either empty or %q, got %q", tc.name, tc.expectedError, str)
-				}
-			}
-		}
 	}
 
 	errorCases := []struct {
@@ -7895,7 +7778,7 @@ func TestRelaxedValidateEnvFrom(t *testing.T) {
 		},
 	},
 	}
-	if errs := ValidateEnvFrom(successCase, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) != 0 {
+	if errs := ValidateEnvFrom(successCase, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -7967,7 +7850,7 @@ func TestRelaxedValidateEnvFrom(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCases {
-		if errs := ValidateEnvFrom(tc.envs, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) == 0 {
+		if errs := ValidateEnvFrom(tc.envs, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
@@ -9696,7 +9579,7 @@ func TestValidateContainers(t *testing.T) {
 		"invalid env var name",
 		line(),
 		[]core.Container{
-			{Name: "abc", Image: "image", Env: []core.EnvVar{{Name: "ev!1"}}, ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+			{Name: "abc", Image: "image", Env: []core.EnvVar{{Name: "ev=1"}}, ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
 		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].env[0].name"}},
 	}, {
