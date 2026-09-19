@@ -5521,6 +5521,46 @@ func TestUpdateJobRequeue(t *testing.T) {
 	}
 }
 
+func TestDeleteJobClearsPodExpectations(t *testing.T) {
+	// Regression test: a Job deleted and recreated with the same name used to
+	// inherit any unsatisfied pod create/delete expectation left over from the
+	// deleted Job, because deleteJob cleared consistencyStore and
+	// finishedJobExpectations but not the pod-management expectations that
+	// gate manageJob. That left the recreated Job's syncJob calls skipping
+	// pod management (satisfiedExpectations false) until the 5-minute
+	// ControllerExpectationsTimeout expired on its own. The ReplicaSet
+	// controller's deleteReplicaSet already clears this on delete; deleteJob
+	// should do the same.
+	logger, ctx := ktesting.NewTestContext(t)
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+
+	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+
+	key, err := controller.KeyFunc(job)
+	if err != nil {
+		t.Fatalf("Unexpected error getting job key: %v", err)
+	}
+
+	// Simulate an outstanding pod-creation expectation from before the delete,
+	// as would exist if manageJob had issued a create that was never observed.
+	if err := manager.expectations.ExpectCreations(logger, key, 1); err != nil {
+		t.Fatalf("ExpectCreations() error = %v", err)
+	}
+	if manager.expectations.SatisfiedExpectations(logger, key) {
+		t.Fatalf("expectations should be unsatisfied before delete")
+	}
+
+	manager.deleteJob(logger, job)
+
+	if !manager.expectations.SatisfiedExpectations(logger, key) {
+		t.Errorf("expectations should be cleared (satisfied) after deleteJob, so a Job recreated with the same name starts clean")
+	}
+}
+
 func TestGetPodCreationInfoForIndependentIndexes(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	now := time.Now()
