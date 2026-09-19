@@ -21,6 +21,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/component-helpers/scheduling/corev1"
 )
 
@@ -61,6 +63,55 @@ func GetPersistentVolumeClass(volume *v1.PersistentVolume) string {
 	}
 
 	return volume.Spec.StorageClassName
+}
+
+// ContainsAccessMode returns true if the requested access mode is present.
+func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}
+
+// MatchTopologySelectorTerms checks whether the given labels match any of the
+// topology selector terms. An empty term list matches all objects, while an
+// empty term matches no objects.
+func MatchTopologySelectorTerms(topologySelectorTerms []v1.TopologySelectorTerm, lbls labels.Set) bool {
+	if len(topologySelectorTerms) == 0 {
+		return true
+	}
+
+	for _, term := range topologySelectorTerms {
+		if len(term.MatchLabelExpressions) == 0 {
+			continue
+		}
+
+		selector, err := topologySelectorRequirementsAsSelector(term.MatchLabelExpressions)
+		if err == nil && selector.Matches(lbls) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func topologySelectorRequirementsAsSelector(requirements []v1.TopologySelectorLabelRequirement) (labels.Selector, error) {
+	if len(requirements) == 0 {
+		return labels.Nothing(), nil
+	}
+
+	selector := labels.NewSelector()
+	for _, expression := range requirements {
+		requirement, err := labels.NewRequirement(expression.Key, selection.In, expression.Values)
+		if err != nil {
+			return nil, err
+		}
+		selector = selector.Add(*requirement)
+	}
+
+	return selector, nil
 }
 
 // CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
