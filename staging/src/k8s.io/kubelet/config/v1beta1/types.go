@@ -1186,6 +1186,32 @@ type ImagePullIntent struct {
 	Image string `json:"image"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type ImagePreloadedRecord struct {
+	metav1.TypeMeta `json:""`
+
+	// LastUpdatedTime is the time of the last update to this record
+	LastUpdatedTime metav1.Time `json:"lastUpdatedTime"`
+
+	// ImageRef is a reference to the image represented by this file as received
+	// from the CRI.
+	// The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe
+	// characters like ':' and '/'.
+	ImageRef string `json:"imageRef"`
+
+	// ObservedImages is a set of images, where `image` is the content of a pod's
+	// container `image` field that's got its tag/digest removed.
+	//
+	// Example:
+	//   Container requests the `hello-world:latest@sha256:91fb4b041da273d5a3273b6d587d62d518300a6ad268b28628f74997b93171b2` image:
+	//     "observedImages": {
+	//       "hello-world": {}
+	//     }
+	ObservedImages map[string]PreloadedImage `json:"observedImages,omitempty"`
+}
+
+type PreloadedImage struct{}
+
 // ImagePullRecord is a record of an image that was pulled by the kubelet.
 //
 // If there are no records in the `kubernetesSecrets` field and both `nodeWideCredentials`
