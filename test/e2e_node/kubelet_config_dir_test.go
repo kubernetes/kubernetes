@@ -148,10 +148,12 @@ featureGates:
 			// Meanwhile, this value was not explicitly set, but could have been overridden by a "default" of 0 for the type.
 			// Ensure the true default persists.
 			initialConfig.CPUCFSQuotaPeriod = metav1.Duration{Duration: time.Duration(100000000)}
-			// This covers the case for a map with the list of values.
+			// This covers the case for a map with the list of values. The merged config is
+			// read back from /configz, which masks StaticPodURLHeader because its values
+			// carry credentials, so the keys survive the merge but the values do not.
 			initialConfig.StaticPodURLHeader = map[string][]string{
-				"kubelet-api-support": {"Authorization: 8945AFSG1", "X-Custom-Header: 987"},
-				"custom-static-pod":   {"Authorization: 223EWRWER", "X-Custom-Header: 345"},
+				"kubelet-api-support": {"<masked>"},
+				"custom-static-pod":   {"<masked>"},
 			}
 			// This covers the case where the fields within the list of structs are overridden.
 			initialConfig.ShutdownGracePeriodByPodPriority = []kubeletconfig.ShutdownGracePeriodByPodPriority{
