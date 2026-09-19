@@ -111,6 +111,10 @@ type Scheduler struct {
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
 	podGroupPreemptionPolicyEnabled                     bool
 
+	// statusPatchLimiter caps how many failure handler status patches may be in flight at once.
+	// Nil when async API calls are disabled or the limit is turned off.
+	statusPatchLimiter *statusPatchLimiter
+
 	algorithm *SchedulingAlgorithm
 }
 
@@ -137,6 +141,7 @@ type schedulerOptions struct {
 	extenders                  []schedulerapi.Extender
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32
+	failureHandlerParallelism  int
 	applyDefaultProfile        bool
 }
 
@@ -259,6 +264,19 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 	}
 }
 
+// DefaultFailureHandlerParallelism is the default number of failure handler status patches
+// allowed to be in flight at once. It is deliberately small: a burst of unschedulable pods
+// must not consume the client's rate limiter tokens ahead of Bind and preemption calls.
+const DefaultFailureHandlerParallelism = 4
+
+// WithFailureHandlerParallelism sets how many status patches the failure handler may have
+// in flight at once. Zero or a negative value disables the limit.
+func WithFailureHandlerParallelism(parallelism int) Option {
+	return func(o *schedulerOptions) {
+		o.failureHandlerParallelism = parallelism
+	}
+}
+
 var defaultSchedulerOptions = schedulerOptions{
 	clock:                             clock.RealClock{},
 	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
@@ -267,6 +285,7 @@ var defaultSchedulerOptions = schedulerOptions{
 	podMaxInUnschedulablePodsDuration: internalqueue.DefaultPodMaxInUnschedulablePodsDuration,
 	maxBatchAge:                       frameworkruntime.DefaultMaxBatchAge,
 	parallelism:                       int32(parallelize.DefaultParallelism),
+	failureHandlerParallelism:         DefaultFailureHandlerParallelism,
 	// Ideally we would statically set the default profile here, but we can't because
 	// creating the default profile may require testing feature gates, which may get
 	// set dynamically in tests. Therefore, we delay creating it until New is actually
@@ -370,6 +389,13 @@ func New(ctx context.Context,
 		compositePodGroupLister = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister()
 	}
 
+	// The limiter only matters when patches are dispatched asynchronously; the synchronous
+	// path already allows at most one in-flight patch because the scheduling cycle blocks.
+	var patchLimiter *statusPatchLimiter
+	if comps.apiDispatcher != nil {
+		patchLimiter = newStatusPatchLimiter(options.failureHandlerParallelism)
+	}
+
 	sched := &Scheduler{
 		Cache:                                  schedulerCache,
 		client:                                 client,
@@ -384,6 +410,7 @@ func New(ctx context.Context,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
 		podGroupPreemptionPolicyEnabled:                     feature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
+		statusPatchLimiter:                                  patchLimiter,
 	}
 	sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore))
 	sched.NextEntity = podQueue.Pop
