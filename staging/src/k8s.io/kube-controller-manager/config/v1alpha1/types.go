@@ -130,6 +130,9 @@ type KubeControllerManagerConfiguration struct {
 	GarbageCollectorController GarbageCollectorControllerConfiguration
 	// HPAControllerConfiguration holds configuration for HPAController related features.
 	HPAController HPAControllerConfiguration
+	// ImperativeEvictionResponderControllerConfiguration holds configuration for
+	// ImperativeEvictionResponderController related features.
+	ImperativeEvictionResponderController ImperativeEvictionResponderControllerConfiguration
 	// JobControllerConfiguration holds configuration for JobController related features.
 	JobController JobControllerConfiguration
 	// CronJobControllerConfiguration holds configuration for CronJobController related features.
@@ -357,6 +360,15 @@ type HPAControllerConfiguration struct {
 	// HPA will disregard CPU samples from unready pods that had last readiness change during that
 	// period.
 	HorizontalPodAutoscalerInitialReadinessDelay metav1.Duration
+}
+
+// ImperativeEvictionResponderControllerConfiguration contains elements configuring
+// the imperative eviction responder controller.
+type ImperativeEvictionResponderControllerConfiguration struct {
+	// ConcurrentImperativeEvictionResponderSyncs is the number of eviction object syncing and imperative
+	// eviction operations that will be done concurrently. Larger number = bigger throughput of imperative eviction
+	// calls (pods/<name>/eviction subresource) and faster Eviction status updating, but more CPU (and network) load.
+	ConcurrentImperativeEvictionResponderSyncs int32
 }
 
 // JobControllerConfiguration contains elements describing JobController.
