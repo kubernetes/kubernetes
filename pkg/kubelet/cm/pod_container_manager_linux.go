@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
@@ -111,7 +112,12 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
+		logger.Info("DEBUG EnsureExists: created pod cgroup, about to check for a stale one in the other partition",
+			"pod", klog.KObj(pod), "cgroupName", podContainerName)
 		m.removeStalePodCgroup(logger, pod)
+	} else {
+		logger.V(4).Info("DEBUG EnsureExists: pod cgroup already exists, not touching the stale-cgroup cleanup path",
+			"pod", klog.KObj(pod))
 	}
 	return nil
 }
@@ -179,18 +185,34 @@ func (m *podContainerManagerImpl) removeStalePodCgroup(logger klog.Logger, pod *
 		stale = podCgroupNameIn(m.systemQOSContainersInfo, pod)
 	}
 	if !m.cgroupManager.Exists(stale) {
+		logger.Info("DEBUG removeStalePodCgroup: stale cgroup does not exist, nothing to do",
+			"pod", klog.KObj(pod), "cgroupName", stale)
 		return
 	}
+	// DEBUG: capture what's still attached to the cgroup right before removal,
+	// so a failure below can be diagnosed as "still has processes" vs. "empty
+	// but the kernel hasn't released charged memory yet" vs. something else.
+	pidsBefore := m.cgroupManager.Pids(logger, stale)
+	memBefore, memErrBefore := m.cgroupManager.MemoryUsage(stale)
+	start := time.Now()
+	logger.Info("DEBUG removeStalePodCgroup: attempting to destroy stale cgroup",
+		"pod", klog.KObj(pod), "cgroupName", stale, "pidsBefore", pidsBefore,
+		"memoryUsageBefore", memBefore, "memoryUsageErrBefore", memErrBefore)
 	// Plain removal rather than podContainerManagerImpl.Destroy, which kills the
 	// processes it finds first. A cgroup that still holds any is not the leftover
 	// this is after, and rmdir fails on it.
-	if err := m.cgroupManager.Destroy(logger, &CgroupConfig{Name: stale}); err != nil {
-		logger.V(4).Info("Failed to remove the pod cgroup left in the other partition",
-			"pod", klog.KObj(pod), "cgroupName", stale, "err", err)
+	err := m.cgroupManager.Destroy(logger, &CgroupConfig{Name: stale})
+	elapsed := time.Since(start)
+	if err != nil {
+		pidsAfter := m.cgroupManager.Pids(logger, stale)
+		memAfter, memErrAfter := m.cgroupManager.MemoryUsage(stale)
+		logger.Info("DEBUG removeStalePodCgroup: failed to remove the pod cgroup left in the other partition",
+			"pod", klog.KObj(pod), "cgroupName", stale, "err", err, "elapsed", elapsed,
+			"pidsAfter", pidsAfter, "memoryUsageAfter", memAfter, "memoryUsageErrAfter", memErrAfter)
 		return
 	}
-	logger.V(2).Info("Removed the pod cgroup left in the other partition",
-		"pod", klog.KObj(pod), "cgroupName", stale)
+	logger.Info("DEBUG removeStalePodCgroup: removed the pod cgroup left in the other partition",
+		"pod", klog.KObj(pod), "cgroupName", stale, "elapsed", elapsed)
 }
 
 func (m *podContainerManagerImpl) GetPodCgroupMemoryUsage(pod *v1.Pod) (uint64, error) {

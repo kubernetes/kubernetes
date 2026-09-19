@@ -2176,16 +2176,25 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		// Don't kill containers in pod if pod's cgroups already
 		// exists or the pod is running for the first time
 		podKilled := false
-		if !pcm.Exists(pod) && !firstSync {
+		pcmExistsBeforeKill := pcm.Exists(pod)
+		logger.Info("DEBUG SyncPod cgroup section: entering", "pod", klog.KObj(pod), "podUID", pod.UID,
+			"pcmExists", pcmExistsBeforeKill, "firstSync", firstSync)
+		if !pcmExistsBeforeKill && !firstSync {
 			p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
-			if err := kl.killPod(ctx, pod, p, nil); err == nil {
+			killStart := time.Now()
+			err := kl.killPod(ctx, pod, p, nil)
+			killElapsed := time.Since(killStart)
+			if err == nil {
 				podKilled = true
 			} else {
 				if wait.Interrupted(err) {
+					logger.Info("DEBUG SyncPod cgroup section: killPod interrupted", "pod", klog.KObj(pod), "elapsed", killElapsed)
 					return false, nil, nil
 				}
 				logger.Error(err, "KillPod failed", "pod", klog.KObj(pod), "podStatus", podStatus)
 			}
+			logger.Info("DEBUG SyncPod cgroup section: killPod returned", "pod", klog.KObj(pod),
+				"podKilled", podKilled, "elapsed", killElapsed, "err", err)
 		}
 		// Create and Update pod's Cgroups
 		// Don't create cgroups for run once pod if it was killed above
@@ -2203,12 +2212,21 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				}
 			}
 		}
+		logger.Info("DEBUG SyncPod cgroup section: deciding whether to EnsureExists", "pod", klog.KObj(pod),
+			"podKilled", podKilled, "runOnce", runOnce, "willEnsureExists", !podKilled || !runOnce)
 		if !podKilled || !runOnce {
-			if !pcm.Exists(pod) {
+			pcmExistsBeforeEnsure := pcm.Exists(pod)
+			logger.Info("DEBUG SyncPod cgroup section: pcm.Exists before EnsureExists", "pod", klog.KObj(pod),
+				"pcmExists", pcmExistsBeforeEnsure)
+			if !pcmExistsBeforeEnsure {
 				if err := kl.containerManager.UpdateQOSCgroups(logger); err != nil {
 					logger.V(2).Info("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)
 				}
-				if err := pcm.EnsureExists(logger, pod); err != nil {
+				ensureStart := time.Now()
+				err := pcm.EnsureExists(logger, pod)
+				logger.Info("DEBUG SyncPod cgroup section: EnsureExists returned", "pod", klog.KObj(pod),
+					"elapsed", time.Since(ensureStart), "err", err)
+				if err != nil {
 					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
 					return false, nil, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 				}
