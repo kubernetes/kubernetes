@@ -158,7 +158,7 @@ fe00::2	ip6-allrouters
 			hostsFileName: "hosts_test_file2_with_host_aliases",
 			hostAliases: []v1.HostAlias{
 				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
-				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
+				{IP: "45.67.89.123", Hostnames: []string{"park", "doo", "boo"}},
 			},
 			rawHostsFileContent: `# another hosts file for testing.
 127.0.0.1	localhost
@@ -181,7 +181,7 @@ fe00::2	ip6-allrouters
 
 # Entries added by HostAliases.
 123.45.67.89	foo	bar	baz
-456.78.90.123	park	doo	boo
+45.67.89.123	park	doo	boo
 `,
 		},
 	}
@@ -272,7 +272,7 @@ fe00::2	ip6-allrouters
 			hostDomainName: "domainFoo",
 			hostAliases: []v1.HostAlias{
 				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
-				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
+				{IP: "45.67.89.123", Hostnames: []string{"park", "doo", "boo"}},
 			},
 			expectedContent: `# Kubernetes-managed hosts file.
 127.0.0.1	localhost
@@ -285,7 +285,7 @@ fe00::2	ip6-allrouters
 
 # Entries added by HostAliases.
 123.45.67.89	foo	bar	baz
-456.78.90.123	park	doo	boo
+45.67.89.123	park	doo	boo
 `,
 		},
 		{
