@@ -501,7 +501,8 @@ func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, er
 	if pod.Spec.Resources == nil || pod.Spec.Resources.Requests == nil {
 		return calculatePodRequestsFromContainers(pod, "", resource)
 	}
-	if _, ok := pod.Spec.Resources.Requests[resource]; !ok || !resourcehelpers.IsSupportedPodLevelResource(resource) {
+	podSpecRequest, ok := pod.Spec.Resources.Requests[resource]
+	if !ok || !resourcehelpers.IsSupportedPodLevelResource(resource) {
 		return calculatePodRequestsFromContainers(pod, "", resource)
 	}
 	if feature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
@@ -511,14 +512,7 @@ func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, er
 			}
 		}
 	}
-	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
-		ExcludeOverhead: true,
-	})
-	podRequest, ok := podLevelRequests[resource]
-	if !ok {
-		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
-	}
-	return podRequest.MilliValue(), nil
+	return podSpecRequest.MilliValue(), nil
 }
 
 // calculatePodRequestsFromContainers computes the requests for the specified
