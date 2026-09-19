@@ -22,6 +22,7 @@ import (
 	"time"
 	"unicode"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -432,6 +433,36 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		if c > unicode.MaxASCII {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q mut contains ASCII characters only", kc.PodLogsDir))
 			break
+		}
+	}
+
+	if sp := kc.SystemPartition; sp != nil {
+		if !localFeatureGate.Enabled(features.NodeSystemPartition) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeSystemPartition feature gate is required for systemPartition"))
+		}
+		if !kc.CgroupsPerQOS {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemPartition requires cgroupsPerQOS (--cgroups-per-qos) to be enabled"))
+		}
+		if len(sp.Namespaces) == 0 {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemPartition.namespaces must not be empty"))
+		}
+		for _, ns := range sp.Namespaces {
+			for _, msg := range utilvalidation.IsDNS1123Label(ns) {
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemPartition.namespaces %q: %s", ns, msg))
+			}
+		}
+		if sp.MemoryLimit != "" {
+			q, err := resource.ParseQuantity(sp.MemoryLimit)
+			if err != nil {
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemPartition.memoryLimit %q failed to parse: %w", sp.MemoryLimit, err))
+			} else if q.Sign() <= 0 {
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemPartition.memoryLimit must be positive, got %q", sp.MemoryLimit))
+			}
+		}
+		if sp.CPUSet != "" {
+			if _, err := cpuset.Parse(sp.CPUSet); err != nil {
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemPartition.cpuset %q failed to parse: %w", sp.CPUSet, err))
+			}
 		}
 	}
 

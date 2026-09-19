@@ -308,6 +308,11 @@ var (
 	NodeProblemDetector = framework.WithFeature(framework.ValidFeatures.Add("NodeProblemDetector"))
 
 	// Owner: sig-node
+	// Marks tests that exercise the node's system partition, which needs the
+	// NodeSystemPartition feature gate and a systemPartition kubelet configuration.
+	NodeSystemPartition = framework.WithFeature(framework.ValidFeatures.Add("NodeSystemPartition"))
+
+	// Owner: sig-node
 	// Tests aiming to verify oom_score functionality
 	OOMScoreAdj = framework.WithFeature(framework.ValidFeatures.Add("OOMScoreAdj"))
 

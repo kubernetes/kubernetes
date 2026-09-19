@@ -22,9 +22,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/utils/cpuset"
+
+	libcontainercgroups "github.com/opencontainers/cgroups"
 )
 
 func TestNodeAllocatableReservationForScheduling(t *testing.T) {
@@ -507,6 +515,198 @@ func TestGetCgroupConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := getCgroupConfigInternal(tc.resourceList, tc.compressibleResources)
 			tc.checks(actual, t)
+		})
+	}
+}
+
+func TestSystemPartitionQOSContainersInfo(t *testing.T) {
+	cases := []struct {
+		name           string
+		cgroupRoot     CgroupName
+		wantGuaranteed CgroupName
+		wantBurstable  CgroupName
+		wantBestEffort CgroupName
+	}{
+		{
+			name:           "default cgroup root",
+			cgroupRoot:     NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName),
+			wantGuaranteed: NewCgroupName(RootCgroupName, "kubepods", "system"),
+			wantBurstable:  NewCgroupName(RootCgroupName, "kubepods", "system", "burstable"),
+			wantBestEffort: NewCgroupName(RootCgroupName, "kubepods", "system", "besteffort"),
+		},
+		{
+			name:           "nested cgroup root",
+			cgroupRoot:     NewCgroupName(RootCgroupName, "kubelet", defaultNodeAllocatableCgroupName),
+			wantGuaranteed: NewCgroupName(RootCgroupName, "kubelet", "kubepods", "system"),
+			wantBurstable:  NewCgroupName(RootCgroupName, "kubelet", "kubepods", "system", "burstable"),
+			wantBestEffort: NewCgroupName(RootCgroupName, "kubelet", "kubepods", "system", "besteffort"),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := systemPartitionQOSContainersInfo(tc.cgroupRoot)
+			// Guaranteed pods sit directly under the partition root, matching the
+			// layout the QoS container manager creates under its own root.
+			require.Equal(t, tc.wantGuaranteed, got.Guaranteed)
+			require.Equal(t, tc.wantBurstable, got.Burstable)
+			require.Equal(t, tc.wantBestEffort, got.BestEffort)
+		})
+	}
+}
+
+func TestSystemPartitionEnabled(t *testing.T) {
+	withNamespaces := &SystemPartitionConfig{Namespaces: sets.New("kube-system")}
+	withoutNamespaces := &SystemPartitionConfig{
+		MemoryLimit: new(int64(1 << 30)),
+		CPUSet:      cpuset.New(0, 1),
+	}
+
+	cases := []struct {
+		name            string
+		featureEnabled  bool
+		cgroupsPerQOS   bool
+		systemPartition *SystemPartitionConfig
+		want            bool
+	}{
+		{
+			name:            "all set",
+			featureEnabled:  true,
+			cgroupsPerQOS:   true,
+			systemPartition: withNamespaces,
+			want:            true,
+		},
+		{
+			name:            "feature gate disabled",
+			featureEnabled:  false,
+			cgroupsPerQOS:   true,
+			systemPartition: withNamespaces,
+			want:            false,
+		},
+		{
+			name:            "cgroupsPerQOS disabled",
+			featureEnabled:  true,
+			cgroupsPerQOS:   false,
+			systemPartition: withNamespaces,
+			want:            false,
+		},
+		{
+			name:            "no system partition",
+			featureEnabled:  true,
+			cgroupsPerQOS:   true,
+			systemPartition: nil,
+			want:            false,
+		},
+		{
+			name:            "system partition without namespaces",
+			featureEnabled:  true,
+			cgroupsPerQOS:   true,
+			systemPartition: withoutNamespaces,
+			want:            false,
+		},
+		{
+			name:            "feature gate disabled and no system partition",
+			featureEnabled:  false,
+			cgroupsPerQOS:   true,
+			systemPartition: nil,
+			want:            false,
+		},
+		{
+			name:            "cgroupsPerQOS disabled and no system partition",
+			featureEnabled:  true,
+			cgroupsPerQOS:   false,
+			systemPartition: nil,
+			want:            false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.NodeSystemPartition, tc.featureEnabled)
+
+			nodeConfig := NodeConfig{
+				CgroupsPerQOS:   tc.cgroupsPerQOS,
+				SystemPartition: tc.systemPartition,
+			}
+			// The partition is scoped to cgroup v2, so nothing is enabled on a
+			// cgroup v1 host regardless of the rest of the configuration.
+			want := tc.want && libcontainercgroups.IsCgroup2UnifiedMode()
+			require.Equal(t, want, systemPartitionEnabled(nodeConfig))
+		})
+	}
+}
+
+func TestSystemPartitionCgroupConfig(t *testing.T) {
+	partitionRoot := NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName, systemPartitionCgroupName)
+
+	cases := []struct {
+		name            string
+		systemPartition *SystemPartitionConfig
+		checks          func(*testing.T, *ResourceConfig)
+	}{
+		{
+			name: "memory limit and cpuset",
+			systemPartition: &SystemPartitionConfig{
+				MemoryLimit: new(int64(4 << 30)),
+				CPUSet:      cpuset.New(0, 1, 2, 3),
+				Namespaces:  sets.New("kube-system"),
+			},
+			checks: func(t *testing.T, actual *ResourceConfig) {
+				require.NotNil(t, actual.Memory)
+				require.Equal(t, int64(4<<30), *actual.Memory)
+				require.Equal(t, "0-3", actual.CPUSet.String())
+			},
+		},
+		{
+			name: "memory limit only",
+			systemPartition: &SystemPartitionConfig{
+				MemoryLimit: new(int64(4 << 30)),
+				Namespaces:  sets.New("kube-system"),
+			},
+			checks: func(t *testing.T, actual *ResourceConfig) {
+				require.NotNil(t, actual.Memory)
+				require.Equal(t, int64(4<<30), *actual.Memory)
+				require.True(t, actual.CPUSet.IsEmpty())
+			},
+		},
+		{
+			name: "cpuset only",
+			systemPartition: &SystemPartitionConfig{
+				CPUSet:     cpuset.New(0, 1),
+				Namespaces: sets.New("kube-system"),
+			},
+			checks: func(t *testing.T, actual *ResourceConfig) {
+				require.Nil(t, actual.Memory)
+				require.Equal(t, "0-1", actual.CPUSet.String())
+			},
+		},
+		{
+			// A partition with neither limit still moves its pods into their own
+			// QoS hierarchy, so the cgroup is created with no limits on it.
+			name: "no limits",
+			systemPartition: &SystemPartitionConfig{
+				Namespaces: sets.New("kube-system"),
+			},
+			checks: func(t *testing.T, actual *ResourceConfig) {
+				require.Nil(t, actual.Memory)
+				require.True(t, actual.CPUSet.IsEmpty())
+				require.Nil(t, actual.CPUShares)
+				require.Nil(t, actual.CPUQuota)
+				require.Nil(t, actual.PidsLimit)
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cm := &containerManagerImpl{
+				NodeConfig:          NodeConfig{SystemPartition: tc.systemPartition},
+				systemPartitionRoot: partitionRoot,
+			}
+			got := cm.systemPartitionCgroupConfig()
+			require.Equal(t, partitionRoot, got.Name)
+			// Nothing is derived from node capacity, unlike the node allocatable cgroup.
+			tc.checks(t, got.ResourceParameters)
 		})
 	}
 }

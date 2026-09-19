@@ -892,6 +892,144 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: `invalid configuration: duplicate sysctl "net.ipv4.ip_forward" found in defaultPodSysctls`,
+		}, {
+			name: "valid systemPartition",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.CgroupsPerQOS = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					MemoryLimit: "4Gi",
+					CPUSet:      "0-3",
+					Namespaces:  []string{"kube-system"},
+				}
+				return conf
+			},
+		}, {
+			name: "valid systemPartition with namespaces only",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.CgroupsPerQOS = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					Namespaces: []string{"kube-system", "monitoring"},
+				}
+				return conf
+			},
+		}, {
+			name: "specify systemPartition without enabling NodeSystemPartition",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = false
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					Namespaces: []string{"kube-system"},
+				}
+				return conf
+			},
+			errMsg: "invalid configuration: NodeSystemPartition feature gate is required for systemPartition",
+		}, {
+			name: "specify systemPartition without enabling CgroupsPerQOS",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.CgroupsPerQOS = false
+				conf.EnforceNodeAllocatable = []string{}
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					Namespaces: []string{"kube-system"},
+				}
+				return conf
+			},
+			errMsg: "invalid configuration: systemPartition requires cgroupsPerQOS (--cgroups-per-qos) to be enabled",
+		}, {
+			name: "systemPartition with no namespaces",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					MemoryLimit: "4Gi",
+				}
+				return conf
+			},
+			errMsg: "invalid configuration: systemPartition.namespaces must not be empty",
+		}, {
+			name: "systemPartition with invalid namespace name",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					Namespaces: []string{"Kube_System"},
+				}
+				return conf
+			},
+			errMsg: `invalid configuration: systemPartition.namespaces "Kube_System"`,
+		}, {
+			name: "systemPartition with unparsable memoryLimit",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					MemoryLimit: "4Gx",
+					Namespaces:  []string{"kube-system"},
+				}
+				return conf
+			},
+			errMsg: `invalid configuration: systemPartition.memoryLimit "4Gx" failed to parse`,
+		}, {
+			name: "systemPartition with zero memoryLimit",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					MemoryLimit: "0",
+					Namespaces:  []string{"kube-system"},
+				}
+				return conf
+			},
+			errMsg: `invalid configuration: systemPartition.memoryLimit must be positive, got "0"`,
+		}, {
+			name: "systemPartition with negative memoryLimit",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					MemoryLimit: "-1Gi",
+					Namespaces:  []string{"kube-system"},
+				}
+				return conf
+			},
+			errMsg: `invalid configuration: systemPartition.memoryLimit must be positive, got "-1Gi"`,
+		}, {
+			name: "systemPartition with unparsable cpuset",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					CPUSet:     "0-",
+					Namespaces: []string{"kube-system"},
+				}
+				return conf
+			},
+			errMsg: `invalid configuration: systemPartition.cpuset "0-" failed to parse`,
 		},
 	}
 
