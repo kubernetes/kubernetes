@@ -1403,7 +1403,10 @@ func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) string {
 		podTemplateSpecHasher.Write(collisionCountBytes)
 	}
 
-	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32()))
+	// Encode the sum as a fixed width decimal. SafeEncodeString returns one character per
+	// input character, so a sum below 1000000000 would otherwise yield a hash shorter than
+	// the ten characters callers expect in ReplicaSet and ControllerRevision names.
+	return rand.SafeEncodeString(fmt.Sprintf("%010d", podTemplateSpecHasher.Sum32()))
 }
 
 func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, labelsToUpdate map[string]string) error {
