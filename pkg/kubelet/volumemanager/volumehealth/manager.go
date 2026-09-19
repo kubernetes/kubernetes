@@ -37,7 +37,7 @@ type StatusUpdater interface {
 
 // CSINodeUpdater updates CSINode.Status.StorageHealth.
 type CSINodeUpdater interface {
-	UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error
+	UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error
 }
 
 // HealthClientFactory creates CSI health clients for registered drivers.
@@ -167,7 +167,7 @@ func (m *manager) probeStorageHealth(ctx context.Context) {
 		setStorageHealthGauges(driverName, gaugeKeys)
 
 		// Dedup lives in nodeinfomanager.UpdateCSINodeStorageHealth.
-		if err := updater.UpdateCSINodeStorageHealth(driverName, backendHealth); err != nil {
+		if err := updater.UpdateCSINodeStorageHealth(ctx, driverName, backendHealth); err != nil {
 			logger.Error(err, "Failed to update CSINode storage health", "driver", driverName)
 		}
 	}
