@@ -70,6 +70,10 @@ import (
 
 const (
 	JitterFactor = 1.2
+
+	// onStartedLeadingBlockedWarningPeriod is the interval between warnings
+	// logged when OnStartedLeading has not returned after context cancellation.
+	onStartedLeadingBlockedWarningPeriod = 10 * time.Second
 )
 
 // NewLeaderElector creates a LeaderElector from a LeaderElectionConfig
@@ -155,6 +159,10 @@ type LeaderElectionConfig struct {
 	// ensure all code guarded by this lease has successfully completed
 	// prior to cancelling the context, or you may have two processes
 	// simultaneously acting on the critical path.
+	//
+	// When enabled, Run() keeps renewing the lock until OnStartedLeading
+	// returns, and only then releases it. OnStartedLeading MUST return
+	// promptly after its context is cancelled, otherwise Run() will block.
 	ReleaseOnCancel bool
 
 	// Name is the name of the resource lock for debugging
@@ -171,7 +179,10 @@ type LeaderElectionConfig struct {
 // possible future callbacks:
 //   - OnChallenge()
 type LeaderCallbacks struct {
-	// OnStartedLeading is called when a LeaderElector client starts leading
+	// OnStartedLeading is called when a LeaderElector client starts leading.
+	// When ReleaseOnCancel is set, it must return after the provided context
+	// is cancelled, otherwise Run() will block. At the same time, it must only
+	// return when all spawned goroutines are terminated.
 	OnStartedLeading func(context.Context)
 	// OnStoppedLeading is called when a LeaderElector client stops leading.
 	// This callback is always called when the LeaderElector exits, even if it did not start leading.
@@ -207,7 +218,13 @@ type LeaderElector struct {
 
 // Run starts the leader election loop. Run will not return
 // before leader election loop is stopped by ctx or it has
-// stopped holding the leader lease
+// stopped holding the leader lease.
+//
+// When ReleaseOnCancel is true, Run keeps renewing the lock after ctx
+// is cancelled until OnStartedLeading returns, and only then releases
+// it. Run waits for OnStartedLeading to return, so it must exit
+// promptly once its context is cancelled or Run will block
+// indefinitely.
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer runtime.HandleCrashWithContext(ctx)
 	defer le.config.Callbacks.OnStoppedLeading()
@@ -217,8 +234,64 @@ func (le *LeaderElector) Run(ctx context.Context) {
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	go le.config.Callbacks.OnStartedLeading(ctx)
-	le.renew(ctx)
+
+	if !le.config.ReleaseOnCancel {
+		go le.config.Callbacks.OnStartedLeading(ctx)
+		le.renew(ctx)
+		return
+	}
+
+	// When ReleaseOnCancel is set, keep renewing the lock until
+	// OnStartedLeading returns, then release it. The caller's context
+	// cancellation signals OnStartedLeading to shut down, but renew()
+	// keeps the lock held until that shutdown is complete.
+	renewCtx, cancelRenew := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	onStartedReturned := make(chan struct{})
+	wg.Go(func() {
+		defer func() {
+			cancelRenew()
+			close(onStartedReturned)
+		}()
+		le.config.Callbacks.OnStartedLeading(ctx)
+	})
+
+	// Log a warning periodically if OnStartedLeading is still running
+	// after the caller's context has been cancelled.
+	wg.Go(func() {
+		var (
+			warningTicker *time.Ticker
+			warningCh     <-chan time.Time
+			ctxDone       = ctx.Done()
+		)
+		defer func() {
+			if warningTicker != nil {
+				warningTicker.Stop()
+			}
+		}()
+		for {
+			select {
+			case <-onStartedReturned:
+				return
+			case <-ctxDone:
+				ctxDone = nil
+				warningTicker = time.NewTicker(onStartedLeadingBlockedWarningPeriod)
+				warningCh = warningTicker.C
+			case <-warningCh:
+				klog.FromContext(ctx).Info(
+					"Still waiting for OnStartedLeading callback to return before releasing the leader election lock",
+					"lock", le.config.Lock.Describe(),
+				)
+			}
+		}
+	})
+
+	le.renew(renewCtx)
+	// Signal OnStartedLeading to stop in case renew exited due to renewal
+	// failure rather than context cancellation.
+	cancel()
+	wg.Wait()
+	le.release(klog.FromContext(ctx))
 }
 
 // RunOrDie starts a client with the provided config or panics if the config
@@ -305,10 +378,6 @@ func (le *LeaderElector) renew(ctx context.Context) {
 		cancel()
 	}, le.config.RetryPeriod)
 
-	// if we hold the lease, give it up
-	if le.config.ReleaseOnCancel {
-		le.release(logger)
-	}
 }
 
 // release attempts to release the leader lease if we have acquired it.
