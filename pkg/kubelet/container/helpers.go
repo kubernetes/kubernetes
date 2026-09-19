@@ -26,7 +26,6 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -82,7 +81,7 @@ type RuntimeHelper interface {
 	OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error
 
 	// ResizeEphemeralVolume directly triggers a resize of the specified volume.
-	ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
+	ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
