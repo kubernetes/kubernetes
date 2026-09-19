@@ -10123,15 +10123,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         namedType: io.k8s.api.flowcontrol.v1.UserSubject
-    unions:
-    - discriminator: kind
-      fields:
-      - fieldName: group
-        discriminatorValue: Group
-      - fieldName: serviceAccount
-        discriminatorValue: ServiceAccount
-      - fieldName: user
-        discriminatorValue: User
 - name: io.k8s.api.flowcontrol.v1.UserSubject
   map:
     fields:
@@ -10449,15 +10440,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         namedType: io.k8s.api.flowcontrol.v1beta1.UserSubject
-    unions:
-    - discriminator: kind
-      fields:
-      - fieldName: group
-        discriminatorValue: Group
-      - fieldName: serviceAccount
-        discriminatorValue: ServiceAccount
-      - fieldName: user
-        discriminatorValue: User
 - name: io.k8s.api.flowcontrol.v1beta1.UserSubject
   map:
     fields:
@@ -10775,15 +10757,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         namedType: io.k8s.api.flowcontrol.v1beta2.UserSubject
-    unions:
-    - discriminator: kind
-      fields:
-      - fieldName: group
-        discriminatorValue: Group
-      - fieldName: serviceAccount
-        discriminatorValue: ServiceAccount
-      - fieldName: user
-        discriminatorValue: User
 - name: io.k8s.api.flowcontrol.v1beta2.UserSubject
   map:
     fields:
@@ -11101,15 +11074,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         namedType: io.k8s.api.flowcontrol.v1beta3.UserSubject
-    unions:
-    - discriminator: kind
-      fields:
-      - fieldName: group
-        discriminatorValue: Group
-      - fieldName: serviceAccount
-        discriminatorValue: ServiceAccount
-      - fieldName: user
-        discriminatorValue: User
 - name: io.k8s.api.flowcontrol.v1beta3.UserSubject
   map:
     fields:

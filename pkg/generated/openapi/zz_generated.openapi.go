@@ -38105,20 +38105,6 @@ func schema_k8sio_api_flowcontrol_v1_Subject(ref common.ReferenceCallback) commo
 				},
 				Required: []string{"kind"},
 			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"x-kubernetes-unions": []interface{}{
-						map[string]interface{}{
-							"discriminator": "kind",
-							"fields-to-discriminateBy": map[string]interface{}{
-								"group":          "Group",
-								"serviceAccount": "ServiceAccount",
-								"user":           "User",
-							},
-						},
-					},
-				},
-			},
 		},
 		Dependencies: []string{
 			flowcontrolv1.GroupSubject{}.OpenAPIModelName(), flowcontrolv1.ServiceAccountSubject{}.OpenAPIModelName(), flowcontrolv1.UserSubject{}.OpenAPIModelName()},
@@ -39127,20 +39113,6 @@ func schema_k8sio_api_flowcontrol_v1beta1_Subject(ref common.ReferenceCallback) 
 				},
 				Required: []string{"kind"},
 			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"x-kubernetes-unions": []interface{}{
-						map[string]interface{}{
-							"discriminator": "kind",
-							"fields-to-discriminateBy": map[string]interface{}{
-								"group":          "Group",
-								"serviceAccount": "ServiceAccount",
-								"user":           "User",
-							},
-						},
-					},
-				},
-			},
 		},
 		Dependencies: []string{
 			flowcontrolv1beta1.GroupSubject{}.OpenAPIModelName(), flowcontrolv1beta1.ServiceAccountSubject{}.OpenAPIModelName(), flowcontrolv1beta1.UserSubject{}.OpenAPIModelName()},
@@ -40148,20 +40120,6 @@ func schema_k8sio_api_flowcontrol_v1beta2_Subject(ref common.ReferenceCallback) 
 					},
 				},
 				Required: []string{"kind"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"x-kubernetes-unions": []interface{}{
-						map[string]interface{}{
-							"discriminator": "kind",
-							"fields-to-discriminateBy": map[string]interface{}{
-								"group":          "Group",
-								"serviceAccount": "ServiceAccount",
-								"user":           "User",
-							},
-						},
-					},
-				},
 			},
 		},
 		Dependencies: []string{
@@ -41174,20 +41132,6 @@ func schema_k8sio_api_flowcontrol_v1beta3_Subject(ref common.ReferenceCallback) 
 					},
 				},
 				Required: []string{"kind"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"x-kubernetes-unions": []interface{}{
-						map[string]interface{}{
-							"discriminator": "kind",
-							"fields-to-discriminateBy": map[string]interface{}{
-								"group":          "Group",
-								"serviceAccount": "ServiceAccount",
-								"user":           "User",
-							},
-						},
-					},
-				},
 			},
 		},
 		Dependencies: []string{
