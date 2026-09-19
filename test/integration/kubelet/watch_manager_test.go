@@ -72,10 +72,7 @@ func TestWatchBasedManager(t *testing.T) {
 	}
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	stopCh := make(chan struct{})
-	t.Cleanup(func() { close(stopCh) })
-
-	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, listWatcherWithWatchListSemanticsWrapper, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
+	store := manager.NewObjectCache(ctx, listObj, watchObj, newObj, isImmutable, listWatcherWithWatchListSemanticsWrapper, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute)
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
