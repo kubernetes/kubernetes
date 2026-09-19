@@ -368,15 +368,8 @@ func (*authzSelectors) ProgramOptions() []cel.ProgramOption {
 }
 
 func authorizerPath(arg1, arg2 ref.Val) ref.Val {
-	authz, ok := arg1.(authorizerVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	path, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
+	authz := arg1.(authorizerVal)
+	path := arg2.Value().(string)
 
 	if len(strings.TrimSpace(path)) == 0 {
 		return types.NewErr("path must not be empty")
@@ -386,16 +379,8 @@ func authorizerPath(arg1, arg2 ref.Val) ref.Val {
 }
 
 func authorizerGroup(arg1, arg2 ref.Val) ref.Val {
-	authz, ok := arg1.(authorizerVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	group, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
+	authz := arg1.(authorizerVal)
+	group := arg2.Value().(string)
 	return authz.groupCheck(group)
 }
 
@@ -405,20 +390,9 @@ func authorizerServiceAccount(args ...ref.Val) ref.Val {
 		return types.NoSuchOverloadErr()
 	}
 
-	authz, ok := args[0].(authorizerVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(args[0])
-	}
-
-	namespace, ok := args[1].Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(args[1])
-	}
-
-	name, ok := args[2].Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(args[2])
-	}
+	authz := args[0].(authorizerVal)
+	namespace := args[1].Value().(string)
+	name := args[2].Value().(string)
 
 	if errors := apimachineryvalidation.ValidateServiceAccountName(name, false); len(errors) > 0 {
 		return types.NewErr("Invalid service account name")
@@ -430,15 +404,8 @@ func authorizerServiceAccount(args ...ref.Val) ref.Val {
 }
 
 func groupCheckResource(arg1, arg2 ref.Val) ref.Val {
-	groupCheck, ok := arg1.(groupCheckVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	resource, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
+	groupCheck := arg1.(groupCheckVal)
+	resource := arg2.Value().(string)
 
 	if len(strings.TrimSpace(resource)) == 0 {
 		return types.NewErr("resource must not be empty")
@@ -447,15 +414,8 @@ func groupCheckResource(arg1, arg2 ref.Val) ref.Val {
 }
 
 func resourceCheckSubresource(arg1, arg2 ref.Val) ref.Val {
-	resourceCheck, ok := arg1.(resourceCheckVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	subresource, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
+	resourceCheck := arg1.(resourceCheckVal)
+	subresource := arg2.Value().(string)
 
 	result := resourceCheck
 	result.subresource = subresource
@@ -463,15 +423,8 @@ func resourceCheckSubresource(arg1, arg2 ref.Val) ref.Val {
 }
 
 func resourceCheckFieldSelector(arg1, arg2 ref.Val) ref.Val {
-	resourceCheck, ok := arg1.(resourceCheckVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	fieldSelector, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
+	resourceCheck := arg1.(resourceCheckVal)
+	fieldSelector := arg2.Value().(string)
 
 	result := resourceCheck
 	result.fieldSelector = fieldSelector
@@ -479,15 +432,8 @@ func resourceCheckFieldSelector(arg1, arg2 ref.Val) ref.Val {
 }
 
 func resourceCheckLabelSelector(arg1, arg2 ref.Val) ref.Val {
-	resourceCheck, ok := arg1.(resourceCheckVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	labelSelector, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
+	resourceCheck := arg1.(resourceCheckVal)
+	labelSelector := arg2.Value().(string)
 
 	result := resourceCheck
 	result.labelSelector = labelSelector
@@ -495,15 +441,8 @@ func resourceCheckLabelSelector(arg1, arg2 ref.Val) ref.Val {
 }
 
 func resourceCheckNamespace(arg1, arg2 ref.Val) ref.Val {
-	resourceCheck, ok := arg1.(resourceCheckVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	namespace, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
+	resourceCheck := arg1.(resourceCheckVal)
+	namespace := arg2.Value().(string)
 
 	result := resourceCheck
 	result.namespace = namespace
@@ -511,15 +450,8 @@ func resourceCheckNamespace(arg1, arg2 ref.Val) ref.Val {
 }
 
 func resourceCheckName(arg1, arg2 ref.Val) ref.Val {
-	resourceCheck, ok := arg1.(resourceCheckVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	name, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
+	resourceCheck := arg1.(resourceCheckVal)
+	name := arg2.Value().(string)
 
 	result := resourceCheck
 	result.name = name
@@ -527,48 +459,24 @@ func resourceCheckName(arg1, arg2 ref.Val) ref.Val {
 }
 
 func pathCheckCheck(arg1, arg2 ref.Val) ref.Val {
-	pathCheck, ok := arg1.(pathCheckVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	httpRequestVerb, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
+	pathCheck := arg1.(pathCheckVal)
+	httpRequestVerb := arg2.Value().(string)
 	return pathCheck.Authorize(context.TODO(), httpRequestVerb)
 }
 
 func resourceCheckCheck(arg1, arg2 ref.Val) ref.Val {
-	resourceCheck, ok := arg1.(resourceCheckVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
-	apiVerb, ok := arg2.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg1)
-	}
-
+	resourceCheck := arg1.(resourceCheckVal)
+	apiVerb := arg2.Value().(string)
 	return resourceCheck.Authorize(context.TODO(), apiVerb)
 }
 
 func decisionErrored(arg ref.Val) ref.Val {
-	decision, ok := arg.(decisionVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	decision := arg.(decisionVal)
 	return types.Bool(decision.err != nil)
 }
 
 func decisionError(arg ref.Val) ref.Val {
-	decision, ok := arg.(decisionVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	decision := arg.(decisionVal)
 	if decision.err == nil {
 		return types.String("")
 	}
@@ -576,20 +484,12 @@ func decisionError(arg ref.Val) ref.Val {
 }
 
 func decisionAllowed(arg ref.Val) ref.Val {
-	decision, ok := arg.(decisionVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	decision := arg.(decisionVal)
 	return types.Bool(decision.authDecision == authorizer.DecisionAllow)
 }
 
 func decisionReason(arg ref.Val) ref.Val {
-	decision, ok := arg.(decisionVal)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	decision := arg.(decisionVal)
 	return types.String(decision.reason)
 }
 
