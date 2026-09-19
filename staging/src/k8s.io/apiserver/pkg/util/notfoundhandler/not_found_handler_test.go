@@ -51,7 +51,7 @@ func TestNotFoundHandler(t *testing.T) {
 	if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
 		t.Fatalf("unexpected Content-Type %q, expected application/json", ct)
 	}
-	expectedMsg := `{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"the server could not find the requested resource","reason":"NotFound","code":404}`
+	expectedMsg := `{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"404 page not found","reason":"NotFound","code":404}`
 	if bodyStr != expectedMsg {
 		t.Fatalf("unexpected response: %v, expected: %v", bodyStr, expectedMsg)
 	}

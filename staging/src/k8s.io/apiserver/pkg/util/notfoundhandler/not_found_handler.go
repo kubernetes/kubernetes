@@ -71,7 +71,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			Status:  metav1.StatusFailure,
 			Code:    int32(http.StatusNotFound),
 			Reason:  metav1.StatusReasonNotFound,
-			Message: "the server could not find the requested resource",
+			Message: "404 page not found",
 		},
 	}
 	responsewriters.ErrorNegotiated(notFoundErr, h.serializer, gv, rw, req)

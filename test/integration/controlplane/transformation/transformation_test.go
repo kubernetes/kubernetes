@@ -617,7 +617,7 @@ func mustNotHaveLivez(t kubeapiservertesting.Logger, checkName, wantBodyContains
 		if err != nil {
 			return false, err
 		}
-		done := !ok && livezBodyMatchesNotFoundExpectation(body, wantBodyContains)
+		done := !ok && strings.Contains(body, wantBodyContains)
 		if !done {
 			t.Logf("expected server check %q with message %q but it is not: %s", checkName, wantBodyContains, body)
 		}
@@ -627,20 +627,6 @@ func mustNotHaveLivez(t kubeapiservertesting.Logger, checkName, wantBodyContains
 	if pollErr != nil {
 		t.Fatalf("failed to get the expected livez status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
 	}
-}
-
-// livezBodyMatchesNotFoundExpectation returns true if the verbose livez response body
-// indicates the requested check path was not found. The server used to return plain text
-// from net/http; the delegation not-found handler now returns a negotiated metav1.Status
-// JSON body for the same case (see staging/src/k8s.io/apiserver/pkg/util/notfoundhandler).
-func livezBodyMatchesNotFoundExpectation(body, wantBodyContains string) bool {
-	if strings.Contains(body, wantBodyContains) {
-		return true
-	}
-	if wantBodyContains == "404 page not found" {
-		return strings.Contains(body, "the server could not find the requested resource")
-	}
-	return false
 }
 
 func getHealthz(checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
