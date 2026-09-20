@@ -397,13 +397,15 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 			if !podutils.IsPodReady(pod) {
 				return func() string { return "pod is not ready" }, nil
 			}
-			if errs := CheckPodResized(ctx, f, pod, expectedContainers); len(errs) != 0 {
-				return func() string {
-					// Suppress managed fields to keep the failure log legible.
-					podCopy := pod.DeepCopy()
-					podCopy.ManagedFields = nil
-					return fmt.Sprintf("%s\nPod:\n%s", formatErrors(utilerrors.NewAggregate(errs)).Error(), framework.PrettyPrintJSON(podCopy))
-				}, nil
+			if expectedContainers != nil {
+				if errs := CheckPodResized(ctx, f, pod, expectedContainers); len(errs) != 0 {
+					return func() string {
+						// Suppress managed fields to keep the failure log legible.
+						podCopy := pod.DeepCopy()
+						podCopy.ManagedFields = nil
+						return fmt.Sprintf("%s\nPod:\n%s", formatErrors(utilerrors.NewAggregate(errs)).Error(), framework.PrettyPrintJSON(podCopy))
+					}, nil
+				}
 			}
 			return nil, nil
 		})),
