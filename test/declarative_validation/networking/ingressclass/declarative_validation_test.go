@@ -17,6 +17,7 @@ limitations under the License.
 package ingressclass
 
 import (
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,6 +77,15 @@ func TestDeclarativeValidateIngressClass(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Required(field.NewPath("spec", "controller"), "").MarkAlpha(),
+					},
+				},
+				"controller max length cannot be longer than 250 characters": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = "example.com/" + strings.Repeat("a", 250)
+					}),
+					expectedErrs: field.ErrorList{
+						field.TooLongCharacters(field.NewPath("spec", "controller"), "",
+							250).WithOrigin("maxLength").MarkAlpha(),
 					},
 				},
 				"missing controller and parameter name": {
