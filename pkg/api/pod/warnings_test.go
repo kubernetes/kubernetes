@@ -878,6 +878,34 @@ func TestWarnings(t *testing.T) {
 			},
 		},
 		{
+			name: "whole byte value whose milli projection overflows int64",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceMemory: resource.MustParse("9223372036854776"),
+						},
+					},
+				}},
+			}},
+			expected: nil,
+		},
+		{
+			name: "fractional byte value within a milli of the next whole byte",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceMemory: resource.MustParse("1.9999"),
+						},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].resources.requests[memory]: fractional byte value "1999900u" is invalid, must be an integer`,
+			},
+		},
+		{
 			name: "node labels in nodeSelector",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				NodeSelector: map[string]string{
