@@ -62,7 +62,7 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
@@ -377,7 +377,7 @@ func newHorizontalSetup(t *testing.T, s *horizontalScenario, testClient *fake.Cl
 	t.Helper()
 
 	metricsClient := metrics.NewRESTMetricsClient(
-		testMetricsClient.MetricsV1beta1(),
+		testMetricsClient.MetricsV1(),
 		testCMClient,
 		testEMClient,
 	)
@@ -6513,7 +6513,7 @@ func TestMultipleHPAs(t *testing.T) {
 	})
 
 	metricsClient := metrics.NewRESTMetricsClient(
-		testMetricsClient.MetricsV1beta1(),
+		testMetricsClient.MetricsV1(),
 		&cmfake.FakeCustomMetricsClient{},
 		&emfake.FakeExternalMetricsClient{},
 	)
