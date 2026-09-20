@@ -66,6 +66,18 @@ func (ep *EventPrinter) printHeadings(w io.Writer) {
 	fmt.Fprintf(w, "LAST SEEN\tTYPE\tREASON\tOBJECT\tMESSAGE\n")
 }
 
+// cellBreakChars are characters that split a tabwriter row. Same set as
+// k8s.io/cli-runtime/pkg/printers so kubectl events stays a table.
+const cellBreakChars = "\f\n\r"
+
+func formatEventMessage(msg string) string {
+	msg = strings.TrimSpace(msg)
+	if i := strings.IndexAny(msg, cellBreakChars); i >= 0 {
+		msg = msg[:i] + "..."
+	}
+	return printers.EscapeTerminal(msg)
+}
+
 func (ep *EventPrinter) printOneEvent(w io.Writer, e corev1.Event) {
 	interval := getInterval(e)
 	if ep.AllNamespaces {
@@ -77,7 +89,7 @@ func (ep *EventPrinter) printOneEvent(w io.Writer, e corev1.Event) {
 		printers.EscapeTerminal(e.Reason),
 		printers.EscapeTerminal(e.InvolvedObject.Kind),
 		printers.EscapeTerminal(e.InvolvedObject.Name),
-		printers.EscapeTerminal(strings.TrimSpace(e.Message)),
+		formatEventMessage(e.Message),
 	)
 }
 
