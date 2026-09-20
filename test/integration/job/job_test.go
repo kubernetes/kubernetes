@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -1831,6 +1832,109 @@ func TestImmediateJobRecreation(t *testing.T) {
 			Terminating: ptr.To[int32](0),
 		}, 5*time.Second)
 	}
+}
+
+// TestJobRecreationClearsPodExpectations verifies that a Job recreated with the
+// same name is reconciled even if the previous Job left a pending Pod creation
+// expectation.
+func TestJobRecreationClearsPodExpectations(t *testing.T) {
+	closeFn, restConfig, clientSet, ns := setup(t, "recreate-job-expectations")
+	t.Cleanup(closeFn)
+
+	podCreateStarted := make(chan struct{})
+	allowPodCreate := make(chan struct{})
+	var blockOnce sync.Once
+	restConfig.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+		return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if req.Method == http.MethodPost && strings.HasSuffix(req.URL.Path, "/pods") {
+				blockOnce.Do(func() {
+					close(podCreateStarted)
+					<-allowPodCreate
+				})
+			}
+			return rt.RoundTrip(req)
+		})
+	}
+	t.Cleanup(func() {
+		select {
+		case <-allowPodCreate:
+		default:
+			close(allowPodCreate)
+		}
+	})
+
+	informerSet := informers.NewSharedInformerFactoryWithOptions(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "job-informers")), 0)
+	jc, ctx, cancel := createJobControllerWithSharedInformers(t, restConfig, informerSet)
+	t.Cleanup(cancel)
+	informerSet.Start(ctx.Done())
+	go jc.Run(ctx, 1)
+	informerSet.WaitForCacheSync(ctx.Done())
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: ns.Name},
+		Spec: batchv1.JobSpec{
+			Completions: ptr.To[int32](1),
+			Parallelism: ptr.To[int32](1),
+			Template: v1.PodTemplateSpec{Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				Containers:    []v1.Container{{Name: "main-container", Image: "foo"}},
+			}},
+		},
+	}
+	oldJob, err := clientSet.BatchV1().Jobs(ns.Name).Create(ctx, job, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	select {
+	case <-podCreateStarted:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("Timed out waiting for the old Job's Pod creation to start")
+	}
+
+	jobClient := clientSet.BatchV1().Jobs(ns.Name)
+	if err := jobClient.Delete(ctx, oldJob.Name, metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {
+		t.Fatalf("Failed to delete old Job: %v", err)
+	}
+	replacement := job.DeepCopy()
+	replacement.ResourceVersion = ""
+	replacement.UID = ""
+	replacement.Spec.Suspend = ptr.To(true)
+	newJob, err := jobClient.Create(ctx, replacement, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create replacement Job: %v", err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		cachedJob, err := informerSet.Batch().V1().Jobs().Lister().Jobs(ns.Name).Get(newJob.Name)
+		return err == nil && cachedJob.UID == newJob.UID, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for the informer to observe the replacement Job: %v", err)
+	}
+	close(allowPodCreate)
+
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		updatedJob, err := jobClient.Get(ctx, newJob.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, condition := range updatedJob.Status.Conditions {
+			if condition.Type == batchv1.JobSuspended && condition.Status == v1.ConditionTrue {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Replacement Job was not reconciled after the old Job was deleted: %v", err)
+	}
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 // TestManagedBy_RecreatedJob verifies that the Job controller skips
