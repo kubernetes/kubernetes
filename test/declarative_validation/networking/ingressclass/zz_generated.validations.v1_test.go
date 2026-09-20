@@ -64,6 +64,7 @@ func init() {
 			"spec.controller": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"spec.parameters.kind": {
 				{ErrorType: "FieldValueRequired"},
