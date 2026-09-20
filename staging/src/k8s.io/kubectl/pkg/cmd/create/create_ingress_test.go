@@ -513,6 +513,141 @@ func TestCreateIngress(t *testing.T) {
 				},
 			},
 		},
+		// A comma is a legal character in a URL path, so it only opens the TLS
+		// clause when what follows it is the TLS clause.
+		"path containing a comma keeps the comma and has no TLS": {
+			rules: []string{
+				"foo.com/a,b=svc:8080",
+			},
+			annotations: []string{},
+			expected: &networkingv1.Ingress{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: networkingv1.SchemeGroupVersion.String(),
+					Kind:       "Ingress",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        ingressName,
+					Annotations: map[string]string{},
+				},
+				Spec: networkingv1.IngressSpec{
+					TLS: []networkingv1.IngressTLS{},
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "foo.com",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:     "/a,b",
+											PathType: &pathTypeExact,
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "svc",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"path containing a comma with TLS": {
+			rules: []string{
+				"foo.com/a,b=svc:8080,tls=secret1",
+			},
+			annotations: []string{},
+			expected: &networkingv1.Ingress{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: networkingv1.SchemeGroupVersion.String(),
+					Kind:       "Ingress",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        ingressName,
+					Annotations: map[string]string{},
+				},
+				Spec: networkingv1.IngressSpec{
+					TLS: []networkingv1.IngressTLS{
+						{
+							Hosts:      []string{"foo.com"},
+							SecretName: "secret1",
+						},
+					},
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "foo.com",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:     "/a,b",
+											PathType: &pathTypeExact,
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "svc",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		// The rule is delimited by its last "=" and the ":" that follows, so a
+		// path carrying its own "=" and ":" must not be read as the backend.
+		"path containing separators does not become the backend": {
+			rules: []string{
+				"foo.com/a=b:c,d=svc:8080",
+			},
+			annotations: []string{},
+			expected: &networkingv1.Ingress{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: networkingv1.SchemeGroupVersion.String(),
+					Kind:       "Ingress",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        ingressName,
+					Annotations: map[string]string{},
+				},
+				Spec: networkingv1.IngressSpec{
+					TLS: []networkingv1.IngressTLS{},
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "foo.com",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:     "/a=b:c,d",
+											PathType: &pathTypeExact,
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "svc",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range tests {

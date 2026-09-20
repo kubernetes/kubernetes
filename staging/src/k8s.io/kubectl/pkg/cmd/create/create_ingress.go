@@ -58,6 +58,12 @@ var (
 	// and the TLS validation regex
 	ruleRegex = regexHostPathSvc + regexTLS + "$"
 
+	// ruleMatcher is the compiled ruleRegex. Rules are parsed with it exactly
+	// once and consumed through the named groups: splitting a rule on "," or
+	// "=" a second time would read a separator out of a path that legitimately
+	// contains one.
+	ruleMatcher = regexp.MustCompile(ruleRegex)
+
 	ingressLong = templates.LongDesc(i18n.T(`
 	Create an ingress with the specified name.`))
 
@@ -214,13 +220,8 @@ func (o *CreateIngressOptions) Validate() error {
 		return fmt.Errorf("not enough information provided: every ingress has to either specify a default-backend (which catches all traffic) or a list of rules (which catch specific paths)")
 	}
 
-	rulevalidation, err := regexp.Compile(ruleRegex)
-	if err != nil {
-		return fmt.Errorf("failed to compile the regex")
-	}
-
 	for _, rule := range o.Rules {
-		if match := rulevalidation.MatchString(rule); !match {
+		if _, ok := parseIngressRule(rule); !ok {
 			return fmt.Errorf("rule %s is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]", rule)
 		}
 	}
@@ -296,6 +297,45 @@ func (o *CreateIngressOptions) buildAnnotations() map[string]string {
 	return annotations
 }
 
+// ingressRule holds the parts of a single --rule argument, as matched by ruleRegex.
+type ingressRule struct {
+	host       string
+	path       string
+	svcName    string
+	svcPort    string
+	tls        bool
+	secretName string
+}
+
+// parseIngressRule matches a --rule argument against ruleRegex and returns its
+// named groups. It reports false for a rule that does not match at all, which
+// is what Validate turns into a user-facing error.
+func parseIngressRule(rule string) (ingressRule, bool) {
+	match := ruleMatcher.FindStringSubmatch(rule)
+	if match == nil {
+		return ingressRule{}, false
+	}
+
+	var parsed ingressRule
+	for i, name := range ruleMatcher.SubexpNames() {
+		switch name {
+		case "host":
+			parsed.host = match[i]
+		case "path":
+			parsed.path = match[i]
+		case "svcname":
+			parsed.svcName = match[i]
+		case "svcport":
+			parsed.svcPort = match[i]
+		case "istls":
+			parsed.tls = match[i] != ""
+		case "secretname":
+			parsed.secretName = match[i]
+		}
+	}
+	return parsed, true
+}
+
 // buildIngressSpec builds the .spec from the diverse arguments passed to kubectl
 func (o *CreateIngressOptions) buildIngressSpec() networkingv1.IngressSpec {
 	var ingressSpec networkingv1.IngressSpec
@@ -305,7 +345,9 @@ func (o *CreateIngressOptions) buildIngressSpec() networkingv1.IngressSpec {
 	}
 
 	if len(o.DefaultBackend) > 0 {
-		defaultbackend := buildIngressBackendSvc(o.DefaultBackend)
+		// Validate has checked that this holds exactly one ":".
+		svc := strings.SplitN(o.DefaultBackend, ":", 2)
+		defaultbackend := buildIngressBackendSvc(svc[0], svc[1])
 		ingressSpec.DefaultBackend = &defaultbackend
 	}
 	ingressSpec.TLS = o.buildTLSRules()
@@ -318,20 +360,18 @@ func (o *CreateIngressOptions) buildTLSRules() []networkingv1.IngressTLS {
 	hostAlreadyPresent := make(map[string]struct{})
 
 	ingressTLSs := []networkingv1.IngressTLS{}
-	var secret string
 
 	for _, rule := range o.Rules {
-		tls := strings.Split(rule, ",")
+		parsed, ok := parseIngressRule(rule)
+		if !ok {
+			// Validate has already rejected these.
+			continue
+		}
 
-		if len(tls) == 2 {
+		if parsed.tls {
 			ingressTLS := networkingv1.IngressTLS{}
-			host := strings.SplitN(rule, "/", 2)[0]
-			secret = ""
-			secretName := strings.Split(tls[1], "=")
-
-			if len(secretName) > 1 {
-				secret = secretName[1]
-			}
+			host := parsed.host
+			secret := parsed.secretName
 
 			idxSecret := getIndexSecret(secret, ingressTLSs)
 			// We accept the same host into TLS secrets only once
@@ -362,14 +402,17 @@ func (o *CreateIngressOptions) buildIngressRules() []networkingv1.IngressRule {
 	ingressRules := []networkingv1.IngressRule{}
 
 	for _, rule := range o.Rules {
-		removeTLS := strings.Split(rule, ",")[0]
-		hostSplit := strings.SplitN(removeTLS, "/", 2)
-		host := hostSplit[0]
-		ingressPath := buildHTTPIngressPath(hostSplit[1])
+		parsed, ok := parseIngressRule(rule)
+		if !ok {
+			// Validate has already rejected these.
+			continue
+		}
+
+		ingressPath := buildHTTPIngressPath(parsed)
 		ingressRule := networkingv1.IngressRule{}
 
-		if host != "" {
-			ingressRule.Host = host
+		if parsed.host != "" {
+			ingressRule.Host = parsed.host
 		}
 
 		idxHost := getIndexHost(ingressRule.Host, ingressRules)
@@ -390,10 +433,8 @@ func (o *CreateIngressOptions) buildIngressRules() []networkingv1.IngressRule {
 	return ingressRules
 }
 
-func buildHTTPIngressPath(pathsvc string) networkingv1.HTTPIngressPath {
-	pathsvcsplit := strings.Split(pathsvc, "=")
-	path := "/" + pathsvcsplit[0]
-	service := pathsvcsplit[1]
+func buildHTTPIngressPath(rule ingressRule) networkingv1.HTTPIngressPath {
+	path := rule.path
 
 	var pathType networkingv1.PathType
 	pathType = "Exact"
@@ -407,15 +448,12 @@ func buildHTTPIngressPath(pathsvc string) networkingv1.HTTPIngressPath {
 	httpIngressPath := networkingv1.HTTPIngressPath{
 		Path:     path,
 		PathType: &pathType,
-		Backend:  buildIngressBackendSvc(service),
+		Backend:  buildIngressBackendSvc(rule.svcName, rule.svcPort),
 	}
 	return httpIngressPath
 }
 
-func buildIngressBackendSvc(service string) networkingv1.IngressBackend {
-	svcname := strings.Split(service, ":")[0]
-	svcport := strings.Split(service, ":")[1]
-
+func buildIngressBackendSvc(svcname, svcport string) networkingv1.IngressBackend {
 	ingressBackend := networkingv1.IngressBackend{
 		Service: &networkingv1.IngressServiceBackend{
 			Name: svcname,
