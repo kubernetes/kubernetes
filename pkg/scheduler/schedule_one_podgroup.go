@@ -391,7 +391,8 @@ func (sched *Scheduler) runRootSchedulingAlgorithm(ctx context.Context, schedFwk
 	defer revertFns.revert()
 	if rootPodGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
 		result := map[fwk.EntityKey]*podGroupAlgorithmResult{}
-		rootResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo, rootPodGroupInfo.PodGroupInfo, result)
+		// hasSubsequentSiblings is always false for root composite podgroups because they have no subsequent siblings, to prevent unnecessary assume into the snapshot.
+		rootResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo, rootPodGroupInfo.PodGroupInfo, result, false)
 		revertFns = childRevertFns
 		if rootResult.status.IsSuccess() && !rootResult.anyScheduled {
 			// The framework requires at least 1 pod to be scheduled in order to return a success status.
@@ -400,7 +401,8 @@ func (sched *Scheduler) runRootSchedulingAlgorithm(ctx context.Context, schedFwk
 		}
 		return result
 	}
-	result, childRevertFns := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo.PodGroupInfo, rootPodGroupInfo)
+	// hasSubsequentSiblings is always false for standalone podgroups, to prevent unnecessary assume into the snapshot.
+	result, childRevertFns := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo.PodGroupInfo, rootPodGroupInfo, false)
 	revertFns = childRevertFns
 
 	if result.status.IsSuccess() && !result.anyScheduled {
@@ -836,7 +838,7 @@ func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
 // and uses it if the gang is feasible there, short-circuiting the rest. Otherwise (or for a
 // PodGroup that is part of a CompositePodGroup) it tries every placement through
 // podGroupSchedulingDefaultAlgorithm and runs placement scorer plugins to select the best one.
-func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) (finalResult *podGroupAlgorithmResult, revertFns revertFns) {
+func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo, hasSubsequentSiblings bool) (finalResult *podGroupAlgorithmResult, revertFns revertFns) {
 	allNodes, err := sched.nodeInfoSnapshot.ListNodesInPlacement()
 	if err != nil {
 		return &podGroupAlgorithmResult{
@@ -950,7 +952,9 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	}
 	bestResult := successfulResults[bestPlacement]
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+	// Only podgroups with subsequent siblings within a hierarchy should be assumed into the snapshot.
+	// Terminal child podgroups and single podgroups skip this assumption because no further entities will be evaluated against the snapshot.
+	if hasSubsequentSiblings && utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
 		revertFns, err = sched.assumeSubtreeWithRevert(ctx, schedFwk, podGroupInfo, map[fwk.EntityKey]*podGroupAlgorithmResult{podGroupInfo.GetKey(): bestResult})
 		if err != nil {
 			return &podGroupAlgorithmResult{
@@ -969,7 +973,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 // Placement is a set of nodes that will be considered when scheduling a pod group.
 // Then for each placement it tries to schedule the pod group through podGroupSchedulingDefaultAlgorithm.
 // Finally, it runs placement scorer plugins to select the best placement.
-func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (finalResult *podGroupAlgorithmResult, revertFns revertFns) {
+func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult, hasSubsequentSiblings bool) (finalResult *podGroupAlgorithmResult, revertFns revertFns) {
 	defer func() {
 		results[podGroupInfo.GetKey()] = finalResult
 	}()
@@ -1062,12 +1066,16 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 
 	bestResult := successfulResults[bestPlacement]
 
-	revertFns, err = sched.assumeSubtreeWithRevert(ctx, schedFwk, podGroupInfo, bestResult)
-	if err != nil {
-		return &podGroupAlgorithmResult{
-			podGroupInfo: podGroupInfo,
-			status:       fwk.AsStatus(fmt.Errorf("failed to assume the subtree: %w", err)),
-		}, nil
+	// Only composite podgroups with subsequent siblings should be assumed into the snapshot.
+	// Root composite podgroups and terminal child composite podgroups skip this, because no further entities will be evaluated against the snapshot.
+	if hasSubsequentSiblings {
+		revertFns, err = sched.assumeSubtreeWithRevert(ctx, schedFwk, podGroupInfo, bestResult)
+		if err != nil {
+			return &podGroupAlgorithmResult{
+				podGroupInfo: podGroupInfo,
+				status:       fwk.AsStatus(fmt.Errorf("failed to assume the subtree: %w", err)),
+			}, nil
+		}
 	}
 	maps.Copy(results, bestResult)
 
@@ -1245,12 +1253,12 @@ func makeProposedAssignments(res *podGroupAlgorithmResult) []fwk.ProposedAssignm
 
 // podGroupSchedulingAlgorithm attempts to schedule pods in the pod group according to the policy and constraints and returns the scheduling result for all evaluated pods in the pod group, not necessarily all pods in the pod group.
 // The returned revertFns accumulates revert functions for all scheduled pods, allowing the caller to rollback tentative reservations if the pod group scheduling cycle fails.
-func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) (*podGroupAlgorithmResult, revertFns) {
+func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo, hasSubsequentSiblings bool) (*podGroupAlgorithmResult, revertFns) {
 	podGroupCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
-		return sched.podGroupSchedulingPlacementAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo)
+		return sched.podGroupSchedulingPlacementAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, hasSubsequentSiblings)
 	}
 	// The non-TAS default algorithm does not evaluate placement candidates, but it
 	// still runs in a single implicit placement context so placement-scoped
@@ -1264,27 +1272,27 @@ func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFw
 // If the pod group info wraps a composite pod group, it will recursively invoke the algorithm on its children.
 // Otherwise, the pod group info wraps a leaf pod group for which we invoke the standard pod group scheduling algorithm.
 // The returned revertFns propagates revert functions from all child pod group evaluations up to the root level.
-func (sched *Scheduler) podGroupSchedulingRecursiveAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (*podGroupAlgorithmResult, revertFns) {
+func (sched *Scheduler) podGroupSchedulingRecursiveAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult, hasSubsequentSiblings bool) (*podGroupAlgorithmResult, revertFns) {
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Running recursive podgroup scheduling algorithm", "rootType", podGroupInfo.GetType(), "root", klog.KObj(podGroupInfo))
 
 	var algorithmResult *podGroupAlgorithmResult
 	var childRevertFns revertFns
 	if podGroupInfo.GetType() == fwk.PodGroupKeyType {
-		algorithmResult, childRevertFns = sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, root)
+		algorithmResult, childRevertFns = sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, root, hasSubsequentSiblings)
 		results[podGroupInfo.GetKey()] = algorithmResult
 	} else {
-		algorithmResult, childRevertFns = sched.compositePodGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, results)
+		algorithmResult, childRevertFns = sched.compositePodGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, results, hasSubsequentSiblings)
 	}
 	return algorithmResult, childRevertFns
 }
 
-func (sched *Scheduler) compositePodGroupSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (result *podGroupAlgorithmResult, revertFns revertFns) {
+func (sched *Scheduler) compositePodGroupSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult, hasSubsequentSiblings bool) (result *podGroupAlgorithmResult, revertFns revertFns) {
 	podGroupCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// CPG requires TopologyAwareWorkloadScheduling feature to be enabled
-	return sched.compositePodGroupSchedulingPlacementAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, root, podGroupInfo, results)
+	return sched.compositePodGroupSchedulingPlacementAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, root, podGroupInfo, results, hasSubsequentSiblings)
 }
 
 // compositePodGroupSchedulingDefaultAlgorithm schedules a composite pod group by recursively scheduling
@@ -1321,10 +1329,13 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 	}
 
 	anyScheduled := false
-	for _, childPGInfo := range podGroupInfo.GetChildGroups() {
+	children := podGroupInfo.GetChildGroups()
+	for i, childPGInfo := range children {
 		childPodGroupState := framework.NewCycleState()
 		childPodGroupState.SetPlacementCycleState(placementCycleState)
-		childResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, childPodGroupState, root, childPGInfo, results)
+		// The last child, should be skipped from being assumed in snapshot since the placement simulation ends immediately afterwards.
+		hasSubsequentSiblings := i < len(children)-1
+		childResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, childPodGroupState, root, childPGInfo, results, hasSubsequentSiblings)
 		if childResult.status.IsError() {
 			return &podGroupAlgorithmResult{
 				podGroupInfo:        podGroupInfo,
