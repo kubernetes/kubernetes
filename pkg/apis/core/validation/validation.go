@@ -5863,6 +5863,9 @@ var updatablePodSpecFields = []string{
 	"`spec.activeDeadlineSeconds`",
 	"`spec.tolerations` (only additions to existing tolerations)",
 	"`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)",
+	"`spec.schedulingGates` (only deletions of existing scheduling gates)",
+	"`spec.nodeSelector` (only additions, and only while the pod has scheduling gates)",
+	"`spec.affinity.nodeAffinity` (only while the pod has scheduling gates)",
 }
 
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
@@ -5878,8 +5881,12 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// 1.  spec.containers[*].image
 	// 2.  spec.initContainers[*].image
 	// 3.  spec.activeDeadlineSeconds
-	// 4.  spec.terminationGracePeriodSeconds
-	// 5.  spec.schedulingGates
+	// 4.  spec.tolerations (only additions)
+	// 5.  spec.terminationGracePeriodSeconds (only negative -> 1)
+	// 6.  spec.schedulingGates (only deletions)
+	// 7.  spec.nodeSelector (only additions, only while gated)
+	// 8.  spec.affinity.nodeAffinity (only while gated)
+	// Keep this list in sync with updatablePodSpecFields.
 
 	containerErrs, stop := ValidateContainerUpdates(newPod.Spec.Containers, oldPod.Spec.Containers, specPath.Child("containers"))
 	allErrs = append(allErrs, containerErrs...)
