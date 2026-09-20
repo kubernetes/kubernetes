@@ -24,6 +24,11 @@ import (
 	"syscall"
 )
 
+// evalSymlinksFunc is a seam so tests can deterministically exercise the
+// fallback branch where filepath.EvalSymlinks fails on an otherwise
+// accessible path (for example a Windows volume-mount point).
+var evalSymlinksFunc = filepath.EvalSymlinks
+
 // evalSymlinks resolves symbolic links in the log path so that fsnotify
 // (which is used when following logs) can watch the real file. On Windows,
 // fsnotify does not follow symlinks, so we resolve them up front.
@@ -35,7 +40,7 @@ import (
 // fall back to the original path, which is still readable through normal
 // file operations.
 func evalSymlinks(path string) (string, error) {
-	evaluated, err := filepath.EvalSymlinks(path)
+	evaluated, err := evalSymlinksFunc(path)
 	if err == nil {
 		return evaluated, nil
 	}
