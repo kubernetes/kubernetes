@@ -1265,7 +1265,17 @@ func (cache *cacheImpl) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroup
 
 	if cache.compositePodGroupEnabled && pg.Spec.ParentCompositePodGroupName != nil {
 		currentKey = fwk.CompositePodGroupKey(pod.Namespace, *pg.Spec.ParentCompositePodGroupName)
-		for range schedulingv1alpha3.WorkloadMaxTreeDepth - 1 {
+		visited := sets.New[fwk.EntityKey]()
+		depth := 1
+		for {
+			depth++
+			if depth > schedulingv1alpha3.WorkloadMaxTreeDepth {
+				return nil, fmt.Errorf("workload tree depth exceeds max depth %d", schedulingv1alpha3.WorkloadMaxTreeDepth)
+			}
+			if visited.Has(currentKey) {
+				return nil, fmt.Errorf("cycle detected in composite pod group hierarchy: %s", currentKey.String())
+			}
+			visited.Insert(currentKey)
 			cpgs, exists := cache.compositePodGroupStates[currentKey]
 			if !exists {
 				return nil, fmt.Errorf("parent composite pod group state not found for %s", currentKey.String())
