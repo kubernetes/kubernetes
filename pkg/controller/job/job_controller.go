@@ -651,6 +651,8 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 	jm.enqueueLabelSelector(jobObj)
 
 	key := cache.MetaObjectToName(jobObj).String()
+	// Delete expectations for the Job so if we create a new one with the same name it starts clean.
+	jm.expectations.DeleteExpectations(logger, key)
 	err := jm.podBackoffStore.removeBackoffRecord(key)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error removing backoff record %w", err))
