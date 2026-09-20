@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
@@ -217,7 +217,7 @@ func newReplicaCalcSetup(t *testing.T, f *calcScenario) *replicaCalcSetup {
 
 	podClient := newFakePodClient(f)
 	metricsClient := metricsclient.NewRESTMetricsClient(
-		newFakeResourceMetricsClient(f).MetricsV1beta1(),
+		newFakeResourceMetricsClient(f).MetricsV1(),
 		newFakeCustomMetricsClient(t, f),
 		newFakeExternalMetricsClient(t, f),
 	)

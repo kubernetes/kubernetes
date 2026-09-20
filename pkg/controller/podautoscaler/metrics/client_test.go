@@ -35,7 +35,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
@@ -237,7 +237,7 @@ func (tc *restClientTestCase) verifyResults(t *testing.T, metrics PodMetricsInfo
 func (tc *restClientTestCase) runTest(t *testing.T) {
 	var err error
 	testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
-	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
+	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1(), testCMClient, testEMClient)
 	isResource := len(tc.resourceName) > 0
 	isExternal := tc.metricSelector != nil
 	if isResource {

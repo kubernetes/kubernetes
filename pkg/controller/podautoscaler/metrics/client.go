@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	customapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
-	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1"
+	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 )
