@@ -61,6 +61,12 @@ type dynamicSharedInformerFactory struct {
 	// startedInformers is used for tracking which informers have been started.
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[schema.GroupVersionResource]bool
+	// stopFuncs cancels the context a started informer runs under, so one informer can be stopped
+	// without stopping the factory. Populated by StartWithContext.
+	stopFuncs map[schema.GroupVersionResource]context.CancelFunc
+	// holders counts the ForResource callers that have not released the informer yet. The factory
+	// is shared between controllers, so an informer is only stopped once every holder released it.
+	holders          map[schema.GroupVersionResource]int
 	tweakListOptions TweakListOptionsFunc
 
 	// wg tracks how many goroutines were started.
@@ -75,6 +81,10 @@ var _ DynamicSharedInformerFactory = &dynamicSharedInformerFactory{}
 func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResource) informers.GenericInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	if f.holders == nil {
+		f.holders = map[schema.GroupVersionResource]int{}
+	}
+	f.holders[gvr]++
 
 	key := gvr
 	informer, exists := f.informers[key]
@@ -111,9 +121,14 @@ func (f *dynamicSharedInformerFactory) StartWithContext(ctx context.Context) {
 			// otherwise the goroutine would use the loop variable
 			// and that keeps changing.
 			informer := informer.Informer()
+			informerCtx, stop := context.WithCancel(ctx)
+			if f.stopFuncs == nil {
+				f.stopFuncs = map[schema.GroupVersionResource]context.CancelFunc{}
+			}
+			f.stopFuncs[informerType] = stop
 			go func() {
 				defer f.wg.Done()
-				informer.RunWithContext(ctx)
+				informer.RunWithContext(informerCtx)
 			}()
 			f.startedInformers[informerType] = true
 		}
@@ -140,6 +155,31 @@ func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) 
 		res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
 	}
 	return res
+}
+
+// Release records that one ForResource caller no longer needs the informer for resource. When
+// the last holder releases it, the informer is stopped and dropped, so a later ForResource builds
+// a fresh one. It is for a resource the server no longer serves: a running informer for it would
+// otherwise keep listing and watching it until the factory shuts down. It reports whether the
+// informer was stopped by this call.
+func (f *dynamicSharedInformerFactory) Release(resource schema.GroupVersionResource) bool {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	if f.holders[resource] > 0 {
+		f.holders[resource]--
+	}
+	if f.holders[resource] > 0 {
+		return false
+	}
+	delete(f.holders, resource)
+	if stop, ok := f.stopFuncs[resource]; ok {
+		stop()
+		delete(f.stopFuncs, resource)
+	}
+	_, known := f.informers[resource]
+	delete(f.startedInformers, resource)
+	delete(f.informers, resource)
+	return known
 }
 
 func (f *dynamicSharedInformerFactory) Shutdown() {
