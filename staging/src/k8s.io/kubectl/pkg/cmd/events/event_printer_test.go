@@ -245,6 +245,27 @@ foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica 
 60s (x3 over 20m)	test^[	test^[	Deployment/bar^[	^[
 `,
 		},
+		{
+			printer: EventPrinter{
+				NoHeaders:     true,
+				AllNamespaces: false,
+			},
+			obj: &corev1.Event{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mlprobe-000",
+					Namespace: "foo",
+				},
+				InvolvedObject: corev1.ObjectReference{
+					Kind: "Pod",
+					Name: "mlprobe",
+				},
+				Type:      corev1.EventTypeWarning,
+				Reason:    "Unhealthy",
+				Message:   "Readiness probe failed: line one\nline two",
+				EventTime: metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
+			},
+			expected: "20m	Warning	Unhealthy	Pod/mlprobe	Readiness probe failed: line one...\n",
+		},
 	}
 
 	for _, test := range tests {
