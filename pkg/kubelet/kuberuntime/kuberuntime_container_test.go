@@ -1143,3 +1143,61 @@ func TestMakeMountsBindMountOptions(t *testing.T) {
 	assert.Equal(t, []string{"noexec", "nosuid"}, result[0].MountOptions)
 	assert.Empty(t, result[1].MountOptions)
 }
+
+// countingWriter records every Write call, including zero-byte ones.
+type countingWriter struct {
+	writes int
+	bytes  int
+}
+
+func (w *countingWriter) Write(p []byte) (int, error) {
+	w.writes++
+	w.bytes += len(p)
+	return len(p), nil
+}
+
+// TestGetContainerLogsWriteOrdering checks GetContainerLogs doesn't write anything
+// until it knows the logs are servable - any later error still needs to turn into
+// a real HTTP status, and the first write already fixes that at 200.
+func TestGetContainerLogsWriteOrdering(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:            "foo",
+				Image:           "busybox",
+				ImagePullPolicy: v1.PullIfNotPresent,
+			}},
+		},
+	}
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+	require.Len(t, fakeContainers, 1)
+
+	t.Run("container gone from the runtime", func(t *testing.T) {
+		id := kubecontainer.ContainerID{Type: "test", ID: "deadbeef"}
+		stdout := &countingWriter{}
+		err := m.GetContainerLogs(tCtx, pod, id, &v1.PodLogOptions{}, stdout, stdout)
+		require.Error(t, err)
+		// Prefix is matched by e2e helpers.
+		assert.Contains(t, err.Error(), "unable to retrieve container logs for ")
+		assert.Zero(t, stdout.writes, "nothing may be written before the runtime lookup succeeds")
+	})
+
+	t.Run("follow flushes headers once the log source is resolved", func(t *testing.T) {
+		id := kubecontainer.ContainerID{Type: "test", ID: fakeContainers[0].Id}
+		stdout := &countingWriter{}
+		// The fake has no log path so ReadLogs itself fails - we only care that the
+		// zero-byte write already went out, so a follow client gets headers right away.
+		_ = m.GetContainerLogs(tCtx, pod, id, &v1.PodLogOptions{Follow: true}, stdout, stdout)
+		assert.Equal(t, 1, stdout.writes, "follow must flush headers before blocking on output")
+		assert.Zero(t, stdout.bytes)
+	})
+}

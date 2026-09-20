@@ -388,28 +388,17 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 	if stopsignal != nil {
 		config.StopSignal = *stopsignal
 	}
-	// set platform specific configurations.
-	if err := m.applyPlatformSpecificContainerConfig(ctx, config, container, pod, uid, username, nsTarget); err != nil {
-		return nil, cleanupAction, err
-	}
-
-	// set environment variables
-	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
 	for idx := range opts.Envs {
 		e := opts.Envs[idx]
 		envs[idx] = &runtimeapi.KeyValue{
 			Key:   e.Name,
 			Value: []byte(e.Value),
 		}
-	}
 	config.Envs = envs
 
 	return config, cleanupAction, nil
 }
-
-func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) error {
 	logger := klog.FromContext(ctx)
-	containerResources := m.generateContainerResources(ctx, pod, container)
 	if containerResources == nil {
 		return fmt.Errorf("container %q updateContainerResources failed: cannot generate resources config", containerID.String())
 	}
@@ -1308,17 +1297,20 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v
 	resp, err := m.runtimeService.ContainerStatus(ctx, containerID.ID, false)
 	if err != nil {
 		logger.V(4).Info("Failed to get container status", "containerID", containerID.String(), "err", err)
-		return fmt.Errorf("unable to retrieve container logs for %v", containerID.String())
+		// Keep the prefix stable, e2e helpers grep for it. Wrapping the error lets
+		// callers tell a missing container apart from an unreachable runtime.
+		return fmt.Errorf("unable to retrieve container logs for %v: %w", containerID.String(), err)
 	}
 	status := resp.GetStatus()
 	if status == nil {
 		return remote.ErrContainerStatusNil
 	}
-	// Since v1.32, stdout may be nil if the stream is not requested.
-	if stdout != nil {
-		// Do a zero-byte write to stdout before handing off to the container runtime.
-		// This ensures at least one Write call is made to the writer when copying starts,
-		// even if we then block waiting for log output from the container.
+
+	// Follow mode can block for a while waiting on output, so flush headers now with
+	// a zero-byte write - but only now that the lookup above has actually succeeded,
+	// since this write commits the response to 200 with no way back.
+	// stdout can be nil since v1.32 if that stream wasn't requested.
+	if logOptions.Follow && stdout != nil {
 		if _, err := stdout.Write([]byte{}); err != nil {
 			return err
 		}

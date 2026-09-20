@@ -1115,6 +1115,34 @@ func TestContainerLogs(t *testing.T) {
 	}
 }
 
+// TestContainerLogsRuntimeError checks a runtime failure comes back as a real HTTP
+// error, not a 200 with the error text stuffed in the body. That depends on
+// GetKubeletContainerLogs not touching the response before it returns the error.
+func TestContainerLogsRuntimeError(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	podNamespace := "other"
+	podName := "foo"
+	containerName := "baz"
+	setPodByNameFunc(fw, podNamespace, podName, containerName)
+	fw.fakeKubelet.containerLogsFunc = func(_ context.Context, _, _ string, _ *v1.PodLogOptions, stdout, stderr io.Writer) error {
+		return fmt.Errorf("unable to retrieve container logs for containerd://deadbeef")
+	}
+
+	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + containerName)
+	require.NoError(t, err)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Contains(t, string(body), "unable to retrieve container logs for")
+}
+
 func TestContainerLogsWithInvalidTail(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fw := newServerTest(tCtx)

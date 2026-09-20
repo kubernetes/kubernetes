@@ -1669,6 +1669,10 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 		return err
 	}
 
+	// Don't write to stdout here - validateContainerLogStatus only checked the cached
+	// pod status, so the container could still be gone from the runtime, and the
+	// first write - even a zero-byte one - commits the response to a 200. Leave that
+	// to the runtime, once it actually knows the log source is real.
 	return kl.containerRuntime.GetContainerLogs(ctx, pod, containerID, logOptions, stdout, stderr)
 }
 

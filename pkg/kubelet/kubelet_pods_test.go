@@ -9852,3 +9852,48 @@ func TestMakeMountsBindMountOptions(t *testing.T) {
 	assert.Equal(t, []string{"noexec", "nosuid"}, mounts[0].BindMountOptions)
 	assert.Empty(t, mounts[1].BindMountOptions)
 }
+
+// countingWriter records every Write call, including zero-byte ones.
+type countingWriter struct {
+	writes int
+	bytes  int
+}
+
+func (w *countingWriter) Write(p []byte) (int, error) {
+	w.writes++
+	w.bytes += len(p)
+	return len(p), nil
+}
+
+// TestGetKubeletContainerLogsRuntimeErrorDoesNotWrite checks that a runtime lookup
+// failure comes back before anything touches the output stream, so the HTTP
+// handler still has a chance to send a real status code instead of 200.
+func TestGetKubeletContainerLogsRuntimeErrorDoesNotWrite(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	pod := podWithUIDNameNs("12345678", "foo", "ns")
+	pod.Spec.Containers = []v1.Container{{Name: "bar"}}
+	pod.Status = v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name: "bar",
+			State: v1.ContainerState{
+				Terminated: &v1.ContainerStateTerminated{ContainerID: "containerd://deadbeef"},
+			},
+		}},
+	}
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+
+	// The container record is gone from the runtime, so the runtime call fails.
+	testKubelet.fakeRuntime.Err = errors.New("unable to retrieve container logs for containerd://deadbeef")
+
+	stdout := &countingWriter{}
+	stderr := &countingWriter{}
+	err := kubelet.GetKubeletContainerLogs(tCtx, kubecontainer.GetPodFullName(pod), "bar", &v1.PodLogOptions{}, stdout, stderr)
+
+	require.Error(t, err)
+	assert.Zero(t, stdout.writes, "no write must reach the client before the runtime error is known")
+	assert.Zero(t, stderr.writes, "no write must reach the client before the runtime error is known")
+}
