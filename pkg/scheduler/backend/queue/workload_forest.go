@@ -223,6 +223,7 @@ func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *fwk.Generic
 			}
 		}
 	}
+	pgi.SortChildren()
 	return pgi
 }
 

@@ -1137,8 +1137,10 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 }
 
 func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
-	pg1WithParent := st.MakePodGroup().Name("pg1").Namespace("ns1").UID("uid1").MinCount(2).ParentCompositePodGroup("cpg1").Obj()
-	cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").MinGroupCount(1).Obj()
+	childPG1 := st.MakePodGroup().Name("pg1").Namespace("ns1").UID("uid1").MinCount(2).ParentCompositePodGroup("cpg1").Obj()
+	childPG2 := st.MakePodGroup().Name("pg2").Namespace("ns1").UID("uid2").MinCount(2).ParentCompositePodGroup("cpg1").Obj()
+	childCPGWithSameName := st.MakeCompositePodGroup().Name("pg1").Namespace("ns1").MinGroupCount(1).ParentCompositePodGroup("cpg1").Obj()
+	rootCPG := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").MinGroupCount(1).Obj()
 
 	tests := []struct {
 		name                       string
@@ -1150,14 +1152,38 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 	}{
 		{
 			name:             "build info for cpg with child pg",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1WithParent},
-			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			cpg:              cpg1,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{childPG1},
+			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{rootCPG},
+			cpg:              rootCPG,
 			wantInfo: &framework.PodGroupInfo{
-				GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(rootCPG),
 				Children: []*framework.PodGroupInfo{
 					{
-						GenericPodGroup: fwk.NewGenericPodGroup(pg1WithParent),
+						GenericPodGroup: fwk.NewGenericPodGroup(childPG1),
+						Children:        []*framework.PodGroupInfo{},
+					},
+				},
+			},
+			isCompositePodGroupEnabled: true,
+		},
+		{
+			name:             "build info for cpg with multiple children sorted by timestamp, name, and entity type",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{childPG1, childPG2},
+			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{rootCPG, childCPGWithSameName},
+			cpg:              rootCPG,
+			wantInfo: &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(rootCPG),
+				Children: []*framework.PodGroupInfo{
+					{
+						GenericPodGroup: fwk.NewGenericCompositePodGroup(childCPGWithSameName),
+						Children:        []*framework.PodGroupInfo{},
+					},
+					{
+						GenericPodGroup: fwk.NewGenericPodGroup(childPG1),
+						Children:        []*framework.PodGroupInfo{},
+					},
+					{
+						GenericPodGroup: fwk.NewGenericPodGroup(childPG2),
 						Children:        []*framework.PodGroupInfo{},
 					},
 				},
@@ -1166,11 +1192,11 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 		},
 		{
 			name:             "build info for cpg with child pg (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1WithParent},
-			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			cpg:              cpg1,
+			initialPodGroups: []*schedulingv1beta1.PodGroup{childPG1},
+			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{rootCPG},
+			cpg:              rootCPG,
 			wantInfo: &framework.PodGroupInfo{
-				GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(rootCPG),
 				Children:        []*framework.PodGroupInfo{},
 			},
 			isCompositePodGroupEnabled: false,
@@ -1191,7 +1217,7 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			visited := sets.New[fwk.EntityKey]()
 			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericCompositePodGroup(tt.cpg), visited)
 
-			// Note: Children are sorted by name in buildPodGroupInfoForCPG, so it is deterministic.
+			// Note: Children are sorted in buildPodGroupInfoForCPG, so it is deterministic.
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
 				t.Errorf("Unexpected PodGroupInfo (-want,+got)\n%s", diff)
 			}
