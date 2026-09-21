@@ -432,39 +432,6 @@ func TestHandle(t *testing.T) {
 			keyFile:  "./testdata/ca-mldsa44.key",
 		},
 		{
-			name:       "should sign without key encipherment if signerName is kubernetes.io/kube-apiserver-client with ML-DSA",
-			signerName: "kubernetes.io/kube-apiserver-client",
-			commonName: "hello-world",
-			org:        []string{"some-org"},
-			usages:     []capi.KeyUsage{capi.UsageClientAuth, capi.UsageDigitalSignature},
-			approved:   true,
-			verify: func(t *testing.T, as []testclient.Action) {
-				if len(as) != 1 {
-					t.Errorf("expected one Update action but got %d", len(as))
-					return
-				}
-				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
-				if len(csr.Status.Certificate) == 0 {
-					t.Errorf("expected certificate to be issued but it was not")
-				}
-
-				block, _ := pem.Decode(csr.Status.Certificate)
-				if block == nil {
-					t.Errorf("pem decoding status.certificate resulted in an empty block")
-				}
-				cert, err := x509.ParseCertificate(block.Bytes)
-				if err != nil {
-					t.Error("parsing certificate: %w", err)
-				}
-
-				if cert.SignatureAlgorithm != x509.MLDSA44 {
-					t.Errorf("expected signature algorithm to be %v but got %v", x509.MLDSA44, cert.SignatureAlgorithm)
-				}
-			},
-			certFile: "./testdata/ca-mldsa44.crt",
-			keyFile:  "./testdata/ca-mldsa44.key",
-		},
-		{
 			name:       "should sign if signerName is kubernetes.io/kube-apiserver-client-kubelet with ML-DSA",
 			signerName: "kubernetes.io/kube-apiserver-client-kubelet",
 			commonName: "system:node:hello-world",
@@ -561,6 +528,71 @@ func TestHandle(t *testing.T) {
 			certFile: "./testdata/ca-mldsa44.crt",
 			keyFile:  "./testdata/ca-mldsa44.key",
 		},
+		{
+			name:       "should error if signerName is kubernetes.io/kube-apiserver-client with ML-DSA with invalid usage entry",
+			signerName: "kubernetes.io/kube-apiserver-client",
+			commonName: "hello-world",
+			org:        []string{"some-org"},
+			usages:     []capi.KeyUsage{capi.UsageClientAuth, capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
+			approved:   true,
+			err:        true,
+			certFile:   "./testdata/ca-mldsa44.crt",
+			keyFile:    "./testdata/ca-mldsa44.key",
+		},
+		{
+			name:       "should error if signerName is kubernetes.io/kube-apiserver-client-kubelet with ML-DSA with invalid usage entry",
+			signerName: "kubernetes.io/kube-apiserver-client-kubelet",
+			commonName: "system:node:hello-world",
+			org:        []string{"system:nodes"},
+			usages:     []capi.KeyUsage{capi.UsageClientAuth, capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
+			approved:   true,
+			err:        true,
+			certFile:   "./testdata/ca-mldsa44.crt",
+			keyFile:    "./testdata/ca-mldsa44.key",
+		},
+		{
+			name:       "should sign if signerName is kubernetes.io/legacy-unknown with ML-DSA with invalid usage entry",
+			signerName: "kubernetes.io/legacy-unknown",
+			usages:     []capi.KeyUsage{capi.UsageClientAuth, capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
+			approved:   true,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 1 {
+					t.Errorf("expected one Update action but got %d", len(as))
+					return
+				}
+				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
+				if len(csr.Status.Certificate) == 0 {
+					t.Errorf("expected certificate to be issued but it was not")
+				}
+
+				block, _ := pem.Decode(csr.Status.Certificate)
+				if block == nil {
+					t.Errorf("pem decoding status.certificate resulted in an empty block")
+				}
+				cert, err := x509.ParseCertificate(block.Bytes)
+				if err != nil {
+					t.Error("parsing certificate: %w", err)
+				}
+
+				if cert.SignatureAlgorithm != x509.MLDSA44 {
+					t.Errorf("expected signature algorithm to be %v but got %v", x509.MLDSA44, cert.SignatureAlgorithm)
+				}
+			},
+			certFile: "./testdata/ca-mldsa44.crt",
+			keyFile:  "./testdata/ca-mldsa44.key",
+		},
+		{
+			name:       "should error if signerName is kubernetes.io/kubelet-serving with ML-DSA with invalid usage",
+			signerName: "kubernetes.io/kubelet-serving",
+			commonName: "system:node:testnode",
+			org:        []string{"system:nodes"},
+			usages:     []capi.KeyUsage{capi.UsageServerAuth, capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
+			dnsNames:   []string{"example.com"},
+			approved:   true,
+			err:        true,
+			certFile:   "./testdata/ca-mldsa44.crt",
+			keyFile:    "./testdata/ca-mldsa44.key",
+		},
 	}
 
 	for _, c := range cases {
@@ -584,7 +616,9 @@ func TestHandle(t *testing.T) {
 			if err := s.handle(ctx, csr); err != nil && !c.err {
 				t.Errorf("unexpected err: %v", err)
 			}
-			c.verify(t, client.Actions())
+			if c.verify != nil {
+				c.verify(t, client.Actions())
+			}
 		})
 	}
 }
