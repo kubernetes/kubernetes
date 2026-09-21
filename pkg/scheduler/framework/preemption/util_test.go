@@ -17,6 +17,7 @@ limitations under the License.
 package preemption
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -31,6 +32,28 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
+
+type mockPodGroupLister struct {
+	podGroups map[string]*schedulingv1beta1.PodGroup
+}
+
+func (m *mockPodGroupLister) Get(namespace, name string) (*schedulingv1beta1.PodGroup, error) {
+	if pg, ok := m.podGroups[name]; ok {
+		return pg, nil
+	}
+	return nil, fmt.Errorf("pod group %s not found", name)
+}
+
+type mockCompositePodGroupLister struct {
+	compositePodGroups map[string]*schedulingv1alpha3.CompositePodGroup
+}
+
+func (m *mockCompositePodGroupLister) Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error) {
+	if cpg, ok := m.compositePodGroups[name]; ok {
+		return cpg, nil
+	}
+	return nil, fmt.Errorf("composite pod group %s not found", name)
+}
 
 func TestFilterVictimsWithPDBViolation(t *testing.T) {
 	newPodInfo := func(p *v1.Pod) fwk.PodInfo {
