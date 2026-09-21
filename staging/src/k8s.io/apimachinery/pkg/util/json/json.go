@@ -18,22 +18,23 @@ package json
 
 import (
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 	"io"
 
 	kjson "sigs.k8s.io/json"
 )
 
-// NewEncoder delegates to json.NewEncoder
-// It is only here so this package can be a drop-in for common encoding/json uses
+// NewEncoder returns the standard library's compatibility encoder, which uses
+// json/v2 with legacy semantics. Its concrete return type is retained for callers
+// that use this package as a drop-in replacement for encoding/json.
 func NewEncoder(w io.Writer) *json.Encoder {
 	return json.NewEncoder(w)
 }
 
-// Marshal delegates to json.Marshal
-// It is only here so this package can be a drop-in for common encoding/json uses
+// Marshal encodes v using json/v2 with encoding/json's legacy semantics.
 func Marshal(v interface{}) ([]byte, error) {
-	return json.Marshal(v)
+	return jsonv2.Marshal(v, json.DefaultOptionsV1())
 }
 
 // limit recursive depth to prevent stack overflow errors

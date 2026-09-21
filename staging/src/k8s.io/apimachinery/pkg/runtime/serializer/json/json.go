@@ -17,9 +17,12 @@ limitations under the License.
 package json
 
 import (
+	"bytes"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"io"
 	"strconv"
+	"sync"
 
 	kjson "sigs.k8s.io/json"
 	"sigs.k8s.io/yaml"
@@ -68,7 +71,7 @@ func identifier(options SerializerOptions) runtime.Identifier {
 		"pretty": strconv.FormatBool(options.Pretty),
 		"strict": strconv.FormatBool(options.Strict),
 	}
-	identifier, err := json.Marshal(result)
+	identifier, err := jsonv2.Marshal(result, json.DefaultOptionsV1())
 	if err != nil {
 		//nolint:logcheck // Should not be reached.
 		klog.Fatalf("Failed marshaling identifier for json Serializer: %v", err)
@@ -224,9 +227,12 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	return s.doEncode(obj, w)
 }
 
+// Reuse the buffer so ordinary responses do not allocate a full output copy.
+var encodePool = sync.Pool{New: func() any { return new(bytes.Buffer) }}
+
 func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	if s.options.Yaml {
-		json, err := json.Marshal(obj)
+		json, err := jsonv2.Marshal(obj, json.DefaultOptionsV1())
 		if err != nil {
 			return err
 		}
@@ -239,11 +245,16 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	}
 
 	if s.options.Pretty {
-		data, err := json.MarshalIndent(obj, "", "  ")
+		data, err := jsonv2.Marshal(obj, json.DefaultOptionsV1())
 		if err != nil {
 			return err
 		}
-		_, err = w.Write(data)
+		// Retain the legacy indentation of custom marshaler output.
+		var indented bytes.Buffer
+		if err := json.Indent(&indented, data, "", "  "); err != nil {
+			return err
+		}
+		_, err = w.Write(indented.Bytes())
 		return err
 	}
 	if s.options.StreamingCollectionsEncoding {
@@ -255,8 +266,16 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 			return nil
 		}
 	}
-	encoder := json.NewEncoder(w)
-	return encoder.Encode(obj)
+	// Buffer before writing so a marshaling error cannot leave a partial response.
+	buf := encodePool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer encodePool.Put(buf)
+	if err := jsonv2.MarshalWrite(buf, obj, json.DefaultOptionsV1()); err != nil {
+		return err
+	}
+	buf.WriteByte('\n')
+	_, err := w.Write(buf.Bytes())
+	return err
 }
 
 // IsStrict indicates whether the serializer
