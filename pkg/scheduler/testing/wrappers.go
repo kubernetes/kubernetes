@@ -1618,6 +1618,12 @@ func (wrapper *PodGroupWrapper) UID(uid types.UID) *PodGroupWrapper {
 	return wrapper
 }
 
+// CreationTimestamp sets the CreationTimestamp of the inner PodGroup.
+func (wrapper *PodGroupWrapper) CreationTimestamp(t metav1.Time) *PodGroupWrapper {
+	wrapper.PodGroup.CreationTimestamp = t
+	return wrapper
+}
+
 // Label sets a {k,v} pair to the inner PodGroup label.
 func (wrapper *PodGroupWrapper) Label(k, v string) *PodGroupWrapper {
 	if wrapper.PodGroup.Labels == nil {
@@ -1926,6 +1932,12 @@ func (wrapper *CompositePodGroupWrapper) Namespace(namespace string) *CompositeP
 // UID sets the UID of the inner CompositePodGroup.
 func (wrapper *CompositePodGroupWrapper) UID(uid string) *CompositePodGroupWrapper {
 	wrapper.CompositePodGroup.UID = types.UID(uid)
+	return wrapper
+}
+
+// CreationTimestamp sets the CreationTimestamp of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) CreationTimestamp(t metav1.Time) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.CreationTimestamp = t
 	return wrapper
 }
 

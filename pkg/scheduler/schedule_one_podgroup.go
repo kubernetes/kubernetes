@@ -193,7 +193,7 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 		Reason:  cpgReason,
 		Message: err.Error(),
 	})
-	for _, child := range pgi.GetChildGroups() {
+	for _, child := range pgi.Children {
 		sched.updatePodGroupConditionWithError(ctx, child, err)
 	}
 }
@@ -319,7 +319,7 @@ func (sched *Scheduler) validatePodGroupSubtree(
 	}
 
 	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
-		for _, child := range podGroupInfo.GetChildGroups() {
+		for _, child := range podGroupInfo.Children {
 			if err := sched.validatePodGroupSubtree(child, podGroupInfo, depth+1, validateChildPodGroup, validatePod); err != nil {
 				return err
 			}
@@ -685,7 +685,7 @@ func completeCompositePodGroupAlgorithmResultMap(ctx context.Context, podGroupIn
 		result.status = parentResult.status.Clone()
 	}
 	if podGroupInfo.CompositePodGroup != nil {
-		for _, child := range podGroupInfo.GetChildGroups() {
+		for _, child := range podGroupInfo.Children {
 			completeCompositePodGroupAlgorithmResultMap(ctx, child, pgResults, result)
 		}
 	}
@@ -1537,7 +1537,7 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 	}
 
 	anyScheduled := false
-	for _, childPGInfo := range podGroupInfo.GetChildGroups() {
+	for _, childPGInfo := range podGroupInfo.Children {
 		childPodGroupState := framework.NewCycleState()
 		childPodGroupState.SetPlacementCycleState(placementCycleState)
 		childResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, childPodGroupState, root, childPGInfo, results)

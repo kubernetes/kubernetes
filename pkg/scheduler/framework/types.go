@@ -1052,7 +1052,7 @@ func (pgqi *QueuedPodGroupInfo) SetFlushTimestamp(t time.Time) {
 	pgqi.FlushTimestamp = t
 }
 
-// AddSubtree adds a subtree to the queued pod group info hierarchy.
+// AddSubtree adds a subtree to the queued pod group info hierarchy and maintains its order.
 // It shouldn't be called when the QueuedPodGroupInfo's root is a PodGroup (not CompositePodGroup).
 func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 	parentKey, ok := subtree.GetParentKey()
@@ -1068,6 +1068,7 @@ func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 			}
 		}
 		parent.Children = append(parent.Children, subtree)
+		parent.SortChildren()
 	}
 }
 
@@ -1153,6 +1154,7 @@ type PodGroupInfo struct {
 	// Only leaf pod groups have unscheduled pods.
 	UnscheduledPods []*v1.Pod
 	// Children are the child pod groups of this pod group. Only composite pod groups have children.
+	// TODO: unexport Children to control mutation of children and be able to track and maintain their sorting order.
 	Children []*PodGroupInfo
 }
 
@@ -1175,22 +1177,17 @@ func (pgi *PodGroupInfo) GetChildren() []fwk.PodGroupInfo {
 		return nil
 	}
 	children := make([]fwk.PodGroupInfo, len(pgi.Children))
-	for i, child := range pgi.GetChildGroups() {
+	for i, child := range pgi.Children {
 		children[i] = child
 	}
 	return children
 }
 
-func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
-	if pgi.CompositePodGroup == nil {
-		// Only CompositePodGroups have children groups.
-		return nil
-	}
-	result := make([]*PodGroupInfo, len(pgi.Children))
-	copy(result, pgi.Children)
-	// Sort the children by creation timestamp. If timestamps are equal, compare the child groups
-	// by their names, and then entity type to have a tie-breaker that enforces deterministic order.
-	slices.SortFunc(result, func(a, b *PodGroupInfo) int {
+// SortChildren sorts the children of this composite pod group in-place by creation
+// timestamp, then name, then entity type to have a tie-breaker that enforces deterministic order.
+// Leaf pod groups have no children, so this is a no-op for them.
+func (pgi *PodGroupInfo) SortChildren() {
+	slices.SortFunc(pgi.Children, func(a, b *PodGroupInfo) int {
 		aTime := a.GetCreationTimestamp()
 		bTime := b.GetCreationTimestamp()
 		if aTime.Before(bTime) {
@@ -1211,7 +1208,6 @@ func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
 		}
 		return 0
 	})
-	return result
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
