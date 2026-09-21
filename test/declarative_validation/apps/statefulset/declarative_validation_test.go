@@ -99,6 +99,26 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
+		"activeDeadlineSeconds minimum boundary violation": {
+			input: mkValidStatefulSet(func(ss *apps.StatefulSet) {
+				deadline := int64(0)
+				ss.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in StatefulSet is not Supported").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"activeDeadlineSeconds maximum boundary violation": {
+			input: mkValidStatefulSet(func(ss *apps.StatefulSet) {
+				deadline := int64(2147483648)
+				ss.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in StatefulSet is not Supported").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+			},
+		},
 		"selector required": {
 			input: mkValidStatefulSet(tweakSelectorLabels(nil)),
 			expectedErrs: field.ErrorList{

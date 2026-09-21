@@ -61,6 +61,10 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"template.spec.activeDeadlineSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"template.spec.evictionResponders": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
