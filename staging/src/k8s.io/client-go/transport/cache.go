@@ -79,6 +79,13 @@ func (t tlsCacheKey) String() string {
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
+	// Load TLS files once up front so the cache key reflects the fully-resolved
+	// config. On a cache hit we return immediately, avoiding the redundant
+	// loadTLSFiles call that TLSConfigFor would otherwise perform.
+	if err := loadTLSFiles(config); err != nil {
+		return nil, err
+	}
+
 	key, canCache, err := tlsConfigKey(config)
 	if err != nil {
 		return nil, err
@@ -249,13 +256,10 @@ func (v *trackedTransport) WrappedRoundTripper() http.RoundTripper {
 	return v.rt
 }
 
-// tlsConfigKey returns a unique key for tls.Config objects returned from TLSConfigFor
+// tlsConfigKey returns a unique key for tls.Config objects returned from TLSConfigFor.
+// The caller must call loadTLSFiles before this function to ensure the config's
+// ReloadTLSFiles/ReloadCAFiles flags and *Data fields are populated.
 func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
-	// Make sure ca/key/cert content is loaded
-	if err := loadTLSFiles(c); err != nil {
-		return tlsCacheKey{}, false, err
-	}
-
 	if c.Proxy != nil {
 		// cannot determine equality for functions
 		return tlsCacheKey{}, false, nil
@@ -279,11 +283,8 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 	}
 
 	if c.TLS.ReloadCAFiles {
-		// When reloading CA files, include CA file path in cache key instead of CA data
-		// This allows the CA to be reloaded from disk on each transport creation
 		k.caFile = c.TLS.CAFile
 	} else {
-		// When not reloading, cache the CA data directly
 		k.caData = string(c.TLS.CAData)
 	}
 

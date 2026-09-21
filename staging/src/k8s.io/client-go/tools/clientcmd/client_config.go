@@ -42,9 +42,14 @@ var (
 	ClusterDefaults = clientcmdapi.Cluster{Server: getDefaultServer()}
 	// DefaultClientConfig represents the legacy behavior of this package for defaulting
 	// DEPRECATED will be replace
-	DefaultClientConfig = DirectClientConfig{*clientcmdapi.NewConfig(), "", &ConfigOverrides{
-		ClusterDefaults: ClusterDefaults,
-	}, nil, NewDefaultClientConfigLoadingRules(), promptedCredentials{}}
+	DefaultClientConfig = DirectClientConfig{
+		config:      *clientcmdapi.NewConfig(),
+		contextName: "",
+		overrides: &ConfigOverrides{
+			ClusterDefaults: ClusterDefaults,
+		},
+		configAccess: NewDefaultClientConfigLoadingRules(),
+	}
 )
 
 // getDefaultServer returns a default setting for DefaultClientConfig
@@ -93,21 +98,41 @@ type DirectClientConfig struct {
 	configAccess   ConfigAccess
 	// promptedCredentials store the credentials input by the user
 	promptedCredentials promptedCredentials
+	// confirmUsableCache caches the result of ConfirmUsable to avoid
+	// redundant os.Open calls.(issue: https://github.com/kubernetes/kubectl/issues/1880)
+	confirmUsableDone bool
+	confirmUsableErr  error
 }
 
 // NewDefaultClientConfig creates a DirectClientConfig using the config.CurrentContext as the context name
 func NewDefaultClientConfig(config clientcmdapi.Config, overrides *ConfigOverrides) OverridingClientConfig {
-	return &DirectClientConfig{config, config.CurrentContext, overrides, nil, NewDefaultClientConfigLoadingRules(), promptedCredentials{}}
+	return &DirectClientConfig{
+		config:       config,
+		contextName:  config.CurrentContext,
+		overrides:    overrides,
+		configAccess: NewDefaultClientConfigLoadingRules(),
+	}
 }
 
 // NewNonInteractiveClientConfig creates a DirectClientConfig using the passed context name and does not have a fallback reader for auth information
 func NewNonInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, configAccess ConfigAccess) OverridingClientConfig {
-	return &DirectClientConfig{config, contextName, overrides, nil, configAccess, promptedCredentials{}}
+	return &DirectClientConfig{
+		config:       config,
+		contextName:  contextName,
+		overrides:    overrides,
+		configAccess: configAccess,
+	}
 }
 
 // NewInteractiveClientConfig creates a DirectClientConfig using the passed context name and a reader in case auth information is not provided via files or flags
 func NewInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, fallbackReader io.Reader, configAccess ConfigAccess) OverridingClientConfig {
-	return &DirectClientConfig{config, contextName, overrides, fallbackReader, configAccess, promptedCredentials{}}
+	return &DirectClientConfig{
+		config:         config,
+		contextName:    contextName,
+		overrides:      overrides,
+		fallbackReader: fallbackReader,
+		configAccess:   configAccess,
+	}
 }
 
 // NewClientConfigFromBytes takes your kubeconfig and gives you back a ClientConfig
@@ -117,7 +142,10 @@ func NewClientConfigFromBytes(configBytes []byte) (OverridingClientConfig, error
 		return nil, err
 	}
 
-	return &DirectClientConfig{*config, "", &ConfigOverrides{}, nil, nil, promptedCredentials{}}, nil
+	return &DirectClientConfig{
+		config:    *config,
+		overrides: &ConfigOverrides{},
+	}, nil
 }
 
 // RESTConfigFromKubeConfig is a convenience method to give back a restconfig from your kubeconfig bytes.
@@ -428,7 +456,12 @@ func (config *DirectClientConfig) ConfigAccess() ConfigAccess {
 
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
+// Results are cached so that repeated calls do not redundantly open files on disk.
 func (config *DirectClientConfig) ConfirmUsable() error {
+	if config.confirmUsableDone {
+		return config.confirmUsableErr
+	}
+
 	validationErrors := make([]error, 0)
 
 	var contextName string
@@ -453,10 +486,16 @@ func (config *DirectClientConfig) ConfirmUsable() error {
 	validationErrors = append(validationErrors, validateClusterInfo(clusterName, cluster)...)
 	// when direct client config is specified, and our only error is that no server is defined, we should
 	// return a standard "no config" error
+	var result error
 	if len(validationErrors) == 1 && validationErrors[0] == ErrEmptyCluster {
-		return newErrConfigurationInvalid([]error{ErrEmptyConfig})
+		result = newErrConfigurationInvalid([]error{ErrEmptyConfig})
+	} else {
+		result = newErrConfigurationInvalid(validationErrors)
 	}
-	return newErrConfigurationInvalid(validationErrors)
+
+	config.confirmUsableDone = true
+	config.confirmUsableErr = result
+	return result
 }
 
 // getContextName returns the default, or user-set context name, and a boolean that indicates

@@ -161,6 +161,14 @@ func TestTLSConfigKey(t *testing.T) {
 		"http2, http1.1": {TLS: TLSConfig{NextProtos: []string{"h2", "http/1.1"}}},
 		"http1.1-only":   {TLS: TLSConfig{NextProtos: []string{"http/1.1"}}},
 	}
+	// loadTLSFiles must be called before tlsConfigKey to resolve file paths
+	// and set ReloadTLSFiles/ReloadCAFiles flags.
+	for name, cfg := range uniqueConfigurations {
+		if err := loadTLSFiles(cfg); err != nil {
+			t.Fatalf("Unexpected error loading TLS files for %q: %v", name, err)
+		}
+	}
+
 	for nameA, valueA := range uniqueConfigurations {
 		for nameB, valueB := range uniqueConfigurations {
 			keyA, canCacheA, err := tlsConfigKey(valueA)
