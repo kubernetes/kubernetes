@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
-var mutationDetectionEnabled = false
+var mutationDetectionEnabled = true // HACK: enable temporarily in all test runs.
 
 func init() {
 	mutationDetectionEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_CACHE_MUTATION_DETECTOR"))
