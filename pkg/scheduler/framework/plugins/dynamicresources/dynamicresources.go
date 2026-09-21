@@ -298,6 +298,9 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 
 // podResourceClaimIndexFunc is an index function that returns ResourceClaim keys
 // (namespace/name) for any ResourceClaim referenced by a pod.
+// Extended resource claims in pod.Status.ExtendedResourceClaimStatus are
+// intentionally not indexed because the scheduler creates them during PreBind
+// and never waits for their creation.
 func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
