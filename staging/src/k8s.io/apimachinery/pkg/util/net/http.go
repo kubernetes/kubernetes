@@ -417,14 +417,14 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 	}
 
 	if len(cidrs) == 0 {
-		klog.V(5).Infof("Proxying all requests via %v because no excluded CIDRs are set", delegate)
+		klog.V(5).Infof("Proxying all requests via original delegate because no excluded CIDRs are set")
 		return delegate
 	}
 
 	return func(req *http.Request) (*url.URL, error) {
 		ip := netutils.ParseIPSloppy(req.URL.Hostname())
 		if ip == nil {
-			klog.V(5).Infof("Proxying request %s via %v because unable to parse IP from hostname", req.URL.String(), delegate)
+			klog.V(5).Infof("Proxying request %s via original delegate because unable to parse IP from hostname", req.URL.String())
 			return delegate(req)
 		}
 
@@ -435,7 +435,7 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 			}
 		}
 
-		klog.V(5).Infof("Proxying request %s via %v because IP %v is not in any excluded CIDR", req.URL.String(), delegate, ip)
+		klog.V(5).Infof("Proxying request %s via original delegate because IP %v is not in any excluded CIDR", req.URL.String(), ip)
 		return delegate(req)
 	}
 }
