@@ -1580,6 +1580,81 @@ func TestDescribeContainerPorts(t *testing.T) {
 	}
 }
 
+func TestFormatEndpointSlices(t *testing.T) {
+	endpoint := func(addr string, ready bool) discoveryv1.Endpoint {
+		return discoveryv1.Endpoint{
+			Addresses:  []string{addr},
+			Conditions: discoveryv1.EndpointConditions{Ready: new(ready)},
+		}
+	}
+	ports := []discoveryv1.EndpointPort{{Name: new("http"), Port: new(int32(80))}}
+
+	testCases := []struct {
+		name           string
+		endpointSlices []discoveryv1.EndpointSlice
+		expected       string
+	}{
+		{
+			name:     "no endpoint slices",
+			expected: "<none>",
+		},
+		{
+			name: "three ready endpoints",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true)},
+			}},
+			expected: "10.0.0.1:80,10.0.0.2:80,10.0.0.3:80",
+		},
+		{
+			name: "three ready endpoints followed by a not ready endpoint",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", false)},
+			}},
+			expected: "10.0.0.1:80,10.0.0.2:80,10.0.0.3:80",
+		},
+		{
+			name: "four ready endpoints",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", true)},
+			}},
+			expected: "10.0.0.1:80,10.0.0.2:80,10.0.0.3:80 + 1 more...",
+		},
+		{
+			name: "not ready endpoints are skipped when counting more",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", false), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", true), endpoint("10.0.0.5", false), endpoint("10.0.0.6", true)},
+			}},
+			expected: "10.0.0.2:80,10.0.0.3:80,10.0.0.4:80 + 1 more...",
+		},
+		{
+			name: "headless service with three ready endpoints followed by not ready endpoints",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", false), endpoint("10.0.0.5", false)},
+			}},
+			expected: "10.0.0.1,10.0.0.2,10.0.0.3",
+		},
+		{
+			name: "headless service with more ready endpoints than shown",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", false), endpoint("10.0.0.5", true)},
+			}},
+			expected: "10.0.0.1,10.0.0.2,10.0.0.3 + 1 more...",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := formatEndpointSlices(tc.endpointSlices, nil); got != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, got)
+			}
+		})
+	}
+}
+
 func TestDescribeContainers(t *testing.T) {
 	trueVal := true
 	testCases := []struct {
