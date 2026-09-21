@@ -597,7 +597,6 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				}
 			}
 			driver := drautils.NewDriverInstance(tCtx)
-			b := drautils.NewBuilderNow(tCtx, driver)
 
 			// Run driver with these custom devices
 			driverResources := map[string]resourceslice.DriverResources{
@@ -612,6 +611,8 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				},
 			}
 			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, driverResources)
+			// Initialize the builder after driver.Run() so LIFO cleanup deletes pods/claims before the driver.
+			b := drautils.NewBuilderNow(tCtx, driver)
 
 			// Create claims and classes
 			createdClaims := createClaims(tCtx, b, tc.containers, tc.unreferencedClaims)
@@ -843,7 +844,6 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			tCtx := f.TContext(ctx)
 			nodes := drautils.NewNodesNow(tCtx, 1, 4)
 			driver := drautils.NewDriverInstance(tCtx)
-			b := drautils.NewBuilderNow(tCtx, driver)
 
 			driverResources := map[string]resourceslice.DriverResources{
 				nodes.NodeNames[0]: {
@@ -857,6 +857,8 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 				},
 			}
 			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, driverResources)
+			// Initialize the builder after driver.Run() so LIFO cleanup deletes pods/claims before the driver.
+			b := drautils.NewBuilderNow(tCtx, driver)
 
 			createdClaims := createClaims(tCtx, b, tc.containers, tc.unreferencedClaims)
 
