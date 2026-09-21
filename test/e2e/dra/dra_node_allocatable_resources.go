@@ -597,7 +597,6 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				}
 			}
 			driver := drautils.NewDriverInstance(tCtx)
-			b := drautils.NewBuilderNow(tCtx, driver)
 
 			// Run driver with these custom devices
 			driverResources := map[string]resourceslice.DriverResources{
@@ -612,6 +611,7 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				},
 			}
 			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, driverResources)
+			b := drautils.NewBuilderNow(tCtx, driver)
 
 			// Create claims and classes
 			createdClaims := createClaims(tCtx, b, tc.containers, tc.unreferencedClaims)
@@ -843,7 +843,6 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			tCtx := f.TContext(ctx)
 			nodes := drautils.NewNodesNow(tCtx, 1, 4)
 			driver := drautils.NewDriverInstance(tCtx)
-			b := drautils.NewBuilderNow(tCtx, driver)
 
 			driverResources := map[string]resourceslice.DriverResources{
 				nodes.NodeNames[0]: {
@@ -857,6 +856,7 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 				},
 			}
 			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, driverResources)
+			b := drautils.NewBuilderNow(tCtx, driver)
 
 			createdClaims := createClaims(tCtx, b, tc.containers, tc.unreferencedClaims)
 
@@ -888,7 +888,9 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting for resize actuation to complete")
-			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, pod, desiredContainers)
+			// Pass nil for expectedContainers to skip standard spec-based cgroup/status
+			// checks, as DRA claims inflate cgroup limits and are verified explicitly below.
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, pod, nil)
 
 			ginkgo.By("verifying updated pod cgroup limits after resize")
 			err = cgroups.VerifyPodCgroups(ctx, f, resizedPod, &tc.expectedPodCgroupAfterResize)
