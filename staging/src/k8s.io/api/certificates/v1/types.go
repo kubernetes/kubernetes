@@ -114,9 +114,9 @@ type CertificateSigningRequestSpec struct {
 
 	// usages specifies a set of key usages requested in the issued certificate.
 	//
-	// Requests for TLS client certificates typically request: "digital signature", "key encipherment", "client auth".
+	// Requests for TLS client certificates typically request: "digital signature", "client auth".
 	//
-	// Requests for TLS serving certificates typically request: "key encipherment", "digital signature", "server auth".
+	// Requests for TLS serving certificates typically request: "digital signature", "server auth".
 	//
 	// Valid values are:
 	//  "signing", "digital signature", "content commitment",
@@ -126,6 +126,11 @@ type CertificateSigningRequestSpec struct {
 	//  "code signing", "email protection", "s/mime",
 	//  "ipsec end system", "ipsec tunnel", "ipsec user",
 	//  "timestamping", "ocsp signing", "microsoft sgc", "netscape sgc"
+	//
+	// When request contains a x509 certificate signing request signed with an ML-DSA key, usages
+	// must contain at least one of "digital signature", "content commitment", "cert sign", or "crl sign"
+	// and must not contain "key encipherment", "key agreement", "data encipherment", "encipher only", or "decipher only".
+	//
 	// +listType=atomic
 	// +k8s:alpha(since: "1.38")=+k8s:listType=atomic
 	// +required
