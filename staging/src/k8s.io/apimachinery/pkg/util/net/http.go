@@ -401,7 +401,7 @@ func isDefault(transportProxier func(*http.Request) (*url.URL, error)) bool {
 // NewProxierWithNoProxyCIDR constructs a Proxier function that respects CIDRs in NO_PROXY and delegates if
 // no matching CIDRs are found
 func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error)) func(req *http.Request) (*url.URL, error) {
-	// we wrap the default method, so we only need to perform our check if the NO_PROXY (or no_proxy) envvar has a CIDR in it
+// we wrap the default method, so we only need to perform our check if the NO_PROXY (or no_proxy) envvar has a CIDR in it
 	noProxyEnv := os.Getenv("NO_PROXY")
 	if noProxyEnv == "" {
 		noProxyEnv = os.Getenv("no_proxy")
@@ -417,21 +417,25 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 	}
 
 	if len(cidrs) == 0 {
+		klog.V(5).Infof("Proxying all requests via %v because no excluded CIDRs are set", delegate)
 		return delegate
 	}
 
 	return func(req *http.Request) (*url.URL, error) {
 		ip := netutils.ParseIPSloppy(req.URL.Hostname())
 		if ip == nil {
+			klog.V(5).Infof("Proxying request %s via %v because unable to parse IP from hostname", req.URL.String(), delegate)
 			return delegate(req)
 		}
 
 		for _, cidr := range cidrs {
 			if cidr.Contains(ip) {
+				klog.V(6).Infof("Not proxying request %s because IP %v is in excluded CIDR %v", req.URL.String(), ip, cidr)
 				return nil, nil
 			}
 		}
 
+		klog.V(5).Infof("Proxying request %s via %v because IP %v is not in any excluded CIDR", req.URL.String(), delegate, ip)
 		return delegate(req)
 	}
 }
