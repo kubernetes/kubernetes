@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-func TestDeclarativeValidateParameter(t *testing.T) {
+func TestDeclarativeValidateIngressClass(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
@@ -70,6 +70,24 @@ func TestDeclarativeValidateParameter(t *testing.T) {
 						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkBeta(),
 					},
 				},
+				"controller is required": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = ""
+					}),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "controller"), "").MarkAlpha(),
+					},
+				},
+				"missing controller and parameter name": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = ""
+						obj.Spec.Parameters.Name = ""
+					}),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "controller"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkBeta(),
+					},
+				},
 			}
 			for name, tc := range testCases {
 				t.Run(name, func(t *testing.T) {
@@ -88,7 +106,7 @@ func TestDeclarativeValidateParameter(t *testing.T) {
 	}
 }
 
-func TestDeclarativeValidateUpdateParameters(t *testing.T) {
+func TestDeclarativeValidateIngressClassUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testCases := map[string]struct {
@@ -97,28 +115,18 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 				expectedErrs field.ErrorList
 			}{
 				"valid update": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
-					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj:    mkValidIngressClass(),
+					updateObj: mkValidIngressClass(),
 				},
 				"nil parameters update": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj: mkValidIngressClass(),
 					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
 						obj.Spec.Parameters = nil
 					}),
 				},
 				"update fails when parameters name is cleared": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj: mkValidIngressClass(),
 					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
 						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
@@ -126,15 +134,21 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 					},
 				},
 				"update fails when parameters kind is cleared": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj: mkValidIngressClass(),
 					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
 						obj.Spec.Parameters.Kind = ""
 					}),
 					expectedErrs: field.ErrorList{
 						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkBeta(),
+					},
+				},
+				"controller is immutable": {
+					oldObj: mkValidIngressClass(),
+					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = "example1.com/ingress-controller"
+					}),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "controller"), "", "").WithOrigin("immutable").MarkAlpha(),
 					},
 				},
 			}
@@ -189,6 +203,7 @@ func mkValidIngressClass(tweaks ...func(obj *networking.IngressClass)) networkin
 			},
 		},
 	}
+	obj.ResourceVersion = "1"
 
 	for _, tweak := range tweaks {
 		tweak(&obj)
