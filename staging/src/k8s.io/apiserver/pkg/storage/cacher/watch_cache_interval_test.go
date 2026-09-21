@@ -594,7 +594,9 @@ func TestCacheIntervalLoadNext(t *testing.T) {
 	t.Run("storeSnapshot", func(t *testing.T) {
 		s := store.NewIndexer(nil)
 		elem := makeTestStoreElement(makeTestPod("pod0", 1))
-		s.Add(elem)
+		if err := s.Add(elem); err != nil {
+			t.Fatal(err)
+		}
 		wci, err := newCacheIntervalFromStore(100, s, "", false)
 		if err != nil {
 			t.Fatal(err)

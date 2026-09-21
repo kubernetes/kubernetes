@@ -789,6 +789,39 @@ func BenchmarkStoreList(b *testing.B) {
 	}
 }
 
+func BenchmarkStoreWatch(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	dimensions := []struct {
+		namespaceCount       int
+		podPerNamespaceCount int
+		nodeCount            int
+	}{
+		{
+			namespaceCount:       10,
+			podPerNamespaceCount: 100,
+			nodeCount:            100,
+		},
+		{
+			namespaceCount:       50,
+			podPerNamespaceCount: 200,
+			nodeCount:            500,
+		},
+	}
+	for _, dims := range dimensions {
+		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withNodeNameAndNamespaceIndex)
+			b.Cleanup(terminate)
+			require.NoError(b, storagetesting.PrecreateBenchmarkPodsParallel(ctx, cacher, data))
+			for _, useIndex := range []bool{true, false} {
+				b.Run(fmt.Sprintf("Indexed=%v", useIndex), func(b *testing.B) {
+					storagetesting.RunBenchmarkStoreWatch(ctx, b, cacher, data, useIndex)
+				})
+			}
+		})
+	}
+}
+
 func BenchmarkStoreStats(b *testing.B) {
 	klog.SetLogger(logr.Discard())
 	data := storagetesting.PrepareBenchmarkData(50, 3_000, 5_000)
