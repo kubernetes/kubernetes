@@ -31,7 +31,7 @@ import (
 // not use the quota requests prefix, and is valid when converted to a quota
 // resource name.
 func IsExtendedResourceName(name v1.ResourceName) bool {
-	if isNativeResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
+	if IsNativeResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
 		return false
 	}
 
@@ -45,7 +45,10 @@ func IsPrefixedNativeResource(name v1.ResourceName) bool {
 	return strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
 }
 
-func isNativeResource(name v1.ResourceName) bool {
+// IsNativeResource returns true if the resource name is in the
+// *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
+// implicitly in the kubernetes.io/ namespace.
+func IsNativeResource(name v1.ResourceName) bool {
 	return !strings.Contains(string(name), "/") || IsPrefixedNativeResource(name)
 }
 

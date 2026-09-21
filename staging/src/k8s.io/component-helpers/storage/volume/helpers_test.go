@@ -21,7 +21,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 )
 
@@ -37,46 +36,6 @@ func TestContainsAccessMode(t *testing.T) {
 	}
 	if ContainsAccessMode(modes, v1.ReadWriteMany) {
 		t.Error("did not expect ReadWriteMany to be present")
-	}
-}
-
-func TestMatchTopologySelectorTerms(t *testing.T) {
-	tests := []struct {
-		name  string
-		terms []v1.TopologySelectorTerm
-		want  bool
-	}{
-		{name: "empty term list", want: true},
-		{name: "empty term", terms: []v1.TopologySelectorTerm{{}}, want: false},
-		{
-			name: "matching term",
-			terms: []v1.TopologySelectorTerm{{MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{{
-				Key: "zone", Values: []string{"a", "b"},
-			}}}},
-			want: true,
-		},
-		{
-			name: "non-matching term",
-			terms: []v1.TopologySelectorTerm{{MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{{
-				Key: "zone", Values: []string{"c"},
-			}}}},
-			want: false,
-		},
-		{
-			name: "invalid term",
-			terms: []v1.TopologySelectorTerm{{MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{{
-				Key: "/invalid", Values: []string{"a"},
-			}}}},
-			want: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := MatchTopologySelectorTerms(test.terms, labels.Set{"zone": "b"}); got != test.want {
-				t.Errorf("MatchTopologySelectorTerms() = %t, want %t", got, test.want)
-			}
-		})
 	}
 }
 

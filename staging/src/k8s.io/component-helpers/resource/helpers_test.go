@@ -40,6 +40,8 @@ func TestResourceNameHelpers(t *testing.T) {
 		{name: "invalid is not extended", helper: IsExtendedResourceName, resource: "example.com/gpu!", want: false},
 		{name: "prefixed native", helper: IsPrefixedNativeResource, resource: "example.kubernetes.io/gpu", want: true},
 		{name: "not prefixed native", helper: IsPrefixedNativeResource, resource: "example.com/gpu", want: false},
+		{name: "unprefixed is native", helper: IsNativeResource, resource: v1.ResourceCPU, want: true},
+		{name: "extended is not native", helper: IsNativeResource, resource: "example.com/gpu", want: false},
 		{name: "huge page", helper: IsHugePageResourceName, resource: "hugepages-2Mi", want: true},
 		{name: "not huge page", helper: IsHugePageResourceName, resource: v1.ResourceMemory, want: false},
 		{name: "attachable volume", helper: IsAttachableVolumeResourceName, resource: "attachable-volumes-csi-driver", want: true},
