@@ -359,3 +359,35 @@ func TestGenericPodGroup_HasDisruptionModeAll(t *testing.T) {
 		})
 	}
 }
+
+func TestGenericPodGroup_GetKind(t *testing.T) {
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want string
+	}{
+		{
+			name: "nil GenericPodGroup",
+			gpg:  nil,
+			want: "",
+		},
+		{
+			name: "PodGroup returns pod group kind",
+			gpg:  NewGenericPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"}}),
+			want: "pod group",
+		},
+		{
+			name: "CompositePodGroup returns composite pod group kind",
+			gpg:  NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", Namespace: "default"}}),
+			want: "composite pod group",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.GetKind(); got != tt.want {
+				t.Errorf("GetKind() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

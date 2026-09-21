@@ -556,6 +556,11 @@ func (s *podGroupStateSnapshot) ScheduledPodsCount() int {
 	return s.podGroupStateData.scheduledPodsCount()
 }
 
+// PodGroup returns the PodGroup API object.
+func (s *podGroupStateSnapshot) PodGroup() *schedulingv1beta1.PodGroup {
+	return s.podGroupStateData.podGroup
+}
+
 // Clone returns a pod group state snapshot with cloned podGroupStateData.
 func (s *podGroupStateSnapshot) Clone() *podGroupStateSnapshot {
 	return &podGroupStateSnapshot{podGroupStateData: s.podGroupStateData.clone()}
@@ -570,4 +575,9 @@ type compositePodGroupStateSnapshot struct {
 // GetChildren returns the keys of the child groups.
 func (s *compositePodGroupStateSnapshot) GetChildren() []fwk.EntityKey {
 	return s.compositePodGroupStateData.getChildren()
+}
+
+// CompositePodGroup returns the CompositePodGroup API object.
+func (s *compositePodGroupStateSnapshot) CompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
+	return s.compositePodGroupStateData.compositePodGroup
 }

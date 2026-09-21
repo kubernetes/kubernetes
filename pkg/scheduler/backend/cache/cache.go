@@ -1253,38 +1253,15 @@ func (cache *cacheImpl) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroup
 
 	// 1. Find root CPG/PG by traversing upwards
 	currentKey := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-	pgs, exists := cache.podGroupStates[currentKey]
-	if !exists {
-		return nil, fmt.Errorf("pod group state not found for %s", currentKey.String())
-	}
-
-	pg := pgs.podGroup
-	if pg == nil {
-		return nil, fmt.Errorf("pod group object not found in state for %s", currentKey.String())
-	}
-
-	if cache.compositePodGroupEnabled && pg.Spec.ParentCompositePodGroupName != nil {
-		currentKey = fwk.CompositePodGroupKey(pod.Namespace, *pg.Spec.ParentCompositePodGroupName)
-		for range schedulingv1alpha3.WorkloadMaxTreeDepth - 1 {
-			cpgs, exists := cache.compositePodGroupStates[currentKey]
-			if !exists {
-				return nil, fmt.Errorf("parent composite pod group state not found for %s", currentKey.String())
-			}
-			cpg := cpgs.compositePodGroup
-			if cpg == nil {
-				return nil, fmt.Errorf("composite pod group object not found in state for %s", currentKey.String())
-			}
-			if cpg.Spec.ParentCompositePodGroupName == nil {
-				break
-			}
-			currentKey = fwk.CompositePodGroupKey(pod.Namespace, *cpg.Spec.ParentCompositePodGroupName)
-		}
+	rootKey, err := newHierarchyWrapper(cache.podGroupStates, cache.compositePodGroupStates, cache.compositePodGroupEnabled).findRootKey(currentKey)
+	if err != nil {
+		return nil, err
 	}
 
 	// 2. We have the root key. Now traverse downwards and update the snapshot.
 	snapshot := NewEmptySnapshot()
 	visited := sets.New[fwk.EntityKey]()
-	err := cache.buildPodGroupStateSnapshotTree(currentKey, snapshot, visited)
+	err = cache.buildPodGroupStateSnapshotTree(*rootKey, snapshot, visited)
 	if err != nil {
 		return nil, err
 	}
@@ -1325,49 +1302,22 @@ func (cache *cacheImpl) buildPodGroupStateSnapshotTree(key fwk.EntityKey, snapsh
 	return nil
 }
 
-// GetRootKeyForGroup returns the root key of the given EntityKey.
+// FindRootKeyForGroup returns the root *EntityKey of the hierarchy for the given EntityKey,
+// or nil if the root group was not found (i.e. does not exist).
 // The key must be of PodGroupKey or CompositePodGroupKey type.
-func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
+func (cache *cacheImpl) FindRootKeyForGroup(key fwk.EntityKey) (*fwk.EntityKey, error) {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 
-	currentKey := key
-	visited := sets.New[fwk.EntityKey]()
-	for {
-		if visited.Has(currentKey) {
-			return fwk.EntityKey{}, false, fmt.Errorf("cycle detected in the hierarchy: %v", visited.UnsortedList())
-		}
-		visited.Insert(currentKey)
+	return newHierarchyWrapper(cache.podGroupStates, cache.compositePodGroupStates, cache.compositePodGroupEnabled).FindRootKeyForGroup(key)
+}
 
-		switch currentKey.Type {
-		case fwk.PodGroupKeyType:
-			pgs, exists := cache.podGroupStates[currentKey]
-			if !exists {
-				return fwk.EntityKey{}, false, nil
-			}
-			pg := pgs.podGroup
-			if pg == nil {
-				return fwk.EntityKey{}, false, nil
-			}
-			if !cache.compositePodGroupEnabled || pg.Spec.ParentCompositePodGroupName == nil {
-				return currentKey, true, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(pg.Namespace, *pg.Spec.ParentCompositePodGroupName)
-		case fwk.CompositePodGroupKeyType:
-			cpgs, exists := cache.compositePodGroupStates[currentKey]
-			if !exists {
-				return fwk.EntityKey{}, false, nil
-			}
-			cpg := cpgs.compositePodGroup
-			if cpg == nil {
-				return fwk.EntityKey{}, false, nil
-			}
-			if cpg.Spec.ParentCompositePodGroupName == nil {
-				return currentKey, true, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(cpg.Namespace, *cpg.Spec.ParentCompositePodGroupName)
-		case fwk.PodKeyType:
-			return fwk.EntityKey{}, false, fmt.Errorf("pod key type not supported in GetRootKeyForGroup for %s", currentKey.String())
-		}
-	}
+// FindRootGroup returns the *RootGroup containing the root key, PodGroup/PodGroupState (if root is a PodGroup),
+// or CompositePodGroup/CompositePodGroupState (if root is a CompositePodGroup) for the given EntityKey,
+// or nil if the root group was not found.
+func (cache *cacheImpl) FindRootGroup(key fwk.EntityKey) (*fwk.RootGroup, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	return newHierarchyWrapper(cache.podGroupStates, cache.compositePodGroupStates, cache.compositePodGroupEnabled).FindRootGroup(key)
 }
