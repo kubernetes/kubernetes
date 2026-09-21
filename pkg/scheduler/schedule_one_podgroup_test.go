@@ -243,6 +243,11 @@ func TestReconcilePodGroupWithSnapshot(t *testing.T) {
 		st.MakePod().Name("p3").PodGroupName("pg2").Obj(),
 	}
 
+	now := metav1.Now()
+	podGroupWithUID := st.MakePodGroup().Name("pg").UID("pg-uid").ParentCompositePodGroup("cpg-nested").CreationTimestamp(now).Obj()
+	recreatedPodGroupWithUID := st.MakePodGroup().Name("pg").UID("pg-uid-recreated").ParentCompositePodGroup("cpg-nested").CreationTimestamp(metav1.NewTime(now.Add(2 * time.Minute))).Obj()
+	siblingPodGroup := st.MakePodGroup().Name("pg-sibling").ParentCompositePodGroup("cpg-nested").CreationTimestamp(metav1.NewTime(now.Add(time.Minute))).Obj()
+
 	tests := []struct {
 		name                       string
 		queued                     *framework.PodGroupInfo
@@ -406,6 +411,22 @@ func TestReconcilePodGroupWithSnapshot(t *testing.T) {
 			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{childPodGroup1Updated, childPodGroup3},
 			enableCompositePodGroup:    true,
 			wantErr:                    "pod group state not found for pod group podgroup//pg2",
+		},
+		{
+			name: "recreated child reorders its parent's children",
+			queued: newCPGInfo(compositePodGroup,
+				newCPGInfo(otherChildCompositePodGroup),
+				newCPGInfo(childCompositePodGroup,
+					newPGInfo(podGroupWithUID),
+					newPGInfo(siblingPodGroup))),
+			snapshotCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{compositePodGroup, childCompositePodGroup, otherChildCompositePodGroup},
+			snapshotPodGroups:          []*schedulingv1beta1.PodGroup{recreatedPodGroupWithUID, siblingPodGroup},
+			enableCompositePodGroup:    true,
+			want: newCPGInfo(compositePodGroup,
+				newCPGInfo(otherChildCompositePodGroup),
+				newCPGInfo(childCompositePodGroup,
+					newPGInfo(siblingPodGroup),
+					newPGInfo(recreatedPodGroupWithUID))),
 		},
 	}
 

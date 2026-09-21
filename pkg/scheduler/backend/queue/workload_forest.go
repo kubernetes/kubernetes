@@ -149,6 +149,7 @@ func (wf *workloadForest) getRootLookupInfoForParentCPG(logger klog.Logger, pare
 }
 
 // getLeafPodGroups returns all PodGroups that are leaf nodes in the subtree rooted at the given rootLookupInfo.
+// The returned children PodGroups are in no particular order; callers that need a deterministic order must sort the result.
 func (wf *workloadForest) getLeafPodGroups(logger klog.Logger, rootLookupInfo *framework.QueuedPodGroupInfo) []*schedulingv1beta1.PodGroup {
 	key := rootLookupInfo.GetKey()
 	if rootLookupInfo.GetType() == fwk.PodGroupKeyType {
@@ -196,6 +197,7 @@ func (wf *workloadForest) getLeafPodGroups(logger klog.Logger, rootLookupInfo *f
 
 // buildPodGroupInfo recursively constructs a PodGroupInfo representation for a given GenericPodGroup
 // and all its children, using the provided visited set to detect cycles in the hierarchy.
+// Children are sorted by SortChildren to keep their order deterministic.
 func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *fwk.GenericPodGroup, visited sets.Set[fwk.EntityKey]) *framework.PodGroupInfo {
 	key := gpg.GetKey()
 	if visited.Has(key) {
@@ -220,6 +222,7 @@ func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *fwk.Generic
 			}
 		}
 	}
+	pgi.SortChildren()
 	return pgi
 }
 

@@ -1052,7 +1052,7 @@ func (pgqi *QueuedPodGroupInfo) SetFlushTimestamp(t time.Time) {
 	pgqi.FlushTimestamp = t
 }
 
-// AddSubtree adds a subtree to the queued pod group info hierarchy.
+// AddSubtree adds a subtree to the queued pod group info hierarchy and maintains its order.
 // It shouldn't be called when the QueuedPodGroupInfo's root is a PodGroup (not CompositePodGroup).
 func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 	parentKey, ok := subtree.GetParentKey()
@@ -1068,14 +1068,22 @@ func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 			}
 		}
 		parent.Children = append(parent.Children, subtree)
+		parent.SortChildren()
 	}
 }
 
 // UpdateGenericPodGroup updates a generic pod group in the queued pod group info hierarchy.
 func (pgqi *QueuedPodGroupInfo) UpdateGenericPodGroup(gpg *fwk.GenericPodGroup) {
-	node, _ := findTreeNodeAndParent(pgqi.PodGroupInfo, nil, gpg.GetKey())
-	if node != nil {
-		node.GenericPodGroup = gpg
+	node, parent := findTreeNodeAndParent(pgqi.PodGroupInfo, nil, gpg.GetKey())
+	if node == nil {
+		return
+	}
+	// An informer relist can deliver a podgroup delete+recreate as an update, changing its order within the parent's children.
+	// If parent is nil, the node is the root: no siblings to reorder, and nothing to call SortChildren on.
+	reorder := parent != nil && CompareChildren(node.GenericPodGroup, gpg) != 0
+	node.GenericPodGroup = gpg
+	if reorder {
+		parent.SortChildren()
 	}
 }
 
@@ -1153,6 +1161,7 @@ type PodGroupInfo struct {
 	// Only leaf pod groups have unscheduled pods.
 	UnscheduledPods []*v1.Pod
 	// Children are the child pod groups of this pod group. Only composite pod groups have children.
+	// TODO: unexport Children, to control mutation of children and be able to track and maintain its sorting order.
 	Children []*PodGroupInfo
 }
 
@@ -1175,43 +1184,43 @@ func (pgi *PodGroupInfo) GetChildren() []fwk.PodGroupInfo {
 		return nil
 	}
 	children := make([]fwk.PodGroupInfo, len(pgi.Children))
-	for i, child := range pgi.GetChildGroups() {
+	for i, child := range pgi.Children {
 		children[i] = child
 	}
 	return children
 }
 
-func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
-	if pgi.CompositePodGroup == nil {
-		// Only CompositePodGroups have children groups.
-		return nil
-	}
-	result := make([]*PodGroupInfo, len(pgi.Children))
-	copy(result, pgi.Children)
-	// Sort the children by creation timestamp. If timestamps are equal, compare the child groups
-	// by their names, and then entity type to have a tie-breaker that enforces deterministic order.
-	slices.SortFunc(result, func(a, b *PodGroupInfo) int {
-		aTime := a.GetCreationTimestamp()
-		bTime := b.GetCreationTimestamp()
-		if aTime.Before(bTime) {
-			return -1
-		}
-		if aTime.After(bTime) {
-			return 1
-		}
-		if a.GetName() < b.GetName() {
-			return -1
-		} else if a.GetName() > b.GetName() {
-			return 1
-		}
-		if a.GetType() < b.GetType() {
-			return -1
-		} else if a.GetType() > b.GetType() {
-			return 1
-		}
-		return 0
+// SortChildren sorts the children of this composite pod group in-place, using the order defined by CompareChildren.
+// Leaf pod groups have no children, so this is a no-op for them.
+func (pgi *PodGroupInfo) SortChildren() {
+	slices.SortFunc(pgi.Children, func(a, b *PodGroupInfo) int {
+		return CompareChildren(a.GenericPodGroup, b.GenericPodGroup)
 	})
-	return result
+}
+
+// CompareChildren compares two children of a composite podgroup by creation timestamp, then name, then entity type.
+// It returns -1 if a comes before b, 1 if a comes after b, and 0 if they are equal.
+// It is the single source of truth for children order, so use it to sort or check children order.
+func CompareChildren(a, b *fwk.GenericPodGroup) int {
+	aTime := a.GetCreationTimestamp()
+	bTime := b.GetCreationTimestamp()
+	if aTime.Before(bTime) {
+		return -1
+	}
+	if aTime.After(bTime) {
+		return 1
+	}
+	if a.GetName() < b.GetName() {
+		return -1
+	} else if a.GetName() > b.GetName() {
+		return 1
+	}
+	if a.GetType() < b.GetType() {
+		return -1
+	} else if a.GetType() > b.GetType() {
+		return 1
+	}
+	return 0
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
