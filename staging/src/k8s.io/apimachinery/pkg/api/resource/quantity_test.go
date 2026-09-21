@@ -816,14 +816,13 @@ func TestQuantityString(t *testing.T) {
 			t.Errorf("%#v: unexpected error: %v", item.expect, err)
 			continue
 		}
-		if len(q.s) != 0 {
-			t.Errorf("%#v: unexpected nested string: %v", item.expect, q.s)
+		// ParseQuantity always canonicalizes and caches the string form itself now,
+		// since String() no longer mutates the receiver.
+		if len(q.s) == 0 || q.s != item.expect {
+			t.Errorf("%#v: did not set canonical string on parse: %s", item.expect, q.s)
 		}
 		if q.String() != item.expect {
 			t.Errorf("%#v: unexpected alternate canonical: %v", item.expect, q.String())
-		}
-		if len(q.s) == 0 || q.s != item.expect {
-			t.Errorf("%#v: did not set canonical string on ToString: %s", item.expect, q.s)
 		}
 	}
 	desired := &inf.Dec{} // Avoid modifying the values in the table.
@@ -888,6 +887,101 @@ func TestBinarySIZeroExponentString(t *testing.T) {
 		if e, a := item.want, item.in.String(); e != a {
 			t.Errorf("String() = %q, want %q", a, e)
 		}
+	}
+}
+
+// TestParseQuantityCachesString verifies that ParseQuantity always populates the
+// canonical string cache (q.s) itself, for every code path it can take, since
+// String() no longer mutates the receiver to fill that cache lazily.
+func TestParseQuantityCachesString(t *testing.T) {
+	tests := map[string]struct {
+		in     string
+		expect string
+	}{
+		"zero": {
+			in:     "0",
+			expect: "0",
+		},
+		"canonical-decimal-si-reuses-input": {
+			in:     "1G",
+			expect: "1G",
+		},
+		"noncanonical-decimal-si-int64-path": {
+			in:     "1000M",
+			expect: "1G",
+		},
+		"canonical-binary-si-reuses-input": {
+			in:     "1Gi",
+			expect: "1Gi",
+		},
+		"noncanonical-binary-si-int64-path": {
+			in:     "1024Mi",
+			expect: "1Gi",
+		},
+		"canonical-decimal-exponent-reuses-input": {
+			in:     "1e9",
+			expect: "1e9",
+		},
+		"noncanonical-decimal-exponent-int64-path": {
+			in:     ".001e12",
+			expect: "1e9",
+		},
+		"negative-value-int64-path": {
+			in:     "-1000M",
+			expect: "-1G",
+		},
+		"fractional-binary-si-dec-path": {
+			in:     "0.5",
+			expect: "500m",
+		},
+		"huge-value-past-int64-dec-path": {
+			in:     "1000000000000000000000e3",
+			expect: "1e24",
+		},
+		"below-nano-precision-dec-path": {
+			in:     "1080000000n",
+			expect: "1080m",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			q, err := ParseQuantity(tc.in)
+			if err != nil {
+				t.Fatalf("unexpected error parsing %q: %v", tc.in, err)
+			}
+			if len(q.s) == 0 {
+				t.Fatalf("ParseQuantity(%q) did not cache a string, q.s is empty", tc.in)
+			}
+			if q.s != tc.expect {
+				t.Errorf("ParseQuantity(%q) cached %q, expected %q", tc.in, q.s, tc.expect)
+			}
+			// String() must return the cached value without needing to compute it.
+			if s := q.String(); s != tc.expect {
+				t.Errorf("ParseQuantity(%q).String() = %q, expected %q", tc.in, s, tc.expect)
+			}
+		})
+	}
+}
+
+func TestQuantityCacheString(t *testing.T) {
+	q := decQuantity(1000, 6, DecimalSI) // canonicalizes to "1G", built without a cached string
+	if len(q.s) != 0 {
+		t.Fatalf("expected no cached string yet, got %q", q.s)
+	}
+	if s := q.CacheString(); s != "1G" {
+		t.Errorf("CacheString() = %q, expected %q", s, "1G")
+	}
+	if q.s != "1G" {
+		t.Errorf("CacheString() did not populate q.s, got %q", q.s)
+	}
+	// calling again with an already-populated cache must return the cached value unchanged
+	if s := q.CacheString(); s != "1G" {
+		t.Errorf("second CacheString() = %q, expected %q", s, "1G")
+	}
+
+	var nilQ *Quantity
+	if s := nilQ.CacheString(); s != "<nil>" {
+		t.Errorf("CacheString() on nil Quantity = %q, expected %q", s, "<nil>")
 	}
 }
 
