@@ -64,16 +64,11 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAdd
 
 	for _, str := range npa.cidrStrings {
 		_, cidr, err := netutils.ParseCIDRSloppy(str)
-		if err != nil || !cidr.IP.IsLoopback() {
+		if err != nil {
 			continue
 		}
 
-		if family == v1.IPv4Protocol {
-			if cidr.Contains(ipv4Localhost) {
-				npa.containsExplicitLoopback = true
-				break
-			}
-		} else if cidr.Contains(net.IPv6loopback) {
+		if !IsZeroCIDR(cidr) && (cidr.Contains(ipv4Localhost) || cidr.Contains(net.IPv6loopback)) {
 			npa.containsExplicitLoopback = true
 			break
 		}
@@ -154,9 +149,8 @@ func (npa *NodePortAddresses) ContainsIPv4Loopback() bool {
 	return npa.containsIPv4Loopback
 }
 
-// ContainsExplicitLoopback returns true if npa's CIDRs include a CIDR that targets
-// loopback specifically (e.g. 127.0.0.0/8 or ::1/128), as opposed to a catch-all CIDR
-// that contains a loopback address.
+// ContainsExplicitLoopback returns true if npa's CIDRs contain the localhost
+// address (127.0.0.1 or ::1).
 func (npa *NodePortAddresses) ContainsExplicitLoopback() bool {
 	return npa.containsExplicitLoopback
 }
