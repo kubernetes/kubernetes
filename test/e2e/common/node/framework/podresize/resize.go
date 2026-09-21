@@ -362,6 +362,10 @@ func verifyOomScoreAdj(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 	})).WithTimeout(framework.PollShortTimeout).Should(gomega.Succeed())
 }
 
+// WaitForPodResizeActuation waits for the pod resize to complete and the pod to become ready.
+// If expectedContainers is non-empty, it also runs CheckPodResized to verify container cgroups,
+// status resources, and restart counts against expectedContainers. Pass nil to skip CheckPodResized
+// when verifying custom cgroup/status expectations (such as DRA-inflated limits) separately.
 func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo) *v1.Pod {
 	ginkgo.GinkgoHelper()
 	// Wait for resize to complete.
@@ -397,13 +401,15 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 			if !podutils.IsPodReady(pod) {
 				return func() string { return "pod is not ready" }, nil
 			}
-			if errs := CheckPodResized(ctx, f, pod, expectedContainers); len(errs) != 0 {
-				return func() string {
-					// Suppress managed fields to keep the failure log legible.
-					podCopy := pod.DeepCopy()
-					podCopy.ManagedFields = nil
-					return fmt.Sprintf("%s\nPod:\n%s", formatErrors(utilerrors.NewAggregate(errs)).Error(), framework.PrettyPrintJSON(podCopy))
-				}, nil
+			if len(expectedContainers) > 0 {
+				if errs := CheckPodResized(ctx, f, pod, expectedContainers); len(errs) != 0 {
+					return func() string {
+						// Suppress managed fields to keep the failure log legible.
+						podCopy := pod.DeepCopy()
+						podCopy.ManagedFields = nil
+						return fmt.Sprintf("%s\nPod:\n%s", formatErrors(utilerrors.NewAggregate(errs)).Error(), framework.PrettyPrintJSON(podCopy))
+					}, nil
+				}
 			}
 			return nil, nil
 		})),
