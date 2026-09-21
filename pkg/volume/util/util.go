@@ -702,6 +702,35 @@ func VolumeHealthConditionSetsEqual(a, b []v1.VolumeHealthCondition) bool {
 	return true
 }
 
+const MaxVolumeHealthConditions = 16
+
+// DeduplicateVolumeHealthConditions removes duplicate conditions that share the same (Status, Reason)
+// composite key and caps the total number of conditions at MaxVolumeHealthConditions (16), preserving
+// the first occurrence of each condition.
+func DeduplicateVolumeHealthConditions(conditions []v1.VolumeHealthCondition) []v1.VolumeHealthCondition {
+	if len(conditions) == 0 {
+		return nil
+	}
+	type key struct {
+		status v1.VolumeHealthStatusType
+		reason string
+	}
+	seen := make(map[key]struct{}, len(conditions))
+	out := make([]v1.VolumeHealthCondition, 0, min(len(conditions), MaxVolumeHealthConditions))
+	for _, c := range conditions {
+		k := key{c.Status, c.Reason}
+		if _, exists := seen[k]; exists {
+			continue
+		}
+		seen[k] = struct{}{}
+		out = append(out, c)
+		if len(out) == MaxVolumeHealthConditions {
+			break
+		}
+	}
+	return out
+}
+
 // FindDetachablePluginBySpec is a variant of VolumePluginMgr.FindAttachablePluginByName() function.
 // The difference is that it bypass the CanAttach() check for CSI plugin, i.e. it assumes all CSI plugin supports detach.
 // The intention here is that a CSI plugin volume can end up in an Uncertain state,  so that a detach

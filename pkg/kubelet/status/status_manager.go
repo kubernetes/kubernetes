@@ -613,6 +613,8 @@ func (m *manager) SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volum
 		}
 	}
 
+	conditions = volumeutil.DeduplicateVolumeHealthConditions(conditions)
+
 	// PATCH only when the (status, reason) set differs; message-only changes are suppressed.
 	if volumeutil.VolumeHealthConditionSetsEqual(existingConditions, conditions) {
 		logger.V(4).Info("Volume health unchanged",
@@ -1442,6 +1444,12 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 
 	normalizeContainerStatuses(status.EphemeralContainerStatuses)
 	sort.Sort(kubetypes.SortedContainerStatuses(status.EphemeralContainerStatuses))
+
+	for i := range status.VolumeHealth {
+		vh := &status.VolumeHealth[i]
+		normalizeTimeStamp(&vh.LastTransitionTime)
+		vh.HealthConditions = volumeutil.DeduplicateVolumeHealthConditions(vh.HealthConditions)
+	}
 
 	return status
 }
