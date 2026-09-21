@@ -62,19 +62,7 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAdd
 		}
 	}
 
-	for _, str := range npa.cidrStrings {
-		_, cidr, err := netutils.ParseCIDRSloppy(str)
-		if err != nil {
-			continue
-		}
-
-		if !IsZeroCIDR(cidr) && (cidr.Contains(ipv4Localhost) || cidr.Contains(net.IPv6loopback)) {
-			npa.containsExplicitLoopback = true
-			break
-		}
-	}
-
-	// Now parse
+	// Calculate loopback properties.
 	for _, str := range npa.cidrStrings {
 		_, cidr, _ := netutils.ParseCIDRSloppy(str)
 
@@ -83,6 +71,16 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAdd
 				npa.containsIPv4Loopback = true
 			}
 		}
+
+		if !IsZeroCIDR(cidr) &&
+			(cidr.Contains(ipv4Localhost) || cidr.Contains(net.IPv6loopback)) {
+			npa.containsExplicitLoopback = true
+		}
+	}
+
+	// Now parse
+	for _, str := range npa.cidrStrings {
+		_, cidr, _ := netutils.ParseCIDRSloppy(str)
 
 		if IsZeroCIDR(cidr) {
 			// Ignore everything else
