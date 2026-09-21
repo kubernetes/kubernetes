@@ -1745,6 +1745,52 @@ func TestVolumeHealthSurvivesPodStatusUpdate(t *testing.T) {
 	}
 }
 
+func TestNormalizeStatusVolumeHealth(t *testing.T) {
+	now := metav1.Now()
+	expectedTime := now.DeepCopy().Rfc3339Copy()
+
+	tests := []struct {
+		name         string
+		featureGate  bool
+		expectedTime metav1.Time
+	}{
+		{
+			name:         "feature gate enabled normalizes timestamp",
+			featureGate:  true,
+			expectedTime: expectedTime,
+		},
+		{
+			name:         "feature gate disabled leaves timestamp unchanged",
+			featureGate:  false,
+			expectedTime: now,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, tc.featureGate)
+
+			pod := getTestPod()
+			status := v1.PodStatus{
+				VolumeHealth: []v1.PodVolumeHealth{
+					{
+						Name:               "vol1",
+						LastTransitionTime: now,
+					},
+				},
+			}
+
+			normalized := normalizeStatus(pod, &status)
+			if len(normalized.VolumeHealth) != 1 {
+				t.Fatalf("expected 1 VolumeHealth, got %d", len(normalized.VolumeHealth))
+			}
+			if normalized.VolumeHealth[0].LastTransitionTime != tc.expectedTime {
+				t.Errorf("expected LastTransitionTime %v, got %v", tc.expectedTime, normalized.VolumeHealth[0].LastTransitionTime)
+			}
+		})
+	}
+}
+
 func TestSetContainerStartup(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	cID1 := kubecontainer.ContainerID{Type: "test", ID: "1"}
