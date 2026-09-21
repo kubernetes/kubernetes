@@ -112,11 +112,17 @@ func (sched *Scheduler) reconcilePodGroupWithSnapshot(pgi *framework.PodGroupInf
 		if len(cpgsChildren) != len(pgi.Children) {
 			return fmt.Errorf("different number of children in composite pod group between snapshot (%d) and queued entity (%d)", len(cpgsChildren), len(pgi.Children))
 		}
-		for i := range pgi.Children {
-			err := sched.reconcilePodGroupWithSnapshot(pgi.Children[i])
-			if err != nil {
+		reorder := false
+		for _, child := range pgi.Children {
+			oldCreationTimestamp := child.GetCreationTimestamp()
+			if err := sched.reconcilePodGroupWithSnapshot(child); err != nil {
 				return err
 			}
+			// If a child was recreated, its timestamp may have been changed, which invalidates the current children order.
+			reorder = reorder || !child.GetCreationTimestamp().Equal(oldCreationTimestamp)
+		}
+		if reorder {
+			pgi.SortChildren()
 		}
 		pgi.GenericPodGroup = fwk.NewGenericCompositePodGroup(compositePodGroup)
 	} else {
@@ -172,7 +178,7 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 		Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
 		Message: err.Error(),
 	})
-	for _, child := range pgi.GetChildGroups() {
+	for _, child := range pgi.Children {
 		sched.updatePodGroupConditionWithError(ctx, child, err)
 	}
 }
@@ -264,7 +270,7 @@ func (sched *Scheduler) validatePodGroupHierarchy(podGroupInfo *framework.PodGro
 	}
 
 	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
-		for _, child := range podGroupInfo.GetChildGroups() {
+		for _, child := range podGroupInfo.Children {
 			if err := sched.validatePodGroupHierarchy(child, validatePodGroup, validatePod); err != nil {
 				return err
 			}
@@ -630,7 +636,7 @@ func completeCompositePodGroupAlgorithmResultMap(ctx context.Context, podGroupIn
 		result.status = parentResult.status.Clone()
 	}
 	if podGroupInfo.CompositePodGroup != nil {
-		for _, child := range podGroupInfo.GetChildGroups() {
+		for _, child := range podGroupInfo.Children {
 			completeCompositePodGroupAlgorithmResultMap(ctx, child, pgResults, result)
 		}
 	}
@@ -1415,7 +1421,7 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 	}
 
 	anyScheduled := false
-	for _, childPGInfo := range podGroupInfo.GetChildGroups() {
+	for _, childPGInfo := range podGroupInfo.Children {
 		childPodGroupState := framework.NewCycleState()
 		childPodGroupState.SetPlacementCycleState(placementCycleState)
 		childResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, childPodGroupState, root, childPGInfo, results)
