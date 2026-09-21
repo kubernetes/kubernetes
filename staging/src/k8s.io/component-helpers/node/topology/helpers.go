@@ -17,7 +17,9 @@ limitations under the License.
 package topology
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 )
 
 // GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
@@ -55,4 +57,43 @@ func GetZoneKey(node *v1.Node) string {
 	// (We do assume there's no null characters in a region or failureDomain)
 	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
 	return region + ":\x00:" + zone
+}
+
+// MatchTopologySelectorTerms checks whether the given labels match any of the
+// topology selector terms. An empty term list matches all objects, while an
+// empty term matches no objects.
+func MatchTopologySelectorTerms(topologySelectorTerms []v1.TopologySelectorTerm, lbls labels.Set) bool {
+	if len(topologySelectorTerms) == 0 {
+		return true
+	}
+
+	for _, term := range topologySelectorTerms {
+		if len(term.MatchLabelExpressions) == 0 {
+			continue
+		}
+
+		selector, err := topologySelectorRequirementsAsSelector(term.MatchLabelExpressions)
+		if err == nil && selector.Matches(lbls) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func topologySelectorRequirementsAsSelector(requirements []v1.TopologySelectorLabelRequirement) (labels.Selector, error) {
+	if len(requirements) == 0 {
+		return labels.Nothing(), nil
+	}
+
+	selector := labels.NewSelector()
+	for _, expression := range requirements {
+		requirement, err := labels.NewRequirement(expression.Key, selection.In, expression.Values)
+		if err != nil {
+			return nil, err
+		}
+		selector = selector.Add(*requirement)
+	}
+
+	return selector, nil
 }
