@@ -329,27 +329,11 @@ var boolType = reflect.TypeOf(true)
 func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
 	// TODO (future): avoid building these maps and instead use a proxy
 	// which wraps the underlying maps and directly looks up values.
-	attributes := make(map[string]any)
-	for name, attr := range input.Attributes {
-		value, err := c.getAttributeValue(attr)
-		if err != nil {
-			return false, nil, fmt.Errorf("attribute %s: %w", name, err)
-		}
-		domain, id := parseQualifiedName(name, input.Driver)
-		if attributes[domain] == nil {
-			attributes[domain] = make(map[string]any)
-		}
-		attributes[domain].(map[string]any)[id] = value
+	attributes, err := c.buildAttributes(input.Attributes, input.Driver)
+	if err != nil {
+		return false, nil, err
 	}
-
-	capacity := make(map[string]any)
-	for name, cap := range input.Capacity {
-		domain, id := parseQualifiedName(name, input.Driver)
-		if capacity[domain] == nil {
-			capacity[domain] = make(map[string]apiservercel.Quantity)
-		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
-	}
+	capacity := buildCapacity(input.Capacity, input.Driver)
 
 	variables := map[string]any{
 		deviceVar: map[string]any{
@@ -383,27 +367,11 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 // EvaluateDerivedAttribute evaluates the compiled CEL expression as a derived attribute against a device,
 // returning the evaluated DeviceAttribute or an error.
 func (c CompilationResult) EvaluateDerivedAttribute(ctx context.Context, input Device) (*resourceapi.DeviceAttribute, *cel.EvalDetails, error) {
-	attributes := make(map[string]any)
-	for name, attr := range input.Attributes {
-		value, err := c.getAttributeValue(attr)
-		if err != nil {
-			return nil, nil, fmt.Errorf("attribute %s: %w", name, err)
-		}
-		domain, id := parseQualifiedName(name, input.Driver)
-		if attributes[domain] == nil {
-			attributes[domain] = make(map[string]any)
-		}
-		attributes[domain].(map[string]any)[id] = value
+	attributes, err := c.buildAttributes(input.Attributes, input.Driver)
+	if err != nil {
+		return nil, nil, err
 	}
-
-	capacity := make(map[string]any)
-	for name, cap := range input.Capacity {
-		domain, id := parseQualifiedName(name, input.Driver)
-		if capacity[domain] == nil {
-			capacity[domain] = make(map[string]apiservercel.Quantity)
-		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
-	}
+	capacity := buildCapacity(input.Capacity, input.Driver)
 
 	variables := map[string]any{
 		deviceVar: map[string]any{
@@ -683,6 +651,105 @@ func parseQualifiedName(name resourceapi.QualifiedName, defaultDomain string) (s
 		return defaultDomain, string(name)
 	}
 	return string(name[0:sep]), string(name[sep+1:])
+}
+
+// buildAttributes converts a device's raw, published Attributes map into the
+// nested domain -> identifier -> value form expected by CEL, with each
+// domain/identifier combination accounted for exactly once.
+//
+// A device's Attributes map is not guaranteed to be free of names that
+// resolve to the same domain and identifier: nothing prevents a device from
+// publishing both an implicit entry (e.g. "bandwidth") and one explicitly
+// qualified with its own driver as domain (e.g. "<driver>/bandwidth").
+// Iterating the map once and resolving each name while building the result
+// would then make the outcome depend on map iteration order, because
+// whichever entry is visited last would win.
+//
+// To make the result deterministic, the map is iterated twice: the first
+// pass only handles entries explicitly qualified with the driver's own
+// domain, the second pass handles all other entries and skips any that
+// would collide with one already recorded in the first pass. This mirrors
+// resolveDeviceCapacity in
+// staging/src/k8s.io/dynamic-resource-allocation/structured/internal/experimental/consumable_capacity.go.
+func (c CompilationResult) buildAttributes(rawAttributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, driver string) (map[string]any, error) {
+	attributes := make(map[string]any)
+	driverPrefix := driver + "/"
+	for name, attr := range rawAttributes {
+		identifier, ok := strings.CutPrefix(string(name), driverPrefix)
+		if !ok {
+			continue
+		}
+		value, err := c.getAttributeValue(attr)
+		if err != nil {
+			return nil, fmt.Errorf("attribute %s: %w", name, err)
+		}
+		if attributes[driver] == nil {
+			attributes[driver] = make(map[string]any)
+		}
+		attributes[driver].(map[string]any)[identifier] = value
+	}
+	for name, attr := range rawAttributes {
+		if strings.HasPrefix(string(name), driverPrefix) {
+			continue // already handled above
+		}
+		domain, id := parseQualifiedName(name, driver)
+		if domain == driver {
+			if domainAttrs, ok := attributes[domain].(map[string]any); ok {
+				if _, alreadyResolved := domainAttrs[id]; alreadyResolved {
+					// An entry explicitly qualified with the driver's own domain
+					// takes precedence over this implicit one for the same identifier.
+					continue
+				}
+			}
+		}
+		value, err := c.getAttributeValue(attr)
+		if err != nil {
+			return nil, fmt.Errorf("attribute %s: %w", name, err)
+		}
+		if attributes[domain] == nil {
+			attributes[domain] = make(map[string]any)
+		}
+		attributes[domain].(map[string]any)[id] = value
+	}
+	return attributes, nil
+}
+
+// buildCapacity converts a device's raw, published Capacity map into the
+// nested domain -> identifier -> value form expected by CEL. See
+// buildAttributes for why the map is iterated twice.
+func buildCapacity(rawCapacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, driver string) map[string]any {
+	capacity := make(map[string]any)
+	driverPrefix := driver + "/"
+	for name, cap := range rawCapacity {
+		identifier, ok := strings.CutPrefix(string(name), driverPrefix)
+		if !ok {
+			continue
+		}
+		if capacity[driver] == nil {
+			capacity[driver] = make(map[string]apiservercel.Quantity)
+		}
+		capacity[driver].(map[string]apiservercel.Quantity)[identifier] = apiservercel.Quantity{Quantity: &cap.Value}
+	}
+	for name, cap := range rawCapacity {
+		if strings.HasPrefix(string(name), driverPrefix) {
+			continue // already handled above
+		}
+		domain, id := parseQualifiedName(name, driver)
+		if domain == driver {
+			if domainCap, ok := capacity[domain].(map[string]apiservercel.Quantity); ok {
+				if _, alreadyResolved := domainCap[id]; alreadyResolved {
+					// An entry explicitly qualified with the driver's own domain
+					// takes precedence over this implicit one for the same identifier.
+					continue
+				}
+			}
+		}
+		if capacity[domain] == nil {
+			capacity[domain] = make(map[string]apiservercel.Quantity)
+		}
+		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
+	}
+	return capacity
 }
 
 // newStringInterfaceMapWithDefault is like
