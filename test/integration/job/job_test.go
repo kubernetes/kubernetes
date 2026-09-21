@@ -2400,13 +2400,27 @@ func TestImmediateJobRecreation(t *testing.T) {
 	}
 }
 
-// TestJobRecreationClearsPodExpectations verifies that a Job recreated with the
-// same name is reconciled even if the previous Job left a pending Pod creation
-// expectation.
+// TestJobRecreationClearsPodExpectations verifies that a replacement Job is
+// reconciled after the old Job leaves a pending Pod creation expectation. The
+// test blocks the old Pod POST, replaces the Job, waits for the informer to
+// observe the replacement UID, releases the POST, and verifies reconciliation.
 func TestJobRecreationClearsPodExpectations(t *testing.T) {
+	tests := map[string]bool{
+		"suspended replacement":   true,
+		"unsuspended replacement": false,
+	}
+	for name, suspended := range tests {
+		t.Run(name, func(t *testing.T) {
+			testJobRecreationClearsPodExpectations(t, suspended)
+		})
+	}
+}
+
+func testJobRecreationClearsPodExpectations(t *testing.T, suspended bool) {
 	closeFn, restConfig, clientSet, ns := setup(t, "recreate-job-expectations")
 	t.Cleanup(closeFn)
 
+	// Phase 1: Block the old Job's Pod POST after its expectation is recorded.
 	podCreateStarted := make(chan struct{})
 	allowPodCreate := make(chan struct{})
 	var blockOnce sync.Once
@@ -2458,6 +2472,7 @@ func TestJobRecreationClearsPodExpectations(t *testing.T) {
 		t.Fatal("Timed out waiting for the old Job's Pod creation to start")
 	}
 
+	// Phase 2: Replace the Job and wait for the informer to observe its new UID.
 	jobClient := clientSet.BatchV1().Jobs(ns.Name)
 	if err := jobClient.Delete(ctx, oldJob.Name, metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {
 		t.Fatalf("Failed to delete old Job: %v", err)
@@ -2465,7 +2480,7 @@ func TestJobRecreationClearsPodExpectations(t *testing.T) {
 	replacement := job.DeepCopy()
 	replacement.ResourceVersion = ""
 	replacement.UID = ""
-	replacement.Spec.Suspend = ptr.To(true)
+	replacement.Spec.Suspend = new(suspended)
 	newJob, err := jobClient.Create(ctx, replacement, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create replacement Job: %v", err)
@@ -2480,7 +2495,20 @@ func TestJobRecreationClearsPodExpectations(t *testing.T) {
 	}
 	close(allowPodCreate)
 
+	// Phase 3: Verify the replacement is reconciled after the old POST completes.
 	err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		if !suspended {
+			pods, err := clientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: batchv1.JobNameLabel + "=" + newJob.Name})
+			if err != nil {
+				return false, err
+			}
+			for i := range pods.Items {
+				if metav1.IsControlledBy(&pods.Items[i], newJob) {
+					return true, nil
+				}
+			}
+			return false, nil
+		}
 		updatedJob, err := jobClient.Get(ctx, newJob.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
