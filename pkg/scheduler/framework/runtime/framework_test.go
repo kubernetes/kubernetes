@@ -2316,7 +2316,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 		node            *v1.Node
 		nodeInfo        *framework.NodeInfo
 		wantStatus      *fwk.Status
-		wantStateKey    fwk.StateKey // if non-empty, verify this key exists in CycleState after run
+		wantState       *testCycleState // if non-nil, verify the CycleState content written by the filter plugin
 	}{
 		{
 			name:            "node has no nominated pod",
@@ -2404,7 +2404,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			wantStatus:   nil,
 		},
 		{
-			name: "filter plugin writes state with nominated pods and pre filters return unschedulable",
+			name: "lower-priority nominated pod does not clone CycleState",
 			preFilterPlugin: &TestPlugin{
 				name: "TestPlugin1",
 				inj: injectedResult{
@@ -2419,7 +2419,9 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			node:         node,
 			nodeInfo:     framework.NewNodeInfo(pod),
 			wantStatus:   nil,
-			wantStateKey: testPluginToWriteState,
+			wantState: &testCycleState{
+				message: "Filter has been called!",
+			},
 		},
 	}
 
@@ -2485,13 +2487,18 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				_ = f.Close()
 			}()
 			tt.nodeInfo.SetNode(tt.node)
+			state := framework.NewCycleState()
 			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, state, tt.pod, tt.nodeInfo)
 			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("Unexpected status: (-want,+got):\n%s", diff)
 			}
-			if tt.wantStateKey != "" {
-				if _, err := state.Read(tt.wantStateKey); err != nil {
-					t.Errorf("Expected state key %q to exist, but got error: %v", tt.wantStateKey, err)
+			if tt.wantState != nil {
+				gotState, err := state.Read(testPluginToWriteState)
+				if err != nil {
+					t.Fatalf("Failed to read state key %q: %v", testPluginToWriteState, err)
+				}
+				if diff := cmp.Diff(tt.wantState, gotState, cmp.AllowUnexported(testCycleState{})); diff != "" {
+					t.Errorf("Unexpected state: (-want,+got):\n%s", diff)
 				}
 			}
 		})
