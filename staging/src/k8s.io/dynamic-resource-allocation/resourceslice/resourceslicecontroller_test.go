@@ -795,18 +795,22 @@ func TestControllerSyncPool(t *testing.T) {
 		"multiple-resourceslices-existing-with-different-resource-pool-generation": {
 			nodeUID: nodeUID,
 			initialObjects: []runtime.Object{
+				// Use names that cannot collide with the deterministic names assigned by
+				// createResourceSliceCreateReactor. A name collision makes a delayed delete
+				// event for an initial slice hide the newly created slice in the mutation
+				// cache, which is not representative of API-server-generated names.
 				// no devices
-				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
+				MakeResourceSlice().Name(generateName1+"old").UID(resourceSlice1).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
 				// matching device
-				MakeResourceSlice().Name(resourceSlice2).UID(resourceSlice2).
+				MakeResourceSlice().Name(generateName2+"old").UID(resourceSlice2).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 1}).Obj(),
 				// no devices
-				MakeResourceSlice().Name(resourceSlice3).UID(resourceSlice3).
+				MakeResourceSlice().Name(generateName3+"old").UID(resourceSlice3).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
