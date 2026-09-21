@@ -306,7 +306,7 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 	return utilerrors.NewAggregate(errs)
 }
 
-func verifyPodRestarts(ctx context.Context, f *framework.Framework, pod *v1.Pod, wantInfo []ResizableContainerInfo) error {
+func VerifyPodRestarts(ctx context.Context, f *framework.Framework, pod *v1.Pod, wantInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 
 	initCtrStatuses, ctrStatuses := separateContainerStatuses(wantInfo)
@@ -457,7 +457,7 @@ func CheckPodResized(ctx context.Context, f *framework.Framework, resizedPod *v1
 		errs = append(errs, fmt.Errorf("container status resources don't match expected: %w", formatErrors(resourceErrs)))
 	}
 
-	if restartErrs := verifyPodRestarts(ctx, f, resizedPod, expectedContainers); restartErrs != nil {
+	if restartErrs := VerifyPodRestarts(ctx, f, resizedPod, expectedContainers); restartErrs != nil {
 		errs = append(errs, fmt.Errorf("container restart counts don't match expected: %w", formatErrors(restartErrs)))
 	}
 

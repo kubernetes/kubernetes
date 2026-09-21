@@ -698,7 +698,7 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 		expectedPodCgroupAfterResize                    cgroups.ContainerResources
 		expectedContainersCgroupAfterResize             []cgroups.ContainerResources // per container
 		expectedPodAllocatedResourcesAfterResize        v1.ResourceList
-		expectedContainersAllocatedResourcesAfterResize []v1.ResourceList
+		expectedContainersAllocatedResourcesAfterResize []v1.ResourceList // ordered by container name to match pod.Status.ContainerStatuses
 	}{
 		{
 			name:                 "direct mappings with resize",
@@ -913,7 +913,8 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			}
 
 			ginkgo.By("verifying pod status updates match spec after resize")
-			framework.ExpectNoError(verifyDRAPodLevelStatusResources(resizedPod, tc.expectedPodAllocatedResourcesAfterResize))
+			framework.ExpectNoError(verifyPodStatusResourcesWithDRA(resizedPod, tc.expectedPodAllocatedResourcesAfterResize, tc.expectedContainersAllocatedResourcesAfterResize))
+			framework.ExpectNoError(podresize.VerifyPodRestarts(ctx, f, resizedPod, desiredContainers))
 
 			ginkgo.By("verifying pod spec resources after patch")
 			podresize.VerifyPodResources(patchedPod, desiredContainers, desiredPodResources)
@@ -1018,12 +1019,18 @@ func createClaims(tCtx ktesting.TContext, b *drautils.Builder, containers []draC
 	return createdClaims
 }
 
-func verifyDRAPodLevelStatusResources(gotPod *v1.Pod, wantAllocatedResources v1.ResourceList) error {
+func verifyPodStatusResourcesWithDRA(gotPod *v1.Pod, wantPodAllocatedResources v1.ResourceList, wantContainersAllocatedResources []v1.ResourceList) error {
 	ginkgo.GinkgoHelper()
 	var errs []error
-	if wantAllocatedResources != nil {
-		if err := framework.Gomega().Expect(gotPod.Status.AllocatedResources).To(gomega.BeComparableTo(wantAllocatedResources)); err != nil {
+	if wantPodAllocatedResources != nil {
+		if err := framework.Gomega().Expect(gotPod.Status.AllocatedResources).To(gomega.BeComparableTo(wantPodAllocatedResources)); err != nil {
 			errs = append(errs, fmt.Errorf("pod[%s] status allocatedResources mismatch: %w", gotPod.Name, err))
+		}
+	}
+	for i, wantAllocatedReqs := range wantContainersAllocatedResources {
+		gotCtrStatus := gotPod.Status.ContainerStatuses[i]
+		if err := framework.Gomega().Expect(gotCtrStatus.AllocatedResources).To(gomega.BeComparableTo(wantAllocatedReqs)); err != nil {
+			errs = append(errs, fmt.Errorf("container[%s] status allocatedResources mismatch: %w", gotCtrStatus.Name, err))
 		}
 	}
 	return errors.NewAggregate(errs)
