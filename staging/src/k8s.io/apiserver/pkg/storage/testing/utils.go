@@ -81,8 +81,8 @@ func DeepEqualSafePodSpec() example.PodSpec {
 	}
 }
 
-func computePodKey(obj *example.Pod) string {
-	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+func computePodKey(obj v1.Object) string {
+	return fmt.Sprintf("/pods/%s/%s", obj.GetNamespace(), obj.GetName())
 }
 
 // testPropagateStore helps propagates store with objects, automates key generation, and returns

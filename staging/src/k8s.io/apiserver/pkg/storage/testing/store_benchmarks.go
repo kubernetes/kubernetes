@@ -31,14 +31,18 @@ import (
 	"k8s.io/utils/clock"
 	"sigs.k8s.io/yaml"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 )
@@ -64,6 +68,65 @@ const (
 	trafficDeleteCreate    = "DeleteCreate"
 	trafficPatch           = "Patch"
 )
+
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
+
+func init() {
+	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(metav1.AddMetaToScheme(scheme))
+	scheme.AddUnversionedTypes(corev1.SchemeGroupVersion, &metav1.Status{})
+	pb := protobuf.NewSerializer(scheme, scheme)
+	corev1ProtoCodec = codecs.CodecForVersions(pb, pb, schema.GroupVersions{corev1.SchemeGroupVersion}, schema.GroupVersions{corev1.SchemeGroupVersion})
+}
+
+var (
+	corev1ProtoCodec runtime.Codec
+)
+
+// StoreConfig is subset of Storage configuration that is shared between cacher and etcd3. Used to ensure consistent config for setting up a store for benchmarks.
+type StoreConfig struct {
+	Versioner      storage.Versioner
+	GroupResource  schema.GroupResource
+	ResourcePrefix string
+	KeyFunc        func(runtime.Object) (string, error)
+	GetAttrsFunc   func(runtime.Object) (label labels.Set, field fields.Set, err error)
+	NewFunc        func() runtime.Object
+	NewListFunc    func() runtime.Object
+	Codec          runtime.Codec
+}
+
+func StoreConfigForBenchmarks() StoreConfig {
+	prefix := "/pods/"
+	return StoreConfig{
+		Versioner:      storage.APIObjectVersioner{},
+		GroupResource:  schema.GroupResource{Resource: "pods"},
+		ResourcePrefix: prefix,
+		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
+		GetAttrsFunc:   getCorev1PodAttrs,
+		NewFunc:        func() runtime.Object { return &corev1.Pod{} },
+		NewListFunc:    func() runtime.Object { return &corev1.PodList{} },
+		Codec:          corev1ProtoCodec,
+	}
+}
+
+func getCorev1PodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a pod")
+	}
+	fs := fields.Set{
+		"metadata.name":      pod.Name,
+		"metadata.namespace": pod.Namespace,
+		"spec.nodeName":      pod.Spec.NodeName,
+		"spec.restartPolicy": string(pod.Spec.RestartPolicy),
+		"status.phase":       string(pod.Status.Phase),
+	}
+	return labels.Set(pod.Labels), fs, nil
+}
 
 func RunBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, hasIndex bool, tracker *WatchLatencyTracker) {
 	require.NoError(b, PrecreateBenchmarkPods(ctx, store, data))
@@ -163,7 +226,7 @@ func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 }
 
 func waitForConsistent(ctx context.Context, store storage.Interface) error {
-	listOut := &example.PodList{}
+	listOut := &corev1.PodList{}
 	err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Recursive: true,
 		Predicate: storage.SelectionPredicate{
@@ -179,10 +242,10 @@ func waitForConsistent(ctx context.Context, store storage.Interface) error {
 }
 
 func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, trafficType string, index int, latestRV *atomic.Pointer[string], tracker *WatchLatencyTracker) (writes uint64) {
-	var podOut *example.Pod
+	var podOut *corev1.Pod
 	switch trafficType {
 	case trafficDeleteCreate:
-		podOut = &example.Pod{}
+		podOut = &corev1.Pod{}
 		err := store.Delete(ctx, data.PodKeys[index], podOut, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 		if err == nil {
 			writes += 1
@@ -193,7 +256,7 @@ func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data
 		if tracker != nil {
 			tracker.RecordWrite(pod)
 		}
-		podOut = &example.Pod{}
+		podOut = &corev1.Pod{}
 		err = store.Create(ctx, data.PodKeys[index], pod, podOut, 0)
 		if err == nil {
 			writes += 1
@@ -202,7 +265,7 @@ func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data
 			panic(fmt.Sprintf("Unexpected error on Create %q: %v", data.PodKeys[index], err))
 		}
 	case trafficPatch:
-		podOut = &example.Pod{}
+		podOut = &corev1.Pod{}
 		err := store.GuaranteedUpdate(ctx, data.PodKeys[index], podOut, false, nil, patchFunc(index, tracker), nil)
 		if err != nil {
 			panic(fmt.Sprintf("Unexpected error on Patch %q: %v", data.PodKeys[index], err))
@@ -218,7 +281,7 @@ func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data
 
 func patchFunc(i int, tracker *WatchLatencyTracker) func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 	return func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		curr := input.(*example.Pod)
+		curr := input.(*corev1.Pod)
 		if curr.Annotations == nil {
 			curr.Annotations = make(map[string]string)
 		}
@@ -276,7 +339,7 @@ func startBackgroundListers(ctx context.Context, store storage.Interface, data B
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			listOut := &example.PodList{}
+			listOut := &corev1.PodList{}
 			ticker := time.NewTicker(10 * time.Millisecond)
 			defer ticker.Stop()
 			for {
@@ -375,7 +438,7 @@ func startBackgroundWatchListers(ctx context.Context, store storage.Interface, d
 						}
 						switch ev.Type {
 						case watch.Bookmark:
-							pod, ok := ev.Object.(*example.Pod)
+							pod, ok := ev.Object.(*corev1.Pod)
 							if !ok {
 								panic("Unexpected type in event")
 							}
@@ -490,7 +553,7 @@ func runBenchmarkStoreList(ctx context.Context, b *testing.B, store storage.Inte
 }
 
 func paginateList(ctx context.Context, store storage.Interface, key string, opts storage.ListOptions) (objectCount int, listCount int) {
-	listOut := &example.PodList{}
+	listOut := &corev1.PodList{}
 	err := store.GetList(ctx, key, opts, listOut)
 	if err != nil {
 		panic(fmt.Sprintf("Unexpected error %s", err))
@@ -501,7 +564,7 @@ func paginateList(ctx context.Context, store storage.Interface, key string, opts
 	listCount += 1
 	objectCount += len(listOut.Items)
 	for opts.Predicate.Continue != "" {
-		listOut := &example.PodList{}
+		listOut := &corev1.PodList{}
 		err := store.GetList(ctx, key, opts, listOut)
 		if err != nil {
 			panic(fmt.Sprintf("Unexpected error %s", err))
@@ -514,7 +577,7 @@ func paginateList(ctx context.Context, store storage.Interface, key string, opts
 }
 
 func podAttr(obj runtime.Object) (labels.Set, fields.Set, error) {
-	pod := obj.(*example.Pod)
+	pod := obj.(*corev1.Pod)
 	return nil, fields.Set{
 		"spec.nodeName":      pod.Spec.NodeName,
 		"metadata.namespace": pod.Namespace,
@@ -543,7 +606,7 @@ func PrepareBenchmarkData(namespaceCount, podPerNamespaceCount, nodeCount int) (
 }
 
 func PrecreateBenchmarkPods(ctx context.Context, store storage.Interface, data BenchmarkData) error {
-	podOut := &example.Pod{}
+	podOut := &corev1.Pod{}
 	for _, pod := range data.Pods {
 		key := computePodKey(pod)
 		err := store.Create(ctx, key, pod, podOut, 0)
@@ -555,24 +618,24 @@ func PrecreateBenchmarkPods(ctx context.Context, store storage.Interface, data B
 }
 
 type BenchmarkData struct {
-	Pods           []*example.Pod
+	Pods           []*corev1.Pod
 	PodKeys        []string
 	NamespaceNames []string
 	NodeNames      []string
 }
 
-func loadExemplarPod() *example.Pod {
-	var pod example.Pod
+func loadExemplarPod() *corev1.Pod {
+	var pod corev1.Pod
 	if len(exemplarPodYAML) == 0 {
 		panic("exemplar pod empty")
 	}
-	if err := yaml.Unmarshal(exemplarPodYAML, &pod); err != nil {
+	if err := yaml.UnmarshalStrict(exemplarPodYAML, &pod); err != nil {
 		panic(fmt.Sprintf("decode exemplar pod: %v", err))
 	}
 	return &pod
 }
 
-func randomizePod(pod *example.Pod, ns string, nodeName string) {
+func randomizePod(pod *corev1.Pod, ns string, nodeName string) {
 	pod.Namespace = ns
 	pod.Name = pod.GenerateName + rand.String(10)
 	pod.UID = types.UID(rand.String(36))
