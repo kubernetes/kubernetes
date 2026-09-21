@@ -166,8 +166,8 @@ github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
 github.com/google/btree v1.1.3 h1:CVpQJjYgC4VbzxeGVHfvZrv1ctoYCAI8vbl07Fcxlyg=
 github.com/google/btree v1.1.3/go.mod h1:qOPhT0dTNdNzV6Z/lhRX0YXUafgPLFUh+gZMl761Gm4=
-github.com/google/cadvisor/lib v0.60.5 h1:C2Ty0ccuKDQnFW4vCSa58wmjc26jL6GiwGEY00pQcIg=
-github.com/google/cadvisor/lib v0.60.5/go.mod h1:htHKT0OSYO6zaik+iLOo3Wj1mf/5l8uV5TJaqLz13oM=
+github.com/google/cadvisor/lib v0.60.6 h1:VX5+magaxafSlozQiLqo2zbHByciW5IBafASCmySZUw=
+github.com/google/cadvisor/lib v0.60.6/go.mod h1:htHKT0OSYO6zaik+iLOo3Wj1mf/5l8uV5TJaqLz13oM=
 github.com/google/cel-go v0.29.2 h1:ZtDxkeiMmz0mxbKDYiNkE5Lk7V5edMRcaaDf2jX002k=
 github.com/google/cel-go v0.29.2/go.mod h1:X0bD6iVNR8pkROSOoHVdgTkzmRcosof7WQqCD6wcMc8=
 github.com/google/gnostic-models v0.7.0 h1:qwTtogB15McXDaNqTZdzPJRHvaVJlAl+HVQnLmJEJxo=
