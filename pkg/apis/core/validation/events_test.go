@@ -213,6 +213,19 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			false,
+		}, {
+			&core.Event{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test15",
+					Namespace: "foo",
+				},
+				InvolvedObject: core.ObjectReference{
+					Namespace: "foo",
+					Kind:      "Pod",
+				},
+				EventTime: metav1.MicroTime{Time: time.Unix(1505828956, 0)},
+			},
+			true,
 		},
 	}
 

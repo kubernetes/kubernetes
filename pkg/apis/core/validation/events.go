@@ -139,8 +139,11 @@ func legacyValidateEvent(event *core.Event, requestVersion schema.GroupVersion) 
 		reportingControllerFieldName = "reportingComponent"
 	}
 
-	// "New" Events need to have EventTime set, so it's validating old object.
-	if event.EventTime.Time == zeroTime {
+	// The core/v1 API can carry EventTime, but it does not expose the fields that
+	// are required for events.k8s.io Events. Do not use EventTime to infer a new
+	// Event when validating the legacy API.
+	isNewEvent := event.EventTime.Time != zeroTime && requestVersion != v1.SchemeGroupVersion
+	if !isNewEvent {
 		// Make sure event.Namespace and the involvedInvolvedObject.Namespace agree
 		if len(event.InvolvedObject.Namespace) == 0 {
 			// event.Namespace must also be empty (or "default", for compatibility with old clients)
