@@ -2641,6 +2641,41 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			repeatableTypes: sets.New("Webhook"),
 		},
 		{
+			// Verifies that leaf-level failures under ConditionsReview surface
+			// through ValidateAuthorizationConfiguration, not just when the leaf
+			// function is called directly. Combines "unsupported version" with
+			// the connectionType-linked kubeConfigContextName check.
+			name:                         "conditionsReview can only be set for SAR v1",
+			conditionalAuthorizationGate: true,
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Name: "default",
+						Webhook: &api.WebhookConfiguration{
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1beta1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+							ConditionsReview: &api.ConditionsReviewConfiguration{
+								Version: "v1alpha1",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{
+				field.Forbidden(field.NewPath("authorizers").Index(0).Child("conditionsReview"), "may only be set when subjectAccessReviewVersion=v1"),
+			},
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
+		},
+		{
 			// Verifies that a nil ConditionsReview yields no ConditionsReview
 			// errors even when the feature gate is off — the whole check is
 			// gated on `c.ConditionsReview != nil` at validation.go:740, so

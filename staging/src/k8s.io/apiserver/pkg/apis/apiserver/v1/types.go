@@ -534,6 +534,7 @@ type ConditionsReviewConfiguration struct {
 	// version is the API version of AuthorizationConditionsReview to use.
 	// Valid values: v1alpha1
 	// Required.
+	// +required
 	Version string `json:"version"`
 
 	// kubeConfigContextName is the name of the context within the webhook's kubeconfig
@@ -544,7 +545,8 @@ type ConditionsReviewConfiguration struct {
 	// AuthorizationConditionsReview payloads to the same HTTP endpoint, and the
 	// caller must distinguish between these through TypeMeta information.
 	// Optional.
-	KubeConfigContextName string `json:"kubeConfigContextName"`
+	// +optional
+	KubeConfigContextName string `json:"kubeConfigContextName,omitempty"`
 }
 
 type WebhookConnectionInfo struct {

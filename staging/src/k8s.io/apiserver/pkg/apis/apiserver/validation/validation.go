@@ -737,6 +737,10 @@ func ValidateWebhookConfiguration(compiler authorizationcel.Compiler, fldPath *f
 	}
 
 	if c.ConditionsReview != nil {
+		if c.SubjectAccessReviewVersion != "v1" {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("conditionsReview"), "may only be set when subjectAccessReviewVersion=v1"))
+		}
+
 		allErrs = append(allErrs, ValidateConditionsReviewConfiguration(fldPath.Child("conditionsReview"), fldPath, c.ConditionsReview, c.ConnectionInfo.Type)...)
 	}
 
