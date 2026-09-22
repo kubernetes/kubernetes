@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -965,21 +966,74 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 		},
 		{
-			name: "Binding first before preemption for gang policy",
+			name: "Binding first before preemption for gang policy on initial attempt",
 			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
 			},
 			initialPods: []*v1.Pod{
-				st.MakePod().Name("pg-pod-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
-				st.MakePod().Name("pg-pod-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
-				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("low-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
 			},
 			preemptorPods: []*v1.Pod{
-				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
-				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-3").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:               []string{"high-1", "high-2", "high-3"},
+			expectedCandidatesForPreemption: []string{"low-1"},
+			expectedPodsPreemptedByWAP:      1,
+			tempRemovePG:                    true,
+			// On an initial scheduling attempt (0 < minCount=2), once high-1 and high-2 satisfy minCount without preemption,
+			// the scheduling cycle prioritizes binding them first over preempting low-1 to fit high-3.
+			// Preemption runs in the subsequent cycle to make room for high-3.
+			expectedEventOrder: []string{"Bind:high-1", "Bind:high-2", "PodGroupPostFilter:pg1", "Bind:high-3"},
+		},
+		{
+			name: "Preemption before binding for gang policy on subsequent attempt",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pg-pod-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg-pod-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("low-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:               []string{"pg-pod-1", "pg-pod-2", "high-1", "high-2"},
+			expectedCandidatesForPreemption: []string{"low-1"},
+			expectedPodsPreemptedByWAP:      1,
+			tempRemovePG:                    true,
+			// Because pg-pod-1 and pg-pod-2 are already scheduled (2 >= minCount=2), this is a subsequent scheduling attempt
+			// for a gang PodGroup. When high-1 fits and high-2 fails, the scheduling cycle prioritizes preemption over binding.
+			expectedEventOrder: []string{"PodGroupPostFilter:pg1", "Bind:high-1", "Bind:high-2"},
+		},
+		{
+			name: "Binding first before preemption for basic policy",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).BasicPolicy().Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pg-pod-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg-pod-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("low-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
 			expectedScheduled:               []string{"pg-pod-1", "pg-pod-2", "high-1", "high-2"},
 			expectedCandidatesForPreemption: []string{"low-1"},
@@ -991,30 +1045,30 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
 		},
 		{
-			name: "Binding first before preemption for basic policy",
+			name: "Subsequent gang policy falls back to binding when preemption fails",
 			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).BasicPolicy().Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
 			},
 			initialPods: []*v1.Pod{
-				st.MakePod().Name("pg-pod-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
-				st.MakePod().Name("pg-pod-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
-				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("pg-pod-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg-pod-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("blocker-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(200).Obj(),
 			},
 			preemptorPods: []*v1.Pod{
-				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
-				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:               []string{"pg-pod-1", "pg-pod-2", "high-1", "high-2"},
-			expectedCandidatesForPreemption: []string{"low-1"},
-			expectedPodsPreemptedByWAP:      1,
-			tempRemovePG:                    true,
-			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
-			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
-			// preemption will be called in the subsequent cycle to make room for the second pod.
-			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
+			expectedScheduled:          []string{"pg-pod-1", "pg-pod-2", "blocker-1", "high-1"},
+			expectedUnschedulable:      []string{"high-2"},
+			expectedPodsPreemptedByWAP: 0,
+			tempRemovePG:               true,
+			// Subsequent gang scheduling returns PartialSuccess, running PodGroupPostFilter first.
+			// When preemption fails to find victims (blocker-1 has priority 200 > 100), podGroupCycle falls back to binding high-1.
+			expectedEventOrder: []string{"PodGroupPostFilter:pg1", "Bind:high-1"},
 		},
 		{
 			name: "Topology-Aware Preemption: single topology domain",
@@ -1394,8 +1448,9 @@ func TestPodGroupPreemption(t *testing.T) {
 
 				// 10. Verify event order
 				if len(tt.expectedEventOrder) > 0 {
-					actualEvents := recorder.GetEvents()
-					if diff := cmp.Diff(tt.expectedEventOrder, actualEvents); diff != "" {
+					actualEvents := normalizeRecordedEvents(recorder.GetEvents())
+					wantEvents := normalizeRecordedEvents(tt.expectedEventOrder)
+					if diff := cmp.Diff(wantEvents, actualEvents); diff != "" {
 						t.Errorf("Unexpected event order (-want,+got):\n%s", diff)
 					}
 				}
@@ -1716,6 +1771,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 		// but before preemptors are created. This simulates scenarios where a hierarchy is broken
 		// mid-operation to ensure the victim selection logic correctly falls back when parents are missing.
 		removeCPGNameBeforePreemption string
+		expectedEventOrder            []string
 	}{
 
 		{
@@ -2322,6 +2378,129 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			expectedPodsPreemptedByWAP:    2,
 			removeCPGNameBeforePreemption: "cpg-victim",
 		},
+		{
+			name: "Subsequent gang CPG: 1 child PartialSuccess and 1 child Success prioritizes preemption before binding",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Label("kubernetes.io/hostname", "node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).MinGroupCount(1).WorkloadRef("wl1", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t2", "wl1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pg1-init").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("low-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("pg1-new-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg1-new-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg2-new-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node3"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"pg1-init", "pg1-new-1", "pg1-new-2", "pg2-new-1"},
+			expectedPreempted:          []string{"low-1"},
+			expectedPodsPreemptedByWAP: 1,
+			tempRemoveCPG:              true,
+			// Because pg1 already has pg1-init scheduled (1 >= minCount=1), cpg-preemptor is in a subsequent scheduling attempt (1 >= minGroupCount=1).
+			// pg1 gets PartialSuccess (pg1-new-1 fits on node1, pg1-new-2 fails on node2) and pg2 gets Success (pg2-new-1 fits on node3).
+			// For a gang CPG, PartiallyScheduled > 0 triggers preemption before binding.
+			expectedEventOrder: []string{"PodGroupPostFilter:cpg-preemptor", "Bind:pg1-new-1", "Bind:pg1-new-2", "Bind:pg2-new-1"},
+		},
+		{
+			name: "Subsequent basic CPG (Example 1): 1 child PartialSuccess and 1 child Success prioritizes binding before preemption",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Label("kubernetes.io/hostname", "node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t2", "wl1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pg1-init").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("low-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("pg1-new-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg1-new-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg2-new-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node3"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"pg1-init", "pg1-new-1", "pg1-new-2", "pg2-new-1"},
+			expectedPreempted:          []string{"low-1"},
+			expectedPodsPreemptedByWAP: 1,
+			tempRemoveCPG:              true,
+			// Because cpg-preemptor has Basic policy and pg2 achieved full Success (NewlySucceeded == 1 > 0),
+			// cpg-preemptor returns Success and binds pg1-new-1 and pg2-new-1 first, running preemption in the subsequent cycle for pg1-new-2.
+			expectedEventOrder: []string{"Bind:pg1-new-1", "Bind:pg2-new-1", "PodGroupPostFilter:cpg-preemptor", "Bind:pg1-new-2"},
+		},
+		{
+			name: "Subsequent basic CPG (Example 2): 1 child PartialSuccess and 1 child Unschedulable prioritizes preemption before binding",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t2", "wl1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pg1-init").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("low-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("pg1-new-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg1-new-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg2-new-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"pg1-init", "pg1-new-1", "pg1-new-2", "pg2-new-1"},
+			expectedPreempted:          []string{"low-1"},
+			expectedPodsPreemptedByWAP: 1,
+			tempRemoveCPG:              true,
+			// Because NewlySucceeded == 0 and PartiallyScheduled == 1 (pg1 PartialSuccess, pg2 Unschedulable),
+			// basic CPG returns PartialSuccess and prioritizes preemption before binding.
+			expectedEventOrder: []string{"PodGroupPostFilter:cpg-preemptor", "Bind:pg1-new-1", "Bind:pg1-new-2", "Bind:pg2-new-1"},
+		},
+		{
+			name: "Subsequent basic CPG (Example 2 fallback): 1 child PartialSuccess and 1 child Unschedulable falls back to binding when preemption fails",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t2", "wl1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pg1-init").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("blocker-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(200).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("pg1-new-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg1-new-2").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg2-new-1").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"pg1-init", "blocker-1", "pg1-new-1"},
+			expectedUnschedulable:      []string{"pg1-new-2", "pg2-new-1"},
+			expectedPodsPreemptedByWAP: 0,
+			tempRemoveCPG:              true,
+			// Because NewlySucceeded == 0 and PartiallyScheduled == 1 (pg1 PartialSuccess, pg2 Unschedulable),
+			// basic CPG returns PartialSuccess, attempts preemption first, and falls back to binding pg1-new-1 when blocker-1 cannot be preempted.
+			expectedEventOrder: []string{"PodGroupPostFilter:cpg-preemptor", "Bind:pg1-new-1"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2332,6 +2511,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				features.TopologyAwareWorkloadScheduling: true,
 				features.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
 			})
+			recorder := eventRecorder{}
 			registry := make(frameworkruntime.Registry)
 
 			// Register mock bind plugin that will register NNN information during binding.
@@ -2340,6 +2520,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				name:       mockBindPluginName,
 				realPlugin: nil,
 				nnnInfo:    sync.Map{},
+				recorder:   &recorder,
 			}
 			err := registry.Register(mockBindPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 				db, err := defaultbinder.New(ctx, o, fh)
@@ -2355,7 +2536,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 
 			mockPGPostFilterPluginName := "mockPGPostFilterPlugin"
 			var pgPostFilterPlugin = mockPodGroupPostFilterPlugin{
-				name: mockPGPostFilterPluginName,
+				name:     mockPGPostFilterPluginName,
+				recorder: &recorder,
 			}
 			err = registry.Register(mockPGPostFilterPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 				return &pgPostFilterPlugin, nil
@@ -2448,24 +2630,19 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				}
 			}
 
+			recorder.Clear()
+
 			// 5. Create preemptor pods
 			if tt.tempRemoveCPG {
-				// Temporarily remove CPGs and PGs. This is a trick to ensure that all preemptor pods
-				// are created and queued as unschedulable first, and then become schedulable at once
-				// when the CPG is recreated.
+				// Temporarily remove CPGs. Since the root CPG is missing, all newly created preemptor pods
+				// across all child PodGroups are held in incompletePodGroupPods until the CPG is recreated,
+				// ensuring all child PodGroups and their pods become schedulable simultaneously.
 				cpgNames := make([]string, len(tt.compositePodGroups))
 				for i, cpg := range tt.compositePodGroups {
 					cpgNames[i] = cpg.Name
 				}
 				if err := deleteCompositePodGroups(testCtx.Ctx, cs, ns, cpgNames); err != nil {
 					t.Fatalf("Failed to delete CompositePodGroups: %v", err)
-				}
-				pgNames := make([]string, len(tt.podGroups))
-				for i, pg := range tt.podGroups {
-					pgNames[i] = pg.Name
-				}
-				if err := deletePodGroups(testCtx.Ctx, cs, ns, pgNames); err != nil {
-					t.Fatalf("Failed to delete PodGroups: %v", err)
 				}
 			}
 
@@ -2493,19 +2670,12 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 					}
 				}
 
-				// Recreate CPGs and PGs
+				// Recreate CPGs
 				for _, cpg := range tt.compositePodGroups {
 					cpgCopy := cpg.DeepCopy()
 					cpgCopy.ResourceVersion = ""
 					if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Create(testCtx.Ctx, cpgCopy, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to recreate CompositePodGroup %s: %v", cpg.Name, err)
-					}
-				}
-				for _, pg := range tt.podGroups {
-					pgCopy := pg.DeepCopy()
-					pgCopy.ResourceVersion = ""
-					if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
-						t.Fatalf("Failed to recreate PodGroup %s: %v", pg.Name, err)
 					}
 				}
 			}
@@ -2577,7 +2747,16 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				}
 			}
 
-			// 11. Dump the state of pods to ease debugging failed runs.
+			// 11. Verify event order
+			if len(tt.expectedEventOrder) > 0 {
+				actualEvents := normalizeRecordedEvents(recorder.GetEvents())
+				wantEvents := normalizeRecordedEvents(tt.expectedEventOrder)
+				if diff := cmp.Diff(wantEvents, actualEvents); diff != "" {
+					t.Errorf("Unexpected event order (-want,+got):\n%s", diff)
+				}
+			}
+
+			// 12. Dump the state of pods to ease debugging failed runs.
 			if t.Failed() {
 				t.Log("Dumping states of initial and preemptor pods:")
 				var allPods []string
@@ -4207,6 +4386,45 @@ func deletePodGroups(ctx context.Context, cs clientset.Interface, ns string, pgN
 		}
 	}
 	return nil
+}
+
+func normalizeRecordedEvents(events []string) []string {
+	res := slices.Clone(events)
+	// Strip trailing PodGroupPostFilter retry events recorded after the final Bind event when
+	// unschedulable pods remain in the queue while the test polls for PodScheduled/PodUnschedulable.
+	lastBindIdx := -1
+	for i, e := range res {
+		if strings.HasPrefix(e, "Bind:") {
+			lastBindIdx = i
+		}
+	}
+	if lastBindIdx >= 0 {
+		allTrailingPostFilter := true
+		for _, e := range res[lastBindIdx+1:] {
+			if !strings.HasPrefix(e, "PodGroupPostFilter:") {
+				allTrailingPostFilter = false
+				break
+			}
+		}
+		if allTrailingPostFilter {
+			res = res[:lastBindIdx+1]
+		}
+	}
+	// Sort contiguous Bind runs within the same scheduling cycle since concurrent binding goroutines
+	// and map iteration across sibling PodGroups do not guarantee deterministic intra-cycle bind ordering.
+	for i := 0; i < len(res); {
+		if !strings.HasPrefix(res[i], "Bind:") {
+			i++
+			continue
+		}
+		j := i + 1
+		for j < len(res) && strings.HasPrefix(res[j], "Bind:") {
+			j++
+		}
+		slices.Sort(res[i:j])
+		i = j
+	}
+	return res
 }
 
 func deleteCompositePodGroups(ctx context.Context, cs clientset.Interface, ns string, cpgNames []string) error {

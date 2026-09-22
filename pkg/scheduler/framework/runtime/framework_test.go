@@ -1077,6 +1077,33 @@ func TestRunPlacementFeasiblePlugins(t *testing.T) {
 			expectedCalled: []bool{true, true},
 		},
 		{
+			name: "First plugin returns PartialSuccess, second returns Success, returns PartialSuccess",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.PartialSuccess, "partial")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.NewStatus(fwk.PartialSuccess, "partial").WithPlugin("p1"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns PartialSuccess, second returns Wait, Wait takes precedence over PartialSuccess",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.PartialSuccess, "partial")},
+				{name: "p2", status: fwk.NewStatus(fwk.Wait, "wait")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Wait, "wait").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns PartialSuccess, second returns Unschedulable, Unschedulable takes precedence",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.PartialSuccess, "partial")},
+				{name: "p2", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
 			name: "Plugin returns Error, breaks",
 			plugins: []*mockPlacementFeasiblePlugin{
 				{name: "p1", status: fwk.NewStatus(fwk.Error, "error")},

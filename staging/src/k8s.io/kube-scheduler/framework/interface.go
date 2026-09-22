@@ -102,10 +102,14 @@ const (
 	// When the scheduling queue requeues Pods, which was rejected with Pending in the last scheduling,
 	// the Pod goes to activeQ directly ignoring backoff.
 	Pending
+	// PartialSuccess is used by PlacementFeasible plugins to indicate that the (composite) pod group
+	// satisfies its minimum quorum in the current placement, but at least one pod or child group failed
+	// in-memory scheduling and the scheduler should prioritize preemption over binding.
+	PartialSuccess
 )
 
 // This list should be exactly the same as the codes iota defined above in the same order.
-var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip", "Pending"}
+var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip", "Pending", "PartialSuccess"}
 
 func (c Code) String() string {
 	return codes[c]
@@ -181,6 +185,11 @@ func (s *Status) IsSuccess() bool {
 	return s.Code() == Success
 }
 
+// IsPartialSuccess returns true if and only if "Status" is non-nil and its Code is "PartialSuccess".
+func (s *Status) IsPartialSuccess() bool {
+	return s.Code() == PartialSuccess
+}
+
 // IsWait returns true if and only if "Status" is non-nil and its Code is "Wait".
 func (s *Status) IsWait() bool {
 	return s.Code() == Wait
@@ -202,10 +211,10 @@ func (s *Status) IsError() bool {
 	return s.Code() == Error
 }
 
-// AsError returns nil if the status is a success, a wait or a skip; otherwise returns an "error" object
+// AsError returns nil if the status is a success, a partial success, a wait or a skip; otherwise returns an "error" object
 // with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
-	if s.IsSuccess() || s.IsWait() || s.IsSkip() {
+	if s.IsSuccess() || s.IsPartialSuccess() || s.IsWait() || s.IsSkip() {
 		return nil
 	}
 	if s.err != nil {
@@ -853,7 +862,8 @@ type PlacementFeasiblePlugin interface {
 	// Return Unschedulable status if the pod group cannot be scheduled in the current placement.
 	// The scheduler will give up this placement and won't even evaluate remaining pods. The placement will remain eligible for preemption.
 	// Return Success status if the pod group can be scheduled in the current partially evaluated placement.
-	// After returning Success, the plugin should keep returning Success for the remaining pods.
+	// Return PartialSuccess status if the pod group satisfies its minimum quorum in the current placement,
+	// but at least one pod or child group failed in-memory scheduling and preemption should be prioritized over binding.
 	PlacementFeasible(ctx context.Context, placementCycleState PlacementCycleState, podGroupInfo PodGroupInfo, placementProgress PlacementProgress) *Status
 }
 
@@ -867,6 +877,15 @@ type PlacementProgress struct {
 	// for a particular (composite) pod group and placement. For a pod group the field includes the pods that are assigned
 	// or assumed in the current PodGroup scheduling cycle.
 	Scheduled int
+	// NewlySucceeded is the number of children evaluated in the current cycle that
+	// scheduled new pods and finished with Success (status == Success && anyScheduled).
+	NewlySucceeded int
+	// PartiallyScheduled is the number of children evaluated in the current cycle that
+	// finished with PartialSuccess. (Always 0 for leaf PodGroups).
+	PartiallyScheduled int
+	// Unschedulable is the number of children evaluated in the current cycle that
+	// failed in-memory scheduling.
+	Unschedulable int
 }
 
 // Handle provides data and some tools that plugins can use. It is

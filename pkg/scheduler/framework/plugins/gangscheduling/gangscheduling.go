@@ -345,26 +345,113 @@ func (pl *GangScheduling) isPGReady(snapshot fwk.PodGroupManager, namespace, pgN
 	return readinessCountFn(pgState) >= minCount
 }
 
+const placementStateKey fwk.StateKey = Name + "/PlacementState"
+
+type placementStateData struct {
+	initiallyScheduled int
+}
+
+func (d *placementStateData) Clone() fwk.StateData {
+	return &placementStateData{
+		initiallyScheduled: d.initiallyScheduled,
+	}
+}
+
 // PlacementFeasible is responsible for enforcing the gang's MinCount constraint in the pod group scheduling cycle.
-// The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
-// In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
+// The function returns Success or PartialSuccess once the group's minimum quorum is satisfied.
+// For subsequent scheduling attempts, PartialSuccess indicates that preemption should be prioritized over binding.
+// In case there are not enough remaining pods or children to satisfy the group's MinCount, it returns Unschedulable
+// which will terminate the pod group scheduling cycle early.
 func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args fwk.PlacementProgress) *fwk.Status {
+	initiallyScheduled := pl.getInitiallyScheduledCount(placementCycleState, podGroupInfo, args)
 	minCount := getMinCount(podGroupInfo)
 	remaining := args.Remaining
 	scheduled := args.Scheduled
 
 	if remaining+scheduled < minCount {
-		// minCount can't be satisfied because there are not enough remaining pods.
+		// minCount can't be satisfied because there are not enough remaining pods/children.
 		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("minCount (%d) cannot be satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
 	}
 
 	if scheduled < minCount {
-		// minCount might be satisfied once more remaining pods are evaluated.
+		// minCount might be satisfied once more remaining pods/children are evaluated.
 		return fwk.NewStatus(fwk.Wait, fmt.Sprintf("minCount (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
 	}
 
-	// minCount is satisfied.
+	// Initial scheduling attempt: prioritize binding over preemption regardless of policy.
+	if initiallyScheduled < minCount {
+		return nil
+	}
+
+	// Subsequent scheduling attempt (initiallyScheduled >= minCount):
+	if isGangPolicy(podGroupInfo) {
+		// Gang policy (flat PG or CPG): prioritize preemption over binding if any child/pod did not fully succeed.
+		if args.Unschedulable > 0 || args.PartiallyScheduled > 0 {
+			return fwk.NewStatus(fwk.PartialSuccess, fmt.Sprintf("subsequent gang scheduling achieved partial success: %d unschedulable, %d partially scheduled", args.Unschedulable, args.PartiallyScheduled))
+		}
+		return nil
+	}
+
+	// Basic policy in subsequent scheduling attempt (flat PG or CPG):
+	// Prioritize binding if at least one pod/child achieved full Success on new pods;
+	// otherwise if any new pods/children failed or only achieved PartialSuccess, return PartialSuccess.
+	if args.NewlySucceeded == 0 && (args.Unschedulable > 0 || args.PartiallyScheduled > 0) {
+		return fwk.NewStatus(fwk.PartialSuccess, fmt.Sprintf("subsequent basic scheduling achieved no new full successes: %d unschedulable, %d partially scheduled", args.Unschedulable, args.PartiallyScheduled))
+	}
+
 	return nil
+}
+
+// getInitiallyScheduledCount returns the number of children (pods for a PodGroup, or direct child groups
+// for a CompositePodGroup) that satisfied their scheduling policy at the beginning of the placement evaluation.
+// Because the scheduler invokes PlacementFeasible before evaluating any pods or children in a placement,
+// caching the initial count on first invocation captures the snapshot state before tentative assumptions mutate it.
+func (pl *GangScheduling) getInitiallyScheduledCount(placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args fwk.PlacementProgress) int {
+	if s, err := placementCycleState.Read(placementStateKey); err == nil {
+		return s.(*placementStateData).initiallyScheduled
+	}
+	var initiallyScheduled int
+	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType && len(podGroupInfo.GetChildren()) > 0 {
+		initiallyScheduled = pl.countInitiallyScheduledChildren(podGroupInfo)
+	} else {
+		initiallyScheduled = args.Scheduled - args.NewlySucceeded - args.PartiallyScheduled
+	}
+	placementCycleState.Write(placementStateKey, &placementStateData{
+		initiallyScheduled: initiallyScheduled,
+	})
+	return initiallyScheduled
+}
+
+func (pl *GangScheduling) isGroupInitiallyScheduled(podGroupInfo fwk.PodGroupInfo) bool {
+	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
+		return pl.countInitiallyScheduledChildren(podGroupInfo) >= getMinCount(podGroupInfo)
+	}
+	if pl.snapshotLister == nil {
+		return false
+	}
+	podGroupState, err := pl.snapshotLister.PodGroupStates().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
+	if err != nil || podGroupState == nil {
+		return false
+	}
+	return podGroupState.ScheduledPodsCount() >= getMinCount(podGroupInfo)
+}
+
+func (pl *GangScheduling) countInitiallyScheduledChildren(podGroupInfo fwk.PodGroupInfo) int {
+	count := 0
+	for _, child := range podGroupInfo.GetChildren() {
+		if pl.isGroupInitiallyScheduled(child) {
+			count++
+		}
+	}
+	return count
+}
+
+// isGangPolicy returns true if the pod group or composite pod group uses the Gang scheduling policy.
+func isGangPolicy(podGroupInfo fwk.PodGroupInfo) bool {
+	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
+		return podGroupInfo.GetCompositePodGroup().Spec.SchedulingPolicy.Gang != nil
+	}
+	return podGroupInfo.GetPodGroup().Spec.SchedulingPolicy.Gang != nil
 }
 
 // getMinCount returns the min count for a pod group or a composite pod group. For basic groups it returns 1.

@@ -878,6 +878,8 @@ func TestPlacementFeasible(t *testing.T) {
 		podStatuses           []fwk.Code
 		expectedStatuses      []fwk.Code
 		initialScheduledCount int
+		onlyCPG               bool
+		onlyFlatPG            bool
 	}{
 		{
 			name:                  "All pods succeed, minCount met at end",
@@ -925,12 +927,12 @@ func TestPlacementFeasible(t *testing.T) {
 			initialScheduledCount: 0,
 		},
 		{
-			name:                  "Non-gang pod group with 1 initially scheduled pod succeeds",
+			name:                  "Non-gang pod group with 1 initially scheduled pod returns PartialSuccess when new pod fails",
 			minCount:              0,
 			childrenCount:         1,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			expectedStatuses:      []fwk.Code{fwk.Success},
+			expectedStatuses:      []fwk.Code{fwk.PartialSuccess},
 			initialScheduledCount: 1,
 		},
 		{
@@ -943,7 +945,7 @@ func TestPlacementFeasible(t *testing.T) {
 			initialScheduledCount: 0,
 		},
 		{
-			name:                  "More than minCount pods, first fails",
+			name:                  "More than minCount pods, first fails (initial attempt prioritizes binding)",
 			minCount:              2,
 			childrenCount:         3,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
@@ -961,7 +963,7 @@ func TestPlacementFeasible(t *testing.T) {
 			initialScheduledCount: 0,
 		},
 		{
-			name:                  "1 pod scheduled, 2 unscheduled pods succeed, minCount 3 met",
+			name:                  "1 pod scheduled, 2 unscheduled pods succeed, minCount 3 met (initial attempt)",
 			minCount:              3,
 			childrenCount:         2,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
@@ -970,13 +972,77 @@ func TestPlacementFeasible(t *testing.T) {
 			initialScheduledCount: 1,
 		},
 		{
-			name:                  "minCount already met by scheduled pods",
+			name:                  "minCount already met by scheduled pods, subsequent gang attempt returns PartialSuccess when pod fails",
 			minCount:              2,
 			childrenCount:         1,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			expectedStatuses:      []fwk.Code{fwk.Success},
+			expectedStatuses:      []fwk.Code{fwk.PartialSuccess},
 			initialScheduledCount: 2,
+		},
+		{
+			name:                  "Subsequent gang attempt: all new pods succeed returns Success",
+			minCount:              2,
+			childrenCount:         2,
+			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
+			podStatuses:           []fwk.Code{fwk.Success, fwk.Success},
+			expectedStatuses:      []fwk.Code{fwk.Success, fwk.Success},
+			initialScheduledCount: 2,
+		},
+		{
+			name:                  "Subsequent gang attempt: 1 succeeds and 1 fails returns PartialSuccess",
+			minCount:              2,
+			childrenCount:         2,
+			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
+			podStatuses:           []fwk.Code{fwk.Success, fwk.Unschedulable},
+			expectedStatuses:      []fwk.Code{fwk.Success, fwk.PartialSuccess},
+			initialScheduledCount: 2,
+		},
+		{
+			name:                  "Subsequent basic flat PodGroup: 1 succeeds and 1 fails returns Success",
+			minCount:              0,
+			childrenCount:         2,
+			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
+			podStatuses:           []fwk.Code{fwk.Success, fwk.Unschedulable},
+			expectedStatuses:      []fwk.Code{fwk.Success, fwk.Success},
+			initialScheduledCount: 1,
+			onlyFlatPG:            true,
+		},
+		{
+			name:                  "Subsequent gang CPG: 1 child PartialSuccess and 1 child Success returns PartialSuccess",
+			minCount:              2,
+			childrenCount:         2,
+			podStatuses:           []fwk.Code{fwk.PartialSuccess, fwk.Success},
+			expectedStatuses:      []fwk.Code{fwk.PartialSuccess, fwk.PartialSuccess},
+			initialScheduledCount: 2,
+			onlyCPG:               true,
+		},
+		{
+			name:                  "Subsequent basic CPG (Example 1): 1 child PartialSuccess and 1 child Success returns Success",
+			minCount:              0,
+			childrenCount:         2,
+			podStatuses:           []fwk.Code{fwk.PartialSuccess, fwk.Success},
+			expectedStatuses:      []fwk.Code{fwk.PartialSuccess, fwk.Success},
+			initialScheduledCount: 1,
+			onlyCPG:               true,
+		},
+		{
+			name:                  "Subsequent basic CPG (Example 2): 1 child PartialSuccess and 1 child Unschedulable returns PartialSuccess",
+			minCount:              0,
+			childrenCount:         2,
+			podStatuses:           []fwk.Code{fwk.PartialSuccess, fwk.Unschedulable},
+			expectedStatuses:      []fwk.Code{fwk.PartialSuccess, fwk.PartialSuccess},
+			initialScheduledCount: 1,
+			onlyCPG:               true,
+		},
+		{
+			name:                  "Subsequent basic CPG (Example 3): 1 child Success and 1 child Unschedulable returns Success",
+			minCount:              0,
+			childrenCount:         2,
+			podStatuses:           []fwk.Code{fwk.Success, fwk.Unschedulable},
+			expectedStatuses:      []fwk.Code{fwk.Success, fwk.Success},
+			initialScheduledCount: 1,
+			onlyCPG:               true,
 		},
 		{
 			name:                  "1 pod scheduled, minCount 3, first unscheduled fails, not enough remaining",
@@ -1003,6 +1069,12 @@ func TestPlacementFeasible(t *testing.T) {
 			for _, isCPG := range []bool{true, false} {
 				if !isCPGEnabled && isCPG {
 					// Cannot happen, skip
+					continue
+				}
+				if tc.onlyCPG && !isCPG {
+					continue
+				}
+				if tc.onlyFlatPG && isCPG {
 					continue
 				}
 				t.Run(fmt.Sprintf("%s (isCPG: %v, CPG enabled: %v)", tc.name, isCPG, isCPGEnabled), func(t *testing.T) {
@@ -1073,15 +1145,29 @@ func TestPlacementFeasible(t *testing.T) {
 					cycleState.SetPodGroupCycleState(cycleState)
 
 					scheduled := tc.initialScheduledCount
+					newlySucceeded := 0
+					partiallyScheduled := 0
+					unschedulable := 0
 					for i, code := range tc.podStatuses {
-						if code == fwk.Success {
+						switch code {
+						case fwk.Success:
 							scheduled++
+							newlySucceeded++
 							mockState.scheduledPodsCount++
+						case fwk.PartialSuccess:
+							scheduled++
+							partiallyScheduled++
+							mockState.scheduledPodsCount++
+						case fwk.Unschedulable:
+							unschedulable++
 						}
 
 						args := fwk.PlacementProgress{
-							Remaining: tc.childrenCount - (i + 1),
-							Scheduled: scheduled,
+							Remaining:          tc.childrenCount - (i + 1),
+							Scheduled:          scheduled,
+							NewlySucceeded:     newlySucceeded,
+							PartiallyScheduled: partiallyScheduled,
+							Unschedulable:      unschedulable,
 						}
 						gotStatus := pl.PlacementFeasible(ctx, cycleState, pgInfo, args)
 
@@ -1129,4 +1215,143 @@ func (m *mockPodGroupManager) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityK
 			return currentKey, true, nil
 		}
 	}
+}
+
+type mockMapPodGroupStateLister struct {
+	states map[string]*mockPodGroupState
+}
+
+func (m *mockMapPodGroupStateLister) Get(_, podGroupName string) (fwk.PodGroupState, error) {
+	if s, ok := m.states[podGroupName]; ok {
+		return s, nil
+	}
+	return nil, fmt.Errorf("podgroup state %q not found", podGroupName)
+}
+
+type mockMapSharedLister struct {
+	fwk.SharedLister
+	lister *mockMapPodGroupStateLister
+}
+
+func (m *mockMapSharedLister) PodGroupStates() fwk.PodGroupStateLister {
+	return m.lister
+}
+
+func TestPlacementFeasible_CompositeHierarchyInitialStateCaching(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
+		features.CompositePodGroup:               true,
+	})
+	_, ctx := ktesting.NewTestContext(t)
+
+	// Build a 3-level hierarchy:
+	// rootCPG (Gang, minGroupCount=2)
+	//  ├─ subCPG1 (Gang, minGroupCount=2) -> pg1_1 (minCount=2), pg1_2 (minCount=2)
+	//  ├─ subCPG2 (Basic)                 -> pg2_1 (Basic)
+	//  └─ subCPG3 (Gang, minGroupCount=1) -> pg3_1 (minCount=2)
+	rootCPG := st.MakeCompositePodGroup().Namespace("default").Name("root-cpg").MinGroupCount(2).Obj()
+	subCPG1 := st.MakeCompositePodGroup().Namespace("default").Name("sub-cpg1").ParentCompositePodGroup("root-cpg").MinGroupCount(2).Obj()
+	subCPG2 := st.MakeCompositePodGroup().Namespace("default").Name("sub-cpg2").ParentCompositePodGroup("root-cpg").BasicPolicy().Obj()
+	subCPG3 := st.MakeCompositePodGroup().Namespace("default").Name("sub-cpg3").ParentCompositePodGroup("root-cpg").MinGroupCount(1).Obj()
+
+	pg1_1 := st.MakePodGroup().Namespace("default").Name("pg1-1").ParentCompositePodGroup("sub-cpg1").MinCount(2).Obj()
+	pg1_2 := st.MakePodGroup().Namespace("default").Name("pg1-2").ParentCompositePodGroup("sub-cpg1").MinCount(2).Obj()
+	pg2_1 := st.MakePodGroup().Namespace("default").Name("pg2-1").ParentCompositePodGroup("sub-cpg2").BasicPolicy().Obj()
+	pg3_1 := st.MakePodGroup().Namespace("default").Name("pg3-1").ParentCompositePodGroup("sub-cpg3").MinCount(2).Obj()
+
+	rootPGInfo := &schedulerframework.PodGroupInfo{
+		GenericPodGroup: fwk.NewGenericCompositePodGroup(rootCPG),
+		Children: []*schedulerframework.PodGroupInfo{
+			{
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(subCPG1),
+				Children: []*schedulerframework.PodGroupInfo{
+					{GenericPodGroup: fwk.NewGenericPodGroup(pg1_1)},
+					{GenericPodGroup: fwk.NewGenericPodGroup(pg1_2)},
+				},
+			},
+			{
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(subCPG2),
+				Children: []*schedulerframework.PodGroupInfo{
+					{GenericPodGroup: fwk.NewGenericPodGroup(pg2_1)},
+				},
+			},
+			{
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(subCPG3),
+				Children: []*schedulerframework.PodGroupInfo{
+					{GenericPodGroup: fwk.NewGenericPodGroup(pg3_1)},
+				},
+			},
+		},
+	}
+
+	t.Run("Initial attempt caches initial count before child states mutate during evaluation", func(t *testing.T) {
+		// Initially only subCPG1 is scheduled (pg1-1 has 2, pg1-2 has 2); subCPG2 and subCPG3 have 0.
+		// Thus rootCPG has 1 initially scheduled child (< minGroupCount=2 -> initial attempt).
+		states := map[string]*mockPodGroupState{
+			"pg1-1": {scheduledPodsCount: 2},
+			"pg1-2": {scheduledPodsCount: 2},
+			"pg2-1": {scheduledPodsCount: 0},
+			"pg3-1": {scheduledPodsCount: 0},
+		}
+		pl := &GangScheduling{
+			snapshotLister:             &mockMapSharedLister{lister: &mockMapPodGroupStateLister{states: states}},
+			isCompositePodGroupEnabled: true,
+		}
+		cycleState := schedulerframework.NewCycleState()
+
+		// 1. Pre-loop call (Remaining=3, Scheduled=0): caches initiallyScheduled=1 (< minGroupCount=2).
+		status := pl.PlacementFeasible(ctx, cycleState, rootPGInfo, fwk.PlacementProgress{Remaining: 3, Scheduled: 0})
+		if status.Code() != fwk.Wait {
+			t.Fatalf("expected pre-loop status Wait, got %v", status)
+		}
+
+		// 2. Simulate subCPG1 and subCPG2 being evaluated in-memory and mutating PodGroupStates so 2 children now appear scheduled.
+		states["pg2-1"].scheduledPodsCount = 1
+
+		// 3. Evaluate after subCPG1 (Success), subCPG2 (Success), subCPG3 (Unschedulable):
+		// Even though states now has 2 scheduled children and Unschedulable=1, cached initiallyScheduled=1 (< 2)
+		// means this is still an initial scheduling attempt and must return Success (prioritizing binding).
+		status = pl.PlacementFeasible(ctx, cycleState, rootPGInfo, fwk.PlacementProgress{
+			Remaining:      0,
+			Scheduled:      2,
+			NewlySucceeded: 1,
+			Unschedulable:  1,
+		})
+		if !status.IsSuccess() {
+			t.Errorf("expected Success for initial attempt when 2 of 3 children succeed, got %v", status)
+		}
+	})
+
+	t.Run("Subsequent attempt on 3-level hierarchy returns PartialSuccess when 3rd child fails", func(t *testing.T) {
+		// Initially both subCPG1 and subCPG2 meet their policies (initiallyScheduled=2 >= minGroupCount=2).
+		states := map[string]*mockPodGroupState{
+			"pg1-1": {scheduledPodsCount: 2},
+			"pg1-2": {scheduledPodsCount: 2},
+			"pg2-1": {scheduledPodsCount: 1},
+			"pg3-1": {scheduledPodsCount: 0},
+		}
+		pl := &GangScheduling{
+			snapshotLister:             &mockMapSharedLister{lister: &mockMapPodGroupStateLister{states: states}},
+			isCompositePodGroupEnabled: true,
+		}
+		cycleState := schedulerframework.NewCycleState()
+
+		// Pre-loop call caches initiallyScheduled=2 (>= minGroupCount=2 -> subsequent attempt).
+		status := pl.PlacementFeasible(ctx, cycleState, rootPGInfo, fwk.PlacementProgress{Remaining: 3, Scheduled: 0})
+		if status.Code() != fwk.Wait {
+			t.Fatalf("expected pre-loop status Wait, got %v", status)
+		}
+
+		// After subCPG1 (Success), subCPG2 (Success), subCPG3 (Unschedulable):
+		// Because rootCPG is Gang and in a subsequent attempt with Unschedulable=1, it must return PartialSuccess.
+		status = pl.PlacementFeasible(ctx, cycleState, rootPGInfo, fwk.PlacementProgress{
+			Remaining:     0,
+			Scheduled:     2,
+			Unschedulable: 1,
+		})
+		if !status.IsPartialSuccess() {
+			t.Errorf("expected PartialSuccess for subsequent attempt when 1 child is unschedulable, got %v", status)
+		}
+	})
 }
