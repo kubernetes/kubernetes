@@ -4,9 +4,9 @@ metadata:
   name: node-{{.Index}}
   labels:
     kubernetes.io/hostname: node-{{.Index}}
-    # Topology hierarchy: 1 zone per 1,000 nodes, 1 rack per 100 nodes (10 racks per zone).
-    topology.kubernetes.io/zone: zone-{{DivideInt .Index 1000}}
-    topology.kubernetes.io/rack: rack-{{DivideInt .Index 100}}
+    # nodesPerZone must be a multiple of nodesPerRack, so that each rack belongs to a single zone.
+    topology.kubernetes.io/zone: zone-{{DivideInt .Index .nodesPerZone}}
+    topology.kubernetes.io/rack: rack-{{DivideInt .Index .nodesPerRack}}
 status:
   capacity:
     cpu: "4"
