@@ -296,6 +296,19 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 		return
 	}
 
+	// Reflector calls UpdateResourceVersion after every watch event, including
+	// the Add/Update/Delete it just delivered, which already advanced the cache
+	// to that resourceVersion. Skipping those no-op updates avoids taking the
+	// write lock, waking up all waiting readers and dispatching a bookmark that
+	// carries no new information.
+	if func() bool {
+		w.RLock()
+		defer w.RUnlock()
+		return w.resourceVersion == rv
+	}() {
+		return
+	}
+
 	func() {
 		w.Lock()
 		defer w.Unlock()
