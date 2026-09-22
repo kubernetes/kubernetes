@@ -427,7 +427,7 @@ func genClientCert(t *testing.T, from, to time.Time) ([]byte, []byte) {
 		NotBefore:    from,
 		NotAfter:     to,
 
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		KeyUsage:              x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 	}
