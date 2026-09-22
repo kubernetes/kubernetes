@@ -560,11 +560,18 @@ type NodeAllocatableMapping struct {
 	// (for a specific claim allocation) determines the base quantity for
 	// the node allocatable resource. `capacityMultiplier` must also be set and is
 	// multiplied with the base quantity.
+	//
 	// For example, if `spec.devices[*].capacity` has an entry "dra.example.com/memory": "128Gi",
 	// and this field is set to "dra.example.com/memory", then for a claim allocation
 	// that consumes { "dra.example.com/memory": "4Gi" } the base quantity for the
 	// node allocatable resource mapping will be "4Gi".
 	// The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.
+	//
+	// In this example, "dra.example.com/memory" is a fictional standardized capacity name.
+	// For driver-specific capacities the driver name can be omitted.
+	// As defined for consumedCapacity, the capacity consumption may be recorded
+	// there with or without the driver name.
+	//
 	// +optional
 	// +k8s:optional
 	// +k8s:unionMember
