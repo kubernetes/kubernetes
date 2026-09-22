@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -158,18 +160,26 @@ func (sched *Scheduler) handlePodGroupFailureBeforeScheduling(ctx context.Contex
 
 func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pgi *framework.PodGroupInfo, err error) {
 	if pgi.PodGroup != nil {
+		pgReason := schedulingapi.PodGroupReasonSchedulerError
+		if _, ok := errors.AsType[*validationError](err); ok {
+			pgReason = schedulingapi.PodGroupReasonPodGroupError
+		}
 		sched.updatePodGroupCondition(ctx, pgi, &metav1.Condition{
 			Type:    schedulingapi.PodGroupInitiallyScheduled,
 			Status:  metav1.ConditionFalse,
-			Reason:  schedulingapi.PodGroupReasonSchedulerError,
+			Reason:  pgReason,
 			Message: err.Error(),
 		})
 		return
 	}
+	cpgReason := schedulingapi.CompositePodGroupReasonSchedulerError
+	if _, ok := errors.AsType[*validationError](err); ok {
+		cpgReason = schedulingapi.CompositePodGroupReasonCompositePodGroupError
+	}
 	sched.updateCompositePodGroupCondition(ctx, pgi, &metav1.Condition{
 		Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
 		Status:  metav1.ConditionFalse,
-		Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
+		Reason:  cpgReason,
 		Message: err.Error(),
 	})
 	for _, child := range pgi.GetChildGroups() {
@@ -178,11 +188,16 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 }
 
 // validatePodGroup ensures that:
+// - the hierarchy does not exceed WorkloadMaxTreeDepth (and has no CompositePodGroup at depth WorkloadMaxTreeDepth),
+// - all groups in the hierarchy reference the same Workload as the root group,
+// - no gang parent group has a basic child group,
+// - no parent group with All disruption mode has a child group with Single disruption mode,
 // - all Pods in a group hierarchy have matching scheduler name,
 // - all entities in a group hierarchy have the same priority as the root group,
 // - all entities in a group hierarchy have the same preemption policy.
 func (sched *Scheduler) validatePodGroup(rootInfo *framework.QueuedPodGroupInfo) error {
 	rootPriority := rootInfo.GetPriority()
+	rootWorkloadName := rootInfo.GetWorkloadName()
 
 	var rootPreemptionPolicy v1.PreemptionPolicy
 	if sched.podGroupPreemptionPolicyEnabled {
@@ -199,31 +214,49 @@ func (sched *Scheduler) validatePodGroup(rootInfo *framework.QueuedPodGroupInfo)
 		break
 	}
 
-	validatePodGroup := func(pgi *framework.PodGroupInfo) error {
+	validatePodGroup := func(pgi, parent *framework.PodGroupInfo) error {
+		if parent == nil {
+			// It's a root, so we can skip the checks against itself.
+			return nil
+		}
+
+		if pgWorkloadName := pgi.GetWorkloadName(); pgWorkloadName != rootWorkloadName {
+			return newValidationErrorf("pod group workload does not match root workload, got: %q (%q) and %q (%q)",
+				pgWorkloadName, pgi.GetKey(), rootWorkloadName, rootInfo.GetKey())
+		}
+
 		pgPriority := pgi.GetPriority()
 		if pgPriority != rootPriority {
-			return fmt.Errorf("all pod groups in a hierarchy should have the same priority as the root pod group's priority, got %d (%q) and %d (%q)",
+			return newValidationErrorf("all pod groups in a hierarchy should have the same priority as the root pod group's priority, got %d (%q) and %d (%q)",
 				pgPriority, pgi.GetKey(), rootPriority, rootInfo.GetKey())
 		}
 
 		if sched.podGroupPreemptionPolicyEnabled {
 			pgPreemptionPolicy := pgi.GetPreemptionPolicy()
 			if pgPreemptionPolicy != rootPreemptionPolicy {
-				return fmt.Errorf("all pod groups in a hierarchy should have the same preemption policy as the root pod group's preemption policy, got %v (%q) and %v (%q)",
+				return newValidationErrorf("all pod groups in a hierarchy should have the same preemption policy as the root pod group's preemption policy, got %v (%q) and %v (%q)",
 					pgPreemptionPolicy, pgi.GetKey(), rootPreemptionPolicy, rootInfo.GetKey())
 			}
+		}
+
+		if parent.IsGang() && pgi.IsBasic() {
+			return newValidationErrorf("gang parent %q cannot have basic child %q", parent.GetKey(), pgi.GetKey())
+		}
+
+		if parent.HasDisruptionModeAll() && pgi.HasDisruptionModeSingle() {
+			return newValidationErrorf("parent %q with All disruption mode cannot have child %q with Single disruption mode", parent.GetKey(), pgi.GetKey())
 		}
 		return nil
 	}
 
 	validatePod := func(pod *v1.Pod) error {
 		if pod.Spec.SchedulerName != schedulerName {
-			return fmt.Errorf("all pods in a pod group hierarchy should have the same .spec.schedulerName set, got: %q (%q) and %q (%q)",
+			return newValidationErrorf("all pods in a pod group hierarchy should have the same .spec.schedulerName set, got: %q (%q) and %q (%q)",
 				pod.Spec.SchedulerName, pod.Name, schedulerName, firstPodName)
 		}
 		podPriority := corev1helpers.PodPriority(pod)
 		if podPriority != rootPriority {
-			return fmt.Errorf("all pods in a pod group hierarchy should have the same priority as the root pod group's priority, got %d (%q) and %d (%q)",
+			return newValidationErrorf("all pods in a pod group hierarchy should have the same priority as the root pod group's priority, got %d (%q) and %d (%q)",
 				podPriority, pod.Name, rootPriority, rootInfo.GetKey())
 		}
 
@@ -232,19 +265,19 @@ func (sched *Scheduler) validatePodGroup(rootInfo *framework.QueuedPodGroupInfo)
 			if sched.podGroupPreemptionPolicyEnabled {
 				// If the PodGroupPreemptionPolicy feature is enabled, validate that the pod's preemption policy
 				// matches the root group's preemption policy.
-				return fmt.Errorf("all pods in a pod group hierarchy should have the same preemption policy as the root pod group's preemption policy, got %v (%q) and %v (%q)",
+				return newValidationErrorf("all pods in a pod group hierarchy should have the same preemption policy as the root pod group's preemption policy, got %v (%q) and %v (%q)",
 					podPreemptionPolicy, pod.Name, rootPreemptionPolicy, rootInfo.GetKey())
 			} else {
 				// If the PodGroupPreemptionPolicy feature is disabled, the preemption policy is determined by the first pod in the group.
 				// Validate that preemption policy is the same across all pods in the pod group.
-				return fmt.Errorf("all pods in a pod group hierarchy should have the same preemption policy, got %v (%q) and %v (%q)",
+				return newValidationErrorf("all pods in a pod group hierarchy should have the same preemption policy, got %v (%q) and %v (%q)",
 					podPreemptionPolicy, pod.Name, rootPreemptionPolicy, firstPodName)
 			}
 		}
 		return nil
 	}
 
-	if err := sched.validatePodGroupHierarchy(rootInfo.PodGroupInfo, validatePodGroup, validatePod); err != nil {
+	if err := sched.validatePodGroupHierarchy(rootInfo.PodGroupInfo, nil /* parent */, 1 /* depth */, validatePodGroup, validatePod); err != nil {
 		return err
 	}
 
@@ -258,14 +291,26 @@ func (sched *Scheduler) validatePodGroup(rootInfo *framework.QueuedPodGroupInfo)
 // validatePodGroupHierarchy recursively validates that all entities in the hierarchy
 // (composite pod groups, pod groups, and both unscheduled and scheduled pods)
 // conform to the group-wide constraints.
-func (sched *Scheduler) validatePodGroupHierarchy(podGroupInfo *framework.PodGroupInfo, validatePodGroup func(pgi *framework.PodGroupInfo) error, validatePod func(pod *v1.Pod) error) error {
-	if err := validatePodGroup(podGroupInfo); err != nil {
+func (sched *Scheduler) validatePodGroupHierarchy(
+	podGroupInfo, parent *framework.PodGroupInfo,
+	depth int,
+	validatePodGroup func(pgi, parent *framework.PodGroupInfo) error,
+	validatePod func(pod *v1.Pod) error,
+) error {
+	// CompositePodGroup nodes cannot be at depth WorkloadMaxTreeDepth as they have to contain a PodGroup as a child,
+	// breaking the depth constraint.
+	if depth > schedulingv1alpha3.WorkloadMaxTreeDepth ||
+		(podGroupInfo.GetType() == fwk.CompositePodGroupKeyType && depth == schedulingv1alpha3.WorkloadMaxTreeDepth) {
+		return newValidationErrorf("hierarchy depth exceeds maximum allowed depth %d at %q", schedulingv1alpha3.WorkloadMaxTreeDepth, podGroupInfo.GetKey())
+	}
+
+	if err := validatePodGroup(podGroupInfo, parent); err != nil {
 		return err
 	}
 
 	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
 		for _, child := range podGroupInfo.GetChildGroups() {
-			if err := sched.validatePodGroupHierarchy(child, validatePodGroup, validatePod); err != nil {
+			if err := sched.validatePodGroupHierarchy(child, podGroupInfo, depth+1, validatePodGroup, validatePod); err != nil {
 				return err
 			}
 		}

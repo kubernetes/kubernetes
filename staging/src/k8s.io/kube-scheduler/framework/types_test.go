@@ -291,11 +291,6 @@ func TestGenericPodGroup_HasDisruptionModeAll(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "nil PodGroup and nil CompositePodGroup",
-			gpg:  &GenericPodGroup{},
-			want: false,
-		},
-		{
 			name: "PodGroup with nil DisruptionMode",
 			gpg:  NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
 			want: false,

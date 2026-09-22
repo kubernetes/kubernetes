@@ -88,18 +88,18 @@ func TestCPGScheduling(t *testing.T) {
 		{
 			name: "TestCPGHierarchicalScheduling",
 			// TestCPGHierarchicalScheduling verifies that readiness and feasibility propagate correctly
-			// across a 3-level CPG hierarchy with mixed Gang and Basic policies.
+			// across a 3-level CPG hierarchy.
 			//
 			// Tree structure:
 			//
 			//	                    cpg-root (Gang, Min: 2)
 			//	            /                 |                 \
-			//	   cpg-sub1 (Gang, Min:2)  cpg-sub2 (Basic)    cpg-sub3 (Gang, Min:2)
+			//	   cpg-sub1 (Gang, Min:2)  cpg-sub2 (Gang, Min:1)    cpg-sub3 (Gang, Min:2)
 			//	   /    |    \              /       \             /         \
 			//	 pg1   pg2   pg3          pg4       pg5         pg6        pg7
 			//	(S)   (S)   (F)          (S)       (S)         (F)        (F)
 			//
-			// [Gang] [Gang] [Gang]     [Basic]   [Gang]      [Gang]     [Gang]
+			// [Gang] [Gang] [Gang]  [Gang, Min:1] [Gang]     [Gang]     [Gang]
 			//
 			// (S) = Success (pods schedule according to policy)
 			// (F) = Fail (pods cannot schedule)
@@ -118,9 +118,9 @@ func TestCPGScheduling(t *testing.T) {
 									st.MakeCompositePodGroupTemplate().Name("sub1-3-t").MinGroupCount(2).Priority(100).Children(
 										st.MakePodGroupTemplate().Name("gang-t1").MinCount(3).Priority(100),
 									),
-									st.MakeCompositePodGroupTemplate().Name("sub2-t").BasicPolicy().Priority(100).Children(
-										st.MakePodGroupTemplate().Name("basic-t").BasicPolicy().Priority(100),
-										st.MakePodGroupTemplate().Name("gang-t2").MinCount(3).Priority(100),
+									st.MakeCompositePodGroupTemplate().Name("sub2-t").MinGroupCount(1).Priority(100).Children(
+										st.MakePodGroupTemplate().Name("gang-t2").MinCount(1).Priority(100),
+										st.MakePodGroupTemplate().Name("gang-t3").MinCount(3).Priority(100),
 									),
 								),
 							).Obj(),
@@ -136,7 +136,7 @@ func TestCPGScheduling(t *testing.T) {
 				},
 				{
 					Name:                    "Create cpg-sub2",
-					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-sub2").WorkloadRef("workload-cpg", "sub2-t").BasicPolicy().ParentCompositePodGroup("cpg-root").Priority(100).Obj(),
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-sub2").WorkloadRef("workload-cpg", "sub2-t").MinGroupCount(1).ParentCompositePodGroup("cpg-root").Priority(100).Obj(),
 				},
 				{
 					Name:                    "Create cpg-sub3",
@@ -156,11 +156,11 @@ func TestCPGScheduling(t *testing.T) {
 				},
 				{
 					Name:           "Create pg4",
-					CreatePodGroup: st.MakePodGroup().Name("pg4").WorkloadRef("workload-cpg", "basic-t").ParentCompositePodGroup("cpg-sub2").Priority(100).BasicPolicy().Obj(),
+					CreatePodGroup: st.MakePodGroup().Name("pg4").WorkloadRef("workload-cpg", "gang-t2").ParentCompositePodGroup("cpg-sub2").Priority(100).MinCount(3).Obj(),
 				},
 				{
 					Name:           "Create pg5",
-					CreatePodGroup: st.MakePodGroup().Name("pg5").WorkloadRef("workload-cpg", "gang-t2").ParentCompositePodGroup("cpg-sub2").Priority(100).MinCount(3).Obj(),
+					CreatePodGroup: st.MakePodGroup().Name("pg5").WorkloadRef("workload-cpg", "gang-t3").ParentCompositePodGroup("cpg-sub2").Priority(100).MinCount(3).Obj(),
 				},
 				{
 					Name:           "Create pg6",
@@ -438,88 +438,6 @@ func TestCPGScheduling(t *testing.T) {
 			},
 		},
 		{
-			name: "TestCPGGangWithBasicChildren",
-			// TestCPGGangWithBasicChildren verifies that a Gang CompositePodGroup with Basic children
-			// enforces the gang scheduling policy (minGroupCount) at the root level.
-			//
-			// Tree structure:
-			//
-			//	   cpg-root (Gang, Min: 2)
-			//	  /          |          \
-			//	pg1         pg2         pg3
-			//	(S)         (S)         (F)
-			//
-			// (S) = Success
-			// (F) = Fail
-			steps: []stepsframework.Step{
-				{
-					Name:        "Create Node",
-					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "8"}).Obj()},
-				},
-				{
-					Name: "Create Workload",
-					CreateWorkloads: []*schedulingapi.Workload{
-						st.MakeWorkload().Name("workload-cpg-gang-basic").
-							Children(
-								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
-									st.MakePodGroupTemplate().Name("basic-t").BasicPolicy().Priority(100),
-								),
-							).Obj(),
-					},
-				},
-				{
-					Name:                    "Create root CPG",
-					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-gang-basic", "root-t").MinGroupCount(2).Priority(100).Obj(),
-				},
-				{
-					Name:           "Create pg1",
-					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-gang-basic", "basic-t").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
-				},
-				{
-					Name:           "Create pg2",
-					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-gang-basic", "basic-t").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
-				},
-				{
-					Name:           "Create pg3",
-					CreatePodGroup: st.MakePodGroup().Name("pg3").WorkloadRef("workload-cpg-gang-basic", "basic-t").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
-				},
-				{
-					Name: "Create Pods",
-					CreatePods: concatPods(
-						makeTestPods("pg1", "1", "1", "1"),
-						makeTestPods("pg2", "1", "1", "1"),
-						makeTestPods("pg3", "10", "10", "10"),
-					),
-				},
-				{
-					Name: "Wait for successful pods",
-					WaitForPodsScheduled: podNames(concatPods(
-						makeTestPods("pg1", "1", "1", "1"),
-						makeTestPods("pg2", "1", "1", "1"),
-					)),
-				},
-				{
-					Name: "Verify failing pods remain unschedulable",
-					WaitForPodsUnschedulable: podNames(concatPods(
-						makeTestPods("pg3", "1", "1", "1"),
-					)),
-				},
-				{
-					Name: "Verify root CPG and pg1, pg2 conditions are Scheduled",
-					WaitForGroupsScheduled: &stepsframework.Groups{
-						CompositePodGroups: []string{"cpg-root"},
-						PodGroups:          []string{"pg1", "pg2"},
-					},
-				},
-				{
-					Name: "Verify pg3 condition is Unschedulable",
-					WaitForGroupsUnschedulable: &stepsframework.Groups{
-						PodGroups: []string{"pg3"},
-					},
-				},
-			},
-		},
-		{
 			name: "TestCPGBasicWithUnschedulableBasicChildren",
 			// TestCPGBasicWithUnschedulableBasicChildren verifies that when a Basic CompositePodGroup has
 			// unschedulable Basic child pod groups, the pods remain unscheduled.
@@ -611,7 +529,7 @@ func TestCPGScheduling(t *testing.T) {
 			//	  /   |  \
 			//	pg1  pg2  cpg-sub (Gang minGroupCount = 2)
 			//	(S)  (S)     |
-			//	           sub-pg1 (Basic)
+			//	           sub-pg1 (Gang)
 			//	           (Pending - quorum of 2 not met)
 			//
 			// Stage 4 (Dynamically added sub-pg2 under cpg-sub):
@@ -620,7 +538,7 @@ func TestCPGScheduling(t *testing.T) {
 			//	  /   |  \
 			//	pg1  pg2  cpg-sub (Gang minGroupCount = 2)
 			//	(S)  (S)   /     \
-			//	        sub-pg1  sub-pg2 (Basic)
+			//	        sub-pg1  sub-pg2 (Gang)
 			//	        (S)      (S)
 			//
 			// (S) = Successfully scheduled
@@ -637,7 +555,7 @@ func TestCPGScheduling(t *testing.T) {
 								st.MakeCompositePodGroupTemplate().Name("root-t").BasicPolicy().Priority(100).Children(
 									st.MakePodGroupTemplate().Name("basic-t").BasicPolicy().Priority(100),
 									st.MakeCompositePodGroupTemplate().Name("sub-cpg-t").MinGroupCount(2).Priority(100).Children(
-										st.MakePodGroupTemplate().Name("sub-pg-t").BasicPolicy().Priority(100),
+										st.MakePodGroupTemplate().Name("sub-pg-t").MinCount(1).Priority(100),
 									),
 								),
 							).Obj(),
@@ -690,7 +608,7 @@ func TestCPGScheduling(t *testing.T) {
 				},
 				{
 					Name:           "Create sub-pg1",
-					CreatePodGroup: st.MakePodGroup().Name("sub-pg1").WorkloadRef("workload-cpg-dynamic", "sub-pg-t").ParentCompositePodGroup("cpg-sub").Priority(100).BasicPolicy().Obj(),
+					CreatePodGroup: st.MakePodGroup().Name("sub-pg1").WorkloadRef("workload-cpg-dynamic", "sub-pg-t").ParentCompositePodGroup("cpg-sub").Priority(100).MinCount(1).Obj(),
 				},
 				{
 					Name:       "Create sub-pg1 pods",
@@ -709,7 +627,7 @@ func TestCPGScheduling(t *testing.T) {
 				},
 				{
 					Name:           "Create sub-pg2",
-					CreatePodGroup: st.MakePodGroup().Name("sub-pg2").WorkloadRef("workload-cpg-dynamic", "sub-pg-t").ParentCompositePodGroup("cpg-sub").Priority(100).BasicPolicy().Obj(),
+					CreatePodGroup: st.MakePodGroup().Name("sub-pg2").WorkloadRef("workload-cpg-dynamic", "sub-pg-t").ParentCompositePodGroup("cpg-sub").Priority(100).MinCount(1).Obj(),
 				},
 				{
 					Name:       "Create sub-pg2 pods",
