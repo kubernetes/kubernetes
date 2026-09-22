@@ -1091,7 +1091,47 @@ func printProjectedVolumeSource(projected *corev1.ProjectedVolumeSource, w Prefi
 		} else if source.ServiceAccountToken != nil {
 			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%d\n",
 				*source.ServiceAccountToken.ExpirationSeconds)
+		} else if source.ClusterTrustBundle != nil {
+			printClusterTrustBundleProjection(source.ClusterTrustBundle, w)
+		} else if source.PodCertificate != nil {
+			printPodCertificateProjection(source.PodCertificate, w)
 		}
+	}
+}
+
+func printClusterTrustBundleProjection(ctb *corev1.ClusterTrustBundleProjection, w PrefixWriter) {
+	// A bundle is selected either by name or by signer name plus a label
+	// selector; exactly one of the two forms is set.
+	if ctb.Name != nil {
+		w.Write(LEVEL_2, "ClusterTrustBundleName:\t%v\n", *ctb.Name)
+	} else {
+		signerName := ""
+		if ctb.SignerName != nil {
+			signerName = *ctb.SignerName
+		}
+		w.Write(LEVEL_2, "ClusterTrustBundleSignerName:\t%v\n", signerName)
+		w.Write(LEVEL_2, "LabelSelector:\t%v\n", metav1.FormatLabelSelector(ctb.LabelSelector))
+	}
+	w.Write(LEVEL_2, "Path:\t%v\n", ctb.Path)
+	w.Write(LEVEL_2, "Optional:\t%v\n", ctb.Optional != nil && *ctb.Optional)
+}
+
+func printPodCertificateProjection(pc *corev1.PodCertificateProjection, w PrefixWriter) {
+	w.Write(LEVEL_2, "PodCertificateSignerName:\t%v\n", pc.SignerName)
+	w.Write(LEVEL_2, "KeyType:\t%v\n", pc.KeyType)
+	if pc.MaxExpirationSeconds != nil {
+		w.Write(LEVEL_2, "MaxExpirationSeconds:\t%d\n", *pc.MaxExpirationSeconds)
+	}
+	// Kubelet writes either a single credential bundle or a separate key and
+	// certificate chain, so only the paths that are set are reported.
+	if pc.CredentialBundlePath != "" {
+		w.Write(LEVEL_2, "CredentialBundlePath:\t%v\n", pc.CredentialBundlePath)
+	}
+	if pc.KeyPath != "" {
+		w.Write(LEVEL_2, "KeyPath:\t%v\n", pc.KeyPath)
+	}
+	if pc.CertificateChainPath != "" {
+		w.Write(LEVEL_2, "CertificateChainPath:\t%v\n", pc.CertificateChainPath)
 	}
 }
 
