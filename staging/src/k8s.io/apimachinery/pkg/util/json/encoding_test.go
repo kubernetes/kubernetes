@@ -31,6 +31,9 @@ func (*pointerMarshaler) MarshalJSON() ([]byte, error) {
 	return []byte(`"custom"`), nil
 }
 
+// TestMarshalLegacyCompatibility compares v2 legacy-mode output and error types
+// for collection states, tags, deterministic values, raw and custom marshalers,
+// addressability-sensitive methods, and invalid inputs.
 func TestMarshalLegacyCompatibility(t *testing.T) {
 	p := pointerMarshaler(1)
 	for _, tc := range []struct {
@@ -88,6 +91,8 @@ func TestMarshalLegacyCompatibility(t *testing.T) {
 	}
 }
 
+// TestNewEncoderCompatibility verifies the concrete return type and output for
+// sequential values across indentation and HTML-escaping settings.
 func TestNewEncoderCompatibility(t *testing.T) {
 	for _, indent := range []bool{false, true} {
 		for _, escapeHTML := range []bool{false, true} {

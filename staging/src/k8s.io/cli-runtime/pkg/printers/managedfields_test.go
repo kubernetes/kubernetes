@@ -51,6 +51,9 @@ func (o *managedFieldsEncodingObject) DeepCopyObject() runtime.Object {
 	return &copy
 }
 
+// TestOmitManagedFieldsPrinterUsesJSONV2 verifies real JSON and YAML delegates
+// for single objects and RawExtension lists, including v2 dispatch, preserved
+// identity fields, managed-field removal, and an unchanged input object.
 func TestOmitManagedFieldsPrinterUsesJSONV2(t *testing.T) {
 	for _, format := range []string{"json", "yaml"} {
 		for _, list := range []bool{false, true} {

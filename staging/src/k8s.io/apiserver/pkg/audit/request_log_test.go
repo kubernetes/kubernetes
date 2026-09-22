@@ -54,6 +54,9 @@ func (o *managedFieldsEncodingObject) DeepCopyObject() runtime.Object {
 	return &copy
 }
 
+// TestManagedFieldsOmissionUsesJSONV2 verifies request and response audit
+// encoding with managed fields retained or omitted, including v2 dispatch,
+// injected TypeMeta, preserved metadata, and an unchanged input object.
 func TestManagedFieldsOmissionUsesJSONV2(t *testing.T) {
 	gvk := schema.GroupVersionKind{Group: "test.example", Version: "v1", Kind: "EncodingProbe"}
 	scheme := runtime.NewScheme()

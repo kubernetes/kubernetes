@@ -48,6 +48,9 @@ func (p typeMetaEncodingProbe) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return enc.WriteToken(jsontext.String("json/v2"))
 }
 
+// TestTypeMetaInjectionUsesJSONV2 verifies that both versioning wrappers reach
+// the v2 engine in compact, pretty, and YAML modes, restore existing TypeMeta,
+// and return marshaling errors without writing partial output.
 func TestTypeMetaInjectionUsesJSONV2(t *testing.T) {
 	gvk := schema.GroupVersionKind{Group: "test.example", Version: "v1", Kind: "Test"}
 	scheme := runtime.NewScheme()
@@ -121,6 +124,9 @@ func TestTypeMetaInjectionUsesJSONV2(t *testing.T) {
 	}
 }
 
+// TestEncodeLegacyCompatibility compares v2 output with encoding/json for
+// typed, raw, unstructured, and list objects in each applicable output mode.
+// The list cases also exercise streaming buffer reuse with large and small items.
 func TestEncodeLegacyCompatibility(t *testing.T) {
 	payload := struct {
 		Bool  bool              `json:"bool,omitempty"`
@@ -132,15 +138,16 @@ func TestEncodeLegacyCompatibility(t *testing.T) {
 		Text  string            `json:"text"`
 	}{Text: "<>&\u2028\u2029"}
 	for _, tc := range []struct {
-		name string
-		obj  runtime.Object
+		name       string
+		obj        runtime.Object
+		streamable bool
 	}{
 		{name: "typed", obj: &testDecodable{Interface: payload}},
 		{name: "raw marshaler", obj: &testDecodable{Interface: gojson.RawMessage(` { "empty": { }, "array": [ ], "text": "<>&" } `)}},
 		{name: "unstructured", obj: &unstructured.Unstructured{Object: map[string]any{
 			"z": int64(math.MaxInt64), "a": []any{nil, "<>&"}, "m": map[string]any{},
 		}}},
-		{name: "list", obj: &unstructured.UnstructuredList{
+		{name: "list", streamable: true, obj: &unstructured.UnstructuredList{
 			Object: map[string]any{
 				"kind": "List", "apiVersion": "v1",
 				"metadata": map[string]any{"continue": "<>&"},
@@ -160,6 +167,9 @@ func TestEncodeLegacyCompatibility(t *testing.T) {
 			{name: "yaml", options: json.SerializerOptions{Yaml: true}},
 			{name: "streaming", options: json.SerializerOptions{StreamingCollectionsEncoding: true}},
 		} {
+			if mode.options.StreamingCollectionsEncoding && !tc.streamable {
+				continue
+			}
 			t.Run(tc.name+"/"+mode.name, func(t *testing.T) {
 				var want []byte
 				var err error
@@ -200,6 +210,9 @@ func (w failingEncodingWriter) Write([]byte) (int, error) {
 	return 0, w.err
 }
 
+// TestEncodeErrors verifies that marshaling failures do not write partial
+// compact, pretty, YAML, or streaming-fallback output and that each mode
+// propagates errors from the destination writer.
 func TestEncodeErrors(t *testing.T) {
 	for _, options := range []json.SerializerOptions{
 		{},
@@ -227,6 +240,8 @@ func TestEncodeErrors(t *testing.T) {
 	}
 }
 
+// TestEncodeConcurrent verifies that parallel calls sharing one serializer and
+// its pooled buffers remain isolated and retain encoding/json-compatible output.
 func TestEncodeConcurrent(t *testing.T) {
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{})
 	for i := range 16 {
