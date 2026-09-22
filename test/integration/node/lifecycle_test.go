@@ -19,6 +19,8 @@ package node
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -475,6 +477,9 @@ func newHandlerForTest() (*defaulttolerationseconds.Plugin, error) {
 	return handler, admission.ValidateInitialization(handler)
 }
 
+// failDeleteAdmission is kept for other tests but is no longer used by
+// TestTaintEvictionDurableRetryEndToEnd, which injects failures at the
+// HTTP transport layer instead (see failDeleteWrapper below).
 type failDeleteAdmission struct {
 	*admission.Handler
 	failures *atomic.Int32
@@ -487,6 +492,36 @@ func (f *failDeleteAdmission) Validate(ctx context.Context, a admission.Attribut
 		}
 	}
 	return nil
+}
+
+// failDeleteWrapper is a client-side HTTP round-trip wrapper that rejects the
+// first maxFail DELETE requests for a specific pod path by returning a 503.
+// Subsequent DELETE requests are forwarded to the real server. This approach
+// gives the test accurate, atomic failure counting without relying on
+// server-side admission state.
+type failDeleteWrapper struct {
+	// podPath is the HTTP path substring that identifies the target pod delete
+	// (e.g. "/pods/test-pod"). Only DELETE requests whose URL path contains
+	// this string are intercepted.
+	podPath string
+	// maxFail is the number of DELETE attempts to reject before allowing them.
+	maxFail int32
+	// attempts counts every DELETE request for the target pod seen by this wrapper.
+	attempts atomic.Int32
+}
+
+// roundTrip implements testutils.RoundTripWrapper: it counts and optionally
+// rejects DELETE requests that target the configured pod path.
+func (w *failDeleteWrapper) roundTrip(inner http.RoundTripper, req *http.Request) (*http.Response, error) {
+	if req.Method == http.MethodDelete && strings.Contains(req.URL.Path, w.podPath) {
+		n := w.attempts.Add(1)
+		if n <= w.maxFail {
+			// Simulate a transient network failure so the controller burst loop
+			// retries (err != nil path) without any server-side side-effects.
+			return nil, fmt.Errorf("injected transient failure for DELETE attempt %d", n)
+		}
+	}
+	return inner.RoundTrip(req)
 }
 
 // TestTaintEvictionDurableRetryEndToEnd exercises the taint-eviction controller
@@ -512,15 +547,25 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 		Effect: v1.TaintEffectNoExecute,
 	}
 
-	// Create our custom admission controller that rejects the first 5 delete attempts
-	admissionCtrl := &failDeleteAdmission{
-		Handler:  admission.NewHandler(admission.Delete),
-		failures: &atomic.Int32{},
-	}
-
-	// Pass the admission controller to the real test API server
-	testCtx := testutils.InitTestAPIServer(t, "taint-eviction-retry", admissionCtrl)
+	// Start the real test API server without any custom admission plugin.
+	// Failure injection is handled client-side via the RoundTrip wrapper below,
+	// which is simpler and avoids races between admission state and the retry queue.
+	testCtx := testutils.InitTestAPIServer(t, "taint-eviction-retry", nil)
 	cs := testCtx.ClientSet
+
+	// Install a client-side transport wrapper that rejects the first 5 DELETE
+	// requests for the pod under test. The wrapper counts all attempts so the
+	// test can assert at least 6 occurred (5 failures + 1 success via retry).
+	//
+	// Using a transport wrapper instead of a server-side admission plugin
+	// avoids admission-state races and guarantees that the failure count is
+	// accurate regardless of backoff or retry scheduling.
+	deleteWrapper := &failDeleteWrapper{
+		podPath: "/pods/test-pod",
+		maxFail: 5,
+	}
+	fn := testutils.RoundTripWrapper(deleteWrapper.roundTrip)
+	testCtx.RoundTrip.Store(&fn)
 
 	// Build informers and controller using the same clientset.
 	externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
@@ -628,20 +673,22 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	}
 
 	// The toleration window is 2 seconds. When it expires, the controller will
-	// attempt to delete the pod 5 times in a quick burst. Our admission plugin
-	// will reject all 5 attempts. The controller will then hand off the eviction
-	// to the rate-limited durable retry queue (podEvictionQueue).
-	// We wait up to 30 seconds for the eventual successful deletion (the 6th attempt
-	// or later) via the durable retry queue.
+	// attempt to delete the pod 5 times in a quick burst. Our transport wrapper
+	// will reject all 5 attempts with a transient network error. The controller
+	// will then hand off the eviction to the rate-limited durable retry queue
+	// (podEvictionQueue). We wait up to 30 seconds for the eventual successful
+	// deletion (the 6th attempt or later) via the durable retry queue.
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 30*time.Second, true,
 		testutils.PodIsGettingEvicted(cs, testCtx.NS.Name, createdPod.Name)); err != nil {
 		t.Errorf("Pod was not evicted within expected window: %v", err)
 	}
 
-	// Verify that the admission plugin actually rejected exactly 5 initial deletion attempts,
-	// and allowed at least a 6th attempt, proving the durable retry queue was exercised.
-	failedAttempts := admissionCtrl.failures.Load()
-	if failedAttempts < 6 {
-		t.Errorf("Expected at least 6 Delete attempts (5 failures + 1 success via retry queue), got %d", failedAttempts)
+	// Verify that the transport wrapper actually saw at least 6 DELETE attempts:
+	// the initial 5 that were rejected plus at least 1 that was allowed and
+	// resulted in the pod being evicted. This confirms the durable retry queue
+	// was exercised end-to-end.
+	totalAttempts := deleteWrapper.attempts.Load()
+	if totalAttempts < 6 {
+		t.Errorf("Expected at least 6 Delete attempts (5 failures + 1 success via retry queue), got %d", totalAttempts)
 	}
 }
