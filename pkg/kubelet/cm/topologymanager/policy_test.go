@@ -1774,7 +1774,7 @@ func TestAggregateHintScores(t *testing.T) {
 
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			score, ok := aggregateHintScores(tc.permutation)
+			score, ok := aggregateHintScores(tc.permutation, nil, nil)
 			if score != tc.expectedScore {
 				t.Errorf("expected score %d, got %d", tc.expectedScore, score)
 			}
@@ -1813,7 +1813,7 @@ func TestMergePermutationCarriesScore(t *testing.T) {
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			merged := mergePermutation(logger, defaultAffinity, tc.permutation)
+			merged := mergePermutation(logger, defaultAffinity, tc.permutation, nil, nil)
 			if merged.Score != tc.expectedScore {
 				t.Errorf("expected merged Score %d, got %d", tc.expectedScore, merged.Score)
 			}
