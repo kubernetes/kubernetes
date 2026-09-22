@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 
@@ -194,11 +195,14 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	numViolatingVictim := 0
 
 	validAssignment := make([]fwk.ProposedAssignment, 0, len(podGroupAssignments.ProposedAssignments))
+	assignmentsByNode := make(map[string][]fwk.ProposedAssignment)
 
 	// Prepare podInfos for each of the assigned preemptor pods
 	for _, assignment := range podGroupAssignments.ProposedAssignments {
-		if assignment.GetNodeName() != "" {
+		nodeName := assignment.GetNodeName()
+		if nodeName != "" {
 			validAssignment = append(validAssignment, assignment)
+			assignmentsByNode[nodeName] = append(assignmentsByNode[nodeName], assignment)
 		}
 	}
 
@@ -209,8 +213,10 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	// reprieveVictim tries to reprieve a victim as a single unit.
 	// If reprieveFilter allows reprieving the victim, it adds all victim's pods back to snapshot
 	// and to CycleStates of preemptor pods.
-	// It then goes through preemptor's proposed assignments and runs FilterPlugins for a given preemptor
-	// pod on proposed node.
+	// In Phase 1, it runs node-local FilterPlugins (those implementing NodeLocalFilterPlugin
+	// with IsNodeLocal() == true) on the nodes directly affected by the victim to fail fast.
+	// In Phase 2, if Phase 1 succeeds, it goes through preemptor's proposed assignments in
+	// scheduling-cycle order and runs all FilterPlugins for a given preemptor pod on its proposed node.
 	// If all FilterPlugins succeed, it notifies reprieveFilter and returns true.
 	// Preemptor pods are evaluated in the same order as in the scheduling cycle.
 	// This logic uses the CycleState returned for each of the preemptor pods from the
@@ -229,42 +235,73 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		if err = addVictimPodsWithPreFilter(v, preemptorAssignments); err != nil {
 			return false, err
 		}
-		cleanupFns := []func() error{}
 		defer func() {
-			for i := len(cleanupFns) - 1; i >= 0; i-- {
-				if cleanupErr := cleanupFns[i](); cleanupErr != nil {
-					err = errors.Join(err, cleanupErr)
+			if !fits {
+				if rmErr := removeVictimPodsWithPreFilter(v, preemptorAssignments); rmErr != nil {
+					err = errors.Join(err, rmErr)
 				}
-			}
-		}()
-		for _, assignment := range preemptorAssignments {
-			nodeInfo, err := mutableLister.NodeInfos().Get(assignment.GetNodeName())
-			if err != nil {
-				return false, err
-			}
-			s := ev.Handle.RunFilterPluginsWithNominatedPods(ctx, assignment.GetCycleState(), assignment.GetPod(), nodeInfo)
-			if !s.IsSuccess() {
-				if err = removeVictimPodsWithPreFilter(v, preemptorAssignments); err != nil {
-					return false, err
+				if err != nil {
+					return
 				}
 				if l := logger.V(6); l.Enabled() {
 					l.Info("Pods are potential preemption victims", "pods", toPodNames(v.Pods()))
 				}
-				return false, nil
 			}
-			// Simulate assuming a preemptor pod and reserving stateful plugins resources.
-			// We do not need to add the preemptor pod to the cycle state of upcoming preemptor pods.
-			// This is because the cycle state was created with them already assumed.
-			if err = mutableLister.AddPod(assignment.GetPodInfo(), assignment.GetNodeName()); err != nil {
-				return false, err
-			}
-			ev.Handle.RunReservePluginsReserve(ctx, assignment.GetCycleState(), assignment.GetPod(), nodeInfo.Node().GetName())
-			cleanupFns = append(cleanupFns, func() error {
-				if ev.Handle.RunReservePluginsUnreserve(ctx, assignment.GetCycleState(), assignment.GetPod(), nodeInfo.Node().GetName()); err != nil {
-					return err
+		}()
+
+		evaluateAssignments := func(assignments []fwk.ProposedAssignment, runOnlyNodeLocal bool) (ok bool, evalErr error) {
+			cleanupFns := []func() error{}
+			defer func() {
+				for i := len(cleanupFns) - 1; i >= 0; i-- {
+					if cleanupErr := cleanupFns[i](); cleanupErr != nil {
+						evalErr = errors.Join(evalErr, cleanupErr)
+					}
 				}
-				return mutableLister.RemovePod(logger, assignment.GetPod(), assignment.GetNodeName())
-			})
+			}()
+			for _, assignment := range assignments {
+				nodeName := assignment.GetNodeName()
+				nodeInfo, err := mutableLister.NodeInfos().Get(nodeName)
+				if err != nil {
+					return false, err
+				}
+
+				cs := assignment.GetCycleState()
+				cs.SetRunOnlyNodeLocalFilterPlugins(runOnlyNodeLocal)
+				s := ev.Handle.RunFilterPluginsWithNominatedPods(ctx, cs, assignment.GetPod(), nodeInfo)
+				cs.SetRunOnlyNodeLocalFilterPlugins(false)
+				if !s.IsSuccess() {
+					return false, nil
+				}
+				// Simulate assuming a preemptor pod and reserving stateful plugins resources.
+				// We do not need to add the preemptor pod to the cycle state of upcoming preemptor pods.
+				// This is because the cycle state was created with them already assumed.
+				if err = mutableLister.AddPod(assignment.GetPodInfo(), nodeName); err != nil {
+					return false, err
+				}
+				ev.Handle.RunReservePluginsReserve(ctx, cs, assignment.GetPod(), nodeName)
+				cleanupFns = append(cleanupFns, func() error {
+					ev.Handle.RunReservePluginsUnreserve(ctx, cs, assignment.GetPod(), nodeName)
+					return mutableLister.RemovePod(logger, assignment.GetPod(), nodeName)
+				})
+			}
+			return true, nil
+		}
+
+		affectedNodes := sets.New[string]()
+		for _, pi := range v.Pods() {
+			affectedNodes.Insert(pi.GetPod().Spec.NodeName)
+		}
+
+		// Phase 1: Fast-fail on nodes directly affected by the victim using node-local Filter plugins.
+		for nodeName := range affectedNodes {
+			if fits, err = evaluateAssignments(assignmentsByNode[nodeName], true); err != nil || !fits {
+				return fits, err
+			}
+		}
+
+		// Phase 2: Replay all assignments in scheduling-cycle order running all Filter plugins.
+		if fits, err := evaluateAssignments(preemptorAssignments, false); err != nil || !fits {
+			return, fits, err
 		}
 		if err = reprieveFilter.OnVictimReprieved(ctx, v); err != nil {
 			return false, err
