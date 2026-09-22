@@ -91,16 +91,25 @@ func mergePermutation(logger klog.Logger, defaultAffinity bitmask.BitMask, permu
 	return TopologyHint{NUMANodeAffinity: mergedAffinity, Preferred: preferred, Score: score}
 }
 
-func filterProvidersHints(logger klog.Logger, providersHints []map[string][]TopologyHint) [][]TopologyHint {
+// filterProvidersHints flattens the per-provider hint maps into a list of hint
+// lists, one per resource, and returns the resource names alongside it.
+//
+// The two returned slices are parallel: allProviderHints[i] holds the hints for
+// resourceNames[i]. A provider which expressed no preference at all has no
+// resource to name, so it contributes an empty name. Callers rely on this
+// correspondence to attribute a hint back to the resource it came from.
+func filterProvidersHints(logger klog.Logger, providersHints []map[string][]TopologyHint) ([][]TopologyHint, []string) {
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
 	// that provider has no preference for topology-aware allocation.
 	var allProviderHints [][]TopologyHint
+	var resourceNames []string
 	for _, hints := range providersHints {
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
 			logger.Info("Hint Provider has no preference for NUMA affinity with any resource")
 			allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}})
+			resourceNames = append(resourceNames, "")
 			continue
 		}
 
@@ -109,19 +118,22 @@ func filterProvidersHints(logger klog.Logger, providersHints []map[string][]Topo
 			if hints[resource] == nil {
 				logger.Info("Hint Provider has no preference for NUMA affinity with resource", "resource", resource)
 				allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}})
+				resourceNames = append(resourceNames, resource)
 				continue
 			}
 
 			if len(hints[resource]) == 0 {
 				logger.Info("Hint Provider has no possible NUMA affinities for resource", "resource", resource)
 				allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: false}})
+				resourceNames = append(resourceNames, resource)
 				continue
 			}
 
 			allProviderHints = append(allProviderHints, hints[resource])
+			resourceNames = append(resourceNames, resource)
 		}
 	}
-	return allProviderHints
+	return allProviderHints, resourceNames
 }
 
 func narrowestHint(hints []TopologyHint) *TopologyHint {
@@ -160,6 +172,11 @@ func maxOfMinAffinityCounts(filteredHints [][]TopologyHint) int {
 type HintMerger struct {
 	NUMAInfo *NUMAInfo
 	Hints    [][]TopologyHint
+	// ResourceNames is parallel to Hints: ResourceNames[i] names the resource
+	// whose hints are in Hints[i]. Since a permutation takes its i-th element
+	// from Hints[i], this also names the resource each hint in a permutation
+	// belongs to.
+	ResourceNames []string
 	// Set bestNonPreferredAffinityCount to help decide which affinity mask is
 	// preferred amongst all non-preferred hints. We calculate this value as
 	// the maximum of the minimum affinity counts supplied for any given hint
@@ -207,7 +224,7 @@ func compareHintScores(strategy string, current, candidate *TopologyHint) *Topol
 	return nil
 }
 
-func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string, opts PolicyOptions) HintMerger {
+func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, resourceNames []string, policyName string, opts PolicyOptions) HintMerger {
 	preferClosest := (policyName != PolicySingleNumaNode) && opts.PreferClosestNUMA
 
 	// The allocation strategy is an alpha-level policy option. NewPolicyOptions
@@ -252,6 +269,7 @@ func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string
 	merger := HintMerger{
 		NUMAInfo:                      numaInfo,
 		Hints:                         hints,
+		ResourceNames:                 resourceNames,
 		BestNonPreferredAffinityCount: maxOfMinAffinityCounts(hints),
 		CompareNUMAAffinityMasks:      compareNumaAffinityMasks,
 	}
