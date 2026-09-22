@@ -135,10 +135,10 @@ type fakeIndexer struct {
 	rv int
 }
 
-func (f fakeIndexer) Add(obj interface{}) error    { return nil }
-func (f fakeIndexer) Update(obj interface{}) error { return nil }
-func (f fakeIndexer) Delete(obj interface{}) error { return nil }
-func (f fakeIndexer) Clone() Snapshot              { return f }
+func (f fakeIndexer) Add(elem *Element) error    { return nil }
+func (f fakeIndexer) Update(elem *Element) error { return nil }
+func (f fakeIndexer) Delete(elem *Element) error { return nil }
+func (f fakeIndexer) Clone() Snapshot            { return f }
 func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
 	return nil, nil
 }

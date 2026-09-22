@@ -51,21 +51,17 @@ func (si *threadedStoreIndexer) Clone() Snapshot {
 	return si.store.Clone()
 }
 
-func (si *threadedStoreIndexer) Add(obj interface{}) error {
-	return si.addOrUpdate(obj)
+func (si *threadedStoreIndexer) Add(elem *Element) error {
+	return si.addOrUpdate(elem)
 }
 
-func (si *threadedStoreIndexer) Update(obj interface{}) error {
-	return si.addOrUpdate(obj)
+func (si *threadedStoreIndexer) Update(elem *Element) error {
+	return si.addOrUpdate(elem)
 }
 
-func (si *threadedStoreIndexer) addOrUpdate(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	newElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
+func (si *threadedStoreIndexer) addOrUpdate(newElem *Element) error {
+	if newElem == nil {
+		return fmt.Errorf("elem cannot be nil")
 	}
 	si.lock.Lock()
 	defer si.lock.Unlock()
@@ -73,18 +69,17 @@ func (si *threadedStoreIndexer) addOrUpdate(obj interface{}) error {
 	return si.indexer.updateElem(newElem.Key, oldElem, newElem)
 }
 
-func (si *threadedStoreIndexer) Delete(obj interface{}) error {
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
+func (si *threadedStoreIndexer) Delete(elem *Element) error {
+	if elem == nil {
+		return fmt.Errorf("elem cannot be nil")
 	}
 	si.lock.Lock()
 	defer si.lock.Unlock()
-	oldObj, existed := si.store.deleteElem(storeElem)
+	oldElem, existed := si.store.deleteElem(elem)
 	if !existed {
 		return nil
 	}
-	return si.indexer.updateElem(storeElem.Key, oldObj, nil)
+	return si.indexer.updateElem(elem.Key, oldElem, nil)
 }
 
 func (si *threadedStoreIndexer) List() []interface{} {
@@ -151,42 +146,6 @@ func (s *btreeStore) Clone() Snapshot {
 	return &btreeStore{
 		tree: s.tree.Clone(),
 	}
-}
-
-func (s *btreeStore) Add(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
-	s.addOrUpdateElem(storeElem)
-	return nil
-}
-
-func (s *btreeStore) Update(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
-	s.addOrUpdateElem(storeElem)
-	return nil
-}
-
-func (s *btreeStore) Delete(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
-	s.deleteElem(storeElem)
-	return nil
 }
 
 func (s *btreeStore) deleteElem(storeElem *Element) (*Element, bool) {

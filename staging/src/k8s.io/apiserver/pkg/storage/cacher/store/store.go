@@ -60,9 +60,9 @@ const (
 )
 
 type Indexer interface {
-	Add(obj interface{}) error
-	Update(obj interface{}) error
-	Delete(obj interface{}) error
+	Add(elem *Element) error
+	Update(elem *Element) error
+	Delete(elem *Element) error
 	List() []interface{}
 	ListKeys() []string
 	Get(obj interface{}) (item interface{}, exists bool, err error)
