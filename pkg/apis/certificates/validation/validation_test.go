@@ -593,7 +593,9 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 		}},
 		oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
 		errs: []string{
-			`status.conditions: Forbidden: updates may not add a condition of type "Approved"`,
+			field.Invalid(field.NewPath("status"), capi.CertificateSigningRequestStatus{
+				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
+			}, "field is immutable").Error(),
 		},
 	}, {
 		name:   "remove Approved condition",
@@ -602,7 +604,7 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 			Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 		}},
 		errs: []string{
-			`status.conditions: Forbidden: updates may not remove a condition of type "Approved"`,
+			field.Invalid(field.NewPath("status"), capi.CertificateSigningRequestStatus{}, "field is immutable").Error(),
 		},
 	}, {
 		name: "add Denied condition",
@@ -611,7 +613,9 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 		}},
 		oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
 		errs: []string{
-			`status.conditions: Forbidden: updates may not add a condition of type "Denied"`,
+			field.Invalid(field.NewPath("status"), capi.CertificateSigningRequestStatus{
+				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateDenied, Status: core.ConditionTrue}},
+			}, "field is immutable").Error(),
 		},
 	}, {
 		name:   "remove Denied condition",
@@ -620,7 +624,7 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 			Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateDenied, Status: core.ConditionTrue}},
 		}},
 		errs: []string{
-			`status.conditions: Forbidden: updates may not remove a condition of type "Denied"`,
+			field.Invalid(field.NewPath("status"), capi.CertificateSigningRequestStatus{}, "field is immutable").Error(),
 		},
 	}, {
 		name: "add Failed condition",
@@ -628,7 +632,11 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 			Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateFailed, Status: core.ConditionTrue}},
 		}},
 		oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-		errs:   []string{},
+		errs: []string{
+			field.Invalid(field.NewPath("status"), capi.CertificateSigningRequestStatus{
+				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateFailed, Status: core.ConditionTrue}},
+			}, "field is immutable").Error(),
+		},
 	}, {
 		name:   "remove Failed condition",
 		newCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMeta, Spec: validSpec},
@@ -636,7 +644,7 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 			Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateFailed, Status: core.ConditionTrue}},
 		}},
 		errs: []string{
-			`status.conditions: Forbidden: updates may not remove a condition of type "Failed"`,
+			field.Invalid(field.NewPath("status"), capi.CertificateSigningRequestStatus{}, "field is immutable").Error(),
 		},
 	}, {
 		name: "set certificate",
@@ -645,7 +653,9 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 		}},
 		oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
 		errs: []string{
-			`status.certificate: Forbidden: updates may not set certificate content`,
+			field.Invalid(field.NewPath("status"), capi.CertificateSigningRequestStatus{
+				Certificate: validCertificate,
+			}, "field is immutable").Error(),
 		},
 	}, {
 		name: "add both approved and denied conditions",
@@ -664,9 +674,12 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 			Spec:       validSpec,
 		},
 		errs: []string{
-			`status.conditions: Forbidden: updates may not add a condition of type "Approved"`,
-			`status.conditions: Forbidden: updates may not add a condition of type "Denied"`,
-			`status.conditions: Invalid value: "Denied": Approved and Denied conditions are mutually exclusive`,
+			field.Invalid(field.NewPath("status"), capi.CertificateSigningRequestStatus{
+				Conditions: []capi.CertificateSigningRequestCondition{
+					{Type: capi.CertificateApproved, Status: core.ConditionTrue},
+					{Type: capi.CertificateDenied, Status: core.ConditionTrue},
+				},
+			}, "field is immutable").Error(),
 		},
 	}}
 
@@ -700,6 +713,8 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 		SignerName: "example.com/something",
 	}
 
+	staticCSRPEM := newCSRPEM(t)
+
 	tests := []struct {
 		name   string
 		newCSR *capi.CertificateSigningRequest
@@ -717,12 +732,12 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 		name: "finalizer change with duplicate and unknown usages",
 		newCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMeta, Spec: capi.CertificateSigningRequestSpec{
 			Usages:     []capi.KeyUsage{"unknown", "unknown"},
-			Request:    newCSRPEM(t),
+			Request:    staticCSRPEM,
 			SignerName: validSignerName,
 		}},
 		oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: capi.CertificateSigningRequestSpec{
 			Usages:     []capi.KeyUsage{"unknown", "unknown"},
-			Request:    newCSRPEM(t),
+			Request:    staticCSRPEM,
 			SignerName: validSignerName,
 		}},
 	}, {

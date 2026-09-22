@@ -278,20 +278,24 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 }
 
 func ValidateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
-	opts := getValidationOptions(newCSR, oldCSR)
-	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&newCSR.ObjectMeta, &oldCSR.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(&newCSR.Spec, &oldCSR.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(&newCSR.Status, &oldCSR.Status, field.NewPath("status"))...)
+	return allErrs
 }
 
 func ValidateCertificateSigningRequestStatusUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
+	allErrs := apivalidation.ValidateImmutableField(&newCSR.Spec, &oldCSR.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()
 	opts := getValidationOptions(newCSR, oldCSR)
 	opts.allowSettingCertificate = true
-	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
+	return append(allErrs, validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)...)
 }
 
 func ValidateCertificateSigningRequestApprovalUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
+	allErrs := apivalidation.ValidateImmutableField(&newCSR.Spec, &oldCSR.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()
 	opts := getValidationOptions(newCSR, oldCSR)
 	opts.allowSettingApprovalConditions = true
-	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
+	return append(allErrs, validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)...)
 }
 
 func validateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest, opts certificateValidationOptions) field.ErrorList {
