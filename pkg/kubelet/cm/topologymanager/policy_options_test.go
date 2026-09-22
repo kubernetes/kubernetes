@@ -18,6 +18,7 @@ package topologymanager
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -220,7 +221,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 				return
 			}
 
-			if opts != tcase.expectedOptions {
+			if !reflect.DeepEqual(opts, tcase.expectedOptions) {
 				t.Errorf("Expected TopologyManagerOptions to equal %v, not %v", tcase.expectedOptions, opts)
 			}
 		})

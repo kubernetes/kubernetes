@@ -19,6 +19,7 @@ package topologymanager
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -267,7 +268,7 @@ func TestNewManagerPolicyOptionPropagation(t *testing.T) {
 					}
 
 					opts := policyOptionsOf(t, mngr.GetPolicy())
-					if opts != tc.expectedOptions {
+					if !reflect.DeepEqual(opts, tc.expectedOptions) {
 						t.Errorf("Unexpected policy options. Have: %v wants %v", opts, tc.expectedOptions)
 					}
 				})
