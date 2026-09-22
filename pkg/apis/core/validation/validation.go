@@ -368,7 +368,7 @@ func ValidateRuntimeClassName(name string, fldPath *field.Path) field.ErrorList 
 // validateOverhead can be used to check whether the given Overhead is valid.
 func validateOverhead(overhead core.ResourceList, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	// reuse the ResourceRequirements validation logic
-	return ValidateContainerResourceRequirements(&core.ResourceRequirements{Limits: overhead}, nil, fldPath, opts)
+	return ValidateContainerResourceRequirements(&core.ResourceRequirements{Limits: overhead}, nil, fldPath, opts, "")
 }
 
 // Validates that given value is not negative.
@@ -2350,6 +2350,8 @@ func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *core.PersistentVolume) f
 	return allErrs
 }
 
+// PersistentVolumeClaimSpecValidationOptions holds a map field (StoredResourceQuantities), so
+// values of this type cannot be compared with == or !=; use reflect.DeepEqual or cmp.Diff instead.
 type PersistentVolumeClaimSpecValidationOptions struct {
 	// Allow users to recover from previously failing expansion operation
 	EnableRecoverFromExpansionFailure bool
@@ -2359,6 +2361,9 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 	AllowInvalidAPIGroupInDataSourceOrRef bool
 	// Allow users to modify the class of volume attributes
 	EnableVolumeAttributesClass bool
+	// StoredResourceQuantities holds the (resource name, quantity) pairs the stored claim's status
+	// already carries. See PodValidationOptions.StoredResourceQuantities.
+	StoredResourceQuantities StoredResourceQuantitySet
 }
 
 func ValidationOptionsForPersistentVolumeClaimCreate() PersistentVolumeClaimSpecValidationOptions {
@@ -2375,6 +2380,11 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 		// If there's no old PVC, use the options based solely on feature enablement
 		return opts
 	}
+
+	// a status.capacity value the stored claim already holds was accepted when it was written
+	opts.StoredResourceQuantities = StoredResourceQuantitiesOfLocatedLists(map[string]core.ResourceList{
+		"capacity": oldPvc.Status.Capacity,
+	})
 
 	// If the old object had an invalid API group in the data source or data source reference, continue to allow it in the new object
 	opts.AllowInvalidAPIGroupInDataSourceOrRef = allowInvalidAPIGroupInDataSourceOrRef(&oldPvc.Spec)
@@ -2761,6 +2771,9 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 
 	capPath := field.NewPath("status", "capacity")
 	for r, qty := range newPvc.Status.Capacity {
+		if validationOpts.StoredResourceQuantities.Has("capacity", r, qty) {
+			continue
+		}
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
 	}
 	allErrs = append(allErrs, validateVolumeHealthStatus(newPvc.Status.HealthStatus, field.NewPath("status", "healthStatus"))...)
@@ -4041,7 +4054,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, ctr, path.Child("volumeMounts"), opts)...)
 	allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, path.Child("volumeDevices"))...)
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
-	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts)...)
+	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts, ctr.Name)...)
 	allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"), podRestartPolicy)...)
 	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers, opts.AllowSysAdminWhenPrivilegeEscalationFalse)...)
 	return allErrs
@@ -4580,7 +4593,9 @@ func validateContainerOnlyForPod(ctr *core.Container, path *field.Path) field.Er
 	return allErrs
 }
 
-// PodValidationOptions contains the different settings for pod validation
+// PodValidationOptions contains the different settings for pod validation. It holds a map field
+// (StoredResourceQuantities), so values of this type cannot be compared with == or !=; use
+// reflect.DeepEqual or cmp.Diff instead.
 type PodValidationOptions struct {
 	// Allow invalid pod-deletion-cost annotation value for backward compatibility.
 	AllowInvalidPodDeletionCost bool
@@ -4621,6 +4636,13 @@ type PodValidationOptions struct {
 	OldPodViolatesMatchLabelKeysValidation bool
 	// OldPod has invalid MatchLabelKeys in TopologySpreadConstraints against legacy(<v1.34) validation
 	OldPodViolatesLegacyMatchLabelKeysValidation bool
+	// StoredResourceQuantities holds the resource quantities the stored pod already carries, so an
+	// update that leaves one of them untouched is not rejected by a check that has since tightened
+	// (#141166); a changed value is still validated as on create. This intentionally also lets an
+	// already-stored value that was never valid persist unchanged, the standard ratchet trade-off:
+	// re-validating on every update would make already-stored, previously-accepted objects
+	// unupdatable. Nil on create.
+	StoredResourceQuantities StoredResourceQuantitySet
 	// Allows containers to consume environment variables via environment variable files.
 	AllowEnvFilesValidation bool
 	// Allows containers have restart policy and restart policy rules.
@@ -4928,7 +4950,7 @@ func validatePodResources(spec *core.PodSpec, podClaimNames sets.Set[string], fl
 
 	// validatePodResourceRequirements checks if resource names and quantities are
 	// valid, and requests are less than limits.
-	allErrs = append(allErrs, validatePodResourceRequirements(spec.Resources, podClaimNames, resourcesFldPath, opts)...)
+	allErrs = append(allErrs, validatePodResourceRequirements(spec.Resources, podClaimNames, resourcesFldPath, opts, "")...)
 	allErrs = append(allErrs, validatePodResourceConsistency(spec, resourcesFldPath)...)
 	return allErrs
 }
@@ -7620,7 +7642,9 @@ func validateNodeDeclaredFeatures(nodeFeatures []string, fldPath *field.Path) fi
 }
 
 // ValidateNode tests if required fields in the node are set.
-func ValidateNode(node *core.Node) field.ErrorList {
+// stored holds the (resource name, quantity) pairs the node already carried before this call, if
+// this is part of an update; nil on create, where there is nothing to ratchet against.
+func ValidateNode(node *core.Node, stored StoredResourceQuantitySet) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, fldPath)
 	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
@@ -7631,7 +7655,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 	// Only validate spec.
 	// All status fields are optional and can be updated later.
 	// That said, if specified, we need to ensure they are valid.
-	allErrs = append(allErrs, ValidateNodeResources(node)...)
+	allErrs = append(allErrs, ValidateNodeResources(node, stored)...)
 	allErrs = append(allErrs, validateNodeSwapStatus(node.Status.NodeInfo.Swap, fldPath.Child("nodeSwapStatus"))...)
 	statusField := field.NewPath("status")
 	allErrs = append(allErrs, validateNodeDeclaredFeatures(node.Status.DeclaredFeatures, statusField.Child("declaredFeatures"))...)
@@ -7661,17 +7685,25 @@ func ValidateNode(node *core.Node) field.ErrorList {
 }
 
 // ValidateNodeResources is used to make sure a node has valid capacity and allocatable values.
-func ValidateNodeResources(node *core.Node) field.ErrorList {
+// stored holds the (resource name, quantity) pairs the node already carried before this update, if
+// any; a value found there was accepted by validation when it was written and is not re-validated.
+func ValidateNodeResources(node *core.Node, stored StoredResourceQuantitySet) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// Validate resource quantities in capacity.
 	for k, v := range node.Status.Capacity {
+		if stored.Has("capacity", k, v) {
+			continue
+		}
 		resPath := field.NewPath("status", "capacity", string(k))
 		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
 	}
 
 	// Validate resource quantities in allocatable.
 	for k, v := range node.Status.Allocatable {
+		if stored.Has("allocatable", k, v) {
+			continue
+		}
 		resPath := field.NewPath("status", "allocatable", string(k))
 		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
 	}
@@ -7688,7 +7720,10 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	// if !apiequality.Semantic.DeepEqual(node.Status, core.NodeStatus{}) {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
-	allErrs = append(allErrs, ValidateNodeResources(node)...)
+	allErrs = append(allErrs, ValidateNodeResources(node, StoredResourceQuantitiesOfLocatedLists(map[string]core.ResourceList{
+		"capacity":    oldNode.Status.Capacity,
+		"allocatable": oldNode.Status.Allocatable,
+	}))...)
 
 	// TODO: dedup the validation checks in ValidateNode() and ValidateNodeUpdate() since both these functions get called during node update.
 	statusField := field.NewPath("status")
@@ -8268,16 +8303,21 @@ func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) fiel
 	return field.ErrorList{}
 }
 
-func validatePodResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, validatePodResourceName, podClaimNames, fldPath, opts)
+// container identifies which container (by name) requirements belongs to, or "" for the pod
+// level's own resources; it scopes the StoredResourceQuantities lookup to that one field so a
+// value stored under a different container or list is never mistaken for this one unchanged.
+func validatePodResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions, container string) field.ErrorList {
+	return validateResourceRequirements(requirements, validatePodResourceName, podClaimNames, fldPath, opts, container)
 }
 
-func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, ValidateContainerResourceName, podClaimNames, fldPath, opts)
+// container identifies which container (by name) requirements belongs to; see
+// validatePodResourceRequirements.
+func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions, container string) field.ErrorList {
+	return validateResourceRequirements(requirements, ValidateContainerResourceName, podClaimNames, fldPath, opts, container)
 }
 
 // Validates resource requirement spec.
-func validateResourceRequirements(requirements *core.ResourceRequirements, resourceNameFn func(core.ResourceName, *field.Path) field.ErrorList, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateResourceRequirements(requirements *core.ResourceRequirements, resourceNameFn func(core.ResourceName, *field.Path) field.ErrorList, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions, container string) field.ErrorList {
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
 	reqPath := fldPath.Child("requests")
@@ -8293,7 +8333,9 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath)...)
 
 		// Validate resource quantity.
-		allErrs = append(allErrs, ValidateResourceQuantityValue(resourceName, quantity, fldPath)...)
+		if !opts.StoredResourceQuantities.Has(podResourcesLocation(container, "limits"), resourceName, quantity) {
+			allErrs = append(allErrs, ValidateResourceQuantityValue(resourceName, quantity, fldPath)...)
+		}
 
 		if helper.IsHugePageResourceName(resourceName) {
 			limContainsHugePages = true
@@ -8312,7 +8354,9 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath)...)
 
 		// Validate resource quantity.
-		allErrs = append(allErrs, ValidateResourceQuantityValue(resourceName, quantity, fldPath)...)
+		if !opts.StoredResourceQuantities.Has(podResourcesLocation(container, "requests"), resourceName, quantity) {
+			allErrs = append(allErrs, ValidateResourceQuantityValue(resourceName, quantity, fldPath)...)
+		}
 
 		// Check that request <= limit.
 		limitQuantity, exists := requirements.Limits[resourceName]
@@ -8600,6 +8644,88 @@ func isIntegerResourceValue(q resource.Quantity) bool {
 	}
 	milli, ok := q.AsMilliInt64()
 	return ok && milli%1000 == 0
+}
+
+// StoredResourceQuantitySet is the set of (location, resource name, quantity) triples a stored
+// object holds. location identifies the specific field a quantity came from (for example one
+// container's limits versus another's, or a Node's capacity versus its allocatable) so that a
+// genuinely new occurrence of a value in a different field is never mistaken for the same field
+// left unchanged. Quantities are keyed by their canonical string, so equal values match however
+// they were spelled. The meaning of a location string is owned by the caller that builds and reads
+// a given set; this type only needs it to be used consistently between the two.
+type StoredResourceQuantitySet map[string]map[core.ResourceName]map[string]struct{}
+
+// Has reports whether the set holds quantity under name at location. quantity.String() caches its
+// result on the receiver, but quantity here is the caller's own copy (Quantity is passed by value),
+// so that mutation is invisible outside this call.
+func (s StoredResourceQuantitySet) Has(location string, name core.ResourceName, quantity resource.Quantity) bool {
+	if s == nil {
+		return false
+	}
+	_, ok := s[location][name][quantity.String()]
+	return ok
+}
+
+// StoredResourceQuantitiesOfLocatedLists collects the (resource name, quantity) pairs held by each
+// of the given resource lists, such as a Node's status capacity and allocatable, keeping each
+// list's values under its own location key. A stored value was accepted by the validation in force
+// when it was written, so an update that leaves it untouched must not be rejected by a check that
+// has since tightened; a value appearing for the first time under a different location is not
+// covered and is validated normally. Returns nil, not an empty set, when every list is empty; Has
+// is nil-safe, and callers (such as the options == comparisons in the tests) rely on the zero value
+// matching a freshly-built empty set.
+func StoredResourceQuantitiesOfLocatedLists(lists map[string]core.ResourceList) StoredResourceQuantitySet {
+	var set StoredResourceQuantitySet
+	for location, list := range lists {
+		for name, quantity := range list {
+			if set == nil {
+				set = StoredResourceQuantitySet{}
+			}
+			if set[location] == nil {
+				set[location] = map[core.ResourceName]map[string]struct{}{}
+			}
+			if set[location][name] == nil {
+				set[location][name] = map[string]struct{}{}
+			}
+			set[location][name][quantity.String()] = struct{}{}
+		}
+	}
+	return set
+}
+
+// podResourcesLocation is the StoredResourceQuantitySet location for a container's (or the pod
+// level's) limits or requests. Container names are unique across containers, initContainers and
+// ephemeralContainers within one pod (enforced elsewhere), so the bare name plus list is enough to
+// tell every field in a pod spec apart; container is "" for the pod level itself.
+func podResourcesLocation(container, list string) string {
+	return container + "/" + list
+}
+
+// StoredResourceQuantitiesOf collects the (resource name, quantity) pairs held by each container's
+// (and the pod level's) limits and requests in spec, each under its own location. See
+// StoredResourceQuantitiesOfLocatedLists and podResourcesLocation.
+func StoredResourceQuantitiesOf(spec *core.PodSpec) StoredResourceQuantitySet {
+	if spec == nil {
+		return nil
+	}
+	lists := map[string]core.ResourceList{}
+	add := func(container string, resources core.ResourceRequirements) {
+		lists[podResourcesLocation(container, "limits")] = resources.Limits
+		lists[podResourcesLocation(container, "requests")] = resources.Requests
+	}
+	for i := range spec.Containers {
+		add(spec.Containers[i].Name, spec.Containers[i].Resources)
+	}
+	for i := range spec.InitContainers {
+		add(spec.InitContainers[i].Name, spec.InitContainers[i].Resources)
+	}
+	for i := range spec.EphemeralContainers {
+		add(spec.EphemeralContainers[i].Name, spec.EphemeralContainers[i].Resources)
+	}
+	if spec.Resources != nil {
+		add("", *spec.Resources)
+	}
+	return StoredResourceQuantitiesOfLocatedLists(lists)
 }
 
 // ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource
