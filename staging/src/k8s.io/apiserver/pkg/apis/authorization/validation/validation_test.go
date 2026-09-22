@@ -547,6 +547,21 @@ func TestValidateSelfSAR(t *testing.T) {
 			t.Errorf("%s: unexpected error: %q, expected: %q", c.name, errs[0], c.msg)
 		}
 	}
+
+	// The error cases above only carry a spec. Here we only test one status error to be
+	// sure the status is validated for this kind too; the more exhaustive suite is
+	// TestValidateSARStatus.
+	t.Run("status is validated", func(t *testing.T) {
+		errs := ValidateSelfSubjectAccessReview(&authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{},
+			},
+			Status: authorizationv1.SubjectAccessReviewStatus{Allowed: true, Denied: true},
+		})
+
+		want := `status: Invalid value: {"allowed":true,"denied":true}: allowed and denied are mutually exclusive`
+		assertErrors(t, errs, []string{want})
+	})
 }
 
 func TestValidateLocalSAR(t *testing.T) {
@@ -613,6 +628,18 @@ func TestValidateLocalSAR(t *testing.T) {
 			},
 		},
 		msg: `spec.resourceAttributes.labelSelector.rawSelector: Invalid value: "foo": may not specified at the same time as requirements`,
+	}, {
+		// here we only test one to be sure the status is validated for this kind too.
+		// The more exhaustive suite is TestValidateSARStatus.
+		name: "status: allowed and denied are mutually exclusive",
+		obj: &authorizationv1.LocalSubjectAccessReview{
+			Spec: authorizationv1.SubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{},
+				User:               "user",
+			},
+			Status: authorizationv1.SubjectAccessReviewStatus{Allowed: true, Denied: true},
+		},
+		msg: `status: Invalid value: {"allowed":true,"denied":true}: allowed and denied are mutually exclusive`,
 	}}
 
 	for _, c := range errorCases {
@@ -625,21 +652,24 @@ func TestValidateLocalSAR(t *testing.T) {
 	}
 }
 
-// TestValidateAuthorizationConditionsReview exercises what is left of the handwritten
-// validation for AuthorizationConditionsReview now that the structural rules live in
-// declarative validation. Only two things are still checked by hand:
+// TestValidateAuthorizationConditionsReview exercises AuthorizationConditionsReview
+// validation through CombinedValidateAuthorizationConditionsReviewCreate, which is what
+// the webhook authorizer actually calls: the handwritten checks plus the generated
+// declarative ones.
 //
-//   - ObjectMeta must be empty, since the review is a non-persisted request/response
-//     envelope. ManagedFields is exempt because the API machinery may set it on any
-//     object.
-//   - response.decision.type must be an unconditional decision, because evaluating a
-//     conditional decision can only ever produce Allow, Deny or NoOpinion.
-//
-// Nothing descends into the conditions themselves. Their IDs, types and sizes
-// are enforced by declarative validation, the 1..128 conditions-per-map bound is
-// enforced when the decision is constructed, and the request decision is not validated
-// here at all.
+// Two rules are handwritten. ObjectMeta must be empty, since the review is a
+// non-persisted request/response envelope, with ManagedFields exempt because the API
+// machinery may set it. And response.decision.type must be an unconditional decision,
+// because evaluating conditions can only ever produce Allow, Deny or NoOpinion.
+// Everything else, including the contents of the conditions, comes from declarative
+// validation.
 func TestValidateAuthorizationConditionsReview(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
+	// A response must echo the UID of the request it is answering, so both sides of a
+	// valid envelope carry the same one.
+	const uid = "test-uid"
+
 	conditionsMapDecision := authorizationv1.ConditionsAwareDecision{
 		Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
 		ConditionsMap: &authorizationv1.ConditionsMap{
@@ -662,118 +692,117 @@ func TestValidateAuthorizationConditionsReview(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name string
-		obj  authorizationv1alpha1.AuthorizationConditionsReview
+		name             string
+		objectMeta       metav1.ObjectMeta
+		requestDecision  authorizationv1.ConditionsAwareDecision
+		responseDecision authorizationv1.ConditionsAwareDecision
 		// msgs is the exact, ordered list of expected errors; nil means valid.
 		msgs []string
 	}{{
-		name: "conditional request, unconditional deny response",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request:  &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: conditionsMapDecision},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: denyDecision},
-		},
+		name:             "conditional request, unconditional deny response",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: denyDecision,
 	}, {
-		name: "unconditional allow response",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request:  &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: conditionsMapDecision},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
-		},
+		name:             "unconditional allow response",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: allowDecision,
 	}, {
-		name: "unconditional no-opinion response",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request:  &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: conditionsMapDecision},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: noOpinionDecision},
-		},
+		name:             "unconditional no-opinion response",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: noOpinionDecision,
 	}, {
-		// type is required, which declarative validation reports; the handwritten
-		// check only runs once a type is present.
-		name: "unset response decision type is left to declarative validation",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request:  &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: conditionsMapDecision},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: authorizationv1.ConditionsAwareDecision{}},
-		},
+		name:             "only ManagedFields on ObjectMeta is allowed",
+		objectMeta:       metav1.ObjectMeta{ManagedFields: []metav1.ManagedFieldsEntry{{Manager: "test"}}},
+		requestDecision:  conditionsMapDecision,
+		responseDecision: allowDecision,
 	}, {
-		name: "nil request and response",
-		obj:  authorizationv1alpha1.AuthorizationConditionsReview{},
+		name:             "non-empty ObjectMeta",
+		objectMeta:       metav1.ObjectMeta{Name: "a-name"},
+		requestDecision:  conditionsMapDecision,
+		responseDecision: allowDecision,
+		msgs:             []string{`metadata: Invalid value: {"name":"a-name"}: must be empty`},
 	}, {
-		name: "only ManagedFields on ObjectMeta is allowed",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			ObjectMeta: metav1.ObjectMeta{
-				ManagedFields: []metav1.ManagedFieldsEntry{{Manager: "test"}},
-			},
-			Request:  &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: conditionsMapDecision},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
-		},
-	}, {
-		// The contents of the request decision are no longer inspected here, so
-		// malformed condition keys and oversized bodies produce no handwritten errors.
-		name: "request conditions are not inspected",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
-				Decision: authorizationv1.ConditionsAwareDecision{
-					Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
-					ConditionsMap: &authorizationv1.ConditionsMap{
-						DenyConditions: []authorizationv1.Condition{{
-							ID:          "no-slash",
-							Type:        "also-no-slash",
-							Condition:   strings.Repeat("a", authorizer.MaxConditionBytes+1),
-							Description: strings.Repeat("b", authorizer.MaxConditionDescriptionBytes+1),
-						}},
-					},
-				},
-			},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
-		},
-	}, {
-		name: "non-empty ObjectMeta",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			ObjectMeta: metav1.ObjectMeta{Name: "a-name"},
-			Request:    &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: conditionsMapDecision},
-			Response:   &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
-		},
-		msgs: []string{`metadata: Invalid value: {"name":"a-name"}: must be empty`},
+		// The type is required, which only declarative validation reports; the
+		// handwritten unconditional-only check deliberately skips an unset type.
+		name:             "unset response decision type",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: authorizationv1.ConditionsAwareDecision{},
+		msgs:             []string{"response.decision.type: Required value"},
 	}, {
 		// A conditional response cannot be the result of evaluating conditions.
-		name: "ConditionsMap response is not supported",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request:  &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: conditionsMapDecision},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: conditionsMapDecision},
-		},
-		msgs: []string{`response.decision.type: Invalid value: "ConditionsMap": currently must evaluate to an unconditional decision`},
+		name:             "ConditionsMap response is not supported",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: conditionsMapDecision,
+		msgs:             []string{`response.decision.type: Invalid value: "ConditionsMap": currently must evaluate to an unconditional decision`},
 	}, {
-		name: "Union response is not supported",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: conditionsMapDecision},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
-				Decision: authorizationv1.ConditionsAwareDecision{
-					Type: authorizationv1.ConditionsAwareDecisionTypeUnion,
-					Union: []authorizationv1.NamedConditionsAwareDecision{{
-						AuthorizerName: "cm",
-						Decision:       conditionsMapDecision,
-					}},
-				},
-			},
+		name:            "Union response is not supported",
+		requestDecision: conditionsMapDecision,
+		responseDecision: authorizationv1.ConditionsAwareDecision{
+			Type: authorizationv1.ConditionsAwareDecisionTypeUnion,
+			Union: []authorizationv1.NamedConditionsAwareDecision{{
+				AuthorizerName: "cm",
+				Decision:       conditionsMapDecision,
+			}},
 		},
 		msgs: []string{`response.decision.type: Invalid value: "Union": currently must evaluate to an unconditional decision`},
 	}, {
-		name: "unrecognized response type is not supported",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: conditionsMapDecision},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
-				Decision: authorizationv1.ConditionsAwareDecision{Type: "SomeFutureType"},
+		name:             "unrecognized response type is not supported",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: authorizationv1.ConditionsAwareDecision{Type: "SomeFutureType"},
+		msgs: []string{
+			`response.decision.type: Invalid value: "SomeFutureType": currently must evaluate to an unconditional decision`,
+			`response.decision.type: Unsupported value: "SomeFutureType": supported values: "Allow", "ConditionsMap", "Deny", "NoOpinion", "Union"`,
+		},
+	}, {
+		// The conditions in the request are reported by declarative validation; the
+		// handwritten validators no longer descend into a decision at all.
+		name: "malformed request conditions are reported by declarative validation",
+		requestDecision: authorizationv1.ConditionsAwareDecision{
+			Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+			ConditionsMap: &authorizationv1.ConditionsMap{
+				DenyConditions: []authorizationv1.Condition{{
+					ID:          "no-slash",
+					Type:        "also-no-slash",
+					Condition:   strings.Repeat("a", authorizer.MaxConditionBytes+1),
+					Description: strings.Repeat("b", authorizer.MaxConditionDescriptionBytes+1),
+				}},
 			},
 		},
-		msgs: []string{`response.decision.type: Invalid value: "SomeFutureType": currently must evaluate to an unconditional decision`},
+		responseDecision: allowDecision,
+		msgs: []string{
+			`request.decision.conditionsMap.denyConditions[0].id: Invalid value: "no-slash": must include a prefix (e.g. 'example.com/key')`,
+			"request.decision.conditionsMap.denyConditions[0].condition: Too long: may not be more than 10240 bytes",
+			`request.decision.conditionsMap.denyConditions[0].type: Invalid value: "also-no-slash": must include a prefix (e.g. 'example.com/key')`,
+			"request.decision.conditionsMap.denyConditions[0].description: Too long: may not be more than 1024 bytes",
+		},
 	}}
 
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
-			assertErrors(t, ValidateAuthorizationConditionsReview(&c.obj), c.msgs)
+			acr := &authorizationv1alpha1.AuthorizationConditionsReview{
+				ObjectMeta: c.objectMeta,
+				Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
+					AdmissionRequest: &admissionv1.AdmissionRequest{UID: uid},
+					Decision:         c.requestDecision,
+				},
+				Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
+					UID:      uid,
+					Decision: c.responseDecision,
+				},
+			}
+			assertErrors(t, CombinedValidateAuthorizationConditionsReviewCreate(context.Background(), acr), c.msgs)
 		})
 	}
+
+	// The request and response are each optional on the wire, so an envelope carrying
+	// neither is structurally valid; the webhook authorizer checks for a missing
+	// response separately.
+	t.Run("nil request and response", func(t *testing.T) {
+		assertErrors(t, CombinedValidateAuthorizationConditionsReviewCreate(context.Background(),
+			&authorizationv1alpha1.AuthorizationConditionsReview{}), nil)
+	})
 }
 
-// assertErrors compares the full text of every error in errs against want, in order.
 // Matching complete error strings rather than substrings means a change to an error's
 // type (for example Invalid to Forbidden) or to its wording is caught here.
 func assertErrors(t *testing.T, errs field.ErrorList, want []string) {
@@ -806,6 +835,8 @@ func assertErrors(t *testing.T, errs field.ErrorList, want []string) {
 //     the v1beta1 conversion overwrite those fields when it folds a conditional
 //     decision down to unconditional form.
 func TestValidateSARStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
 	conditionsMap := &authorizationv1.ConditionsMap{
 		AllowConditions: []authorizationv1.Condition{{ID: "example.com/allow", Type: "example.com/opaque"}},
 	}
@@ -1009,20 +1040,21 @@ func TestValidateSARStatus(t *testing.T) {
 		},
 	}, {
 		// An unrecognized type matches no arm of the handwritten switch, so the
-		// unconditional fields are not constrained; declarative validation is
-		// responsible for rejecting the type itself.
-		name:    "unrecognized type is left to declarative validation",
+		// unconditional fields alongside it are not constrained. Declarative validation
+		// rejects the type itself.
+		name:    "unrecognized type is rejected by declarative validation",
 		options: conditionalOptions,
 		status: authorizationv1.SubjectAccessReviewStatus{
 			Allowed:             true,
 			Reason:              "because",
 			ConditionalDecision: &authorizationv1.ConditionsAwareDecision{Type: "SomeFutureType"},
 		},
+		msgs: []string{`status.conditionalDecision.type: Unsupported value: "SomeFutureType": supported values: "Allow", "ConditionsMap", "Deny", "NoOpinion", "Union"`},
 	}, {
-		// The status validator does not descend into the decision, so the contents of
-		// the conditions are declarative validation's problem, whether they sit directly
-		// in a ConditionsMap or nested inside a Union.
-		name:    "condition contents are left to declarative validation",
+		// The handwritten validators do not descend into a decision, so the contents of
+		// the conditions are reported by declarative validation, which reaches them even
+		// when they are nested inside a Union.
+		name:    "malformed condition contents are rejected by declarative validation",
 		options: conditionalOptions,
 		status: authorizationv1.SubjectAccessReviewStatus{
 			ConditionalDecision: &authorizationv1.ConditionsAwareDecision{
@@ -1038,43 +1070,21 @@ func TestValidateSARStatus(t *testing.T) {
 				}},
 			},
 		},
+		msgs: []string{`status.conditionalDecision.union[0].decision.conditionsMap.allowConditions[0].id: Invalid value: "no-slash": must include a prefix (e.g. 'example.com/key')`},
 	}}
 
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			// A spec that is valid on its own, so every reported error comes from the
-			// status. The namespace is set because LocalSubjectAccessReview requires
-			// spec.resourceAttributes.namespace to match metadata.namespace.
-			sarSpec := authorizationv1.SubjectAccessReviewSpec{
-				ResourceAttributes:   &authorizationv1.ResourceAttributes{Namespace: "ns"},
-				User:                 "me",
-				AuthorizationOptions: c.options,
-			}
-
-			t.Run("SubjectAccessReview", func(t *testing.T) {
-				assertErrors(t, ValidateSubjectAccessReview(&authorizationv1.SubjectAccessReview{
-					Spec:   sarSpec,
-					Status: c.status,
-				}), c.msgs)
-			})
-
-			t.Run("SelfSubjectAccessReview", func(t *testing.T) {
-				assertErrors(t, ValidateSelfSubjectAccessReview(&authorizationv1.SelfSubjectAccessReview{
-					Spec: authorizationv1.SelfSubjectAccessReviewSpec{
-						ResourceAttributes:   &authorizationv1.ResourceAttributes{Namespace: "ns"},
-						AuthorizationOptions: c.options,
-					},
-					Status: c.status,
-				}), c.msgs)
-			})
-
-			t.Run("LocalSubjectAccessReview", func(t *testing.T) {
-				assertErrors(t, ValidateLocalSubjectAccessReview(&authorizationv1.LocalSubjectAccessReview{
-					ObjectMeta: metav1.ObjectMeta{Namespace: "ns"},
-					Spec:       sarSpec,
-					Status:     c.status,
-				}), c.msgs)
-			})
+			// status.
+			assertErrors(t, CombinedValidateSubjectAccessReviewCreate(context.Background(), &authorizationv1.SubjectAccessReview{
+				Spec: authorizationv1.SubjectAccessReviewSpec{
+					ResourceAttributes:   &authorizationv1.ResourceAttributes{Namespace: "ns"},
+					User:                 "me",
+					AuthorizationOptions: c.options,
+				},
+				Status: c.status,
+			}), c.msgs)
 		})
 	}
 }
