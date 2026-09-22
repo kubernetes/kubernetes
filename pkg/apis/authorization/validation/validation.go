@@ -47,7 +47,7 @@ func ValidateSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.Sche
 
 	errs := apiservervalidation.ValidateSubjectAccessReview(sarV1)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
-	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, sarValidationConfig())
+	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, apiservervalidation.DeclarativeValidationConfig())
 }
 
 // ValidateSelfSubjectAccessReviewCreate is the single composition of handwritten and declarative
@@ -65,7 +65,7 @@ func ValidateSelfSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.
 
 	errs := apiservervalidation.ValidateSelfSubjectAccessReview(sarV1)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
-	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, sarValidationConfig())
+	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, apiservervalidation.DeclarativeValidationConfig())
 }
 
 // ValidateLocalSubjectAccessReviewCreate is the single composition of handwritten and declarative
@@ -83,7 +83,7 @@ func ValidateLocalSubjectAccessReviewCreate(ctx context.Context, scheme *runtime
 
 	errs := apiservervalidation.ValidateLocalSubjectAccessReview(sarV1)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
-	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, sarValidationConfig())
+	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, apiservervalidation.DeclarativeValidationConfig())
 }
 
 // ValidateAuthorizationConditionsReviewCreate is the single composition of handwritten and declarative
@@ -98,16 +98,5 @@ func ValidateAuthorizationConditionsReviewCreate(ctx context.Context, scheme *ru
 
 	errs := apiservervalidation.ValidateAuthorizationConditionsReview(acrV1)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
-	return dv.ValidateDeclaratively(ctx, acr, nil, errs, operation.Create, sarValidationConfig())
-}
-
-// sarValidationConfig returns the declarative validation config to use for
-// SubjectAccessReview-family create validation. It enables the
-// "ConditionalAuthorization" option when the corresponding feature gate is
-// enabled, so that the +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
-// tag on spec.conditionalAuthorization does not reject the field.
-func sarValidationConfig() rest.DeclarativeValidationConfig {
-	return rest.DeclarativeValidationConfig{
-		Options: apiservervalidation.GetDeclarativeValidationOptions(),
-	}
+	return dv.ValidateDeclaratively(ctx, acr, nil, errs, operation.Create, apiservervalidation.DeclarativeValidationConfig())
 }
