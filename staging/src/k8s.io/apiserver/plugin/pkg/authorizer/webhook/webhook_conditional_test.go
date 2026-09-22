@@ -442,7 +442,7 @@ func TestEvaluateConditions(t *testing.T) {
 			wantDecision:    authorizer.DecisionNoOpinion,
 			wantReason:      "failed closed",
 			wantErr:         true,
-			wantErrContains: "got unconditional decision in EvaluateConditions",
+			wantErrContains: "got unconditional decisionToEvaluate in EvaluateConditions",
 		},
 		{
 			name:            "unconditional deny rejected: FailureDecision is Deny",
@@ -451,7 +451,7 @@ func TestEvaluateConditions(t *testing.T) {
 			wantDecision:    authorizer.DecisionDeny,
 			wantReason:      "failed closed",
 			wantErr:         true,
-			wantErrContains: "got unconditional decision in EvaluateConditions",
+			wantErrContains: "got unconditional decisionToEvaluate in EvaluateConditions",
 		},
 		{
 			name:            "unconditional no-opinion rejected: FailureDecision is NoOpinion",
@@ -460,7 +460,7 @@ func TestEvaluateConditions(t *testing.T) {
 			wantDecision:    authorizer.DecisionNoOpinion,
 			wantReason:      "failed closed",
 			wantErr:         true,
-			wantErrContains: "got unconditional decision in EvaluateConditions",
+			wantErrContains: "got unconditional decisionToEvaluate in EvaluateConditions",
 		},
 		// No ACR reviewer configured: must fail closed.
 		{
@@ -576,9 +576,22 @@ func TestEvaluateConditions(t *testing.T) {
 			wantReason:      "failed closed",
 			wantErr:         true,
 		},
-		// Nil Response field in the ACR response.
+		// nil response field in the ACR response.
 		{
-			name: "nil Response field returns NoOpinion",
+			name: "nil response returns FailureDecision (Deny)",
+			decision: authorizer.ConditionsAwareDecisionConditionsMap(
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Type: "example.com/opaque"}},
+				nil, nil,
+			),
+			acrResponse:     &authorizationv1alpha1.AuthorizationConditionsReview{},
+			decisionOnError: authorizer.DecisionNoOpinion,
+			wantDecision:    authorizer.DecisionDeny,
+			wantReason:      "failed closed",
+			wantErr:         true,
+			wantErrContains: "response: Required value: must be set in AuthorizationConditionsReview responses",
+		},
+		{
+			name: "nil response returns FailureDecision (NoOpinion)",
 			decision: authorizer.ConditionsAwareDecisionConditionsMap(
 				nil, nil,
 				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Type: "example.com/opaque"}},
@@ -586,7 +599,9 @@ func TestEvaluateConditions(t *testing.T) {
 			acrResponse:     &authorizationv1alpha1.AuthorizationConditionsReview{},
 			decisionOnError: authorizer.DecisionNoOpinion,
 			wantDecision:    authorizer.DecisionNoOpinion,
-			wantReason:      "",
+			wantReason:      "failed closed",
+			wantErr:         true,
+			wantErrContains: "response: Required value: must be set in AuthorizationConditionsReview responses",
 		},
 		// ACR request must contain the serialized conditions.
 		{

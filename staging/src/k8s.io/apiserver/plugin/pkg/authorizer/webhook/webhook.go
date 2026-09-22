@@ -34,7 +34,6 @@ import (
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/operation"
-	"k8s.io/apimachinery/pkg/api/validate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,8 +51,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -262,9 +259,9 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	case r.Status.ConditionalDecision != nil:
 		// Fail with Deny if there is at least one Deny condition or decision.
 		if shouldFailWithDeny(*r.Status.ConditionalDecision) {
-			return authorizer.DecisionDeny, r.Status.Reason, fmt.Errorf("webhook authorizer tried to return conditional decision although client does not support it")
+			return authorizer.DecisionDeny, r.Status.Reason, fmt.Errorf("webhook subject access review returned unrequested conditional decision")
 		}
-		return authorizer.DecisionNoOpinion, r.Status.Reason, fmt.Errorf("webhook authorizer tried to return conditional decision although client does not support it")
+		return authorizer.DecisionNoOpinion, r.Status.Reason, fmt.Errorf("webhook subject access review returned unrequested conditional decision")
 	case r.Status.Denied:
 		return authorizer.DecisionDeny, r.Status.Reason, nil
 	case r.Status.Allowed:
@@ -440,28 +437,28 @@ func (w *WebhookAuthorizer) sendSARWebhook(ctx context.Context, r *authorization
 	}
 }
 
-func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
-	if decision.IsUnconditional() {
-		return decision.FailureDecision(), "failed closed", fmt.Errorf("got unconditional decision in EvaluateConditions")
+func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decisionToEvaluate authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	if decisionToEvaluate.IsUnconditional() {
+		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("got unconditional decisionToEvaluate in EvaluateConditions")
 	}
 
 	// EvaluateConditions must be handed data to evaluate against. Without any
 	// data there is nothing for the remote authorizer to condition on, and no
 	// AdmissionRequest UID to correlate the response with. Fail closed.
 	if data == nil {
-		return decision.FailureDecision(), "failed closed", fmt.Errorf("data must be non-nil in EvaluateConditions")
+		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("data must be non-nil in EvaluateConditions")
 	}
 
 	// Fail closed when evaluation is not supported
 	if w.authorizationConditionsReviewer == nil {
-		return decision.FailureDecision(), "failed closed", fmt.Errorf("no authorization conditions review client configured for the webhook authorizer, cannot evaluate conditions")
+		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("no authorization conditions review client configured for the webhook authorizer, cannot evaluate conditions")
 	}
 
 	// TODO(luxas): Use builtin evaluators to resolve as much as possible of the ConditionsMap or Union
 
 	r := &authorizationv1alpha1.AuthorizationConditionsReview{
 		Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
-			Decision: apiserverauthorizationv1.SerializeConditionsAwareDecision(decision),
+			Decision: apiserverauthorizationv1.SerializeConditionsAwareDecision(decisionToEvaluate),
 		},
 	}
 
@@ -501,7 +498,6 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decision aut
 	}
 
 	var result *authorizationv1alpha1.AuthorizationConditionsReview
-	var metricsResult string
 	// WithExponentialBackoff will return SAR create error (sarErr) if any.
 	if err := webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
 		var acrErr error
@@ -510,103 +506,77 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decision aut
 
 		return acrErr
 	}, webhook.DefaultShouldRetry); err != nil {
-		klog.Errorf("Failed to make webhook authorizer evaluation request: %v", err)
+		klog.Errorf("Failed to make webhook authorizer condition evaluation request: %v", err)
 
-		// we're returning NoOpinion, and the parent context has not timed out or been canceled
-		if w.decisionOnError == authorizer.DecisionNoOpinion && ctx.Err() == nil {
-			w.metrics.RecordWebhookFailOpen(ctx, w.name, metricsResult)
-		}
-
-		return decision.FailureDecision(), "failed closed", err
+		return decisionToEvaluate.FailureDecision(), "failed closed", err
 	}
 
 	if result.Response == nil {
-		return authorizer.DecisionNoOpinion, "", nil
+		return decisionToEvaluate.FailureDecision(), "failed closed", field.Required(field.NewPath("response"), "must be set in AuthorizationConditionsReview responses")
 	}
 
 	// Verify that the webhook authorizer set UID correctly for the request.
 	if result.Response.UID != evaluateRequestUUID {
-		return decision.FailureDecision(), "failed closed", fmt.Errorf("uid mismatch in webhook EvaluateConditions for webhook with name %q, expected %q but got %q", w.name, evaluateRequestUUID, result.Response.UID)
+		return decisionToEvaluate.FailureDecision(), "failed closed", field.Invalid(field.NewPath("response", "uid"), result.Response.UID, fmt.Sprintf("mismatch, expected %q that was given in request.uid", evaluateRequestUUID))
 	}
 
 	if errs := validateAuthorizationConditionsReviewCreate(ctx, r); len(errs) > 0 {
-		return decision.FailureDecision(), "failed closed", errs.ToAggregate()
+		return decisionToEvaluate.FailureDecision(), "failed closed", errs.ToAggregate()
 	}
 
 	switch result.Response.Decision.Type {
 	case authorizationv1.ConditionsAwareDecisionTypeDeny:
-		if !decision.PossibleDecisions().Has(authorizer.DecisionDeny) {
-			return decision.FailureDecision(), "failed closed", fmt.Errorf("webhook authorizer tried to return Deny from EvaluateConditions, but the possible outcomes were %v", sets.List(decision.PossibleDecisions()))
+		if !decisionToEvaluate.PossibleDecisions().Has(authorizer.DecisionDeny) {
+			return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("webhook authorizer tried to return Deny from EvaluateConditions, but the possible outcomes were %v", sets.List(decisionToEvaluate.PossibleDecisions()))
 		}
 		return authorizer.DecisionDeny, apiserverauthorizationv1.DeserializeReason(result.Response.Decision.Deny), apiserverauthorizationv1.DeserializeEvaluationError(result.Response.Decision.Deny)
 	case authorizationv1.ConditionsAwareDecisionTypeNoOpinion:
-		if !decision.PossibleDecisions().Has(authorizer.DecisionNoOpinion) {
-			return decision.FailureDecision(), "failed closed", fmt.Errorf("webhook authorizer tried to return NoOpinion from EvaluateConditions, but the possible outcomes were %v", sets.List(decision.PossibleDecisions()))
+		if !decisionToEvaluate.PossibleDecisions().Has(authorizer.DecisionNoOpinion) {
+			return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("webhook authorizer tried to return NoOpinion from EvaluateConditions, but the possible outcomes were %v", sets.List(decisionToEvaluate.PossibleDecisions()))
 		}
 		return authorizer.DecisionNoOpinion, apiserverauthorizationv1.DeserializeReason(result.Response.Decision.NoOpinion), apiserverauthorizationv1.DeserializeEvaluationError(result.Response.Decision.NoOpinion)
 	case authorizationv1.ConditionsAwareDecisionTypeAllow:
-		if !decision.PossibleDecisions().Has(authorizer.DecisionAllow) {
-			return decision.FailureDecision(), "failed closed", fmt.Errorf("webhook authorizer tried to return Allow from EvaluateConditions, but the possible outcomes were %v", sets.List(decision.PossibleDecisions()))
+		if !decisionToEvaluate.PossibleDecisions().Has(authorizer.DecisionAllow) {
+			return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("webhook authorizer tried to return Allow from EvaluateConditions, but the possible outcomes were %v", sets.List(decisionToEvaluate.PossibleDecisions()))
 		}
 		return authorizer.DecisionAllow, apiserverauthorizationv1.DeserializeReason(result.Response.Decision.Allow), apiserverauthorizationv1.DeserializeEvaluationError(result.Response.Decision.Allow)
 	default:
-		return decision.FailureDecision(), "failed closed", fmt.Errorf("unrecognized decision type %q", result.Response.Decision.Type)
+		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("unrecognized decisionToEvaluate type %q", result.Response.Decision.Type)
 	}
 }
 
-func validateSubjectAccessReviewCreate(ctx context.Context, sar *authorizationv1.SubjectAccessReview) field.ErrorList {
-	return compositeValidate(ctx, func() field.ErrorList {
-		return authorizationvalidation.ValidateSubjectAccessReview(sar)
-	}, func() field.ErrorList {
-		op := operation.Operation{
-			Type:    operation.Create,
-			Options: authorizationvalidation.GetDeclarativeValidationOptions(),
+func validateSubjectAccessReviewCreate(ctx context.Context, sar *authorizationv1.SubjectAccessReview) (errs field.ErrorList) {
+	defer func() {
+		if r := recover(); r != nil {
+			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during SAR validation: %v", r)))
 		}
-		return authorizationv1.Validate_SubjectAccessReview(ctx, op, nil /* fldPath */, sar, nil)
-	})
-}
+	}()
+	errs = authorizationvalidation.ValidateSubjectAccessReview(sar)
 
-func validateAuthorizationConditionsReviewCreate(ctx context.Context, acr *authorizationv1alpha1.AuthorizationConditionsReview) field.ErrorList {
-	return compositeValidate(ctx, func() field.ErrorList {
-		return authorizationvalidation.ValidateAuthorizationConditionsReview(acr)
-	}, func() field.ErrorList {
-		op := operation.Operation{
-			Type:    operation.Create,
-			Options: authorizationvalidation.GetDeclarativeValidationOptions(),
-		}
-		return authorizationv1alpha1.Validate_AuthorizationConditionsReview(ctx, op, nil /* fldPath */, acr, nil)
-	})
-}
-
-// compositeValidate models rest.ValidateDeclarativelyWithMigrationChecks
-func compositeValidate(ctx context.Context, validateHandwritten, validateDeclarative func() field.ErrorList) field.ErrorList {
-	errs := validateHandwritten()
-
-	declarativeErrs := runValidationWithRecover(ctx, validateDeclarative)
-
-	betaEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta)
-	// TODO: Consider finding mismatches between handwritten and declarative validations at alpha/beta level like rest.ValidateDeclarativelyWithMigrationChecks
-
-	// Collect the declarative errors that are enforced (i.e. surfaced to the user) in the current mode.
-	enforcedDeclarativeErrs := validate.FilterEnforcedDeclarativeErrors(ctx, declarativeErrs, betaEnabled)
-	// Remove handwritten errors that are superseded by an enforced declarative counterpart.
-	errs = validate.FilterCoveredHandwrittenErrors(ctx, errs, enforcedDeclarativeErrs, betaEnabled)
-
-	// Append the enforced declarative errors.
-	errs = append(errs, enforcedDeclarativeErrs...)
+	op := operation.Operation{
+		Type:    operation.Create,
+		Options: authorizationvalidation.GetDeclarativeValidationOptions(),
+	}
+	declarativeErrs := authorizationv1.Validate_SubjectAccessReview(ctx, op, nil /* fldPath */, sar, nil)
+	errs = append(errs, declarativeErrs...)
 	return errs
 }
 
-// runValidationWithRecover invokes validateDeclaratively with panic recovery.
-// On panic, the panic metric is incremented and an InternalError is appended to the returned errors.
-func runValidationWithRecover(ctx context.Context, validate func() field.ErrorList) (errs field.ErrorList) {
+func validateAuthorizationConditionsReviewCreate(ctx context.Context, acr *authorizationv1alpha1.AuthorizationConditionsReview) (errs field.ErrorList) {
 	defer func() {
 		if r := recover(); r != nil {
-			// TODO(luxas): Consider running validationmetrics.Metrics.IncDeclarativeValidationPanicMetric(o.ValidationIdentifier)
-			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during declarative validation: %v", r)))
+			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during ACR validation: %v", r)))
 		}
 	}()
-	return validate()
+	errs = authorizationvalidation.ValidateAuthorizationConditionsReview(acr)
+
+	op := operation.Operation{
+		Type:    operation.Create,
+		Options: authorizationvalidation.GetDeclarativeValidationOptions(),
+	}
+	declarativeErrs := authorizationv1alpha1.Validate_AuthorizationConditionsReview(ctx, op, nil /* fldPath */, acr, nil)
+	errs = append(errs, declarativeErrs...)
+	return errs
 }
 
 func resourceAttributesFrom(attr authorizer.Attributes) *authorizationv1.ResourceAttributes {
@@ -903,7 +873,6 @@ type subjectAccessReviewV1beta1ClientGW struct {
 
 func (t *subjectAccessReviewV1beta1ClientGW) Create(ctx context.Context, subjectAccessReview *authorizationv1.SubjectAccessReview, _ metav1.CreateOptions) (*authorizationv1.SubjectAccessReview, int, error) {
 	var statusCode int
-	// TODO(luxas): We can now convert directly from v1 -> v1beta1 through auto-generated k8s.io/apiserver/pkg/apis/authorization conversions.
 	v1beta1Spec, err := v1SpecToV1beta1Spec(&subjectAccessReview.Spec)
 	if err != nil {
 		return subjectAccessReview, http.StatusBadRequest, err
