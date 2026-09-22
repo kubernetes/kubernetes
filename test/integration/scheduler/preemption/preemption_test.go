@@ -1675,14 +1675,6 @@ func TestAsyncPreemption(t *testing.T) {
 					WaitForPodsDeleted: []int{0, 1},
 				},
 				{
-					Name:                     "verify preemptor is still in unschedulable queue",
-					VerifyPodInUnschedulable: "preemptor",
-				},
-				{
-					Name:               "flush scheduling queue",
-					FlushUnschedulable: true,
-				},
-				{
 					Name: "verify preemptor scheduled",
 					SchedulePod: &asyncframework.SchedulePod{
 						PodName:       "preemptor",
