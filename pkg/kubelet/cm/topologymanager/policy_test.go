@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -45,6 +46,19 @@ func unnamedHintLists(hintLists [][]TopologyHint) []resourceHints {
 	all := make([]resourceHints, 0, len(hintLists))
 	for _, hints := range hintLists {
 		all = append(all, resourceHints{hints: hints})
+	}
+	return all
+}
+
+// namedHintLists pairs each hint list with the resource it came from.
+// resources[i] names hintLists[i]; a name missing from resources is left empty,
+// which is what a provider with no preference at all contributes.
+func namedHintLists(resources []string, hintLists [][]TopologyHint) []resourceHints {
+	all := unnamedHintLists(hintLists)
+	for i := range all {
+		if i < len(resources) {
+			all[i].resource = resources[i]
+		}
 	}
 	return all
 }
@@ -2355,6 +2369,658 @@ func TestHintMergerWithAllocationStrategy(t *testing.T) {
 			result := merger.Merge(logger)
 			if !result.NUMANodeAffinity.IsEqual(tc.expectedAffinity) {
 				t.Errorf("Expected affinity %v, got %v", tc.expectedAffinity, result.NUMANodeAffinity)
+			}
+		})
+	}
+}
+
+func TestAggregateHintScoresWithWeights(t *testing.T) {
+	maskNode0 := NewTestBitMask(0)
+
+	tcases := []struct {
+		description   string
+		permutation   []TopologyHint
+		resourceNames []string
+		weights       map[string]int
+		expectedScore int64
+		expectedOk    bool
+	}{
+		{
+			description: "nil weights give the equal-weight average",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 60},
+			},
+			resourceNames: []string{"cpu", "memory"},
+			weights:       nil,
+			expectedScore: 70,
+			expectedOk:    true,
+		},
+		{
+			description: "empty weights give the equal-weight average",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 60},
+			},
+			resourceNames: []string{"cpu", "memory"},
+			weights:       map[string]int{},
+			expectedScore: 70,
+			expectedOk:    true,
+		},
+		{
+			// The lookup is case-sensitive, so a weight whose case does not
+			// match the name the provider reported simply never applies. With
+			// the opt-in pattern, this excludes all resources, with no error
+			// anywhere: a name matching nothing is indistinguishable from one
+			// the pod does not request.
+			description: "a weight whose case does not match excludes the resource (opt-in)",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 60},
+			},
+			resourceNames: []string{"cpu", "memory"},
+			weights:       map[string]int{"CPU": 100},
+			expectedScore: 0,
+			expectedOk:    false,
+		},
+		{
+			// Conversely, a name that does match exactly is applied, including
+			// the mixed case hugepages resources carry.
+			description: "a mixed-case resource name matches when the case is exact",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 60},
+			},
+			resourceNames: []string{"cpu", "hugepages-2Mi"},
+			weights:       map[string]int{"hugepages-2Mi": 3},
+			// (80*1 + 60*3) / 4
+			expectedScore: 65,
+			expectedOk:    true,
+		},
+		{
+			description: "explicit weights tilt the average towards the heavier resource",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 60},
+			},
+			resourceNames: []string{"cpu", "memory"},
+			weights:       map[string]int{"cpu": 7, "memory": 3},
+			// (80*7 + 60*3) / 10
+			expectedScore: 74,
+			expectedOk:    true,
+		},
+		{
+			description: "only the ratios between weights matter",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 60},
+			},
+			resourceNames: []string{"cpu", "memory"},
+			// Ten times the weights of the previous case, for the same result.
+			weights:       map[string]int{"cpu": 70, "memory": 30},
+			expectedScore: 74,
+			expectedOk:    true,
+		},
+		{
+			description: "a single amplified resource dominates the rest",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 60},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 40},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 90},
+			},
+			resourceNames: []string{"cpu", "memory", "nvidia.com/gpu"},
+			weights:       map[string]int{"cpu": 2, "memory": 2, "nvidia.com/gpu": 6},
+			// (60*2 + 40*2 + 90*6) / 10
+			expectedScore: 74,
+			expectedOk:    true,
+		},
+		{
+			description: "a resource the weights do not name is excluded (opt-in pattern)",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 40},
+			},
+			resourceNames: []string{"cpu", "intel.com/nic"},
+			weights:       map[string]int{"cpu": 8},
+			// nic not in weights → excluded. Only CPU: (80*8) / 8
+			expectedScore: 80,
+			expectedOk:    true,
+		},
+		{
+			description: "naming only resources the pod does not request excludes all contributors",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 60},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 40},
+			},
+			resourceNames: []string{"cpu", "memory", "intel.com/nic"},
+			weights:       map[string]int{"nvidia.com/gpu": 10},
+			// All three not in weights → all excluded → no score
+			expectedScore: 0,
+			expectedOk:    false,
+		},
+		{
+			description: "a weight of 0 drops the resource from the average",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 40},
+			},
+			resourceNames: []string{"cpu", "memory"},
+			weights:       map[string]int{"cpu": 10, "memory": 0},
+			expectedScore: 80,
+			expectedOk:    true,
+		},
+		{
+			description: "the hint is unscored once every contributor is weighted 0",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 40},
+			},
+			resourceNames: []string{"cpu", "memory"},
+			weights:       map[string]int{"cpu": 0, "memory": 0},
+			expectedScore: 0,
+			expectedOk:    false,
+		},
+		{
+			description: "an unscored contributor takes no part, whatever its weight",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 0},
+			},
+			resourceNames: []string{"cpu", "memory"},
+			// Were the unscored contributor weighted in, its 0 would drag the
+			// average down to (80*5) / 10 = 40.
+			weights:       map[string]int{"cpu": 5, "memory": 5},
+			expectedScore: 80,
+			expectedOk:    true,
+		},
+		{
+			description: "a contributor with no affinity takes no part, whatever its weight",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: nil, Preferred: true, Score: 40},
+			},
+			resourceNames: []string{"cpu", "memory"},
+			weights:       map[string]int{"cpu": 5, "memory": 5},
+			expectedScore: 80,
+			expectedOk:    true,
+		},
+		{
+			description: "weights follow the resource name when the order differs",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 50},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 90},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 30},
+			},
+			// The names are deliberately out of the order the weights are
+			// written in, so weighting by index would pick the wrong ones.
+			resourceNames: []string{"memory", "nvidia.com/gpu", "cpu"},
+			weights:       map[string]int{"cpu": 2, "memory": 2, "nvidia.com/gpu": 6},
+			// (50*2 + 90*6 + 30*2) / 10
+			expectedScore: 70,
+			expectedOk:    true,
+		},
+		{
+			description: "a contributor with no name is excluded (opt-in pattern)",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 80},
+				{NUMANodeAffinity: maskNode0, Preferred: true, Score: 40},
+			},
+			// A hint provider which expressed no preference at all has no
+			// resource to name. With opt-in pattern, unnamed resources are
+			// excluded from scoring.
+			resourceNames: []string{"cpu"},
+			weights:       map[string]int{"cpu": 3},
+			// Second hint has no name → excluded. Only first: (80*3) / 3
+			expectedScore: 80,
+			expectedOk:    true,
+		},
+		{
+			description:   "an empty permutation leaves the hint unscored",
+			permutation:   []TopologyHint{},
+			resourceNames: []string{},
+			weights:       map[string]int{"cpu": 5},
+			expectedScore: 0,
+			expectedOk:    false,
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.description, func(t *testing.T) {
+			score, ok := mergerForPermutation(tc.resourceNames, tc.permutation, tc.weights).aggregateHintScores(tc.permutation)
+			if score != tc.expectedScore {
+				t.Errorf("expected score %d, got %d", tc.expectedScore, score)
+			}
+			if ok != tc.expectedOk {
+				t.Errorf("expected ok %v, got %v", tc.expectedOk, ok)
+			}
+		})
+	}
+}
+
+// bestScoringHint folds compareHintScores over a set of hints the way the merger
+// folds it over the permutations of a pod's hints, so that a test can assert
+// which NUMA node a strategy ends up selecting rather than eyeballing the
+// aggregated scores. Hints the strategy cannot separate leave the incumbent in
+// place.
+func bestScoringHint(strategy string, hints []TopologyHint) *TopologyHint {
+	var best *TopologyHint
+	for i := range hints {
+		if best == nil {
+			best = &hints[i]
+			continue
+		}
+		if winner := compareHintScores(strategy, best, &hints[i]); winner != nil {
+			best = winner
+		}
+	}
+	return best
+}
+
+// TestAggregateHintScoresKEPWorkedExamples pins the worked examples the KEP
+// publishes as the user-facing documentation of numa-score-weights. The weight
+// strings are the literal ones from the KEP and go through the same parser the
+// kubelet uses, so each example is verified end to end from the string an
+// operator writes to the NUMA node it selects.
+func TestAggregateHintScoresKEPWorkedExamples(t *testing.T) {
+	t.Run("prioritizing GPU consolidation", func(t *testing.T) {
+		// A two-NUMA-node machine, each node with 64 exclusively allocatable
+		// CPUs, 128Gi of memory and 4 GPUs, in the allocation state
+		//
+		//   NUMA node | CPUs     | memory      | GPUs | cpu | memory | gpu
+		//   numa0     | 48 / 64  |  64 / 128Gi | 1/4  |  75 |     50 |  25
+		//   numa1     | 16 / 64  |  32 / 128Gi | 3/4  |  25 |     25 |  75
+		//
+		// A pod requests 8 exclusive CPUs, 16Gi of memory and 1 GPU. Both nodes
+		// can satisfy it with a single-node affinity, so the two hints are
+		// structurally identical and the aggregated score decides. The operator
+		// runs most-allocated to consolidate GPU usage: filling numa1's last GPU
+		// keeps a block of 3 free GPUs on numa0 for a later multi-GPU pod.
+		resourceNames := []string{"cpu", "memory", "nvidia.com/gpu"}
+		numa0 := []TopologyHint{
+			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 75},
+			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 50},
+			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 25},
+		}
+		numa1 := []TopologyHint{
+			{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 25},
+			{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 25},
+			{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 75},
+		}
+
+		tcases := []struct {
+			weights          string
+			expectedNUMA0    int64
+			expectedNUMA1    int64
+			strategy         string
+			expectedSelected bitmask.BitMask
+		}{
+			{
+				// Empty weights → defaults {cpu:1, memory:1}, GPU excluded.
+				// numa0: (75+50)/2=62, numa1: (25+25)/2=25
+				weights:          "",
+				expectedNUMA0:    62,
+				expectedNUMA1:    25,
+				strategy:         NUMAAllocationStrategyMostAllocated,
+				expectedSelected: NewTestBitMask(0),
+			},
+			{
+				// Only GPU participates: numa0=25, numa1=75
+				weights:          "nvidia.com/gpu=10",
+				expectedNUMA0:    25,
+				expectedNUMA1:    75,
+				strategy:         NUMAAllocationStrategyMostAllocated,
+				expectedSelected: NewTestBitMask(1),
+			},
+			{
+				// GPU still leads, CPU moderates it.
+				weights:          "cpu=3,memory=1,nvidia.com/gpu=6",
+				expectedNUMA0:    42,
+				expectedNUMA1:    55,
+				strategy:         NUMAAllocationStrategyMostAllocated,
+				expectedSelected: NewTestBitMask(1),
+			},
+			{
+				// cpu and gpu (memory excluded): numa0=(75*5+25*5)/10=50, numa1=(25*5+75*5)/10=50
+				// Equal scores, structural tiebreak picks numa0
+				weights:          "cpu=5,nvidia.com/gpu=5",
+				expectedNUMA0:    50,
+				expectedNUMA1:    50,
+				strategy:         NUMAAllocationStrategyMostAllocated,
+				expectedSelected: NewTestBitMask(0),
+			},
+			{
+				// cpu=0 excludes it, only gpu participates: numa0=25, numa1=75
+				weights:          "nvidia.com/gpu=10,cpu=0",
+				expectedNUMA0:    25,
+				expectedNUMA1:    75,
+				strategy:         NUMAAllocationStrategyMostAllocated,
+				expectedSelected: NewTestBitMask(1),
+			},
+			{
+				// Uniform weights are equivalent to leaving the option unset.
+				weights:          "cpu=100,memory=100,nvidia.com/gpu=100",
+				expectedNUMA0:    50,
+				expectedNUMA1:    41,
+				strategy:         NUMAAllocationStrategyMostAllocated,
+				expectedSelected: NewTestBitMask(0),
+			},
+			{
+				// Only gpu: numa0=25, numa1=75
+				// least-allocated picks lower score (numa0)
+				weights:          "nvidia.com/gpu=10",
+				expectedNUMA0:    25,
+				expectedNUMA1:    75,
+				strategy:         NUMAAllocationStrategyLeastAllocated,
+				expectedSelected: NewTestBitMask(0),
+			},
+		}
+
+		for _, tc := range tcases {
+			t.Run(fmt.Sprintf("%s/%q", tc.strategy, tc.weights), func(t *testing.T) {
+				weights, err := parseNUMAScoreWeights(tc.weights)
+				if err != nil {
+					t.Fatalf("unexpected error parsing %q: %v", tc.weights, err)
+				}
+
+				score0, ok0 := mergerForPermutation(resourceNames, numa0, weights).aggregateHintScores(numa0)
+				score1, ok1 := mergerForPermutation(resourceNames, numa1, weights).aggregateHintScores(numa1)
+				if !ok0 || !ok1 {
+					t.Fatalf("expected both nodes to be scored, got ok %v and %v", ok0, ok1)
+				}
+				if score0 != tc.expectedNUMA0 {
+					t.Errorf("expected numa0 aggregate %d, got %d", tc.expectedNUMA0, score0)
+				}
+				if score1 != tc.expectedNUMA1 {
+					t.Errorf("expected numa1 aggregate %d, got %d", tc.expectedNUMA1, score1)
+				}
+
+				selected := bestScoringHint(tc.strategy, []TopologyHint{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: score0},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: score1},
+				})
+				if !selected.NUMANodeAffinity.IsEqual(tc.expectedSelected) {
+					t.Errorf("expected %v to be selected, got %v", tc.expectedSelected, selected.NUMANodeAffinity)
+				}
+			})
+		}
+	})
+
+	t.Run("excluding a resource from scoring", func(t *testing.T) {
+		// An NFV node with four NUMA nodes, each with 32 exclusively allocatable
+		// CPUs, 128Gi of memory and 8 SR-IOV VFs. The operator runs
+		// least-allocated and cares only about VF availability, because a NUMA
+		// node with no free VF cannot host the pod at all while CPU and memory
+		// pressure is already handled by the scheduler.
+		//
+		//   NUMA node | cpu | memory | VF | free VFs
+		//   numa0     |  25 |     25 | 75 |        2
+		//   numa1     |  75 |     75 | 25 |        6
+		//   numa2     |  50 |     50 | 50 |        4
+		//   numa3     |  50 |     50 | 50 |        4
+		resourceNames := []string{"cpu", "memory", "intel.com/sriov-nic"}
+		perNode := [][]int64{
+			{25, 25, 75},
+			{75, 75, 25},
+			{50, 50, 50},
+			{50, 50, 50},
+		}
+
+		tcases := []struct {
+			weights           string
+			expectedAggregate []int64
+			expectedSelected  bitmask.BitMask
+		}{
+			{
+				// Empty weights → defaults {cpu:1, memory:1}, NIC excluded.
+				// numa0: (25+25)/2=25, numa1: (75+75)/2=75, numa2/3: 50
+				// least-allocated picks lowest (numa0)
+				weights:           "",
+				expectedAggregate: []int64{25, 75, 50, 50},
+				expectedSelected:  NewTestBitMask(0),
+			},
+			{
+				// Zeroing CPU and memory, including NIC explicitly (opt-in pattern).
+				// Only NIC participates: scores are 75, 25, 50, 50
+				weights:           "cpu=0,memory=0,intel.com/sriov-nic=1",
+				expectedAggregate: []int64{75, 25, 50, 50},
+				expectedSelected:  NewTestBitMask(1),
+			},
+		}
+
+		for _, tc := range tcases {
+			t.Run(fmt.Sprintf("%q", tc.weights), func(t *testing.T) {
+				weights, err := parseNUMAScoreWeights(tc.weights)
+				if err != nil {
+					t.Fatalf("unexpected error parsing %q: %v", tc.weights, err)
+				}
+
+				var scored []TopologyHint
+				for node, scores := range perNode {
+					permutation := make([]TopologyHint, 0, len(scores))
+					for _, score := range scores {
+						permutation = append(permutation, TopologyHint{
+							NUMANodeAffinity: NewTestBitMask(node),
+							Preferred:        true,
+							Score:            score,
+						})
+					}
+
+					aggregate, ok := mergerForPermutation(resourceNames, permutation, weights).aggregateHintScores(permutation)
+					if !ok {
+						t.Fatalf("expected numa%d to be scored", node)
+					}
+					if aggregate != tc.expectedAggregate[node] {
+						t.Errorf("expected numa%d aggregate %d, got %d", node, tc.expectedAggregate[node], aggregate)
+					}
+					scored = append(scored, TopologyHint{
+						NUMANodeAffinity: NewTestBitMask(node),
+						Preferred:        true,
+						Score:            aggregate,
+					})
+				}
+
+				selected := bestScoringHint(NUMAAllocationStrategyLeastAllocated, scored)
+				if !selected.NUMANodeAffinity.IsEqual(tc.expectedSelected) {
+					t.Errorf("expected %v to be selected, got %v", tc.expectedSelected, selected.NUMANodeAffinity)
+				}
+			})
+		}
+	})
+}
+
+// TestHintMergerWithScoreWeights drives the weights through merger.Merge, to
+// cover what aggregateHintScores on its own cannot: that the weights reach the
+// aggregation and that they compose with numa-allocation-strategy.
+//
+// Every case runs the same allocation state, the one from the KEP's GPU
+// consolidation example: cpu and memory rate numa0 as the busier node, the GPU
+// rates numa1 as the busier one. Which node wins therefore says which resource
+// the weights put in charge, and the cases come in pairs which differ only in
+// the weights so that neither half can pass by accident.
+//
+// Note that a case expecting numa0 proves less on its own than one expecting
+// numa1: IsNarrowerThan tie-breaks equal-width masks with IsLessThan, so numa0
+// is what the structural comparison falls back to anyway. Each such case is
+// paired with the one that pulls the other way.
+func TestHintMergerWithScoreWeights(t *testing.T) {
+	resourceNames := []string{"cpu", "memory", "nvidia.com/gpu"}
+	hints := [][]TopologyHint{
+		{
+			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 75},
+			{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 25},
+		},
+		{
+			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 50},
+			{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 25},
+		},
+		{
+			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 25},
+			{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 75},
+		},
+	}
+
+	tcases := []struct {
+		description      string
+		strategy         string
+		weights          map[string]int
+		gateEnabled      bool
+		expectedAffinity bitmask.BitMask
+		expectedScore    int64
+	}{
+		{
+			// weights=nil gets defaults {cpu:1, memory:1}. With opt-in, only
+			// cpu and memory participate (gpu excluded).
+			// numa0: (75+50)/2=62, numa1: (25+25)/2=25
+			description:      "without weights most-allocated follows the CPU and memory majority",
+			strategy:         NUMAAllocationStrategyMostAllocated,
+			weights:          defaultNUMAScoreWeights(),
+			gateEnabled:      true,
+			expectedAffinity: NewTestBitMask(0),
+			expectedScore:    62,
+		},
+		{
+			// weights={gpu:10}: only gpu participates (cpu/memory excluded).
+			// numa0: 25, numa1: 75
+			description:      "amplifying the GPU makes most-allocated follow it instead",
+			strategy:         NUMAAllocationStrategyMostAllocated,
+			weights:          map[string]int{"nvidia.com/gpu": 10},
+			gateEnabled:      true,
+			expectedAffinity: NewTestBitMask(1),
+			expectedScore:    75,
+		},
+		{
+			// Defaults {cpu:1, memory:1}: numa0=62, numa1=25
+			// least-allocated picks lower score
+			description:      "without weights least-allocated follows the CPU and memory majority",
+			strategy:         NUMAAllocationStrategyLeastAllocated,
+			weights:          defaultNUMAScoreWeights(),
+			gateEnabled:      true,
+			expectedAffinity: NewTestBitMask(1),
+			expectedScore:    25,
+		},
+		{
+			description:      "amplifying the GPU makes least-allocated follow it instead",
+			strategy:         NUMAAllocationStrategyLeastAllocated,
+			weights:          map[string]int{"nvidia.com/gpu": 10},
+			gateEnabled:      true,
+			expectedAffinity: NewTestBitMask(0),
+			expectedScore:    25,
+		},
+		{
+			// cpu and memory excluded, gpu explicitly included (opt-in pattern)
+			description: "excluding the CPU and memory leaves the GPU deciding on its own",
+			strategy:    NUMAAllocationStrategyMostAllocated,
+			weights:     map[string]int{"cpu": 0, "memory": 0, "nvidia.com/gpu": 1},
+			gateEnabled: true,
+			// The GPU is the only resource left with a weight, so the merged
+			// score is its own.
+			expectedAffinity: NewTestBitMask(1),
+			expectedScore:    75,
+		},
+		{
+			description: "weights do nothing without an allocation strategy",
+			strategy:    NUMAAllocationStrategyNone,
+			weights:     map[string]int{"nvidia.com/gpu": 10},
+			gateEnabled: true,
+			// The merged hint still carries the weighted score, but with no
+			// strategy to consult it the structural tiebreak decides.
+			expectedAffinity: NewTestBitMask(0),
+			expectedScore:    25,
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.TopologyManagerPolicyAlphaOptions, tc.gateEnabled)
+
+			opts := PolicyOptions{
+				NUMAAllocationStrategy: tc.strategy,
+				NUMAScoreWeights:       tc.weights,
+			}
+			merger := NewHintMerger(commonNUMAInfoTwoNodes(), namedHintLists(resourceNames, hints), PolicySingleNumaNode, opts)
+
+			result := merger.Merge(logger)
+			if !result.NUMANodeAffinity.IsEqual(tc.expectedAffinity) {
+				t.Errorf("expected affinity %v, got %v", tc.expectedAffinity, result.NUMANodeAffinity)
+			}
+			if result.Score != tc.expectedScore {
+				t.Errorf("expected merged Score %d, got %d", tc.expectedScore, result.Score)
+			}
+		})
+	}
+}
+
+// TestPolicyMergeAppliesScoreWeights closes the loop from a provider's
+// map[string][]TopologyHint to the weighted aggregate, which the merger-level
+// tests cannot: they hand the resource names to NewHintMerger themselves,
+// whereas here the names have to survive filterProvidersHints and stay lined up
+// with the hints they came from.
+//
+// All three resources come from a single provider, so Go randomizes the order
+// filterProvidersHints reads them in. Weighting by position rather than by name
+// would therefore pick the wrong weights for most of the orderings, and show up
+// as an intermittent failure rather than a green run.
+func TestPolicyMergeAppliesScoreWeights(t *testing.T) {
+	providersHints := []map[string][]TopologyHint{
+		{
+			"cpu": {
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 75},
+				{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 25},
+			},
+			"memory": {
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 50},
+				{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 25},
+			},
+			"nvidia.com/gpu": {
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 25},
+				{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 75},
+			},
+		},
+	}
+
+	tcases := []struct {
+		description      string
+		weights          map[string]int
+		expectedAffinity bitmask.BitMask
+		expectedScore    int64
+	}{
+		{
+			// weights=nil gets defaults {cpu:1, memory:1}, only cpu/memory participate.
+			// numa0: (75+50)/2=62, numa1: (25+25)/2=25
+			description:      "equal weights consolidate onto the node the CPU and memory rate busiest",
+			weights:          defaultNUMAScoreWeights(),
+			expectedAffinity: NewTestBitMask(0),
+			expectedScore:    62,
+		},
+		{
+			description:      "amplifying the GPU consolidates onto the node it rates busiest",
+			weights:          map[string]int{"nvidia.com/gpu": 10},
+			expectedAffinity: NewTestBitMask(1),
+			expectedScore:    75,
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.TopologyManagerPolicyAlphaOptions, true)
+
+			policy := NewBestEffortPolicy(commonNUMAInfoTwoNodes(), PolicyOptions{
+				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
+				NUMAScoreWeights:       tc.weights,
+			})
+
+			result, admit := policy.Merge(logger, providersHints)
+			if !admit {
+				t.Fatal("expected the best-effort policy to admit")
+			}
+			if !result.NUMANodeAffinity.IsEqual(tc.expectedAffinity) {
+				t.Errorf("expected affinity %v, got %v", tc.expectedAffinity, result.NUMANodeAffinity)
+			}
+			if result.Score != tc.expectedScore {
+				t.Errorf("expected merged Score %d, got %d", tc.expectedScore, result.Score)
 			}
 		})
 	}
