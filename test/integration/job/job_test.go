@@ -2061,18 +2061,50 @@ func TestImmediateJobRecreation(t *testing.T) {
 // test blocks the old Pod POST, replaces the Job, waits for the informer to
 // observe the replacement UID, releases the POST, and verifies reconciliation.
 func TestJobRecreationClearsPodExpectations(t *testing.T) {
-	tests := map[string]bool{
-		"suspended replacement":   true,
-		"unsuspended replacement": false,
+	baseJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-job"},
+		Spec: batchv1.JobSpec{
+			Completions: ptr.To[int32](1),
+			Parallelism: ptr.To[int32](1),
+		},
 	}
-	for name, suspended := range tests {
+	suspendedJob := baseJob.DeepCopy()
+	suspendedJob.Spec.Suspend = new(true)
+	unsuspendedJob := baseJob.DeepCopy()
+	unsuspendedJob.Spec.Suspend = new(false)
+	tests := map[string]struct {
+		baseJob            batchv1.Job
+		replacementJob     batchv1.Job
+		wantConditionTypes []batchv1.JobConditionType
+		wantPodsStatus     podsByStatus
+	}{
+		"suspended replacement": {
+			baseJob:            *baseJob.DeepCopy(),
+			replacementJob:     *suspendedJob,
+			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuspended},
+			wantPodsStatus: podsByStatus{
+				Ready:       ptr.To[int32](0),
+				Terminating: ptr.To[int32](0),
+			},
+		},
+		"unsuspended replacement": {
+			baseJob:        *baseJob.DeepCopy(),
+			replacementJob: *unsuspendedJob,
+			wantPodsStatus: podsByStatus{
+				Active:      1,
+				Ready:       ptr.To[int32](0),
+				Terminating: ptr.To[int32](0),
+			},
+		},
+	}
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			testJobRecreationClearsPodExpectations(t, suspended)
+			testJobRecreationClearsPodExpectations(t, tc.baseJob, tc.replacementJob, tc.wantConditionTypes, tc.wantPodsStatus)
 		})
 	}
 }
 
-func testJobRecreationClearsPodExpectations(t *testing.T, suspended bool) {
+func testJobRecreationClearsPodExpectations(t *testing.T, baseJob, replacementJob batchv1.Job, wantConditionTypes []batchv1.JobConditionType, wantPodsStatus podsByStatus) {
 	closeFn, restConfig, clientSet, ns := setup(t, "recreate-job-expectations")
 	t.Cleanup(closeFn)
 
@@ -2106,18 +2138,8 @@ func testJobRecreationClearsPodExpectations(t *testing.T, suspended bool) {
 	go jc.Run(ctx, 1)
 	informerSet.WaitForCacheSync(ctx.Done())
 
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: ns.Name},
-		Spec: batchv1.JobSpec{
-			Completions: ptr.To[int32](1),
-			Parallelism: ptr.To[int32](1),
-			Template: v1.PodTemplateSpec{Spec: v1.PodSpec{
-				RestartPolicy: v1.RestartPolicyNever,
-				Containers:    []v1.Container{{Name: "main-container", Image: "foo"}},
-			}},
-		},
-	}
-	oldJob, err := clientSet.BatchV1().Jobs(ns.Name).Create(ctx, job, metav1.CreateOptions{})
+	baseJob.Namespace = ns.Name
+	oldJob, err := createJobWithDefaults(ctx, clientSet, ns.Name, &baseJob)
 	if err != nil {
 		t.Fatalf("Failed to create Job: %v", err)
 	}
@@ -2133,11 +2155,8 @@ func testJobRecreationClearsPodExpectations(t *testing.T, suspended bool) {
 	if err := jobClient.Delete(ctx, oldJob.Name, metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {
 		t.Fatalf("Failed to delete old Job: %v", err)
 	}
-	replacement := job.DeepCopy()
-	replacement.ResourceVersion = ""
-	replacement.UID = ""
-	replacement.Spec.Suspend = new(suspended)
-	newJob, err := jobClient.Create(ctx, replacement, metav1.CreateOptions{})
+	replacementJob.Namespace = ns.Name
+	newJob, err := createJobWithDefaults(ctx, clientSet, ns.Name, &replacementJob)
 	if err != nil {
 		t.Fatalf("Failed to create replacement Job: %v", err)
 	}
@@ -2152,33 +2171,10 @@ func testJobRecreationClearsPodExpectations(t *testing.T, suspended bool) {
 	close(allowPodCreate)
 
 	// Phase 3: Verify the replacement is reconciled after the old POST completes.
-	err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-		if !suspended {
-			pods, err := clientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: batchv1.JobNameLabel + "=" + newJob.Name})
-			if err != nil {
-				return false, err
-			}
-			for i := range pods.Items {
-				if metav1.IsControlledBy(&pods.Items[i], newJob) {
-					return true, nil
-				}
-			}
-			return false, nil
-		}
-		updatedJob, err := jobClient.Get(ctx, newJob.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, condition := range updatedJob.Status.Conditions {
-			if condition.Type == batchv1.JobSuspended && condition.Status == v1.ConditionTrue {
-				return true, nil
-			}
-		}
-		return false, nil
-	})
-	if err != nil {
-		t.Fatalf("Replacement Job was not reconciled after the old Job was deleted: %v", err)
+	for _, conditionType := range wantConditionTypes {
+		validateJobCondition(ctx, t, clientSet, newJob, conditionType)
 	}
+	validateJobsPodsStatusOnlyWithTimeout(ctx, t, clientSet, newJob, "after recreation", wantPodsStatus, 5*time.Second)
 }
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
