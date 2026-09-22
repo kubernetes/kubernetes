@@ -1833,3 +1833,68 @@ func TestPodDeletionEvent(t *testing.T) {
 		}
 	})
 }
+
+// TestPodEvictionRetryRaceWithTimedWorker verifies that if the durable retry queue
+// executes while the original timed worker is still in the active workers map,
+// the retry correctly deletes the pod without restarting the TolerationSeconds window.
+//
+// Regression test for race condition where processPodEvictionRetry checked
+// decision.keepExisting BEFORE item.fireAt.After(item.createdAt).
+func TestPodEvictionRetryRaceWithTimedWorker(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tolerationSeconds := int64(5)
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	pod.Spec.Tolerations = []corev1.Toleration{{
+		Key:               "testTaint1",
+		Value:             "test1",
+		Effect:            corev1.TaintEffectNoExecute,
+		TolerationSeconds: &tolerationSeconds,
+	}}
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		deleteAttempts.Add(1)
+		return true, nil, nil // Delete succeeds
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+
+	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+
+	realNow := time.Now()
+	createdAt := realNow.Add(-10 * time.Second)
+	fireAt := realNow.Add(-5 * time.Second) // 5s toleration, already expired 5s ago
+
+	// 1. Simulate the state where the timed worker has fired, but hasn't returned yet,
+	//    so it is still present in taintEvictionQueue.workers.
+	controller.taintEvictionQueue.AddWork(ctx, NewWorkArgsWithUID(podNamespacedName.Name, podNamespacedName.Namespace, pod.UID), createdAt, fireAt)
+
+	// 2. The retry item (created by the timed worker) is processed.
+	item := podEvictionItem{
+		podRef:    NamespacedObject{NamespacedName: podNamespacedName, UID: pod.UID},
+		createdAt: createdAt,
+		fireAt:    fireAt,
+	}
+
+	// This direct call represents the podEvictionWorker processing the retry asynchronously
+	// while the timed worker is still in the map.
+	err := controller.processPodEvictionRetry(ctx, item)
+	if err != nil {
+		t.Fatalf("processPodEvictionRetry failed: %v", err)
+	}
+
+	if got := deleteAttempts.Load(); got != 1 {
+		t.Fatalf("Expected exactly 1 delete attempt, got %d. The retry was incorrectly discarded due to the visible timed worker.", got)
+	}
+}

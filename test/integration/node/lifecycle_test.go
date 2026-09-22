@@ -3,7 +3,7 @@ Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
-You may obtain a copy of the License a
+You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
 
@@ -38,6 +38,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	"k8s.io/kubernetes/pkg/features"
@@ -121,7 +122,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)
 			testCtx := testutils.InitTestAPIServer(t, "taint-no-execute", nil)
-			cs := testCtx.ClientSe
+			cs := testCtx.ClientSet
 
 			// Build clientset and informers for controllers.
 			externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
@@ -230,7 +231,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 	}
 	tests := []struct {
 		name                                  string
-		nodeTaints                            []v1.Tain
+		nodeTaints                            []v1.Taint
 		nodeConditions                        []v1.NodeCondition
 		pod                                   *v1.Pod
 		tolerationSeconds                     int64
@@ -344,7 +345,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			podTolerations.SetExternalKubeClientSet(externalClientset)
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)
 
-			cs := testCtx.ClientSe
+			cs := testCtx.ClientSet
 
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(
@@ -476,7 +477,7 @@ func newHandlerForTest() (*defaulttolerationseconds.Plugin, error) {
 
 type failDeleteAdmission struct {
 	*admission.Handler
-	failures atomic.Int32
+	failures *atomic.Int32
 }
 
 func (f *failDeleteAdmission) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
@@ -512,7 +513,10 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	}
 
 	// Create our custom admission controller that rejects the first 5 delete attempts
-	admissionCtrl := &failDeleteAdmission{Handler: admission.NewHandler(admission.Delete)}
+	admissionCtrl := &failDeleteAdmission{
+		Handler:  admission.NewHandler(admission.Delete),
+		failures: &atomic.Int32{},
+	}
 
 	// Pass the admission controller to the real test API server
 	testCtx := testutils.InitTestAPIServer(t, "taint-eviction-retry", admissionCtrl)
@@ -523,6 +527,12 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	externalClientConfig.QPS = -1
 	externalClientset := clientset.NewForConfigOrDie(externalClientConfig)
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, 0)
+
+	if err := controller.AddPodNodeNameIndexer(
+		externalInformers.Core().V1().Pods().Informer(),
+	); err != nil {
+		t.Fatalf("Failed to add Pod node name indexer: %v", err)
+	}
 
 	tm, err := tainteviction.New(
 		testCtx.Ctx,
@@ -621,7 +631,7 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	// attempt to delete the pod 5 times in a quick burst. Our admission plugin
 	// will reject all 5 attempts. The controller will then hand off the eviction
 	// to the rate-limited durable retry queue (podEvictionQueue).
-	// We wait up to 30 seconds for the eventual successful deletion (the 6th attemp
+	// We wait up to 30 seconds for the eventual successful deletion (the 6th attempt
 	// or later) via the durable retry queue.
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 30*time.Second, true,
 		testutils.PodIsGettingEvicted(cs, testCtx.NS.Name, createdPod.Name)); err != nil {
