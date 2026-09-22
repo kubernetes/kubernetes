@@ -654,7 +654,12 @@ func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod 
 	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
 	// If any handler rejects, the pod is rejected.
-	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods, Operation: operation}
+	attrs := &lifecycle.PodAdmitAttributes{
+		Pod:                 pod,
+		OtherPods:           allocatedPods,
+		Operation:           operation,
+		PreviouslyAllocated: m.HasPodAllocatedResources(pod.UID),
+	}
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
 			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation)

@@ -931,3 +931,26 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestDeclaredFeaturesAdmitHandlerPreviouslyAllocated(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	for _, previouslyAllocated := range []bool{false, true} {
+		t.Run(strconv.FormatBool(previouslyAllocated), func(t *testing.T) {
+			var got bool
+			feature := ndftesting.NewMockFeature(t)
+			feature.SetName("FeatureA")
+			feature.SetMaxVersion(nil)
+			feature.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool {
+				got = podInfo.PreviouslyAdmitted
+				return false
+			})
+			framework := ndf.New([]ndf.Feature{feature})
+			handler := NewDeclaredFeaturesAdmitHandler(framework, framework.MustMapSorted(nil), version.MustParseSemantic("1.30.0"))
+
+			result := handler.Admit(tCtx, &PodAdmitAttributes{Pod: &v1.Pod{}, PreviouslyAllocated: previouslyAllocated})
+
+			require.True(t, result.Admit)
+			require.Equal(t, previouslyAllocated, got)
+		})
+	}
+}

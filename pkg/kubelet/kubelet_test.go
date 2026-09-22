@@ -2800,6 +2800,59 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
 }
 
+type delegatingAdmitHandler struct {
+	delegate lifecycle.PodAdmitHandler
+}
+
+func (d *delegatingAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	return d.delegate.Admit(ctx, attrs)
+}
+
+func TestHandlePodAdditionsReadmissionSkipsDeclaredFeatureCheck(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+
+	feature := ndftesting.NewMockFeature(t)
+	feature.SetName("FeatureA")
+	feature.SetMaxVersion(nil)
+	feature.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool { return !podInfo.PreviouslyAdmitted })
+	framework := ndf.New([]ndf.Feature{feature})
+	version := utilversion.MustParse("1.35.0")
+	withFeature := lifecycle.NewDeclaredFeaturesAdmitHandler(framework, framework.MustMapSorted([]string{"FeatureA"}), version)
+	withoutFeature := lifecycle.NewDeclaredFeaturesAdmitHandler(framework, framework.MustMapSorted(nil), version)
+
+	handler := &delegatingAdmitHandler{delegate: withFeature}
+	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "111", Name: "podA", Namespace: "foo"}}
+	kl.HandlePodAdditions(tCtx, []*v1.Pod{pod})
+	checkPodStatus(t, kl, pod, v1.PodPending)
+	require.True(t, kl.allocationManager.HasPodAllocatedResources(pod.UID))
+
+	// Kubelet "restarts" without the feature: the allocation checkpoint survives, the pod is re-added.
+	handler.delegate = withoutFeature
+	kl.HandlePodAdditions(tCtx, []*v1.Pod{pod})
+	checkPodStatus(t, kl, pod, v1.PodPending)
+
+	newPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "222", Name: "podB", Namespace: "foo"}}
+	kl.HandlePodAdditions(tCtx, []*v1.Pod{newPod})
+	checkPodStatus(t, kl, newPod, v1.PodFailed)
+	status, _ := kl.statusManager.GetPodStatus(newPod.UID)
+	require.Equal(t, lifecycle.PodFeatureUnsupported, status.Reason)
+}
+
 // Test verifies that HandlePodAdditions only tracks pod certificates for pods
 // that pass admission, not for pods that are rejected.
 // See https://github.com/kubernetes/kubernetes/issues/138920

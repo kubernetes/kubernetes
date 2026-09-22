@@ -256,7 +256,7 @@ func NewDeclaredFeaturesAdmitHandler(nodeDeclaredFeaturesHelper *ndf.Framework, 
 func (c *declaredFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	pod := attrs.Pod
 
-	podInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
+	podInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status, PreviouslyAdmitted: attrs.PreviouslyAllocated}
 	reqs, err := c.ndfFramework.InferForPodScheduling(podInfo, c.version)
 	if err != nil {
 		return PodAdmitResult{

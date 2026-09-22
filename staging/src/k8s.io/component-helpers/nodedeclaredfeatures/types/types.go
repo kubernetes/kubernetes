@@ -31,6 +31,10 @@ type PodInfo struct {
 	// when this struct represents a pod not yet created.
 	// (e.g., during scheduling).
 	Status *v1.PodStatus
+	// PreviouslyAdmitted is true when the kubelet holds a persisted allocation for this
+	// pod from an earlier admission (e.g. the pod is being re-admitted after a kubelet
+	// restart). It is always false during scheduling.
+	PreviouslyAdmitted bool
 	// Add other ancillary resources here in the future as needed.
 	// Example: ResourceClaims []*v1.ResourceClaim
 }

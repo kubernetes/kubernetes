@@ -1676,6 +1676,61 @@ func (a *testPodAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAdmit
 	return a.admitFunc(attrs)
 }
 
+func TestAddPodPreviouslyAllocated(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	var got bool
+	handler := &testPodAdmitHandler{admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+		got = attrs.PreviouslyAllocated
+		return lifecycle.PodAdmitResult{Admit: true}
+	}}
+	am := NewInMemoryManager(logger, nil, nil, func() []*v1.Pod { return nil }, nil, nil, nil)
+	am.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod", Name: "pod"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "c1"}}},
+	}
+
+	// first add
+	ok, _, _ := am.AddPod(context.TODO(), nil, pod)
+	require.True(t, ok)
+	assert.False(t, got)
+
+	// second add
+	ok, _, _ = am.AddPod(context.TODO(), nil, pod)
+	require.True(t, ok)
+	assert.True(t, got)
+}
+
+func TestAddPodPreviouslyAllocatedAfterRestart(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	checkpointDir := t.TempDir()
+	var got bool
+	handler := &testPodAdmitHandler{admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+		got = attrs.PreviouslyAllocated
+		return lifecycle.PodAdmitResult{Admit: true}
+	}}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod", Name: "pod"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "c1"}}},
+	}
+
+	am1 := NewManager(checkpointDir, nil, nil, func() []*v1.Pod { return nil }, nil, nil, nil, logger)
+	am1.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
+	ok, _, _ := am1.AddPod(context.TODO(), nil, pod)
+	require.True(t, ok)
+	assert.False(t, got)
+
+	// Create new AllocationManager using same checkpoint directory,
+	// so checkpoint is restored, simulating restart of a kubelet.
+	am2 := NewManager(checkpointDir, nil, nil, func() []*v1.Pod { return nil }, nil, nil, nil, logger)
+	am2.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
+	ok, _, _ = am2.AddPod(context.TODO(), nil, pod)
+	require.True(t, ok)
+	assert.True(t, got)
+}
+
 func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
