@@ -61,6 +61,7 @@ type staticPolicy struct {
 	// Note that the restartable init container memory is not included here,
 	// because it is not reusable.
 	initContainersReusableMemory reusableMemory
+	maxMemoryDrift               uint64
 	// skipExtend, when true, disables extending the Topology Manager hint to
 	// additional NUMA nodes even when the hint does not, by itself, satisfy the
 	// container's memory request. The Linux static policy always leaves it false.
@@ -1123,19 +1124,28 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 
 	// calculate all memory assigned to containers
 	expectedMachineState := p.getDefaultMachineState()
+	var fitErr error
 	for pod, container := range memoryAssignments {
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
 			if podBlocks := s.GetPodMemoryBlocks(pod); len(podBlocks) > 0 {
-				if err := p.updateExpectedMachineState(expectedMachineState, podBlocks, pod, ""); err != nil {
+				fits, err := p.updateExpectedMachineState(expectedMachineState, podBlocks, pod, "")
+				if err != nil {
 					return err
+				}
+				if !fits && fitErr == nil {
+					fitErr = fmt.Errorf("[memorymanager] (pod: %s) the memory assignment does not fit the machine state", pod)
 				}
 				continue
 			}
 		}
 
 		for containerName, blocks := range container {
-			if err := p.updateExpectedMachineState(expectedMachineState, blocks, pod, containerName); err != nil {
+			fits, err := p.updateExpectedMachineState(expectedMachineState, blocks, pod, containerName)
+			if err != nil {
 				return err
+			}
+			if !fits && fitErr == nil {
+				fitErr = fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment does not fit the machine state", pod, containerName)
 			}
 		}
 	}
@@ -1145,19 +1155,28 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	// - adding or removing physical memory bank from the node
 	// - change of kubelet system-reserved, kube-reserved or pre-reserved-memory-zone parameters
 	if !areMachineStatesEqual(logger, machineState, expectedMachineState) {
-		return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+		if p.maxMemoryDrift > 0 && fitErr != nil {
+			return fitErr
+		}
+		drift, ok := isTolerableMachineStateDrift(logger, machineState, expectedMachineState, p.maxMemoryDrift)
+		if !ok {
+			return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+		}
+		logger.Info("Tolerating a small NUMA node memory drift and re-baselining the memory manager state", "nodeDriftBytes", drift, "maxDriftBytes", p.maxMemoryDrift)
+		s.SetMachineState(expectedMachineState)
 	}
 
 	return nil
 }
 
-func (p *staticPolicy) updateExpectedMachineState(expectedMachineState state.NUMANodeMap, blocks []state.Block, podUID, containerName string) error {
+func (p *staticPolicy) updateExpectedMachineState(expectedMachineState state.NUMANodeMap, blocks []state.Block, podUID, containerName string) (bool, error) {
+	fits := true
 	for _, b := range blocks {
 		requestedSize := b.Size
 		for _, nodeID := range b.NUMAAffinity {
 			nodeState, ok := expectedMachineState[nodeID]
 			if !ok {
-				return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses the NUMA that does not exist", podUID, containerName)
+				return false, fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses the NUMA that does not exist", podUID, containerName)
 			}
 
 			nodeState.NumberOfAssignments++
@@ -1165,7 +1184,7 @@ func (p *staticPolicy) updateExpectedMachineState(expectedMachineState state.NUM
 
 			memoryState, ok := nodeState.MemoryMap[b.Type]
 			if !ok {
-				return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses memory resource that does not exist", podUID, containerName)
+				return false, fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses memory resource that does not exist", podUID, containerName)
 			}
 
 			if requestedSize == 0 {
@@ -1190,8 +1209,12 @@ func (p *staticPolicy) updateExpectedMachineState(expectedMachineState state.NUM
 			memoryState.Reserved += memoryState.Free
 			memoryState.Free = 0
 		}
+
+		if requestedSize > 0 {
+			fits = false
+		}
 	}
-	return nil
+	return fits, nil
 }
 
 func areMachineStatesEqual(logger klog.Logger, ms1, ms2 state.NUMANodeMap) bool {
@@ -1272,6 +1295,88 @@ func areMemoryStatesEqual(logger klog.Logger, memoryState1, memoryState2 *state.
 		return false
 	}
 	return true
+}
+
+func isTolerableMachineStateDrift(logger klog.Logger, stored, expected state.NUMANodeMap, maxDrift uint64) (map[int]uint64, bool) {
+	if maxDrift == 0 || len(stored) != len(expected) {
+		return nil, false
+	}
+	drift := make(map[int]uint64, len(stored))
+	for nodeID, storedNode := range stored {
+		expectedNode, ok := expected[nodeID]
+		if !ok {
+			return nil, false
+		}
+		if storedNode.NumberOfAssignments != expectedNode.NumberOfAssignments {
+			return nil, false
+		}
+		if !areGroupsEqual(storedNode.Cells, expectedNode.Cells) {
+			return nil, false
+		}
+		if len(storedNode.MemoryMap) != len(expectedNode.MemoryMap) {
+			return nil, false
+		}
+		for resourceName, storedMem := range storedNode.MemoryMap {
+			expectedMem, ok := expectedNode.MemoryMap[resourceName]
+			if !ok {
+				return nil, false
+			}
+			if storedMem.SystemReserved != expectedMem.SystemReserved {
+				return nil, false
+			}
+			if storedMem.Free+storedMem.Reserved != storedMem.Allocatable {
+				logger.Info("Recorded memory table is not internally consistent, not tolerating the drift", "node", nodeID, "resource", resourceName, "storedMemoryState", *storedMem)
+				return nil, false
+			}
+			storedGroup, ok := groupMemoryTotals(stored, storedNode.Cells, resourceName)
+			if !ok {
+				return nil, false
+			}
+			expectedGroup, ok := groupMemoryTotals(expected, storedNode.Cells, resourceName)
+			if !ok {
+				return nil, false
+			}
+			if storedGroup.Reserved != expectedGroup.Reserved {
+				logger.Info("Recorded reserved memory of the NUMA group does not match the assignments, not tolerating the drift", "node", nodeID, "resource", resourceName, "storedReserved", storedGroup.Reserved, "expectedReserved", expectedGroup.Reserved)
+				return nil, false
+			}
+			if resourceName != v1.ResourceMemory {
+				if storedMem.TotalMemSize != expectedMem.TotalMemSize || storedMem.Allocatable != expectedMem.Allocatable || storedGroup.Free != expectedGroup.Free {
+					return nil, false
+				}
+				continue
+			}
+			if storedMem.TotalMemSize-storedMem.Allocatable != expectedMem.TotalMemSize-expectedMem.Allocatable {
+				logger.Info("Recorded allocatable memory does not follow the total memory of the NUMA node, not tolerating the drift", "node", nodeID, "storedMemoryState", *storedMem, "expectedMemoryState", *expectedMem)
+				return nil, false
+			}
+			nodeDrift := max(storedMem.TotalMemSize, expectedMem.TotalMemSize) - min(storedMem.TotalMemSize, expectedMem.TotalMemSize)
+			if nodeDrift > maxDrift {
+				logger.Info("NUMA node memory drift exceeds the tolerated bound, treating it as a real topology change",
+					"node", nodeID, "storedTotalMemSize", storedMem.TotalMemSize, "expectedTotalMemSize", expectedMem.TotalMemSize, "maxDriftBytes", maxDrift)
+				return nil, false
+			}
+			drift[nodeID] = nodeDrift
+		}
+	}
+	return drift, true
+}
+
+func groupMemoryTotals(machineState state.NUMANodeMap, cells []int, resourceName v1.ResourceName) (state.MemoryTable, bool) {
+	totals := state.MemoryTable{}
+	for _, nodeID := range cells {
+		nodeState, ok := machineState[nodeID]
+		if !ok {
+			return totals, false
+		}
+		memoryState, ok := nodeState.MemoryMap[resourceName]
+		if !ok {
+			return totals, false
+		}
+		totals.Reserved += memoryState.Reserved
+		totals.Free += memoryState.Free
+	}
+	return totals, true
 }
 
 func (p *staticPolicy) getDefaultMachineState() state.NUMANodeMap {
