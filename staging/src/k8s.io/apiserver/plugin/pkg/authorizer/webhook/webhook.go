@@ -32,7 +32,6 @@ import (
 	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -315,7 +314,7 @@ func (w *WebhookAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attr a
 		return authorizer.ConditionsAwareDecisionDeny(r.Status.Reason, fmt.Errorf("webhook subject access review returned both allow and deny response"))
 	}
 
-	if errs := validateSubjectAccessReviewCreate(ctx, r); len(errs) > 0 {
+	if errs := authorizationvalidation.CombinedValidateSubjectAccessReviewCreate(ctx, r); len(errs) > 0 {
 		return w.conditionsAwareFailureDecision(errs.ToAggregate())
 	}
 
@@ -497,7 +496,7 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decisionToEv
 		return decisionToEvaluate.FailureDecision(), "failed closed", field.Invalid(field.NewPath("response", "uid"), result.Response.UID, fmt.Sprintf("mismatch, expected %q that was given in request.uid", evaluateRequestUUID))
 	}
 
-	if errs := validateAuthorizationConditionsReviewCreate(ctx, r); len(errs) > 0 {
+	if errs := authorizationvalidation.CombinedValidateAuthorizationConditionsReviewCreate(ctx, r); len(errs) > 0 {
 		return decisionToEvaluate.FailureDecision(), "failed closed", errs.ToAggregate()
 	}
 
@@ -520,40 +519,6 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decisionToEv
 	default:
 		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("unrecognized decisionToEvaluate type %q", result.Response.Decision.Type)
 	}
-}
-
-func validateSubjectAccessReviewCreate(ctx context.Context, sar *authorizationv1.SubjectAccessReview) (errs field.ErrorList) {
-	defer func() {
-		if r := recover(); r != nil {
-			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during SAR validation: %v", r)))
-		}
-	}()
-	errs = authorizationvalidation.ValidateSubjectAccessReview(sar)
-
-	op := operation.Operation{
-		Type:    operation.Create,
-		Options: authorizationvalidation.GetDeclarativeValidationOptions(),
-	}
-	declarativeErrs := authorizationv1.Validate_SubjectAccessReview(ctx, op, nil /* fldPath */, sar, nil)
-	errs = append(errs, declarativeErrs...)
-	return errs
-}
-
-func validateAuthorizationConditionsReviewCreate(ctx context.Context, acr *authorizationv1alpha1.AuthorizationConditionsReview) (errs field.ErrorList) {
-	defer func() {
-		if r := recover(); r != nil {
-			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during ACR validation: %v", r)))
-		}
-	}()
-	errs = authorizationvalidation.ValidateAuthorizationConditionsReview(acr)
-
-	op := operation.Operation{
-		Type:    operation.Create,
-		Options: authorizationvalidation.GetDeclarativeValidationOptions(),
-	}
-	declarativeErrs := authorizationv1alpha1.Validate_AuthorizationConditionsReview(ctx, op, nil /* fldPath */, acr, nil)
-	errs = append(errs, declarativeErrs...)
-	return errs
 }
 
 func resourceAttributesFrom(attr authorizer.Attributes) *authorizationv1.ResourceAttributes {

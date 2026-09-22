@@ -17,18 +17,17 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
-	"strings"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/validate/content"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -77,7 +76,7 @@ func ValidateSelfSubjectAccessReviewSpec(spec authorizationv1.SelfSubjectAccessR
 func validateAuthorizationOptions(ao *authorizationv1.AuthorizationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// Only run the validation for HandledDecisionTypes when it is set, declarative validation already covers the "handledDecisionTypes is required case"
-	if len(ao.HandledDecisionTypes) != 0 {
+	if 0 < len(ao.HandledDecisionTypes) && len(ao.HandledDecisionTypes) <= 32 {
 		if !sets.New(ao.HandledDecisionTypes...).IsSuperset(authorizationv1.UnconditionalAuthorizationDecisionTypes()) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("handledDecisionTypes"), ao.HandledDecisionTypes, "set must at least contain {Allow, Deny, NoOpinion}"))
 		}
@@ -129,8 +128,6 @@ func ValidateSubjectAccessReviewStatus(status authorizationv1.SubjectAccessRevie
 			}
 			// unrecognized modes are covered by declarative validation
 		}
-
-		allErrs = append(allErrs, ValidateConditionsAwareDecision(status.ConditionalDecision, fldPath.Child("conditionalDecision"))...)
 	}
 
 	return allErrs
@@ -264,90 +261,33 @@ func ValidateAuthorizationConditionsReview(acr *authorizationv1alpha1.Authorizat
 // ValidateAuthorizationConditionsRequest validates a AuthorizationConditionsRequest and returns an
 // ErrorList with any errors.
 func ValidateAuthorizationConditionsRequest(req *authorizationv1alpha1.AuthorizationConditionsRequest, fldPath *field.Path) field.ErrorList {
-	allErrs := ValidateConditionsAwareDecision(&req.Decision, fldPath.Child("decision"))
-	// TODO(luxas): We could consider validating the AdmissionRequest here, either declaratively or manually. However, the original AdmissionRequest does not have any validation.
+	var allErrs field.ErrorList
+	// conditionalDecision does not need any handwritten validation.
+	// That a ConditionsMap has between 1 and 128 conditions is enforced by authorizer.ConditionsAwareDecisionConditionsMap(...)
+
+	// Note: One could consider validating request.admissionRequest here, either declaratively or manually.
+	// However, the original AdmissionRequest does not have any validation.
 	return allErrs
 }
 
 // ValidateAuthorizationConditionsResponse validates a AuthorizationConditionsResponse and returns an
 // ErrorList with any errors.
 func ValidateAuthorizationConditionsResponse(resp *authorizationv1alpha1.AuthorizationConditionsResponse, fldPath *field.Path) field.ErrorList {
-	allErrs := ValidateConditionsAwareDecision(&resp.Decision, fldPath.Child("decision"))
-	return allErrs
-}
+	var allErrs field.ErrorList
 
-// ValidateConditionsAwareDecision validates a ConditionsAwareDecision and returns an
-// ErrorList with any errors. Only the fields not fully covered by Standard declarative
-// validation are enforced here; every emitted error mirrors a declarative Beta rule and
-// is marked CoveredByDeclarative so the equivalence check treats them as one.
-func ValidateConditionsAwareDecision(decision *authorizationv1.ConditionsAwareDecision, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if decision.ConditionsMap != nil {
-		allErrs = append(allErrs, ValidateConditionsMap(decision.ConditionsMap, fldPath.Child("conditionsMap"))...)
-	}
-	// TODO(luxas): Descend into unions as well
-	return allErrs
-}
-
-// ValidateConditionsMap validates a ConditionsMap by descending into each condition. It
-// only fires Beta-shadowed errors (via ValidateCondition); the Standard rules on the
-// slices themselves are already covered by declarative validation in every mode.
-func ValidateConditionsMap(conditionsMap *authorizationv1.ConditionsMap, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	for i := range conditionsMap.DenyConditions {
-		allErrs = append(allErrs, ValidateCondition(&conditionsMap.DenyConditions[i], fldPath.Child("denyConditions").Index(i))...)
-	}
-	for i := range conditionsMap.NoOpinionConditions {
-		allErrs = append(allErrs, ValidateCondition(&conditionsMap.NoOpinionConditions[i], fldPath.Child("noOpinionConditions").Index(i))...)
-	}
-	for i := range conditionsMap.AllowConditions {
-		allErrs = append(allErrs, ValidateCondition(&conditionsMap.AllowConditions[i], fldPath.Child("allowConditions").Index(i))...)
-	}
-
-	// TODO(luxas): Consider validating that the length of all conditions <= MaxConditions. However, that is already validated in the
-	// core framework.
-
-	return allErrs
-}
-
-// ValidateCondition mirrors the Beta declarative rules on Condition (MaxBytes on
-// condition and description) so equivalence tests can rely on the errors appearing
-// when the DeclarativeValidationBeta gate is off. Each error is CoveredByDeclarative
-// so the composition layer folds it with its declarative counterpart.
-func ValidateCondition(condition *authorizationv1.Condition, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	// TODO(luxas): Preferably support IsDomainPrefixedKey directly in declarative validation instead of this manual validation.
-	// The required-value and label-key format checks are already performed by declarative validation.
-	// This handwritten validation is STRICTER: it additionally enforces the domain-prefix separator ("/"),
-	// which declarative label-key validation does not cover. We only fire it when the key is otherwise a
-	// valid label key so we do not double-emit the format error already reported by declarative.
-	allErrs = append(allErrs, validateDomainPrefixSeparator(fldPath.Child("id"), condition.ID)...)
-	allErrs = append(allErrs, validateDomainPrefixSeparator(fldPath.Child("type"), condition.Type)...)
-
-	if l := len(condition.Condition); l > authorizer.MaxConditionBytes {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("condition"), condition.Condition, authorizer.MaxConditionBytes).WithOrigin("maxBytes").MarkCoveredByDeclarative())
-	}
-	if l := len(condition.Description); l > authorizer.MaxConditionDescriptionBytes {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("description"), condition.Description, authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes").MarkCoveredByDeclarative())
+	// Declarative validation covers type being required, only validate if set
+	if len(resp.Decision.Type) != 0 {
+		switch resp.Decision.Type {
+		case authorizationv1.ConditionsAwareDecisionTypeDeny,
+			authorizationv1.ConditionsAwareDecisionTypeNoOpinion,
+			authorizationv1.ConditionsAwareDecisionTypeAllow:
+			// ok
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("decision", "type"), resp.Decision.Type, "currently must evaluate to an unconditional decision"))
+		}
 	}
 
 	return allErrs
-}
-
-// validateDomainPrefixSeparator asserts that key has a domain-prefix separator ("/"),
-// but only when key is otherwise a valid label key. Empty keys and label-key format
-// violations are handled by declarative validation and are skipped here to avoid
-// emitting duplicate errors from handwritten and declarative validation.
-func validateDomainPrefixSeparator(fldPath *field.Path, key string) field.ErrorList {
-	if len(key) == 0 || len(content.IsLabelKey(key)) != 0 {
-		return nil
-	}
-	if len(strings.Split(key, "/")) != 2 {
-		return field.ErrorList{field.Invalid(fldPath, key, `must be a domain-prefixed key (such as "acme.io/foo")`)}
-	}
-	return nil
 }
 
 // GetDeclarativeValidationOptions returns the options used in the authorization.k8s.io API group
@@ -355,4 +295,40 @@ func GetDeclarativeValidationOptions() map[string]bool {
 	return map[string]bool{
 		string(genericfeatures.ConditionalAuthorization): utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization),
 	}
+}
+
+// CombinedValidateSubjectAccessReviewCreate calls both the handwritten and declarative validations for SubjectAccessReview.
+func CombinedValidateSubjectAccessReviewCreate(ctx context.Context, sar *authorizationv1.SubjectAccessReview) (errs field.ErrorList) {
+	defer func() {
+		if r := recover(); r != nil {
+			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during SAR validation: %v", r)))
+		}
+	}()
+	errs = ValidateSubjectAccessReview(sar)
+
+	op := operation.Operation{
+		Type:    operation.Create,
+		Options: GetDeclarativeValidationOptions(),
+	}
+	declarativeErrs := authorizationv1.Validate_SubjectAccessReview(ctx, op, nil /* fldPath */, sar, nil)
+	errs = append(errs, declarativeErrs...)
+	return errs
+}
+
+// CombinedValidateAuthorizationConditionsReviewCreate calls both the handwritten and declarative validations for AuthorizationConditionsReview.
+func CombinedValidateAuthorizationConditionsReviewCreate(ctx context.Context, acr *authorizationv1alpha1.AuthorizationConditionsReview) (errs field.ErrorList) {
+	defer func() {
+		if r := recover(); r != nil {
+			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during ACR validation: %v", r)))
+		}
+	}()
+	errs = ValidateAuthorizationConditionsReview(acr)
+
+	op := operation.Operation{
+		Type:    operation.Create,
+		Options: GetDeclarativeValidationOptions(),
+	}
+	declarativeErrs := authorizationv1alpha1.Validate_AuthorizationConditionsReview(ctx, op, nil /* fldPath */, acr, nil)
+	errs = append(errs, declarativeErrs...)
+	return errs
 }

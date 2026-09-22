@@ -296,7 +296,7 @@ type SubjectAccessReviewStatus struct {
 	// The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or
 	// ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented
 	// with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone.
-	// May only be set if spec.conditionalAuthorization is non-null.
+	// May only be set if spec.authorizationOptions.handledDecisionTypes includes `ConditionsMap` and `Union`.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
 	// +k8s:optional
@@ -411,7 +411,7 @@ type AuthorizationOptions struct {
 	// handledDecisionTypes specifies what decision types the client can handle in the context it is in.
 	// Currently valid values are:
 	// - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or
-	// - [Allow, Deny, NoOpinion, ConditionsMap, Union] (for conditions-aware clients)
+	// - [Allow, Deny, NoOpinion, ConditionsMap, Union, ...] (for conditions-aware clients)
 	// If the authorizer would like to return conditions, but the client does not opt in to handle those here,
 	//   the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()
 	//   (Deny if any Deny conditions were present, otherwise NoOpinion).
@@ -423,6 +423,7 @@ type AuthorizationOptions struct {
 	// +k8s:required
 	// +required
 	// +k8s:eachVal=+k8s:opaqueType
+	// +k8s:maxItems=32
 	HandledDecisionTypes []ConditionsAwareDecisionType `json:"handledDecisionTypes" protobuf:"bytes,1,rep,name=handledDecisionTypes"`
 }
 
@@ -433,7 +434,7 @@ type Condition struct {
 	// that authored it and ConditionsMap it is part of. Validated as a Kubernetes label key.
 	// Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
 	// +k8s:required
-	// +k8s:format=k8s-label-key
+	// +k8s:format=k8s-prefixed-label-key
 	// +required
 	ID string `json:"id" protobuf:"bytes,1,opt,name=id"`
 
@@ -441,7 +442,7 @@ type Condition struct {
 	// It is a pure, deterministic function from ConditionsData to a boolean (or error).
 	// Might or might not be human-readable.
 	// Optional, if the ID alone is enough for the authorizer to know how to evaluate the condition.
-	// +k8s:beta=+k8s:maxBytes=10240
+	// +k8s:maxBytes=10240
 	// +k8s:optional
 	// +optional
 	Condition string `json:"condition,omitempty" protobuf:"bytes,2,opt,name=condition"`
@@ -450,14 +451,14 @@ type Condition struct {
 	// Should be formatted as a Kubernetes label key.
 	// Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
 	// Optional. Can be omitted if the authorizer already knows how to evaluate the condition.
-	// +k8s:format=k8s-label-key
+	// +k8s:format=k8s-prefixed-label-key
 	// +k8s:optional
 	// +optional
 	Type string `json:"type,omitempty" protobuf:"bytes,3,opt,name=type"`
 
 	// description is an optional human-friendly description that can be shown
 	// as an error message or for debugging. Optional.
-	// +k8s:beta=+k8s:maxBytes=1024
+	// +k8s:maxBytes=1024
 	// +k8s:optional
 	// +optional
 	Description string `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`

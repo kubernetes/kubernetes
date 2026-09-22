@@ -227,7 +227,7 @@ type SubjectAccessReviewStatus struct {
 	// The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or
 	// ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented
 	// with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone.
-	// May only be set if spec.conditionalAuthorization is non-null.
+	// May only be set if spec.authorizationOptions.handledDecisionTypes includes `ConditionsMap` and `Union`.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
 	// +featureGate=ConditionalAuthorization
@@ -309,7 +309,7 @@ type AuthorizationOptions struct {
 	// HandledDecisionTypes specifies what decision types the client can handle in the context it is in.
 	// Currently valid values are:
 	// - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or
-	// - [Allow, Deny, NoOpinion, ConditionsMap, Union] (for conditions-aware clients)
+	// - [Allow, Deny, NoOpinion, ConditionsMap, Union, ...] (for conditions-aware clients)
 	// If the authorizer would like to return conditions, but the client does not opt in to handle those here,
 	//   the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()
 	//   (Deny if any Deny conditions were present, otherwise NoOpinion).
@@ -501,7 +501,7 @@ type AuthorizationConditionsRequest struct {
 	Decision ConditionsAwareDecision
 
 	// AdmissionRequest may contain additional information for evaluating the conditions.
-	// +optional
+	// +required
 	AdmissionRequest *admission.AdmissionRequest
 }
 
@@ -511,7 +511,7 @@ type AuthorizationConditionsResponse struct {
 	// This must be copied over from the corresponding AuthorizationConditionsRequest.
 	// It is possible that the same request content (except uid) is sent to the
 	// authorizer multiple times.
-	// +optional
+	// +required
 	UID types.UID
 
 	// Decision contains the authorizer's decision after seeing the data.

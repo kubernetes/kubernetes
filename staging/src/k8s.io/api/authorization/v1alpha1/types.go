@@ -56,9 +56,8 @@ type AuthorizationConditionsRequest struct {
 	Decision authorizationv1.ConditionsAwareDecision `json:"decision" protobuf:"bytes,1,opt,name=decision"`
 
 	// admissionRequest may contain additional information for evaluating the conditions.
-	// +k8s:unionMember
-	// +k8s:optional
-	// +optional
+	// +k8s:required
+	// +required
 	AdmissionRequest *admissionv1.AdmissionRequest `json:"admissionRequest,omitempty" protobuf:"bytes,2,opt,name=admissionRequest"`
 }
 
@@ -73,6 +72,7 @@ type AuthorizationConditionsResponse struct {
 	UID types.UID `json:"uid" protobuf:"bytes,1,opt,name=uid"`
 
 	// decision contains the authorizer's decision after seeing the data.
+	// Currently, this must return an unconditional decision, that is, one of {Allow, Deny, NoOpinion}.
 	// +required
 	Decision authorizationv1.ConditionsAwareDecision `json:"decision" protobuf:"bytes,2,opt,name=decision"`
 }
