@@ -381,9 +381,6 @@ func TestValidatePodGroup(t *testing.T) {
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg2").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
 			},
-			profiles: profile.Map{
-				"": nil,
-			},
 			enablePodGroupPreemptionPolicy: true,
 			enableCompositePodGroup:        true,
 			wantErr:                        "",
@@ -401,9 +398,6 @@ func TestValidatePodGroup(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg2").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
-			},
-			profiles: profile.Map{
-				"": nil,
 			},
 			enablePodGroupPreemptionPolicy: false,
 			enableCompositePodGroup:        true,
@@ -423,9 +417,6 @@ func TestValidatePodGroup(t *testing.T) {
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg2").Priority(10).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			},
-			profiles: profile.Map{
-				"": nil,
-			},
 			enablePodGroupPreemptionPolicy: true,
 			enableCompositePodGroup:        true,
 			wantErr:                        "",
@@ -443,9 +434,6 @@ func TestValidatePodGroup(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg2").Priority(10).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
-			},
-			profiles: profile.Map{
-				"": nil,
 			},
 			enablePodGroupPreemptionPolicy: true,
 			enableCompositePodGroup:        true,
@@ -465,9 +453,6 @@ func TestValidatePodGroup(t *testing.T) {
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg2").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
 			},
-			profiles: profile.Map{
-				"": nil,
-			},
 			enablePodGroupPreemptionPolicy: true,
 			enableCompositePodGroup:        true,
 			wantErr:                        `all pod groups in a hierarchy should have the same preemption policy as the root pod group's preemption policy, got PreemptLowerPriority ("podgroup//pg1") and Never ("compositepodgroup//cpg-root")`,
@@ -485,9 +470,6 @@ func TestValidatePodGroup(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg2").Priority(10).PreemptionPolicy(v1.PreemptLowerPriority).Obj(), // different
-			},
-			profiles: profile.Map{
-				"": nil,
 			},
 			enablePodGroupPreemptionPolicy: true,
 			enableCompositePodGroup:        true,
@@ -507,9 +489,6 @@ func TestValidatePodGroup(t *testing.T) {
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg2").Priority(10).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			},
-			profiles: profile.Map{
-				"": nil,
-			},
 			enablePodGroupPreemptionPolicy: true,
 			enableCompositePodGroup:        true,
 			wantErr:                        `all pod groups in a hierarchy should have the same preemption policy as the root pod group's preemption policy, got PreemptLowerPriority ("podgroup//pg2") and Never ("compositepodgroup//cpg-root")`,
@@ -526,9 +505,6 @@ func TestValidatePodGroup(t *testing.T) {
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
-			},
-			profiles: profile.Map{
-				"": nil,
 			},
 			enablePodGroupPreemptionPolicy: true,
 			enableCompositePodGroup:        true,
@@ -547,9 +523,6 @@ func TestValidatePodGroup(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
 			},
-			profiles: profile.Map{
-				"": nil,
-			},
 			enablePodGroupPreemptionPolicy: true,
 			enableCompositePodGroup:        true,
 			wantErr:                        `all pod groups in a hierarchy should have the same preemption policy as the root pod group's preemption policy, got PreemptLowerPriority ("compositepodgroup//cpg-nested") and Never ("compositepodgroup//cpg-root")`,
@@ -566,9 +539,6 @@ func TestValidatePodGroup(t *testing.T) {
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
-			},
-			profiles: profile.Map{
-				"": nil,
 			},
 			enablePodGroupPreemptionPolicy: false,
 			enableCompositePodGroup:        true,
@@ -588,9 +558,6 @@ func TestValidatePodGroup(t *testing.T) {
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg2").Priority(10).Obj(),
 			},
-			profiles: profile.Map{
-				"": nil,
-			},
 			enableCompositePodGroup: true,
 			wantErr:                 `all pod groups in a hierarchy should have the same priority as the root pod group's priority, got 20 ("podgroup//pg2") and 10 ("compositepodgroup//cpg-root")`,
 		},
@@ -607,9 +574,6 @@ func TestValidatePodGroup(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg2").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
-			},
-			profiles: profile.Map{
-				"": nil,
 			},
 			enablePodGroupPreemptionPolicy: true,
 			enableCompositePodGroup:        true,
@@ -628,9 +592,6 @@ func TestValidatePodGroup(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
 			},
-			profiles: profile.Map{
-				"": nil,
-			},
 			enableCompositePodGroup: true,
 			wantErr:                 `all pod groups in a hierarchy should have the same priority as the root pod group's priority, got 20 ("compositepodgroup//cpg-nested") and 10 ("compositepodgroup//cpg-root")`,
 		},
@@ -646,9 +607,6 @@ func TestValidatePodGroup(t *testing.T) {
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
-			},
-			profiles: profile.Map{
-				"": nil,
 			},
 			enableCompositePodGroup: true,
 			wantErr:                 `all pod groups in a hierarchy should have the same priority as the root pod group's priority, got 20 ("podgroup//pg1") and 10 ("compositepodgroup//cpg-root")`,
@@ -666,12 +624,235 @@ func TestValidatePodGroup(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
 			},
-			profiles: profile.Map{
-				"": nil,
-			},
 			enablePodGroupPreemptionPolicy: true,
 			enableCompositePodGroup:        true,
 			wantErr:                        `all pod groups in a hierarchy should have the same preemption policy as the root pod group's preemption policy, got PreemptLowerPriority ("podgroup//pg1") and Never ("compositepodgroup//cpg-root")`,
+		},
+		{
+			name:              "CPG success when tree depth is exactly WorkloadMaxTreeDepth (4 levels)",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+		},
+		{
+			name:              "CPG failure when tree depth exceeds WorkloadMaxTreeDepth (5 levels)",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-3").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-3").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `hierarchy depth exceeds maximum allowed depth 4 at "compositepodgroup//cpg-3"`,
+		},
+		{
+			name:              "CPG failure when child branch exceeds WorkloadMaxTreeDepth without pods in that branch",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-3").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-4").ParentCompositePodGroup("cpg-3").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `hierarchy depth exceeds maximum allowed depth 4 at "compositepodgroup//cpg-3"`,
+		},
+		{
+			name:              "CPG failure when child branch has a CompositePodGroup at depth 4 without level-5 children",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-3").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `hierarchy depth exceeds maximum allowed depth 4 at "compositepodgroup//cpg-3"`,
+		},
+		{
+			name:              "CPG failure when child group references a different workload than root group",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("wl-1", "root-t").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("wl-1", "root-t").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").WorkloadRef("wl-2", "child-t").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-1").WorkloadRef("wl-1", "pg-t").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `pod group workload does not match root workload, got: "wl-2" ("compositepodgroup//cpg-1") and "wl-1" ("compositepodgroup//cpg-root")`,
+		},
+		{
+			name:              "CPG failure when leaf group references a different workload than root group",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("wl-1", "root-t").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("wl-1", "root-t").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").WorkloadRef("wl-1", "child-t").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-1").WorkloadRef("wl-2", "pg-t").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `pod group workload does not match root workload, got: "wl-2" ("podgroup//pg1") and "wl-1" ("compositepodgroup//cpg-root")`,
+		},
+		{
+			name:              "CPG failure when gang parent group has a basic child PodGroup",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").BasicPolicy().Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `gang parent "compositepodgroup//cpg-root" cannot have basic child "podgroup//pg1"`,
+		},
+		{
+			name:              "CPG failure when gang parent non-root group has a basic child CompositePodGroup",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-child").ParentCompositePodGroup("cpg-root").MinGroupCount(1).Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-child").BasicPolicy().Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `gang parent "compositepodgroup//cpg-child" cannot have basic child "podgroup//pg1"`,
+		},
+		{
+			name:              "CPG success when basic parent group has a gang child CompositePodGroup",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-child").ParentCompositePodGroup("cpg-root").MinGroupCount(1).Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-child").MinCount(1).Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+		},
+		{
+			name:              "CPG failure when gang parent group has a basic child CompositePodGroup",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").MinGroupCount(1).Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-child").ParentCompositePodGroup("cpg-root").BasicPolicy().Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-child").MinCount(1).Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `gang parent "compositepodgroup//cpg-root" cannot have basic child "compositepodgroup//cpg-child"`,
+		},
+		{
+			name:              "CPG failure when parent group with All disruption mode has PG child group with Single disruption mode",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeSingle().Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `parent "compositepodgroup//cpg-root" with All disruption mode cannot have child "podgroup//pg1" with Single disruption mode`,
+		},
+		{
+			name:              "CPG failure when parent non-root group with All disruption mode has child group with Single disruption mode",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-child").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-child").BasicPolicy().DisruptionModeSingle().Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `parent "compositepodgroup//cpg-child" with All disruption mode cannot have child "podgroup//pg1" with Single disruption mode`,
+		},
+		{
+			name:              "CPG failure when parent group with All disruption mode has CPG child group with Single disruption mode",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-child").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeSingle().Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-child").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `parent "compositepodgroup//cpg-root" with All disruption mode cannot have child "compositepodgroup//cpg-child" with Single disruption mode`,
+		},
+		{
+			name:              "CPG success when parent group with All disruption mode has child group with All disruption mode",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeAll().Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
 		},
 	}
 
@@ -5033,7 +5214,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	expectedCondition := metav1.Condition{
 		Type:    schedulingapi.PodGroupInitiallyScheduled,
 		Status:  metav1.ConditionFalse,
-		Reason:  schedulingapi.PodGroupReasonSchedulerError,
+		Reason:  schedulingapi.PodGroupReasonPodGroupError,
 		Message: `all pods in a pod group hierarchy should have the same .spec.schedulerName set, got: "sched2" ("p2") and "sched1" ("p1")`,
 	}
 	matchedCondition := apimeta.FindStatusCondition(pg.Status.Conditions, schedulingapi.PodGroupInitiallyScheduled)

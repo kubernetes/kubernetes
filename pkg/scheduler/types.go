@@ -195,3 +195,18 @@ func (fe *podGroupFitError) Error() string {
 	}
 	return fmt.Sprintf("0/%d placements are available, first placement status: %s", fe.numPlacements, reason)
 }
+
+// validationError wraps a runtime pod group validation failure so that
+// status updates can report the Invalid condition reason.
+type validationError struct {
+	err error
+}
+
+// newValidationErrorf creates a formatted validationError.
+func newValidationErrorf(msg string, args ...any) *validationError {
+	return &validationError{err: fmt.Errorf(msg, args...)}
+}
+
+func (e *validationError) Error() string {
+	return e.err.Error()
+}
