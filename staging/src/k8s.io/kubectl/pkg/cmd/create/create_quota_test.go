@@ -21,8 +21,49 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func TestPopulateResourceListV1(t *testing.T) {
+
+	tests := map[string]struct {
+		hard      string
+		expected  corev1.ResourceList
+		expectErr bool
+	}{
+		"single resource": {
+			hard: "cpu=1",
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("1"),
+			},
+		},
+		"single resource with no name": {
+			hard:      "=1",
+			expectErr: true,
+		},
+		"double resource with no name in one": {
+			hard:      "cpu=1,=2",
+			expectErr: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := populateResourceListV1(tc.hard)
+			if tc.expectErr {
+				if err == nil {
+					t.Errorf("unexpected error:\n%#v\n", err)
+					return
+				}
+			}
+
+			if !apiequality.Semantic.DeepEqual(got, tc.expected) {
+				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, got)
+			}
+		})
+	}
+}
 
 func TestCreateQuota(t *testing.T) {
 	hards := []string{"cpu=1", "cpu=1,pods=42"}

@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -625,6 +626,41 @@ func TestSetResourcesRemoteWithSpecificContainers(t *testing.T) {
 				err = opts.Run()
 			}
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestParseResourceList(t *testing.T) {
+	tests := map[string]struct {
+		hard        string
+		expected    corev1.ResourceList
+		expectedErr bool
+	}{
+		"single resource": {
+			hard: "cpu=1",
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU: apiresource.MustParse("1"),
+			},
+		},
+		"singe resource no name": {
+			hard:        "=1",
+			expectedErr: true,
+		},
+		"double resource one no name": {
+			hard:        "cpu=1,=4",
+			expectedErr: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := parseResourceList(tc.hard)
+			if tc.expectedErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, got)
 		})
 	}
 }
