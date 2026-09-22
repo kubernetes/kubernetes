@@ -23,6 +23,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -106,10 +107,12 @@ func (p *staticPolicy) Name() string {
 }
 
 func (p *staticPolicy) Start(logger klog.Logger, s state.State) error {
-	if err := p.validateState(logger, s); err != nil {
+	drift, err := p.validateState(logger, s)
+	if err != nil {
 		logger.Error(err, "Invalid state, please drain node and remove policy state file")
 		return err
 	}
+	p.initializeMetrics(drift)
 	return nil
 }
 
@@ -1109,20 +1112,20 @@ func areGroupsEqual(group1, group2 []int) bool {
 	return true
 }
 
-func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
+func (p *staticPolicy) validateState(logger klog.Logger, s state.State) (map[int]uint64, error) {
 	machineState := s.GetMachineState()
 	memoryAssignments := s.GetMemoryAssignments()
 
 	if len(machineState) == 0 {
 		// Machine state cannot be empty when assignments exist
 		if len(memoryAssignments) != 0 {
-			return fmt.Errorf("[memorymanager] machine state can not be empty when it has memory assignments")
+			return nil, fmt.Errorf("[memorymanager] machine state can not be empty when it has memory assignments")
 		}
 
 		defaultMachineState := p.getDefaultMachineState()
 		s.SetMachineState(defaultMachineState)
 
-		return nil
+		return nil, nil
 	}
 
 	// calculate all memory assigned to containers
@@ -1133,7 +1136,7 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 			if podBlocks := s.GetPodMemoryBlocks(pod); len(podBlocks) > 0 {
 				fits, err := p.updateExpectedMachineState(expectedMachineState, podBlocks, pod, "")
 				if err != nil {
-					return err
+					return nil, err
 				}
 				if !fits {
 					fitErrs = append(fitErrs, fmt.Errorf("[memorymanager] (pod: %s) the memory assignment does not fit the machine state", pod))
@@ -1145,7 +1148,7 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 		for containerName, blocks := range container {
 			fits, err := p.updateExpectedMachineState(expectedMachineState, blocks, pod, containerName)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if !fits {
 				fitErrs = append(fitErrs, fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment does not fit the machine state", pod, containerName))
@@ -1159,23 +1162,24 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	// - change of kubelet system-reserved, kube-reserved or pre-reserved-memory-zone parameters
 	if !areMachineStatesEqual(logger, machineState, expectedMachineState) {
 		if p.maxMemoryDrift == 0 {
-			return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+			return nil, fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
 		}
 		if err := errors.Join(fitErrs...); err != nil {
-			return err
+			return nil, err
 		}
 		if err := validateMachineStateConsistency(machineState, expectedMachineState); err != nil {
-			return err
+			return nil, err
 		}
 		drift, err := machineStateDrift(machineState, expectedMachineState, p.maxMemoryDrift)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		logger.Info("Tolerating a small NUMA node memory drift and re-baselining the memory manager state", "nodeDriftBytes", drift, "maxDriftBytes", p.maxMemoryDrift)
 		s.SetMachineState(expectedMachineState)
+		return drift, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (p *staticPolicy) updateExpectedMachineState(expectedMachineState state.NUMANodeMap, blocks []state.Block, podUID, containerName string) (bool, error) {
@@ -1388,6 +1392,13 @@ func groupMemoryTotals(machineState state.NUMANodeMap, cells []int, resourceName
 		totals.Free += memoryState.Free
 	}
 	return totals, true
+}
+
+func (p *staticPolicy) initializeMetrics(drift map[int]uint64) {
+	metrics.MemoryManagerDriftToleranceBytes.Set(float64(p.maxMemoryDrift))
+	for _, node := range p.machineInfo.Topology {
+		metrics.MemoryManagerDriftBytes.WithLabelValues(strconv.Itoa(node.Id)).Set(float64(drift[node.Id]))
+	}
 }
 
 func (p *staticPolicy) getDefaultMachineState() state.NUMANodeMap {
