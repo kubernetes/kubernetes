@@ -17,6 +17,8 @@ limitations under the License.
 package schedulerapi
 
 import (
+	"strings"
+
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -202,20 +204,38 @@ type DeviceConsumedCapacity struct {
 }
 
 // NewDeviceConsumedCapacity creates a new DeviceConsumedCapacity for deviceID from
-// consumedCapacity as found in a DeviceRequestAllocationResult, i.e. keyed by
-// QualifiedName with the domain omitted iff it equals deviceID.Driver (for downgrade
-// compatibility with Kubernetes 1.37, see DeviceRequestAllocationResult.ConsumedCapacity).
-// Each key is normalized against deviceID.Driver so that the returned
+// consumedCapacity as found in a DeviceRequestAllocationResult.
+// Each key is resolved against deviceID.Driver so that the returned
 // DeviceConsumedCapacity, like the rest of the internal ConsumedCapacity tracking, is
 // always keyed by fully-qualified names.
+//
+// consumedCapacity is not guaranteed to be free of names that resolve to the same
+// fully-qualified name: a 1.37 allocator could persist both "cap" and "<driver>/cap" for a
+// device that published both. Resolving each name independently and inserting it into
+// normalized would then make the outcome depend on map iteration order, whichever entry
+// is visited last would win. To make the result deterministic without iterating
+// consumedCapacity twice: an entry explicitly qualified with deviceID.Driver always
+// overwrites whatever is already recorded for its key, while an unqualified entry is
+// dropped if an entry (qualified or not) was already recorded for its key.
 //
 // Callers that already have a ConsumedCapacity (for example, the allocators
 // themselves, while computing what a request would consume) do not need this
 // conversion and can construct a DeviceConsumedCapacity directly instead.
 func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
 	normalized := make(ConsumedCapacity, len(consumedCapacity))
+	driverPrefix := deviceID.Driver.String() + "/"
 	for name, val := range consumedCapacity {
-		normalized[draapi.MakeFullyQualifiedName(name, deviceID.Driver.String())] = new(val)
+		identifier, ok := strings.CutPrefix(string(name), driverPrefix)
+		if ok {
+			key := draapi.FullyQualifiedName{Domain: deviceID.Driver.String(), Identifier: identifier}
+			normalized[key] = new(val)
+			continue
+		}
+		key := draapi.MakeFullyQualifiedName(name, deviceID.Driver.String())
+		if _, alreadySet := normalized[key]; alreadySet {
+			continue
+		}
+		normalized[key] = new(val)
 	}
 	return DeviceConsumedCapacity{
 		DeviceID:         deviceID,
