@@ -9093,6 +9093,9 @@ func RunTestAllocator(t *testing.T,
 				classLister.objs = append(classLister.objs, class.DeepCopy())
 			}
 			claimsToAllocate := slices.Clone(tc.claimsToAllocate)
+			for i, claim := range claimsToAllocate {
+				claimsToAllocate[i] = wrapResourceClaim{claim.DeepCopy()}
+			}
 			allocatedDevices := slices.Clone(tc.allocatedDevices)
 			allocatedShare := tc.allocatedCapacityDevices.Clone()
 			var slices []*resourceapi.ResourceSlice
@@ -9148,7 +9151,7 @@ func RunTestAllocator(t *testing.T,
 			g.Expect(results).To(gomega.ConsistOf(tc.expectResults...))
 
 			// Objects that the allocator had access to should not have been modified.
-			g.Expect(claimsToAllocate).To(gomega.HaveExactElements(tc.claimsToAllocate))
+			g.Expect(claimsToAllocate).To(gomega.Equal(tc.claimsToAllocate))
 			g.Expect(allocatedDevices).To(gomega.HaveExactElements(tc.allocatedDevices))
 			g.Expect(slices).To(gomega.Equal(tc.slices))
 			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
