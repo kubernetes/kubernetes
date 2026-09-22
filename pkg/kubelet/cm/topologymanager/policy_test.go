@@ -49,6 +49,22 @@ func unnamedHintLists(hintLists [][]TopologyHint) []resourceHints {
 	return all
 }
 
+// mergerForPermutation builds a HintMerger which can score the given
+// permutation directly, without going through Merge. The permutation's i-th
+// element is attributed to resources[i], mirroring what iterating over
+// m.Hints would have produced; a name missing from resources is left empty,
+// which is what a provider with no preference at all contributes.
+func mergerForPermutation(resources []string, permutation []TopologyHint, weights map[string]int) HintMerger {
+	hints := make([]resourceHints, len(permutation))
+	for i := range permutation {
+		if i < len(resources) {
+			hints[i].resource = resources[i]
+		}
+		hints[i].hints = []TopologyHint{permutation[i]}
+	}
+	return HintMerger{Hints: hints, ScoreWeights: weights}
+}
+
 func commonPolicyMergeTestCases(_ []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
@@ -1848,7 +1864,7 @@ func TestAggregateHintScores(t *testing.T) {
 
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			score, ok := aggregateHintScores(tc.permutation)
+			score, ok := mergerForPermutation(nil, tc.permutation, nil).aggregateHintScores(tc.permutation)
 			if score != tc.expectedScore {
 				t.Errorf("expected score %d, got %d", tc.expectedScore, score)
 			}
@@ -1904,7 +1920,7 @@ func TestMergePermutationCarriesScore(t *testing.T) {
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			merged := mergePermutation(logger, defaultAffinity, tc.permutation)
+			merged := mergerForPermutation(nil, tc.permutation, nil).mergePermutation(logger, defaultAffinity, tc.permutation)
 			if merged.Score != tc.expectedScore {
 				t.Errorf("expected merged Score %d, got %d", tc.expectedScore, merged.Score)
 			}
