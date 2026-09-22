@@ -165,6 +165,7 @@ type testStaticPolicy struct {
 	systemReserved                  systemReservedMemory
 	expectedError                   error
 	machineInfo                     *cadvisorapi.MachineInfo
+	policyOptions                   map[string]string
 	pod                             *v1.Pod
 	topologyHint                    *topologymanager.TopologyHint
 	expectedTopologyHints           map[string][]topologymanager.TopologyHint
@@ -188,7 +189,11 @@ func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.T
 		manager = topologymanager.NewFakeManagerWithHint(logger, hint)
 	}
 
-	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager)
+	opts, err := NewPolicyOptions(logger, testCase.policyOptions)
+	if err != nil {
+		return nil, nil, err
+	}
+	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager, opts)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1749,6 +1754,92 @@ func TestStaticPolicyStartWithMemoryDriftReportsEveryAssignmentThatDoesNotFit(t 
 		"[memorymanager] (pod: pod1, container: container1) the memory assignment does not fit the machine state",
 		"[memorymanager] (pod: pod2, container: container1) the memory assignment does not fit the machine state",
 	}, strings.Split(err.Error(), "\n"))
+}
+
+func TestStaticPolicyStartWithMemoryDriftOption(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	driftError := fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+	testCases := []struct {
+		description          string
+		featureGateEnable    bool
+		policyOptions        map[string]string
+		drift                uint64
+		expectedError        error
+		expectedTotalMemSize uint64
+	}{
+		{
+			description:          "the exact comparison stays while the feature gate is disabled",
+			drift:                4 * mb,
+			expectedError:        driftError,
+			expectedTotalMemSize: 2 * gb,
+		},
+		{
+			description:          "the exact comparison stays while the option is unset",
+			featureGateEnable:    true,
+			drift:                4 * mb,
+			expectedError:        driftError,
+			expectedTotalMemSize: 2 * gb,
+		},
+		{
+			description:          "off keeps the exact comparison",
+			featureGateEnable:    true,
+			policyOptions:        map[string]string{MemoryDriftTolerance: "off"},
+			drift:                4 * mb,
+			expectedError:        driftError,
+			expectedTotalMemSize: 2 * gb,
+		},
+		{
+			description:          "an explicit bound tolerates a drift below it and re-baselines the state",
+			featureGateEnable:    true,
+			policyOptions:        map[string]string{MemoryDriftTolerance: "8Mi"},
+			drift:                4 * mb,
+			expectedTotalMemSize: 2*gb - 4*mb,
+		},
+		{
+			description:          "an explicit bound rejects a drift above it",
+			featureGateEnable:    true,
+			policyOptions:        map[string]string{MemoryDriftTolerance: "8Mi"},
+			drift:                12 * mb,
+			expectedError:        fmt.Errorf("[memorymanager] (NUMA node: 0) the memory drift of %d bytes exceeds the tolerated %d bytes", 12*mb, 8*mb),
+			expectedTotalMemSize: 2 * gb,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryManagerDriftTolerance, tc.featureGateEnable)
+			testCase := testStaticPolicy{
+				assignments: state.ContainerMemoryAssignments{},
+				machineState: state.NUMANodeMap{
+					0: &state.NUMANodeState{
+						MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+							v1.ResourceMemory: {Allocatable: 512 * mb, Free: 512 * mb, Reserved: 0, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+							hugepages1Gi:      {Allocatable: gb, Free: gb, Reserved: 0, SystemReserved: 0, TotalMemSize: gb},
+						},
+						Cells:               []int{0},
+						NumberOfAssignments: 0,
+					},
+				},
+				systemReserved: systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}},
+				machineInfo: &cadvisorapi.MachineInfo{
+					Topology: []cadvisorapi.Node{
+						{Id: 0, Memory: 2*gb - tc.drift, HugePages: []cadvisorapi.HugePagesInfo{{PageSize: pageSize1Gb, NumPages: 1}}},
+					},
+				},
+				policyOptions: tc.policyOptions,
+			}
+			p, s, err := initTests(t, &testCase, nil, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if err := p.Start(logger, s); !reflect.DeepEqual(err, tc.expectedError) {
+				t.Fatalf("Start error = %v, want %v", err, tc.expectedError)
+			}
+			if total := s.GetMachineState()[0].MemoryMap[v1.ResourceMemory].TotalMemSize; total != tc.expectedTotalMemSize {
+				t.Fatalf("recorded total memory of NUMA node 0 = %d, want %d", total, tc.expectedTotalMemSize)
+			}
+		})
+	}
 }
 
 func TestStaticPolicyAllocate(t *testing.T) {
@@ -5900,7 +5991,7 @@ func TestValidatePodScopeResources(t *testing.T) {
 					v1.ResourceMemory: 256 * mb,
 				},
 			}
-			policy, err := NewPolicyStatic(logger, machineInfo, systemReserved, topologymanager.NewFakeManagerWithScope(tc.scope))
+			policy, err := NewPolicyStatic(logger, machineInfo, systemReserved, topologymanager.NewFakeManagerWithScope(tc.scope), PolicyOptions{})
 			if err != nil {
 				t.Fatalf("NewPolicyStatic() failed: %v", err)
 			}
@@ -6701,7 +6792,7 @@ func TestStaticPolicyLifecycleAllocate(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), PolicyOptions{})
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)
@@ -6780,7 +6871,7 @@ func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), PolicyOptions{})
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)
@@ -6859,7 +6950,7 @@ func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), PolicyOptions{})
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)
@@ -6941,7 +7032,7 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 			logger := tCtx.Logger()
 
 			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
-			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger), PolicyOptions{})
 			require.NoError(t, err)
 
 			st := state.NewMemoryState(logger)

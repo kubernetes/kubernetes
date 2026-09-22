@@ -25,17 +25,20 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const memoryDriftGraceBytes uint64 = 64 * 1024 * 1024
+const (
+	memoryDriftGraceBytes uint64 = 64 * 1024 * 1024
+	procIomemPath                = "/proc/iomem"
+)
 
 func memoryDriftFromKernelImage(logger klog.Logger, iomemPath string) uint64 {
 	iomem, err := os.ReadFile(iomemPath)
 	if err != nil {
-		logger.Info("Could not read the kernel image size, memory drift tolerance stays off", "path", iomemPath, "err", err)
+		logger.Info("Could not read the kernel image size, memory drift tolerance stays off unless memory-drift-tolerance is set to a quantity", "path", iomemPath, "err", err)
 		return 0
 	}
 	size := parseKernelImageSize(string(iomem))
 	if size == 0 {
-		logger.Info("Could not determine the kernel image size, memory drift tolerance stays off", "path", iomemPath)
+		logger.Info("Could not determine the kernel image size, memory drift tolerance stays off unless memory-drift-tolerance is set to a quantity", "path", iomemPath)
 		return 0
 	}
 	maxDrift := size + memoryDriftGraceBytes
