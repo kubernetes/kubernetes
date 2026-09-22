@@ -313,6 +313,13 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		}
 	}
 
+	if obj.ClientCertificateKeyAlgorithm == nil {
+		obj.ClientCertificateKeyAlgorithm = ptr.To(kubeletconfigv1beta1.CertificateKeyAlgorithmDefault)
+	}
+	if obj.ServerCertificateKeyAlgorithm == nil {
+		obj.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfigv1beta1.CertificateKeyAlgorithmDefault)
+	}
+
 	if localFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
 		if obj.ImagePullCredentialsVerificationPolicy == "" {
 			obj.ImagePullCredentialsVerificationPolicy = kubeletconfigv1beta1.NeverVerifyPreloadedImages

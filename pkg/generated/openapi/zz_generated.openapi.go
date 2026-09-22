@@ -76098,6 +76098,20 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"clientCertificateKeyAlgorithm": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clientCertificateKeyAlgorithm specifies the key algorithm to use when generating client certificate signing requests during certificate rotation. This field only takes effect when rotateCertificates is true. It controls keys generated for initial and renewal CSRs; it does not alter supplied static credentials. Note: ML-DSA algorithms require TLS 1.3 and peers that support the selected signature algorithm. Go rejects ML-DSA certificates under TLS 1.2. Valid values are: \"ECDSA-P256\", \"ECDSA-P384\", \"RSA-2048\", \"RSA-3072\", \"RSA-4096\", \"ML-DSA-44\", \"ML-DSA-65\", \"ML-DSA-87\". When omitted, defaults to \"ECDSA-P256\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"serverCertificateKeyAlgorithm": {
+						SchemaProps: spec.SchemaProps{
+							Description: "serverCertificateKeyAlgorithm specifies the key algorithm to use when generating server certificate signing requests during certificate rotation. This field only takes effect when serverTLSBootstrap is true. It is not used for self-signed serving certificates. Changing this value does not immediately replace an existing certificate; the new algorithm takes effect at the next certificate renewal. Note: ML-DSA algorithms require TLS 1.3 and peers that support the selected signature algorithm. Go rejects ML-DSA certificates under TLS 1.2. Valid values are: \"ECDSA-P256\", \"ECDSA-P384\", \"RSA-2048\", \"RSA-3072\", \"RSA-4096\", \"ML-DSA-44\", \"ML-DSA-65\", \"ML-DSA-87\". When omitted, defaults to \"ECDSA-P256\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"authentication": {
 						SchemaProps: spec.SchemaProps{
 							Description: "authentication specifies how requests to the Kubelet's server are authenticated. Defaults:\n  anonymous:\n    enabled: false\n  webhook:\n    enabled: true\n    cacheTTL: \"2m\"",
