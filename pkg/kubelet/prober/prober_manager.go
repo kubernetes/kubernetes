@@ -297,6 +297,12 @@ func (m *manager) isContainerStarted(logger klog.Logger, pod *v1.Pod, containerS
 		return true
 	}
 
+	// SyncPod generates the pod status before it calls AddPod, so on the first sync after
+	// a kubelet restart the worker lookup below misses the startup probe of a container.
+	if containerSpec := kubecontainer.GetContainerSpec(pod, containerStatus.Name); containerSpec != nil && containerSpec.StartupProbe != nil {
+		return false
+	}
+
 	// if there is a startup probe which hasn't run yet, the container is not
 	// started.
 	if _, exists := m.getWorker(pod.UID, containerStatus.Name, startup); exists {

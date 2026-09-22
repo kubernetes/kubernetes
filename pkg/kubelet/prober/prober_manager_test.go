@@ -917,6 +917,110 @@ func TestUpdatePodStatusOnKubeletRestartWithMultipleContainers(t *testing.T) {
 	}
 }
 
+func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, false)
+
+	const (
+		containerName = "startup_container"
+		containerID   = "test://startup_container_id"
+	)
+
+	tests := []struct {
+		name string
+		// startedBeforeRestart is the Started in the pod status the kubelet last
+		// observed from the API server.
+		startedBeforeRestart bool
+		readinessProbe       *v1.Probe
+		expectedStarted      bool
+		expectedReady        bool
+	}{
+		{
+			name:            "still in startup period, no readiness probe",
+			expectedStarted: false,
+			expectedReady:   false,
+		},
+		{
+			name:            "still in startup period, with readiness probe",
+			readinessProbe:  defaultProbe,
+			expectedStarted: false,
+			expectedReady:   false,
+		},
+		{
+			name:                 "startup probe already passed before the restart",
+			startedBeforeRestart: true,
+			expectedStarted:      true,
+			expectedReady:        true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			m := newTestManager()
+			// no cleanup: no workers, as on the first sync after a kubelet restart.
+
+			// The runtime reports a container that started before the kubelet
+			// restart grace period, so its start time alone makes it look like a
+			// container that survived the restart.
+			startedBeforeKubeletRestart := metav1.Time{Time: kubeletRestartGracePeriod(m.start).Add(-time.Minute)}
+			podStatus := v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{{
+					Name:        containerName,
+					ContainerID: containerID,
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{StartedAt: startedBeforeKubeletRestart},
+					},
+					Started: &tc.startedBeforeRestart,
+				}},
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: testPodUID},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:           containerName,
+						StartupProbe:   defaultProbe,
+						ReadinessProbe: tc.readinessProbe,
+					}},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{{
+						Type:   v1.PodReady,
+						Status: boolToConditionStatus(tc.startedBeforeRestart),
+					}},
+					ContainerStatuses: []v1.ContainerStatus{{
+						Name:        containerName,
+						ContainerID: containerID,
+						Ready:       tc.startedBeforeRestart,
+						Started:     &tc.startedBeforeRestart,
+					}},
+				},
+			}
+
+			m.UpdatePodStatus(ctx, pod, &podStatus)
+
+			got := podStatus.ContainerStatuses[0]
+			if got.Started == nil {
+				t.Fatalf("Unexpected started for container %v: expected %v but got nil", containerName, tc.expectedStarted)
+			}
+			if *got.Started != tc.expectedStarted {
+				t.Errorf("Unexpected started for container %v: expected %v but got %v", containerName, tc.expectedStarted, *got.Started)
+			}
+			if got.Ready != tc.expectedReady {
+				t.Errorf("Unexpected readiness for container %v: expected %v but got %v", containerName, tc.expectedReady, got.Ready)
+			}
+		})
+	}
+}
+
+func boolToConditionStatus(b bool) v1.ConditionStatus {
+	if b {
+		return v1.ConditionTrue
+	}
+	return v1.ConditionFalse
+}
+
 func (m *manager) extractedReadinessHandling(logger klog.Logger) {
 	update := <-m.readinessManager.Updates()
 	// This code corresponds to an extract from kubelet.syncLoopIteration()
