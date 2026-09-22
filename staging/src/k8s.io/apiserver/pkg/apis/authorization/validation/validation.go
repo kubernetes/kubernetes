@@ -92,7 +92,7 @@ func ValidateSubjectAccessReviewStatus(status authorizationv1.SubjectAccessRevie
 	allErrs := field.ErrorList{}
 
 	if status.Allowed && status.Denied {
-		allErrs = append(allErrs, field.Invalid(fldPath, status.Denied,
+		allErrs = append(allErrs, field.Invalid(fldPath, authorizationv1.SubjectAccessReviewStatus{Allowed: status.Allowed, Denied: status.Denied},
 			"allowed and denied are mutually exclusive"))
 	}
 
@@ -112,12 +112,20 @@ func ValidateSubjectAccessReviewStatus(status authorizationv1.SubjectAccessRevie
 		// Enforce status.allowed=false && status.denied=false for a conditional decision
 		case authorizationv1.ConditionsAwareDecisionTypeConditionsMap, authorizationv1.ConditionsAwareDecisionTypeUnion:
 			if status.Allowed {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("allowed"), status.Allowed,
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("allowed"),
 					fmt.Sprintf("must be false when status.conditionalDecision.type=%s", status.ConditionalDecision.Type)))
 			}
 			if status.Denied {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("denied"), status.Denied,
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("denied"),
 					fmt.Sprintf("must be false when status.conditionalDecision.type=%s", status.ConditionalDecision.Type)))
+			}
+			if len(status.EvaluationError) != 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("evaluationError"),
+					fmt.Sprintf("must be empty when status.conditionalDecision.type=%s", status.ConditionalDecision.Type)))
+			}
+			if len(status.Reason) != 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("reason"),
+					fmt.Sprintf("must be empty when status.conditionalDecision.type=%s", status.ConditionalDecision.Type)))
 			}
 			// unrecognized modes are covered by declarative validation
 		}
@@ -277,6 +285,7 @@ func ValidateConditionsAwareDecision(decision *authorizationv1.ConditionsAwareDe
 	if decision.ConditionsMap != nil {
 		allErrs = append(allErrs, ValidateConditionsMap(decision.ConditionsMap, fldPath.Child("conditionsMap"))...)
 	}
+	// TODO(luxas): Descend into unions as well
 	return allErrs
 }
 

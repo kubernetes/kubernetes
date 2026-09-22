@@ -45,12 +45,8 @@ func TestRoundTrip(t *testing.T) {
 		original.Spec.AuthorizationOptions = nil  // does not roundtrip
 		original.Status.ConditionalDecision = nil // does not roundtrip
 
-		v1beta1Spec, err := v1SpecToV1beta1Spec(&original.Spec)
-		if err != nil {
-			t.Fatal(err)
-		}
 		converted := &authorizationv1beta1.SubjectAccessReview{
-			Spec:   v1beta1Spec,
+			Spec:   v1SpecToV1beta1Spec(&original.Spec),
 			Status: v1StatusToV1beta1Status(original.Status),
 		}
 		roundtripped := &authorizationv1.SubjectAccessReview{

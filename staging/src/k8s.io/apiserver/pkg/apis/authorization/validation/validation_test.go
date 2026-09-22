@@ -20,6 +20,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -930,6 +932,326 @@ func TestValidateCondition(t *testing.T) {
 			} else if len(errs) != 0 {
 				t.Errorf("expected success, got: %v", errs)
 			}
+		})
+	}
+}
+
+// assertErrors compares the full text of every error in errs against want, in order.
+// Matching complete error strings rather than substrings means a change to an error's
+// type (for example Invalid to Forbidden) or to its wording is caught here.
+func assertErrors(t *testing.T, errs field.ErrorList, want []string) {
+	t.Helper()
+	var got []string
+	for _, e := range errs {
+		got = append(got, e.Error())
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected errors (-want +got):\n%s", diff)
+	}
+}
+
+// TestValidateSARStatus covers status validation through the three top-level
+// validators rather than through ValidateSubjectAccessReviewStatus directly, because
+// whether status.conditionalDecision is permitted depends on the spec: each validator
+// derives the client's conditions-awareness from spec.authorizationOptions and passes
+// it down. Every case therefore pairs a status with the options the client asked for,
+// on an otherwise valid spec, so the only errors reported are the status ones.
+//
+// The rules being exercised are:
+//
+//   - status.conditionalDecision may only be set when the client opted into
+//     conditions-awareness; otherwise the server ignored the client's request for
+//     unconditional answers.
+//   - It may not carry the unconditional types (Allow/Deny/NoOpinion), which belong in
+//     status.allowed / status.denied.
+//   - When it carries a conditional type, the unconditional result fields must all be
+//     empty, so there is exactly one place to look for the answer. This is what lets
+//     the v1beta1 conversion overwrite those fields when it folds a conditional
+//     decision down to unconditional form.
+func TestValidateSARStatus(t *testing.T) {
+	conditionsMap := &authorizationv1.ConditionsMap{
+		AllowConditions: []authorizationv1.Condition{{ID: "example.com/allow", Type: "example.com/opaque"}},
+	}
+	conditionsMapDecision := &authorizationv1.ConditionsAwareDecision{
+		Type:          authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+		ConditionsMap: conditionsMap,
+	}
+	unionDecision := &authorizationv1.ConditionsAwareDecision{
+		Type: authorizationv1.ConditionsAwareDecisionTypeUnion,
+		Union: []authorizationv1.NamedConditionsAwareDecision{{
+			AuthorizerName: "cm",
+			Decision: authorizationv1.ConditionsAwareDecision{
+				Type:          authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+				ConditionsMap: conditionsMap,
+			},
+		}},
+	}
+	conditionalOptions := &authorizationv1.AuthorizationOptions{
+		HandledDecisionTypes: []authorizationv1.ConditionsAwareDecisionType{
+			authorizationv1.ConditionsAwareDecisionTypeAllow,
+			authorizationv1.ConditionsAwareDecisionTypeDeny,
+			authorizationv1.ConditionsAwareDecisionTypeNoOpinion,
+			authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+			authorizationv1.ConditionsAwareDecisionTypeUnion,
+		},
+	}
+	unconditionalOptions := &authorizationv1.AuthorizationOptions{
+		HandledDecisionTypes: []authorizationv1.ConditionsAwareDecisionType{
+			authorizationv1.ConditionsAwareDecisionTypeAllow,
+			authorizationv1.ConditionsAwareDecisionTypeDeny,
+			authorizationv1.ConditionsAwareDecisionTypeNoOpinion,
+		},
+	}
+	const notOptedIn = "status.conditionalDecision: Forbidden: can only be set when the client opted into conditions-awareness"
+
+	testCases := []struct {
+		name string
+		// options is what the client advertised it can handle, and is what decides
+		// whether a conditional decision is allowed in the status at all.
+		options *authorizationv1.AuthorizationOptions
+		status  authorizationv1.SubjectAccessReviewStatus
+		// msgs is the exact, ordered list of expected errors; nil means valid.
+		msgs []string
+	}{{
+		name:   "empty status",
+		status: authorizationv1.SubjectAccessReviewStatus{},
+	}, {
+		name:   "allowed only",
+		status: authorizationv1.SubjectAccessReviewStatus{Allowed: true},
+	}, {
+		name:   "denied only",
+		status: authorizationv1.SubjectAccessReviewStatus{Denied: true},
+	}, {
+		// reason and evaluationError are only constrained alongside a conditional
+		// decision; on their own they are ordinary result metadata.
+		name: "reason and evaluationError without a conditional decision",
+		status: authorizationv1.SubjectAccessReviewStatus{
+			Allowed:         true,
+			Reason:          "rbac allowed",
+			EvaluationError: "one authorizer was flaky",
+		},
+	}, {
+		// The error echoes the whole status, so this case keeps the status minimal to
+		// keep the expectation readable.
+		name: "allowed and denied are mutually exclusive",
+		status: authorizationv1.SubjectAccessReviewStatus{
+			Allowed: true,
+			Denied:  true,
+		},
+		msgs: []string{`status: Invalid value: {"allowed":true,"denied":true}: allowed and denied are mutually exclusive`},
+	}, {
+		// Nil options means unconditional-only, so a conditional answer was never
+		// asked for.
+		name:    "conditional decision with nil options is not opted in",
+		options: nil,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			ConditionalDecision: conditionsMapDecision,
+		},
+		msgs: []string{notOptedIn},
+	}, {
+		name:    "conditional decision with unconditional options is not opted in",
+		options: unconditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			ConditionalDecision: conditionsMapDecision,
+		},
+		msgs: []string{notOptedIn},
+	}, {
+		name:    "ConditionsMap decision for an opted-in client",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			ConditionalDecision: conditionsMapDecision,
+		},
+	}, {
+		name:    "Union decision for an opted-in client",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			ConditionalDecision: unionDecision,
+		},
+	}, {
+		name:    "conditionalDecision.type=Allow is rejected",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			ConditionalDecision: &authorizationv1.ConditionsAwareDecision{
+				Type:  authorizationv1.ConditionsAwareDecisionTypeAllow,
+				Allow: &authorizationv1.UnconditionalDecision{Reason: "allowed"},
+			},
+		},
+		msgs: []string{`status.conditionalDecision.type: Invalid value: "Allow": cannot be one of [Allow, Deny, NoOpinion], these decisions must be expressed using status.allowed and status.denied`},
+	}, {
+		name:    "conditionalDecision.type=Deny is rejected",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			ConditionalDecision: &authorizationv1.ConditionsAwareDecision{
+				Type: authorizationv1.ConditionsAwareDecisionTypeDeny,
+				Deny: &authorizationv1.UnconditionalDecision{Reason: "denied"},
+			},
+		},
+		msgs: []string{`status.conditionalDecision.type: Invalid value: "Deny": cannot be one of [Allow, Deny, NoOpinion], these decisions must be expressed using status.allowed and status.denied`},
+	}, {
+		name:    "conditionalDecision.type=NoOpinion is rejected",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			ConditionalDecision: &authorizationv1.ConditionsAwareDecision{
+				Type:      authorizationv1.ConditionsAwareDecisionTypeNoOpinion,
+				NoOpinion: &authorizationv1.UnconditionalDecision{},
+			},
+		},
+		msgs: []string{`status.conditionalDecision.type: Invalid value: "NoOpinion": cannot be one of [Allow, Deny, NoOpinion], these decisions must be expressed using status.allowed and status.denied`},
+	}, {
+		name:    "allowed must be false alongside a ConditionsMap",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			Allowed:             true,
+			ConditionalDecision: conditionsMapDecision,
+		},
+		msgs: []string{"status.allowed: Forbidden: must be false when status.conditionalDecision.type=ConditionsMap"},
+	}, {
+		name:    "denied must be false alongside a ConditionsMap",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			Denied:              true,
+			ConditionalDecision: conditionsMapDecision,
+		},
+		msgs: []string{"status.denied: Forbidden: must be false when status.conditionalDecision.type=ConditionsMap"},
+	}, {
+		name:    "evaluationError must be empty alongside a ConditionsMap",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			EvaluationError:     "an authorizer failed",
+			ConditionalDecision: conditionsMapDecision,
+		},
+		msgs: []string{"status.evaluationError: Forbidden: must be empty when status.conditionalDecision.type=ConditionsMap"},
+	}, {
+		name:    "reason must be empty alongside a ConditionsMap",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			Reason:              "because",
+			ConditionalDecision: conditionsMapDecision,
+		},
+		msgs: []string{"status.reason: Forbidden: must be empty when status.conditionalDecision.type=ConditionsMap"},
+	}, {
+		// The message names the offending type, so Union reads differently to
+		// ConditionsMap.
+		name:    "reason must be empty alongside a Union",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			Reason:              "because",
+			ConditionalDecision: unionDecision,
+		},
+		msgs: []string{"status.reason: Forbidden: must be empty when status.conditionalDecision.type=Union"},
+	}, {
+		// Each unconditional field is reported independently, in the order the
+		// validator checks them. Denied is left unset here so the mutual-exclusion
+		// error, which echoes the whole status, stays out of the expectation.
+		name:    "several unconditional fields set alongside a ConditionsMap",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			Allowed:             true,
+			Reason:              "because",
+			EvaluationError:     "an authorizer failed",
+			ConditionalDecision: conditionsMapDecision,
+		},
+		msgs: []string{
+			"status.allowed: Forbidden: must be false when status.conditionalDecision.type=ConditionsMap",
+			"status.evaluationError: Forbidden: must be empty when status.conditionalDecision.type=ConditionsMap",
+			"status.reason: Forbidden: must be empty when status.conditionalDecision.type=ConditionsMap",
+		},
+	}, {
+		// Not opting in and sending a rejected type are independent failures.
+		name:    "not opted in and an unconditional type together",
+		options: nil,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			ConditionalDecision: &authorizationv1.ConditionsAwareDecision{
+				Type:  authorizationv1.ConditionsAwareDecisionTypeAllow,
+				Allow: &authorizationv1.UnconditionalDecision{},
+			},
+		},
+		msgs: []string{
+			notOptedIn,
+			`status.conditionalDecision.type: Invalid value: "Allow": cannot be one of [Allow, Deny, NoOpinion], these decisions must be expressed using status.allowed and status.denied`,
+		},
+	}, {
+		// An unrecognized type matches no arm of the handwritten switch, so the
+		// unconditional fields are not constrained; declarative validation is
+		// responsible for rejecting the type itself.
+		name:    "unrecognized type is left to declarative validation",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			Allowed:             true,
+			Reason:              "because",
+			ConditionalDecision: &authorizationv1.ConditionsAwareDecision{Type: "SomeFutureType"},
+		},
+	}, {
+		// The decision is descended into, so a malformed condition is reported at its
+		// full path.
+		name:    "condition errors inside the decision are reported",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			ConditionalDecision: &authorizationv1.ConditionsAwareDecision{
+				Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+				ConditionsMap: &authorizationv1.ConditionsMap{
+					AllowConditions: []authorizationv1.Condition{{ID: "no-slash"}},
+				},
+			},
+		},
+		msgs: []string{`status.conditionalDecision.conditionsMap.allowConditions[0].id: Invalid value: "no-slash": must be a domain-prefixed key (such as "acme.io/foo")`},
+	}, {
+		// ValidateConditionsAwareDecision only descends into ConditionsMap, not into
+		// Union members, so a malformed condition nested in a Union is not reported by
+		// the handwritten path.
+		name:    "condition errors nested in a Union are left to declarative validation",
+		options: conditionalOptions,
+		status: authorizationv1.SubjectAccessReviewStatus{
+			ConditionalDecision: &authorizationv1.ConditionsAwareDecision{
+				Type: authorizationv1.ConditionsAwareDecisionTypeUnion,
+				Union: []authorizationv1.NamedConditionsAwareDecision{{
+					AuthorizerName: "cm",
+					Decision: authorizationv1.ConditionsAwareDecision{
+						Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+						ConditionsMap: &authorizationv1.ConditionsMap{
+							AllowConditions: []authorizationv1.Condition{{ID: "no-slash"}},
+						},
+					},
+				}},
+			},
+		},
+	}}
+
+	for _, c := range testCases {
+		t.Run(c.name, func(t *testing.T) {
+			// A spec that is valid on its own, so every reported error comes from the
+			// status. The namespace is set because LocalSubjectAccessReview requires
+			// spec.resourceAttributes.namespace to match metadata.namespace.
+			sarSpec := authorizationv1.SubjectAccessReviewSpec{
+				ResourceAttributes:   &authorizationv1.ResourceAttributes{Namespace: "ns"},
+				User:                 "me",
+				AuthorizationOptions: c.options,
+			}
+
+			t.Run("SubjectAccessReview", func(t *testing.T) {
+				assertErrors(t, ValidateSubjectAccessReview(&authorizationv1.SubjectAccessReview{
+					Spec:   sarSpec,
+					Status: c.status,
+				}), c.msgs)
+			})
+
+			t.Run("SelfSubjectAccessReview", func(t *testing.T) {
+				assertErrors(t, ValidateSelfSubjectAccessReview(&authorizationv1.SelfSubjectAccessReview{
+					Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+						ResourceAttributes:   &authorizationv1.ResourceAttributes{Namespace: "ns"},
+						AuthorizationOptions: c.options,
+					},
+					Status: c.status,
+				}), c.msgs)
+			})
+
+			t.Run("LocalSubjectAccessReview", func(t *testing.T) {
+				assertErrors(t, ValidateLocalSubjectAccessReview(&authorizationv1.LocalSubjectAccessReview{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "ns"},
+					Spec:       sarSpec,
+					Status:     c.status,
+				}), c.msgs)
+			})
 		})
 	}
 }

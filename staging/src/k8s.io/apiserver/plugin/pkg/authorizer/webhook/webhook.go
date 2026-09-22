@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"strconv"
 	"time"
 
@@ -257,37 +256,15 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	case r.Status.Denied && r.Status.Allowed:
 		return authorizer.DecisionDeny, r.Status.Reason, fmt.Errorf("webhook subject access review returned both allow and deny response")
 	case r.Status.ConditionalDecision != nil:
-		// Fail with Deny if there is at least one Deny condition or decision.
-		if shouldFailWithDeny(*r.Status.ConditionalDecision) {
-			return authorizer.DecisionDeny, r.Status.Reason, fmt.Errorf("webhook subject access review returned unrequested conditional decision")
-		}
-		return authorizer.DecisionNoOpinion, r.Status.Reason, fmt.Errorf("webhook subject access review returned unrequested conditional decision")
+		// Parse the conditional decision so we know how to fail closed, reusing the existing code.
+		gotDecision := apiserverauthorizationv1.DeserializeConditionsAwareDecision(*r.Status.ConditionalDecision, w.conditionsAwareFailureDecision)
+		return gotDecision.FailureDecision(), r.Status.Reason, fmt.Errorf("webhook subject access review returned unrequested conditional decision")
 	case r.Status.Denied:
 		return authorizer.DecisionDeny, r.Status.Reason, nil
 	case r.Status.Allowed:
 		return authorizer.DecisionAllow, r.Status.Reason, nil
 	default:
 		return authorizer.DecisionNoOpinion, r.Status.Reason, nil
-	}
-}
-
-func shouldFailWithDeny(decision authorizationv1.ConditionsAwareDecision) bool {
-	switch decision.Type {
-	case authorizationv1.ConditionsAwareDecisionTypeAllow, authorizationv1.ConditionsAwareDecisionTypeNoOpinion:
-		return false
-	case authorizationv1.ConditionsAwareDecisionTypeDeny:
-		return true
-	case authorizationv1.ConditionsAwareDecisionTypeConditionsMap:
-		if decision.ConditionsMap != nil {
-			return len(decision.ConditionsMap.DenyConditions) > 0
-		}
-		return false
-	case authorizationv1.ConditionsAwareDecisionTypeUnion:
-		return slices.ContainsFunc(decision.Union, func(nd authorizationv1.NamedConditionsAwareDecision) bool {
-			return shouldFailWithDeny(nd.Decision)
-		})
-	default:
-		return true
 	}
 }
 
@@ -873,17 +850,13 @@ type subjectAccessReviewV1beta1ClientGW struct {
 
 func (t *subjectAccessReviewV1beta1ClientGW) Create(ctx context.Context, subjectAccessReview *authorizationv1.SubjectAccessReview, _ metav1.CreateOptions) (*authorizationv1.SubjectAccessReview, int, error) {
 	var statusCode int
-	v1beta1Spec, err := v1SpecToV1beta1Spec(&subjectAccessReview.Spec)
-	if err != nil {
-		return subjectAccessReview, http.StatusBadRequest, err
-	}
-	v1beta1Review := &authorizationv1beta1.SubjectAccessReview{Spec: v1beta1Spec}
+	v1beta1Review := &authorizationv1beta1.SubjectAccessReview{Spec: v1SpecToV1beta1Spec(&subjectAccessReview.Spec)}
 	v1beta1Result := &authorizationv1beta1.SubjectAccessReview{}
 
 	restResult := t.client.Post().Body(v1beta1Review).Do(ctx)
 
 	restResult.StatusCode(&statusCode)
-	err = restResult.Into(v1beta1Result)
+	err := restResult.Into(v1beta1Result)
 	if err == nil {
 		subjectAccessReview.Status = v1beta1StatusToV1Status(&v1beta1Result.Status)
 	}
@@ -914,13 +887,7 @@ func v1beta1StatusToV1Status(in *authorizationv1beta1.SubjectAccessReviewStatus)
 	}
 }
 
-func v1SpecToV1beta1Spec(in *authorizationv1.SubjectAccessReviewSpec) (authorizationv1beta1.SubjectAccessReviewSpec, error) {
-	// if in.AuthorizationOptions are set, the only allowed value is [Allow, Deny, NoOpinion], which is how callers should interpret
-	// in.AuthorizationOptions == nil. Anything else cannot be expressed in v1beta1, and thus error.
-	if !in.AuthorizationOptions.GetHandledDecisionTypes().Equal(authorizationv1.UnconditionalAuthorizationDecisionTypes()) {
-		return authorizationv1beta1.SubjectAccessReviewSpec{}, fmt.Errorf("cannot send SubjectAccessReview with non-default AuthorizationOptions to a v1beta1 client. Got handledDecisionTypes %v, supported %v", in.AuthorizationOptions.HandledDecisionTypes, sets.List(authorizationv1.UnconditionalAuthorizationDecisionTypes()))
-	}
-
+func v1SpecToV1beta1Spec(in *authorizationv1.SubjectAccessReviewSpec) authorizationv1beta1.SubjectAccessReviewSpec {
 	return authorizationv1beta1.SubjectAccessReviewSpec{
 		ResourceAttributes:    v1ResourceAttributesToV1beta1ResourceAttributes(in.ResourceAttributes),
 		NonResourceAttributes: v1NonResourceAttributesToV1beta1NonResourceAttributes(in.NonResourceAttributes),
@@ -929,7 +896,10 @@ func v1SpecToV1beta1Spec(in *authorizationv1.SubjectAccessReviewSpec) (authoriza
 		Extra:                 v1ExtraToV1beta1Extra(in.Extra),
 		UID:                   in.UID,
 		// AuthorizationOptions are unrepresentable in v1beta1, treated as {HandledDecisionTypes: [Allow, Deny, NoOpinion]} in terms of the new API.
-	}, nil
+		// Even if in.AuthorizationOptions would support a superset of [Allow, Deny, NoOpinion], the fact that we send the webhook to a v1beta1 client
+		// automatically "downgrades" us to the always-supported unconditional-responses-only mode.
+		// Covered by TestConditionsAwareAuthorize_V1beta1Downgrade.
+	}
 }
 
 func v1ResourceAttributesToV1beta1ResourceAttributes(in *authorizationv1.ResourceAttributes) *authorizationv1beta1.ResourceAttributes {

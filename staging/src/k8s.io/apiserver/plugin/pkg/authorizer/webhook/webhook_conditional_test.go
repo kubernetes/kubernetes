@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -245,7 +244,7 @@ func TestConditionsAwareAuthorize(t *testing.T) {
 				},
 			},
 			decisionOnError: authorizer.DecisionDeny,
-			wantDecision:    `Deny(reason="failed closed", err="[status.denied: Invalid value: true: must be false when status.conditionalDecision.type=ConditionsMap, status.conditionalDecision.conditionsMap: Invalid value: \"\": must be specified when ` + "`type`" + ` is \"ConditionsMap\"]")`,
+			wantDecision:    `Deny(reason="failed closed", err="[status.denied: Forbidden: must be false when status.conditionalDecision.type=ConditionsMap, status.conditionalDecision.conditionsMap: Invalid value: \"\": must be specified when ` + "`type`" + ` is \"ConditionsMap\"]")`,
 		},
 		{
 			name: "both conditional and Allowed",
@@ -256,7 +255,7 @@ func TestConditionsAwareAuthorize(t *testing.T) {
 				},
 			},
 			decisionOnError: authorizer.DecisionDeny,
-			wantDecision:    `Deny(reason="failed closed", err="[status.allowed: Invalid value: true: must be false when status.conditionalDecision.type=ConditionsMap, status.conditionalDecision.conditionsMap: Invalid value: \"\": must be specified when ` + "`type`" + ` is \"ConditionsMap\"]")`,
+			wantDecision:    `Deny(reason="failed closed", err="[status.allowed: Forbidden: must be false when status.conditionalDecision.type=ConditionsMap, status.conditionalDecision.conditionsMap: Invalid value: \"\": must be specified when ` + "`type`" + ` is \"ConditionsMap\"]")`,
 		},
 		{
 			// ConditionsMap must come first in the Union sub-list so that
@@ -426,8 +425,8 @@ func TestEvaluateConditions(t *testing.T) {
 		decisionOnError authorizer.Decision
 		wantDecision    authorizer.Decision
 		wantReason      string
-		wantErr         bool
-		wantErrContains string
+		// wantErr is the exact expected error text; the empty string means no error.
+		wantErr string
 		// verifyACR is called after EvaluateConditions with the ACR request that
 		// was received by the fake reviewer. Useful for inspecting serialized fields.
 		verifyACR func(*testing.T, *authorizationv1alpha1.AuthorizationConditionsReview)
@@ -436,31 +435,28 @@ func TestEvaluateConditions(t *testing.T) {
 		// EvaluateConditions is only ever supposed to be called on a conditional
 		// decision. It fails closed to the sub-decision's FailureDecision.
 		{
-			name:            "unconditional allow rejected: FailureDecision is NoOpinion",
-			decision:        authorizer.ConditionsAwareDecisionAllow("allowed by admin", nil),
-			noACRReviewer:   true,
-			wantDecision:    authorizer.DecisionNoOpinion,
-			wantReason:      "failed closed",
-			wantErr:         true,
-			wantErrContains: "got unconditional decisionToEvaluate in EvaluateConditions",
+			name:          "unconditional allow rejected: FailureDecision is NoOpinion",
+			decision:      authorizer.ConditionsAwareDecisionAllow("allowed by admin", nil),
+			noACRReviewer: true,
+			wantDecision:  authorizer.DecisionNoOpinion,
+			wantReason:    "failed closed",
+			wantErr:       "got unconditional decisionToEvaluate in EvaluateConditions",
 		},
 		{
-			name:            "unconditional deny rejected: FailureDecision is Deny",
-			decision:        authorizer.ConditionsAwareDecisionDeny("denied by policy", nil),
-			noACRReviewer:   true,
-			wantDecision:    authorizer.DecisionDeny,
-			wantReason:      "failed closed",
-			wantErr:         true,
-			wantErrContains: "got unconditional decisionToEvaluate in EvaluateConditions",
+			name:          "unconditional deny rejected: FailureDecision is Deny",
+			decision:      authorizer.ConditionsAwareDecisionDeny("denied by policy", nil),
+			noACRReviewer: true,
+			wantDecision:  authorizer.DecisionDeny,
+			wantReason:    "failed closed",
+			wantErr:       "got unconditional decisionToEvaluate in EvaluateConditions",
 		},
 		{
-			name:            "unconditional no-opinion rejected: FailureDecision is NoOpinion",
-			decision:        authorizer.ConditionsAwareDecisionNoOpinion("no opinion", nil),
-			noACRReviewer:   true,
-			wantDecision:    authorizer.DecisionNoOpinion,
-			wantReason:      "failed closed",
-			wantErr:         true,
-			wantErrContains: "got unconditional decisionToEvaluate in EvaluateConditions",
+			name:          "unconditional no-opinion rejected: FailureDecision is NoOpinion",
+			decision:      authorizer.ConditionsAwareDecisionNoOpinion("no opinion", nil),
+			noACRReviewer: true,
+			wantDecision:  authorizer.DecisionNoOpinion,
+			wantReason:    "failed closed",
+			wantErr:       "got unconditional decisionToEvaluate in EvaluateConditions",
 		},
 		// No ACR reviewer configured: must fail closed.
 		{
@@ -473,7 +469,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionNoOpinion,
 			wantDecision:    authorizer.DecisionDeny,
 			wantReason:      "failed closed",
-			wantErr:         true,
+			wantErr:         "no authorization conditions review client configured for the webhook authorizer, cannot evaluate conditions",
 		},
 		{
 			name: "no reviewer, Allow-only condition, failurePolicy=NoOpinion",
@@ -485,7 +481,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionNoOpinion,
 			wantDecision:    authorizer.DecisionNoOpinion,
 			wantReason:      "failed closed",
-			wantErr:         true,
+			wantErr:         "no authorization conditions review client configured for the webhook authorizer, cannot evaluate conditions",
 		},
 		// ACR webhook returns various decision types.
 		{
@@ -561,7 +557,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionDeny,
 			wantDecision:    authorizer.DecisionDeny,
 			wantReason:      "failed closed",
-			wantErr:         true,
+			wantErr:         "conditions review webhook unavailable",
 		},
 		{
 			name: "webhook error, failurePolicy=NoOpinion",
@@ -574,7 +570,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionDeny,
 			wantDecision:    authorizer.DecisionNoOpinion,
 			wantReason:      "failed closed",
-			wantErr:         true,
+			wantErr:         "conditions review webhook unavailable",
 		},
 		// nil response field in the ACR response.
 		{
@@ -587,8 +583,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionNoOpinion,
 			wantDecision:    authorizer.DecisionDeny,
 			wantReason:      "failed closed",
-			wantErr:         true,
-			wantErrContains: "response: Required value: must be set in AuthorizationConditionsReview responses",
+			wantErr:         "response: Required value: must be set in AuthorizationConditionsReview responses",
 		},
 		{
 			name: "nil response returns FailureDecision (NoOpinion)",
@@ -600,8 +595,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionNoOpinion,
 			wantDecision:    authorizer.DecisionNoOpinion,
 			wantReason:      "failed closed",
-			wantErr:         true,
-			wantErrContains: "response: Required value: must be set in AuthorizationConditionsReview responses",
+			wantErr:         "response: Required value: must be set in AuthorizationConditionsReview responses",
 		},
 		// ACR request must contain the serialized conditions.
 		{
@@ -673,8 +667,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionNoOpinion,
 			wantDecision:    authorizer.DecisionAllow,
 			wantReason:      "partial allow",
-			wantErr:         true,
-			wantErrContains: "condition 'c' evaluation had a warning",
+			wantErr:         "condition 'c' evaluation had a warning",
 		},
 		// Unknown response type must fail closed.
 		{
@@ -693,7 +686,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionNoOpinion, // ignored on purpose, Deny condition is stronger
 			wantDecision:    authorizer.DecisionDeny,
 			wantReason:      "failed closed",
-			wantErr:         true,
+			wantErr:         `unrecognized decisionToEvaluate type "UnknownDecisionType"`,
 		},
 		{
 			name: "unknown response type fails closed, allow condition",
@@ -711,7 +704,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionDeny, // ignored on purpose, Deny condition is stronger
 			wantDecision:    authorizer.DecisionNoOpinion,
 			wantReason:      "failed closed",
-			wantErr:         true,
+			wantErr:         `unrecognized decisionToEvaluate type "UnknownDecisionType"`,
 		},
 		// Union decision is serialized into the ACR request and its response is honored.
 		{
@@ -777,8 +770,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionNoOpinion,
 			wantDecision:    authorizer.DecisionDeny,
 			wantReason:      "failed closed",
-			wantErr:         true,
-			wantErrContains: "tried to return Allow from EvaluateConditions, but the possible outcomes were",
+			wantErr:         "webhook authorizer tried to return Allow from EvaluateConditions, but the possible outcomes were [Deny NoOpinion]",
 		},
 		{
 			// PossibleDecisions of an Allow-only ConditionsMap is {NoOpinion, Allow},
@@ -800,8 +792,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionDeny,
 			wantDecision:    authorizer.DecisionNoOpinion,
 			wantReason:      "failed closed",
-			wantErr:         true,
-			wantErrContains: "tried to return Deny from EvaluateConditions, but the possible outcomes were",
+			wantErr:         "webhook authorizer tried to return Deny from EvaluateConditions, but the possible outcomes were [Allow NoOpinion]",
 		},
 		{
 			// A Union that contains any unconditional Allow/Deny leaf drops NoOpinion
@@ -830,8 +821,7 @@ func TestEvaluateConditions(t *testing.T) {
 			decisionOnError: authorizer.DecisionNoOpinion,
 			wantDecision:    authorizer.DecisionDeny,
 			wantReason:      "failed closed",
-			wantErr:         true,
-			wantErrContains: "tried to return NoOpinion from EvaluateConditions, but the possible outcomes were",
+			wantErr:         "webhook authorizer tried to return NoOpinion from EvaluateConditions, but the possible outcomes were [Deny Allow]",
 		},
 	}
 
@@ -850,11 +840,12 @@ func TestEvaluateConditions(t *testing.T) {
 			wh := newTestWebhookAuthorizer(&fakeSubjectAccessReviewer{}, acrReviewer, tc.decisionOnError)
 			d, reason, err := wh.EvaluateConditions(testCtx, tc.decision, fakeConditionsData{})
 
-			if (err != nil) != tc.wantErr {
-				t.Errorf("wantErr=%v, got err=%v", tc.wantErr, err)
+			var gotErr string
+			if err != nil {
+				gotErr = err.Error()
 			}
-			if tc.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErrContains)) {
-				t.Errorf("expected error containing %q, got %v", tc.wantErrContains, err)
+			if gotErr != tc.wantErr {
+				t.Errorf("expected error %q, got %q", tc.wantErr, gotErr)
 			}
 			if d != tc.wantDecision {
 				t.Errorf("expected decision %v, got %v", tc.wantDecision, d)
@@ -1035,4 +1026,116 @@ func conditionsReviewConfigFromTLSServer(server *httptest.Server, _ string) (*re
 		return nil, err
 	}
 	return webhookutil.LoadKubeconfig(tempfile.Name(), nil)
+}
+
+// TestConditionsAwareAuthorize_V1beta1Downgrade covers ConditionsAwareAuthorize
+// being called against a webhook configured for v1beta1, which can only express
+// unconditional authorization.
+//
+// The v1beta1 SubjectAccessReview has neither spec.authorizationOptions nor
+// status.conditionalDecision, so sending the conditional opt-in to such a webhook
+// silently downgrades to unconditional mode. Two properties must hold:
+//
+//  1. The opt-in is not sent on the wire. The webhook sees a plain SAR, identical
+//     to what a pre-conditions API server would have sent, so existing v1beta1
+//     webhooks keep working when a caller starts using the conditions-aware path.
+//  2. The decision handed back is always unconditional, even if the webhook tries
+//     to answer with conditions. v1beta1 cannot carry them, so the response decodes
+//     without them rather than smuggling an unvalidated conditional decision into
+//     the authorizer.
+func TestConditionsAwareAuthorize_V1beta1Downgrade(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
+	tests := []struct {
+		name string
+		// sendStatusJSON is the raw JSON for the v1beta1 status the webhook answers
+		// with. It is raw so that a response can attempt to carry a conditional
+		// decision that the v1beta1 schema has no field for.
+		sendStatusJSON string
+		wantDecision   string
+	}{
+		{
+			name:           "allow",
+			sendStatusJSON: `{"allowed":true,"reason":"beta allowed"}`,
+			wantDecision:   `Allow(reason="beta allowed")`,
+		},
+		{
+			name:           "deny",
+			sendStatusJSON: `{"allowed":false,"denied":true,"reason":"beta denied"}`,
+			wantDecision:   `Deny(reason="beta denied")`,
+		},
+		{
+			name:           "no opinion",
+			sendStatusJSON: `{"allowed":false}`,
+			wantDecision:   "NoOpinion",
+		},
+		{
+			name:           "evaluation error is preserved",
+			sendStatusJSON: `{"allowed":false,"reason":"beta errored","evaluationError":"backend lookup failed"}`,
+			wantDecision:   `NoOpinion(reason="beta errored", err="backend lookup failed")`,
+		},
+		{
+			// A v1beta1 webhook has no conditionalDecision field to populate. If one
+			// shows up anyway it must be dropped on decode, leaving the unconditional
+			// allowed/denied fields as the only signal.
+			// Note: This is _invalid_ behavior of the SAR server, which must never return conditions when none were asked for,
+			// but here we just show what happens if the SAR server behaves wrongly.
+			name: "conditional decision in a v1beta1 response is dropped",
+			sendStatusJSON: `{"allowed":false,"reason":"beta cannot condition",` +
+				`"conditionalDecision":{"type":"ConditionsMap","conditionsMap":{"allowConditions":[` +
+				`{"id":"example.com/allow-all","type":"example.com/opaque"}]}}}`,
+			wantDecision: `NoOpinion(reason="beta cannot condition")`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var rawBody []byte
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				rawBody, _ = io.ReadAll(r.Body)
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprintf(w, `{"apiVersion":"authorization.k8s.io/v1beta1","kind":"SubjectAccessReview","status":%s}`, tc.sendStatusJSON)
+			}))
+			defer server.Close()
+
+			serverCAPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+			wh, err := newV1beta1Authorizer(server.URL, nil, nil, serverCAPEM, 0)
+			if err != nil {
+				t.Fatalf("failed to create v1beta1 authorizer: %v", err)
+			}
+
+			decision := wh.ConditionsAwareAuthorize(testCtx, testAttr)
+			if got := decision.String(); got != tc.wantDecision {
+				t.Errorf("expected decision %s, got %s", tc.wantDecision, got)
+			}
+			// The downgraded decision must be usable by a conditions-unaware caller.
+			if !decision.IsUnconditional() {
+				t.Errorf("expected an unconditional decision from a v1beta1 webhook, got %s", decision.String())
+			}
+
+			// Verify the request was serialized as v1beta1 without the conditional opt-in.
+			if rawBody == nil {
+				t.Fatal("expected the webhook to be called")
+			}
+			var sent struct {
+				APIVersion string                     `json:"apiVersion"`
+				Kind       string                     `json:"kind"`
+				Spec       map[string]json.RawMessage `json:"spec"`
+			}
+			if err := json.Unmarshal(rawBody, &sent); err != nil {
+				t.Fatalf("failed to unmarshal the outgoing request: %v", err)
+			}
+			if sent.APIVersion != "authorization.k8s.io/v1beta1" {
+				t.Errorf("expected apiVersion %q, got %q", "authorization.k8s.io/v1beta1", sent.APIVersion)
+			}
+			if sent.Kind != "SubjectAccessReview" {
+				t.Errorf("expected kind %q, got %q", "SubjectAccessReview", sent.Kind)
+			}
+			// authorizationOptions is v1-only. Sending it to a v1beta1 webhook would
+			// advertise conditional support that the response schema cannot express.
+			if _, ok := sent.Spec["authorizationOptions"]; ok {
+				t.Errorf("expected no authorizationOptions in the outgoing v1beta1 spec, got spec %v", sent.Spec)
+			}
+		})
+	}
 }
