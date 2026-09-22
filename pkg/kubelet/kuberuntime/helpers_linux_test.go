@@ -562,6 +562,41 @@ func TestSubtractOverheadFromResourceConfig(t *testing.T) {
 				CPUQuota:  ptr.To[int64](20000),
 			},
 		},
+		{
+			name: "unlimitedQuotaStaysUnlimited",
+			cfgInput: &cm.ResourceConfig{
+				Memory:    new(int64(335544320)),
+				CPUShares: new(uint64(306)),
+				CPUPeriod: new(uint64(100000)),
+				CPUQuota:  new(int64(-1)),
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{v1.ResourceCPU: podOverheadCPUMilli},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    new(int64(335544320)),
+				CPUShares: new(uint64(203)),
+				CPUPeriod: new(uint64(100000)),
+				CPUQuota:  new(int64(-1)),
+			},
+		},
+		{
+			name:     "overheadQuotaUnlimitedSubtractsNothing",
+			cfgInput: resCfg,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{v1.ResourceCPU: resource.MustParse("92233720")},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    new(int64(335544320)),
+				CPUShares: new(uint64(2)),
+				CPUPeriod: new(uint64(100000)),
+				CPUQuota:  new(int64(30000)),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			gotCfg := subtractOverheadFromResourceConfig(tc.cfgInput, tc.pod)
