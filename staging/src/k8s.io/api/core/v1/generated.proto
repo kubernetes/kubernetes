@@ -4761,6 +4761,9 @@ message PodSpec {
   // StartTime before the system will actively try to mark it failed and kill associated containers.
   // Value must be a positive integer.
   // +optional
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:minimum=1
+  // +k8s:alpha(since: "1.38")=+k8s:maximum=2147483647
   optional int64 activeDeadlineSeconds = 5;
 
   // dnsPolicy sets the DNS policy for the pod.
