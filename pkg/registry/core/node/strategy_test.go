@@ -228,6 +228,31 @@ func TestValidateUpdate(t *testing.T) {
 				},
 			},
 		}, true},
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "unchanged-fractional-extended-capacity-and-allocatable",
+			},
+			Status: api.NodeStatus{
+				Capacity: api.ResourceList{
+					api.ResourceName("example.com/a"): resource.MustParse("18446744073709551616m"),
+				},
+				Allocatable: api.ResourceList{
+					api.ResourceName("example.com/a"): resource.MustParse("18446744073709551616m"),
+				},
+			},
+		}, api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "unchanged-fractional-extended-capacity-and-allocatable",
+			},
+			Status: api.NodeStatus{
+				Capacity: api.ResourceList{
+					api.ResourceName("example.com/a"): resource.MustParse("18446744073709551616m"),
+				},
+				Allocatable: api.ResourceList{
+					api.ResourceName("example.com/a"): resource.MustParse("18446744073709551616m"),
+				},
+			},
+		}, true},
 	}
 	for i, test := range tests {
 		test.node.ObjectMeta.ResourceVersion = "1"
