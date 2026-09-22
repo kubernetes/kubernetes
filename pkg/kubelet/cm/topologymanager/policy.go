@@ -103,16 +103,40 @@ func mergePermutation(logger klog.Logger, defaultAffinity bitmask.BitMask, permu
 	return TopologyHint{NUMANodeAffinity: mergedAffinity, Preferred: preferred, Score: score}
 }
 
-func filterProvidersHints(logger klog.Logger, providersHints []map[string][]TopologyHint) [][]TopologyHint {
+// resourceHints are the hints one hint provider reported for one resource.
+//
+// Hint providers hand the Topology Manager a map[string][]TopologyHint, so the
+// resource a hint belongs to is known at the point the hints are collected.
+// Keeping the two together through the merge means nothing has to reconstruct
+// the association later, which is what per-resource score weights need.
+type resourceHints struct {
+	// resource is the name the hint provider filed these hints under, e.g.
+	// "cpu" or "nvidia.com/gpu". It is empty for a provider which expressed no
+	// preference at all, since such a provider named no resource.
+	resource string
+	hints    []TopologyHint
+}
+
+// filterProvidersHints flattens the per-provider hint maps into one entry per
+// resource, keeping each resource's name with its hints.
+//
+// The result is a slice rather than a map because the same name can legitimately
+// occur more than once: every provider with no preference at all contributes an
+// entry with an empty name, and nothing stops two providers naming the same
+// resource. Each entry is an independent axis of the merge permutation, so
+// collapsing duplicates would silently drop one.
+func filterProvidersHints(logger klog.Logger, providersHints []map[string][]TopologyHint) []resourceHints {
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
 	// that provider has no preference for topology-aware allocation.
-	var allProviderHints [][]TopologyHint
+	var allProviderHints []resourceHints
 	for _, hints := range providersHints {
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
 			logger.Info("Hint Provider has no preference for NUMA affinity with any resource")
-			allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}})
+			allProviderHints = append(allProviderHints, resourceHints{
+				hints: []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}},
+			})
 			continue
 		}
 
@@ -120,17 +144,26 @@ func filterProvidersHints(logger klog.Logger, providersHints []map[string][]Topo
 		for resource := range hints {
 			if hints[resource] == nil {
 				logger.Info("Hint Provider has no preference for NUMA affinity with resource", "resource", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}})
+				allProviderHints = append(allProviderHints, resourceHints{
+					resource: resource,
+					hints:    []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}},
+				})
 				continue
 			}
 
 			if len(hints[resource]) == 0 {
 				logger.Info("Hint Provider has no possible NUMA affinities for resource", "resource", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: false}})
+				allProviderHints = append(allProviderHints, resourceHints{
+					resource: resource,
+					hints:    []TopologyHint{{NUMANodeAffinity: nil, Preferred: false}},
+				})
 				continue
 			}
 
-			allProviderHints = append(allProviderHints, hints[resource])
+			allProviderHints = append(allProviderHints, resourceHints{
+				resource: resource,
+				hints:    hints[resource],
+			})
 		}
 	}
 	return allProviderHints
@@ -155,10 +188,10 @@ func narrowestHint(hints []TopologyHint) *TopologyHint {
 	return narrowestHint
 }
 
-func maxOfMinAffinityCounts(filteredHints [][]TopologyHint) int {
+func maxOfMinAffinityCounts(filteredHints []resourceHints) int {
 	maxOfMinCount := 0
-	for _, resourceHints := range filteredHints {
-		narrowestHint := narrowestHint(resourceHints)
+	for _, oneResource := range filteredHints {
+		narrowestHint := narrowestHint(oneResource.hints)
 		if narrowestHint == nil {
 			continue
 		}
@@ -171,7 +204,11 @@ func maxOfMinAffinityCounts(filteredHints [][]TopologyHint) int {
 
 type HintMerger struct {
 	NUMAInfo *NUMAInfo
-	Hints    [][]TopologyHint
+	// Hints holds one entry per resource, each carrying the name of the
+	// resource its hints came from. A permutation takes its i-th element from
+	// Hints[i], so Hints[i].resource also names the resource the i-th hint of
+	// a permutation belongs to.
+	Hints []resourceHints
 	// Set bestNonPreferredAffinityCount to help decide which affinity mask is
 	// preferred amongst all non-preferred hints. We calculate this value as
 	// the maximum of the minimum affinity counts supplied for any given hint
@@ -219,7 +256,7 @@ func compareHintScores(strategy string, current, candidate *TopologyHint) *Topol
 	return nil
 }
 
-func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string, opts PolicyOptions) HintMerger {
+func NewHintMerger(numaInfo *NUMAInfo, hints []resourceHints, policyName string, opts PolicyOptions) HintMerger {
 	preferClosest := (policyName != PolicySingleNumaNode) && opts.PreferClosestNUMA
 
 	// The allocation strategy is an alpha-level policy option. NewPolicyOptions
@@ -415,27 +452,31 @@ func (m HintMerger) Merge(logger klog.Logger) TopologyHint {
 	return *bestHint
 }
 
-// Iterate over all permutations of hints in 'allProviderHints [][]TopologyHint'.
+// Iterate over all permutations of hints in 'allProviderHints []resourceHints'.
 //
 // This procedure is implemented as a recursive function over the set of hints
-// in 'allproviderHints[i]'. It applies the function 'callback' to each
+// in 'allproviderHints[i].hints'. It applies the function 'callback' to each
 // permutation as it is found. It is the equivalent of:
 //
-// for i := 0; i < len(providerHints[0]); i++
+// for i := 0; i < len(providerHints[0].hints); i++
 //
-//	for j := 0; j < len(providerHints[1]); j++
-//	    for k := 0; k < len(providerHints[2]); k++
+//	for j := 0; j < len(providerHints[1].hints); j++
+//	    for k := 0; k < len(providerHints[2].hints); k++
 //	        ...
-//	        for z := 0; z < len(providerHints[-1]); z++
+//	        for z := 0; z < len(providerHints[-1].hints); z++
 //	            permutation := []TopologyHint{
-//	                providerHints[0][i],
-//	                providerHints[1][j],
-//	                providerHints[2][k],
+//	                providerHints[0].hints[i],
+//	                providerHints[1].hints[j],
+//	                providerHints[2].hints[k],
 //	                ...
-//	                providerHints[-1][z]
+//	                providerHints[-1].hints[z]
 //	            }
 //	            callback(permutation)
-func iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback func([]TopologyHint)) {
+//
+// The permutation is positional: its i-th element is drawn from
+// allProviderHints[i], so the caller can name the resource a given element came
+// from without the names being carried in the permutation itself.
+func iterateAllProviderTopologyHints(allProviderHints []resourceHints, callback func([]TopologyHint)) {
 	// Internal helper function to accumulate the permutation before calling the callback.
 	var iterate func(i int, accum []TopologyHint)
 	iterate = func(i int, accum []TopologyHint) {
@@ -447,8 +488,8 @@ func iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback
 
 		// Loop through all hints for provider 'i', and recurse to build the
 		// permutation of this hint with all hints from providers 'i++'.
-		for j := range allProviderHints[i] {
-			iterate(i+1, append(accum, allProviderHints[i][j]))
+		for j := range allProviderHints[i].hints {
+			iterate(i+1, append(accum, allProviderHints[i].hints[j]))
 		}
 	}
 	iterate(0, []TopologyHint{})

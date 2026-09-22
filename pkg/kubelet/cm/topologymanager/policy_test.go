@@ -35,6 +35,20 @@ type policyMergeTestCase struct {
 	expected TopologyHint
 }
 
+// unnamedHintLists turns bare hint lists into resourceHints with no resource
+// names attached, for the tests which exercise the merge arithmetic and do not
+// care which resource a hint came from.
+func unnamedHintLists(hintLists [][]TopologyHint) []resourceHints {
+	if hintLists == nil {
+		return nil
+	}
+	all := make([]resourceHints, 0, len(hintLists))
+	for _, hints := range hintLists {
+		all = append(all, resourceHints{hints: hints})
+	}
+	return all
+}
+
 func commonPolicyMergeTestCases(_ []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
@@ -1365,7 +1379,7 @@ func TestMaxOfMinAffinityCounts(t *testing.T) {
 
 	for _, tc := range tcases {
 		t.Run("", func(t *testing.T) {
-			result := maxOfMinAffinityCounts(tc.hints)
+			result := maxOfMinAffinityCounts(unnamedHintLists(tc.hints))
 			if result != tc.expected {
 				t.Errorf("Expected result to be %v, got %v", tc.expected, result)
 			}
@@ -1561,7 +1575,7 @@ func TestCompareHintsNarrowest(t *testing.T) {
 	for _, tc := range tcases {
 		t.Run(tc.description, func(t *testing.T) {
 			numaInfo := &NUMAInfo{}
-			merger := NewHintMerger(numaInfo, [][]TopologyHint{}, PolicyBestEffort, PolicyOptions{})
+			merger := NewHintMerger(numaInfo, nil, PolicyBestEffort, PolicyOptions{})
 			merger.BestNonPreferredAffinityCount = tc.bestNonPreferredAffinityCount
 
 			result := merger.compare(tc.current, tc.candidate)
@@ -1613,6 +1627,115 @@ func commonNUMAInfoEightNodes() *NUMAInfo {
 			6: {30, 30, 30, 30, 12, 12, 10, 11},
 			7: {30, 30, 30, 30, 12, 12, 13, 10},
 		},
+	}
+}
+
+// TestFilterProvidersHints checks that each entry filterProvidersHints returns
+// carries the hints together with the name of the resource they came from.
+// Providers are iterated as maps, so the order of the entries is not fixed and
+// the expectations are keyed by resource name rather than by position. A name
+// maps to a list of hint lists because the same name can occur more than once.
+func TestFilterProvidersHints(t *testing.T) {
+	tcases := []struct {
+		name          string
+		providersHint []map[string][]TopologyHint
+		expected      map[string][][]TopologyHint
+	}{
+		{
+			name:          "no providers",
+			providersHint: nil,
+			expected:      map[string][][]TopologyHint{},
+		},
+		{
+			name:          "provider with no preference for any resource",
+			providersHint: []map[string][]TopologyHint{nil},
+			expected: map[string][][]TopologyHint{
+				"": {{{NUMANodeAffinity: nil, Preferred: true}}},
+			},
+		},
+		{
+			// Every provider with nothing to say contributes an entry under
+			// the empty name, so a pod which pins neither CPUs nor memory nor
+			// devices produces several of them. Each is an independent axis of
+			// the merge permutation and all of them have to survive, which is
+			// why the result is a slice and not a map keyed by resource name.
+			name:          "several providers with no preference for any resource",
+			providersHint: []map[string][]TopologyHint{nil, nil, nil},
+			expected: map[string][][]TopologyHint{
+				"": {
+					{{NUMANodeAffinity: nil, Preferred: true}},
+					{{NUMANodeAffinity: nil, Preferred: true}},
+					{{NUMANodeAffinity: nil, Preferred: true}},
+				},
+			},
+		},
+		{
+			name: "provider with no preference for a resource",
+			providersHint: []map[string][]TopologyHint{
+				{"cpu": nil},
+			},
+			expected: map[string][][]TopologyHint{
+				"cpu": {{{NUMANodeAffinity: nil, Preferred: true}}},
+			},
+		},
+		{
+			name: "provider with no possible affinity for a resource",
+			providersHint: []map[string][]TopologyHint{
+				{"cpu": {}},
+			},
+			expected: map[string][][]TopologyHint{
+				"cpu": {{{NUMANodeAffinity: nil, Preferred: false}}},
+			},
+		},
+		{
+			name: "several resources from several providers",
+			providersHint: []map[string][]TopologyHint{
+				{
+					"cpu": {
+						{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 20},
+						{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 40},
+					},
+				},
+				{
+					"memory": {
+						{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 60},
+					},
+					"nvidia.com/gpu": {
+						{NUMANodeAffinity: NewTestBitMask(0), Preferred: false, Score: 80},
+					},
+				},
+				nil,
+			},
+			expected: map[string][][]TopologyHint{
+				"cpu": {{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 20},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 40},
+				}},
+				"memory": {{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true, Score: 60},
+				}},
+				"nvidia.com/gpu": {{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: false, Score: 80},
+				}},
+				"": {{{NUMANodeAffinity: nil, Preferred: true}}},
+			},
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			filtered := filterProvidersHints(logger, tc.providersHint)
+
+			got := map[string][][]TopologyHint{}
+			for _, oneResource := range filtered {
+				got[oneResource.resource] = append(got[oneResource.resource], oneResource.hints)
+			}
+			if !reflect.DeepEqual(got, tc.expected) {
+				t.Errorf("Expected hints per resource to be %v, got %v", tc.expected, got)
+			}
+		})
 	}
 }
 
@@ -1795,7 +1918,7 @@ func TestMergePermutationCarriesScore(t *testing.T) {
 func TestCompareWinnerUnchangedByScore(t *testing.T) {
 	numaInfo := commonNUMAInfoTwoNodes()
 	hints := [][]TopologyHint{}
-	merger := NewHintMerger(numaInfo, hints, PolicyBestEffort, PolicyOptions{})
+	merger := NewHintMerger(numaInfo, unnamedHintLists(hints), PolicyBestEffort, PolicyOptions{})
 
 	tcases := []struct {
 		name          string
@@ -1898,7 +2021,7 @@ func TestCompareNUMAAffinityMasksWithAllocationStrategy(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.TopologyManagerPolicyAlphaOptions, tc.gateEnabled)
 
 			opts := PolicyOptions{NUMAAllocationStrategy: tc.strategy}
-			merger := NewHintMerger(numaInfo, [][]TopologyHint{}, PolicySingleNumaNode, opts)
+			merger := NewHintMerger(numaInfo, nil, PolicySingleNumaNode, opts)
 
 			result := merger.CompareNUMAAffinityMasks(current, candidate)
 			if tc.expected == "current" && result != current {
@@ -2012,7 +2135,7 @@ func TestCompareNUMAAffinityMasksStrategyDoesNotBeatStructure(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.TopologyManagerPolicyAlphaOptions, true)
 
 	opts := PolicyOptions{NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated}
-	merger := NewHintMerger(numaInfo, [][]TopologyHint{}, PolicyBestEffort, opts)
+	merger := NewHintMerger(numaInfo, nil, PolicyBestEffort, opts)
 
 	if result := merger.CompareNUMAAffinityMasks(current, candidate); result != current {
 		t.Errorf("Expected the narrowest hint %v to win, got %v", current, result)
@@ -2225,7 +2348,7 @@ func TestHintMergerWithAllocationStrategy(t *testing.T) {
 				NUMAAllocationStrategy: tc.strategy,
 				PreferClosestNUMA:      tc.preferClosest,
 			}
-			merger := NewHintMerger(numaInfo, tc.hints, policyName, opts)
+			merger := NewHintMerger(numaInfo, unnamedHintLists(tc.hints), policyName, opts)
 
 			result := merger.Merge(logger)
 			if !result.NUMANodeAffinity.IsEqual(tc.expectedAffinity) {
