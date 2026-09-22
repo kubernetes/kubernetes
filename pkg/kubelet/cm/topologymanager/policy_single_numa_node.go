@@ -42,12 +42,14 @@ func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return hint.Preferred
 }
 
-// Return hints that have valid bitmasks with exactly one bit set.
-func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
-	var filteredResourcesHints [][]TopologyHint
-	for _, oneResourceHints := range allResourcesHints {
+// Return hints that have valid bitmasks with exactly one bit set. One entry is
+// returned per entry of allResourcesHints, keeping each resource's name with
+// the hints that survive the filter.
+func filterSingleNumaHints(allResourcesHints []resourceHints) []resourceHints {
+	var filteredResourcesHints []resourceHints
+	for _, oneResource := range allResourcesHints {
 		var filtered []TopologyHint
-		for _, hint := range oneResourceHints {
+		for _, hint := range oneResource.hints {
 			if hint.NUMANodeAffinity == nil && hint.Preferred {
 				filtered = append(filtered, hint)
 			}
@@ -55,7 +57,10 @@ func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint 
 				filtered = append(filtered, hint)
 			}
 		}
-		filteredResourcesHints = append(filteredResourcesHints, filtered)
+		filteredResourcesHints = append(filteredResourcesHints, resourceHints{
+			resource: oneResource.resource,
+			hints:    filtered,
+		})
 	}
 	return filteredResourcesHints
 }
