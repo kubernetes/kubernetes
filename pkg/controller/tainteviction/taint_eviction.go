@@ -593,10 +593,6 @@ func (tc *Controller) processPodEvictionRetry(ctx context.Context, item podEvict
 		tc.forgetPodEvictionRetry(item)
 		return nil
 	case podEvictionLater:
-		if decision.keepExisting {
-			tc.forgetPodEvictionRetry(item)
-			return nil
-		}
 		// The original toleration window expired at item.fireAt. If this was a
 		// timed eviction (item.fireAt > item.createdAt), the window has already
 		// expired by the time this retry runs — the retry is only enqueued by
@@ -615,6 +611,10 @@ func (tc *Controller) processPodEvictionRetry(ctx context.Context, item podEvict
 				metrics.PodDeletionsTotal.Inc()
 				metrics.PodDeletionsLatency.Observe(time.Since(item.fireAt).Seconds())
 			}
+			tc.forgetPodEvictionRetry(item)
+			return nil
+		}
+		if decision.keepExisting {
 			tc.forgetPodEvictionRetry(item)
 			return nil
 		}
