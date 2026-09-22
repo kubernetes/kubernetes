@@ -286,30 +286,39 @@ func TestThreadSafeStoreRV(t *testing.T) {
 }
 
 func BenchmarkIndexer(b *testing.B) {
-	testIndexer := "testIndexer"
-
-	indexers := Indexers{
-		testIndexer: func(obj interface{}) (strings []string, e error) {
-			indexes := []string{obj.(string)}
-			return indexes, nil
-		},
-	}
-
-	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
-
 	// The following benchmark imitates what is happening in indexes
 	// used in storage layer, where indexing is mostly static (e.g.
 	// indexing objects by their (namespace, name)).
 	// The 5000 number imitates indexing nodes in 5000-node cluster.
-	objectCount := 5000
-	objects := make([]string, 0, 5000)
-	for i := 0; i < objectCount; i++ {
-		objects = append(objects, fmt.Sprintf("object-number-%d", i))
-	}
+	for _, valuesPerObject := range []int{1, 10} {
+		b.Run(fmt.Sprintf("valuesPerObject=%d", valuesPerObject), func(b *testing.B) {
+			testIndexer := "testIndexer"
+			indexers := Indexers{
+				testIndexer: func(obj interface{}) ([]string, error) {
+					return append([]string(nil), obj.([]string)...), nil
+				},
+			}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		store.Update(objects[i%objectCount], objects[i%objectCount])
+			store := NewThreadSafeStore(indexers, Indices{}).(*threadSafeMap)
+			objectCount := 5000
+			keys := make([]string, objectCount)
+			objects := make([][]string, objectCount)
+			for i := 0; i < objectCount; i++ {
+				keys[i] = fmt.Sprintf("object-number-%d", i)
+				vals := make([]string, valuesPerObject)
+				for v := 0; v < valuesPerObject; v++ {
+					vals[v] = fmt.Sprintf("object-number-%d-val-%d", i, v)
+				}
+				objects[i] = vals
+				store.Add(keys[i], objects[i])
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				idx := i % objectCount
+				store.Update(keys[idx], objects[idx])
+			}
+		})
 	}
 }
