@@ -27,7 +27,7 @@ import (
 // +genclient:nonNamespaced
 // +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.37
+// +k8s:prerelease-lifecycle-gen:introduced=1.38
 
 // AuthorizationConditionsReview describes a request to evaluate authorization conditions.
 type AuthorizationConditionsReview struct {
