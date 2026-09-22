@@ -17,6 +17,7 @@ limitations under the License.
 package limitranger
 
 import (
+	"math/big"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -90,11 +91,10 @@ func TestLimitRangerRatioIsExact(t *testing.T) {
 		{"ratio one unit below the maximum", "9007199254740992", "18014398509481983", "2", false},
 		{"ratio exactly at the maximum", "9007199254740992", "18014398509481984", "2", false},
 		{"ratio one unit above the maximum", "9007199254740992", "18014398509481985", "2", true},
+		{"ratio well under a suffixed maximum at the largest exponent", "1e2147483647", "1e2147483647", "1k", false},
 		{"ratio at a suffixed maximum at the largest exponent", "1e2147483647", "1000e2147483647", "1k", false},
-		// TODO(#141166): A 10000:1 ratio exceeds max 1000, so wantError must be true.
-		{"ratio above a suffixed maximum at the largest exponent", "1e2147483647", "10000e2147483647", "1k", false},
-		// TODO(#141166): Ratio 3 exceeds max 2, so wantError must be true.
-		{"ratio above the maximum with both operands negative", "-1", "-3", "2", false},
+		{"ratio above a suffixed maximum at the largest exponent", "1e2147483647", "10000e2147483647", "1k", true},
+		{"ratio above the maximum with both operands negative", "-1", "-3", "2", true},
 	}
 	for _, testCase := range testCases {
 		if err := ratioOf(testCase.req, testCase.lim, testCase.maxRatio); (err != nil) != testCase.wantError {
@@ -115,12 +115,27 @@ func TestLimitRequestRatioConstraint(t *testing.T) {
 		{"ratio at the maximum", "1", "2", "2", ""},
 		{"ratio above the maximum", "1", "3", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000"},
 		{"ratio at the maximum past float64", "1e400", "2e400", "2", ""},
-		// TODO(#141166): The message must show the exact ratio 3.
-		{"ratio above the maximum with the limit past float64", "1e308", "3e308", "2", "memory max limit to request ratio per Container is 2, but provided ratio is +Inf"},
-		// TODO(#141166): The message must show the exact ratio 3.
-		{"ratio above the maximum with both operands past float64", "1e400", "3e400", "2", "memory max limit to request ratio per Container is 2, but provided ratio is NaN"},
-		// TODO(#141166): A negative pair with ratio 1 must not fail the ratio check. Expect no error, or an error about negative values.
-		{"ratio under the maximum with both operands negative", "-1", "-1", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1.000000"},
+		{"ratio above the maximum with the limit past float64", "1e308", "3e308", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000"},
+		{"ratio above the maximum with both operands past float64", "1e400", "3e400", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000"},
+		{"ratio under the maximum with both operands negative", "-1", "-1", "2", ""},
+		{"ratio above the maximum with both operands negative", "-1", "-3", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000"},
+		{"ratio above the maximum with only the request negative", "-1", "3", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000"},
+		{"ratio above the maximum with only the limit negative", "1", "-3", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000"},
+		{"ratio with operands at different scales", "1", "1500m", "1", "memory max limit to request ratio per Container is 1, but provided ratio is 1.500000"},
+		{"ratio too large to print in full", "1", "1e2147483647", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1.000000e2147483647"},
+		{"ratio whose coefficients differ in width", "10000000", "1e50", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1.000000e43"},
+		{"same ratio with the request written as an exponent", "1e7", "1e50", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1.000000e43"},
+		{"small ratio whose operands are at far apart scales", "10000000", "3e50", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000e43"},
+		{"small ratio that needs no exponent once normalized", "100000000000000000000000000000000000000000000000000", "3e50", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000"},
+		{"ratio just below the rounding boundary", "10000000", "99999994e50", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 9.999999e50"},
+		{"ratio whose mantissa carries to ten", "10000000", "99999999e50", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1.000000e51"},
+		{"ratio at the rounding tie with an odd digit kept", "10000000", "99999995e50", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1.000000e51"},
+		{"ratio at the rounding tie with an even digit kept", "10000000", "99999985e50", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 9.999998e50"},
+		{"ratio whose coefficient quotient is below one", "5", "1e50", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 2.000000e49"},
+		{"ratio whose limit coefficient is the wider of the two", "1", "12345678e50", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1.234568e57"},
+		{"ratio at the last scale gap the plain form covers", "1", "1e40", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 10000000000000000000000000000000000000000.000000"},
+		{"ratio one scale gap past the plain form", "1", "1e41", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1.000000e41"},
+		{"ratio at the last negative scale gap the plain form covers", "1e31", "10000000000000000000000000000000000000001", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1000000000.000000"},
 	}
 	for _, testCase := range testCases {
 		err := limitRequestRatioConstraint("Container", "memory", resource.MustParse(testCase.maxRatio),
@@ -205,6 +220,74 @@ func TestConstraintsRejectValuesTheProjectionRounded(t *testing.T) {
 	for _, testCase := range testCases {
 		if err := testCase.check(); err == nil {
 			t.Errorf("%s: expected rejection", testCase.desc)
+		}
+	}
+}
+
+// A Quantity whose coefficient passes int64 carries an inf.Dec, which Neg
+// writes through, so the caller's own value would change with it.
+func TestRatioHelpersLeaveTheirArgumentsAlone(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		req      string
+		lim      string
+		maxRatio string
+	}{
+		{"both operands negative", "-18446744073709551616", "-55340232221128654848", "2"},
+		{"only the request negative", "-18446744073709551616", "55340232221128654848", "2"},
+		{"neither operand negative", "18446744073709551616", "55340232221128654848", "2"},
+	}
+	for _, testCase := range testCases {
+		req, lim := resource.MustParse(testCase.req), resource.MustParse(testCase.lim)
+		maxRatio := resource.MustParse(testCase.maxRatio)
+		reqWas, limWas, maxWas := req.DeepCopy(), lim.DeepCopy(), maxRatio.DeepCopy()
+		exceedsAllowed(lim, req, maxRatio)
+		ratioString(lim, req)
+		if req.Cmp(reqWas) != 0 || lim.Cmp(limWas) != 0 || maxRatio.Cmp(maxWas) != 0 {
+			t.Errorf("%s: arguments changed, request %v, limit %v, ratio %v", testCase.desc, &req, &lim, &maxRatio)
+		}
+	}
+}
+
+func TestCmpScaled(t *testing.T) {
+	mustBig := func(s string) *big.Int {
+		v, ok := new(big.Int).SetString(s, 10)
+		if !ok {
+			t.Fatalf("bad number %q", s)
+		}
+		return v
+	}
+	testCases := []struct {
+		desc string
+		a    string
+		sa   int64
+		b    string
+		sb   int64
+		want int
+	}{
+		{"zero against a value", "0", 0, "5", 0, -1},
+		{"a value against zero", "5", 0, "0", 0, 1},
+		{"both zero", "0", 0, "0", 0, 0},
+		{"zero against a value at a wider scale", "0", 0, "5", 10, -1},
+		{"a value at a wider scale against zero", "5", 10, "0", 0, 1},
+		{"a value against a negative", "5", 0, "-5", 0, 1},
+		{"a larger magnitude", "5", 0, "5", 1, 1},
+		{"a smaller magnitude", "5", 1, "5", 0, -1},
+		{"equal at the same scale", "5", 0, "5", 0, 0},
+		{"equal magnitudes decided by the coefficients", "6", 0, "5", 0, 1},
+		{"equal magnitudes with b at the wider scale", "5", 0, "500", 2, 0},
+		{"equal magnitudes with a at the wider scale", "500", 2, "5", 0, 0},
+		{"equal magnitudes past inf.Scale", "1000", -2147483647, "1", -2147483650, 0},
+		{"a below b past inf.Scale", "1", -2147483647, "1", -2147483650, -1},
+	}
+	for _, testCase := range testCases {
+		a, b := mustBig(testCase.a), mustBig(testCase.b)
+		aCopy, bCopy := new(big.Int).Set(a), new(big.Int).Set(b)
+		if got := cmpScaled(a, testCase.sa, b, testCase.sb); got != testCase.want {
+			t.Errorf("%s: got %d, want %d", testCase.desc, got, testCase.want)
+		}
+		if a.Cmp(aCopy) != 0 || b.Cmp(bCopy) != 0 {
+			t.Errorf("%s: cmpScaled modified its arguments", testCase.desc)
 		}
 	}
 }
