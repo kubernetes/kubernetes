@@ -1821,6 +1821,73 @@ func TestStaticPolicyStartWithMemoryDriftReportsEveryAssignmentThatDoesNotFit(t 
 	}, strings.Split(err.Error(), "\n"))
 }
 
+func TestStaticPolicyValidateStateReportsMemoryDrift(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	const total = 8 * gb
+	numaNode := func(nodeID int) *state.NUMANodeState {
+		return &state.NUMANodeState{
+			MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+				v1.ResourceMemory: {Allocatable: total - gb, Free: total - gb, Reserved: 0, SystemReserved: gb, TotalMemSize: total},
+			},
+			Cells:               []int{nodeID},
+			NumberOfAssignments: 0,
+		}
+	}
+	machineInfo := func(memory0, memory1 uint64) *cadvisorapi.MachineInfo {
+		return &cadvisorapi.MachineInfo{
+			Topology: []cadvisorapi.Node{
+				{Id: 0, Memory: memory0},
+				{Id: 1, Memory: memory1},
+			},
+		}
+	}
+	systemReserved := systemReservedMemory{
+		0: map[v1.ResourceName]uint64{v1.ResourceMemory: gb},
+		1: map[v1.ResourceName]uint64{v1.ResourceMemory: gb},
+	}
+
+	testCases := []struct {
+		description   string
+		machineState  state.NUMANodeMap
+		machineInfo   *cadvisorapi.MachineInfo
+		expectedDrift map[int]uint64
+	}{
+		{
+			description:  "a fresh start reports no drift",
+			machineState: state.NUMANodeMap{},
+			machineInfo:  machineInfo(total, total),
+		},
+		{
+			description:  "a restart on an unchanged machine reports no drift",
+			machineState: state.NUMANodeMap{0: numaNode(0), 1: numaNode(1)},
+			machineInfo:  machineInfo(total, total),
+		},
+		{
+			description:   "a restart reports the drift observed on each NUMA node",
+			machineState:  state.NUMANodeMap{0: numaNode(0), 1: numaNode(1)},
+			machineInfo:   machineInfo(total-4*mb, total+8*mb),
+			expectedDrift: map[int]uint64{0: 4 * mb, 1: 8 * mb},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			tc := testStaticPolicy{
+				assignments:    state.ContainerMemoryAssignments{},
+				machineState:   testCase.machineState,
+				systemReserved: systemReserved,
+				machineInfo:    testCase.machineInfo,
+			}
+			p, s, err := initTests(t, &tc, nil, nil)
+			require.NoError(t, err)
+			p.(*staticPolicy).maxMemoryDrift = testMemoryDriftBound
+			drift, err := p.(*staticPolicy).validateState(logger, s)
+			require.NoError(t, err)
+			require.Equal(t, testCase.expectedDrift, drift)
+		})
+	}
+}
+
 func TestStaticPolicyAllocate(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
