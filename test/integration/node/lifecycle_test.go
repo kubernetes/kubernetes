@@ -3,7 +3,7 @@ Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+You may obtain a copy of the License a
 
     http://www.apache.org/licenses/LICENSE-2.0
 
@@ -17,7 +17,9 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -119,7 +121,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)
 			testCtx := testutils.InitTestAPIServer(t, "taint-no-execute", nil)
-			cs := testCtx.ClientSet
+			cs := testCtx.ClientSe
 
 			// Build clientset and informers for controllers.
 			externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
@@ -228,7 +230,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 	}
 	tests := []struct {
 		name                                  string
-		nodeTaints                            []v1.Taint
+		nodeTaints                            []v1.Tain
 		nodeConditions                        []v1.NodeCondition
 		pod                                   *v1.Pod
 		tolerationSeconds                     int64
@@ -342,7 +344,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			podTolerations.SetExternalKubeClientSet(externalClientset)
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)
 
-			cs := testCtx.ClientSet
+			cs := testCtx.ClientSe
 
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(
@@ -470,4 +472,166 @@ func newHandlerForTest() (*defaulttolerationseconds.Plugin, error) {
 	pluginInitializer := initializer.New(nil, nil, nil, nil, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	return handler, admission.ValidateInitialization(handler)
+}
+
+type failDeleteAdmission struct {
+	*admission.Handler
+	failures atomic.Int32
+}
+
+func (f *failDeleteAdmission) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+	if a.GetResource().Resource == "pods" && a.GetName() == "test-pod" && a.GetOperation() == admission.Delete {
+		if f.failures.Add(1) <= 5 {
+			return admission.NewForbidden(a, fmt.Errorf("injected failure for testing durable retry"))
+		}
+	}
+	return nil
+}
+
+// TestTaintEvictionDurableRetryEndToEnd exercises the taint-eviction controller
+// end-to-end against a real API server. It verifies that:
+//
+//  1. A pod with a finite TolerationSeconds window is NOT evicted immediately
+//     when a NoExecute taint is added to its node.
+//  2. The pod IS evicted after the toleration window expires.
+//  3. When the initial burst of Delete requests fails, the durable retry queue
+//     is correctly utilized to eventually delete the pod.
+//
+// This covers the timed-worker → durable-retry chain introduced by
+// https://github.com/kubernetes/kubernetes/pull/141568. The test uses the
+// real tainteviction.Controller and a live API server so that transient API
+// failures and the rate-limited retry queue are exercised under realistic
+// conditions.
+func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
+	// Use a short toleration window so the test completes quickly.
+	tolerationSeconds := int64(2)
+	noExecuteTaint := v1.Taint{
+		Key:    "test/noexecute",
+		Value:  "true",
+		Effect: v1.TaintEffectNoExecute,
+	}
+
+	// Create our custom admission controller that rejects the first 5 delete attempts
+	admissionCtrl := &failDeleteAdmission{Handler: admission.NewHandler(admission.Delete)}
+
+	// Pass the admission controller to the real test API server
+	testCtx := testutils.InitTestAPIServer(t, "taint-eviction-retry", admissionCtrl)
+	cs := testCtx.ClientSet
+
+	// Build informers and controller using the same clientset.
+	externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
+	externalClientConfig.QPS = -1
+	externalClientset := clientset.NewForConfigOrDie(externalClientConfig)
+	externalInformers := informers.NewSharedInformerFactory(externalClientset, 0)
+
+	tm, err := tainteviction.New(
+		testCtx.Ctx,
+		testCtx.ClientSet,
+		externalInformers.Core().V1().Pods(),
+		externalInformers.Core().V1().Nodes(),
+		"taint-eviction-retry-test",
+	)
+	if err != nil {
+		t.Fatalf("Failed to create taint eviction controller: %v", err)
+	}
+
+	externalInformers.Start(testCtx.Ctx.Done())
+	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
+	go tm.Run(testCtx.Ctx)
+
+	// Create a Ready node.
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{{
+				Type:   v1.NodeReady,
+				Status: v1.ConditionTrue,
+			}},
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+				v1.ResourcePods:   resource.MustParse("10"),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+				v1.ResourcePods:   resource.MustParse("10"),
+			},
+		},
+	}
+	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+	t.Cleanup(func() { testutils.CleanupNodes(cs, t) })
+
+	// Create a pod assigned to the node with a finite toleration for the taint.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: testCtx.NS.Name,
+		},
+		Spec: v1.PodSpec{
+			NodeName: node.Name,
+			Containers: []v1.Container{
+				{Name: "c", Image: "pause"},
+			},
+			Tolerations: []v1.Toleration{{
+				Key:               noExecuteTaint.Key,
+				Operator:          v1.TolerationOpExists,
+				Effect:            v1.TaintEffectNoExecute,
+				TolerationSeconds: &tolerationSeconds,
+			}},
+		},
+	}
+	createdPod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+	t.Cleanup(func() { testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{createdPod}) })
+
+	// Add a NoExecute taint. The controller should start the toleration timer.
+	if err := testutils.AddTaintToNode(cs, node.Name, noExecuteTaint); err != nil {
+		t.Fatalf("Failed to add taint to node: %v", err)
+	}
+
+	// Poll briefly to confirm the pod is NOT evicted immediately.
+	// It has a 2-second toleration window so deletion timestamp must not be
+	// set within the first 500ms.
+	evictedEarly := false
+	_ = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 500*time.Millisecond, false,
+		func(ctx context.Context) (bool, error) {
+			p, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, createdPod.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, nil
+			}
+			if p.DeletionTimestamp != nil {
+				evictedEarly = true
+				return true, nil
+			}
+			return false, nil
+		},
+	)
+	if evictedEarly {
+		t.Error("Pod was evicted before its TolerationSeconds window expired")
+	}
+
+	// The toleration window is 2 seconds. When it expires, the controller will
+	// attempt to delete the pod 5 times in a quick burst. Our admission plugin
+	// will reject all 5 attempts. The controller will then hand off the eviction
+	// to the rate-limited durable retry queue (podEvictionQueue).
+	// We wait up to 30 seconds for the eventual successful deletion (the 6th attemp
+	// or later) via the durable retry queue.
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 30*time.Second, true,
+		testutils.PodIsGettingEvicted(cs, testCtx.NS.Name, createdPod.Name)); err != nil {
+		t.Errorf("Pod was not evicted within expected window: %v", err)
+	}
+
+	// Verify that the admission plugin actually rejected exactly 5 initial deletion attempts,
+	// and allowed at least a 6th attempt, proving the durable retry queue was exercised.
+	failedAttempts := admissionCtrl.failures.Load()
+	if failedAttempts < 6 {
+		t.Errorf("Expected at least 6 Delete attempts (5 failures + 1 success via retry queue), got %d", failedAttempts)
+	}
 }

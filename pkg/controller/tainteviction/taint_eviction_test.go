@@ -857,6 +857,139 @@ func TestPodEvictionRetrySchedulesNewDeadlineForChangedTaint(t *testing.T) {
 	}
 }
 
+// TestPodEvictionRetryWithExpiredTolerationDeletesDirectly verifies that a durable
+// retry occurring after a finite TolerationSeconds window has already expired does
+// NOT restart that toleration window. The retry must delete the pod immediately
+// rather than scheduling a fresh timed worker for another N seconds.
+//
+// Regression test for: https://github.com/kubernetes/kubernetes/issues/140639
+func TestPodEvictionRetryWithExpiredTolerationDeletesDirectly(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Pod starts with TolerationSeconds: 5 for the matching taint so the initial
+	// eviction goes through the timed-worker path (podEvictionLater), not the
+	// immediate path (podEvictionNow).
+	tolerationSeconds := int64(5)
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	pod.Spec.Tolerations = []corev1.Toleration{{
+		Key:               "testTaint1",
+		Value:             "test1",
+		Effect:            corev1.TaintEffectNoExecute,
+		TolerationSeconds: &tolerationSeconds,
+	}}
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	// All delete attempts fail so the durable retry queue is exercised.
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		deleteAction := action.(clienttesting.DeleteAction)
+		deleteAttempts.Add(1)
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+	// Use 1s/10s backoff so each retry step can be driven deterministically
+	// by advancing the fake clock by exactly one backoff period.
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	useFakePodEvictionQueueWithBackoff(controller, fakeClock, time.Second, 10*time.Second)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+	// Trigger the initial eviction decision. Because the pod has TolerationSeconds: 5,
+	// getPodEvictionDecision returns podEvictionLater and a timed worker is created.
+	controller.PodUpdated(nil, pod)
+
+	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+
+	// Wait for the timed worker to appear in the queue with the 5s window.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		w := controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String())
+		return w != nil && w.FireAt.Sub(w.CreatedAt) == time.Duration(tolerationSeconds)*time.Second, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for initial timed worker with 5s window: %v", err)
+	}
+
+	// No delete attempts should have happened yet — the pod is still in its
+	// toleration window.
+	if got := deleteAttempts.Load(); got != 0 {
+		t.Fatalf("Delete should not have been attempted before toleration window expires: got %d attempts", got)
+	}
+
+	// Advance the fake clock past the 5-second toleration window to fire the
+	// timed worker.
+	fakeClock.Step(time.Duration(tolerationSeconds) * time.Second)
+
+	// Wait for the initial burst of delete attempts to be exhausted.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == int32(retries), nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for initial burst of %d delete attempts: %v", retries, err)
+	}
+
+	// Wait for the durable retry to be registered in podEvictionTokens. The
+	// item carries the original createdAt/fireAt so the retry path knows when
+	// the toleration window actually expired.
+	podRef := NamespacedObject{NamespacedName: podNamespacedName, UID: pod.UID}
+	item, err := waitForPodEvictionRetry(controller, podRef)
+	if err != nil {
+		t.Fatalf("Timed out waiting for durable retry handoff: %v", err)
+	}
+
+	// The timed worker slot must be empty at this point — the worker that fired
+	// at T+5s has already completed and removed itself.
+	if w := controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()); w != nil {
+		t.Fatalf("Timed worker still present after initial burst: %#v", w)
+	}
+
+	// Advance the fake clock by the first backoff period (1s) to release the
+	// rate-limited retry item from podEvictionQueue.
+	fakeClock.Step(time.Second)
+
+	// The retry must delete directly (attempt count goes to retries+1) without
+	// creating a new 5-second timed worker. Under the bug, the retry would call
+	// AddWork with a future triggerTime and no new delete attempt would happen
+	// within the 200ms window below; the test would time out here.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 200*time.Millisecond, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == int32(retries+1), nil
+	}); err != nil {
+		t.Fatalf("Durable retry did not delete directly after expired toleration window: %v", err)
+	}
+
+	// Confirm no new timed worker was created. Under the bug a fresh 5-second
+	// worker would have been created here.
+	if w := controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()); w != nil {
+		t.Fatalf("Retry incorrectly created a new timed worker, granting a fresh grace period: FireAt=%v CreatedAt=%v", w.FireAt, w.CreatedAt)
+	}
+
+	// The retry item must still be active (the delete failed again).
+	if current, ok := currentPodEvictionRetry(controller, podNamespacedName); !ok || current != item {
+		t.Fatalf("Durable retry item changed or disappeared: ok=%v got=%#v want=%#v", ok, current, item)
+	}
+
+	// Verify the second retry also deletes directly (2s backoff step).
+	fakeClock.Step(2 * time.Second)
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 200*time.Millisecond, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == int32(retries+2), nil
+	}); err != nil {
+		t.Fatalf("Second durable retry did not delete directly: %v", err)
+	}
+	if w := controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()); w != nil {
+		t.Fatalf("Second retry created an unexpected timed worker: %#v", w)
+	}
+}
+
 func TestDeletePod(t *testing.T) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -875,6 +1008,64 @@ func TestDeletePod(t *testing.T) {
 	controller.PodUpdated(testutil.NewPod("pod1", "node1"), nil)
 	// wait a bit to see if nothing will panic
 	time.Sleep(timeForControllerToProgressForSanityCheck)
+}
+
+// TestAddConditionAndDeletePodNotFoundIsSuccess verifies that a NotFound error
+// returned by the Delete API call is treated as a clean success. This covers
+// the race window between our Get and Delete calls where another actor may
+// concurrently delete the pod. The controller must not enter the durable retry
+// queue when this happens.
+func TestAddConditionAndDeletePodNotFoundIsSuccess(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	fakeClientset := fake.NewSimpleClientset(pod)
+
+	var deleteCalls atomic.Int32
+	// Simulate concurrent deletion: the Get succeeds (pod exists in fake store)
+	// but the Delete call returns NotFound as if another actor deleted it first.
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		deleteCalls.Add(1)
+		return true, nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, action.(clienttesting.DeleteAction).GetName())
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+
+	// Trigger eviction. Pod has no tolerations so it will be deleted immediately.
+	controller.PodUpdated(nil, pod)
+
+	// Wait for the delete reactor to be called.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteCalls.Load() > 0, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for Delete call: %v", err)
+	}
+
+	// Give the controller a moment to process the result.
+	time.Sleep(timeForControllerToProgressForSanityCheck)
+
+	// The NotFound result must be treated as success: no retry token should
+	// have been registered in podEvictionTokens.
+	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+	if _, ok := currentPodEvictionRetry(controller, podNamespacedName); ok {
+		t.Errorf("NotFound on Delete incorrectly registered a durable retry token")
+	}
 }
 
 func TestUpdatePod(t *testing.T) {

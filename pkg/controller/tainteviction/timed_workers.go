@@ -51,7 +51,11 @@ func NewWorkArgs(name, namespace string) *WorkArgs {
 	}
 }
 
-// NewWorkArgsWithUID is a helper function to create new `WorkArgs` with a UID.
+// NewWorkArgsWithUID creates a WorkArgs for the named pod with a UID.
+// The UID is stored in the work item and propagated to the worker function
+// via WorkArgs.Object.UID. When non-empty, it is used to set a delete
+// precondition so that a pod recreated with the same name is not accidentally
+// deleted in place of the original.
 func NewWorkArgsWithUID(name, namespace string, uid types.UID) *WorkArgs {
 	return &WorkArgs{
 		Object: NamespacedObject{NamespacedName: types.NamespacedName{Namespace: namespace, Name: name}, UID: uid},
@@ -67,6 +71,14 @@ type TimedWorker struct {
 	cancelled atomic.Bool
 }
 
+// timedWorkerToken is an opaque generation tag allocated for each worker
+// entry in TimedWorkerQueue.workers. Its pointer identity — not its value —
+// is used to associate a running goroutine with the map entry that created
+// it. When a worker is replaced (via UpdateWork or CancelWork), a fresh
+// token is allocated, so the old goroutine can detect on completion that its
+// entry has been superseded and skip the delete(q.workers, key) call.
+// The zero-size field ensures no two allocations share an address while
+// keeping the struct size minimal.
 type timedWorkerToken struct {
 	_ byte
 }
