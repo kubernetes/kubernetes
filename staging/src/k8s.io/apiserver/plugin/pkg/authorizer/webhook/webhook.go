@@ -257,7 +257,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		return authorizer.DecisionDeny, r.Status.Reason, fmt.Errorf("webhook subject access review returned both allow and deny response")
 	case r.Status.ConditionalDecision != nil:
 		// Parse the conditional decision so we know how to fail closed, reusing the existing code.
-		gotDecision := apiserverauthorizationv1.DeserializeConditionsAwareDecision(*r.Status.ConditionalDecision, w.conditionsAwareFailureDecision)
+		gotDecision := apiserverauthorizationv1.ToAuthorizerConditionsAwareDecision(*r.Status.ConditionalDecision, w.conditionsAwareFailureDecision)
 		return gotDecision.FailureDecision(), r.Status.Reason, fmt.Errorf("webhook subject access review returned unrequested conditional decision")
 	case r.Status.Denied:
 		return authorizer.DecisionDeny, r.Status.Reason, nil
@@ -329,7 +329,7 @@ func (w *WebhookAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attr a
 	case r.Status.Denied:
 		return authorizer.ConditionsAwareDecisionDeny(r.Status.Reason, evaluationErr)
 	case r.Status.ConditionalDecision != nil:
-		return apiserverauthorizationv1.DeserializeConditionsAwareDecision(*r.Status.ConditionalDecision, w.conditionsAwareFailureDecision)
+		return apiserverauthorizationv1.ToAuthorizerConditionsAwareDecision(*r.Status.ConditionalDecision, w.conditionsAwareFailureDecision)
 	case r.Status.Allowed:
 		return authorizer.ConditionsAwareDecisionAllow(r.Status.Reason, evaluationErr)
 	default:
@@ -435,7 +435,7 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decisionToEv
 
 	r := &authorizationv1alpha1.AuthorizationConditionsReview{
 		Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
-			Decision: apiserverauthorizationv1.SerializeConditionsAwareDecision(decisionToEvaluate),
+			Decision: apiserverauthorizationv1.FromAuthorizerConditionsAwareDecision(decisionToEvaluate),
 		},
 	}
 
@@ -506,17 +506,17 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decisionToEv
 		if !decisionToEvaluate.PossibleDecisions().Has(authorizer.DecisionDeny) {
 			return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("webhook authorizer tried to return Deny from EvaluateConditions, but the possible outcomes were %v", sets.List(decisionToEvaluate.PossibleDecisions()))
 		}
-		return authorizer.DecisionDeny, apiserverauthorizationv1.DeserializeReason(result.Response.Decision.Deny), apiserverauthorizationv1.DeserializeEvaluationError(result.Response.Decision.Deny)
+		return authorizer.DecisionDeny, apiserverauthorizationv1.UnconditionalReason(result.Response.Decision.Deny), apiserverauthorizationv1.UnconditionalEvaluationError(result.Response.Decision.Deny)
 	case authorizationv1.ConditionsAwareDecisionTypeNoOpinion:
 		if !decisionToEvaluate.PossibleDecisions().Has(authorizer.DecisionNoOpinion) {
 			return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("webhook authorizer tried to return NoOpinion from EvaluateConditions, but the possible outcomes were %v", sets.List(decisionToEvaluate.PossibleDecisions()))
 		}
-		return authorizer.DecisionNoOpinion, apiserverauthorizationv1.DeserializeReason(result.Response.Decision.NoOpinion), apiserverauthorizationv1.DeserializeEvaluationError(result.Response.Decision.NoOpinion)
+		return authorizer.DecisionNoOpinion, apiserverauthorizationv1.UnconditionalReason(result.Response.Decision.NoOpinion), apiserverauthorizationv1.UnconditionalEvaluationError(result.Response.Decision.NoOpinion)
 	case authorizationv1.ConditionsAwareDecisionTypeAllow:
 		if !decisionToEvaluate.PossibleDecisions().Has(authorizer.DecisionAllow) {
 			return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("webhook authorizer tried to return Allow from EvaluateConditions, but the possible outcomes were %v", sets.List(decisionToEvaluate.PossibleDecisions()))
 		}
-		return authorizer.DecisionAllow, apiserverauthorizationv1.DeserializeReason(result.Response.Decision.Allow), apiserverauthorizationv1.DeserializeEvaluationError(result.Response.Decision.Allow)
+		return authorizer.DecisionAllow, apiserverauthorizationv1.UnconditionalReason(result.Response.Decision.Allow), apiserverauthorizationv1.UnconditionalEvaluationError(result.Response.Decision.Allow)
 	default:
 		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("unrecognized decisionToEvaluate type %q", result.Response.Decision.Type)
 	}

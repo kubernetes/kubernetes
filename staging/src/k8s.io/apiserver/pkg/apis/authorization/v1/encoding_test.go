@@ -26,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
-func TestSerializeConditionsAwareDecision(t *testing.T) {
+func TestFromAuthorizerConditionsAwareDecision(t *testing.T) {
 	denyCond := authorizer.GenericCondition{ID: "example.com/deny", Condition: "cond-d", Type: "example.com/t", Description: "deny-desc"}
 	noOpCond := authorizer.GenericCondition{ID: "example.com/noop", Condition: "cond-n", Type: "example.com/t", Description: "noop-desc"}
 	allowCond := authorizer.GenericCondition{ID: "example.com/allow", Condition: "cond-a", Type: "example.com/t", Description: "allow-desc"}
@@ -134,7 +134,7 @@ func TestSerializeConditionsAwareDecision(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := SerializeConditionsAwareDecision(tt.in)
+			got := FromAuthorizerConditionsAwareDecision(tt.in)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("unexpected serialization (-want +got):\n%s", diff)
 			}
@@ -142,7 +142,7 @@ func TestSerializeConditionsAwareDecision(t *testing.T) {
 	}
 }
 
-func TestDeserializeReason(t *testing.T) {
+func TestUnconditionalReason(t *testing.T) {
 	tests := []struct {
 		name string
 		in   *authorizationv1.UnconditionalDecision
@@ -154,14 +154,14 @@ func TestDeserializeReason(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := DeserializeReason(tt.in); got != tt.want {
-				t.Errorf("DeserializeReason = %q, want %q", got, tt.want)
+			if got := UnconditionalReason(tt.in); got != tt.want {
+				t.Errorf("UnconditionalReason = %q, want %q", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestDeserializeEvaluationError(t *testing.T) {
+func TestUnconditionalEvaluationError(t *testing.T) {
 	tests := []struct {
 		name    string
 		in      *authorizationv1.UnconditionalDecision
@@ -173,7 +173,7 @@ func TestDeserializeEvaluationError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := DeserializeEvaluationError(tt.in)
+			got := UnconditionalEvaluationError(tt.in)
 			switch {
 			case tt.wantErr == "" && got != nil:
 				t.Errorf("expected nil error, got %v", got)
@@ -186,7 +186,7 @@ func TestDeserializeEvaluationError(t *testing.T) {
 	}
 }
 
-func TestDeserializeConditionsAwareDecision(t *testing.T) {
+func TestToAuthorizerConditionsAwareDecision(t *testing.T) {
 	failClosedSentinel := authorizer.ConditionsAwareDecisionDeny("failClosed called", nil)
 	failClosed := func(err error) authorizer.ConditionsAwareDecision {
 		return failClosedSentinel
@@ -344,7 +344,7 @@ func TestDeserializeConditionsAwareDecision(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := DeserializeConditionsAwareDecision(tt.in, failClosed)
+			got := ToAuthorizerConditionsAwareDecision(tt.in, failClosed)
 			tt.check(t, got)
 		})
 	}
@@ -371,8 +371,8 @@ func TestSerializeDeserializeRoundTrip(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			serialized := SerializeConditionsAwareDecision(tt.in)
-			deserialized := DeserializeConditionsAwareDecision(serialized, func(err error) authorizer.ConditionsAwareDecision {
+			serialized := FromAuthorizerConditionsAwareDecision(tt.in)
+			deserialized := ToAuthorizerConditionsAwareDecision(serialized, func(err error) authorizer.ConditionsAwareDecision {
 				t.Fatalf("unexpected failClosed call: %v", err)
 				return authorizer.ConditionsAwareDecisionDeny("", err)
 			})

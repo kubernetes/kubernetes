@@ -64,7 +64,7 @@ func Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessRev
 			return fmt.Errorf("unexpected, cannot convert authorization.SubjectAccessReviewStatus to v1.SubjectAccessReviewStatus: %w", err)
 		}
 
-		decodedDecision := apiserverauthorizationv1.DeserializeConditionsAwareDecision(*v1SARSpec.ConditionalDecision, func(err error) authorizer.ConditionsAwareDecision {
+		decodedDecision := apiserverauthorizationv1.ToAuthorizerConditionsAwareDecision(*v1SARSpec.ConditionalDecision, func(err error) authorizer.ConditionsAwareDecision {
 			return authorizer.ConditionsAwareDecisionDeny("failed closed", fmt.Errorf("couldn't deserialize decision: %w", err))
 		})
 
