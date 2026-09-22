@@ -7800,7 +7800,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 		podGroups                    []*schedulingv1beta1.PodGroup
 		scheduledPods                []*v1.Pod
 		unscheduledPods              []*v1.Pod
-		rootPodGroupInfo             *framework.QueuedPodGroupInfo
 		filterStatus                 map[string]*fwk.Status
 		onPostFilter                 func(t *testing.T, plugin *fakePodGroupPlugin) func(ctx context.Context, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
 		wantPodGroupPostFilterCalled bool
@@ -7816,23 +7815,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p2").UID("p2").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").MinCount(2).Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p1").UID("p1").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2").UID("p2").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1").UID("p1").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2").UID("p2").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-				},
 			},
 			filterStatus: map[string]*fwk.Status{
 				"p1": fwk.NewStatus(fwk.Success),
@@ -7855,21 +7837,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p2").UID("p2").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").BasicPolicy().Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p2").UID("p2").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2").UID("p2").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-				},
-			},
 			filterStatus: map[string]*fwk.Status{
 				"p2": fwk.NewStatus(fwk.Success),
 				"p3": fwk.NewStatus(fwk.Unschedulable, "insufficient resources"),
@@ -7891,23 +7858,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p4").UID("p4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p5").UID("p5").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").MinCount(2).Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p4").UID("p4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p5").UID("p5").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p4").UID("p4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p5").UID("p5").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-				},
 			},
 			filterStatus: map[string]*fwk.Status{
 				"p3": fwk.NewStatus(fwk.Success),
@@ -7952,21 +7902,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p4").UID("p4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").MinCount(2).Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p4").UID("p4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p4").UID("p4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-				},
-			},
 			filterStatus: map[string]*fwk.Status{
 				"p3": fwk.NewStatus(fwk.Success),
 				"p4": fwk.NewStatus(fwk.Unschedulable, "insufficient resources"),
@@ -7993,59 +7928,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p3_1").UID("p3_1").Namespace("default").PodGroupName("pg3").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p3_2").UID("p3_2").Namespace("default").PodGroupName("pg3").SchedulerName("test-scheduler").Obj(),
-			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg1").Namespace("default").MinGroupCount(2).Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p1_1").UID("p1_1").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p1_2").UID("p1_2").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p3_1").UID("p3_1").Namespace("default").PodGroupName("pg3").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p3_2").UID("p3_2").Namespace("default").PodGroupName("pg3").SchedulerName("test-scheduler").Obj(),
-					},
-					Children: []*framework.PodGroupInfo{
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p1_1").UID("p1_1").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p1_2").UID("p1_2").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg3").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p3_1").UID("p3_1").Namespace("default").PodGroupName("pg3").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p3_2").UID("p3_2").Namespace("default").PodGroupName("pg3").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_1").UID("p1_1").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_2").UID("p1_2").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-					fwk.PodGroupKey("default", "pg2"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-					},
-					fwk.PodGroupKey("default", "pg3"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p3_1").UID("p3_1").Namespace("default").PodGroupName("pg3").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p3_2").UID("p3_2").Namespace("default").PodGroupName("pg3").SchedulerName("test-scheduler").Obj())},
-					},
-				},
 			},
 			filterStatus: map[string]*fwk.Status{
 				"p1_1": fwk.NewStatus(fwk.Success),
@@ -8080,40 +7962,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
 			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg1").Namespace("default").MinGroupCount(2).Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-					},
-					Children: []*framework.PodGroupInfo{
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-					fwk.PodGroupKey("default", "pg2"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-					},
-				},
-			},
 			filterStatus: map[string]*fwk.Status{
 				"p1_3": fwk.NewStatus(fwk.Success),
 				"p1_4": fwk.NewStatus(fwk.Unschedulable, "insufficient resources"),
@@ -8142,46 +7990,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg1").Namespace("default").BasicPolicy().Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-					},
-					Children: []*framework.PodGroupInfo{
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-					fwk.PodGroupKey("default", "pg2"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-					},
-				},
 			},
 			filterStatus: map[string]*fwk.Status{
 				"p1_3": fwk.NewStatus(fwk.Success),
@@ -8214,46 +8022,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
 			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg1").Namespace("default").BasicPolicy().Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-					},
-					Children: []*framework.PodGroupInfo{
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-					fwk.PodGroupKey("default", "pg2"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-					},
-				},
-			},
 			filterStatus: map[string]*fwk.Status{
 				"p1_3": fwk.NewStatus(fwk.Success),
 				"p1_4": fwk.NewStatus(fwk.Unschedulable, "insufficient resources"),
@@ -8285,46 +8053,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
 			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg1").Namespace("default").BasicPolicy().Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-					},
-					Children: []*framework.PodGroupInfo{
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").BasicPolicy().Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-					fwk.PodGroupKey("default", "pg2"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_1").UID("p2_1").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_2").UID("p2_2").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-					},
-				},
-			},
 			filterStatus: map[string]*fwk.Status{
 				"p1_3": fwk.NewStatus(fwk.Success),
 				"p1_4": fwk.NewStatus(fwk.Unschedulable, "insufficient resources"),
@@ -8355,35 +8083,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p2_4").UID("p2_4").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
 			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg1").Namespace("default").BasicPolicy().Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_4").UID("p2_4").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-					},
-					Children: []*framework.PodGroupInfo{
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: nil,
-						},
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p2_4").UID("p2_4").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): nil,
-					fwk.PodGroupKey("default", "pg2"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_4").UID("p2_4").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-					},
-				},
-			},
 			filterStatus: map[string]*fwk.Status{
 				"p2_3": fwk.NewStatus(fwk.Success),
 				"p2_4": fwk.NewStatus(fwk.Unschedulable, "insufficient resources"),
@@ -8403,19 +8102,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 			},
 			unscheduledPods: []*v1.Pod{
 				st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").MinCount(2).Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-				},
 			},
 			filterStatus: map[string]*fwk.Status{
 				"p3": fwk.NewStatus(fwk.Unschedulable, "insufficient resources"),
@@ -8444,43 +8130,6 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p1_5").UID("p1_5").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
 				st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-			},
-			rootPodGroupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg1").Namespace("default").MinGroupCount(2).Obj()),
-					UnscheduledPods: []*v1.Pod{
-						st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p1_5").UID("p1_5").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-						st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-					},
-					Children: []*framework.PodGroupInfo{
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-								st.MakePod().Name("p1_5").UID("p1_5").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-						{
-							GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg1").MinCount(2).Obj()),
-							UnscheduledPods: []*v1.Pod{
-								st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj(),
-							},
-						},
-					},
-				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg1"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_3").UID("p1_3").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_4").UID("p1_4").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p1_5").UID("p1_5").Namespace("default").PodGroupName("pg1").SchedulerName("test-scheduler").Obj())},
-					},
-					fwk.PodGroupKey("default", "pg2"): {
-						{PodInfo: mustNewPodInfo(t, st.MakePod().Name("p2_3").UID("p2_3").Namespace("default").PodGroupName("pg2").SchedulerName("test-scheduler").Obj())},
-					},
-				},
 			},
 			filterStatus: map[string]*fwk.Status{
 				"p1_3": fwk.NewStatus(fwk.Success),
@@ -8630,7 +8279,30 @@ func TestPodGroupCycle_PartialSuccessAndPreemptionVsBinding(t *testing.T) {
 				t.Fatalf("Failed to update snapshot: %v", err)
 			}
 
-			sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), tt.rootPodGroupInfo, time.Now())
+			var root *framework.PodGroupInfo
+			if len(tt.compositePodGroups) > 0 {
+				children := make([]*framework.PodGroupInfo, len(tt.podGroups))
+				for i, pg := range tt.podGroups {
+					children[i] = &framework.PodGroupInfo{
+						GenericPodGroup: fwk.NewGenericPodGroup(pg),
+					}
+				}
+				root = &framework.PodGroupInfo{
+					GenericPodGroup: fwk.NewGenericCompositePodGroup(tt.compositePodGroups[0]),
+					Children:        children,
+				}
+			} else {
+				root = &framework.PodGroupInfo{
+					GenericPodGroup: fwk.NewGenericPodGroup(tt.podGroups[0]),
+				}
+			}
+			var qInfos []*framework.QueuedPodInfo
+			for _, p := range tt.unscheduledPods {
+				qInfos = append(qInfos, &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, p)})
+			}
+			rootPodGroupInfo := newQueuedPodGroupInfo(root, qInfos...)
+
+			sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), rootPodGroupInfo, time.Now())
 
 			if customPlugin.podGroupPostFilterCalled != tt.wantPodGroupPostFilterCalled {
 				t.Errorf("podGroupPostFilterCalled = %v, want %v", customPlugin.podGroupPostFilterCalled, tt.wantPodGroupPostFilterCalled)
@@ -8857,18 +8529,13 @@ func TestPodGroupCycle_TASPlacementRankingWithPartialSuccess(t *testing.T) {
 				t.Fatalf("Failed to update snapshot: %v", err)
 			}
 
-			rootPodGroupInfo := &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
+			rootPodGroupInfo := newQueuedPodGroupInfo(
+				&framework.PodGroupInfo{
 					GenericPodGroup: fwk.NewGenericPodGroup(pg),
-					UnscheduledPods: []*v1.Pod{p3, p4},
 				},
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					pgKey: {
-						{PodInfo: mustNewPodInfo(t, p3)},
-						{PodInfo: mustNewPodInfo(t, p4)},
-					},
-				},
-			}
+				&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, p3)},
+				&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, p4)},
+			)
 
 			sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), rootPodGroupInfo, time.Now())
 
