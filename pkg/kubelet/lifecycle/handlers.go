@@ -144,7 +144,7 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 	if err != nil {
 		return err
 	}
-	resp, err := hr.httpDoer.Do(req)
+	resp, err := hr.httpDoer.Do(req.WithContext(ctx))
 	discardHTTPRespBody(resp)
 
 	if isHTTPResponseError(err) {
