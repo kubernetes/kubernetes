@@ -55,7 +55,7 @@ func TestSnapshotListPrefix(t *testing.T) {
 			newSnapshot: func(t *testing.T) Snapshot {
 				store := newBtreeStore(btreeDegree)
 				for _, elem := range elements {
-					require.NoError(t, store.Add(elem))
+					store.addOrUpdateElem(elem)
 				}
 				return &store
 			},
