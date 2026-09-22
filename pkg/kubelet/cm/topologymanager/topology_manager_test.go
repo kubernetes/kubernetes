@@ -254,6 +254,29 @@ func TestNewManagerPolicyOptionPropagation(t *testing.T) {
 				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
 			},
 		},
+		{
+			description: "numa-score-weights reaches the policy parsed",
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=3,memory=1,nvidia.com/gpu=6",
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  defaultMaxAllowableNUMANodes,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+				NUMAScoreWeights:       map[string]int{"cpu": 3, "memory": 1, "nvidia.com/gpu": 6},
+			},
+		},
+		{
+			description: "numa-score-weights alongside numa-allocation-strategy",
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+				NUMAScoreWeights:       "intel.com/sriov-nic=10,cpu=0,memory=0",
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  defaultMaxAllowableNUMANodes,
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+				NUMAScoreWeights:       map[string]int{"intel.com/sriov-nic": 10, "cpu": 0, "memory": 0},
+			},
+		},
 	}
 
 	for _, policyName := range []string{PolicyBestEffort, PolicyRestricted, PolicySingleNumaNode} {
@@ -311,6 +334,79 @@ func TestNewManagerInvalidNUMAAllocationStrategy(t *testing.T) {
 			alphaOptionsGate: false,
 			policyOptions: map[string]string{
 				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
+			},
+			expectedErrSubstr: `topology manager policy alpha-level options not enabled`,
+		},
+	}
+
+	for _, policyName := range []string{PolicyBestEffort, PolicyRestricted, PolicySingleNumaNode} {
+		for _, tc := range tcases {
+			t.Run(fmt.Sprintf("%s/%s", policyName, tc.description), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyManagerPolicyAlphaOptions, tc.alphaOptionsGate)
+
+				_, err := NewManager(logger, nil, policyName, ContainerTopologyScope, tc.policyOptions)
+				if err == nil {
+					t.Fatalf("expected an error containing %q, got none", tc.expectedErrSubstr)
+				}
+				if !strings.Contains(err.Error(), tc.expectedErrSubstr) {
+					t.Errorf("Unexpected error message. Have: %s wants a message containing %s", err.Error(), tc.expectedErrSubstr)
+				}
+			})
+		}
+	}
+}
+
+// TestNewManagerInvalidNUMAScoreWeights checks that a bad numa-score-weights
+// value aborts manager creation, for the same reason as the
+// numa-allocation-strategy equivalent above: NewContainerManager propagates
+// the error, so kubelet startup fails rather than silently running with the
+// weights ignored.
+func TestNewManagerInvalidNUMAScoreWeights(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	tcases := []struct {
+		description       string
+		alphaOptionsGate  bool
+		policyOptions     map[string]string
+		expectedErrSubstr string
+	}{
+		{
+			description:      "numa-score-weights entry without a separator",
+			alphaOptionsGate: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu:3",
+			},
+			expectedErrSubstr: `bad value for option "numa-score-weights"`,
+		},
+		{
+			description:      "numa-score-weights with a fractional weight",
+			alphaOptionsGate: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=3.5",
+			},
+			expectedErrSubstr: `bad value for option "numa-score-weights"`,
+		},
+		{
+			description:      "numa-score-weights with a negative weight",
+			alphaOptionsGate: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=-5",
+			},
+			expectedErrSubstr: "must be in range [0, 100]",
+		},
+		{
+			description:      "numa-score-weights above the accepted range",
+			alphaOptionsGate: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=101",
+			},
+			expectedErrSubstr: "must be in range [0, 100]",
+		},
+		{
+			description:      "numa-score-weights without the alpha options gate",
+			alphaOptionsGate: false,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=3,memory=1",
 			},
 			expectedErrSubstr: `topology manager policy alpha-level options not enabled`,
 		},

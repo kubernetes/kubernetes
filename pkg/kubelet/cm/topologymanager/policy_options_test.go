@@ -199,6 +199,72 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			},
 			expectedErr: fmt.Errorf("topology manager policy alpha-level options not enabled,"),
 		},
+		{
+			description:       "return TopologyManagerOptions with NUMAScoreWeights parsed",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=3,memory=1,nvidia.com/gpu=6",
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+				NUMAScoreWeights:       map[string]int{"cpu": 3, "memory": 1, "nvidia.com/gpu": 6},
+			},
+		},
+		{
+			description:       "NUMAScoreWeights alongside NUMAAllocationStrategy",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+				NUMAScoreWeights:       "cpu=0,memory=0",
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+				NUMAScoreWeights:       map[string]int{"cpu": 0, "memory": 0},
+			},
+		},
+		{
+			description:       "an empty NUMAScoreWeights means no weights",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "",
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  8,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+				NUMAScoreWeights:       map[string]int{},
+			},
+		},
+		{
+			description:       "fail to parse options with a malformed NUMAScoreWeights",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu:3",
+			},
+			expectedErr: fmt.Errorf("bad value for option"),
+		},
+		{
+			description:       "fail to parse options with an out-of-range NUMAScoreWeights",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=101",
+			},
+			expectedErr: fmt.Errorf("must be in range [0, 100]"),
+		},
+		{
+			description: "NUMAScoreWeights is rejected unless the alpha options gate is on",
+			featureGate: pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=3,memory=1",
+			},
+			expectedErr: fmt.Errorf("topology manager policy alpha-level options not enabled,"),
+		},
 	}
 
 	setTopologyManagerOptionsDuringTest(t, betaOptions, fancyBetaOption)
@@ -228,6 +294,145 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 	}
 }
 
+// TestParseAndValidateNUMAScoreWeights covers every row of the validation
+// table in the KEP: the accepted forms of the weight string, and each way one
+// can be malformed. Parsing and validation are exercised as a pair because
+// that is how NewPolicyOptions uses them — a string is only accepted when both
+// succeed.
+func TestParseAndValidateNUMAScoreWeights(t *testing.T) {
+	testCases := []struct {
+		description     string
+		raw             string
+		expectedWeights map[string]int
+		expectedErr     string
+	}{
+		{
+			description:     "simple ratios",
+			raw:             "cpu=3,memory=1",
+			expectedWeights: map[string]int{"cpu": 3, "memory": 1},
+		},
+		{
+			description:     "larger ratios are equivalent, only the proportions matter",
+			raw:             "cpu=30,memory=10,nvidia.com/gpu=60",
+			expectedWeights: map[string]int{"cpu": 30, "memory": 10, "nvidia.com/gpu": 60},
+		},
+		{
+			description:     "device resource names survive the slash and the dots",
+			raw:             "nvidia.com/gpu=6,intel.com/sriov-nic=2,cpu=3",
+			expectedWeights: map[string]int{"nvidia.com/gpu": 6, "intel.com/sriov-nic": 2, "cpu": 3},
+		},
+		{
+			description:     "a single resource, the rest left at the default weight",
+			raw:             "nvidia.com/gpu=10",
+			expectedWeights: map[string]int{"nvidia.com/gpu": 10},
+		},
+		{
+			description:     "weight 0 is accepted as an explicit exclusion",
+			raw:             "nvidia.com/gpu=10,cpu=0",
+			expectedWeights: map[string]int{"nvidia.com/gpu": 10, "cpu": 0},
+		},
+		{
+			description:     "the bounds of the accepted range are inclusive",
+			raw:             "cpu=0,memory=100",
+			expectedWeights: map[string]int{"cpu": 0, "memory": 100},
+		},
+		{
+			description:     "an empty value means no weights",
+			raw:             "",
+			expectedWeights: map[string]int{},
+		},
+		{
+			description:     "surrounding whitespace is tolerated",
+			raw:             " cpu = 3 , memory = 1 ",
+			expectedWeights: map[string]int{"cpu": 3, "memory": 1},
+		},
+		{
+			description:     "a trailing comma is tolerated",
+			raw:             "cpu=3,",
+			expectedWeights: map[string]int{"cpu": 3},
+		},
+		{
+			description: "reject a negative weight",
+			raw:         "cpu=-5",
+			expectedErr: "must be in range [0, 100]",
+		},
+		{
+			description: "reject a weight above the range",
+			raw:         "cpu=150",
+			expectedErr: "must be in range [0, 100]",
+		},
+		{
+			description: "reject a fractional weight",
+			raw:         "cpu=3.5",
+			expectedErr: "invalid weight value",
+		},
+		{
+			description: "reject a non-numeric weight",
+			raw:         "cpu=abc",
+			expectedErr: "invalid weight value",
+		},
+		{
+			description: "reject an entry with no separator",
+			raw:         "cpu:5",
+			expectedErr: "expected resource=weight",
+		},
+		{
+			description: "reject an empty resource name",
+			raw:         "=5",
+			expectedErr: "empty resource name",
+		},
+		{
+			description: "reject a malformed entry alongside a valid one",
+			raw:         "cpu=3,memory",
+			expectedErr: "expected resource=weight",
+		},
+	}
+
+	for _, tcase := range testCases {
+		t.Run(tcase.description, func(t *testing.T) {
+			weights, err := parseNUMAScoreWeights(tcase.raw)
+			if err == nil {
+				err = validateNUMAScoreWeights(weights)
+			}
+
+			if tcase.expectedErr != "" {
+				if err == nil {
+					t.Fatalf("expected an error containing %q, got none (weights=%v)", tcase.expectedErr, weights)
+				}
+				if !strings.Contains(err.Error(), tcase.expectedErr) {
+					t.Errorf("Unexpected error message. Have: %s, wants %s", err.Error(), tcase.expectedErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(weights, tcase.expectedWeights) {
+				t.Errorf("Expected weights to equal %v, not %v", tcase.expectedWeights, weights)
+			}
+		})
+	}
+}
+
+// TestValidateNUMAScoreWeightsScaleInvariance pins the property the option
+// documentation rests on: weights are not validated against their sum, so
+// proportionally equivalent strings are equally acceptable however large the
+// numbers get.
+func TestValidateNUMAScoreWeightsScaleInvariance(t *testing.T) {
+	for _, raw := range []string{"cpu=3,memory=1", "cpu=30,memory=10", "cpu=90,memory=30"} {
+		t.Run(raw, func(t *testing.T) {
+			weights, err := parseNUMAScoreWeights(raw)
+			if err != nil {
+				t.Fatalf("unexpected parse error: %v", err)
+			}
+			if err := validateNUMAScoreWeights(weights); err != nil {
+				t.Errorf("unexpected validation error: %v", err)
+			}
+		})
+	}
+}
+
 func setTopologyManagerOptionsDuringTest(t *testing.T, optionGroup sets.Set[string], opts ...string) {
 	t.Helper()
 	t.Cleanup(func() {
@@ -252,6 +457,10 @@ func TestPolicyDefaultsAvailable(t *testing.T) {
 		},
 		{
 			option:            NUMAAllocationStrategy,
+			expectedAvailable: false,
+		},
+		{
+			option:            NUMAScoreWeights,
 			expectedAvailable: false,
 		},
 	}
@@ -336,6 +545,18 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 		},
 		{
 			option:            NUMAAllocationStrategy,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: false,
+			expectedAvailable: false,
+		},
+		{
+			option:            NUMAScoreWeights,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            NUMAScoreWeights,
 			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
 			featureGateEnable: false,
 			expectedAvailable: false,
