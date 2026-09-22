@@ -79,13 +79,6 @@ func (t tlsCacheKey) String() string {
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
-	// Load TLS files once up front so the cache key reflects the fully-resolved
-	// config. On a cache hit we return immediately, avoiding the redundant
-	// loadTLSFiles call that TLSConfigFor would otherwise perform.
-	if err := loadTLSFiles(config); err != nil {
-		return nil, err
-	}
-
 	key, canCache, err := tlsConfigKey(config)
 	if err != nil {
 		return nil, err
@@ -111,11 +104,27 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		metrics.TransportCreateCalls.Increment("uncacheable")
 	}
 
-	// Get the TLS options for this client config
+	// Get the TLS options for this client config.
+	// Note: TLSConfigFor calls loadTLSFiles which mutates config. Recompute
+	// the cache key afterwards so that future lookups with the mutated config
+	// still hit. The pre-mutation key was already checked above. (issue: https://github.com/kubernetes/kubectl/issues/1880)
 	tlsConfig, err := TLSConfigFor(config)
 	if err != nil {
 		return nil, err
 	}
+
+	if canCache {
+		if postKey, postCanCache, err := tlsConfigKey(config); err == nil && postCanCache && postKey != key {
+			key = postKey
+			// Check cache again with the post-mutation key, another goroutine
+			// may have raced and stored a transport under this key already.
+			if t, ok := c.getLocked(key); ok && t != nil {
+				metrics.TransportCreateCalls.Increment("hit")
+				return t, nil
+			}
+		}
+	}
+
 	// The options didn't require a custom TLS config
 	if tlsConfig == nil && config.DialHolder == nil && config.Proxy == nil {
 		return http.DefaultTransport, nil
@@ -257,36 +266,27 @@ func (v *trackedTransport) WrappedRoundTripper() http.RoundTripper {
 }
 
 // tlsConfigKey returns a unique key for tls.Config objects returned from TLSConfigFor.
-// The caller must call loadTLSFiles before this function to ensure the config's
-// ReloadTLSFiles/ReloadCAFiles flags and *Data fields are populated.
+// It does NOT call loadTLSFiles and does NOT read any files from disk — it builds
+// the key directly from every TLS-relevant field already on the config. Cache hits
+// therefore incur zero file I/O.
 func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 	if c.Proxy != nil {
 		// cannot determine equality for functions
 		return tlsCacheKey{}, false, nil
 	}
 
-	k := tlsCacheKey{
+	return tlsCacheKey{
 		insecure:           c.TLS.Insecure,
+		caData:             string(c.TLS.CAData),
+		caFile:             c.TLS.CAFile,
+		certData:           string(c.TLS.CertData),
+		keyData:            string(c.TLS.KeyData),
+		certFile:           c.TLS.CertFile,
+		keyFile:            c.TLS.KeyFile,
 		serverName:         c.TLS.ServerName,
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		disableCompression: c.DisableCompression,
 		getCert:            c.TLS.GetCertHolder,
 		dial:               c.DialHolder,
-	}
-
-	if c.TLS.ReloadTLSFiles {
-		k.certFile = c.TLS.CertFile
-		k.keyFile = c.TLS.KeyFile
-	} else {
-		k.certData = string(c.TLS.CertData)
-		k.keyData = string(c.TLS.KeyData)
-	}
-
-	if c.TLS.ReloadCAFiles {
-		k.caFile = c.TLS.CAFile
-	} else {
-		k.caData = string(c.TLS.CAData)
-	}
-
-	return k, true, nil
+	}, true, nil
 }

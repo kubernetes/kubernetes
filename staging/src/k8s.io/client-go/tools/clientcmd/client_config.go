@@ -98,10 +98,6 @@ type DirectClientConfig struct {
 	configAccess   ConfigAccess
 	// promptedCredentials store the credentials input by the user
 	promptedCredentials promptedCredentials
-	// confirmUsableCache caches the result of ConfirmUsable to avoid
-	// redundant os.Open calls.(issue: https://github.com/kubernetes/kubectl/issues/1880)
-	confirmUsableDone bool
-	confirmUsableErr  error
 }
 
 // NewDefaultClientConfig creates a DirectClientConfig using the config.CurrentContext as the context name
@@ -456,12 +452,7 @@ func (config *DirectClientConfig) ConfigAccess() ConfigAccess {
 
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
-// Results are cached so that repeated calls do not redundantly open files on disk.
 func (config *DirectClientConfig) ConfirmUsable() error {
-	if config.confirmUsableDone {
-		return config.confirmUsableErr
-	}
-
 	validationErrors := make([]error, 0)
 
 	var contextName string
@@ -486,16 +477,10 @@ func (config *DirectClientConfig) ConfirmUsable() error {
 	validationErrors = append(validationErrors, validateClusterInfo(clusterName, cluster)...)
 	// when direct client config is specified, and our only error is that no server is defined, we should
 	// return a standard "no config" error
-	var result error
 	if len(validationErrors) == 1 && validationErrors[0] == ErrEmptyCluster {
-		result = newErrConfigurationInvalid([]error{ErrEmptyConfig})
-	} else {
-		result = newErrConfigurationInvalid(validationErrors)
+		return newErrConfigurationInvalid([]error{ErrEmptyConfig})
 	}
-
-	config.confirmUsableDone = true
-	config.confirmUsableErr = result
-	return result
+	return newErrConfigurationInvalid(validationErrors)
 }
 
 // getContextName returns the default, or user-set context name, and a boolean that indicates

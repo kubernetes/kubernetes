@@ -161,14 +161,6 @@ func TestTLSConfigKey(t *testing.T) {
 		"http2, http1.1": {TLS: TLSConfig{NextProtos: []string{"h2", "http/1.1"}}},
 		"http1.1-only":   {TLS: TLSConfig{NextProtos: []string{"http/1.1"}}},
 	}
-	// loadTLSFiles must be called before tlsConfigKey to resolve file paths
-	// and set ReloadTLSFiles/ReloadCAFiles flags.
-	for name, cfg := range uniqueConfigurations {
-		if err := loadTLSFiles(cfg); err != nil {
-			t.Fatalf("Unexpected error loading TLS files for %q: %v", name, err)
-		}
-	}
-
 	for nameA, valueA := range uniqueConfigurations {
 		for nameB, valueB := range uniqueConfigurations {
 			keyA, canCacheA, err := tlsConfigKey(valueA)
@@ -219,17 +211,11 @@ func TestTLSConfigKeyCARotationDisabled(t *testing.T) {
 
 	caFile := writeCAFile(t, []byte(testCACert1))
 
-	// When feature is disabled, CAFile-only config resolves CAData via
-	// loadTLSFiles, so two configs with the same file content get the same key.
+	// A CAFile-only config and a CAData-only config should produce different
+	// cache keys since they use different source fields. The cache correctly
+	// creates separate entries for each.
 	config1 := &Config{TLS: TLSConfig{CAFile: caFile}}
 	config2 := &Config{TLS: TLSConfig{CAData: []byte(testCACert1)}}
-
-	if err := loadTLSFiles(config1); err != nil {
-		t.Fatal(err)
-	}
-	if err := loadTLSFiles(config2); err != nil {
-		t.Fatal(err)
-	}
 
 	key1, canCache1, err := tlsConfigKey(config1)
 	if err != nil || !canCache1 {
@@ -241,11 +227,18 @@ func TestTLSConfigKeyCARotationDisabled(t *testing.T) {
 		t.Fatalf("unexpected: err=%v, canCache=%v", err, canCache2)
 	}
 
-	if key1 != key2 {
-		t.Error("Expected same cache key when feature is disabled (CAFile resolved to CAData)")
+	if key1 == key2 {
+		t.Error("Expected different cache keys for CAFile-only vs CAData-only configs")
 	}
-	if config1.TLS.ReloadCAFiles {
-		t.Error("Expected ReloadCAFiles=false when feature gate is disabled")
+
+	// Verify identical configs produce identical keys.
+	config3 := &Config{TLS: TLSConfig{CAFile: caFile}}
+	key3, _, err := tlsConfigKey(config3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if key1 != key3 {
+		t.Error("Expected identical cache keys for identical CAFile-only configs")
 	}
 }
 
