@@ -38,37 +38,69 @@ func IsAlignmentGuaranteed(p Policy) bool {
 	return p.Name() == PolicySingleNumaNode
 }
 
-// aggregateHintScores returns the equal-weight average of the Score values in the
-// permutation, and whether any contributor supplied one.
+// aggregateHintScores reduces the scores of the hints in a permutation to the
+// single score carried by the merged hint, as the weighted average
 //
-// Only hints with an affinity and a non-zero Score are counted: Score 0 means "no
-// signal", not "zero utilization", so averaging it in would drag the result towards
-// zero for every provider that simply has nothing to say. The current implementation
+//	sum(weight[r] * score[r]) / sum(weight[r])
+//
+// over the contributors which reported a score. Contributors with no affinity,
+// or an unscored (zero) Score, take no part in it: Score 0 means "no signal",
+// not "zero utilization", so averaging it in would drag the result towards zero
+// for every provider that simply has nothing to say. The current implementation
 // means that a lone contributor scoring 1 sets the merged score to 1 however many
 // unscored or affinity-less contributors sit beside it.
 //
+// The weight lookup is keyed on the resource a hint came from, which the
+// permutation gives up by position: its i-th element is drawn from
+// m.Hints[i], so m.Hints[i].resource names it. A resource the weights do not
+// name carries defaultNUMAScoreWeight, so nil or empty weights reduce the
+// formula to the equal-weight average sum/count. A resource named with a
+// weight of 0 is dropped from the average entirely.
+//
+// Dividing by the total applicable weight keeps the result in the same [1,100]
+// range as the individual scores, and makes the weights self-normalizing: only
+// the ratios between them matter, so "cpu=30,memory=10" behaves exactly like
+// "cpu=3,memory=1".
+//
 // Score is a coarse packing signal and does not drive hint selection. Because of this,
-// we use integer division that truncates towards zero. For example, scores of 40 and 81
-// aggregate to 60.
-func aggregateHintScores(permutation []TopologyHint) (int64, bool) {
-	var sum int64
-	var count int64
-	for _, hint := range permutation {
-		if hint.NUMANodeAffinity != nil && hint.Score > 0 {
-			sum += hint.Score
-			count++
+// we use integer division that truncates towards zero. For example, equally weighted
+// scores of 40 and 81 aggregate to 60.
+//
+// The second return value is false when nothing contributed, that is when the
+// total applicable weight is 0. The merged hint is then left unscored and hint
+// selection falls back to the structural comparison alone.
+func (m HintMerger) aggregateHintScores(permutation []TopologyHint) (int64, bool) {
+	var weightedSum int64
+	var totalWeight int64
+	for i, hint := range permutation {
+		if hint.NUMANodeAffinity == nil || hint.Score <= 0 {
+			continue
 		}
+
+		weight := defaultNUMAScoreWeight
+		if w, ok := m.ScoreWeights[m.Hints[i].resource]; ok {
+			weight = w
+		}
+		if weight == 0 {
+			continue
+		}
+
+		weightedSum += hint.Score * int64(weight)
+		totalWeight += int64(weight)
 	}
-	if count == 0 {
+	if totalWeight == 0 {
 		return 0, false
 	}
-	return sum / count, true
+	return weightedSum / totalWeight, true
 }
 
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
 // of their affinity masks. The hint shall be preferred if all hits in the permutation
 // are preferred.
-func mergePermutation(logger klog.Logger, defaultAffinity bitmask.BitMask, permutation []TopologyHint) TopologyHint {
+//
+// The permutation must be one produced from m.Hints, since the score
+// aggregation reads the resource of its i-th element from m.Hints[i].
+func (m HintMerger) mergePermutation(logger klog.Logger, defaultAffinity bitmask.BitMask, permutation []TopologyHint) TopologyHint {
 	// Get the NUMANodeAffinity from each hint in the permutation and see if any
 	// of them encode unpreferred allocations.
 	preferred := true
@@ -91,7 +123,7 @@ func mergePermutation(logger klog.Logger, defaultAffinity bitmask.BitMask, permu
 	// Merge the affinities using a bitwise-and operation.
 	mergedAffinity := bitmask.And(defaultAffinity, numaAffinities...)
 
-	score, hasScores := aggregateHintScores(permutation)
+	score, hasScores := m.aggregateHintScores(permutation)
 	if hasScores {
 		logger.V(4).Info("Merged hint includes aggregated score", "score", score)
 	}
@@ -207,6 +239,11 @@ type HintMerger struct {
 	// Hints[i], so Hints[i].resource also names the resource the i-th hint of
 	// a permutation belongs to.
 	Hints []resourceHints
+	// ScoreWeights maps a resource name to the weight its score carries when
+	// the scores of a permutation are aggregated. It is nil unless the user
+	// asked for weights; every resource then sits at the default weight and
+	// the aggregation is the equal-weight average.
+	ScoreWeights map[string]int
 	// Set bestNonPreferredAffinityCount to help decide which affinity mask is
 	// preferred amongst all non-preferred hints. We calculate this value as
 	// the maximum of the minimum affinity counts supplied for any given hint
@@ -261,6 +298,7 @@ func NewHintMerger(numaInfo *NUMAInfo, hints []resourceHints, policyName string,
 	if allocationStrategy == "" {
 		allocationStrategy = NUMAAllocationStrategyNone
 	}
+	scoreWeights := opts.NUMAScoreWeights
 
 	compareNumaAffinityMasks := func(current, candidate *TopologyHint) *TopologyHint {
 		// If current and candidate bitmasks are the same, prefer current hint.
@@ -295,6 +333,7 @@ func NewHintMerger(numaInfo *NUMAInfo, hints []resourceHints, policyName string,
 	merger := HintMerger{
 		NUMAInfo:                      numaInfo,
 		Hints:                         hints,
+		ScoreWeights:                  scoreWeights,
 		BestNonPreferredAffinityCount: maxOfMinAffinityCounts(hints),
 		CompareNUMAAffinityMasks:      compareNumaAffinityMasks,
 	}
@@ -432,7 +471,11 @@ func (m HintMerger) Merge(logger klog.Logger) TopologyHint {
 	iterateAllProviderTopologyHints(m.Hints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
-		mergedHint := mergePermutation(logger, defaultAffinity, permutation)
+		//
+		// The permutation is built from m.Hints, so permutation[i] is drawn from
+		// m.Hints[i] and the aggregation can weight each hint by the resource it
+		// came from without the two ever being able to fall out of step.
+		mergedHint := m.mergePermutation(logger, defaultAffinity, permutation)
 
 		// Compare the current bestHint with the candidate mergedHint and
 		// update bestHint if appropriate.
