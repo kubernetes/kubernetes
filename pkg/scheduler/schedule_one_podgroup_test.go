@@ -3336,7 +3336,9 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 				SchedulingQueue:  queue,
 				Profiles:         profile.Map{"test-scheduler": schedFwk},
 			}
-			sched.initAlgorithm()
+			if err := sched.initAlgorithm(); err != nil {
+				t.Fatalf("Failed to initialize scheduler algorithm: %v", err)
+			}
 			sched.SchedulePod = sched.algorithm.SchedulePod
 
 			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
@@ -8099,7 +8101,9 @@ func TestPodGroupSchedulingPlacementAlgorithm_PlacementLimit(t *testing.T) {
 				Profiles:                      profile.Map{"test-scheduler": schedFwk},
 				percentageOfPlacementsToScore: test.percentageLimit,
 			}
-			sched.initAlgorithm()
+			if err := sched.initAlgorithm(); err != nil {
+				t.Fatalf("Failed to initialize scheduler algorithm: %v", err)
+			}
 			sched.SchedulePod = func(_ context.Context, _ framework.Framework, _ fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
 				placement := sched.nodeInfoSnapshot.GetPlacement()
 				if len(placement.Nodes) != 1 {
@@ -8113,20 +8117,11 @@ func TestPodGroupSchedulingPlacementAlgorithm_PlacementLimit(t *testing.T) {
 				return ScheduleResult{SuggestedHost: nodeName, EvaluatedNodes: 1, FeasibleNodes: 1}, nil
 			}
 
-			podGroupPod := st.MakePod().Name("foo").UID("foo").PodGroupName("pg").Obj()
-			pgInfo := &framework.QueuedPodGroupInfo{
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					podGroupKey: {
-						{
-							PodInfo: &framework.PodInfo{Pod: podGroupPod},
-						},
-					},
-				},
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup),
-					UnscheduledPods: []*v1.Pod{podGroupPod},
-				},
-			}
+			podGroupPod := st.MakePod().Name("foo").Namespace("default").UID("foo").PodGroupName("pg").Obj()
+			pgInfo := newQueuedPodGroupInfo(
+				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)},
+				&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: podGroupPod}},
+			)
 
 			_, revertFns := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
 			revertFns.revert()
@@ -8249,7 +8244,9 @@ func TestPodGroupSchedulingPlacementAlgorithm_UsesShufflePlacements(t *testing.T
 			}
 		},
 	}
-	sched.initAlgorithm()
+	if err := sched.initAlgorithm(); err != nil {
+		t.Fatalf("Failed to initialize scheduler algorithm: %v", err)
+	}
 	sched.SchedulePod = sched.algorithm.SchedulePod
 
 	for _, test := range []struct {
@@ -8269,18 +8266,11 @@ func TestPodGroupSchedulingPlacementAlgorithm_UsesShufflePlacements(t *testing.T
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			trackingFilter.scoredNodes = sets.New[string]()
-			podGroupPod := st.MakePod().Name("foo").UID("foo").PodGroupName("pg").NominatedNodeName(test.nominatedNodeName).Obj()
-			pgInfo := &framework.QueuedPodGroupInfo{
-				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
-					fwk.PodGroupKey("default", "pg"): {
-						{PodInfo: &framework.PodInfo{Pod: podGroupPod}},
-					},
-				},
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup),
-					UnscheduledPods: []*v1.Pod{podGroupPod},
-				},
-			}
+			podGroupPod := st.MakePod().Name("foo").Namespace("default").UID("foo").PodGroupName("pg").NominatedNodeName(test.nominatedNodeName).Obj()
+			pgInfo := newQueuedPodGroupInfo(
+				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)},
+				&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: podGroupPod}},
+			)
 
 			result, revertFns := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
 			revertFns.revert()
