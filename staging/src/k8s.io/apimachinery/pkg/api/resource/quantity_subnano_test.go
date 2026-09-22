@@ -52,6 +52,10 @@ func TestParseQuantitySubNanoRoundsUp(t *testing.T) {
 		{"1000000000000000000000e-30", "1n"},
 		{"1000000000000000000001e-30", "2n"},
 		{"999999999999999999999e-30", "1n"},
+		// a long mantissa with a large positive exponent takes the Dec path and keeps its value
+		{"1234567890123456789012e2147483647", "12345678901234567890120e2147483646"},
+		{"-1234567890123456789012e2147483647", "-12345678901234567890120e2147483646"},
+		{"1234567890123456789012e300", "1234567890123456789012000e297"},
 		// zero is never rounded up, whatever the exponent
 		{"0e-2147483647", "0"},
 		{"0.0e-100", "0"},
@@ -89,6 +93,10 @@ func TestParseQuantitySubNanoMatchesRound(t *testing.T) {
 		{"-0.1e-2147483647", "-1e-9", DecimalExponent},
 		{"0.0e-2147483647", "0", DecimalExponent},
 		{"-0.0e-2147483647", "0", DecimalExponent},
+		// large positive exponents keep their value and canonical spelling
+		{"1234567890123456789012e2147483647", "12345678901234567890120e2147483646", DecimalExponent},
+		{"-1234567890123456789012e2147483647", "-12345678901234567890120e2147483646", DecimalExponent},
+		{"1234567890123456789012e300", "1234567890123456789012e300", DecimalExponent},
 	} {
 		if q := MustParse(tc.in); q.String() != tc.want || q.Format != tc.format {
 			t.Errorf("ParseQuantity(%q) = (%q, %v), want (%q, %v)", tc.in, q.String(), q.Format, tc.want, tc.format)

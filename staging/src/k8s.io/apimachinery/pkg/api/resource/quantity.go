@@ -413,11 +413,12 @@ func ParseQuantity(str string) (Quantity, error) {
 	// the side effect of rounding values < .5n to zero.
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
 		// 2^BitLen < 10^BitLen, so at scale >= BitLen+9 the value is under 1n.
-		// Set 1n here; Round would first build 10^scale.
+		// Set 1n here; Round would first build 10^scale. A scale under nano has
+		// nothing to round, and padding it to nano would cost 10^(9-scale).
 		if int64(amount.Scale())-9 >= int64(amount.UnscaledBig().BitLen()) {
 			amount.SetUnscaled(1)
 			amount.SetScale(Nano.infScale())
-		} else {
+		} else if amount.Scale() > Nano.infScale() {
 			amount.Round(amount, Nano.infScale(), inf.RoundUp)
 		}
 	}
