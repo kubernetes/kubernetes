@@ -159,6 +159,18 @@ func TestEvictionWithETCD(t *testing.T) {
 			podName:     "t8",
 			policies:    []*policyv1.UnhealthyPodEvictionPolicyType{nil, unhealthyPolicyPtr(policyv1.IfHealthyBudget)}, // AlwaysAllow would terminate the pod since Running pods are not guarded by this policy
 		},
+		{
+			name: "matching pdbs with disruptions allowed, graceful deletion",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default", ResourceVersion: "99999"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+			}},
+			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t9", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(30)},
+			expectDeleted: false,
+			podPhase:      api.PodRunning,
+			podName:       "t9",
+		},
 	}
 
 	for _, unhealthyPodEvictionPolicy := range []*policyv1.UnhealthyPodEvictionPolicyType{nil, unhealthyPolicyPtr(policyv1.IfHealthyBudget), unhealthyPolicyPtr(policyv1.AlwaysAllow)} {
@@ -198,6 +210,12 @@ func TestEvictionWithETCD(t *testing.T) {
 					}
 				}
 
+				podBeforeEviction, err := storage.Get(testContext, pod.Name, &metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("unexpected error getting pod before eviction: %v", err)
+				}
+				rvBeforeEviction := podBeforeEviction.(*api.Pod).ResourceVersion
+
 				client := fake.NewSimpleClientset(pdbsCopy...)
 				evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
 
@@ -206,7 +224,7 @@ func TestEvictionWithETCD(t *testing.T) {
 					name += "bad-name"
 				}
 
-				_, err := evictionRest.Create(testContext, name, evictionCopy, nil, &metav1.CreateOptions{})
+				res, err := evictionRest.Create(testContext, name, evictionCopy, nil, &metav1.CreateOptions{})
 				gotErr := errToString(err)
 				if gotErr != tc.expectError {
 					t.Errorf("error mismatch: expected %v, got %v; name %v", tc.expectError, gotErr, pod.Name)
@@ -225,10 +243,21 @@ func TestEvictionWithETCD(t *testing.T) {
 					return
 				}
 
+				status, ok := res.(*metav1.Status)
+				if !ok {
+					t.Fatalf("expected *metav1.Status, got %T", res)
+				}
+				if status.ResourceVersion == "" {
+					t.Errorf("expected non-empty ResourceVersion on returned Status")
+				}
+
 				existingPod, err := storage.Get(testContext, pod.Name, &metav1.GetOptions{})
 				if tc.expectDeleted {
 					if !apierrors.IsNotFound(err) {
 						t.Errorf("expected to be deleted, lookup returned %#v", existingPod)
+					}
+					if status.ResourceVersion == rvBeforeEviction {
+						t.Errorf("expected Status ResourceVersion %q to advance beyond pre-eviction pod ResourceVersion %q", status.ResourceVersion, rvBeforeEviction)
 					}
 					return
 				} else if apierrors.IsNotFound(err) {
@@ -243,6 +272,9 @@ func TestEvictionWithETCD(t *testing.T) {
 
 				if existingPod.(*api.Pod).DeletionTimestamp == nil {
 					t.Errorf("expected gracefully deleted pod with deletionTimestamp set, got %#v", existingPod)
+				}
+				if status.ResourceVersion != existingPod.(*api.Pod).ResourceVersion {
+					t.Errorf("expected Status ResourceVersion %q to match gracefully deleted pod ResourceVersion %q", status.ResourceVersion, existingPod.(*api.Pod).ResourceVersion)
 				}
 			})
 		}
@@ -664,13 +696,26 @@ func TestEviction(t *testing.T) {
 				evictionRest := newEvictionStorage(ms, client.PolicyV1())
 
 				name := pod.Name
+				if pod.ResourceVersion == "" {
+					pod.ResourceVersion = "100"
+				}
 				ms.pod = pod
 
-				_, err := evictionRest.Create(testContext, name, evictionCopy, nil, &metav1.CreateOptions{})
+				res, err := evictionRest.Create(testContext, name, evictionCopy, nil, &metav1.CreateOptions{})
 				gotErr := errToString(err)
 				if gotErr != tc.expectError {
 					t.Errorf("error mismatch: expected %v, got %v; name %v", tc.expectError, gotErr, pod.Name)
 					return
+				}
+
+				if tc.expectError == "" {
+					status, ok := res.(*metav1.Status)
+					if !ok {
+						t.Fatalf("expected *metav1.Status, got %T", res)
+					}
+					if status.ResourceVersion != ms.pod.ResourceVersion {
+						t.Errorf("expected Status ResourceVersion %q to match pod ResourceVersion %q", status.ResourceVersion, ms.pod.ResourceVersion)
+					}
 				}
 
 				if tc.expectedDeleteCount != ms.deleteCount {
@@ -742,16 +787,26 @@ func TestEvictionWithDeleteOptions(t *testing.T) {
 			pod := validNewPod()
 			pod.Labels = map[string]string{"a": "true"}
 			pod.Spec.NodeName = "foo"
-			if _, err := storage.Create(testContext, pod, nil, &metav1.CreateOptions{}); err != nil {
+			createdObj, err := storage.Create(testContext, pod, nil, &metav1.CreateOptions{})
+			if err != nil {
 				t.Error(err)
 			}
 
 			client := fake.NewSimpleClientset(tc.pdbs...)
 			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
 			eviction := &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: tc.evictionOptions}
-			_, err := evictionRest.Create(testContext, pod.Name, eviction, nil, tc.requestOptions)
+			res, err := evictionRest.Create(testContext, pod.Name, eviction, nil, tc.requestOptions)
 			if !cmp.Equal(tc.err, err) {
 				t.Errorf("expected error to match, diff: %s", cmp.Diff(tc.err, err))
+			}
+			if tc.err == nil {
+				status, ok := res.(*metav1.Status)
+				if !ok {
+					t.Fatalf("expected *metav1.Status, got %T", res)
+				}
+				if status.ResourceVersion != createdObj.(*api.Pod).ResourceVersion {
+					t.Errorf("expected dry-run Status ResourceVersion %q to match pod ResourceVersion %q", status.ResourceVersion, createdObj.(*api.Pod).ResourceVersion)
+				}
 			}
 		})
 	}
@@ -937,10 +992,13 @@ func TestAddConditionAndDelete(t *testing.T) {
 				deleteOptions = &metav1.DeleteOptions{}
 			}
 
-			err := addConditionAndDeletePod(evictionRest, testContext, "foo", rest.ValidateAllObjectFunc, deleteOptions)
+			rv, err := addConditionAndDeletePod(evictionRest, testContext, "foo", rest.ValidateAllObjectFunc, deleteOptions)
 			if err == nil {
 				if tc.expectErr != "" {
 					t.Fatalf("expected err containing %q, got none", tc.expectErr)
+				}
+				if rv == "" {
+					t.Errorf("expected non-empty resourceVersion, got empty")
 				}
 				return
 			}
@@ -971,7 +1029,7 @@ func (ms *mockStore) mutatorDeleteFunc(count int, options *metav1.DeleteOptions)
 	if ms.pod.Name == "t6" || ms.pod.Name == "t8" {
 		// t6: This pod has a deletionTimestamp and should not raise conflict on delete
 		// t8: This pod should not have a resource conflict.
-		return nil, true, nil
+		return ms.pod, true, nil
 	}
 	if ms.pod.Name == "t10" {
 		return nil, false, apierrors.NewBadRequest("test designed to error")
@@ -988,7 +1046,7 @@ func (ms *mockStore) mutatorDeleteFunc(count int, options *metav1.DeleteOptions)
 	}
 	// Compare enforce deletionOptions
 	if options == nil || options.Preconditions == nil || options.Preconditions.ResourceVersion == nil {
-		return nil, true, nil
+		return ms.pod, true, nil
 	} else if *options.Preconditions.ResourceVersion != "1000" {
 		// Here we're simulating that the pod has changed resource version again
 		// pod "t4" should make it here, this validates we're getting the latest
@@ -997,7 +1055,7 @@ func (ms *mockStore) mutatorDeleteFunc(count int, options *metav1.DeleteOptions)
 		ms.pod.ResourceVersion = "1000"
 		return nil, false, apierrors.NewConflict(resource("tests"), "2", errors.New("message"))
 	}
-	return nil, true, nil
+	return ms.pod, true, nil
 }
 
 func (ms *mockStore) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
