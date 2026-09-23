@@ -256,3 +256,5 @@ replace (
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 	k8s.io/streaming => ./staging/src/k8s.io/streaming
 )
+
+replace github.com/go-jose/go-jose/v4 => github.com/james-d-elliott/go-jose/v4 v4.0.0-20260819232147-08b3c5999fb1
