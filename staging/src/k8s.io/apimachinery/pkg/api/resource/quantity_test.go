@@ -1886,6 +1886,7 @@ func TestQuantityAsInt64(t *testing.T) {
 		{"binary whole with decimal point", MustParse("1.5Gi"), 1610612736, true, 1610612736, true},
 		{"binary whole with trailing fraction zeros", MustParse("1.5000Gi"), 1610612736, true, 1610612736, true},
 		{"binary fractional", MustParse("1.5555555555555555Gi"), 0, false, 0, false},
+		{"binary fraction rounded up to whole", MustParse("0.99999999999999999Ki"), 0, false, 0, false},
 	}
 
 	for _, item := range table {
@@ -2035,6 +2036,9 @@ func TestQuantityRoundUpAsInt64(t *testing.T) {
 		{"1.5Gi", 0, 1610612736, true, 1610612736, true},
 		{"1.5555555555555555Gi", -3, 0, false, 0, false},
 		{"1.5555555555555555Gi", 0, 1670265060, true, 1670265060, true},
+		// TODO(#141166): (math.MaxInt64, false) once the binarySI parse cap is removed.
+		{"8Ei", -3, 0, false, 0, false},
+		{"8Ei", 3, math.MaxInt64, false, math.MaxInt64, false},
 		{"9223372036854775808", 0, math.MaxInt64, false, math.MaxInt64, false},
 		{"1000000000000000000000m", -3, 0, false, 0, false},
 		{"1000000000000000000000m", 0, 1000000000000000000, true, 1000000000000000000, true},
