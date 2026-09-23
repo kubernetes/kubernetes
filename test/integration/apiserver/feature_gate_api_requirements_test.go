@@ -154,19 +154,26 @@ func TestFeatureGateAPIRequirements(t *testing.T) {
 			},
 		},
 		{
-			name: "enabled gate whose API predates the emulated version is rejected",
+			// v1 clustertrustbundles is installed for the gate and then removed by API lifecycle
+			// because it is introduced in 1.37, so the resource is unavailable rather than
+			// unserved and the server starts with a warning.
+			name: "enabled gate whose default API version is not yet introduced at the emulated version starts",
 			flags: []string{
 				"--emulated-version=1.36",
 				"--feature-gates=ClusterTrustBundle=true",
 			},
-			wantErr: true,
-			wantErrContains: []string{
-				"ClusterTrustBundle is enabled",
-				"clustertrustbundles.certificates.k8s.io",
+		},
+		{
+			// Same shape as the ClusterTrustBundle case but v1 podcertificaterequests is introduced
+			// in 1.37 and v1beta1 is not enabled by default at 1.36.
+			name: "enabled gate whose only default API version is not yet introduced at the emulated version starts",
+			flags: []string{
+				"--emulated-version=1.36",
+				"--feature-gates=PodCertificateRequest=true",
 			},
 		},
 		{
-			// The same configuration is satisfiable through the version that does exist at 1.36.
+			// The gate is satisfiable through the version that does exist at 1.36.
 			name: "enabled gate served by an older version at the emulated version starts",
 			flags: []string{
 				"--emulated-version=1.36",

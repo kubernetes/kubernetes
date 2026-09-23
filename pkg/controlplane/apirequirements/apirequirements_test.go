@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
@@ -49,7 +50,7 @@ import (
 )
 
 func TestFeatureGateAPIRequirementsWellFormed(t *testing.T) {
-	registeredFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	registeredFeatures := utilfeature.DefaultMutableFeatureGate.GetAllVersioned()
 
 	tests := []struct {
 		name         string
@@ -67,22 +68,39 @@ func TestFeatureGateAPIRequirementsWellFormed(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			for feature, resources := range tc.requirements {
-				if _, ok := registeredFeatures[feature]; !ok {
+			for feature, versioned := range tc.requirements {
+				specs, ok := registeredFeatures[feature]
+				if !ok {
 					t.Errorf("feature gate %q declares API requirements but is not registered in the DefaultFeatureGate", feature)
 				}
-				if len(resources) == 0 {
-					t.Errorf("feature gate %q declares an empty requirement list; omit the entry instead", feature)
+				if len(versioned) == 0 {
+					t.Errorf("feature gate %q declares no requirement entries; omit the gate instead", feature)
 				}
-				seen := sets.New[schema.GroupResource]()
-				for _, gr := range resources {
-					if gr.Resource == "" {
-						t.Errorf("feature gate %q has a malformed requirement %#v: resource must be set", feature, gr)
+
+				var previous *version.Version
+				for i, entry := range versioned {
+					prefix := fmt.Sprintf("feature gate %q entry %d", feature, i)
+					switch {
+					case entry.Version == nil:
+						t.Errorf("%s has no Version; set it to the release from which the gate has needed these resources", prefix)
+						continue
+					case len(specs) > 0 && entry.Version.LessThan(specs[0].Version):
+						t.Errorf("%s starts at %s, before the gate was introduced in %s", prefix, entry.Version, specs[0].Version)
+					case previous != nil && !entry.Version.GreaterThan(previous):
+						t.Errorf("%s starts at %s, not after the previous entry at %s", prefix, entry.Version, previous)
 					}
-					if seen.Has(gr) {
-						t.Errorf("feature gate %q lists duplicate requirement %s", feature, gr)
+					previous = entry.Version
+
+					if len(entry.Resources) == 0 {
+						t.Errorf("%s (%s) declares an empty resource list; a gate that stopped needing APIs should drop its entries instead", prefix, entry.Version)
 					}
-					seen.Insert(gr)
+					seen := sets.New[schema.GroupResource]()
+					for _, gr := range entry.Resources {
+						if gr.Resource == "" || seen.Has(gr) {
+							t.Errorf("%s (%s) lists %#v, which is malformed or a duplicate", prefix, entry.Version, gr)
+						}
+						seen.Insert(gr)
+					}
 				}
 			}
 		})
@@ -91,11 +109,18 @@ func TestFeatureGateAPIRequirementsWellFormed(t *testing.T) {
 	// kube-apiserver serves a superset of the generic control plane, so a gate validated on a
 	// generic control plane must be validated identically on kube-apiserver.
 	kube := DefaultForKubeAPIServer()
-	for feature, resources := range DefaultForGenericControlPlane() {
-		if !reflect.DeepEqual(kube[feature], resources) {
-			t.Errorf("feature gate %q requires %v generically but %v in kube-apiserver; the kube requirements must include the generic ones", feature, resources, kube[feature])
+	for feature, versioned := range DefaultForGenericControlPlane() {
+		if !reflect.DeepEqual(kube[feature], versioned) {
+			t.Errorf("feature gate %q requires %v generically but %v in kube-apiserver; the kube requirements must include the generic ones", feature, versioned, kube[feature])
 		}
 	}
+}
+
+func latestResources(versioned serverstorage.VersionedAPIRequirements) []schema.GroupResource {
+	if len(versioned) == 0 {
+		return nil
+	}
+	return versioned[len(versioned)-1].Resources
 }
 
 func TestFeatureGateAPIRequirementsMatchScheme(t *testing.T) {
@@ -115,14 +140,16 @@ func TestFeatureGateAPIRequirementsMatchScheme(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			for feature, resources := range tc.requirements {
-				for _, gr := range resources {
-					if !legacyscheme.Scheme.IsGroupRegistered(gr.Group) {
-						t.Errorf("feature gate %q requires %s, but group %q is not registered in legacyscheme.Scheme", feature, gr, gr.Group)
-						continue
-					}
-					if len(schemeVersionsCarrying(gr)) == 0 {
-						t.Errorf("feature gate %q requires %s, but no version of group %q has a kind whose plural is %q", feature, gr, gr.Group, gr.Resource)
+			for feature, versioned := range tc.requirements {
+				for _, entry := range versioned {
+					for _, gr := range entry.Resources {
+						if !legacyscheme.Scheme.IsGroupRegistered(gr.Group) {
+							t.Errorf("feature gate %q requires %s from %s, but group %q is not registered in legacyscheme.Scheme", feature, gr, entry.Version, gr.Group)
+							continue
+						}
+						if len(schemeVersionsCarrying(gr)) == 0 {
+							t.Errorf("feature gate %q requires %s from %s, but no version of group %q has a kind whose plural is %q", feature, gr, entry.Version, gr.Group, gr.Resource)
+						}
 					}
 				}
 			}
@@ -192,9 +219,9 @@ func TestFeatureGateAPIRequirementsMatchProviders(t *testing.T) {
 	}
 
 	declared := map[featuregate.Feature]sets.Set[string]{}
-	for feature, resources := range DefaultForKubeAPIServer() {
+	for feature, versioned := range DefaultForKubeAPIServer() {
 		declared[feature] = sets.New[string]()
-		for _, gr := range resources {
+		for _, gr := range latestResources(versioned) {
 			declared[feature].Insert(gr.Resource)
 		}
 	}
