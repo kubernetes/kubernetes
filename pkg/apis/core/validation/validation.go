@@ -8362,7 +8362,7 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 
 		if helper.IsHugePageResourceName(resourceName) {
 			limContainsHugePages = true
-			if err := validateResourceQuantityHugePageValue(resourceName, quantity, opts); err != nil {
+			if err := validateResourceQuantityHugePageValue(resourceName, quantity, location+"/limits", opts); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), err.Error()))
 			}
 		}
@@ -8395,7 +8395,7 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 		}
 		if helper.IsHugePageResourceName(resourceName) {
 			reqContainsHugePages = true
-			if err := validateResourceQuantityHugePageValue(resourceName, quantity, opts); err != nil {
+			if err := validateResourceQuantityHugePageValue(resourceName, quantity, location+"/requests", opts); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), err.Error()))
 			}
 		}
@@ -8473,12 +8473,20 @@ func validateResourceClaimNames(claims []core.ResourceClaim, podClaimNames sets.
 	return allErrs
 }
 
-func validateResourceQuantityHugePageValue(name core.ResourceName, quantity resource.Quantity, opts PodValidationOptions) error {
+// location is the same StoredResourceQuantities key the caller already validated quantity
+// against (see validateResourceRequirements); an exact match there ratchets a specific stored
+// indivisible value without opening every hugepages entry the way AllowIndivisibleHugePagesValues
+// does.
+func validateResourceQuantityHugePageValue(name core.ResourceName, quantity resource.Quantity, location string, opts PodValidationOptions) error {
 	if !helper.IsHugePageResourceName(name) {
 		return nil
 	}
 
-	if !opts.AllowIndivisibleHugePagesValues && !helper.IsHugePageResourceValueDivisible(name, quantity) {
+	if opts.AllowIndivisibleHugePagesValues || opts.StoredResourceQuantities.Has(location, name, quantity) {
+		return nil
+	}
+
+	if !helper.IsHugePageResourceValueDivisible(name, quantity) {
 		return fmt.Errorf("%s is not positive integer multiple of %s", quantity.String(), name)
 	}
 

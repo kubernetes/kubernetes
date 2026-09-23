@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodeapi "k8s.io/kubernetes/pkg/api/node"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/node/validation"
@@ -92,18 +91,6 @@ func (strategy) Canonicalize(obj runtime.Object) {
 	_ = obj.(*node.RuntimeClass)
 }
 
-// hasIndivisibleHugePagesOverhead reports whether overhead holds a hugepage quantity that is not
-// an exact multiple of the hugepage size. Mirrors pod/util.go's hasIndivisibleHugePagesValue: a
-// stored value like this must stay updatable even though a fresh one would be rejected.
-func hasIndivisibleHugePagesOverhead(overhead core.ResourceList) bool {
-	for name, quantity := range overhead {
-		if helper.IsHugePageResourceName(name) && !helper.IsHugePageResourceValueDivisible(name, quantity) {
-			return true
-		}
-	}
-	return false
-}
-
 // ValidateUpdate is the default update validation for an end user.
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newObj := obj.(*node.RuntimeClass)
@@ -114,9 +101,12 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	}
 	// an overhead value the stored object already carries was accepted when it was written; see
 	// kubernetes/kubernetes#141166. The key must match the location validateOverhead uses
-	// ("overhead", giving the lookup "overhead/limits").
+	// ("overhead", giving the lookup "overhead/limits"). This also covers a stored indivisible
+	// hugepages value: validateResourceQuantityHugePageValue ratchets an exact (location, name,
+	// quantity) match the same way, so a per-value StoredResourceQuantities hit is enough here
+	// without the coarser, whole-overhead AllowIndivisibleHugePagesValues flag pods use, which
+	// would let a changed or unrelated new hugepages entry through too.
 	opts := corevalidation.PodValidationOptions{
-		AllowIndivisibleHugePagesValues: hasIndivisibleHugePagesOverhead(oldOverhead),
 		StoredResourceQuantities: corevalidation.StoredResourceQuantitiesOfLocatedLists(map[string]core.ResourceList{
 			"overhead/limits": oldOverhead,
 		}),
