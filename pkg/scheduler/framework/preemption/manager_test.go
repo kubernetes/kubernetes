@@ -452,7 +452,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 				_ = informerFactory.Policy().V1().PodDisruptionBudgets().Informer().GetStore().Add(pdb)
 			}
 
-			snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(tt.initPods, nodes, tt.initPodGroups, tt.initCompositePodGroups)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, nodes, tt.initPodGroups, tt.initCompositePodGroups)
 			var sharedLister fwk.SharedLister = snapshot
 			if tt.injectSnapshotErr {
 				sharedLister = &errSharedLister{SharedLister: snapshot}

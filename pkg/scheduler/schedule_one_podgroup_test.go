@@ -687,10 +687,10 @@ func TestValidatePodGroup(t *testing.T) {
 			var podGroupInfo *framework.QueuedPodGroupInfo
 
 			if tt.compositePodGroup != nil {
-				snapshot = internalcache.NewTestSnapshotWithCompositePodGroups(tt.scheduledPods, nil, tt.podGroups, tt.compositePodGroups)
+				snapshot = internalcache.NewTestSnapshotWithPodGroups(tt.scheduledPods, nil, tt.podGroups, tt.compositePodGroups)
 				podGroupInfo = buildHierarchicalQueuedPodGroupInfo(tt.compositePodGroup, tt.compositePodGroups, tt.podGroups, tt.pods)
 			} else {
-				snapshot = internalcache.NewTestSnapshotWithPodGroups(tt.scheduledPods, nil, []*schedulingv1beta1.PodGroup{tt.podGroup})
+				snapshot = internalcache.NewTestSnapshotWithPodGroups(tt.scheduledPods, nil, []*schedulingv1beta1.PodGroup{tt.podGroup}, nil)
 				podGroupInfo = &framework.QueuedPodGroupInfo{
 					PodGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(tt.podGroup)},
 				}
@@ -5028,6 +5028,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 			[]*v1.Pod{st.MakePod().Name("p").Namespace("default").UID("p").PodGroupName("pg").Node("node1").SchedulerName("sched1").Obj()},
 			[]*v1.Node{st.MakeNode().Name("node1").Obj()},
 			[]*schedulingv1beta1.PodGroup{st.MakePodGroup().Name("pg").Namespace("default").UID("pg").Obj()},
+			nil,
 		),
 		client: client,
 		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {

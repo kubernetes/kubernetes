@@ -1214,7 +1214,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			parallelism := parallelize.DefaultParallelism
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups, nil)
 			mockPreemptionManager := &mockPreemptionManager{}
 			f, err := tf.NewFramework(
 				ctx,
@@ -1556,7 +1556,7 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups, nil)
 			f, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
