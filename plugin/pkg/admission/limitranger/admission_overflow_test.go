@@ -32,13 +32,13 @@ func TestConstraintsAreOverflowSafe(t *testing.T) {
 	normal := resource.MustParse("1000")
 	small := resource.MustParse("1")
 
-	if err := maxConstraint("Container", "memory", normal, api.ResourceList{}, api.ResourceList{api.ResourceMemory: huge}); err == nil {
+	if err := maxConstraint("Container", "memory", normal, api.ResourceList{}, api.ResourceList{api.ResourceMemory: huge}, false, false); err == nil {
 		t.Error("maxConstraint admitted a limit above the max")
 	}
 	if err := maxRequestConstraint("Container", "memory", normal, api.ResourceList{api.ResourceMemory: huge}); err == nil {
 		t.Error("maxRequestConstraint admitted a request above the max")
 	}
-	if err := minConstraint("Container", "memory", huge, api.ResourceList{api.ResourceMemory: small}, api.ResourceList{}); err == nil {
+	if err := minConstraint("Container", "memory", huge, api.ResourceList{api.ResourceMemory: small}, api.ResourceList{}, false, false); err == nil {
 		t.Error("minConstraint admitted a request below the min")
 	}
 	if err := limitRequestRatioConstraint("Container", "memory", normal, api.ResourceList{api.ResourceMemory: small}, api.ResourceList{api.ResourceMemory: huge}); err == nil {
@@ -55,7 +55,7 @@ func TestConstraintsAreOverflowSafe(t *testing.T) {
 
 	// A within-limit value must still pass, so the exact comparison did not
 	// start rejecting ordinary requests.
-	if err := maxConstraint("Container", "memory", normal, api.ResourceList{}, api.ResourceList{api.ResourceMemory: small}); err != nil {
+	if err := maxConstraint("Container", "memory", normal, api.ResourceList{}, api.ResourceList{api.ResourceMemory: small}, false, false); err != nil {
 		t.Errorf("maxConstraint rejected a within-limit value: %v", err)
 	}
 }
@@ -148,16 +148,16 @@ func TestConstraintAllocationsDoNotGrowWithTheExponent(t *testing.T) {
 	}
 	checks := map[string]func(api.ResourceList) error{
 		"min request": func(l api.ResourceList) error {
-			return minConstraint("Container", "memory", enforced, l, api.ResourceList{})
+			return minConstraint("Container", "memory", enforced, l, api.ResourceList{}, false, false)
 		},
 		"min limit": func(l api.ResourceList) error {
-			return minConstraint("Container", "memory", enforced, memory("1Gi"), l)
+			return minConstraint("Container", "memory", enforced, memory("1Gi"), l, false, false)
 		},
 		"max limit": func(l api.ResourceList) error {
-			return maxConstraint("Container", "memory", enforced, api.ResourceList{}, l)
+			return maxConstraint("Container", "memory", enforced, api.ResourceList{}, l, false, false)
 		},
 		"max request": func(l api.ResourceList) error {
-			return maxConstraint("Container", "memory", enforced, l, memory("1Gi"))
+			return maxConstraint("Container", "memory", enforced, l, memory("1Gi"), false, false)
 		},
 		"max request only": func(l api.ResourceList) error {
 			return maxRequestConstraint("Container", "memory", enforced, l)
@@ -190,10 +190,10 @@ func TestConstraintsRejectValuesTheProjectionRounded(t *testing.T) {
 		check func() error
 	}{
 		{"request a fraction below the minimum", func() error {
-			return minConstraint("Container", "memory", resource.MustParse("1"), memory("0.9999"), api.ResourceList{})
+			return minConstraint("Container", "memory", resource.MustParse("1"), memory("0.9999"), api.ResourceList{}, false, false)
 		}},
 		{"limit a fraction above the maximum", func() error {
-			return maxConstraint("Container", "memory", resource.MustParse("1.0001"), api.ResourceList{}, memory("1.0009"))
+			return maxConstraint("Container", "memory", resource.MustParse("1.0001"), api.ResourceList{}, memory("1.0009"), false, false)
 		}},
 		{"request a fraction above the maximum", func() error {
 			return maxRequestConstraint("Container", "memory", resource.MustParse("1.0001"), memory("1.0009"))
