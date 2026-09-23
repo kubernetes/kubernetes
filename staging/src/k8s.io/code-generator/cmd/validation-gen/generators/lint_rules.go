@@ -363,9 +363,20 @@ func nonPointerStructRequiredness(extractor validators.ValidationExtractor, tagP
 	}
 }
 
+// enumConsistency enforces +k8s:enum to be set when +enum is set.
+func enumConsistency(tagPrefix string) lintRule {
+	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
+		if hasTag(tags, "enum") && !hasTag(tags, tagPrefix+"enum") {
+			return fmt.Sprintf("+enum requires +%senum to be set", tagPrefix), nil
+		}
+		return "", nil
+	}
+}
+
 func lintRules(extractor validators.ValidationExtractor, tagPrefix string) []lintRule {
 	return []lintRule{
 		alphaBetaPrefix(tagPrefix),
+		enumConsistency(tagPrefix),
 		requiredAndOptional(extractor, tagPrefix),
 		nonPointerStructRequiredness(extractor, tagPrefix),
 	}
