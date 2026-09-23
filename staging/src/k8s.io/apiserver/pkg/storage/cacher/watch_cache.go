@@ -690,5 +690,5 @@ func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) 
 			return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot), nil
 		}
 	}
-	return newCacheIntervalFromStore(w.resourceVersion, w.storage.StoreLocked(), key, matchesSingle)
+	return newCacheIntervalFromStore(w.resourceVersion, w.storage, key, matchesSingle)
 }

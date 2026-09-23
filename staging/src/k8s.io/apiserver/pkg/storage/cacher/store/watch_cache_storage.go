@@ -61,13 +61,6 @@ type WatchCacheStorage struct {
 	snapshottingEnabled atomic.Bool
 }
 
-// StoreLocked returns the live store.
-// Unlike GetExactSnapshotLocked this is not an immutable point-in-time copy.
-// The caller must hold the lock for the duration of use.
-func (w *WatchCacheStorage) StoreLocked() Indexer {
-	return w.store
-}
-
 func (w *WatchCacheStorage) SnapshottingEnabled() bool {
 	return w.snapshots != nil && w.snapshottingEnabled.Load()
 }
@@ -114,11 +107,7 @@ func (w *WatchCacheStorage) GetLatestSnapshotOrBuildLocked(key, continueKey stri
 		return snap, nil
 	}
 	// TODO: Consider using Indexer Clone() after benchmarking.
-	return orderedSnapshotResponseFromIndexer(w.store, key, continueKey)
-}
-
-func orderedSnapshotResponseFromIndexer(indexer Indexer, key, continueKey string) (Snapshot, error) {
-	items, err := indexer.OrderedListPrefix(key, continueKey)
+	items, err := w.OrderedListPrefix(key, continueKey)
 	if err != nil {
 		return nil, err
 	}
@@ -259,6 +248,10 @@ func (w *WatchCacheStorage) Get(obj interface{}) (interface{}, bool, error) {
 // GetByKey returns pointer to <storeElement>.
 func (w *WatchCacheStorage) GetByKey(key string) (interface{}, bool, error) {
 	return w.store.GetByKey(key)
+}
+
+func (w *WatchCacheStorage) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
+	return w.store.OrderedListPrefix(prefix, continueKey)
 }
 
 func (w *WatchCacheStorage) ListKeys() []string {
