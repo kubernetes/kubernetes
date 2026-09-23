@@ -918,8 +918,6 @@ func TestUpdatePodStatusOnKubeletRestartWithMultipleContainers(t *testing.T) {
 }
 
 func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, false)
-
 	const (
 		containerName = "startup_container"
 		containerID   = "test://startup_container_id"
@@ -927,27 +925,73 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 
 	tests := []struct {
 		name string
+		// featureEnabled toggles ChangeContainerStatusOnKubeletRestart feature gate.
+		// When enabled, Started is never preserved across a kubelet restart.
+		featureEnabled bool
 		// startedBeforeRestart is the Started in the pod status the kubelet last
-		// observed from the API server.
-		startedBeforeRestart bool
-		readinessProbe       *v1.Probe
-		expectedStarted      bool
-		expectedReady        bool
+		// observed from the API server. It is nil when no probe result for the
+		// container reached the API server before the restart.
+		startedBeforeRestart *bool
+		// readyBeforeRestart is the PodReady condition the kubelet last observed
+		// from the API server.
+		readyBeforeRestart v1.ConditionStatus
+		readinessProbe     *v1.Probe
+		expectedStarted    bool
+		expectedReady      bool
 	}{
 		{
-			name:            "still in startup period, no readiness probe",
-			expectedStarted: false,
-			expectedReady:   false,
+			name:                 "feature is disabled, the container is still in its startup period",
+			startedBeforeRestart: new(false),
+			readyBeforeRestart:   v1.ConditionFalse,
+			expectedStarted:      false,
+			expectedReady:        false,
 		},
 		{
-			name:            "still in startup period, with readiness probe",
-			readinessProbe:  defaultProbe,
-			expectedStarted: false,
-			expectedReady:   false,
+			name:                 "feature is disabled, the container is still in its startup period, with a readiness probe",
+			startedBeforeRestart: new(false),
+			readyBeforeRestart:   v1.ConditionFalse,
+			readinessProbe:       defaultProbe,
+			expectedStarted:      false,
+			expectedReady:        false,
 		},
 		{
-			name:                 "startup probe already passed before the restart",
-			startedBeforeRestart: true,
+			name:                 "feature is disabled, the API server reports no Started",
+			startedBeforeRestart: nil,
+			readyBeforeRestart:   v1.ConditionFalse,
+			expectedStarted:      false,
+			expectedReady:        false,
+		},
+		{
+			name:                 "feature is disabled, the startup probe passed before the kubelet restart",
+			startedBeforeRestart: new(true),
+			readyBeforeRestart:   v1.ConditionTrue,
+			expectedStarted:      true,
+			expectedReady:        true,
+		},
+		// The feature gate restores the legacy behavior: the startup probe is
+		// verified again after a restart, but the first sync, which runs before
+		// the workers are added, reports the container as started.
+		{
+			name:                 "feature is enabled, the container is still in its startup period",
+			featureEnabled:       true,
+			startedBeforeRestart: new(false),
+			readyBeforeRestart:   v1.ConditionFalse,
+			expectedStarted:      true,
+			expectedReady:        true,
+		},
+		{
+			name:                 "feature is enabled, the API server reports no Started",
+			featureEnabled:       true,
+			startedBeforeRestart: nil,
+			readyBeforeRestart:   v1.ConditionFalse,
+			expectedStarted:      true,
+			expectedReady:        true,
+		},
+		{
+			name:                 "feature is enabled, the startup probe passed before the kubelet restart",
+			featureEnabled:       true,
+			startedBeforeRestart: new(true),
+			readyBeforeRestart:   v1.ConditionTrue,
 			expectedStarted:      true,
 			expectedReady:        true,
 		},
@@ -955,6 +999,8 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
+
 			ctx := ktesting.Init(t)
 			m := newTestManager()
 			// no cleanup: no workers, as on the first sync after a kubelet restart.
@@ -963,6 +1009,11 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 			// restart grace period, so its start time alone makes it look like a
 			// container that survived the restart.
 			startedBeforeKubeletRestart := metav1.Time{Time: kubeletRestartGracePeriod(m.start).Add(-time.Minute)}
+			// convertToAPIContainerStatuses preserves Started only while the gate is disabled.
+			var generatedStarted *bool
+			if !tc.featureEnabled {
+				generatedStarted = tc.startedBeforeRestart
+			}
 			podStatus := v1.PodStatus{
 				Phase: v1.PodRunning,
 				ContainerStatuses: []v1.ContainerStatus{{
@@ -971,7 +1022,7 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 					State: v1.ContainerState{
 						Running: &v1.ContainerStateRunning{StartedAt: startedBeforeKubeletRestart},
 					},
-					Started: &tc.startedBeforeRestart,
+					Started: generatedStarted,
 				}},
 			}
 
@@ -987,13 +1038,13 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{{
 						Type:   v1.PodReady,
-						Status: boolToConditionStatus(tc.startedBeforeRestart),
+						Status: tc.readyBeforeRestart,
 					}},
 					ContainerStatuses: []v1.ContainerStatus{{
 						Name:        containerName,
 						ContainerID: containerID,
-						Ready:       tc.startedBeforeRestart,
-						Started:     &tc.startedBeforeRestart,
+						Ready:       tc.readyBeforeRestart == v1.ConditionTrue,
+						Started:     tc.startedBeforeRestart,
 					}},
 				},
 			}
@@ -1012,13 +1063,6 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 			}
 		})
 	}
-}
-
-func boolToConditionStatus(b bool) v1.ConditionStatus {
-	if b {
-		return v1.ConditionTrue
-	}
-	return v1.ConditionFalse
 }
 
 func (m *manager) extractedReadinessHandling(logger klog.Logger) {
