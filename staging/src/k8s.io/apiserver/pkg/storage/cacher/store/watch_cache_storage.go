@@ -286,7 +286,7 @@ func (w *WatchCacheStorage) UpdateStoreLocked(eventType watch.EventType, elem *E
 		return err
 	}
 	if w.snapshots != nil && w.snapshottingEnabled.Load() {
-		w.snapshots.Add(resourceVersion, w.store)
+		w.snapshots.Add(resourceVersion, w.store.Clone())
 	}
 	return nil
 }
@@ -306,7 +306,7 @@ func (w *WatchCacheStorage) ReplaceLocked(toReplace []interface{}, resourceVersi
 	if w.snapshots != nil {
 		w.snapshots.Reset()
 		if w.snapshottingEnabled.Load() {
-			w.snapshots.Add(version, w.store)
+			w.snapshots.Add(version, w.store.Clone())
 		}
 	}
 	w.listResourceVersion = version
