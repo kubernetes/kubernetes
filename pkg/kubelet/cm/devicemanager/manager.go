@@ -481,8 +481,8 @@ func (m *ManagerImpl) markResourceUnhealthy(logger klog.Logger, resourceName str
 // capacity for already allocated pods so that they can continue to run. However, new pods
 // requiring device plugin resources will not be scheduled till device plugin re-registers.
 func (m *ManagerImpl) GetCapacity(logger klog.Logger) (v1.ResourceList, v1.ResourceList, []string) {
-	var capacity = v1.ResourceList{}
-	var allocatable = v1.ResourceList{}
+	capacity := v1.ResourceList{}
+	allocatable := v1.ResourceList{}
 	deletedResources := sets.New[string]()
 	m.mutex.Lock()
 	for resourceName, devices := range m.healthyDevices {
@@ -1292,6 +1292,17 @@ func (m *ManagerImpl) UpdateAllocatedResourcesStatus(_ klog.Logger, pod *v1.Pod,
 				status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, resourceStatus)
 			}
 		}
+
+		cs := status.ContainerStatuses[i]
+		for j := range cs.AllocatedResourcesStatus {
+			resources := cs.AllocatedResourcesStatus[j].Resources
+			sort.Slice(resources, func(k, l int) bool {
+				return resources[k].ResourceID < resources[l].ResourceID
+			})
+		}
+		sort.Slice(cs.AllocatedResourcesStatus, func(j, k int) bool {
+			return cs.AllocatedResourcesStatus[j].Name < cs.AllocatedResourcesStatus[k].Name
+		})
 	}
 }
 

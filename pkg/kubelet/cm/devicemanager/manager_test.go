@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -2146,7 +2145,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	podUID := "test-pod-uid"
 	containerName := "test-container"
-	resourceName := "test-resource"
+	resourceNames := []string{"test-resource-a", "test-resource-b"}
 
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	if err != nil {
@@ -2174,75 +2173,72 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 		checkpointManager: ckm,
 	}
 
-	testManager.podDevices.insert(podUID, containerName, resourceName,
-		constructDevices([]string{"dev1", "dev2"}),
-		newContainerAllocateResponse(
-			withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}),
-			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
-		),
-	)
+	for _, resourceName := range resourceNames {
+		testManager.podDevices.insert(podUID, containerName, resourceName,
+			constructDevices([]string{"dev1", "dev2"}),
+			newContainerAllocateResponse(
+				withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}),
+				withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+			),
+		)
 
-	testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
-		{ID: "dev1", Health: pluginapi.Healthy},
-		{ID: "dev2", Health: pluginapi.Unhealthy},
-	})
+		testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
+			{ID: "dev1", Health: pluginapi.Healthy},
+			{ID: "dev2", Health: pluginapi.Unhealthy},
+		})
+	}
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: types.UID(podUID),
 		},
 	}
-	status := &v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
-			{
-				Name: containerName,
-			},
+	expectedResources := []v1.ResourceHealth{
+		{
+			ResourceID: "dev1",
+			Health:     pluginapi.Healthy,
 		},
-	}
-	testManager.UpdateAllocatedResourcesStatus(logger, pod, status)
-
-	expectedStatus := v1.ResourceStatus{
-		Name: v1.ResourceName(resourceName),
-		Resources: []v1.ResourceHealth{
-			{
-				ResourceID: "dev1",
-				Health:     pluginapi.Healthy,
-			},
-			{
-				ResourceID: "dev2",
-				Health:     pluginapi.Unhealthy,
-			},
+		{
+			ResourceID: "dev2",
+			Health:     pluginapi.Unhealthy,
 		},
 	}
 	expectedContainerStatuses := []v1.ContainerStatus{
 		{
-			Name:                     containerName,
-			AllocatedResourcesStatus: []v1.ResourceStatus{expectedStatus},
+			Name: containerName,
+			AllocatedResourcesStatus: []v1.ResourceStatus{
+				{
+					Name:      v1.ResourceName(resourceNames[0]),
+					Resources: expectedResources,
+				},
+				{
+					Name:      v1.ResourceName(resourceNames[1]),
+					Resources: expectedResources,
+				},
+				{
+					Name:      "test-resource-c",
+					Resources: expectedResources,
+				},
+			},
 		},
 	}
 
-	// Sort the resources for the expected status and actual status
-	sortContainerStatuses(status.ContainerStatuses)
-	sortContainerStatuses(expectedContainerStatuses)
+	status := &v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name: containerName,
+			AllocatedResourcesStatus: []v1.ResourceStatus{{
+				Name: "test-resource-c",
+				Resources: []v1.ResourceHealth{
+					{ResourceID: "dev2", Health: pluginapi.Unhealthy},
+					{ResourceID: "dev1", Health: pluginapi.Healthy},
+				},
+			}},
+		}},
+	}
+	testManager.UpdateAllocatedResourcesStatus(logger, pod, status)
 
 	if !reflect.DeepEqual(status.ContainerStatuses, expectedContainerStatuses) {
-		t.Errorf("UpdateAllocatedResourcesStatus failed, expected: %v, got: %v", expectedContainerStatuses, status.ContainerStatuses)
-	}
-}
-
-// Helper function to sort ResourceHealth slices
-func sortResourceHealth(resources []v1.ResourceHealth) {
-	sort.SliceStable(resources, func(i, j int) bool {
-		return resources[i].ResourceID < resources[j].ResourceID
-	})
-}
-
-// Helper function to sort ContainerStatus slices
-func sortContainerStatuses(statuses []v1.ContainerStatus) {
-	for i := range statuses {
-		for j := range statuses[i].AllocatedResourcesStatus {
-			sortResourceHealth(statuses[i].AllocatedResourcesStatus[j].Resources)
-		}
+		t.Fatalf("UpdateAllocatedResourcesStatus failed, expected: %v, got: %v", expectedContainerStatuses, status.ContainerStatuses)
 	}
 }
 
