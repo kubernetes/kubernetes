@@ -51,6 +51,7 @@ message CertificateSigningRequest {
   // Other fields are derived by Kubernetes and cannot be modified by users.
   // +required
   // +k8s:alpha(since: "1.38")=+k8s:required
+  // +k8s:alpha(since: "1.38")=+k8s:immutable
   optional CertificateSigningRequestSpec spec = 2;
 
   // status contains information about whether the request is approved or denied,
