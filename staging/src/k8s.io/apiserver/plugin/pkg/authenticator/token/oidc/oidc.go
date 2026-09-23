@@ -256,15 +256,18 @@ func AllValidSigningAlgorithms() []string {
 
 // allowlist of signing algorithms to ensure users don't mistakenly pass something goofy.
 var allowedSigningAlgs = map[string]bool{
-	oidc.RS256: true,
-	oidc.RS384: true,
-	oidc.RS512: true,
-	oidc.ES256: true,
-	oidc.ES384: true,
-	oidc.ES512: true,
-	oidc.PS256: true,
-	oidc.PS384: true,
-	oidc.PS512: true,
+	oidc.RS256:  true,
+	oidc.RS384:  true,
+	oidc.RS512:  true,
+	oidc.ES256:  true,
+	oidc.ES384:  true,
+	oidc.ES512:  true,
+	oidc.PS256:  true,
+	oidc.PS384:  true,
+	oidc.PS512:  true,
+	"ML-DSA-44": true,
+	"ML-DSA-65": true,
+	"ML-DSA-87": true,
 }
 
 type AuthenticatorTokenWithHealthCheck interface {

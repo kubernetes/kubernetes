@@ -30,7 +30,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	externaljwtv1 "k8s.io/externaljwt/apis/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	externaljwtmetrics "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/metrics"
 )
@@ -182,6 +184,10 @@ func (p *Plugin) validateJWTHeader(ctx context.Context, response *externaljwtv1.
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 	case "RS256", "ES256", "ES384", "ES512":
 		// OK
+	case "ML-DSA-44", "ML-DSA-65", "ML-DSA-87":
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenMLDSA) {
+			return fmt.Errorf("bad signing algorithm %q", header.Algorithm)
+		}
 	default:
 		return fmt.Errorf("bad signing algorithm %q", header.Algorithm)
 	}
