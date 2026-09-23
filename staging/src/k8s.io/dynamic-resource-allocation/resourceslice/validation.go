@@ -41,6 +41,9 @@ func validateDriverResources(driverName string, resources *DriverResources) erro
 // validatePool checks that there aren't any pool-wide issues that
 // can't be caught in the API-server per-ResourceSlice validation.
 //
+// An empty driverName skips validateUnqualifiedName checks (used when the
+// caller opted out via [Options.ValidateQualifiedNames]).
+//
 // This logic is very similar to what we do in the allocator when we
 // gather the pools. We might want to see if there is a good way to
 // put this logic in one place.
@@ -63,14 +66,16 @@ func validatePool(driverName, name string, pool Pool) error {
 			}
 			devices.Insert(device.Name)
 
-			for attrName := range device.Attributes {
-				if err := validateUnqualifiedName(driverName, attrName); err != nil {
-					return fmt.Errorf("pool %q: device %q: attribute %q: %w", name, device.Name, attrName, err)
+			if driverName != "" {
+				for attrName := range device.Attributes {
+					if err := validateUnqualifiedName(driverName, attrName); err != nil {
+						return fmt.Errorf("pool %q: device %q: attribute %q: %w", name, device.Name, attrName, err)
+					}
 				}
-			}
-			for capName := range device.Capacity {
-				if err := validateUnqualifiedName(driverName, capName); err != nil {
-					return fmt.Errorf("pool %q: device %q: capacity %q: %w", name, device.Name, capName, err)
+				for capName := range device.Capacity {
+					if err := validateUnqualifiedName(driverName, capName); err != nil {
+						return fmt.Errorf("pool %q: device %q: capacity %q: %w", name, device.Name, capName, err)
+					}
 				}
 			}
 
@@ -99,6 +104,8 @@ func validatePool(driverName, name string, pool Pool) error {
 // The apiserver does not validate this. The scheduling code in 1.37 prefers
 // the fully-qualified name for constraints, but CEL lookup is random.
 // Therefore DRA drivers should not publish both.
+//
+// Callers must not invoke this with an empty driverName; see [validatePool].
 func validateUnqualifiedName(driverName string, name resourceapi.QualifiedName) error {
 	domain, id, hasDomain := strings.Cut(string(name), "/")
 	if hasDomain && domain == driverName {
