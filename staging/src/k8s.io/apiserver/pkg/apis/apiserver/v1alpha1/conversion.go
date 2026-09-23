@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
-
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	apiserver "k8s.io/apiserver/pkg/apis/apiserver"
 )
@@ -34,8 +32,5 @@ func Convert_v1alpha1_EgressSelection_To_apiserver_EgressSelection(in *EgressSel
 }
 
 func Convert_apiserver_WebhookConfiguration_To_v1alpha1_WebhookConfiguration(in *apiserver.WebhookConfiguration, out *WebhookConfiguration, s conversion.Scope) error {
-	if in.ConditionsReview != nil {
-		return fmt.Errorf("WebhookConfiguration.ConditionsReview is not supported in v1alpha1 AuthorizationConfiguration")
-	}
 	return autoConvert_apiserver_WebhookConfiguration_To_v1alpha1_WebhookConfiguration(in, out, s)
 }
