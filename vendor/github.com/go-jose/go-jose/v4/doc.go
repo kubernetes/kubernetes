@@ -21,5 +21,10 @@ the JSON Web Encryption and JSON Web Signature standards, with optional JSON Web
 Token support available in a sub-package. The library supports both the compact
 and JWS/JWE JSON Serialization formats, and has optional support for multiple
 recipients.
+
+ML-DSA (FIPS 204) signing and verification, and the AKP JSON Web Key type, are
+defined by RFC 9964 and require Go 1.27 or later. On earlier toolchains the
+ML-DSA algorithms are recognized but unusable, and AKP keys fail to parse with
+ErrUnsupportedKeyType.
 */
 package jose

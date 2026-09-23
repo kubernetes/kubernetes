@@ -158,7 +158,7 @@ github.com/fxamacker/cbor/v2
 # github.com/go-errors/errors v1.4.2
 ## explicit; go 1.14
 github.com/go-errors/errors
-# github.com/go-jose/go-jose/v4 v4.1.5
+# github.com/go-jose/go-jose/v4 v4.1.5 => github.com/james-d-elliott/go-jose/v4 v4.0.0-20260819232147-08b3c5999fb1
 ## explicit; go 1.24.0
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
@@ -1307,3 +1307,4 @@ sigs.k8s.io/yaml/kyaml
 # tags.cncf.io/container-device-interface/specs-go v1.1.0
 ## explicit; go 1.19
 tags.cncf.io/container-device-interface/specs-go
+# github.com/go-jose/go-jose/v4 => github.com/james-d-elliott/go-jose/v4 v4.0.0-20260819232147-08b3c5999fb1
