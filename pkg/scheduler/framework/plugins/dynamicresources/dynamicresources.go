@@ -186,6 +186,20 @@ type DynamicResources struct {
 	draManager            fwk.SharedDRAManager
 	podIndexer            cache.Indexer
 	podResourceClaimIndex string
+	newConstraints        structured.NewAllocationConstraintFunc
+}
+
+// allocationConstraintProvider, when set, is used by all subsequently
+// created DynamicResources plugins. It must be set before framework
+// initialization. Intended for out-of-tree scheduler binaries that
+// need to install a custom DRA device-allocation policy.
+var allocationConstraintProvider structured.NewAllocationConstraintFunc
+
+// SetAllocationConstraintProvider installs a provider used by all
+// subsequently created DynamicResources plugins. It must be called before
+// framework initialization. Intended for out-of-tree scheduler binaries.
+func SetAllocationConstraintProvider(fn structured.NewAllocationConstraintFunc) {
+	allocationConstraintProvider = fn
 }
 
 const (
@@ -225,7 +239,8 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 			EnableConsumableCapacity: fts.EnableDRAConsumableCapacity,
 			EnableListTypeAttributes: fts.EnableDRAListTypeAttributes,
 		}),
-		draManager: fh.SharedDRAManager(),
+		draManager:     fh.SharedDRAManager(),
+		newConstraints: allocationConstraintProvider,
 	}
 
 	// Set up pod indexer for PreQueueingHint to look up pods by claim.
@@ -801,7 +816,11 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			return nil, statusError(logger, err)
 		}
 		features := AllocatorFeatures(pl.fts)
-		allocator, err := structured.NewAllocator(ctx, features, *allocatedState, pl.draManager.DeviceClasses(), slices, pl.celCache)
+		var allocOpts []structured.Option
+		if pl.newConstraints != nil {
+			allocOpts = append(allocOpts, structured.WithAllocationConstraints(pl.newConstraints))
+		}
+		allocator, err := structured.NewAllocator(ctx, features, *allocatedState, pl.draManager.DeviceClasses(), slices, pl.celCache, allocOpts...)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
