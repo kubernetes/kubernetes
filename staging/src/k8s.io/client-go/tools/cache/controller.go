@@ -913,13 +913,21 @@ func processDeltasInBatch(
 		}
 		return nil
 	}
-	// deltasList is a list of unique objects
+	inBatch := make(map[string]interface{}, len(deltas))
 	for _, d := range deltas {
 		obj := d.Object
+		key, err := keyFunc(obj)
 		switch d.Type {
 		case Sync, Replaced, Added, Updated:
-			// it will only return one old object for each because items are unique
-			if old, exists, err := clientState.Get(obj); err == nil && exists {
+			var old interface{}
+			if err == nil {
+				var seen bool
+				if old, seen = inBatch[key]; !seen {
+					old, _, _ = clientState.GetByKey(key)
+				}
+				inBatch[key] = obj
+			}
+			if old != nil {
 				txn := Transaction{
 					Type:   TransactionTypeUpdate,
 					Object: obj,
@@ -939,6 +947,9 @@ func processDeltasInBatch(
 				})
 			}
 		case Deleted:
+			if err == nil {
+				inBatch[key] = nil
+			}
 			txn := Transaction{
 				Type:   TransactionTypeDelete,
 				Object: obj,
