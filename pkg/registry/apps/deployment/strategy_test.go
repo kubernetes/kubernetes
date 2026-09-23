@@ -320,8 +320,9 @@ func TestDeploymentStrategyValidateUpdate(t *testing.T) {
 		oldDeployment *apps.Deployment
 	}{
 		{
-			name:          "validation on an existing deployment with indivisible hugepages values to a new deployment with indivisible hugepages values",
-			newDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
+			// The stored indivisible value is unchanged, so it is ratcheted through.
+			name:          "validation on an existing deployment with indivisible hugepages values to a new deployment with the same indivisible hugepages values",
+			newDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"1Gi", resource.MustParse("1.1Gi")),
 			oldDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"1Gi", resource.MustParse("1.1Gi")),
 		},
 	}
@@ -343,6 +344,13 @@ func TestDeploymentStrategyValidateUpdate(t *testing.T) {
 			name:          "validation on an existing deployment with divisible hugepages values to a new deployment with indivisible hugepages values",
 			newDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
 			oldDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"1Gi", resource.MustParse("2Gi")),
+		},
+		{
+			// A stored indivisible value ratchets only itself: a different indivisible value under
+			// another hugepages resource was never accepted and is validated in full.
+			name:          "validation on an existing deployment with indivisible hugepages values to a new deployment with a different indivisible hugepages value",
+			newDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
+			oldDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"1Gi", resource.MustParse("1.1Gi")),
 		},
 	}
 
