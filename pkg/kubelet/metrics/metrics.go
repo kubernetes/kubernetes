@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -1118,7 +1119,10 @@ var (
 
 	// ImagePullDuration is a Histogram that tracks the duration (in seconds) it takes for an image to be pulled,
 	// including the time spent in the waiting queue of image puller.
-	// The metric is broken down by image name, pull policy, and bucketed image size.
+	// The metric is broken down by image repository (tag and digest stripped, see
+	// GetImageNameForMetrics, to bound cardinality), pull policy, and bucketed image size. The
+	// full image reference, including tag and digest, is attached as an exemplar where supported
+	// (see ObserveImagePullDurationWithExemplar) rather than as a label.
 	ImagePullDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1647,12 +1651,55 @@ func GetPriorityBucketLabel(pod *v1.Pod) PriorityBucket {
 	}
 }
 
-// GetImageNameForMetrics strips the digest from an image reference for use in metrics labels.
-// This reduces cardinality while keeping registry/repo:tag information.
-// Example: "gcr.io/project/app:v1@sha256:abc123" -> "gcr.io/project/app:v1"
+// GetImageNameForMetrics strips the tag and digest from an image reference for use in metrics
+// labels. This bounds cardinality to distinct repositories regardless of tagging scheme (e.g.
+// per-commit tags in CI/GitOps pipelines would otherwise grow the label unboundedly).
+// Example: "gcr.io/project/app:v1@sha256:abc123" -> "gcr.io/project/app"
+//
+// Only a ':' after the last '/' is treated as a tag separator, since the registry domain
+// itself may contain a port, e.g. "localhost:5000/app:v1" -> "localhost:5000/app".
 func GetImageNameForMetrics(image string) string {
 	if before, _, found := strings.Cut(image, "@"); found {
-		return before
+		image = before
+	}
+	slash := strings.LastIndex(image, "/")
+	tail := image[slash+1:]
+	if before, _, found := strings.Cut(tail, ":"); found {
+		image = image[:slash+1] + before
 	}
 	return image
+}
+
+// imageRefExemplarLabel is the exemplar label name used to attach the full image reference
+// (tag and digest included) to an ImagePullDuration observation. See
+// ObserveImagePullDurationWithExemplar.
+const imageRefExemplarLabel = "image_ref"
+
+// ObserveImagePullDurationWithExemplar records an image pull duration observation and, where
+// supported, attaches the full image reference (registry/repo/tag/digest) as a Prometheus
+// exemplar via metrics.ObserveWithExemplar. This keeps the permanent "image" label bounded to
+// the repository (see GetImageNameForMetrics, which strips tag and digest) while still
+// surfacing the exact tag or digest that was pulled, for spot-debugging a specific slow pull in
+// tools like Grafana. Unlike the "image" label, exemplars don't grow the metric's permanent
+// series count.
+func ObserveImagePullDurationWithExemplar(observer metrics.ObserverMetric, seconds float64, imageRef string) {
+	metrics.ObserveWithExemplar(observer, seconds, map[string]string{
+		imageRefExemplarLabel: truncateForExemplar(imageRef, imageRefExemplarLabel),
+	})
+}
+
+// truncateForExemplar truncates s, keeping its tail, so that the combined rune count of s and
+// labelName fits within metrics.ExemplarMaxRunes. The tail is kept (rather than the head)
+// because the tag/digest at the end of an image reference is more informative than the
+// registry/repo prefix, which is already captured by the "image" label.
+func truncateForExemplar(s, labelName string) string {
+	budget := metrics.ExemplarMaxRunes - utf8.RuneCountInString(labelName)
+	if budget <= 0 {
+		return ""
+	}
+	if utf8.RuneCountInString(s) <= budget {
+		return s
+	}
+	runes := []rune(s)
+	return string(runes[len(runes)-budget:])
 }

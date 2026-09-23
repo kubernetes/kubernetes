@@ -380,11 +380,15 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 	imagePullDuration := time.Since(startTime).Truncate(time.Millisecond)
 	m.logIt(logger, objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting). Image size: %v bytes.",
 		image, imagePullResult.pullDuration.Truncate(time.Millisecond), imagePullDuration, imagePullResult.imageSize))
-	metrics.ImagePullDuration.WithLabelValues(
-		metrics.GetImageNameForMetrics(image),
-		string(pullPolicy),
-		metrics.GetImageSizeBucket(imagePullResult.imageSize),
-	).Observe(imagePullDuration.Seconds())
+	metrics.ObserveImagePullDurationWithExemplar(
+		metrics.ImagePullDuration.WithLabelValues(
+			metrics.GetImageNameForMetrics(image),
+			string(pullPolicy),
+			metrics.GetImageSizeBucket(imagePullResult.imageSize),
+		),
+		imagePullDuration.Seconds(),
+		image,
+	)
 	m.backOff.GC()
 	finalPullCredentials = imagePullResult.credentialsUsed
 	pullSucceeded = true
