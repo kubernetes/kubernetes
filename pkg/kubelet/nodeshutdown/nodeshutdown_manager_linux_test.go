@@ -704,7 +704,6 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 				nodeRef:               tt.fields.nodeRef,
 				getPods:               tt.fields.getPods,
 				syncNodeStatus:        tt.fields.syncNodeStatus,
-				dbusCon:               tt.fields.dbusCon,
 				inhibitLock:           tt.fields.inhibitLock,
 				nodeShuttingDownMutex: sync.Mutex{},
 				nodeShuttingDownNow:   tt.fields.nodeShuttingDownNow,
@@ -716,7 +715,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 					clock:                            tt.fields.clock,
 				},
 			}
-			err := m.processShutdownEvent(tCtx)
+			err := m.processShutdownEvent(tCtx, tt.fields.dbusCon)
 			if tt.wantErr {
 				require.Error(t, err, "managerImpl.processShutdownEvent() should return an error")
 			} else {
@@ -770,7 +769,6 @@ func testProcessShutdownEventVolumeUnmountTimeout(tCtx ktesting.TContext) {
 			}
 		},
 		syncNodeStatus: syncNodeStatus,
-		dbusCon:        &fakeDbus{},
 		podManager: &podManager{
 			logger:        logger,
 			volumeManager: fakeVolumeManager,
@@ -788,7 +786,7 @@ func testProcessShutdownEventVolumeUnmountTimeout(tCtx ktesting.TContext) {
 	}
 
 	start := fakeclock.Now()
-	err := m.processShutdownEvent(tCtx)
+	err := m.processShutdownEvent(tCtx, &fakeDbus{})
 	end := fakeclock.Now()
 
 	require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")
@@ -888,6 +886,10 @@ func testRestartClosesOldConnection(tCtx ktesting.TContext) {
 			overrideSystemInhibitDelay: 40 * time.Second,
 			shutdownChan:               ch,
 		}
+		if firstConn == nil {
+			firstConn = fd
+			firstConn.onCloseChan = firstConnClosedChan
+		}
 		return fd, nil
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
@@ -911,11 +913,6 @@ func testRestartClosesOldConnection(tCtx ktesting.TContext) {
 	})
 
 	err := manager.Start(tCtx)
-
-	// Grab a reference to the first connection and arm its close notification.
-	m := manager.(*managerImpl)
-	firstConn = m.dbusCon.(*fakeDbus)
-	firstConn.onCloseChan = firstConnClosedChan
 	lock.Unlock()
 
 	require.NoError(t, err)
