@@ -17,6 +17,8 @@ limitations under the License.
 package resource
 
 import (
+	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -425,4 +427,69 @@ func getPodWithPodLevelResources(cname string, podResources resources, resources
 	pod.Spec.Resources = &r
 
 	return pod
+}
+
+// TestConvertQuantityToStringBounds covers quantities whose scale is far from
+// the divisor's. Aligning the two scales multiplies one side by 10^(scale
+// difference), so without a bound a value written as 1e1000000 makes a million
+// digit intermediate, and a scale near math.MaxInt32 would try to allocate far
+// more than that. These cases must return promptly.
+func TestConvertQuantityToStringBounds(t *testing.T) {
+	testCases := []struct {
+		name     string
+		quantity string
+		divisor  string
+		expected string
+	}{
+		{
+			name:     "huge exponent saturates instead of expanding",
+			quantity: "1e1000000",
+			divisor:  "1",
+			expected: strconv.FormatInt(math.MaxInt64, 10),
+		},
+		{
+			name:     "huge exponent against a huge divisor of the same magnitude",
+			quantity: "1e1000000",
+			divisor:  "1e1000000",
+			expected: "1",
+		},
+		{
+			name:     "divisor dwarfs the value",
+			quantity: "1",
+			divisor:  "1e1000000",
+			expected: "1",
+		},
+		{
+			name:     "value just past int64 saturates",
+			quantity: "100E",
+			divisor:  "1",
+			expected: strconv.FormatInt(math.MaxInt64, 10),
+		},
+		{
+			name:     "ordinary ratio is unaffected",
+			quantity: "100Mi",
+			divisor:  "1Mi",
+			expected: "100",
+		},
+		{
+			name:     "ordinary ceiling is unaffected",
+			quantity: "1500m",
+			divisor:  "1",
+			expected: "2",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			q := resource.MustParse(tc.quantity)
+			divisor := resource.MustParse(tc.divisor)
+			got, err := convertQuantityToString(&q, divisor)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.expected {
+				t.Errorf("got %q, want %q", got, tc.expected)
+			}
+		})
+	}
 }

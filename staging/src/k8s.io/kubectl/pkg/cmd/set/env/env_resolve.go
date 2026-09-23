@@ -19,7 +19,9 @@ package env
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -234,6 +236,23 @@ func convertQuantityToString(q *resource.Quantity, divisor resource.Quantity) (s
 	qScale := int(qDec.Scale())
 	divScale := int(divDec.Scale())
 
+	// Bound the work before aligning scales. Aligning multiplies one side by
+	// 10^(scale difference), and a value written as 1e1000000 would make that
+	// a million digits wide, so compare magnitudes first: the bit length gives
+	// the decimal exponent without materializing anything.
+	qExp := decimalExponent(qBig, qScale)
+	divExp := decimalExponent(divBig, divScale)
+	switch {
+	case qExp-divExp > maxResultDigits:
+		// The ratio cannot be expressed in the int64 that callers expect, so
+		// saturate instead of computing it.
+		return strconv.FormatInt(math.MaxInt64, 10), nil
+	case divExp-qExp > 1:
+		// The divisor is at least an order of magnitude larger, so the
+		// ceiling of this positive ratio is 1.
+		return "1", nil
+	}
+
 	sDiff := divScale - qScale
 
 	if sDiff > 0 {
@@ -258,6 +277,23 @@ func convertQuantityToString(q *resource.Quantity, divisor resource.Quantity) (s
 
 // convertResourceCPUToString converts cpu value to the format of divisor and returns
 // ceiling of the value.
+
+// maxResultDigits is the number of decimal digits math.MaxInt64 has. A ratio
+// wider than this cannot be expressed as an int64, so it saturates.
+const maxResultDigits = 19
+
+// decimalExponent returns the approximate power of ten of unscaled/10^scale.
+// It reads the bit length rather than the digits so that measuring a value
+// like 1e1000000 stays cheap.
+func decimalExponent(unscaled *big.Int, scale int) int {
+	if unscaled.Sign() == 0 {
+		return 0
+	}
+	// log10(2) rounded up, so this stays an upper bound on the digit count.
+	digits := int(float64(unscaled.BitLen())*0.3011) + 1
+	return digits - scale
+}
+
 func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantity) (string, error) {
 	return convertQuantityToString(cpu, divisor)
 }
