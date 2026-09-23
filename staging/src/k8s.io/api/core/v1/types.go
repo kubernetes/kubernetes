@@ -454,6 +454,7 @@ type VolumeNodeAffinity struct {
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
 // +enum
+// +k8s:validation-gen-nolint
 type PersistentVolumeReclaimPolicy string
 
 const (
@@ -470,6 +471,7 @@ const (
 
 // PersistentVolumeMode describes how a volume is intended to be consumed, either Block or Filesystem.
 // +enum
+// +k8s:validation-gen-nolint
 type PersistentVolumeMode string
 
 const (
@@ -693,6 +695,7 @@ const (
 )
 
 // +enum
+// +k8s:validation-gen-nolint
 // When a controller receives persistentvolume claim update with ClaimResourceStatus for a resource
 // that it does not recognizes, then it should ignore that update and let other controllers
 // handle it.
@@ -718,6 +721,7 @@ const (
 )
 
 // +enum
+// +k8s:validation-gen-nolint
 // New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately
 type PersistentVolumeClaimModifyVolumeStatus string
 
@@ -967,6 +971,7 @@ type PersistentVolumeClaimStatus struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type PersistentVolumeAccessMode string
 
 const (
@@ -982,6 +987,7 @@ const (
 )
 
 // +enum
+// +k8s:validation-gen-nolint
 type PersistentVolumePhase string
 
 const (
@@ -1001,6 +1007,7 @@ const (
 )
 
 // +enum
+// +k8s:validation-gen-nolint
 type PersistentVolumeClaimPhase string
 
 const (
@@ -1015,6 +1022,7 @@ const (
 )
 
 // +enum
+// +k8s:validation-gen-nolint
 type HostPathType string
 
 const (
@@ -1377,6 +1385,7 @@ const (
 
 // Protocol defines network protocols supported for things like container ports.
 // +enum
+// +k8s:validation-gen-nolint
 type Protocol string
 
 const (
@@ -1840,9 +1849,11 @@ type PhotonPersistentDiskVolumeSource struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type AzureDataDiskCachingMode string
 
 // +enum
+// +k8s:validation-gen-nolint
 type AzureDataDiskKind string
 
 const (
@@ -2674,6 +2685,7 @@ const (
 
 // MountPropagationMode describes mount propagation.
 // +enum
+// +k8s:validation-gen-nolint
 type MountPropagationMode string
 
 const (
@@ -2897,6 +2909,7 @@ type HTTPHeader struct {
 // HTTPProtocol selects the wire protocol for the HTTP probe,
 // independently of the URI scheme.
 // +enum
+// +k8s:validation-gen-nolint
 type HTTPProtocol string
 
 const (
@@ -2937,6 +2950,7 @@ type HTTPGetAction struct {
 
 // URIScheme identifies the scheme used for connection to a host for Get actions
 // +enum
+// +k8s:validation-gen-nolint
 type URIScheme string
 
 const (
@@ -2981,6 +2995,7 @@ type GRPCAction struct {
 
 // GRPCProbeMode describes the connection mode for a gRPC probe.
 // +enum
+// +k8s:validation-gen-nolint
 type GRPCProbeMode string
 
 const (
@@ -3052,6 +3067,7 @@ type Probe struct {
 
 // PullPolicy describes a policy for if/when to pull a container image
 // +enum
+// +k8s:validation-gen-nolint
 type PullPolicy string
 
 const (
@@ -3092,6 +3108,7 @@ type ContainerResizePolicy struct {
 
 // PreemptionPolicy describes a policy for if/when to preempt a pod.
 // +enum
+// +k8s:validation-gen-nolint
 type PreemptionPolicy string
 
 const (
@@ -3103,6 +3120,7 @@ const (
 
 // TerminationMessagePolicy describes how termination messages are retrieved from a container.
 // +enum
+// +k8s:validation-gen-nolint
 type TerminationMessagePolicy string
 
 const (
@@ -3440,6 +3458,7 @@ type LifecycleHandler struct {
 
 // Signal defines the stop signal of containers
 // +enum
+// +k8s:validation-gen-nolint
 type Signal string
 
 const (
@@ -3786,6 +3805,7 @@ type LinuxContainerUser struct {
 
 // PodPhase is a label for the condition of a pod at the current time.
 // +enum
+// +k8s:validation-gen-nolint
 type PodPhase string
 
 // These are the valid statuses of pods.
@@ -3961,6 +3981,7 @@ type ImageVolumeStatus struct {
 // If none of the following policies is specified, the default one
 // is RestartPolicyAlways.
 // +enum
+// +k8s:validation-gen-nolint
 type RestartPolicy string
 
 const (
@@ -4033,6 +4054,7 @@ const (
 
 // DNSPolicy defines how a pod's DNS will be configured.
 // +enum
+// +k8s:validation-gen-nolint
 type DNSPolicy string
 
 const (
@@ -4109,6 +4131,7 @@ type NodeSelectorRequirement struct {
 // A node selector operator is the set of operators that can be used in
 // a node selector requirement.
 // +enum
+// +k8s:validation-gen-nolint
 type NodeSelectorOperator string
 
 const (
@@ -4360,6 +4383,7 @@ type Taint struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type TaintEffect string
 
 const (
@@ -4417,6 +4441,7 @@ type Toleration struct {
 
 // A toleration operator is the set of operators that can be used in a toleration.
 // +enum
+// +k8s:validation-gen-nolint
 type TolerationOperator string
 
 const (
@@ -4970,6 +4995,7 @@ type PodSchedulingGroup struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type UnsatisfiableConstraintAction string
 
 const (
@@ -4983,6 +5009,7 @@ const (
 
 // NodeInclusionPolicy defines the type of node inclusion policy
 // +enum
+// +k8s:validation-gen-nolint
 type NodeInclusionPolicy string
 
 const (
@@ -5128,6 +5155,7 @@ type HostAlias struct {
 // PodFSGroupChangePolicy holds policies that will be used for applying fsGroup to a volume
 // when volume is mounted.
 // +enum
+// +k8s:validation-gen-nolint
 type PodFSGroupChangePolicy string
 
 const (
@@ -5145,6 +5173,7 @@ const (
 // SupplementalGroupsPolicy defines how supplemental groups
 // of the first container processes are calculated.
 // +enum
+// +k8s:validation-gen-nolint
 type SupplementalGroupsPolicy string
 
 const (
@@ -5320,6 +5349,7 @@ type SeccompProfile struct {
 
 // SeccompProfileType defines the supported seccomp profile types.
 // +enum
+// +k8s:validation-gen-nolint
 type SeccompProfileType string
 
 const (
@@ -5352,6 +5382,7 @@ type AppArmorProfile struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type AppArmorProfileType string
 
 const (
@@ -5366,6 +5397,7 @@ const (
 
 // PodQOSClass defines the supported qos classes of Pods.
 // +enum
+// +k8s:validation-gen-nolint
 type PodQOSClass string
 
 const (
@@ -6104,6 +6136,7 @@ type ReplicationControllerList struct {
 
 // Session Affinity Type string
 // +enum
+// +k8s:validation-gen-nolint
 type ServiceAffinity string
 
 const (
@@ -6134,6 +6167,7 @@ type ClientIPConfig struct {
 
 // Service Type string describes ingress methods for a service
 // +enum
+// +k8s:validation-gen-nolint
 type ServiceType string
 
 const (
@@ -6159,6 +6193,7 @@ const (
 // ServiceInternalTrafficPolicy describes how nodes distribute service traffic they
 // receive on the ClusterIP.
 // +enum
+// +k8s:validation-gen-nolint
 type ServiceInternalTrafficPolicy string
 
 const (
@@ -6173,6 +6208,7 @@ const (
 // ServiceInternalTrafficPolicy describes how nodes distribute service traffic they
 // receive on the ClusterIP.
 // +enum
+// +k8s:validation-gen-nolint
 //
 // Deprecated: use ServiceInternalTrafficPolicy instead.
 type ServiceInternalTrafficPolicyType = ServiceInternalTrafficPolicy
@@ -6181,6 +6217,7 @@ type ServiceInternalTrafficPolicyType = ServiceInternalTrafficPolicy
 // receive on one of the Service's "externally-facing" addresses (NodePorts, ExternalIPs,
 // and LoadBalancer IPs.
 // +enum
+// +k8s:validation-gen-nolint
 type ServiceExternalTrafficPolicy string
 
 const (
@@ -6197,6 +6234,7 @@ const (
 // receive on one of the Service's "externally-facing" addresses (NodePorts, ExternalIPs,
 // and LoadBalancer IPs.
 // +enum
+// +k8s:validation-gen-nolint
 //
 // Deprecated: use ServiceExternalTrafficPolicy instead.
 type ServiceExternalTrafficPolicyType = ServiceExternalTrafficPolicy
@@ -6296,6 +6334,7 @@ type LoadBalancerIngress struct {
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used
 // to express the family of an IP expressed by a type (e.g. service.spec.ipFamilies).
 // +enum
+// +k8s:validation-gen-nolint
 type IPFamily string
 
 const (
@@ -6309,6 +6348,7 @@ const (
 
 // IPFamilyPolicy represents the dual-stack-ness requested or required by a Service
 // +enum
+// +k8s:validation-gen-nolint
 type IPFamilyPolicy string
 
 const (
@@ -6333,6 +6373,7 @@ const (
 
 // IPFamilyPolicy represents the dual-stack-ness requested or required by a Service
 // +enum
+// +k8s:validation-gen-nolint
 //
 // Deprecated: use IPFamilyPolicy instead.
 type IPFamilyPolicyType = IPFamilyPolicy
@@ -7286,6 +7327,7 @@ type ContainerImage struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type NodePhase string
 
 // These are the valid phases of node.
@@ -7528,6 +7570,7 @@ type NamespaceStatus struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type NamespacePhase string
 
 // These are the valid phases of a namespace.
@@ -8230,6 +8273,7 @@ const (
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota
 // +enum
+// +k8s:validation-gen-nolint
 type ResourceQuotaScope string
 
 const (
@@ -8298,6 +8342,7 @@ type ScopedResourceSelectorRequirement struct {
 // A scope selector operator is the set of operators that can be used in
 // a scope selector requirement.
 // +enum
+// +k8s:validation-gen-nolint
 type ScopeSelectorOperator string
 
 const (
@@ -8776,6 +8821,7 @@ type SecurityContext struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type ProcMountType string
 
 const (

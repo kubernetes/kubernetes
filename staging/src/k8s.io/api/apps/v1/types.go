@@ -67,6 +67,7 @@ type StatefulSet struct {
 
 // PodManagementPolicyType defines the policy for creating pods under a stateful set.
 // +enum
+// +k8s:validation-gen-nolint
 type PodManagementPolicyType string
 
 const (
@@ -97,6 +98,7 @@ type StatefulSetUpdateStrategy struct {
 // StatefulSetUpdateStrategyType is a string enumeration type that enumerates
 // all possible update strategies for the StatefulSet controller.
 // +enum
+// +k8s:validation-gen-nolint
 type StatefulSetUpdateStrategyType string
 
 const (
@@ -483,6 +485,7 @@ type DeploymentStrategy struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type DeploymentStrategyType string
 
 const (
@@ -643,6 +646,7 @@ type DaemonSetUpdateStrategy struct {
 }
 
 // +enum
+// +k8s:validation-gen-nolint
 type DaemonSetUpdateStrategyType string
 
 const (
