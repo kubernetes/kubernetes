@@ -270,6 +270,24 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
+		"activeDeadlineSeconds minimum boundary violation": {
+			input: mkCronJob(func(cj *batch.CronJob) {
+				deadline := int64(0)
+				cj.Spec.JobTemplate.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"activeDeadlineSeconds maximum boundary violation": {
+			input: mkCronJob(func(cj *batch.CronJob) {
+				deadline := int64(2147483648)
+				cj.Spec.JobTemplate.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {

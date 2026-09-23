@@ -242,25 +242,19 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 	wcEvent.timeline.MarkAt(metrics.PointStorageDecoded, recordTime)
 	wcEvent.timeline.MarkAt(metrics.PointCacheReceived, cacheReceived)
 
-	// We can call w.storage.Get() outside of a critical section,
-	// because the w.storage itself is thread-safe and the only
-	// place where it is modified is below (via UpdateStoreLocked)
-	// and these calls are serialized because reflector is processing
-	// events one-by-one.
-	previous, exists, err := w.storage.Get(event.Object)
-	if err != nil {
-		return err
-	}
-	if exists {
-		previousElem := previous.(*store.Element)
-		wcEvent.PrevObject = previousElem.Object
-		wcEvent.PrevObjLabels = previousElem.Labels
-		wcEvent.PrevObjFields = previousElem.Fields
-	}
-
 	if err := func() error {
 		w.Lock()
 		defer w.Unlock()
+
+		previous, err := w.storage.UpdateStoreLocked(event.Type, elem, resourceVersion)
+		if err != nil {
+			return err
+		}
+		if previous != nil {
+			wcEvent.PrevObject = previous.Object
+			wcEvent.PrevObjLabels = previous.Labels
+			wcEvent.PrevObjFields = previous.Fields
+		}
 
 		w.history.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
@@ -269,9 +263,6 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		if w.history.isCacheFullLocked() {
 			oldestRV := w.history.OldestResourceVersionLocked()
 			w.storage.CompactSnapshotsLocked(oldestRV)
-		}
-		if err := w.storage.UpdateStoreLocked(event.Type, elem, resourceVersion); err != nil {
-			return err
 		}
 		return nil
 	}(); err != nil {
@@ -293,6 +284,19 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 	rv, err := w.config.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
 		klog.Errorf("Couldn't parse resourceVersion: %v", err)
+		return
+	}
+
+	// Reflector calls UpdateResourceVersion after every watch event, including
+	// the Add/Update/Delete it just delivered, which already advanced the cache
+	// to that resourceVersion. Skipping those no-op updates avoids taking the
+	// write lock, waking up all waiting readers and dispatching a bookmark that
+	// carries no new information.
+	if func() bool {
+		w.RLock()
+		defer w.RUnlock()
+		return w.resourceVersion == rv
+	}() {
 		return
 	}
 
@@ -677,5 +681,5 @@ func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) 
 			return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot), nil
 		}
 	}
-	return newCacheIntervalFromStore(w.resourceVersion, w.storage.StoreLocked(), key, matchesSingle)
+	return newCacheIntervalFromStore(w.resourceVersion, w.storage, key, matchesSingle)
 }

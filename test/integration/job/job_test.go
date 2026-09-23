@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -1831,6 +1832,133 @@ func TestImmediateJobRecreation(t *testing.T) {
 			Terminating: ptr.To[int32](0),
 		}, 5*time.Second)
 	}
+}
+
+// TestJobRecreationClearsPodExpectations verifies that a replacement Job is
+// reconciled after the old Job leaves a pending Pod creation expectation. The
+// test blocks the old Pod POST, replaces the Job, waits for the informer to
+// observe the replacement UID, releases the POST, and verifies reconciliation.
+func TestJobRecreationClearsPodExpectations(t *testing.T) {
+	baseJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-job"},
+		Spec: batchv1.JobSpec{
+			Completions: ptr.To[int32](1),
+			Parallelism: ptr.To[int32](1),
+		},
+	}
+	suspendedJob := baseJob.DeepCopy()
+	suspendedJob.Spec.Suspend = new(true)
+	unsuspendedJob := baseJob.DeepCopy()
+	unsuspendedJob.Spec.Suspend = new(false)
+	tests := map[string]struct {
+		baseJob            batchv1.Job
+		replacementJob     batchv1.Job
+		wantConditionTypes []batchv1.JobConditionType
+		wantPodsStatus     podsByStatus
+	}{
+		"suspended replacement": {
+			baseJob:            *baseJob.DeepCopy(),
+			replacementJob:     *suspendedJob,
+			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuspended},
+			wantPodsStatus: podsByStatus{
+				Ready:       ptr.To[int32](0),
+				Terminating: ptr.To[int32](0),
+			},
+		},
+		"unsuspended replacement": {
+			baseJob:        *baseJob.DeepCopy(),
+			replacementJob: *unsuspendedJob,
+			wantPodsStatus: podsByStatus{
+				Active:      1,
+				Ready:       ptr.To[int32](0),
+				Terminating: ptr.To[int32](0),
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			testJobRecreationClearsPodExpectations(t, tc.baseJob, tc.replacementJob, tc.wantConditionTypes, tc.wantPodsStatus)
+		})
+	}
+}
+
+func testJobRecreationClearsPodExpectations(t *testing.T, baseJob, replacementJob batchv1.Job, wantConditionTypes []batchv1.JobConditionType, wantPodsStatus podsByStatus) {
+	closeFn, restConfig, clientSet, ns := setup(t, "recreate-job-expectations")
+	t.Cleanup(closeFn)
+
+	// Phase 1: Block the old Job's Pod POST after its expectation is recorded.
+	podCreateStarted := make(chan struct{})
+	allowPodCreate := make(chan struct{})
+	var blockOnce sync.Once
+	restConfig.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+		return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if req.Method == http.MethodPost && strings.HasSuffix(req.URL.Path, "/pods") {
+				blockOnce.Do(func() {
+					close(podCreateStarted)
+					<-allowPodCreate
+				})
+			}
+			return rt.RoundTrip(req)
+		})
+	}
+	t.Cleanup(func() {
+		select {
+		case <-allowPodCreate:
+		default:
+			close(allowPodCreate)
+		}
+	})
+
+	informerSet := informers.NewSharedInformerFactoryWithOptions(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "job-informers")), 0)
+	jc, ctx, cancel := createJobControllerWithSharedInformers(t, restConfig, informerSet)
+	t.Cleanup(cancel)
+	informerSet.Start(ctx.Done())
+	go jc.Run(ctx, 1)
+	informerSet.WaitForCacheSync(ctx.Done())
+
+	baseJob.Namespace = ns.Name
+	oldJob, err := createJobWithDefaults(ctx, clientSet, ns.Name, &baseJob)
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	select {
+	case <-podCreateStarted:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("Timed out waiting for the old Job's Pod creation to start")
+	}
+
+	// Phase 2: Replace the Job and wait for the informer to observe its new UID.
+	jobClient := clientSet.BatchV1().Jobs(ns.Name)
+	if err := jobClient.Delete(ctx, oldJob.Name, metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {
+		t.Fatalf("Failed to delete old Job: %v", err)
+	}
+	replacementJob.Namespace = ns.Name
+	newJob, err := createJobWithDefaults(ctx, clientSet, ns.Name, &replacementJob)
+	if err != nil {
+		t.Fatalf("Failed to create replacement Job: %v", err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		cachedJob, err := informerSet.Batch().V1().Jobs().Lister().Jobs(ns.Name).Get(newJob.Name)
+		return err == nil && cachedJob.UID == newJob.UID, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for the informer to observe the replacement Job: %v", err)
+	}
+	close(allowPodCreate)
+
+	// Phase 3: Verify the replacement is reconciled after the old POST completes.
+	for _, conditionType := range wantConditionTypes {
+		validateJobCondition(ctx, t, clientSet, newJob, conditionType)
+	}
+	validateJobsPodsStatusOnlyWithTimeout(ctx, t, clientSet, newJob, "after recreation", wantPodsStatus, 5*time.Second)
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 // TestManagedBy_RecreatedJob verifies that the Job controller skips

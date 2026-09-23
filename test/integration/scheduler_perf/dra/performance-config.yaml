@@ -25,8 +25,6 @@
 # cycles: the more pods get scheduled without changes to ResourceSlices, the less it matters
 # how long this takes.
 - name: PublishResourceSlices
-  featureGates:
-    DynamicResourceAllocation: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -66,8 +64,6 @@
 # creating a few pods and then one more each time one pod is scheduled.
 # Throughput is fairly consistent, with stable results after 10 seconds.
 - name: SchedulingWithResourceClaimTemplate
-  featureGates:
-    DynamicResourceAllocation: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -329,8 +325,6 @@
 # There is a fixed ratio of 1:5 between claims and pods
 # and only 2 instead of 10 devices per node.
 - name: SchedulingWithResourceClaim
-  featureGates:
-    DynamicResourceAllocation: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA

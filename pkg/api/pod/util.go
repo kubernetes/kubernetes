@@ -434,6 +434,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowImageVolumeWithDigest:                              utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
 		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
 		AllowSysAdminWhenPrivilegeEscalationFalse:               false,
+		AllowMLDSAPodCertificateKeyTypes:                        utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateMLDSA),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -490,6 +491,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowEmptyImageVolumeReference = hasEmptyImageVolumeReference(oldPodSpec)
 
 		opts.AllowSysAdminWhenPrivilegeEscalationFalse = useAllowSysAdminWhenPrivilegeEscalationFalse(oldPodSpec)
+
+		// If old spec has a projected pod certificate requesting an ML-DSA key type, allow it
+		opts.AllowMLDSAPodCertificateKeyTypes = opts.AllowMLDSAPodCertificateKeyTypes || hasMLDSAPodCertificateProjection(oldPodSpec.Volumes)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -597,6 +601,20 @@ func hasSysAdminAndPrivilegeEscalationFalse(sc *api.SecurityContext) bool {
 			return true
 		}
 	}
+	return false
+}
+
+func hasMLDSAPodCertificateProjection(volumes []api.Volume) bool {
+	for _, volume := range volumes {
+		if volume.Projected != nil {
+			for _, source := range volume.Projected.Sources {
+				if source.PodCertificate != nil && (source.PodCertificate.KeyType == "MLDSA44" || source.PodCertificate.KeyType == "MLDSA65" || source.PodCertificate.KeyType == "MLDSA87") {
+					return true
+				}
+			}
+		}
+	}
+
 	return false
 }
 
@@ -751,7 +769,6 @@ func dropDisabledFields(
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysFieldInTopologySpread(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysFieldInPodAffinity(podSpec, oldPodSpec)
-	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
 	dropDisabledAtomicWriteVolumeUserFields(podSpec, oldPodSpec)
@@ -1054,10 +1071,6 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		dropAllocatedResourcesField(podStatus.EphemeralContainerStatuses)
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
-		podStatus.ResourceClaimStatuses = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) && !draExendedResourceInUse(oldPodStatus) {
 		podStatus.ExtendedResourceClaimStatus = nil
 	}
@@ -1127,18 +1140,6 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && !volumeHealthInUse(oldPodStatus) {
 		podStatus.VolumeHealth = nil
-	}
-}
-
-// dropDisabledDynamicResourceAllocationFields removes pod claim references from
-// container specs and pod-level resource claims unless they are already used
-// by the old pod spec.
-func dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
-		dropResourceClaimRequests(podSpec.Containers)
-		dropResourceClaimRequests(podSpec.InitContainers)
-		dropEphemeralResourceClaimRequests(podSpec.EphemeralContainers)
-		podSpec.ResourceClaims = nil
 	}
 }
 
@@ -1226,28 +1227,6 @@ func resourceHealthStatusMessageInUse(podStatus *api.PodStatus) bool {
 	}
 
 	return false
-}
-
-func dynamicResourceAllocationInUse(podSpec *api.PodSpec) bool {
-	// We only need to check this field because the containers cannot have
-	// resource requirements entries for claims without a corresponding
-	// entry at the pod spec level.
-	if podSpec != nil && len(podSpec.ResourceClaims) > 0 {
-		return true
-	}
-	return false
-}
-
-func dropResourceClaimRequests(containers []api.Container) {
-	for i := range containers {
-		containers[i].Resources.Claims = nil
-	}
-}
-
-func dropEphemeralResourceClaimRequests(containers []api.EphemeralContainer) {
-	for i := range containers {
-		containers[i].Resources.Claims = nil
-	}
 }
 
 // dropDisabledProcMountField removes disabled fields from PodSpec related

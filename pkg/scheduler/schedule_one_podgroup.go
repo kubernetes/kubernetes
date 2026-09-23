@@ -76,7 +76,7 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	// skipPodGroupPodSchedule could remove some pods from the pod group.
 	// Pod group constraints will be re-evaluated on a PlacementFeasible phase.
 	// Now, verify if it has any pods left.
-	if len(podGroupInfo.QueuedPodInfos) == 0 {
+	if !podGroupInfo.HasQueuedPodInfos() {
 		// Finish the in-flight attempt so members that arrived while these pods were
 		// being skipped can be requeued instead of remaining pending indefinitely.
 		if err := sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle(), fwk.NewStatus(fwk.Success)); err != nil {
@@ -355,7 +355,7 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 		completePGResults = completeCompositePodGroupAlgorithmResult(ctx, rootPodGroupInfo, podGroupCycleState, pgResults)
 	} else {
 		// pgResults has exactly 1 element.
-		queuedPodInfos := rootPodGroupInfo.QueuedPodInfos[rootPodGroupInfo.PodGroupInfo.GetKey()]
+		queuedPodInfos := rootPodGroupInfo.PodInfosForGroup(rootPodGroupInfo.PodGroupInfo.GetKey())
 		result := completePodGroupAlgorithmResult(ctx, queuedPodInfos, podGroupCycleState, pgResults[rootPodGroupInfo.PodGroupInfo.GetKey()])
 		completePGResults = map[fwk.EntityKey]*podGroupAlgorithmResult{rootPodGroupInfo.PodGroupInfo.GetKey(): result}
 	}
@@ -426,7 +426,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 	}()
 
 	// Retrieve the queued podinfos for the given pod group from the root queuedPodGroupInfo.
-	queuedPodInfos := queuedPodGroupInfo.QueuedPodInfos[podGroupInfo.GetKey()]
+	queuedPodInfos := queuedPodGroupInfo.PodInfosForGroup(podGroupInfo.GetKey())
 	result = &podGroupAlgorithmResult{
 		podGroupInfo:        podGroupInfo,
 		podResults:          make([]algorithmResult, 0, len(queuedPodInfos)),
@@ -520,46 +520,52 @@ func podGroupPotentiallyFeasible(ctx context.Context, schedFwk framework.Framewo
 // It returns the algorithm result together with the revert function.
 // The returned revert function rolls back tentative node reservations for the pod if the overall
 // pod group fails to schedule.
-func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, placementCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, podInfo *framework.QueuedPodInfo) (algorithmResult, func()) {
+//
+// Pods of a pod group are assumed into the snapshot rather than the cache: the group's placement
+// stays tentative until the whole group is submitted, and a snapshot assume is dropped by the
+// next UpdateSnapshot instead of outliving the cycle.
+func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework,
+	placementCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo,
+	podInfo *framework.QueuedPodInfo) (algorithmResult, func()) {
+
 	pod := podInfo.Pod
 	podCtx := initPodSchedulingContext(ctx, pod, placementCycleState)
 	logger := podCtx.logger
 	ctx = klog.NewContext(ctx, logger)
 	start := time.Now()
 
-	logger.V(4).Info("Attempting to schedule a pod belonging to a pod group", "podGroup", klog.KObj(podGroupInfo), "pod", klog.KObj(pod))
+	logger.V(4).Info("Attempting to schedule a pod belonging to a pod group",
+		"podGroup", klog.KObj(podGroupInfo), "pod", klog.KObj(pod))
 
 	scheduleResult, status := sched.schedulingAlgorithm(ctx, podCtx.state, schedFwk, podInfo, start)
-	if !status.IsSuccess() {
-		return algorithmResult{
-			podInfo:            podInfo,
-			scheduleResult:     scheduleResult,
-			podCtx:             podCtx,
-			schedulingDuration: time.Since(start),
-			status:             status,
-		}, nil
-	}
-	assumeStatus, revertFn := sched.algorithm.assumeAndReserveWithRevert(ctx, podCtx.state, schedFwk, podInfo, scheduleResult)
-	if !assumeStatus.IsSuccess() {
-		return algorithmResult{
-			podInfo:            podInfo,
-			scheduleResult:     ScheduleResult{nominatingInfo: clearNominatedNode},
-			podCtx:             podCtx,
-			schedulingDuration: time.Since(start),
-			status:             assumeStatus,
-		}, nil
-	}
 
-	return algorithmResult{
+	algorithmResult := algorithmResult{
 		podInfo:            podInfo,
 		scheduleResult:     scheduleResult,
-		podCtx:             podCtx,
 		schedulingDuration: time.Since(start),
+		podCtx:             podCtx,
 		status:             status,
-	}, revertFn
+	}
+
+	if !status.IsSuccess() {
+		return algorithmResult, nil
+	}
+
+	assumeStatus, revertFn := sched.algorithm.AssumeAndReserveInSnapshot(
+		ctx, podCtx.state, schedFwk, podInfo, scheduleResult)
+	algorithmResult.schedulingDuration = time.Since(start)
+	if !assumeStatus.IsSuccess() {
+		// The evaluation succeeded but the placement could not be held: drop the
+		// result and clear the nomination, as the single-pod cycle does.
+		algorithmResult.scheduleResult = ScheduleResult{nominatingInfo: clearNominatedNode}
+		algorithmResult.status = assumeStatus
+		return algorithmResult, nil
+	}
+
+	return algorithmResult, revertFn
 }
 
-// completePodGroupAlgorithmResult ensures that the podGroupAlgorithmResult contains the same number of podResults as there are pods in QueuedPodInfos.
+// completePodGroupAlgorithmResult ensures that the podGroupAlgorithmResult contains the same number of podResults as there are queued pods in the pod group.
 func completePodGroupAlgorithmResult(ctx context.Context, queuedPodInfos []*framework.QueuedPodInfo, podGroupState *framework.CycleState, podGroupResult *podGroupAlgorithmResult) *podGroupAlgorithmResult {
 	numInResult := len(podGroupResult.podResults)
 	numInQueue := len(queuedPodInfos)
@@ -587,7 +593,7 @@ func completePodGroupAlgorithmResult(ctx context.Context, queuedPodInfos []*fram
 // are propagated down the tree before finalizing the cycle.
 func completeCompositePodGroupAlgorithmResult(ctx context.Context, rootPodGroupInfo *framework.QueuedPodGroupInfo, rootCycleState *framework.CycleState, pgResults map[fwk.EntityKey]*podGroupAlgorithmResult) map[fwk.EntityKey]*podGroupAlgorithmResult {
 	completeCompositePodGroupAlgorithmResultMap(ctx, rootPodGroupInfo.PodGroupInfo, pgResults, &podGroupAlgorithmResult{})
-	for pgKey, queuedPodInfos := range rootPodGroupInfo.QueuedPodInfos {
+	for pgKey, queuedPodInfos := range rootPodGroupInfo.ForEachGroupAndPodInfos() {
 		pgResult := pgResults[pgKey]
 		// Ensure podResults has an entry for each pod in the pod group with a status.
 		completePodGroupAlgorithmResult(ctx, queuedPodInfos, rootCycleState, pgResult)
@@ -680,7 +686,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			// Composite pod groups do not own any pods directly.
 			continue
 		}
-		queuedPodInfos := rootPodGroupInfo.QueuedPodInfos[pgi.GetKey()]
+		queuedPodInfos := rootPodGroupInfo.PodInfosForGroup(pgi.GetKey())
 		if len(podGroupResult.podResults) != len(queuedPodInfos) {
 			// This should never happen, but if it does, complete the result with the error status.
 			logger.Error(fmt.Errorf("some pods were not processed"), "scheduling error for pod group", "podGroup", klog.KObj(pgi))
@@ -1140,7 +1146,7 @@ func nominatedPlacement(placements []*fwk.Placement, podGroupInfo *framework.Pod
 	// (podGroupInfo), which for CPG TAS is the CPG or PG carrying the TAS constraints, not the
 	// whole hierarchy rooted at queuedPodGroupInfo.
 	nominatedNodes := sets.New[string]()
-	for _, podInfo := range queuedPodGroupInfo.QueuedPodInfos[podGroupInfo.GetKey()] {
+	for _, podInfo := range queuedPodGroupInfo.PodInfosForGroup(podGroupInfo.GetKey()) {
 		if nnn := podInfo.Pod.Status.NominatedNodeName; nnn != "" {
 			nominatedNodes.Insert(nnn)
 		}
@@ -1354,7 +1360,7 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 	}, revertFns
 }
 
-// assumeSubtreeWithRevert runs assumeAndReserveWithRevert on all pods within the subtree.
+// assumeSubtreeWithRevert runs AssumeAndReserveInSnapshot on all pods within the subtree.
 // This is needed for placement-based algorithm, because after evaluating the results for all placements,
 // the chosen result needs to be assumed for the other pods in the hierarchy to see the result.
 func (sched *Scheduler) assumeSubtreeWithRevert(ctx context.Context, schedFwk framework.Framework, pgi *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (_ revertFns, err error) {
@@ -1373,7 +1379,7 @@ func (sched *Scheduler) assumeSubtreeWithRevert(ctx context.Context, schedFwk fr
 			if !podResult.status.IsSuccess() || podResult.GetNodeName() == "" {
 				continue
 			}
-			status, revert := sched.algorithm.assumeAndReserveWithRevert(ctx, podResult.podCtx.state, schedFwk, podResult.podInfo, podResult.scheduleResult)
+			status, revert := sched.algorithm.AssumeAndReserveInSnapshot(ctx, podResult.podCtx.state, schedFwk, podResult.podInfo, podResult.scheduleResult)
 			if revert != nil {
 				revertFns = append(revertFns, revert)
 			}

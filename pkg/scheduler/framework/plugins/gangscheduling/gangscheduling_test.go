@@ -214,14 +214,14 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			name:                       "add a pod group which matches the pod's pod group name",
 			isCompositePodGroupEnabled: []bool{true, false},
 			pod:                        st.MakePod().Name("p").PodGroupName("pg").Obj(),
-			newPodGroup:                st.MakePodGroup().Name("pg").MinCount(1).WorkloadRef("t", "w").Obj(),
+			newPodGroup:                st.MakePodGroup().Name("pg").MinCount(1).WorkloadRef("w", "t").Obj(),
 			expectedHint:               fwk.Queue,
 		},
 		{
 			name:                       "add a pod group which doesn't match the pod's scheduling group name",
 			isCompositePodGroupEnabled: []bool{true, false},
 			pod:                        st.MakePod().Name("p").PodGroupName("pg1").Obj(),
-			newPodGroup:                st.MakePodGroup().Name("pg2").MinCount(1).WorkloadRef("t", "w").Obj(),
+			newPodGroup:                st.MakePodGroup().Name("pg2").MinCount(1).WorkloadRef("w", "t").Obj(),
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Obj(),
 			},
@@ -231,7 +231,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			name:                       "add a pod group which doesn't match the pod's scheduling group namespace",
 			isCompositePodGroupEnabled: []bool{true, false},
 			pod:                        st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
-			newPodGroup:                st.MakePodGroup().Namespace("ns2").Name("pg").MinCount(1).WorkloadRef("t", "w").Obj(),
+			newPodGroup:                st.MakePodGroup().Namespace("ns2").Name("pg").MinCount(1).WorkloadRef("w", "t").Obj(),
 			pgs: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Namespace("ns1").Name("pg").Obj(),
 			},
@@ -356,50 +356,50 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 		{
 			name:         "minCount decreased matches target pod",
 			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
-			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("t", "w").Obj(),
-			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("w", "t").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("w", "t").Obj(),
 			expectedHint: fwk.Queue,
 		},
 		{
 			name:         "update Basic policy",
 			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
-			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().WorkloadRef("t", "w").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().WorkloadRef("w", "t").Obj(),
 			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "minCount increased matches target pod",
 			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
-			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
-			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("t", "w").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("w", "t").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("w", "t").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "minCount unchanged matches target pod",
 			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
-			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
-			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("w", "t").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("w", "t").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "minCount decreased but pod group name doesn't match target pod",
 			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg-other").Obj(),
-			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("t", "w").Obj(),
-			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("w", "t").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("w", "t").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "minCount decreased but pod group namespace doesn't match target pod",
 			pod:          st.MakePod().Namespace("ns-other").Name("p").PodGroupName("pg").Obj(),
-			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("t", "w").Obj(),
-			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("w", "t").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("w", "t").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "pod without a scheduling group is skipped",
 			pod:          st.MakePod().Namespace("ns1").Name("p").Obj(),
-			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("t", "w").Obj(),
-			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("w", "t").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("w", "t").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 	}
@@ -631,9 +631,9 @@ func (m *mockSharedLister) PodGroupStates() fwk.PodGroupStateLister {
 }
 
 func TestPreEnqueue(t *testing.T) {
-	gangPodGroup1 := st.MakePodGroup().Namespace("ns1").Name("pg1").WorkloadRef("t1", "gang-wl").MinCount(3).Obj()
-	gangPodGroup2 := st.MakePodGroup().Namespace("ns1").Name("pg2").WorkloadRef("t2", "gang-wl").MinCount(4).Obj()
-	basicPodGroup := st.MakePodGroup().Namespace("ns1").Name("pg3").WorkloadRef("1", "basic-wl").BasicPolicy().Obj()
+	gangPodGroup1 := st.MakePodGroup().Namespace("ns1").Name("pg1").WorkloadRef("gang-wl", "t1").MinCount(3).Obj()
+	gangPodGroup2 := st.MakePodGroup().Namespace("ns1").Name("pg2").WorkloadRef("gang-wl", "t2").MinCount(4).Obj()
+	basicPodGroup := st.MakePodGroup().Namespace("ns1").Name("pg3").WorkloadRef("basic-wl", "1").BasicPolicy().Obj()
 
 	p1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").PodGroupName("pg1").Obj()
 	p2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").PodGroupName("pg1").Obj()

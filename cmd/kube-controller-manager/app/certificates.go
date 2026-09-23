@@ -353,7 +353,7 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 	}
 
 	if runner == nil {
-		klog.Info("no known scheme version was found for clustertrustbundles, cannot start kube-apiserver-serving-clustertrustbundle-publisher-controller")
+		klog.FromContext(ctx).Info("no known scheme version was found for clustertrustbundles, cannot start kube-apiserver-serving-clustertrustbundle-publisher-controller")
 		return nil, nil
 	}
 

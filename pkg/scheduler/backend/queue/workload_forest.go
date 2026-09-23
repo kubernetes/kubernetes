@@ -17,8 +17,6 @@ limitations under the License.
 package queue
 
 import (
-	"fmt"
-
 	v1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -100,16 +98,16 @@ func (wf *workloadForest) deleteGenericPodGroup(gpg *fwk.GenericPodGroup) {
 }
 
 // getRootLookupInfoForPod returns the lookup info of the current root PodGroup or CompositePodGroup for a given pod.
-func (wf *workloadForest) getRootLookupInfoForPod(pod *v1.Pod) (*framework.QueuedPodGroupInfo, bool) {
+func (wf *workloadForest) getRootLookupInfoForPod(logger klog.Logger, pod *v1.Pod) (*framework.QueuedPodGroupInfo, bool) {
 	podGroup, exists := wf.podGroups[podGroupKeyForPod(pod)]
 	if !exists {
 		return nil, false
 	}
-	return wf.getRootLookupInfo(podGroup)
+	return wf.getRootLookupInfo(logger, podGroup)
 }
 
 // getRootLookupInfo returns the lookup info of the current root PodGroup or CompositePodGroup for a given GenericPodGroup.
-func (wf *workloadForest) getRootLookupInfo(gpg *fwk.GenericPodGroup) (*framework.QueuedPodGroupInfo, bool) {
+func (wf *workloadForest) getRootLookupInfo(logger klog.Logger, gpg *fwk.GenericPodGroup) (*framework.QueuedPodGroupInfo, bool) {
 	storedGPG, exists := wf.podGroups[gpg.GetKey()]
 	if !exists {
 		return nil, false
@@ -122,19 +120,18 @@ func (wf *workloadForest) getRootLookupInfo(gpg *fwk.GenericPodGroup) (*framewor
 			},
 		}, true
 	}
-	return wf.getRootLookupInfoForParentCPG(*storedGPG.GetParentCompositePodGroupName(), storedGPG.GetNamespace())
+	return wf.getRootLookupInfoForParentCPG(logger, *storedGPG.GetParentCompositePodGroupName(), storedGPG.GetNamespace())
 }
 
 // getRootLookupInfoForParentCPG is a helper to traverse up the parent chain and return the lookup info of the root CompositePodGroup.
 // It should be called only when the CompositePodGroup feature gate is enabled.
-func (wf *workloadForest) getRootLookupInfoForParentCPG(parentName, namespace string) (*framework.QueuedPodGroupInfo, bool) {
+func (wf *workloadForest) getRootLookupInfoForParentCPG(logger klog.Logger, parentName, namespace string) (*framework.QueuedPodGroupInfo, bool) {
 	currParentName := parentName
 	visited := sets.New[fwk.EntityKey]()
 	for {
 		cpgKey := fwk.CompositePodGroupKey(namespace, currParentName)
 		if visited.Has(cpgKey) {
-			// TODO(jdzikowski): propagate logger to the getPod method in the scheduling queue.
-			utilruntime.HandleError(fmt.Errorf("cycle detected in composite pod group hierarchy when getting root info: %s/%s", parentName, namespace))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cycle detected in composite pod group hierarchy when getting root info", "parentName", parentName, "namespace", namespace)
 			return nil, false
 		}
 		visited.Insert(cpgKey)

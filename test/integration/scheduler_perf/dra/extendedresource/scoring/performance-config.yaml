@@ -25,7 +25,6 @@
 # by multiple nodes, triggering scoring competition to test the DRA scoring implementation.
 - name: ExtendedResourceScoring
   featureGates:
-    DynamicResourceAllocation: true
     DRAExtendedResource: true
   schedulerConfigPath: scheduler-config.yaml
   workloadTemplate:

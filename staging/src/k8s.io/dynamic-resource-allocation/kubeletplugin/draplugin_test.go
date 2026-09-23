@@ -18,6 +18,10 @@ package kubeletplugin
 
 import (
 	"context"
+	"errors"
+	"net"
+	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +32,7 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes/fake"
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 )
@@ -97,6 +102,84 @@ func TestStartWithoutDRAAPI(t *testing.T) {
 		NodeV1beta1(false),
 	)
 	require.ErrorContains(t, err, "no supported DRA gRPC API")
+}
+
+func TestRollingUpdatePluginSocketPathLength(t *testing.T) {
+	podUID := types.UID("11111111-2222-3333-4444-555555555555")
+	for _, tc := range []struct {
+		name            string
+		driverName      string
+		driverLen       int
+		fullEndpointLen int
+	}{
+		{name: "36-byte driver", driverName: "abcde.dra-example-driver.sigs.k8s.io", driverLen: 36, fullEndpointLen: 107},
+		{name: "37-byte driver", driverName: "abcdef.dra-example-driver.sigs.k8s.io", driverLen: 37, fullEndpointLen: 108},
+		{name: "63-byte driver", driverName: "a." + strings.Repeat("a", 61), driverLen: 63, fullEndpointLen: 134},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Len(t, tc.driverName, tc.driverLen)
+			require.Empty(t, validation.IsDNS1123Subdomain(tc.driverName))
+
+			fullUIDEndpoint := path.Join(KubeletPluginsDir, tc.driverName, "dra-"+string(podUID)+".sock")
+			require.Len(t, fullUIDEndpoint, tc.fullEndpointLen)
+			pluginEndpoint := capturePluginEndpoint(t, tc.driverName, RollingUpdate(podUID))
+			require.Lessf(t, len(pluginEndpoint), unixPathMax, "DRA plugin endpoint %q must be shorter than %d bytes", pluginEndpoint, unixPathMax)
+			if tc.fullEndpointLen < unixPathMax {
+				require.Equal(t, fullUIDEndpoint, pluginEndpoint)
+			} else {
+				require.NotEqual(t, fullUIDEndpoint, pluginEndpoint)
+			}
+		})
+	}
+}
+
+func TestPluginSocketAutomaticNaming(t *testing.T) {
+	podUID := types.UID("11111111-2222-3333-4444-555555555555")
+	shortDriverName := "driver.example.com"
+	require.Empty(t, validation.IsDNS1123Subdomain(shortDriverName))
+	t.Run("non-rolling", func(t *testing.T) {
+		driverName := "a." + strings.Repeat("a", 61)
+		got := capturePluginEndpoint(t, driverName)
+		require.Equal(t, path.Join(KubeletPluginsDir, driverName, "dra.sock"), got)
+	})
+	t.Run("rolling with short driver", func(t *testing.T) {
+		got := capturePluginEndpoint(t, shortDriverName, RollingUpdate(podUID))
+		require.Equal(t, path.Join(KubeletPluginsDir, shortDriverName, "dra-"+string(podUID)+".sock"), got)
+	})
+	t.Run("explicit with rolling", func(t *testing.T) {
+		got := capturePluginEndpoint(t, shortDriverName, RollingUpdate(podUID), PluginSocket("custom.sock"))
+		require.Equal(t, path.Join(KubeletPluginsDir, shortDriverName, "custom.sock"), got)
+	})
+}
+
+func TestRollingUpdatePluginSocketFile_distinctInputs(t *testing.T) {
+	driverName := "a." + strings.Repeat("a", 61)
+	pluginDir := path.Join(KubeletPluginsDir, driverName)
+	first := rollingUpdatePluginSocketFile(pluginDir, "11111111-2222-3333-4444-555555555555")
+	second := rollingUpdatePluginSocketFile(pluginDir, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+
+	require.Equal(t, first, rollingUpdatePluginSocketFile(pluginDir, "11111111-2222-3333-4444-555555555555"))
+	require.NotEqual(t, first, second)
+	require.Less(t, len(path.Join(pluginDir, first)), unixPathMax)
+	require.Less(t, len(path.Join(pluginDir, second)), unixPathMax)
+}
+
+func capturePluginEndpoint(t *testing.T, driverName string, opts ...Option) string {
+	t.Helper()
+	var pluginEndpoint string
+	listenerErr := errors.New("listener disabled")
+	opts = append(opts,
+		DriverName(driverName),
+		KubeClient(fake.NewClientset()),
+		RegistrationService(false),
+		PluginListener(func(_ context.Context, endpoint string) (net.Listener, error) {
+			pluginEndpoint = endpoint
+			return nil, listenerErr
+		}),
+	)
+	_, err := Start(t.Context(), &stubPlugin{}, opts...)
+	require.ErrorIs(t, err, listenerErr)
+	return pluginEndpoint
 }
 
 // fakeHealthStream captures the responses sent by the helper's gRPC bridge.

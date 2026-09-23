@@ -59,20 +59,6 @@ const (
 	btreeDegree = 16
 )
 
-type Indexer interface {
-	Add(obj interface{}) error
-	Update(obj interface{}) error
-	Delete(obj interface{}) error
-	List() []interface{}
-	ListKeys() []string
-	Get(obj interface{}) (item interface{}, exists bool, err error)
-	GetByKey(key string) (item interface{}, exists bool, err error)
-	Replace([]interface{}, string) error
-	ByIndex(indexName, indexedValue string) ([]interface{}, error)
-	Clone() Snapshot
-	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
-}
-
 // Snapshot is an immutable point-in-time view of the store.
 type Snapshot interface {
 	GetByKey(key string) (item interface{}, exists bool, err error)
@@ -127,10 +113,6 @@ func (r prefixRange) All() iter.Seq2[*Element, error] {
 
 func (r prefixRange) Count() int {
 	return r.snapshot.countPrefix(r.prefix, r.continueKey)
-}
-
-func NewIndexer(indexers *cache.Indexers) Indexer {
-	return newThreadedBtreeStoreIndexer(ElementIndexers(indexers), btreeDegree)
 }
 
 // Computing a key of an object is generally non-trivial (it performs

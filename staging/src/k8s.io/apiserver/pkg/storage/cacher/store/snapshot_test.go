@@ -43,11 +43,13 @@ func TestSnapshotListPrefix(t *testing.T) {
 		{
 			name: "Indexer",
 			newSnapshot: func(t *testing.T) Snapshot {
-				indexer := newThreadedBtreeStoreIndexer(nil, btreeDegree)
+				indexer := NewWatchCacheStorage(nil, nil)
 				for _, elem := range elements {
-					require.NoError(t, indexer.Add(elem))
+					prev, err := indexer.Add(elem)
+					require.NoError(t, err)
+					assert.Nil(t, prev)
 				}
-				return indexer.Clone()
+				return indexer.store.Clone()
 			},
 		},
 		{
@@ -55,7 +57,7 @@ func TestSnapshotListPrefix(t *testing.T) {
 			newSnapshot: func(t *testing.T) Snapshot {
 				store := newBtreeStore(btreeDegree)
 				for _, elem := range elements {
-					require.NoError(t, store.Add(elem))
+					store.addOrUpdateElem(elem)
 				}
 				return &store
 			},

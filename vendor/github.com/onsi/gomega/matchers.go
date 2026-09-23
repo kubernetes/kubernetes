@@ -621,6 +621,18 @@ func BeADirectory() types.GomegaMatcher {
 	return &matchers.BeADirectoryMatcher{}
 }
 
+// BeASlice succeeds if actual is a value of slice type.
+// This is useful when actual has type any (interface{}) and you want to assert it is a slice.
+func BeASlice() types.GomegaMatcher {
+	return &matchers.BeASliceMatcher{}
+}
+
+// BeAnArray succeeds if actual is a value of array type.
+// This is useful when actual has type any (interface{}) and you want to assert it is an array.
+func BeAnArray() types.GomegaMatcher {
+	return &matchers.BeAnArrayMatcher{}
+}
+
 // HaveHTTPStatus succeeds if the Status or StatusCode field of an HTTP response matches.
 // Actual must be either a *http.Response or *httptest.ResponseRecorder.
 // Expected must be either an int or a string.

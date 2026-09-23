@@ -2354,7 +2354,7 @@ func testEviction(tCtx ktesting.TContext) {
 		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			start := time.Now()
 			fakeClientset := fake.NewClientset(tt.initialObjects...)
-			tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 			var podGets int
 			var podUpdates int
@@ -2385,11 +2385,10 @@ func testEviction(tCtx ktesting.TContext) {
 			controller := newTestController(tCtx)
 
 			var wg sync.WaitGroup
-			defer func() {
+			tCtx.Cleanup(func() {
 				tCtx.Log("Waiting for goroutine termination...")
-				tCtx.Cancel("time to stop")
 				wg.Wait()
-			}()
+			})
 			wg.Go(func() {
 				tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 			})
@@ -2479,15 +2478,14 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, toleration, slowDelete bool
 			tCtx.Logf("Proceeding with pod deletion")
 		}}
 	}
-	tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, client, nil)
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		// Run with 1 worker to ensure sequential execution. Concurrent workers cause
 		// non-deterministic ordering of status updates, leading to flakes in Status assertions.
@@ -2672,7 +2670,7 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 		return false, nil, nil
 	})
 
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 	controller := newTestController(tCtx)
 
 	podEvicting := false
@@ -2687,11 +2685,10 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	})
@@ -2756,7 +2753,7 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		inUseClaim,
 		pod,
 	)
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get pod before eviction")
@@ -2784,11 +2781,10 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	})
@@ -2817,7 +2813,7 @@ func synctestRetry(tCtx ktesting.TContext) {
 		inUseClaim,
 		pod,
 	)
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get pod before eviction")
@@ -2851,11 +2847,10 @@ func synctestRetry(tCtx ktesting.TContext) {
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	})

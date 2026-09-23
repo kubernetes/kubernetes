@@ -147,9 +147,8 @@ type fakeImageGCManager struct {
 	images.ImageGCManager
 }
 
-func (f *fakeImageGCManager) GetImageList() ([]kubecontainer.Image, error) {
-	// ImageGCManager interface does not accept a context parameter.
-	return f.fakeImageService.ListImages(context.TODO())
+func (f *fakeImageGCManager) GetImageList(ctx context.Context) ([]kubecontainer.Image, error) {
+	return f.fakeImageService.ListImages(ctx)
 }
 
 type TestKubelet struct {
@@ -5757,4 +5756,50 @@ func cleanUpTempDir(t *testing.T, tempDir, originalLogsDir string) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	require.NoError(t, err)
+}
+
+func TestStaticPodURLHeaderAndKeys(t *testing.T) {
+	const secretBearer = "Bearer static-pod-url-secret-must-not-leak"
+	const secretAPIKey = "super-secret-api-key-must-not-leak"
+
+	tests := []struct {
+		name       string
+		headers    map[string][]string
+		wantKeys   []string
+		wantAbsent []string
+	}{
+		{
+			name:       "Authorization bearer not leaked in keys",
+			headers:    map[string][]string{"Authorization": {secretBearer}},
+			wantKeys:   []string{"Authorization"},
+			wantAbsent: []string{secretBearer},
+		},
+		{
+			name:       "multiple sensitive headers not leaked in keys",
+			headers:    map[string][]string{"Authorization": {secretBearer}, "X-API-Key": {secretAPIKey}},
+			wantKeys:   []string{"Authorization", "X-Api-Key"}, // http.CanonicalHeaderKey: X-API-Key → X-Api-Key
+			wantAbsent: []string{secretBearer, secretAPIKey},
+		},
+		{
+			name:       "lowercase input canonicalized",
+			headers:    map[string][]string{"authorization": {secretBearer}},
+			wantKeys:   []string{"Authorization"},
+			wantAbsent: []string{secretBearer, "authorization"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, keys := staticPodURLHeaderAndKeys(tc.headers)
+			require.ElementsMatch(t, tc.wantKeys, keys)
+
+			// Verify no secret values appear in the keys.
+			keysStr := strings.Join(keys, " ")
+			for _, absent := range tc.wantAbsent {
+				if strings.Contains(keysStr, absent) {
+					t.Fatalf("header keys contain %q which must not be present\ngot keys: %v", absent, keys)
+				}
+			}
+		})
+	}
 }

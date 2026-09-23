@@ -218,7 +218,7 @@ func TestRegistrationHandler(t *testing.T) {
 			if test.withClient {
 				fakeClient := getFakeClient(t, nodeName, test.driverName, getSlice("test-slice"))
 				client = fakeClient
-				tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+				tCtx = tCtx.WithClients(nil, nil, client, nil)
 			}
 
 			// The DRAPluginManager wipes all slices at startup.
@@ -312,7 +312,7 @@ func TestConnectionHandling(t *testing.T) {
 
 			slice := getSlice(sliceName)
 			client := getFakeClient(t, nodeName, driverName, slice)
-			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, client, nil)
 
 			// The handler wipes all slices at startup.
 			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, test.delay)

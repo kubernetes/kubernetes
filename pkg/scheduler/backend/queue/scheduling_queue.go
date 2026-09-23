@@ -152,7 +152,7 @@ type SchedulingQueue interface {
 
 	// The following functions are supposed to be used only for testing or debugging.
 	GetPodGroup(name, namespace string) (*framework.QueuedPodGroupInfo, bool)
-	GetPod(name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool)
+	GetPod(ctx context.Context, name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool)
 	PendingPods() ([]*v1.Pod, string)
 	InFlightPods() []*v1.Pod
 	PodsInActiveQ() []*v1.Pod
@@ -903,7 +903,7 @@ func (p *PriorityQueue) addPod(ctx context.Context, pod *v1.Pod) {
 
 // addPodGroupMember adds pInfo as a member of its pod group into the scheduling queue.
 func (p *PriorityQueue) addPodGroupMember(logger klog.Logger, pInfo *framework.QueuedPodInfo) {
-	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfoForPod(pInfo.Pod)
+	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfoForPod(logger, pInfo.Pod)
 	if !hasRoot {
 		// If the PodGroup object cannot be fetched, the pod cannot be scheduled.
 		// It should be put into incompletePodGroupPods waiting for the pod group to be observed.
@@ -987,7 +987,7 @@ func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 		var entityLookup framework.QueuedEntityInfo
 		if p.isPodGroupMember(pod) {
 			var hasRoot bool
-			entityLookup, hasRoot = p.workloadForest.getRootLookupInfoForPod(pod)
+			entityLookup, hasRoot = p.workloadForest.getRootLookupInfoForPod(logger, pod)
 			if !hasRoot {
 				continue
 			}
@@ -1209,7 +1209,7 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 		return nil
 	}
 	// hadUnschedulableOrErrorPods is true if at least one pod of the pod group in this scheduling cycle was unschedulable or had an error.
-	hadUnschedulableOrErrorPods := hasIntersection(pgInfo.QueuedPodInfos, pendingPods)
+	hadUnschedulableOrErrorPods := hasIntersection(pgInfo, pendingPods)
 
 	rootInfo := p.workloadForest.buildQueuedPodGroupInfo(logger, pgInfo)
 	if rootInfo == nil {
@@ -1289,13 +1289,11 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 	return nil
 }
 
-// hasIntersection returns true if any pod in slice is present in the map.
-func hasIntersection(m map[fwk.EntityKey][]*framework.QueuedPodInfo, slice []*framework.QueuedPodInfo) bool {
+// hasIntersection returns true if any pod in slice is queued in pgInfo.
+func hasIntersection(pgInfo *framework.QueuedPodGroupInfo, slice []*framework.QueuedPodInfo) bool {
 	uids := sets.New[types.UID]()
-	for _, pInfos := range m {
-		for _, pInfo := range pInfos {
-			uids.Insert(pInfo.Pod.UID)
-		}
+	for pInfo := range pgInfo.ForEachPodInfo() {
+		uids.Insert(pInfo.Pod.UID)
 	}
 
 	for _, pInfo := range slice {
@@ -1382,7 +1380,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 	var entityLookup framework.QueuedEntityInfo
 	if p.isPodGroupMember(oldPod) {
 		var hasRoot bool
-		entityLookup, hasRoot = p.workloadForest.getRootLookupInfoForPod(oldPod)
+		entityLookup, hasRoot = p.workloadForest.getRootLookupInfoForPod(logger, oldPod)
 		if !hasRoot {
 			if pInfo := p.incompletePodGroupPods.update(newPod); pInfo != nil {
 				p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
@@ -1503,7 +1501,7 @@ func (p *PriorityQueue) Delete(logger klog.Logger, pod *v1.Pod) {
 // deletePodGroupMember removes a pod from its pod group in the queue.
 // If the pod group is empty after removal, the pod group is removed from the queue.
 func (p *PriorityQueue) deletePodGroupMember(logger klog.Logger, pod *v1.Pod) {
-	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfoForPod(pod)
+	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfoForPod(logger, pod)
 	if !hasRoot {
 		pInfo := p.incompletePodGroupPods.delete(pod)
 		if pInfo == nil {
@@ -1586,7 +1584,7 @@ func (p *PriorityQueue) AddGenericPodGroup(logger klog.Logger, gpg *fwk.GenericP
 
 	p.workloadForest.addGenericPodGroup(gpg)
 
-	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(gpg)
+	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(logger, gpg)
 	if !hasRoot {
 		// If the root does not exist, then pods should stay in the incompletePodGroupPods.
 		return
@@ -1625,7 +1623,7 @@ func (p *PriorityQueue) UpdateGenericPodGroup(logger klog.Logger, gpg *fwk.Gener
 	defer p.lock.Unlock()
 
 	p.workloadForest.updateGenericPodGroup(gpg)
-	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(gpg)
+	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(logger, gpg)
 	if !hasRoot {
 		return
 	}
@@ -1646,7 +1644,7 @@ func (p *PriorityQueue) DeleteGenericPodGroup(logger klog.Logger, gpg *fwk.Gener
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	rootInfoLookup, hadRoot := p.workloadForest.getRootLookupInfo(gpg)
+	rootInfoLookup, hadRoot := p.workloadForest.getRootLookupInfo(logger, gpg)
 	if !hadRoot {
 		p.workloadForest.deleteGenericPodGroup(gpg)
 		return
@@ -1672,7 +1670,7 @@ func (p *PriorityQueue) DeleteGenericPodGroup(logger klog.Logger, gpg *fwk.Gener
 			return
 		}
 		for _, pInfo := range pendingPods {
-			_, staysPending := p.workloadForest.getRootLookupInfoForPod(pInfo.Pod)
+			_, staysPending := p.workloadForest.getRootLookupInfoForPod(logger, pInfo.Pod)
 			if staysPending {
 				p.pendingPodGroupPods.add(pInfo)
 			} else {
@@ -1722,12 +1720,10 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 //
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) ([]framework.QueuedEntityInfo, *preQueueingHintPodKeys) {
-	// Run PreQueueingHintFns to narrow the pod set.
+
 	hintKeys := p.runPreQueueingHintPlugins(logger, event, oldObj, newObj)
 
-	// TODO: Add PreQueueingHint support for CompositePodGroup entities.
-	// Until then, skip narrowing when CPG is enabled to avoid missing CPG entities.
-	if !p.isCompositePodGroupEnabled && hintKeys != nil {
+	if hintKeys != nil && !hintKeys.evaluateAllPods {
 		logger.V(5).Info("PreQueueingHint narrowed pod set", "candidates", hintKeys.candidatePods.Len(), "total", len(p.unschedulableEntities.entityInfoMap))
 		// Directly look up entities for pods identified by PreQueueingHint.
 		entities := make([]framework.QueuedEntityInfo, 0, hintKeys.candidatePods.Len())
@@ -1746,13 +1742,16 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 			if p.isGenericWorkloadEnabled {
 				pod, err := p.podLister.Pods(nn.Namespace).Get(nn.Name)
 				if err != nil {
-					logger.V(5).Info("Failed to get pod for PodGroup lookup", "pod", nn, "err", err)
+					utilruntime.HandleErrorWithLogger(logger, err, "Failed to get pod for PodGroup lookup", "pod", nn)
 				} else if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
-					entityKey = fwk.PodGroupKey(nn.Namespace, *pod.Spec.SchedulingGroup.PodGroupName).String()
-					if entity, exists := p.unschedulableEntities.entityInfoMap[entityKey]; exists && !seen[entityKey] {
-						seen[entityKey] = true
-						if preCheck == nil || preCheck(entity) {
-							entities = append(entities, entity)
+					if rootLookup, hasRoot := p.workloadForest.getRootLookupInfoForPod(logger, pod); hasRoot {
+						if entity := p.unschedulableEntities.get(rootLookup); entity != nil {
+							if rootKey := queuedEntityKeyFunc(entity); !seen[rootKey] {
+								seen[rootKey] = true
+								if preCheck == nil || preCheck(entity) {
+									entities = append(entities, entity)
+								}
+							}
 						}
 					}
 				}
@@ -1768,7 +1767,7 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 			entities = append(entities, entity)
 		}
 	}
-	return entities, nil
+	return entities, hintKeys
 }
 
 // MoveAllToActiveOrBackoffQueue moves all pods from unschedulableEntities to activeQ or backoffQ.
@@ -1892,7 +1891,7 @@ func (p *PriorityQueue) IncompletePodGroupPodsPods() []*v1.Pod {
 }
 
 // GetPod searches for a pod in the activeQ, backoffQ, and unschedulableEntities.
-func (p *PriorityQueue) GetPod(name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool) {
+func (p *PriorityQueue) GetPod(ctx context.Context, name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -1907,7 +1906,7 @@ func (p *PriorityQueue) GetPod(name, namespace string, schedulingGroup *v1.PodSc
 	}
 	var pInfo *framework.QueuedPodInfo
 	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
-		pInfo = p.getPod(pod, unlockedActiveQ)
+		pInfo = p.getPod(klog.FromContext(ctx), pod, unlockedActiveQ)
 	})
 	return pInfo, pInfo != nil
 }
@@ -1931,11 +1930,11 @@ func (p *PriorityQueue) GetPodGroup(name, namespace string) (*framework.QueuedPo
 	return foundPGInfo, foundPGInfo != nil
 }
 
-func (p *PriorityQueue) getPod(podLookup *v1.Pod, unlockedActiveQ unlockedActiveQueueReader) *framework.QueuedPodInfo {
+func (p *PriorityQueue) getPod(logger klog.Logger, podLookup *v1.Pod, unlockedActiveQ unlockedActiveQueueReader) *framework.QueuedPodInfo {
 	var entityLookup framework.QueuedEntityInfo
 	if p.isPodGroupMember(podLookup) {
 		var hasRoot bool
-		entityLookup, hasRoot = p.workloadForest.getRootLookupInfoForPod(podLookup)
+		entityLookup, hasRoot = p.workloadForest.getRootLookupInfoForPod(logger, podLookup)
 		if !hasRoot {
 			return p.incompletePodGroupPods.get(podLookup)
 		}
@@ -2004,9 +2003,9 @@ func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, conditions []*v1.PodConditio
 }
 
 // Note: this function assumes the caller locks both p.lock.RLock and p.activeQ.getLock().RLock.
-func (p *PriorityQueue) nominatedPodToInfo(np podRef, unlockedActiveQ unlockedActiveQueueReader) *framework.PodInfo {
+func (p *PriorityQueue) nominatedPodToInfo(logger klog.Logger, np podRef, unlockedActiveQ unlockedActiveQueueReader) *framework.PodInfo {
 	pod := np.toPod()
-	pInfo := p.getPod(pod, unlockedActiveQ)
+	pInfo := p.getPod(logger, pod, unlockedActiveQ)
 	if pInfo != nil {
 		return pInfo.PodInfo
 	}
@@ -2047,7 +2046,7 @@ func (p *PriorityQueue) Close() {
 // NominatedPodsForNode returns a copy of pods that are nominated to run on the given node,
 // but they are waiting for other pods to be removed from the node.
 // CAUTION: Make sure you don't call this function while taking any queue's lock in any scenario.
-func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []fwk.PodInfo {
+func (p *PriorityQueue) NominatedPodsForNode(logger klog.Logger, nodeName string) []fwk.PodInfo {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	nominatedPods := p.nominator.nominatedPodsForNode(nodeName)
@@ -2057,7 +2056,7 @@ func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []fwk.PodInfo {
 	pods := make([]fwk.PodInfo, len(nominatedPods))
 	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
 		for i, np := range nominatedPods {
-			pods[i] = p.nominatedPodToInfo(np, unlockedActiveQ).DeepCopy()
+			pods[i] = p.nominatedPodToInfo(logger, np, unlockedActiveQ).DeepCopy()
 		}
 	})
 	return pods
@@ -2144,10 +2143,12 @@ func podGroupKeyForPod(pod *v1.Pod) fwk.EntityKey {
 type preQueueingHintPodKeys struct {
 	candidatePods sets.Set[types.NamespacedName]
 	perPlugin     map[string]sets.Set[types.NamespacedName]
+	// evaluateAllPods indicates at least one plugin wants to evaluate all pods
+	evaluateAllPods bool
 }
 
 // runPreQueueingHintPlugins runs all registered PreQueueingHintFns for the given event
-// and returns a narrowed set of pod keys to evaluate, or nil if all pods should be evaluated.
+// and returns a narrowed set of pod keys to evaluate.
 //
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}) *preQueueingHintPodKeys {
@@ -2170,19 +2171,28 @@ func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.
 			}
 			for _, hintfn := range hintfns {
 				if hintfn.PreQueueingHintFn == nil {
+					// if current plugin doesn't register PreQueueingHints, we will treat it as AllPods
+					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultNoPreQFn)
+					result.evaluateAllPods = true
 					continue
 				}
 				hintResult, err := hintfn.PreQueueingHintFn(logger, oldObj, newObj)
 				if err != nil {
-					logger.Error(err, "PreQueueingHintFn failed, falling back to evaluate all pods", "plugin", hintfn.PluginName)
-					return nil
+					// we will set evaluateAllPods to true but still continue to evaluate other fns
+					// because we can still skip pods for other plugins
+					utilruntime.HandleErrorWithLogger(logger, err, "PreQueueingHintFn failed, falling back to evaluate all pods", "plugin", hintfn.PluginName)
+					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultPreQFnError)
+					result.evaluateAllPods = true
+					continue
 				}
 				if hintResult.AllPods {
 					// This plugin wants all pods evaluated; we cannot narrow.
-					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, "all_pods")
-					return nil
+					// Same here, we still continue to evaluate other plugins's PreQHints.
+					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultAllPods)
+					result.evaluateAllPods = true
+					continue
 				}
-				p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, "narrowed")
+				p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultNarrowed)
 				keys := sets.New(hintResult.Pods...)
 				if existing, ok := result.perPlugin[hintfn.PluginName]; ok {
 					result.perPlugin[hintfn.PluginName] = existing.Union(keys)
@@ -2197,7 +2207,7 @@ func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.
 			}
 		}
 	}
-	if result.candidatePods == nil {
+	if result.candidatePods == nil && !result.evaluateAllPods {
 		return nil
 	}
 	return result

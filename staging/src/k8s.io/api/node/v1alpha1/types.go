@@ -62,9 +62,9 @@ type RuntimeClassSpec struct {
 	// The runtimeHandler must be lowercase, conform to the DNS Label (RFC 1123)
 	// requirements, and is immutable.
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:format="k8s-short-name"
-	// +k8s:beta(since: "1.37")=+k8s:immutable
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:format="k8s-short-name"
+	// +k8s:immutable
+	// +k8s:required
 	RuntimeHandler string `json:"runtimeHandler" protobuf:"bytes,1,opt,name=runtimeHandler"`
 
 	// overhead represents the resource overhead associated with running a pod for a

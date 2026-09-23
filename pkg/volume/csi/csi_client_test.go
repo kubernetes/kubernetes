@@ -858,6 +858,21 @@ func TestNodeExpandVolume(t *testing.T) {
 			newSize:    resource.MustParse("-9.5Gi"),
 			mustFail:   true,
 		},
+		{
+			name:       "with quantity of exactly MaxInt64 bytes",
+			volID:      "vol-1234",
+			volumePath: "/foo/bar",
+			newSize:    resource.MustParse("9223372036854775807"),
+			mustFail:   false,
+		},
+		{
+			// TODO(#141166): A size past int64 must be rejected before the CSI call.
+			name:       "with quantity past int64",
+			volID:      "vol-1234",
+			volumePath: "/foo/bar",
+			newSize:    resource.MustParse("100E"),
+			mustFail:   false,
+		},
 	}
 
 	for _, tc := range testCases {
