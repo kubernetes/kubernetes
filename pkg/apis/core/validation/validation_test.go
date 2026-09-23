@@ -22254,7 +22254,7 @@ func TestValidatePodResources(t *testing.T) {
 	path := field.NewPath("spec")
 	resourceClaimName := "resource-claim"
 	podClaimNames := sets.New(resourceClaimName)
-	podValidationOpts := PodValidationOptions{AllowIndivisibleHugePagesValues: true}
+	podValidationOpts := PodValidationOptions{}
 
 	tests := []struct {
 		name           string
