@@ -49,6 +49,14 @@ func TestCreateIngressValidation(t *testing.T) {
 			defaultbackend: "xpto:4444",
 			expected:       "",
 		},
+		"default backend without service name": {
+			defaultbackend: ":4444",
+			expected:       "default-backend should be in format servicename:serviceport",
+		},
+		"default backend without port value": {
+			defaultbackend: "xpto:",
+			expected:       "default-backend should be in format servicename:serviceport",
+		},
 		"invalid annotation": {
 			defaultbackend: "xpto:4444",
 			annotations: []string{
@@ -64,6 +72,13 @@ func TestCreateIngressValidation(t *testing.T) {
 				"key2=",
 			},
 			expected: "",
+		},
+		"empty annotation key": {
+			defaultbackend: "xpto:4444",
+			annotations: []string{
+				"=value",
+			},
+			expected: "annotation =value is invalid and should be in format key=[value]",
 		},
 		"multiple conformant rules": {
 			rules: []string{
