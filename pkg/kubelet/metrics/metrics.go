@@ -1118,7 +1118,8 @@ var (
 
 	// ImagePullDuration is a Histogram that tracks the duration (in seconds) it takes for an image to be pulled,
 	// including the time spent in the waiting queue of image puller.
-	// The metric is broken down by image name, pull policy, and bucketed image size.
+	// The metric is broken down by image repository (tag and digest stripped, see
+	// GetImageNameForMetrics, to bound cardinality), pull policy, and bucketed image size.
 	ImagePullDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1647,12 +1648,21 @@ func GetPriorityBucketLabel(pod *v1.Pod) PriorityBucket {
 	}
 }
 
-// GetImageNameForMetrics strips the digest from an image reference for use in metrics labels.
-// This reduces cardinality while keeping registry/repo:tag information.
-// Example: "gcr.io/project/app:v1@sha256:abc123" -> "gcr.io/project/app:v1"
+// GetImageNameForMetrics strips the tag and digest from an image reference for use in metrics
+// labels. This bounds cardinality to distinct repositories regardless of tagging scheme (e.g.
+// per-commit tags in CI/GitOps pipelines would otherwise grow the label unboundedly).
+// Example: "gcr.io/project/app:v1@sha256:abc123" -> "gcr.io/project/app"
+//
+// Only a ':' after the last '/' is treated as a tag separator, since the registry domain
+// itself may contain a port, e.g. "localhost:5000/app:v1" -> "localhost:5000/app".
 func GetImageNameForMetrics(image string) string {
 	if before, _, found := strings.Cut(image, "@"); found {
-		return before
+		image = before
+	}
+	slash := strings.LastIndex(image, "/")
+	tail := image[slash+1:]
+	if before, _, found := strings.Cut(tail, ":"); found {
+		image = image[:slash+1] + before
 	}
 	return image
 }
