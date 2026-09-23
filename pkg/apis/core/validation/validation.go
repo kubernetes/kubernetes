@@ -4592,8 +4592,6 @@ type PodValidationOptions struct {
 	AllowInvalidPodDeletionCost bool
 	// Allow invalid label-value in LabelSelector
 	AllowInvalidLabelValueInSelector bool
-	// Allow pod spec to use non-integer multiple of huge page unit size
-	AllowIndivisibleHugePagesValues bool
 	// Allow invalid topologySpreadConstraint labelSelector for backward compatibility
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
 	// Allow projected token volumes with non-local paths
@@ -8470,14 +8468,14 @@ func validateResourceClaimNames(claims []core.ResourceClaim, podClaimNames sets.
 
 // location is the same StoredResourceQuantities key the caller already validated quantity
 // against (see validateResourceRequirements); an exact match there ratchets a specific stored
-// indivisible value without opening every hugepages entry the way AllowIndivisibleHugePagesValues
-// does.
+// indivisible value, and only that value: a new or different hugepages value is validated in
+// full.
 func validateResourceQuantityHugePageValue(name core.ResourceName, quantity resource.Quantity, location string, opts PodValidationOptions) error {
 	if !helper.IsHugePageResourceName(name) {
 		return nil
 	}
 
-	if opts.AllowIndivisibleHugePagesValues || opts.StoredResourceQuantities.Has(location, name, quantity) {
+	if opts.StoredResourceQuantities.Has(location, name, quantity) {
 		return nil
 	}
 
