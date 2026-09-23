@@ -120,6 +120,51 @@ X2i8uIp/C/ASqiIGUeeKQtX0/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 //  3. URLSafe Base64-encoding the sha bytes
 const ecdsaKeyID = "SoABiieYuNx4UdqYvZRVeuC6SihxgLrhLy9peHMHpTc"
 
+// openssl genpkey -algorithm ML-DSA-44 -provparam ml-dsa.output_formats=seed-only -out mldsa44-priv.pem
+const mldsa44PrivateKey = `-----BEGIN PRIVATE KEY-----
+MDQCAQAwCwYJYIZIAWUDBAMRBCKAIERz6p69gPaVMOBq4wlLM7B/ZKvGjkR3TPXR
+vh+K2OoE
+-----END PRIVATE KEY-----`
+
+// openssl pkey -in mldsa44-priv.pem -pubout -out mldsa44-public.pem
+const mldsa44PublicKey = `-----BEGIN PUBLIC KEY-----
+MIIFMjALBglghkgBZQMEAxEDggUhACd2RrSgGNuFoOXNXT3D7fZxUj+ks1cVspRx
+a1e4xXDX9Ki/nJ6AfGoqC2idkuVFa/ZjTYgXxXvCdNgLHFGpHZ2EvUhEI3qoudiC
+lRaT++szVlGeJePJZohgJ5sH8tl2bNg8ltKL0pDkA0HZvDxlTxgv/zBrlDx7merW
+OqX+zLKXxHtOZEY4yM9dKfgZY/d5M5T7EVpPldR5QLzhvlwXmQl5i+sYrFtoJXRd
+OTibV1AtfwgoHpL6CI0B7/pkmhKtMCL40lCh/j9bqilgrnfp1vI3d5Y2JHcvNLGQ
+zGJhdbJo2ddZaUzQCha1uLm8vkapfSV5i4Co1l9grqpUAERRskZLggzOjciCcGtM
+LysX+jHfTVxmQ2qVV0hbPo7IMdhVVVmK7Lc1mr1Q0Wq4nUBr/nd3HpO6/fcQcYK7
+04kXUmFSIIpGWEOi/vq5XSLBQpXpFtZBrY6o0MkqkXNjFTCcQ0H2x+N36bX6IolO
+kCYlbbcuFLKplDIW0bx6YIJiKSiAj5eugLPZLPwwNEiafG1Pn6SaNvd+gXo7iBOW
+HomUsh5auE6iWlIOvOepyDxWUECu1/pRxRqj1crTV7Kvz5q4oawVLzCHHg04pymW
+ZIQPFgVQN/X4y8lHhX8/9x8+W2yS4uaSzWTL+YfgjLEjGH5EMbVi/KP4zwyUG1Sa
+NE9pBcXN2e2EXEK/gE/zNOkAJMNi6N/5gocJ2KhT996h7XI/+Jnzc7IMTOoT9BHS
+9VnwLjPPx/qQ6oOSn+Pgdr+kknQ1XJE3rPn5haEnTKwwe8t5VdqNb82pypX+VHhk
+FK/tk79+5hnJzj+avD7dCVvbsjR0BafZv+fSZWH8wkmZYitBoN0wlc7F6n8bwKSV
+VJKE5RD6xMIjs5n+DA0HVDfLYGM+1Qn05V7AaAP0FXuABEP+v65rAqzB3OpfIsow
+EIrDbgloNz5nenrKEXFJYknONzn8M1eDBIej7RyWRgRtJOg1mNFP8WnbjBFqHfSA
+mdOSWgVPqA6Wx6NZBLdLTGPK//MVayH2q+ixcemp5LFwYyqMIKQRf3F81uzH9gW9
+3u5vANCVtCmZT/PIYCCRGy4RzluJHs4tEv3AwgKXMsFhkEU3r0QujAkbqiWgX7rh
+XDGMoEp/XVOaH+DAiEij3aDvmwfYeaXfOBLlhQgA8QEtv6Rl6Thaj2Cb3h2I2Kct
+wmqga71FHDUcF2PFmv+g3LIgD7nY0SdYxe7kDIQ5PJgEdzlZRhRvEgeoPCpjdcP6
+6P0+QHyKEOktwtT1atWlblDq/lrfFvcRgJBxq+CydL4CaHp0Dr9rxF8Y0PGvTEQp
+Z1987A7LJ2YcGIPsJZ28FSDUJ+rT2gNgv8Ja9+kqbW3pP2z4OVVlVog1TLU96Xbf
+VZefwnDzYWn9I4y5QMG1gbmN7SRpcYfpiSbKYf5Lsm4sIT6+JmKQ0pTie5BPOhmZ
+yc6j/aG3Aicq76O/BN75oRg+gSm7rPG6b5A5uTII9lI96ISXdIQ6MsHWEZbB/7ej
+T3tZ/s0sRQxzPOA9YzbdRh3+g6Hz2LKafI8ob0VgroJ+O0Ev7SCaudHYK3fnkJ/X
+YHAJEYoBiUxaoLpx3TeNRr8oiciSql7042vMi8cwdspnQ/bnyKrrJRtzMFvr4CCU
+6BXhb3ZRWBopzR1HW7sJWr5nzjcF6WpPzERogNUmZIcMCrsp3h01VGNGhZD7qQWB
+AqBiW3lpSxcS4S4TtrM/wCLB9cgtXXW7iYzJljI/VnJ7jN5NbJU=
+-----END PUBLIC KEY-----`
+
+// Obtained by:
+//
+//  1. Serializing ecdsaPublicKey as DER
+//  2. Taking the SHA256 of the DER bytes
+//  3. URLSafe Base64-encoding the sha bytes
+const mldsa44KeyID = "ujqYahCmg9pxpxdLGbGbhQyizN2vtd-lMTixkaKHggo"
+
 func getPrivateKey(data string) interface{} {
 	key, err := keyutil.ParsePrivateKeyPEM([]byte(data))
 	if err != nil {
@@ -166,6 +211,12 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	ecdsaSecret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-ecdsa-secret",
+			Namespace: "test",
+		},
+	}
+	mldsa44Secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-mldsa44-secret",
 			Namespace: "test",
 		},
 	}
@@ -237,6 +288,15 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		t.Fatalf("error generating token: %v", err)
 	}
 
+	// Generate ML-DSA-44 token
+	mldsa44Token := generateMLDSA44Token(t, serviceaccount.LegacyIssuer, serviceAccount, mldsa44Secret)
+
+	mldsa44Secret.Data = map[string][]byte{
+		"token": []byte(mldsa44Token),
+	}
+
+	checkJSONWebSignatureHasKeyID(t, mldsa44Token, mldsa44KeyID)
+
 	testCases := map[string]struct {
 		Client clientset.Interface
 		Keys   []interface{}
@@ -264,6 +324,13 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		},
 		"invalid keys (ecdsa)": {
 			Token:       ecdsaToken,
+			Client:      nil,
+			Keys:        []interface{}{getPublicKey(otherPublicKey), getPublicKey(rsaPublicKey)},
+			ExpectedErr: true,
+			ExpectedOK:  false,
+		},
+		"invalid keys (mldsa)": {
+			Token:       mldsa44Token,
 			Client:      nil,
 			Keys:        []interface{}{getPublicKey(otherPublicKey), getPublicKey(rsaPublicKey)},
 			ExpectedErr: true,
@@ -306,6 +373,16 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedUserUID:  expectedUserUID,
 			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
 		},
+		"valid key (mldsa)": {
+			Token:            mldsa44Token,
+			Client:           nil,
+			Keys:             []interface{}{getPublicKey(mldsa44PublicKey)},
+			ExpectedErr:      false,
+			ExpectedOK:       true,
+			ExpectedUserName: expectedUserName,
+			ExpectedUserUID:  expectedUserUID,
+			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
+		},
 		"rotated keys (rsa)": {
 			Token:            rsaToken,
 			Client:           nil,
@@ -320,6 +397,16 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			Token:            ecdsaToken,
 			Client:           nil,
 			Keys:             []interface{}{getPublicKey(otherPublicKey), getPublicKey(rsaPublicKey), getPublicKey(ecdsaPublicKey)},
+			ExpectedErr:      false,
+			ExpectedOK:       true,
+			ExpectedUserName: expectedUserName,
+			ExpectedUserUID:  expectedUserUID,
+			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
+		},
+		"rotated keys (mldsa)": {
+			Token:            mldsa44Token,
+			Client:           nil,
+			Keys:             []interface{}{getPublicKey(otherPublicKey), getPublicKey(rsaPublicKey), getPublicKey(mldsa44PublicKey)},
 			ExpectedErr:      false,
 			ExpectedOK:       true,
 			ExpectedUserName: expectedUserName,
@@ -451,6 +538,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 }
 
+
 type keyIDPrefixer struct {
 	serviceaccount.PublicKeysGetter
 	keyIDPrefix string
@@ -549,6 +637,25 @@ func generateECDSATokenWithMalformedIss(t *testing.T, serviceAccount *v1.Service
 	}
 
 	return string(out)
+}
+
+func generateMLDSA44Token(t *testing.T, iss string, serviceAccount *v1.ServiceAccount, mldsa44Secret *v1.Secret) string {
+	t.Helper()
+
+	mldsaGenerator, err := serviceaccount.JWTTokenGenerator(iss, getPrivateKey(mldsa44PrivateKey))
+	if err != nil {
+		t.Fatalf("error making generator: %v", err)
+	}
+	c, pc := serviceaccount.LegacyClaims(*serviceAccount, *mldsa44Secret)
+	mldsaToken, err := mldsaGenerator.GenerateToken(context.TODO(), c, pc)
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
+	}
+	if len(mldsaToken) == 0 {
+		t.Fatalf("no token generated")
+	}
+
+	return mldsaToken
 }
 
 func TestStaticPublicKeysGetter(t *testing.T) {

@@ -180,7 +180,7 @@ func (p *Plugin) validateJWTHeader(ctx context.Context, response *externaljwtv1.
 	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
 	// - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
-	case "RS256", "ES256", "ES384", "ES512":
+	case "RS256", "ES256", "ES384", "ES512", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87":
 		// OK
 	default:
 		return fmt.Errorf("bad signing algorithm %q", header.Algorithm)

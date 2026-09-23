@@ -265,6 +265,9 @@ var allowedSigningAlgs = map[string]bool{
 	oidc.PS256: true,
 	oidc.PS384: true,
 	oidc.PS512: true,
+	"ML-DSA-44": true,
+	"ML-DSA-65": true,
+	"ML-DSA-87": true,
 }
 
 type AuthenticatorTokenWithHealthCheck interface {
