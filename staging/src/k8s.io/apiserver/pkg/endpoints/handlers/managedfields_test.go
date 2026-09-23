@@ -18,11 +18,16 @@ package handlers
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
+	"io"
 	"reflect"
 	"slices"
 	"testing"
 
+	"sigs.k8s.io/yaml"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -208,5 +213,72 @@ func TestDropManagedFieldsEncoding(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+//go:embed responsewriters/testdata/exemplar_pod.yaml
+var benchmarkExemplarPodYAML []byte
+
+// BenchmarkDropManagedFields encodes an exemplar Pod and a LIST of 1000 of them,
+// typed and unstructured, with and without managedFields, using the encoders
+// the apiserver serves them with.
+func BenchmarkDropManagedFields(b *testing.B) {
+	var pod corev1.Pod
+	if err := yaml.Unmarshal(benchmarkExemplarPodYAML, &pod); err != nil {
+		b.Fatal(err)
+	}
+	content, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
+	if err != nil {
+		b.Fatal(err)
+	}
+	cached := slices.Repeat([]corev1.Pod{pod}, 1000)
+	cachedUnstructured := slices.Repeat([]unstructured.Unstructured{{Object: content}}, 1000)
+	objects := []struct {
+		name   string
+		object func() runtime.Object
+	}{
+		{"Pod", func() runtime.Object { return &pod }},
+		// The cacher copies cached objects into a fresh list for each request.
+		{"PodList", func() runtime.Object { return &corev1.PodList{Items: slices.Clone(cached)} }},
+		{"Unstructured", func() runtime.Object { return &unstructured.Unstructured{Object: content} }},
+		{"UnstructuredList", func() runtime.Object {
+			return &unstructured.UnstructuredList{Items: slices.Clone(cachedUnstructured)}
+		}},
+	}
+	encoders := []struct {
+		name    string
+		encoder runtime.Encoder
+	}{
+		{"Json", json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{StreamingCollectionsEncoding: true})},
+		// The apiserver encodes protobuf with a pooled allocator.
+		{"Protobuf", runtime.NewEncoderWithAllocator(protobuf.NewSerializerWithOptions(nil, nil, protobuf.SerializerOptions{StreamingCollectionsEncoding: true}), &runtime.Allocator{})},
+		{"Cbor", cbor.NewSerializer(nil, nil)},
+	}
+	for _, o := range objects {
+		for _, e := range encoders {
+			if _, ok := o.object().(runtime.Unstructured); ok && e.name == "Protobuf" {
+				continue // Protobuf can't encode unstructured objects.
+			}
+			for _, drop := range []bool{false, true} {
+				b.Run(fmt.Sprintf("Object=%s/MediaType=%s/Drop=%t", o.name, e.name, drop), func(b *testing.B) {
+					encode := func(w io.Writer) {
+						obj := o.object()
+						if drop {
+							obj = dropManagedFields(obj)
+						}
+						if err := e.encoder.Encode(obj, w); err != nil {
+							b.Fatal(err)
+						}
+					}
+					var written bytes.Buffer
+					encode(&written)
+					b.ReportAllocs()
+					for b.Loop() {
+						encode(io.Discard)
+					}
+					b.ReportMetric(float64(written.Len()), "writtenBytes/op")
+				})
+			}
+		}
 	}
 }
