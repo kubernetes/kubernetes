@@ -295,7 +295,7 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 
 func TestResourceVersionAfterInitEvents(t *testing.T) {
 	const numObjects = 10
-	store := store.NewIndexer(nil)
+	store := store.NewWatchCacheStorage(nil, nil)
 
 	for i := 0; i < numObjects; i++ {
 		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod-%d", i), uint64(i)))

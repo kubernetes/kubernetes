@@ -24,7 +24,7 @@ import (
 )
 
 func TestStoreListOrdered(t *testing.T) {
-	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
+	store := NewWatchCacheStorage(nil, nil)
 	prev, err := store.Add(testStorageElement("foo3", "bar3", 1))
 	require.NoError(t, err)
 	assert.Nil(t, prev)
@@ -42,7 +42,7 @@ func TestStoreListOrdered(t *testing.T) {
 }
 
 func TestStoreListPrefix(t *testing.T) {
-	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
+	store := NewWatchCacheStorage(nil, nil)
 	prev, err := store.Add(testStorageElement("foo3", "bar3", 1))
 	require.NoError(t, err)
 	assert.Nil(t, prev)

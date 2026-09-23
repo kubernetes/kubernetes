@@ -26,40 +26,15 @@ import (
 	"k8s.io/utils/third_party/forked/golang/btree"
 )
 
-// newThreadedBtreeStoreIndexer returns a storage for cacher by adding locking over the two 2 data structures:
-// * btree based storage for efficient LIST operation on prefix
-// * map based indexer for retrieving values by index.
-// This separation is used to allow independent snapshotting those two storages in the future.
-// Intention is to utilize btree for its cheap snapshots that don't require locking if don't mutate data.
-func newThreadedBtreeStoreIndexer(indexers cache.Indexers, degree int) *threadedStoreIndexer {
-	return &threadedStoreIndexer{
-		store:   newBtreeStore(degree),
-		indexer: newIndexer(indexers),
-	}
-}
-
-type threadedStoreIndexer struct {
-	lock    sync.RWMutex
-	store   btreeStore
-	indexer indexer
-}
-
-func (si *threadedStoreIndexer) Clone() Snapshot {
-	// Clone should not be called concurrently.
-	si.lock.Lock()
-	defer si.lock.Unlock()
-	return si.store.Clone()
-}
-
-func (si *threadedStoreIndexer) Add(elem *Element) (*Element, error) {
+func (si *WatchCacheStorage) Add(elem *Element) (*Element, error) {
 	return si.addOrUpdate(elem)
 }
 
-func (si *threadedStoreIndexer) Update(elem *Element) (*Element, error) {
+func (si *WatchCacheStorage) Update(elem *Element) (*Element, error) {
 	return si.addOrUpdate(elem)
 }
 
-func (si *threadedStoreIndexer) addOrUpdate(newElem *Element) (*Element, error) {
+func (si *WatchCacheStorage) addOrUpdate(newElem *Element) (*Element, error) {
 	if newElem == nil {
 		return nil, fmt.Errorf("elem cannot be nil")
 	}
@@ -69,7 +44,7 @@ func (si *threadedStoreIndexer) addOrUpdate(newElem *Element) (*Element, error) 
 	return oldElem, si.indexer.updateElem(newElem.Key, oldElem, newElem)
 }
 
-func (si *threadedStoreIndexer) Delete(elem *Element) (*Element, error) {
+func (si *WatchCacheStorage) Delete(elem *Element) (*Element, error) {
 	if elem == nil {
 		return nil, fmt.Errorf("elem cannot be nil")
 	}
@@ -82,37 +57,37 @@ func (si *threadedStoreIndexer) Delete(elem *Element) (*Element, error) {
 	return oldElem, si.indexer.updateElem(elem.Key, oldElem, nil)
 }
 
-func (si *threadedStoreIndexer) List() []interface{} {
+func (si *WatchCacheStorage) List() []interface{} {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.List()
 }
 
-func (si *threadedStoreIndexer) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
+func (si *WatchCacheStorage) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.OrderedListPrefix(prefix, continueKey)
 }
 
-func (si *threadedStoreIndexer) ListKeys() []string {
+func (si *WatchCacheStorage) ListKeys() []string {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.ListKeys()
 }
 
-func (si *threadedStoreIndexer) Get(obj interface{}) (item interface{}, exists bool, err error) {
+func (si *WatchCacheStorage) get(obj interface{}) (item interface{}, exists bool, err error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.Get(obj)
 }
 
-func (si *threadedStoreIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
+func (si *WatchCacheStorage) GetByKey(key string) (item interface{}, exists bool, err error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.GetByKey(key)
 }
 
-func (si *threadedStoreIndexer) Replace(objs []interface{}, resourceVersion string) error {
+func (si *WatchCacheStorage) Replace(objs []interface{}, resourceVersion string) error {
 	si.lock.Lock()
 	defer si.lock.Unlock()
 	err := si.store.Replace(objs, resourceVersion)
@@ -122,7 +97,7 @@ func (si *threadedStoreIndexer) Replace(objs []interface{}, resourceVersion stri
 	return si.indexer.Replace(objs, resourceVersion)
 }
 
-func (si *threadedStoreIndexer) ByIndex(indexName, indexValue string) ([]interface{}, error) {
+func (si *WatchCacheStorage) ByIndex(indexName, indexValue string) ([]interface{}, error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.indexer.ByIndex(indexName, indexValue)
