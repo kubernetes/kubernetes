@@ -18,7 +18,6 @@ package internal
 
 import (
 	"fmt"
-
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v7/merge"
 	"sigs.k8s.io/structured-merge-diff/v7/typed"
@@ -27,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 )
 
 type structuredMergeManager struct {
@@ -96,6 +96,12 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert live object (%v) to proper version: %v", objectGVKNN(liveObj), err)
+	}
+	// newObj has no managedFields by now, so the comparison would only report
+	// metadata.managedFields as removed. That changes no manager's set unless one
+	// owns that path, so skip converting the live managedFields, which is costly.
+	if liveObjVersioned != liveObj && !ownsManagedFields(managed.Fields()) {
+		RemoveObjectManagedFields(liveObjVersioned)
 	}
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned, typed.AllowDuplicates)
 	if err != nil {
@@ -179,6 +185,22 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 		return nil, nil, fmt.Errorf("failed to convert to unversioned (%v): %v", objectGVKNN(patchObj), err)
 	}
 	return newObjUnversioned, managed, nil
+}
+
+var (
+	metadataPathElement      = fieldpath.PathElement{FieldName: ptr.To("metadata")}
+	managedFieldsPathElement = fieldpath.PathElement{FieldName: ptr.To("managedFields")}
+)
+
+func ownsManagedFields(managers fieldpath.ManagedFields) bool {
+	for _, vs := range managers {
+		if md, ok := vs.Set().Children.Get(metadataPathElement); ok {
+			if _, ok := md.Children.Get(managedFieldsPathElement); ok || md.Members.Has(managedFieldsPathElement) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (f *structuredMergeManager) toVersioned(obj runtime.Object) (runtime.Object, error) {
