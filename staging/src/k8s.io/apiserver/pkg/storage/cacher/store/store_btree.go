@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"iter"
 	"strings"
-	"sync"
 
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/third_party/forked/golang/btree"
@@ -87,9 +86,7 @@ func (si *WatchCacheStorage) GetByKey(key string) (item interface{}, exists bool
 	return si.store.GetByKey(key)
 }
 
-func (si *WatchCacheStorage) Replace(objs []interface{}, resourceVersion string) error {
-	si.lock.Lock()
-	defer si.lock.Unlock()
+func (si *WatchCacheStorage) replaceLocked(objs []interface{}, resourceVersion string) error {
 	err := si.store.Replace(objs, resourceVersion)
 	if err != nil {
 		return err
@@ -374,28 +371,15 @@ func (i *indexer) delete(key, value string, index map[string]map[string]*Element
 // However, this solution is more complex and is deferred for future implementation.
 //
 // TODO: Rewrite to use a cyclic buffer
-func NewSnapshotter() Snapshotter {
-	s := &storeSnapshotter{
+func newSnapshotter() snapshotter {
+	return snapshotter{
 		snapshots: btree.New(btreeDegree, func(a, b rvSnapshot) bool {
 			return a.resourceVersion < b.resourceVersion
 		}),
 	}
-	return s
 }
 
-var _ Snapshotter = (*storeSnapshotter)(nil)
-
-type Snapshotter interface {
-	Reset()
-	GetLessOrEqual(rv uint64) (Snapshot, bool)
-	Latest() (Snapshot, bool)
-	Add(rv uint64, snapshot Snapshot)
-	RemoveLess(rv uint64)
-	Len() int
-}
-
-type storeSnapshotter struct {
-	mux       sync.RWMutex
+type snapshotter struct {
 	snapshots *btree.BTree[rvSnapshot]
 }
 
@@ -404,16 +388,11 @@ type rvSnapshot struct {
 	snapshot        Snapshot
 }
 
-func (s *storeSnapshotter) Reset() {
-	s.mux.Lock()
-	defer s.mux.Unlock()
+func (s *snapshotter) Reset() {
 	s.snapshots.Clear(false)
 }
 
-func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
+func (s *snapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
 	var result *rvSnapshot
 	s.snapshots.DescendLessOrEqual(rvSnapshot{resourceVersion: rv}, func(rvs rvSnapshot) bool {
 		result = &rvs
@@ -425,10 +404,7 @@ func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
 	return result.snapshot, true
 }
 
-func (s *storeSnapshotter) Latest() (Snapshot, bool) {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
+func (s *snapshotter) Latest() (Snapshot, bool) {
 	max, ok := s.snapshots.Max()
 	if !ok {
 		return nil, false
@@ -436,15 +412,11 @@ func (s *storeSnapshotter) Latest() (Snapshot, bool) {
 	return max.snapshot, true
 }
 
-func (s *storeSnapshotter) Add(rv uint64, snapshot Snapshot) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
+func (s *snapshotter) Add(rv uint64, snapshot Snapshot) {
 	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: snapshot})
 }
 
-func (s *storeSnapshotter) RemoveLess(rv uint64) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
+func (s *snapshotter) RemoveLess(rv uint64) {
 	for s.snapshots.Len() > 0 {
 		oldest, ok := s.snapshots.Min()
 		if !ok {
@@ -457,9 +429,6 @@ func (s *storeSnapshotter) RemoveLess(rv uint64) {
 	}
 }
 
-func (s *storeSnapshotter) Len() int {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
+func (s *snapshotter) Len() int {
 	return s.snapshots.Len()
 }

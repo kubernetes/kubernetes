@@ -50,7 +50,7 @@ func testStoreSingleKey(t *testing.T, store *WatchCacheStorage) {
 	assert.Equal(t, testStorageElement("foo", "baz", 2), prev)
 	assertStoreSingleKey(t, store, "foo", "baz", 3)
 
-	require.NoError(t, store.Replace([]interface{}{testStorageElement("foo", "bar", 4)}, ""))
+	require.NoError(t, store.replaceLocked([]interface{}{testStorageElement("foo", "bar", 4)}, ""))
 	assertStoreSingleKey(t, store, "foo", "bar", 4)
 
 	prev, err = store.Delete(testStorageElement("foo", "", 0))
@@ -106,7 +106,7 @@ func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
 		testStorageElement("foo", "baz", 3),
 	}, items)
 
-	require.NoError(t, store.Replace([]interface{}{
+	require.NoError(t, store.replaceLocked([]interface{}{
 		testStorageElement("foo", "bar", 4),
 	}, ""))
 	items, err = store.ByIndex("by_val", "bar")
