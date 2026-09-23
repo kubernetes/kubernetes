@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -519,6 +520,24 @@ type failDeleteWrapper struct {
 	podJSON []byte
 }
 
+// completionTrackingBody records a successful request only after its response
+// body has been consumed. http.RoundTripper returns as soon as response headers
+// arrive, which is too early for a test that must not cancel the request while
+// the apiserver is still writing its response.
+type completionTrackingBody struct {
+	io.ReadCloser
+	onComplete func()
+	once       sync.Once
+}
+
+func (b *completionTrackingBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if err == io.EOF {
+		b.once.Do(b.onComplete)
+	}
+	return n, err
+}
+
 // setPod caches a JSON-encoded snapshot of pod for use in synthetic responses.
 // Must be called after pod creation and before the controller starts.
 func (w *failDeleteWrapper) setPod(pod *v1.Pod) error {
@@ -563,7 +582,12 @@ func (w *failDeleteWrapper) roundTrip(inner http.RoundTripper, req *http.Request
 		// Attempt 6+: pass to the real server so the pod is actually deleted.
 		resp, err := inner.RoundTrip(req)
 		if err == nil && resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
-			w.successfulDeletes.Add(1)
+			resp.Body = &completionTrackingBody{
+				ReadCloser: resp.Body,
+				onComplete: func() {
+					w.successfulDeletes.Add(1)
+				},
+			}
 		}
 		return resp, err
 	case http.MethodGet:
@@ -709,7 +733,8 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	if err := deleteWrapper.setPod(createdPod); err != nil {
 		t.Fatalf("Failed to cache pod JSON: %v", err)
 	}
-	t.Cleanup(func() { testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{createdPod}) })
+	// The controller's deletion is the result under test. On an early failure,
+	// InitTestAPIServer's namespace cleanup removes the pod with a fresh context.
 
 	// Add a NoExecute taint. The controller should start the toleration timer.
 	if err := testutils.AddTaintToNode(cs, node.Name, noExecuteTaint); err != nil {
@@ -763,5 +788,9 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	}
 	if completedDeletes := deleteWrapper.successfulDeletes.Load(); completedDeletes == 0 {
 		t.Error("Expected a real Delete request to complete successfully via the durable retry queue")
+	}
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, true,
+		testutils.PodIsGettingEvicted(cs, testCtx.NS.Name, createdPod.Name)); err != nil {
+		t.Errorf("Pod did not reflect the completed durable retry deletion: %v", err)
 	}
 }
