@@ -364,6 +364,8 @@ func NewPodGroupPreemptionState[T fwk.PreemptionVictim](potentialVictims []T) *P
 	for _, v := range slices.Backward(potentialVictims) {
 		var pv fwk.PreemptionVictim = v
 		for _, pi := range pv.Pods() {
+			// Pre-populate cached resource requests before parallel PreScore workers read PodInfo.
+			pi.CalculateResource()
 			nodeName := pi.GetPod().Spec.NodeName
 			if !slices.Contains(victimsByNode[nodeName], pv) {
 				victimsByNode[nodeName] = append(victimsByNode[nodeName], pv)
