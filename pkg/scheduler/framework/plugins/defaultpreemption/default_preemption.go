@@ -105,6 +105,7 @@ var _ fwk.PodGroupPostFilterPlugin = &DefaultPreemption{}
 var _ fwk.PreScorePlugin = &DefaultPreemption{}
 var _ fwk.ScorePlugin = &DefaultPreemption{}
 var _ fwk.ReservePlugin = &DefaultPreemption{}
+var _ fwk.SignPlugin = &DefaultPreemption{}
 
 // SetName overrides the plugin name reported by Name(). Used by test harnesses that
 // register DefaultPreemption under an out-of-tree plugin name.
@@ -665,22 +666,46 @@ func (pl *DefaultPreemption) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
+// SignPod returns nil fragments because DefaultPreemption only scores nodes during
+// Workload-Aware Preemption (when opportunistic batching is bypassed) and skips PreScore
+// during normal scheduling cycles.
+func (pl *DefaultPreemption) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return nil, nil
+}
+
 // Reserve records newly condemned victims when a pod in a PodGroup is tentatively assumed on nodeName.
 func (pl *DefaultPreemption) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	preemptionState := preemption.PodGroupPreemptionStateFromContext(ctx)
 	if preemptionState == nil {
 		return nil
 	}
-	c, err := state.Read(preScoreStateKey)
-	if err != nil {
-		return nil
+	var s *preemptionScoreState
+	var victims []fwk.PreemptionVictim
+	if c, err := state.Read(preScoreStateKey); err == nil {
+		if ps, ok := c.(*preemptionScoreState); ok {
+			s = ps
+			victims = s.deltaVictims[nodeName]
+		}
+	} else {
+		// PreScore is skipped when len(feasibleNodes) == 1. Compute delta victims on nodeName directly.
+		surviving := preemptionState.SurvivingVictimsOnNode(nodeName)
+		if len(surviving) > 0 {
+			if nodeInfo, err := pl.fh.SnapshotSharedLister().NodeInfos().Get(nodeName); err == nil {
+				// AssumeAndReserveInSnapshot has already assumed pod onto nodeInfo before calling Reserve;
+				// clone nodeInfo and remove pod so fitsWithAllSurvivingVictims / computeDeltaVictimsOnNode
+				// do not double-count pod.
+				nodeInfoClone := nodeInfo.Snapshot()
+				_ = nodeInfoClone.RemovePod(klog.FromContext(ctx), pod)
+				fits, err := pl.fitsWithAllSurvivingVictims(ctx, state, pod, nodeInfoClone, surviving)
+				if err == nil && !fits {
+					victims, _, _ = pl.computeDeltaVictimsOnNode(ctx, state, pod, nodeInfoClone, surviving)
+				}
+			}
+		}
+		s = &preemptionScoreState{}
+		state.Write(preScoreStateKey, s)
 	}
-	s, ok := c.(*preemptionScoreState)
-	if !ok {
-		return nil
-	}
-	victims := s.deltaVictims[nodeName]
-	if len(victims) > 0 {
+	if s != nil && len(victims) > 0 {
 		s.condemnedByPod = victims
 		preemptionState.AddCondemned(victims)
 	}
