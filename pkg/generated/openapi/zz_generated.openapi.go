@@ -12737,7 +12737,7 @@ func schema_k8sio_api_authorization_v1_AuthorizationOptions(ref common.Reference
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "handledDecisionTypes specifies what decision types the client can handle in the context it is in. Currently valid values are: - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or - [Allow, Deny, NoOpinion, ConditionsMap, Union] (for conditions-aware clients) If the authorizer would like to return conditions, but the client does not opt in to handle those here,\n  the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()\n  (Deny if any Deny conditions were present, otherwise NoOpinion).\nOrder does not matter in this slice; set semantics should be used. The server should not reject unrecognized decision types (hence the k8s:opaqueType), but focus on whether the client supports a mode that the server does. All clients must support \"classic\", conditions-unaware authorization.",
+							Description: "handledDecisionTypes specifies what decision types the client can handle in the context it is in. Currently valid values are: - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or - [Allow, Deny, NoOpinion, ConditionsMap, Union, ...] (for conditions-aware clients) If the authorizer would like to return conditions, but the client does not opt in to handle those here,\n  the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()\n  (Deny if any Deny conditions were present, otherwise NoOpinion).\nOrder does not matter in this slice; set semantics should be used. The server should not reject unrecognized decision types (hence the k8s:opaqueType), but focus on whether the client supports a mode that the server does. All clients must support \"classic\", conditions-unaware authorization.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -12780,7 +12780,7 @@ func schema_k8sio_api_authorization_v1_Condition(ref common.ReferenceCallback) c
 					},
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "type describes the type of the condition, if there are multiple possibilities. Should be formatted as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use. Optional. Can be omitted if the authorizer already knows how to evaluate the condition.",
+							Description: "type describes the type of the condition, if there are multiple possibilities. Should be formatted as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use. authorizer.kubernetes.io/cel is a conditions type for CEL, handled by kube-apiserver. Optional. Can be omitted if the authorizer already knows how to evaluate the condition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -12848,7 +12848,7 @@ func schema_k8sio_api_authorization_v1_ConditionsAwareDecision(ref common.Refere
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "union forms an ordered tree of decisions, where the union decision is represented by an internal node, and all other decision types are leaf nodes. During evaluation, the leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found. The order of the decisions must match exactly the order of the authorizers in the union authorizer. At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially reduced to just a single Allow/Deny/NoOpinion.\n\nMust have at least one element when type == \"Union\", otherwise this field must be unset.",
+							Description: "union forms an ordered tree of decisions, where the union decision is represented by an internal node, and all other decision types are leaf nodes. During evaluation, the leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found. The order of the decisions should match the order of the authorizers in the union authorizer for interpretability, but the authorizerName is the map key. At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially reduced to just a single Allow/Deny/NoOpinion.\n\nMust have at least one element when type == \"Union\", otherwise this field must be unset.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -13423,7 +13423,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref common.Re
 					},
 					"authorizationOptions": {
 						SchemaProps: spec.SchemaProps{
-							Description: "authorizationOptions contains options for specifying the client's authorization abilities. Requires the ConditionalAuthorization feature to be enabled.",
+							Description: "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compability. Requires the ConditionalAuthorization feature to be enabled.",
 							Ref:         ref(authorizationv1.AuthorizationOptions{}.OpenAPIModelName()),
 						},
 					},
@@ -13634,7 +13634,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 					},
 					"authorizationOptions": {
 						SchemaProps: spec.SchemaProps{
-							Description: "authorizationOptions contains options for specifying the client's authorization abilities. Requires the ConditionalAuthorization feature to be enabled.",
+							Description: "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compability. Requires the ConditionalAuthorization feature to be enabled.",
 							Ref:         ref(authorizationv1.AuthorizationOptions{}.OpenAPIModelName()),
 						},
 					},
@@ -13684,7 +13684,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 					},
 					"conditionalDecision": {
 						SchemaProps: spec.SchemaProps{
-							Description: "conditionalDecision represents a conditional decision returned by the authorizer. Mutually exclusive with allowed=true and denied=true. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.conditionalAuthorization is non-null. Requires the ConditionalAuthorization feature to be enabled.",
+							Description: "conditionalDecision represents a conditional decision returned by the authorizer. Mutually exclusive with allowed=true and denied=true. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.authorizationOptions.handledDecisionTypes includes `ConditionsMap` and `Union`. Requires the ConditionalAuthorization feature to be enabled.",
 							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
 						},
 					},
@@ -13810,7 +13810,7 @@ func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsRequest(ref 
 						},
 					},
 				},
-				Required: []string{"decision"},
+				Required: []string{"decision", "admissionRequest"},
 			},
 		},
 		Dependencies: []string{
@@ -13835,7 +13835,7 @@ func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsResponse(ref
 					},
 					"decision": {
 						SchemaProps: spec.SchemaProps{
-							Description: "decision contains the authorizer's decision after seeing the data.",
+							Description: "decision contains the authorizer's decision after seeing the data. Currently, this must return an unconditional decision, that is, one of {Allow, Deny, NoOpinion}.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
 						},

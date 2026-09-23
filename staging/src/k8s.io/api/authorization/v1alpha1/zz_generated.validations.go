@@ -33,23 +33,11 @@ import (
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-var unionMembershipFor_k8s_io_api_authorization_v1alpha1_AuthorizationConditionsRequest_ = validate.NewUnionMembership(validate.NewUnionMember("admissionRequest"))
-
 // Validate_AuthorizationConditionsRequest validates an instance of AuthorizationConditionsRequest according
 // to declarative validation rules in the API schema.
 func Validate_AuthorizationConditionsRequest(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *AuthorizationConditionsRequest) (errs field.ErrorList) {
-
-	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_authorization_v1alpha1_AuthorizationConditionsRequest_,
-		func(obj *AuthorizationConditionsRequest) bool {
-			if obj == nil {
-				return false
-			}
-			return obj.AdmissionRequest != nil
-		}); len(e) != 0 {
-		errs = append(errs, e...)
-	}
 
 	{ // field AuthorizationConditionsRequest.Decision
 		fn := func(
@@ -86,7 +74,8 @@ func Validate_AuthorizationConditionsRequest(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {

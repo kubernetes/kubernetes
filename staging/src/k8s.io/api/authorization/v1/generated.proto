@@ -33,7 +33,7 @@ message AuthorizationOptions {
   // handledDecisionTypes specifies what decision types the client can handle in the context it is in.
   // Currently valid values are:
   // - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or
-  // - [Allow, Deny, NoOpinion, ConditionsMap, Union] (for conditions-aware clients)
+  // - [Allow, Deny, NoOpinion, ConditionsMap, Union, ...] (for conditions-aware clients)
   // If the authorizer would like to return conditions, but the client does not opt in to handle those here,
   //   the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()
   //   (Deny if any Deny conditions were present, otherwise NoOpinion).
@@ -45,6 +45,7 @@ message AuthorizationOptions {
   // +k8s:required
   // +required
   // +k8s:eachVal=+k8s:opaqueType
+  // +k8s:maxItems=32
   repeated string handledDecisionTypes = 1;
 }
 
@@ -55,7 +56,7 @@ message Condition {
   // that authored it and ConditionsMap it is part of. Validated as a Kubernetes label key.
   // Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
   // +k8s:required
-  // +k8s:format=k8s-label-key
+  // +k8s:format=k8s-prefixed-label-key
   // +required
   optional string id = 1;
 
@@ -63,7 +64,7 @@ message Condition {
   // It is a pure, deterministic function from ConditionsData to a boolean (or error).
   // Might or might not be human-readable.
   // Optional, if the ID alone is enough for the authorizer to know how to evaluate the condition.
-  // +k8s:beta=+k8s:maxBytes=10240
+  // +k8s:maxBytes=10240
   // +k8s:optional
   // +optional
   optional string condition = 2;
@@ -71,15 +72,16 @@ message Condition {
   // type describes the type of the condition, if there are multiple possibilities.
   // Should be formatted as a Kubernetes label key.
   // Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
+  // authorizer.kubernetes.io/cel is a conditions type for CEL, handled by kube-apiserver.
   // Optional. Can be omitted if the authorizer already knows how to evaluate the condition.
-  // +k8s:format=k8s-label-key
+  // +k8s:format=k8s-prefixed-label-key
   // +k8s:optional
   // +optional
   optional string type = 3;
 
   // description is an optional human-friendly description that can be shown
   // as an error message or for debugging. Optional.
-  // +k8s:beta=+k8s:maxBytes=1024
+  // +k8s:maxBytes=1024
   // +k8s:optional
   // +optional
   optional string description = 4;
@@ -89,7 +91,7 @@ message Condition {
 // with variants described in ConditionsAwareDecisionType, plus a reason and error.
 message ConditionsAwareDecision {
   // type describes the type of the decision, and acts as an enum discriminator.
-  // +k8s:beta=+k8s:unionDiscriminator
+  // +k8s:unionDiscriminator
   // +k8s:required
   // +required
   optional string type = 1;
@@ -125,7 +127,8 @@ message ConditionsAwareDecision {
   // union forms an ordered tree of decisions, where the union decision is represented by
   // an internal node, and all other decision types are leaf nodes. During evaluation, the
   // leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found.
-  // The order of the decisions must match exactly the order of the authorizers in the union authorizer.
+  // The order of the decisions should match the order of the authorizers in the union authorizer
+  // for interpretability, but the authorizerName is the map key.
   // At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially
   // reduced to just a single Allow/Deny/NoOpinion.
   //
@@ -411,10 +414,11 @@ message SelfSubjectAccessReviewSpec {
   optional NonResourceAttributes nonResourceAttributes = 2;
 
   // authorizationOptions contains options for specifying the client's authorization abilities.
+  // If unset, only unconditional authorization is supported, for backwards-compability.
   // Requires the ConditionalAuthorization feature to be enabled.
   // +optional
-  // +k8s:optional
   // +featureGate=ConditionalAuthorization
+  // +k8s:ifEnabled("ConditionalAuthorization")=+k8s:optional
   // +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
   optional AuthorizationOptions authorizationOptions = 3;
 }
@@ -502,10 +506,11 @@ message SubjectAccessReviewSpec {
   optional string uid = 6;
 
   // authorizationOptions contains options for specifying the client's authorization abilities.
+  // If unset, only unconditional authorization is supported, for backwards-compability.
   // Requires the ConditionalAuthorization feature to be enabled.
   // +optional
-  // +k8s:optional
   // +featureGate=ConditionalAuthorization
+  // +k8s:ifEnabled("ConditionalAuthorization")=+k8s:optional
   // +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
   optional AuthorizationOptions authorizationOptions = 7;
 }
@@ -539,11 +544,11 @@ message SubjectAccessReviewStatus {
   // The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or
   // ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented
   // with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone.
-  // May only be set if spec.conditionalAuthorization is non-null.
+  // May only be set if spec.authorizationOptions.handledDecisionTypes includes `ConditionsMap` and `Union`.
   // Requires the ConditionalAuthorization feature to be enabled.
   // +optional
-  // +k8s:optional
   // +featureGate=ConditionalAuthorization
+  // +k8s:ifEnabled("ConditionalAuthorization")=+k8s:optional
   // +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
   optional ConditionsAwareDecision conditionalDecision = 5;
 }

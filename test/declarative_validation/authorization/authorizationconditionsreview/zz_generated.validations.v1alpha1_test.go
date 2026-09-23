@@ -30,8 +30,8 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "authorization.k8s.io", Version: "v1alpha1", Kind: "AuthorizationConditionsReview"},
 		coverage.FieldRules{
-			"request": {
-				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			"request.admissionRequest": {
+				{ErrorType: "FieldValueRequired"},
 			},
 			"request.decision.conditionsMap.allowConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -46,11 +46,11 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"request.decision.conditionsMap.allowConditions[*].id": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"request.decision.conditionsMap.allowConditions[*].type": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 			},
 			"request.decision.conditionsMap.denyConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -65,11 +65,11 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"request.decision.conditionsMap.denyConditions[*].id": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"request.decision.conditionsMap.denyConditions[*].type": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 			},
 			"request.decision.conditionsMap.noOpinionConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -84,11 +84,11 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"request.decision.conditionsMap.noOpinionConditions[*].id": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"request.decision.conditionsMap.noOpinionConditions[*].type": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 			},
 			"request.decision.type": {
 				{ErrorType: "FieldValueNotSupported"},
@@ -114,11 +114,11 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"response.decision.conditionsMap.allowConditions[*].id": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"response.decision.conditionsMap.allowConditions[*].type": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 			},
 			"response.decision.conditionsMap.denyConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -133,11 +133,11 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"response.decision.conditionsMap.denyConditions[*].id": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"response.decision.conditionsMap.denyConditions[*].type": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 			},
 			"response.decision.conditionsMap.noOpinionConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -152,11 +152,11 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"response.decision.conditionsMap.noOpinionConditions[*].id": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"response.decision.conditionsMap.noOpinionConditions[*].type": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 			},
 			"response.decision.type": {
 				{ErrorType: "FieldValueNotSupported"},

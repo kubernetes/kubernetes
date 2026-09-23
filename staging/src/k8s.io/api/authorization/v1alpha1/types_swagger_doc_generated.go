@@ -40,7 +40,7 @@ func (AuthorizationConditionsRequest) SwaggerDoc() map[string]string {
 var map_AuthorizationConditionsResponse = map[string]string{
 	"":         "AuthorizationConditionsResponse describes an authorization conditions response.",
 	"uid":      "uid is an identifier for the individual request/response. This must be copied over from the corresponding AuthorizationConditionsRequest. It is possible that the same request content (except uid) is sent to the authorizer multiple times.",
-	"decision": "decision contains the authorizer's decision after seeing the data.",
+	"decision": "decision contains the authorizer's decision after seeing the data. Currently, this must return an unconditional decision, that is, one of {Allow, Deny, NoOpinion}.",
 }
 
 func (AuthorizationConditionsResponse) SwaggerDoc() map[string]string {

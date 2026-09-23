@@ -38,6 +38,7 @@ func init() {
 			},
 			"spec.authorizationOptions.handledDecisionTypes": {
 				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
 			"spec.authorizationOptions.handledDecisionTypes[*]": {
 				{ErrorType: "FieldValueDuplicate"},
@@ -58,11 +59,11 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"status.conditionalDecision.conditionsMap.allowConditions[*].id": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.conditionalDecision.conditionsMap.allowConditions[*].type": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 			},
 			"status.conditionalDecision.conditionsMap.denyConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -77,11 +78,11 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"status.conditionalDecision.conditionsMap.denyConditions[*].id": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.conditionalDecision.conditionsMap.denyConditions[*].type": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 			},
 			"status.conditionalDecision.conditionsMap.noOpinionConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -96,11 +97,11 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"status.conditionalDecision.conditionsMap.noOpinionConditions[*].id": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.conditionalDecision.conditionsMap.noOpinionConditions[*].type": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
 			},
 			"status.conditionalDecision.type": {
 				{ErrorType: "FieldValueNotSupported"},

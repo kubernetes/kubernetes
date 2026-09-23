@@ -29,7 +29,7 @@ package v1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AuthorizationOptions = map[string]string{
 	"":                     "AuthorizationOptions contains options for specifying the client's authorization abilities.",
-	"handledDecisionTypes": "handledDecisionTypes specifies what decision types the client can handle in the context it is in. Currently valid values are: - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or - [Allow, Deny, NoOpinion, ConditionsMap, Union] (for conditions-aware clients) If the authorizer would like to return conditions, but the client does not opt in to handle those here,\n  the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()\n  (Deny if any Deny conditions were present, otherwise NoOpinion).\nOrder does not matter in this slice; set semantics should be used. The server should not reject unrecognized decision types (hence the k8s:opaqueType), but focus on whether the client supports a mode that the server does. All clients must support \"classic\", conditions-unaware authorization.",
+	"handledDecisionTypes": "handledDecisionTypes specifies what decision types the client can handle in the context it is in. Currently valid values are: - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or - [Allow, Deny, NoOpinion, ConditionsMap, Union, ...] (for conditions-aware clients) If the authorizer would like to return conditions, but the client does not opt in to handle those here,\n  the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()\n  (Deny if any Deny conditions were present, otherwise NoOpinion).\nOrder does not matter in this slice; set semantics should be used. The server should not reject unrecognized decision types (hence the k8s:opaqueType), but focus on whether the client supports a mode that the server does. All clients must support \"classic\", conditions-unaware authorization.",
 }
 
 func (AuthorizationOptions) SwaggerDoc() map[string]string {
@@ -40,7 +40,7 @@ var map_Condition = map[string]string{
 	"":            "Condition represents a single authorization condition to be evaluated against data available later in the request chain, e.g. objects available in admission.",
 	"id":          "id uniquely identifies this condition within the scope of the authorizer that authored it and ConditionsMap it is part of. Validated as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.",
 	"condition":   "condition returns a string encoding of the condition to be evaluated. It is a pure, deterministic function from ConditionsData to a boolean (or error). Might or might not be human-readable. Optional, if the ID alone is enough for the authorizer to know how to evaluate the condition.",
-	"type":        "type describes the type of the condition, if there are multiple possibilities. Should be formatted as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use. Optional. Can be omitted if the authorizer already knows how to evaluate the condition.",
+	"type":        "type describes the type of the condition, if there are multiple possibilities. Should be formatted as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use. authorizer.kubernetes.io/cel is a conditions type for CEL, handled by kube-apiserver. Optional. Can be omitted if the authorizer already knows how to evaluate the condition.",
 	"description": "description is an optional human-friendly description that can be shown as an error message or for debugging. Optional.",
 }
 
@@ -55,7 +55,7 @@ var map_ConditionsAwareDecision = map[string]string{
 	"noOpinion":     "noOpinion represents an unconditional NoOpinion decision. Must be non-null when type == \"NoOpinion\", otherwise this field must be unset.",
 	"allow":         "allow represents an unconditional Allow decision. Must be non-null when type == \"Allow\", otherwise this field must be unset.",
 	"conditionsMap": "conditionsMap represents a conditional decision, modelled as a map of conditions. Must be non-null when type == \"ConditionsMap\", otherwise this field must be unset.",
-	"union":         "union forms an ordered tree of decisions, where the union decision is represented by an internal node, and all other decision types are leaf nodes. During evaluation, the leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found. The order of the decisions must match exactly the order of the authorizers in the union authorizer. At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially reduced to just a single Allow/Deny/NoOpinion.\n\nMust have at least one element when type == \"Union\", otherwise this field must be unset.",
+	"union":         "union forms an ordered tree of decisions, where the union decision is represented by an internal node, and all other decision types are leaf nodes. During evaluation, the leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found. The order of the decisions should match the order of the authorizers in the union authorizer for interpretability, but the authorizerName is the map key. At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially reduced to just a single Allow/Deny/NoOpinion.\n\nMust have at least one element when type == \"Union\", otherwise this field must be unset.",
 }
 
 func (ConditionsAwareDecision) SwaggerDoc() map[string]string {
@@ -178,7 +178,7 @@ var map_SelfSubjectAccessReviewSpec = map[string]string{
 	"":                      "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of resourceAttributes and nonResourceAttributes must be set",
 	"resourceAttributes":    "resourceAttributes describes information for a resource access request",
 	"nonResourceAttributes": "nonResourceAttributes describes information for a non-resource access request",
-	"authorizationOptions":  "authorizationOptions contains options for specifying the client's authorization abilities. Requires the ConditionalAuthorization feature to be enabled.",
+	"authorizationOptions":  "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compability. Requires the ConditionalAuthorization feature to be enabled.",
 }
 
 func (SelfSubjectAccessReviewSpec) SwaggerDoc() map[string]string {
@@ -224,7 +224,7 @@ var map_SubjectAccessReviewSpec = map[string]string{
 	"groups":                "groups is the groups you're testing for.",
 	"extra":                 "extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
 	"uid":                   "uid information about the requesting user.",
-	"authorizationOptions":  "authorizationOptions contains options for specifying the client's authorization abilities. Requires the ConditionalAuthorization feature to be enabled.",
+	"authorizationOptions":  "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compability. Requires the ConditionalAuthorization feature to be enabled.",
 }
 
 func (SubjectAccessReviewSpec) SwaggerDoc() map[string]string {
@@ -237,7 +237,7 @@ var map_SubjectAccessReviewStatus = map[string]string{
 	"denied":              "denied is optional. True if the action would be denied, otherwise false If allowed is false, denied is false, and conditionalDecision is unset, then the authorizer has no opinion on whether to authorize the action. denied=true is mutually exclusive with allowed=true and conditionalDecision != nil.",
 	"reason":              "reason is optional.  It indicates why a request was allowed or denied.",
 	"evaluationError":     "evaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
-	"conditionalDecision": "conditionalDecision represents a conditional decision returned by the authorizer. Mutually exclusive with allowed=true and denied=true. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.conditionalAuthorization is non-null. Requires the ConditionalAuthorization feature to be enabled.",
+	"conditionalDecision": "conditionalDecision represents a conditional decision returned by the authorizer. Mutually exclusive with allowed=true and denied=true. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.authorizationOptions.handledDecisionTypes includes `ConditionsMap` and `Union`. Requires the ConditionalAuthorization feature to be enabled.",
 }
 
 func (SubjectAccessReviewStatus) SwaggerDoc() map[string]string {
