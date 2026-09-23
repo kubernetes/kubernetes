@@ -77,9 +77,12 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 		},
 		NotBefore:             notBefore,
 		NotAfter:              now.Add(duration365d * 10).UTC(),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
+	}
+	if _, ok := key.Public().(*rsa.PublicKey); ok {
+		tmpl.KeyUsage |= x509.KeyUsageKeyEncipherment
 	}
 	if len(cfg.CommonName) > 0 {
 		tmpl.DNSNames = []string{cfg.CommonName}
@@ -170,6 +173,9 @@ func GenerateSelfSignedCertKeyWithOptions(opts SelfSignedCertKeyOptions) ([]byte
 		maxAge = 100 * time.Hour * 24 * 365 // 100 years fixtures
 	}
 
+	// If the key algorithm changes (and it doesn't support key encipherment)
+	// KeyUsageKeyEncipherment should be removed from the CA and serving
+	// certificate templates
 	caKey, err := rsa.GenerateKey(cryptorand.Reader, 2048)
 	if err != nil {
 		return nil, nil, err
