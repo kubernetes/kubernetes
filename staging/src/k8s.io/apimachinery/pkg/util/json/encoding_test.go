@@ -31,6 +31,11 @@ func (*pointerMarshaler) MarshalJSON() ([]byte, error) {
 	return []byte(`"custom"`), nil
 }
 
+// requireStandardEncoder keeps the concrete return type check explicit without relying on a redundant declaration.
+func requireStandardEncoder(encoder *gojson.Encoder) *gojson.Encoder {
+	return encoder
+}
+
 // TestMarshalLegacyCompatibility compares v2 legacy-mode output and error types
 // for collection states, tags, deterministic values, raw and custom marshalers,
 // addressability-sensitive methods, and invalid inputs.
@@ -97,8 +102,7 @@ func TestNewEncoderCompatibility(t *testing.T) {
 	for _, indent := range []bool{false, true} {
 		for _, escapeHTML := range []bool{false, true} {
 			var got, want bytes.Buffer
-			// Preserve compatibility with callers that name the concrete return type.
-			var encoder *gojson.Encoder = NewEncoder(&got)
+			encoder := requireStandardEncoder(NewEncoder(&got))
 			reference := gojson.NewEncoder(&want)
 			encoder.SetEscapeHTML(escapeHTML)
 			reference.SetEscapeHTML(escapeHTML)
