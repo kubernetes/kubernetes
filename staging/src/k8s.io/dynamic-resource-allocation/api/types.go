@@ -17,10 +17,34 @@ limitations under the License.
 package api
 
 import (
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// FullyQualifiedName is a fully-qualified name (i.e. domain is non-empty) with both parts already split apart.
+//
+// +k8s:conversion-gen=false
+type FullyQualifiedName struct {
+	Domain     string
+	Identifier string
+}
+
+func (n FullyQualifiedName) String() string {
+	return n.Domain + "/" + n.Identifier
+}
+
+// MakeFullyQualifiedName creates a [FullyQualifiedName] from a [resourceapi.QualifiedName].
+// The name may or may not have an explicit domain; if it doesn't, the default domain is used.
+func MakeFullyQualifiedName(name resourceapi.QualifiedName, defaultDomain string) FullyQualifiedName {
+	domain, identifier, hasDomain := strings.Cut(string(name), "/")
+	if !hasDomain {
+		return FullyQualifiedName{Domain: defaultDomain, Identifier: string(name)}
+	}
+	return FullyQualifiedName{Domain: domain, Identifier: identifier}
+}
 
 // JSON tags exist to make the output more readable (klog, diff.Diff).
 // They are intentionally not compatible with the normal encoding

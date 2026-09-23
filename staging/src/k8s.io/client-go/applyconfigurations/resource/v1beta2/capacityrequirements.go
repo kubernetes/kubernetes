@@ -36,6 +36,17 @@ type CapacityRequirementsApplyConfiguration struct {
 	// `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`.
 	// For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.
 	//
+	// The domain prefix can be omitted, in which case it defaults to the driver of the
+	// device under evaluation. For example, "bandwidth: 1Gi" is equivalent to
+	// "<driver>/bandwidth: 1Gi" for a device published by driver "<driver>", regardless of
+	// which other, differently-domained "bandwidth" capacities that device might also have.
+	// To request one of those, the domain must be given explicitly, for example
+	// "example.com/bandwidth". Requesting the same driver capacity with and without
+	// the driver name as domain, for example "bandwidth: 1Gi" and "<driver>/bandwidth: 2Gi", is
+	// ambiguous and causes scheduling to fail with an error. For the sake of consistency
+	// there's no exception for such a conflict where the value is the same - that is still
+	// an error.
+	//
 	// When a requestPolicy is defined, the requested amount is adjusted upward
 	// to the nearest valid value based on the policy.
 	// If the requested amount cannot be adjusted to a valid value—because it exceeds what the requestPolicy allows—
