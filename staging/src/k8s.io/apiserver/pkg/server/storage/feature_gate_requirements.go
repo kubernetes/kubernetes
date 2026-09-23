@@ -25,12 +25,49 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
 
+// APIRequirement is the set of GroupResources a feature gate has required since Version.
+//
+// Version records when the gate started to need Resources. Whether a resource exists at
+// the emulation version is decided by its API lifecycle tags when the server installs it.
+type APIRequirement struct {
+	Version   *version.Version
+	Resources []schema.GroupResource
+}
+
+// VersionedAPIRequirements lists the gate requirements in ascending Version order. The
+// entry with the highest Version at or below the emulation version applies.
+type VersionedAPIRequirements []APIRequirement
+
+// atVersion returns the resources that apply at emulationVersion.
+func (v VersionedAPIRequirements) atVersion(emulationVersion *version.Version) []schema.GroupResource {
+	for i := len(v) - 1; i >= 0; i-- {
+		if v[i].Version.GreaterThan(emulationVersion) {
+			continue
+		}
+		return v[i].Resources
+	}
+	return nil
+}
+
 // FeatureGateAPIRequirements declares the GroupResources that must be served per feature
 // gate. A gate requires its resources, and a resource requires every gate it is listed under.
-type FeatureGateAPIRequirements map[featuregate.Feature][]schema.GroupResource
+type FeatureGateAPIRequirements map[featuregate.Feature]VersionedAPIRequirements
+
+// AtVersion resolves the requirements that apply at emulationVersion. Gates whose entries all
+// start after emulationVersion are omitted.
+func (r FeatureGateAPIRequirements) AtVersion(emulationVersion *version.Version) map[featuregate.Feature][]schema.GroupResource {
+	ret := map[featuregate.Feature][]schema.GroupResource{}
+	for feature, versioned := range r {
+		if resources := versioned.atVersion(emulationVersion); resources != nil {
+			ret[feature] = resources
+		}
+	}
+	return ret
+}
 
 // explicitFeatureGate is satisfied by featuregate.MutableVersionedFeatureGate, which is what
 // the ComponentGlobalsRegistry hands out and what utilfeature.DefaultFeatureGate is.
@@ -46,21 +83,33 @@ func explicitlyEnabled(gate featuregate.FeatureGate, feature featuregate.Feature
 	return ok && explicit.ExplicitlySet(feature) && gate.Enabled(feature)
 }
 
-// Validate checks every enabled feature gate against the resources that are served.
-func (r FeatureGateAPIRequirements) Validate(gate featuregate.FeatureGate, served sets.Set[schema.GroupResource]) (warnings []string, err error) {
+// Validate checks every enabled feature gate against the resources that are served at
+// emulationVersion.
+func (r FeatureGateAPIRequirements) Validate(gate featuregate.FeatureGate, emulationVersion *version.Version,
+	served, unavailable sets.Set[schema.GroupResource]) (warnings []string, err error) {
 	var errs []error
+	resolved := r.AtVersion(emulationVersion)
 
 	// Sorted so a misconfiguration touching several gates reports them in a stable order.
-	for _, feature := range slices.Sorted(maps.Keys(r)) {
+	for _, feature := range slices.Sorted(maps.Keys(resolved)) {
 		if !gate.Enabled(feature) {
 			continue
 		}
 
-		var missing []string
-		for _, gr := range r[feature] {
-			if !served.Has(gr) {
+		var missing, notApplicable []string
+		for _, gr := range resolved[feature] {
+			switch {
+			case served.Has(gr):
+			case unavailable.Has(gr):
+				notApplicable = append(notApplicable, gr.String())
+			default:
 				missing = append(missing, gr.String())
 			}
+		}
+
+		if len(notApplicable) > 0 {
+			warnings = append(warnings, fmt.Sprintf("feature gate %s is enabled, but requires API resources that are not available at emulation version %s: %s; the feature is inactive until the emulation version is raised",
+				feature, emulationVersion, strings.Join(notApplicable, ", ")))
 		}
 		if len(missing) == 0 {
 			continue
@@ -78,13 +127,14 @@ func (r FeatureGateAPIRequirements) Validate(gate featuregate.FeatureGate, serve
 	return warnings, utilerrors.NewAggregate(errs)
 }
 
-// gatesByResource maps each resource to the gates that list it, the reverse of the
-// declaration. A resource listed under several gates requires all of them, matching the
-// conjunction the storage providers use to guard it.
-func (r FeatureGateAPIRequirements) gatesByResource() map[schema.GroupResource][]featuregate.Feature {
+// gatesByResource maps each resource to the gates that list it at emulationVersion of the
+// reverse of the declaration. A resource listed under several gates requires all of them,
+// matching the conjunction the storage providers use to guard it.
+func (r FeatureGateAPIRequirements) gatesByResource(emulationVersion *version.Version) map[schema.GroupResource][]featuregate.Feature {
+	resolved := r.AtVersion(emulationVersion)
 	ret := map[schema.GroupResource][]featuregate.Feature{}
-	for _, feature := range slices.Sorted(maps.Keys(r)) {
-		for _, gr := range r[feature] {
+	for _, feature := range slices.Sorted(maps.Keys(resolved)) {
+		for _, gr := range resolved[feature] {
 			ret[gr] = append(ret[gr], feature)
 		}
 	}
@@ -93,11 +143,11 @@ func (r FeatureGateAPIRequirements) gatesByResource() map[schema.GroupResource][
 
 // ValidateExplicitlyEnabledAPIs reports every required API resource that was explicitly
 // enabled by name with --runtime-config (group/version/resource=true) while a feature gate it
-// requires is disabled. The storage providers skip such a resource, so the explicit request
-// could never be honoured.
-func (r FeatureGateAPIRequirements) ValidateExplicitlyEnabledAPIs(gate featuregate.FeatureGate,
+// requires at emulationVersion is disabled. The storage providers skip such a resource, so the
+// explicit request could never be honoured.
+func (r FeatureGateAPIRequirements) ValidateExplicitlyEnabledAPIs(gate featuregate.FeatureGate, emulationVersion *version.Version,
 	cfg APIResourceConfigSource, registered sets.Set[schema.GroupVersionResource]) error {
-	byResource := r.gatesByResource()
+	byResource := r.gatesByResource(emulationVersion)
 
 	type request struct {
 		keys     sets.Set[string]

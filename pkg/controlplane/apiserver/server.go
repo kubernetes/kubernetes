@@ -90,6 +90,10 @@ type Server struct {
 	// servedResources is populated by InstallAPIs with the resources that survived
 	// runtime-config, feature gate, emulation version and API lifecycle filtering.
 	servedResources sets.Set[schema.GroupResource]
+	// unavailableResources is populated by InstallAPIs with the resources that passed
+	// runtime-config and feature gate filtering but were removed by API lifecycle because
+	// they do not exist at the emulation version.
+	unavailableResources sets.Set[schema.GroupResource]
 	// registeredResources is populated by InstallAPIs with every resource the storage
 	// providers know how to serve, before any of that filtering.
 	registeredResources sets.Set[schema.GroupVersionResource]

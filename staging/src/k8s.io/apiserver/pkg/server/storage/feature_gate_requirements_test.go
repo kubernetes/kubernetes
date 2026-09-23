@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -30,6 +31,13 @@ const (
 	featureA         featuregate.Feature = "FeatureA"
 	featureB         featuregate.Feature = "FeatureB"
 	featureDefaultOn featuregate.Feature = "FeatureDefaultOn"
+)
+
+var (
+	olderVersion  = version.MajorMinor(1, 1)
+	middleVersion = version.MajorMinor(1, 2)
+	newerVersion  = version.MajorMinor(1, 3)
+	latestVersion = version.MajorMinor(1, 4)
 )
 
 func newTestGate(t *testing.T, set ...string) featuregate.MutableVersionedFeatureGate {
@@ -50,10 +58,88 @@ func newTestGate(t *testing.T, set ...string) featuregate.MutableVersionedFeatur
 	return gate
 }
 
+func since(v *version.Version, resources ...schema.GroupResource) VersionedAPIRequirements {
+	return VersionedAPIRequirements{{Version: v, Resources: resources}}
+}
+
 // gateWithoutExplicitness hides ExplicitlySet, standing in for a FeatureGate implementation
 // that cannot tell an explicit setting from a default.
 type gateWithoutExplicitness struct {
 	featuregate.FeatureGate
+}
+
+func TestFeatureGateAPIRequirementsAtVersion(t *testing.T) {
+	var (
+		firstResource  = schema.GroupResource{Group: "one", Resource: "first"}
+		secondResource = schema.GroupResource{Group: "one", Resource: "second"}
+	)
+
+	tests := []struct {
+		name             string
+		requirements     FeatureGateAPIRequirements
+		emulationVersion *version.Version
+		want             map[featuregate.Feature][]schema.GroupResource
+	}{
+		{
+			name:             "no requirements",
+			requirements:     FeatureGateAPIRequirements{},
+			emulationVersion: middleVersion,
+			want:             map[featuregate.Feature][]schema.GroupResource{},
+		},
+		{
+			name:             "entry at the emulation version applies",
+			requirements:     FeatureGateAPIRequirements{featureA: since(middleVersion, firstResource)},
+			emulationVersion: middleVersion,
+			want:             map[featuregate.Feature][]schema.GroupResource{featureA: {firstResource}},
+		},
+		{
+			name:             "entry before the emulation version applies",
+			requirements:     FeatureGateAPIRequirements{featureA: since(olderVersion, firstResource)},
+			emulationVersion: newerVersion,
+			want:             map[featuregate.Feature][]schema.GroupResource{featureA: {firstResource}},
+		},
+		{
+			name:             "entry after the emulation version drops the gate",
+			requirements:     FeatureGateAPIRequirements{featureA: since(newerVersion, firstResource)},
+			emulationVersion: middleVersion,
+			want:             map[featuregate.Feature][]schema.GroupResource{},
+		},
+		{
+			name: "highest entry at or below the emulation version wins",
+			requirements: FeatureGateAPIRequirements{featureA: {
+				{Version: olderVersion, Resources: []schema.GroupResource{firstResource}},
+				{Version: newerVersion, Resources: []schema.GroupResource{firstResource, secondResource}},
+			}},
+			emulationVersion: middleVersion,
+			want:             map[featuregate.Feature][]schema.GroupResource{featureA: {firstResource}},
+		},
+		{
+			name: "later entry replaces rather than extends the earlier one",
+			requirements: FeatureGateAPIRequirements{featureA: {
+				{Version: olderVersion, Resources: []schema.GroupResource{firstResource}},
+				{Version: newerVersion, Resources: []schema.GroupResource{secondResource}},
+			}},
+			emulationVersion: latestVersion,
+			want:             map[featuregate.Feature][]schema.GroupResource{featureA: {secondResource}},
+		},
+		{
+			name: "gates resolve independently",
+			requirements: FeatureGateAPIRequirements{
+				featureA: since(olderVersion, firstResource),
+				featureB: since(newerVersion, secondResource),
+			},
+			emulationVersion: middleVersion,
+			want:             map[featuregate.Feature][]schema.GroupResource{featureA: {firstResource}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.requirements.AtVersion(tc.emulationVersion); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("AtVersion(%s) = %v, want %v", tc.emulationVersion, got, tc.want)
+			}
+		})
+	}
 }
 
 func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
@@ -64,14 +150,16 @@ func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
 	)
 
 	tests := []struct {
-		name         string
-		set          []string
-		noExplicit   bool
-		requirements FeatureGateAPIRequirements
-		served       sets.Set[schema.GroupResource]
-		wantErr      bool
-		wantContains []string
-		wantWarnings []string
+		name             string
+		set              []string
+		noExplicit       bool
+		requirements     FeatureGateAPIRequirements
+		emulationVersion *version.Version
+		served           sets.Set[schema.GroupResource]
+		unavailable      sets.Set[schema.GroupResource]
+		wantErr          bool
+		wantContains     []string
+		wantWarnings     []string
 	}{
 		{
 			name:         "no requirements declared",
@@ -81,19 +169,19 @@ func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
 		},
 		{
 			name:         "disabled feature with unserved requirement is ignored",
-			requirements: FeatureGateAPIRequirements{featureA: {firstResource}},
+			requirements: FeatureGateAPIRequirements{featureA: since(olderVersion, firstResource)},
 			served:       sets.New[schema.GroupResource](),
 		},
 		{
 			name:         "explicitly enabled feature with served requirement",
 			set:          []string{"FeatureA=true"},
-			requirements: FeatureGateAPIRequirements{featureA: {firstResource}},
+			requirements: FeatureGateAPIRequirements{featureA: since(olderVersion, firstResource)},
 			served:       sets.New(firstResource),
 		},
 		{
 			name:         "explicitly enabled feature with unserved requirement",
 			set:          []string{"FeatureA=true"},
-			requirements: FeatureGateAPIRequirements{featureA: {firstResource}},
+			requirements: FeatureGateAPIRequirements{featureA: since(olderVersion, firstResource)},
 			served:       sets.New[schema.GroupResource](),
 			wantErr:      true,
 			wantContains: []string{"FeatureA is enabled", "first.one"},
@@ -101,7 +189,7 @@ func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
 		{
 			name:         "explicitly enabled feature reports only the unserved of several requirements",
 			set:          []string{"FeatureA=true"},
-			requirements: FeatureGateAPIRequirements{featureA: {firstResource, secondResource}},
+			requirements: FeatureGateAPIRequirements{featureA: since(olderVersion, firstResource, secondResource)},
 			served:       sets.New(firstResource),
 			wantErr:      true,
 			wantContains: []string{"second.one"},
@@ -109,7 +197,7 @@ func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
 		{
 			name:         "legacy group resource renders without a group suffix",
 			set:          []string{"FeatureA=true"},
-			requirements: FeatureGateAPIRequirements{featureA: {legacyResource}},
+			requirements: FeatureGateAPIRequirements{featureA: since(olderVersion, legacyResource)},
 			served:       sets.New[schema.GroupResource](),
 			wantErr:      true,
 			wantContains: []string{"not served: legacy;"},
@@ -118,8 +206,8 @@ func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
 			name: "only enabled features are checked",
 			set:  []string{"FeatureB=true"},
 			requirements: FeatureGateAPIRequirements{
-				featureA: {firstResource},
-				featureB: {secondResource},
+				featureA: since(olderVersion, firstResource),
+				featureB: since(olderVersion, secondResource),
 			},
 			served: sets.New(secondResource),
 		},
@@ -127,8 +215,8 @@ func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
 			name: "several failing features are all reported",
 			set:  []string{"FeatureA=true", "FeatureB=true"},
 			requirements: FeatureGateAPIRequirements{
-				featureA: {firstResource},
-				featureB: {secondResource},
+				featureA: since(olderVersion, firstResource),
+				featureB: since(olderVersion, secondResource),
 			},
 			served:       sets.New[schema.GroupResource](),
 			wantErr:      true,
@@ -136,19 +224,19 @@ func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
 		},
 		{
 			name:         "feature enabled by default with served requirement",
-			requirements: FeatureGateAPIRequirements{featureDefaultOn: {firstResource}},
+			requirements: FeatureGateAPIRequirements{featureDefaultOn: since(olderVersion, firstResource)},
 			served:       sets.New(firstResource),
 		},
 		{
 			name:         "feature enabled by default with unserved requirement only warns",
-			requirements: FeatureGateAPIRequirements{featureDefaultOn: {firstResource}},
+			requirements: FeatureGateAPIRequirements{featureDefaultOn: since(olderVersion, firstResource)},
 			served:       sets.New[schema.GroupResource](),
 			wantWarnings: []string{"FeatureDefaultOn is enabled by default", "first.one", "inactive"},
 		},
 		{
 			name:         "feature enabled by default and explicitly enabled with unserved requirement fails",
 			set:          []string{"FeatureDefaultOn=true"},
-			requirements: FeatureGateAPIRequirements{featureDefaultOn: {firstResource}},
+			requirements: FeatureGateAPIRequirements{featureDefaultOn: since(olderVersion, firstResource)},
 			served:       sets.New[schema.GroupResource](),
 			wantErr:      true,
 			wantContains: []string{"FeatureDefaultOn is enabled", "first.one"},
@@ -156,15 +244,15 @@ func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
 		{
 			name:         "feature enabled by default but explicitly disabled is ignored",
 			set:          []string{"FeatureDefaultOn=false"},
-			requirements: FeatureGateAPIRequirements{featureDefaultOn: {firstResource}},
+			requirements: FeatureGateAPIRequirements{featureDefaultOn: since(olderVersion, firstResource)},
 			served:       sets.New[schema.GroupResource](),
 		},
 		{
 			name: "explicit failure is an error while default failure is a warning",
 			set:  []string{"FeatureA=true"},
 			requirements: FeatureGateAPIRequirements{
-				featureA:         {firstResource},
-				featureDefaultOn: {secondResource},
+				featureA:         since(olderVersion, firstResource),
+				featureDefaultOn: since(olderVersion, secondResource),
 			},
 			served:       sets.New[schema.GroupResource](),
 			wantErr:      true,
@@ -175,9 +263,70 @@ func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
 			name:         "gate that cannot report explicitness never fails",
 			set:          []string{"FeatureA=true"},
 			noExplicit:   true,
-			requirements: FeatureGateAPIRequirements{featureA: {firstResource}},
+			requirements: FeatureGateAPIRequirements{featureA: since(olderVersion, firstResource)},
 			served:       sets.New[schema.GroupResource](),
 			wantWarnings: []string{"FeatureA is enabled by default", "first.one"},
+		},
+		{
+			name:             "requirement that starts after the emulation version is not checked",
+			set:              []string{"FeatureA=true"},
+			requirements:     FeatureGateAPIRequirements{featureA: since(newerVersion, firstResource)},
+			emulationVersion: middleVersion,
+			served:           sets.New[schema.GroupResource](),
+		},
+		{
+			name: "older emulation version checks the older requirement set",
+			set:  []string{"FeatureA=true"},
+			requirements: FeatureGateAPIRequirements{featureA: {
+				{Version: olderVersion, Resources: []schema.GroupResource{firstResource}},
+				{Version: newerVersion, Resources: []schema.GroupResource{firstResource, secondResource}},
+			}},
+			emulationVersion: middleVersion,
+			served:           sets.New(firstResource),
+		},
+		{
+			name: "newer emulation version checks the newer requirement set",
+			set:  []string{"FeatureA=true"},
+			requirements: FeatureGateAPIRequirements{featureA: {
+				{Version: olderVersion, Resources: []schema.GroupResource{firstResource}},
+				{Version: newerVersion, Resources: []schema.GroupResource{firstResource, secondResource}},
+			}},
+			emulationVersion: newerVersion,
+			served:           sets.New(firstResource),
+			wantErr:          true,
+			wantContains:     []string{"second.one"},
+		},
+		{
+			name:         "explicitly enabled feature with unavailable requirement only warns",
+			set:          []string{"FeatureA=true"},
+			requirements: FeatureGateAPIRequirements{featureA: since(olderVersion, firstResource)},
+			served:       sets.New[schema.GroupResource](),
+			unavailable:  sets.New(firstResource),
+			wantWarnings: []string{"FeatureA is enabled", "not available at emulation version " + latestVersion.String(), "first.one"},
+		},
+		{
+			name:         "feature enabled by default with unavailable requirement warns about the emulation version",
+			requirements: FeatureGateAPIRequirements{featureDefaultOn: since(olderVersion, firstResource)},
+			served:       sets.New[schema.GroupResource](),
+			unavailable:  sets.New(firstResource),
+			wantWarnings: []string{"FeatureDefaultOn is enabled", "not available at emulation version " + latestVersion.String(), "first.one"},
+		},
+		{
+			name:         "served requirement is not reported as unavailable",
+			set:          []string{"FeatureA=true"},
+			requirements: FeatureGateAPIRequirements{featureA: since(olderVersion, firstResource)},
+			served:       sets.New(firstResource),
+			unavailable:  sets.New(firstResource),
+		},
+		{
+			name:         "unavailable requirement warns while missing requirement fails",
+			set:          []string{"FeatureA=true"},
+			requirements: FeatureGateAPIRequirements{featureA: since(olderVersion, firstResource, secondResource)},
+			served:       sets.New[schema.GroupResource](),
+			unavailable:  sets.New(firstResource),
+			wantErr:      true,
+			wantContains: []string{"not served: second.one;"},
+			wantWarnings: []string{"not available at emulation version " + latestVersion.String() + ": first.one;"},
 		},
 	}
 
@@ -187,8 +336,16 @@ func TestFeatureGateAPIRequirementsValidate(t *testing.T) {
 			if tc.noExplicit {
 				gate = gateWithoutExplicitness{gate}
 			}
+			emulationVersion := tc.emulationVersion
+			if emulationVersion == nil {
+				emulationVersion = latestVersion
+			}
+			unavailable := tc.unavailable
+			if unavailable == nil {
+				unavailable = sets.New[schema.GroupResource]()
+			}
 
-			warnings, err := tc.requirements.Validate(gate, tc.served)
+			warnings, err := tc.requirements.Validate(gate, emulationVersion, tc.served, unavailable)
 			if tc.wantErr != (err != nil) {
 				t.Fatalf("Validate() error = %v, wantErr %v", err, tc.wantErr)
 			}
@@ -220,9 +377,10 @@ func TestFeatureGateAPIRequirementsGatesByResource(t *testing.T) {
 	)
 
 	tests := []struct {
-		name         string
-		requirements FeatureGateAPIRequirements
-		want         map[schema.GroupResource][]featuregate.Feature
+		name             string
+		requirements     FeatureGateAPIRequirements
+		emulationVersion *version.Version
+		want             map[schema.GroupResource][]featuregate.Feature
 	}{
 		{
 			name:         "no requirements",
@@ -231,7 +389,7 @@ func TestFeatureGateAPIRequirementsGatesByResource(t *testing.T) {
 		},
 		{
 			name:         "one gate with several resources",
-			requirements: FeatureGateAPIRequirements{featureA: {firstResource, secondResource}},
+			requirements: FeatureGateAPIRequirements{featureA: since(olderVersion, firstResource, secondResource)},
 			want: map[schema.GroupResource][]featuregate.Feature{
 				firstResource:  {featureA},
 				secondResource: {featureA},
@@ -240,20 +398,35 @@ func TestFeatureGateAPIRequirementsGatesByResource(t *testing.T) {
 		{
 			name: "resource shared by several gates requires all of them in gate order",
 			requirements: FeatureGateAPIRequirements{
-				featureB: {firstResource},
-				featureA: {firstResource, secondResource},
+				featureB: since(olderVersion, firstResource),
+				featureA: since(olderVersion, firstResource, secondResource),
 			},
 			want: map[schema.GroupResource][]featuregate.Feature{
 				firstResource:  {featureA, featureB},
 				secondResource: {featureA},
 			},
 		},
+		{
+			name: "gate whose requirement starts after the emulation version is left out",
+			requirements: FeatureGateAPIRequirements{
+				featureA: since(olderVersion, firstResource),
+				featureB: since(newerVersion, firstResource),
+			},
+			emulationVersion: middleVersion,
+			want: map[schema.GroupResource][]featuregate.Feature{
+				firstResource: {featureA},
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.requirements.gatesByResource(); !reflect.DeepEqual(got, tc.want) {
-				t.Errorf("gatesByResource() = %v, want %v", got, tc.want)
+			emulationVersion := tc.emulationVersion
+			if emulationVersion == nil {
+				emulationVersion = latestVersion
+			}
+			if got := tc.requirements.gatesByResource(emulationVersion); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("gatesByResource(%s) = %v, want %v", emulationVersion, got, tc.want)
 			}
 		})
 	}
@@ -265,16 +438,16 @@ func TestFeatureGateAPIRequirementsValidateExplicitlyEnabledAPIs(t *testing.T) {
 		betaVersion  = schema.GroupVersion{Group: "one", Version: "v1beta1"}
 		alphaVersion = schema.GroupVersion{Group: "one", Version: "v1alpha1"}
 
-		// workloads and podgroups need featureA; composites need featureA and featureB;
-		// plain is not gated.
+		// workloads and podgroups need featureA; composites need featureA and, from
+		// newerVersion, featureB; plain is not gated.
 		workloads  = schema.GroupResource{Group: "one", Resource: "workloads"}
 		podgroups  = schema.GroupResource{Group: "one", Resource: "podgroups"}
 		composites = schema.GroupResource{Group: "one", Resource: "composites"}
 	)
 
 	requirements := FeatureGateAPIRequirements{
-		featureA: {workloads, podgroups, composites},
-		featureB: {composites},
+		featureA: since(olderVersion, workloads, podgroups, composites),
+		featureB: since(newerVersion, composites),
 	}
 
 	registered := sets.New(
@@ -287,13 +460,14 @@ func TestFeatureGateAPIRequirementsValidateExplicitlyEnabledAPIs(t *testing.T) {
 	)
 
 	tests := []struct {
-		name         string
-		set          []string
-		config       func(*ResourceConfig)
-		wantErr      bool
-		wantContains []string
-		wantMissing  []string
-		wantOrdered  bool
+		name             string
+		set              []string
+		emulationVersion *version.Version
+		config           func(*ResourceConfig)
+		wantErr          bool
+		wantContains     []string
+		wantMissing      []string
+		wantOrdered      bool
 	}{
 		{
 			name:   "nothing enabled",
@@ -346,6 +520,12 @@ func TestFeatureGateAPIRequirementsValidateExplicitlyEnabledAPIs(t *testing.T) {
 			wantContains: []string{"composites.one", "disabled: FeatureB;"},
 		},
 		{
+			name:             "gate that does not yet require the resource at the emulation version is not checked",
+			set:              []string{"FeatureA=true"},
+			emulationVersion: middleVersion,
+			config:           func(c *ResourceConfig) { c.ExplicitlyEnableResources(alphaVersion.WithResource("composites")) },
+		},
+		{
 			name:   "resource explicitly enabled in a version that does not carry it",
 			config: func(c *ResourceConfig) { c.ExplicitlyEnableResources(gaVersion.WithResource("workloads")) },
 		},
@@ -374,8 +554,12 @@ func TestFeatureGateAPIRequirementsValidateExplicitlyEnabledAPIs(t *testing.T) {
 			gate := newTestGate(t, tc.set...)
 			cfg := NewResourceConfig()
 			tc.config(cfg)
+			emulationVersion := tc.emulationVersion
+			if emulationVersion == nil {
+				emulationVersion = latestVersion
+			}
 
-			err := requirements.ValidateExplicitlyEnabledAPIs(gate, cfg, registered)
+			err := requirements.ValidateExplicitlyEnabledAPIs(gate, emulationVersion, cfg, registered)
 			if tc.wantErr != (err != nil) {
 				t.Fatalf("ValidateExplicitlyEnabledAPIs() error = %v, wantErr %v", err, tc.wantErr)
 			}
