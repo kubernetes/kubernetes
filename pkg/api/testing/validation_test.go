@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	nodevalidation "k8s.io/kubernetes/pkg/apis/node/validation"
 	resourcevalidation "k8s.io/kubernetes/pkg/apis/resource/validation"
 )
@@ -90,9 +91,7 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 				// TODO(luxas): Find a better place for this configuration, as per the comment above.
 				if gvk.Group == "authorization.k8s.io" {
 					opts = append(opts,
-						WithOptions(map[string]bool{
-							"ConditionalAuthorization": true,
-						}),
+						WithMapErrorListsFuncs(authorizationvalidation.MapV1ToV1beta1ErrorLists),
 					)
 				}
 

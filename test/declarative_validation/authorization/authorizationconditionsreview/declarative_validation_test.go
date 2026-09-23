@@ -31,6 +31,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apis/admission"
 	"k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 )
@@ -47,27 +48,30 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(),
 		&genericapirequest.RequestInfo{APIGroup: "authorization.k8s.io", APIVersion: apiVersion, Resource: "authorizationconditionsreviews"})
 
-	// Union on AuthorizationConditionsRequest has a single member (admissionControlData) and
-	// therefore always requires it to be set. Every non-nil Request that leaves it unset
-	// contributes a single Invalid+union error at the "request" path — the coverable form of
-	// the declared rule at `request`. Each test case must expect this error unless it clears
-	// Request or provides admissionControlData.
-	requestUnionErr := field.Invalid(field.NewPath("request"), "", "").WithOrigin("union")
+	// response.decision.type carries a handwritten constraint on top of the declarative
+	// rules: evaluating conditions can only ever produce Allow, Deny or NoOpinion, so a
+	// conditional decision is rejected. Cases that put a ConditionsMap or a Union in the
+	// response therefore expect this error alongside whatever they are exercising. It has
+	// no declarative counterpart, hence MarkFromImperative.
+	responseNotUnconditionalErr := field.Invalid(field.NewPath("response", "decision", "type"), "", "").MarkFromImperative()
 
 	testCases := map[string]struct {
 		obj          authorization.AuthorizationConditionsReview
 		expectedErrs field.ErrorList
 	}{
-		"request+response union member unset": {
-			obj: mkACR(),
+		"valid": {
+			obj:          mkACR(),
+			expectedErrs: nil,
+		},
+		"request.admissionRequest required": {
+			obj: mkACR(clearRequestAdmissionRequest()),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
+				field.Required(field.NewPath("request", "admissionRequest"), ""),
 			},
 		},
 		"response.uid required": {
 			obj: mkACR(clearResponseUID()),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
 				field.Required(field.NewPath("response", "uid"), ""),
 			},
 		},
@@ -77,7 +81,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				setResponseDecision(authorization.ConditionsAwareDecision{}),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
 				field.Required(field.NewPath("request", "decision", "type"), ""),
 				field.Required(field.NewPath("response", "decision", "type"), ""),
 			},
@@ -88,9 +91,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				setResponseDecision(authorization.ConditionsAwareDecision{Type: "BogusType"}),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
 				field.NotSupported[authorization.ConditionsAwareDecisionType](field.NewPath("request", "decision", "type"), authorization.ConditionsAwareDecisionType("BogusType"), nil),
 				field.NotSupported[authorization.ConditionsAwareDecisionType](field.NewPath("response", "decision", "type"), authorization.ConditionsAwareDecisionType("BogusType"), nil),
+				// An unrecognized type is not unconditional either.
+				responseNotUnconditionalErr,
 			},
 		},
 		"decision.conditionsMap[deny|noOpinion|allow]Conditions[*].id required (request+response)": {
@@ -113,7 +117,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				}),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
+				responseNotUnconditionalErr,
 				field.Required(field.NewPath("request", "decision", "conditionsMap", "denyConditions").Index(0).Child("id"), ""),
 				field.Required(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("id"), ""),
 				field.Required(field.NewPath("request", "decision", "conditionsMap", "allowConditions").Index(0).Child("id"), ""),
@@ -128,7 +132,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				setResponseDecision(duplicateConditionsMapDecision()),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
+				responseNotUnconditionalErr,
 				field.Duplicate(field.NewPath("request", "decision", "conditionsMap", "denyConditions").Index(1), nil),
 				field.Duplicate(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions").Index(1), nil),
 				field.Duplicate(field.NewPath("request", "decision", "conditionsMap", "allowConditions").Index(1), nil),
@@ -153,7 +157,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				}),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
+				responseNotUnconditionalErr,
 				field.Required(field.NewPath("request", "decision", "union").Index(0).Child("authorizerName"), ""),
 				field.Required(field.NewPath("response", "decision", "union").Index(0).Child("authorizerName"), ""),
 			},
@@ -176,7 +180,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				}),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
+				responseNotUnconditionalErr,
 				field.Duplicate(field.NewPath("request", "decision", "union").Index(1), nil),
 				field.Duplicate(field.NewPath("response", "decision", "union").Index(1), nil),
 			},
@@ -197,7 +201,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				}),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
+				responseNotUnconditionalErr,
 				field.Invalid(field.NewPath("request", "decision", "union").Index(0).Child("authorizerName"), "", "").WithOrigin("format=k8s-long-name"),
 				field.Invalid(field.NewPath("response", "decision", "union").Index(0).Child("authorizerName"), "", "").WithOrigin("format=k8s-long-name"),
 			},
@@ -208,7 +212,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				setResponseDecision(tooManyConditionsDecision()),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
+				responseNotUnconditionalErr,
 				field.TooMany(field.NewPath("request", "decision", "conditionsMap", "denyConditions"), authorizer.MaxConditionsPerMap+1, authorizer.MaxConditionsPerMap).WithOrigin("maxItems"),
 				field.TooMany(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions"), authorizer.MaxConditionsPerMap+1, authorizer.MaxConditionsPerMap).WithOrigin("maxItems"),
 				field.TooMany(field.NewPath("request", "decision", "conditionsMap", "allowConditions"), authorizer.MaxConditionsPerMap+1, authorizer.MaxConditionsPerMap).WithOrigin("maxItems"),
@@ -223,13 +227,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				setResponseDecision(invalidIDConditionsDecision()),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
-				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "denyConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "allowConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "denyConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "allowConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-label-key"),
+				responseNotUnconditionalErr,
+				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "denyConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "allowConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "denyConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "allowConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
 			},
 		},
 		"decision.conditionsMap[*]Conditions[*].type invalid label key (request+response)": {
@@ -238,13 +242,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				setResponseDecision(invalidTypeConditionsDecision()),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
-				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "denyConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "allowConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "denyConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "allowConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-label-key"),
+				responseNotUnconditionalErr,
+				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "denyConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("request", "decision", "conditionsMap", "allowConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "denyConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("response", "decision", "conditionsMap", "allowConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
 			},
 		},
 		"decision.conditionsMap[*]Conditions[*].condition too long (request+response)": {
@@ -253,13 +257,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				setResponseDecision(tooLongConditionDecision()),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
-				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "denyConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "allowConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "denyConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "allowConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes").MarkBeta(),
+				responseNotUnconditionalErr,
+				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "denyConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "allowConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "denyConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "allowConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes"),
 			},
 		},
 		"decision.conditionsMap[*]Conditions[*].description too long (request+response)": {
@@ -268,13 +272,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				setResponseDecision(tooLongDescriptionDecision()),
 			),
 			expectedErrs: field.ErrorList{
-				requestUnionErr,
-				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "denyConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "allowConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "denyConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "allowConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes").MarkBeta(),
+				responseNotUnconditionalErr,
+				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "denyConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("request", "decision", "conditionsMap", "allowConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "denyConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "noOpinionConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("response", "decision", "conditionsMap", "allowConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes"),
 			},
 		},
 	}
@@ -283,6 +287,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		t.Run(k, func(t *testing.T) {
 			apitesting.VerifyValidationEquivalenceFunc(t, ctx, &tc.obj, func(ctx context.Context, obj runtime.Object) field.ErrorList {
 				acr := obj.(*authorization.AuthorizationConditionsReview)
+				// TODO(luxas): This should probably just call declarative validation, not both? Ofc both is good
+				// TODO(luxas): We might want to register coverage rules for the hand-written stuff in a hand-written init() func
 				return authorizationvalidation.ValidateAuthorizationConditionsReviewCreate(ctx, legacyscheme.Scheme, acr)
 			}, tc.expectedErrs)
 		})
@@ -293,7 +299,8 @@ func mkACR(tweaks ...func(*authorization.AuthorizationConditionsReview)) authori
 	acr := authorization.AuthorizationConditionsReview{
 		ObjectMeta: metav1.ObjectMeta{},
 		Request: &authorization.AuthorizationConditionsRequest{
-			Decision: validNoOpinionDecision(),
+			Decision:         validNoOpinionDecision(),
+			AdmissionRequest: &admission.AdmissionRequest{UID: "test-uid"},
 		},
 		Response: &authorization.AuthorizationConditionsResponse{
 			UID:      "test-uid",
@@ -315,6 +322,12 @@ func setRequestDecision(d authorization.ConditionsAwareDecision) func(*authoriza
 func clearResponseUID() func(*authorization.AuthorizationConditionsReview) {
 	return func(acr *authorization.AuthorizationConditionsReview) {
 		acr.Response.UID = ""
+	}
+}
+
+func clearRequestAdmissionRequest() func(*authorization.AuthorizationConditionsReview) {
+	return func(acr *authorization.AuthorizationConditionsReview) {
+		acr.Request.AdmissionRequest = nil
 	}
 }
 

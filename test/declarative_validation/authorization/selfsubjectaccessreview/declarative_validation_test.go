@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	apiserverauthorizationvalidation "k8s.io/apiserver/pkg/apis/authorization/validation"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -115,11 +116,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"spec.authorizationOptions.handledDecisionTypes duplicate": {
 			v1Only:                         true,
 			enableConditionalAuthorization: true,
-			// Include ConditionsMap/Union so the v1 -> v1beta1 conversion fails
-			// closed (v1beta1 rejects non-unconditional AuthorizationOptions),
-			// letting the equivalence sweep skip v1beta1 via
-			// WithIgnoreObjectConversionErrors instead of comparing this v1-only
-			// Duplicate against v1beta1's empty result.
 			obj: mkSelfSAR(setConditionalAuthorization(&authorization.AuthorizationOptions{
 				HandledDecisionTypes: []authorization.ConditionsAwareDecisionType{
 					authorization.ConditionsAwareDecisionTypeAllow,
@@ -132,6 +128,16 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			})),
 			expectedErrs: field.ErrorList{
 				field.Duplicate(field.NewPath("spec", "authorizationOptions", "handledDecisionTypes").Index(1), authorization.ConditionsAwareDecisionTypeAllow),
+			},
+		},
+		"spec.authorizationOptions.handledDecisionTypes too many": {
+			v1Only:                         true,
+			enableConditionalAuthorization: true,
+			obj: mkSelfSAR(setConditionalAuthorization(&authorization.AuthorizationOptions{
+				HandledDecisionTypes: tooManyHandledDecisionTypes(),
+			})),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "authorizationOptions", "handledDecisionTypes"), maxHandledDecisionTypes+1, maxHandledDecisionTypes).WithOrigin("maxItems"),
 			},
 		},
 		"status.conditionalDecision forbidden when feature gate disabled": {
@@ -273,9 +279,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				},
 			})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "denyConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "noOpinionConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "allowConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-label-key"),
+				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "denyConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "noOpinionConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "allowConditions").Index(0).Child("id"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
 			},
 		},
 		"status.conditionalDecision.conditionsMap[deny|noOpinion|allow]Conditions[*].type invalid label key": {
@@ -290,9 +296,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				},
 			})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "denyConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "noOpinionConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-label-key"),
-				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "allowConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-label-key"),
+				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "denyConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "noOpinionConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
+				field.Invalid(field.NewPath("status", "conditionalDecision", "conditionsMap", "allowConditions").Index(0).Child("type"), "", "").WithOrigin("format=k8s-prefixed-label-key"),
 			},
 		},
 		"status.conditionalDecision.conditionsMap[deny|noOpinion|allow]Conditions[*].condition too long": {
@@ -307,9 +313,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				},
 			})),
 			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "denyConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "noOpinionConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "allowConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes").MarkBeta(),
+				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "denyConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "noOpinionConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "allowConditions").Index(0).Child("condition"), "", authorizer.MaxConditionBytes).WithOrigin("maxBytes"),
 			},
 		},
 		"status.conditionalDecision.conditionsMap[deny|noOpinion|allow]Conditions[*].description too long": {
@@ -324,9 +330,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				},
 			})),
 			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "denyConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "noOpinionConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes").MarkBeta(),
-				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "allowConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes").MarkBeta(),
+				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "denyConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "noOpinionConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes"),
+				field.TooLong(field.NewPath("status", "conditionalDecision", "conditionsMap", "allowConditions").Index(0).Child("description"), "", authorizer.MaxConditionDescriptionBytes).WithOrigin("maxBytes"),
 			},
 		},
 	}
@@ -352,19 +358,16 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 					},
 				}
 			}
-			// v1Only cases carry internal fields that authorization.k8s.io/v1beta1 refuses to
-			// round-trip (it dropped the conditional-authorization fields). Ignore conversion
-			// errors so the cross-version sweep skips v1beta1 instead of failing; the
-			// per-version equivalence check itself already excludes v1beta1 via
-			// skippedEquivalenceGroupVersions.
 			apitesting.VerifyValidationEquivalenceFunc(t, ctx, &tc.obj, func(ctx context.Context, obj runtime.Object) field.ErrorList {
 				sar := obj.(*authorization.SelfSubjectAccessReview)
 				return authorizationvalidation.ValidateSelfSubjectAccessReviewCreate(ctx, legacyscheme.Scheme, sar)
 			}, tc.expectedErrs,
-				apitesting.WithIgnoreObjectConversionErrors(),
-				apitesting.WithOptions(map[string]bool{
-					string(genericfeatures.ConditionalAuthorization): tc.enableConditionalAuthorization,
-				}),
+				apitesting.WithOptions(apiserverauthorizationvalidation.DeclarativeValidationConfig().Options),
+				// authorization.k8s.io/v1beta1 has no authorizationOptions or
+				// conditionalDecision, so converting to it drops those fields and that
+				// version cannot report errors under them. Only errors on those paths are
+				// excused; every field the two versions share is still compared.
+				apitesting.WithMapErrorListsFuncs(authorizationvalidation.MapV1ToV1beta1ErrorLists),
 			)
 		})
 	}
@@ -426,6 +429,22 @@ func makeConditions(n int) []authorization.Condition {
 	out := make([]authorization.Condition, n)
 	for i := range out {
 		out[i].ID = "example.com/cond-" + strconv.Itoa(i)
+	}
+	return out
+}
+
+// maxHandledDecisionTypes mirrors the +k8s:maxItems marker on
+// AuthorizationOptions.HandledDecisionTypes.
+const maxHandledDecisionTypes = 32
+
+// tooManyHandledDecisionTypes returns one entry more than the maximum. The entries are
+// distinct because the field is a set, so that only the maxItems rule fires and not the
+// duplicate rule. Their values are arbitrary: the field is opaque, so unrecognized
+// decision types are not themselves validated.
+func tooManyHandledDecisionTypes() []authorization.ConditionsAwareDecisionType {
+	out := make([]authorization.ConditionsAwareDecisionType, 0, maxHandledDecisionTypes+1)
+	for i := 0; i <= maxHandledDecisionTypes; i++ {
+		out = append(out, authorization.ConditionsAwareDecisionType("Type"+strconv.Itoa(i)))
 	}
 	return out
 }
