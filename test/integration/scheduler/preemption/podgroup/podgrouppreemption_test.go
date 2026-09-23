@@ -183,10 +183,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			// With custom scoring, preemptor pods will prefer high-1 node
-			// which will force preemption of low-1 pod.
-			expectedScheduled:               []string{"high-1", "high-2", "high-3", "very-low-1"},
-			expectedCandidatesForPreemption: []string{"low-1"},
+			// Even though custom scoring prefers node1, victim-aware preemption scoring
+			// prefers node2 to preempt very-low-1 (priority 5) instead of low-1 (priority 10).
+			expectedScheduled:               []string{"high-1", "high-2", "high-3", "low-1"},
+			expectedCandidatesForPreemption: []string{"very-low-1"},
 			expectedToHaveNNNInfo:           []string{},
 			expectedPodsPreemptedByWAP:      1,
 			customPluginName:                "mockScorePlugin",
