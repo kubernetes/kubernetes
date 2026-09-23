@@ -414,7 +414,7 @@ type Snapshotter interface {
 	Reset()
 	GetLessOrEqual(rv uint64) (Snapshot, bool)
 	Latest() (Snapshot, bool)
-	Add(rv uint64, indexer Indexer)
+	Add(rv uint64, snapshot Snapshot)
 	RemoveLess(rv uint64)
 	Len() int
 }
@@ -461,10 +461,10 @@ func (s *storeSnapshotter) Latest() (Snapshot, bool) {
 	return max.snapshot, true
 }
 
-func (s *storeSnapshotter) Add(rv uint64, indexer Indexer) {
+func (s *storeSnapshotter) Add(rv uint64, snapshot Snapshot) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: indexer.Clone()})
+	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: snapshot})
 }
 
 func (s *storeSnapshotter) RemoveLess(rv uint64) {
