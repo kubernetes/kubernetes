@@ -149,7 +149,6 @@ func TestAddPodContinuesAfterExistingWorker(t *testing.T) {
 }
 
 func testAddPodContinuesAfterExistingWorker(tCtx ktesting.TContext) {
-	defer tCtx.Cancel("test completed")
 	t := tCtx.TB()
 	ctx := tCtx.Context
 
