@@ -1402,35 +1402,40 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 	var allErrs field.ErrorList
 	foundDefault := false
 
-	// Check if validValues is sorted in ascending order
+	enableFractionalCapacityRange := utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange)
+	// An oversized list is rejected as a whole below, so its entries are not reported here.
+	findDuplicates := enableFractionalCapacityRange && len(validValues) <= resource.CapacityRequestPolicyDiscreteMaxOptions
+
+	// Check if validValues is sorted in ascending order. A sorted list keeps equal
+	// values adjacent, so the same pass finds duplicates however they are spelled.
 	for i := range len(validValues) - 1 {
-		if validValues[i].Cmp(validValues[i+1]) > 0 {
+		switch c := validValues[i].Cmp(validValues[i+1]); {
+		case c > 0:
 			allErrs = append(allErrs, field.Invalid(
 				fldPath.Index(i+1),
 				validValues[i+1].String(),
 				"values must be sorted in ascending order"))
+		case c == 0 && findDuplicates:
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i+1), validValues[i+1].String()))
 		}
 	}
 
-	// Choose the key function based on whether fractional capacity values are
-	// supported. When DRAFractionalCapacityRange is enabled, use decimal precision;
-	// otherwise, use integer-based keys.
-	quantityKeyFunc := quantityKeyInt
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
-		quantityKeyFunc = quantityKeyAsDec
+	validateOption := func(option apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+		var allErrs field.ErrorList
+		if option.Cmp(maxCapacity) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, option.String(), fmt.Sprintf("option is larger than capacity value: %s", maxCapacity.String())))
+		}
+		if option.Cmp(defaultValue) == 0 {
+			foundDefault = true
+		}
+		return allErrs
 	}
-
-	allErrs = append(allErrs, validateSet(validValues, resource.CapacityRequestPolicyDiscreteMaxOptions,
-		func(option apiresource.Quantity, fldPath *field.Path) field.ErrorList {
-			var allErrs field.ErrorList
-			if option.Cmp(maxCapacity) > 0 {
-				allErrs = append(allErrs, field.Invalid(fldPath, option.String(), fmt.Sprintf("option is larger than capacity value: %s", maxCapacity.String())))
-			}
-			if option.Cmp(defaultValue) == 0 {
-				foundDefault = true
-			}
-			return allErrs
-		}, quantityKeyFunc, fldPath)...)
+	if enableFractionalCapacityRange {
+		allErrs = append(allErrs, validateSlice(validValues, resource.CapacityRequestPolicyDiscreteMaxOptions, validateOption, fldPath)...)
+	} else {
+		// Without the gate each option is read as an integer, so values that round the same are one option.
+		allErrs = append(allErrs, validateSet(validValues, resource.CapacityRequestPolicyDiscreteMaxOptions, validateOption, quantityKeyInt, fldPath)...)
+	}
 	if !foundDefault {
 		allErrs = append(allErrs, field.Invalid(fldPath, defaultValue.String(), "default value is not valid according to the requestPolicy"))
 	}
@@ -1748,12 +1753,6 @@ func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(
 // stringKey uses the item itself as a key for validateSet.
 func stringKey(item string) string {
 	return item
-}
-
-// quantityKeyAsDec uses a scaled inf.Dec of the item as itself
-// as a key for validateSet.
-func quantityKeyAsDec(item apiresource.Quantity) string {
-	return item.AsDec().String()
 }
 
 // quantityKeyInt uses base-10 integer of the item itself
