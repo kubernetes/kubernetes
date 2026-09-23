@@ -1354,4 +1354,77 @@ func TestPlacementFeasible_CompositeHierarchyInitialStateCaching(t *testing.T) {
 			t.Errorf("expected PartialSuccess for subsequent attempt when 1 child is unschedulable, got %v", status)
 		}
 	})
+
+	t.Run("Single bottom-up pass propagates initiallyScheduled via PodGroupCycleState without re-traversing subtree", func(t *testing.T) {
+		states := map[string]*mockPodGroupState{
+			"pg1-1": {scheduledPodsCount: 2},
+			"pg1-2": {scheduledPodsCount: 2},
+			"pg2-1": {scheduledPodsCount: 1},
+			"pg3-1": {scheduledPodsCount: 0},
+		}
+		pl := &GangScheduling{
+			snapshotLister:             &mockMapSharedLister{lister: &mockMapPodGroupStateLister{states: states}},
+			isCompositePodGroupEnabled: true,
+		}
+
+		// Set up root PodGroupCycleState and PlacementCycleState.
+		rootPGCycleState := schedulerframework.NewCycleState()
+		rootPlacementState := schedulerframework.NewCycleState()
+		rootPlacementState.SetPodGroupCycleState(rootPGCycleState)
+
+		// 1. First call on rootCPG computes the entire hierarchy's initial counts in one bottom-up pass.
+		status := pl.PlacementFeasible(ctx, rootPlacementState, rootPGInfo, fwk.PlacementProgress{Remaining: 3, Scheduled: 0})
+		if status.Code() != fwk.Wait {
+			t.Fatalf("expected pre-loop status Wait, got %v", status)
+		}
+
+		// 2. Nil out snapshotLister to prove that neither subsequent placements of rootCPG nor child/grandchild groups
+		// ever touch snapshotLister or re-traverse the hierarchy.
+		pl.snapshotLister = nil
+
+		// 3. Second placement of rootCPG reuses rootPGCycleState in O(1).
+		rootPlacementState2 := schedulerframework.NewCycleState()
+		rootPlacementState2.SetPodGroupCycleState(rootPGCycleState)
+		status = pl.PlacementFeasible(ctx, rootPlacementState2, rootPGInfo, fwk.PlacementProgress{
+			Remaining:     0,
+			Scheduled:     2,
+			Unschedulable: 1,
+		})
+		if !status.IsPartialSuccess() {
+			t.Errorf("expected PartialSuccess on second root placement using cached PodGroupCycleState, got %v", status)
+		}
+
+		// 4. Child CPG (subCPG1, initiallyScheduled=2 >= minGroupCount=2) inherits state 1 hop from rootPlacementState.
+		subCPG1CycleState := schedulerframework.NewCycleState()
+		subCPG1CycleState.SetPlacementCycleState(rootPlacementState)
+		subCPG1PlacementState := schedulerframework.NewCycleState()
+		subCPG1PlacementState.SetPodGroupCycleState(subCPG1CycleState)
+
+		subCPG1Info := rootPGInfo.GetChildren()[0]
+		status = pl.PlacementFeasible(ctx, subCPG1PlacementState, subCPG1Info, fwk.PlacementProgress{
+			Remaining:          0,
+			Scheduled:          2,
+			PartiallyScheduled: 1,
+		})
+		if !status.IsPartialSuccess() {
+			t.Errorf("expected PartialSuccess for subCPG1 using inherited state with snapshotLister=nil, got %v", status)
+		}
+
+		// 5. Grandchild leaf PG (pg1-1, initiallyScheduled=2 >= minCount=2) inherits state 1 hop from subCPG1PlacementState.
+		pg11CycleState := schedulerframework.NewCycleState()
+		pg11CycleState.SetPlacementCycleState(subCPG1PlacementState)
+		pg11PlacementState := schedulerframework.NewCycleState()
+		pg11PlacementState.SetPodGroupCycleState(pg11CycleState)
+
+		pg11Info := subCPG1Info.GetChildren()[0]
+		status = pl.PlacementFeasible(ctx, pg11PlacementState, pg11Info, fwk.PlacementProgress{
+			Remaining:      0,
+			Scheduled:      3,
+			NewlySucceeded: 1,
+			Unschedulable:  1,
+		})
+		if !status.IsPartialSuccess() {
+			t.Errorf("expected PartialSuccess for leaf pg1-1 using inherited state, got %v", status)
+		}
+	})
 }

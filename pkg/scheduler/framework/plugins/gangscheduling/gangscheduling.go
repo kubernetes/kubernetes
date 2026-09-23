@@ -19,6 +19,7 @@ package gangscheduling
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
@@ -345,15 +346,15 @@ func (pl *GangScheduling) isPGReady(snapshot fwk.PodGroupManager, namespace, pgN
 	return readinessCountFn(pgState) >= minCount
 }
 
-const placementStateKey fwk.StateKey = Name + "/PlacementState"
+const hierarchyStateKey fwk.StateKey = Name + "/HierarchyState"
 
-type placementStateData struct {
-	initiallyScheduled int
+type hierarchyStateData struct {
+	initiallyScheduledByGroup map[fwk.EntityKey]int
 }
 
-func (d *placementStateData) Clone() fwk.StateData {
-	return &placementStateData{
-		initiallyScheduled: d.initiallyScheduled,
+func (d *hierarchyStateData) Clone() fwk.StateData {
+	return &hierarchyStateData{
+		initiallyScheduledByGroup: maps.Clone(d.initiallyScheduledByGroup),
 	}
 }
 
@@ -403,47 +404,65 @@ func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleS
 }
 
 // getInitiallyScheduledCount returns the number of children (pods for a PodGroup, or direct child groups
-// for a CompositePodGroup) that satisfied their scheduling policy at the beginning of the placement evaluation.
-// Because the scheduler invokes PlacementFeasible before evaluating any pods or children in a placement,
-// caching the initial count on first invocation captures the snapshot state before tentative assumptions mutate it.
+// for a CompositePodGroup) that satisfied their scheduling policy at the beginning of the cycle.
+// At the root group's first invocation, it computes the initial counts for the entire hierarchy in a single
+// O(N) bottom-up pass and stores the map in PodGroupCycleState. Child groups inherit the map pointer in O(1)
+// from their immediate parent's PodGroupCycleState via GetParentPlacementCycleState.
 func (pl *GangScheduling) getInitiallyScheduledCount(placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args fwk.PlacementProgress) int {
-	if s, err := placementCycleState.Read(placementStateKey); err == nil {
-		return s.(*placementStateData).initiallyScheduled
+	if pgCycleState := placementCycleState.GetPodGroupCycleState(); pgCycleState != nil {
+		if s, err := pgCycleState.Read(hierarchyStateKey); err == nil {
+			return s.(*hierarchyStateData).initiallyScheduledByGroup[podGroupInfo.GetKey()]
+		}
+		if parentPlacementState := pgCycleState.GetParentPlacementCycleState(); parentPlacementState != nil && parentPlacementState.GetPodGroupCycleState() != nil {
+			if s, err := parentPlacementState.GetPodGroupCycleState().Read(hierarchyStateKey); err == nil {
+				pgCycleState.Write(hierarchyStateKey, s)
+				return s.(*hierarchyStateData).initiallyScheduledByGroup[podGroupInfo.GetKey()]
+			}
+		}
+		out := make(map[fwk.EntityKey]int)
+		pl.computeHierarchyInitiallyScheduled(podGroupInfo, args, true, out)
+		pgCycleState.Write(hierarchyStateKey, &hierarchyStateData{
+			initiallyScheduledByGroup: out,
+		})
+		return out[podGroupInfo.GetKey()]
 	}
-	var initiallyScheduled int
-	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType && len(podGroupInfo.GetChildren()) > 0 {
-		initiallyScheduled = pl.countInitiallyScheduledChildren(podGroupInfo)
-	} else {
-		initiallyScheduled = args.Scheduled - args.NewlySucceeded - args.PartiallyScheduled
+
+	if s, err := placementCycleState.Read(hierarchyStateKey); err == nil {
+		return s.(*hierarchyStateData).initiallyScheduledByGroup[podGroupInfo.GetKey()]
 	}
-	placementCycleState.Write(placementStateKey, &placementStateData{
-		initiallyScheduled: initiallyScheduled,
+	out := make(map[fwk.EntityKey]int)
+	pl.computeHierarchyInitiallyScheduled(podGroupInfo, args, true, out)
+	placementCycleState.Write(hierarchyStateKey, &hierarchyStateData{
+		initiallyScheduledByGroup: out,
 	})
-	return initiallyScheduled
+	return out[podGroupInfo.GetKey()]
 }
 
-func (pl *GangScheduling) isGroupInitiallyScheduled(podGroupInfo fwk.PodGroupInfo) bool {
-	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
-		return pl.countInitiallyScheduledChildren(podGroupInfo) >= getMinCount(podGroupInfo)
+// computeHierarchyInitiallyScheduled performs a single bottom-up post-order traversal of the pod group
+// hierarchy, populating out with the initial scheduled count for every group in O(N) time and returning
+// whether pgInfo itself satisfied its minimum quorum at the start of the cycle.
+func (pl *GangScheduling) computeHierarchyInitiallyScheduled(pgInfo fwk.PodGroupInfo, args fwk.PlacementProgress, isRoot bool, out map[fwk.EntityKey]int) bool {
+	if pgInfo.GetType() == fwk.CompositePodGroupKeyType && len(pgInfo.GetChildren()) > 0 {
+		scheduledChildren := 0
+		for _, child := range pgInfo.GetChildren() {
+			if pl.computeHierarchyInitiallyScheduled(child, fwk.PlacementProgress{}, false, out) {
+				scheduledChildren++
+			}
+		}
+		out[pgInfo.GetKey()] = scheduledChildren
+		return scheduledChildren >= getMinCount(pgInfo)
 	}
-	if pl.snapshotLister == nil {
-		return false
-	}
-	podGroupState, err := pl.snapshotLister.PodGroupStates().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
-	if err != nil || podGroupState == nil {
-		return false
-	}
-	return podGroupState.ScheduledPodsCount() >= getMinCount(podGroupInfo)
-}
 
-func (pl *GangScheduling) countInitiallyScheduledChildren(podGroupInfo fwk.PodGroupInfo) int {
-	count := 0
-	for _, child := range podGroupInfo.GetChildren() {
-		if pl.isGroupInitiallyScheduled(child) {
-			count++
+	var scheduledPods int
+	if isRoot {
+		scheduledPods = args.Scheduled - args.NewlySucceeded - args.PartiallyScheduled
+	} else if pl.snapshotLister != nil {
+		if pgState, err := pl.snapshotLister.PodGroupStates().Get(pgInfo.GetNamespace(), pgInfo.GetName()); err == nil && pgState != nil {
+			scheduledPods = pgState.ScheduledPodsCount()
 		}
 	}
-	return count
+	out[pgInfo.GetKey()] = scheduledPods
+	return scheduledPods >= getMinCount(pgInfo)
 }
 
 // isGangPolicy returns true if the pod group or composite pod group uses the Gang scheduling policy.
