@@ -1137,6 +1137,78 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
 			},
 		},
+		"reconcile-with-pool-name-other-pools": {
+			nodeUID:               nodeUID,
+			reconcilePoolWithName: poolName,
+			initialObjects:        []runtime.Object{},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices:   []Slice{{Devices: []resourceapi.Device{}}},
+						AllNodes: true,
+					},
+					"other-pool-1": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+					"other-pool-2": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+				},
+			},
+			expectedStats: Stats{NumCreates: 1},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).
+					AllNodes(true).
+					NodeName("").
+					NodeSelector(nil).
+					PerDeviceNodeSelection(false).
+					Driver(driverName).Devices([]resourceapi.Device{}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+			expectedErrors: []string{
+				`pool validation failed: found pool "other-pool-1", but ReconcilePoolWithName only allows pool "pool"`,
+				`pool validation failed: found pool "other-pool-2", but ReconcilePoolWithName only allows pool "pool"`,
+			},
+		},
+		"reconcile-with-pool-name-wrong-pool": {
+			nodeUID:               nodeUID,
+			reconcilePoolWithName: poolName,
+			syncDelay:             ptr.To(time.Duration(0)), // Ensure that the initial object causes an immediate sync of the pool.
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).
+					Driver(driverName).Devices([]resourceapi.Device{}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+				},
+			},
+			expectedStats:  Stats{NumDeletes: 1},
+			expectedErrors: []string{`pool validation failed: found pool "other-pool", but ReconcilePoolWithName only allows pool "pool"`},
+		},
+		"reconcile-with-pool-name-invalid-other-pool": {
+			nodeUID:               nodeUID,
+			reconcilePoolWithName: poolName,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{newDevice(deviceName), newDevice(deviceName)}}}},
+				},
+			},
+			expectedErrors: []string{`pool validation failed: found pool "other-pool", but ReconcilePoolWithName only allows pool "pool"`},
+		},
+		"reconcile-with-pool-name-no-pools": {
+			nodeUID:               nodeUID,
+			reconcilePoolWithName: poolName,
+			syncDelay:             ptr.To(time.Duration(0)), // Ensure that the initial object causes an immediate sync of the pool.
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).
+					Driver(driverName).Devices([]resourceapi.Device{}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+			inputDriverResources: &DriverResources{Pools: map[string]Pool{}},
+			expectedStats:        Stats{NumDeletes: 1},
+		},
 		"update-node-selector": {
 			initialObjects: []runtime.Object{
 				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
@@ -1792,67 +1864,112 @@ func TestControllerUpdateDeleteRecreate(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond, "controller should recreate the deleted slice")
 }
 
-// TestControllerUpdateReconcilePoolWithNameValidation verifies that Update rejects
-// invalid pool sets when ReconcilePoolWithName is set
-func TestControllerUpdateReconcilePoolWithNameValidation(t *testing.T) {
+// TestControllerUpdateErrorHandlerCanReplaceResources verifies that an error
+// handler can replace invalid resources by calling Update.
+func TestControllerUpdateErrorHandlerCanReplaceResources(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	type ctxKey struct{}
+	ctx = context.WithValue(ctx, ctxKey{}, "controller")
 	const poolName = "pool"
-
-	testcases := map[string]struct {
-		resources      *DriverResources
-		expectedErrors []string
-	}{
-		"multiple pools returns error": {
-			resources: &DriverResources{
-				Pools: map[string]Pool{
-					poolName:     {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-				},
-			},
-			expectedErrors: []string{"found 2 pools; expected exactly one pool with this name"},
+	valid := &DriverResources{
+		Pools: map[string]Pool{
+			poolName: {AllNodes: true, Slices: []Slice{{Devices: []resourceapi.Device{}}}},
 		},
-
-		"wrong pool only returns error": {
-			resources: &DriverResources{
-				Pools: map[string]Pool{
-					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-				},
-			},
-			expectedErrors: []string{"found 1 pools; expected exactly one pool with this name"},
+	}
+	invalid := &DriverResources{
+		Pools: map[string]Pool{
+			"other-pool": {AllNodes: true, Slices: []Slice{{Devices: []resourceapi.Device{}}}},
 		},
-
-		"empty pools succeeds": {
-			resources: &DriverResources{Pools: map[string]Pool{}},
-		},
-
-		"single matching pool succeeds": {
-			resources: &DriverResources{
-				Pools: map[string]Pool{
-					poolName: {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-				},
-			},
+	}
+	mixed := &DriverResources{
+		Pools: map[string]Pool{
+			poolName:     valid.Pools[poolName],
+			"other-pool": invalid.Pools["other-pool"],
 		},
 	}
 
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			ctrl := &Controller{
-				reconcilePoolWithName: poolName,
-				queue:                 ptr.To(workqueue.Mock[string]{}),
-				errorHandler: func(_ context.Context, err error, _ string) {
-					if len(tc.expectedErrors) > 0 {
-						require.Error(t, err)
-						for _, expectedError := range tc.expectedErrors {
-							assert.Contains(t, err.Error(), expectedError)
-						}
-						return
-					}
-
-					require.NoError(t, err)
-				},
+	var ctrl *Controller
+	var queue workqueue.Mock[string]
+	var controllerErrors []error
+	ctrl, err := newController(ctx, Options{
+		DriverName:            "driver",
+		KubeClient:            createTestClient(features{}, metav1.Time{}),
+		Resources:             invalid,
+		Queue:                 &queue,
+		ReconcilePoolWithName: poolName,
+		ErrorHandler: func(ctx context.Context, err error, _ string) {
+			controllerErrors = append(controllerErrors, err)
+			// kubeletplugin.Helper creates and updates the controller with its
+			// mutex held, so a HandleError that publishes again would deadlock.
+			if ctrl == nil {
+				t.Error("error handler called while creating the controller")
+				return
 			}
-			ctrl.Update(tc.resources)
-		})
-	}
+			// Fail instead of deadlocking if the lock is held.
+			if !ctrl.mutex.TryLock() {
+				t.Error("error handler called while holding the lock")
+				return
+			}
+			ctrl.mutex.Unlock()
+			// Contextual logging needs the controller's context.
+			assert.Equal(t, "controller", ctx.Value(ctxKey{}))
+			// Replace only once, so that a regression fails below instead of looping.
+			if len(controllerErrors) == 1 {
+				ctrl.Update(valid)
+			}
+		},
+	})
+	require.NoError(t, err)
+	defer ctrl.Stop()
+
+	ctrl.run(ctx)
+	require.Len(t, controllerErrors, 1)
+	require.ErrorContains(t, controllerErrors[0], `found pool "other-pool"`)
+	require.Equal(t, Stats{NumCreates: 1}, ctrl.GetStats())
+
+	ctrl.Update(mixed)
+	ctrl.run(ctx)
+	require.Len(t, controllerErrors, 2)
+	require.ErrorContains(t, controllerErrors[1], `found pool "other-pool"`)
+	assert.Equal(t, Stats{NumCreates: 1}, ctrl.GetStats())
+}
+
+// TestControllerUpdateRemovesSlicesAfterInvalidOtherPool verifies that the
+// ReconcilePoolWithName pool gets synced again once another pool no longer
+// fails validation.
+func TestControllerUpdateRemovesSlicesAfterInvalidOtherPool(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	const poolName = "pool"
+	var queue workqueue.Mock[string]
+	ctrl, err := newController(ctx, Options{
+		DriverName: "driver",
+		KubeClient: createTestClient(features{}, metav1.Time{}),
+		Resources: &DriverResources{
+			Pools: map[string]Pool{
+				poolName: {AllNodes: true, Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+			},
+		},
+		Queue:                 &queue,
+		ReconcilePoolWithName: poolName,
+		ErrorHandler:          func(context.Context, error, string) {},
+	})
+	require.NoError(t, err)
+	defer ctrl.Stop()
+	ctrl.run(ctx)
+	require.Equal(t, Stats{NumCreates: 1}, ctrl.GetStats())
+
+	// The duplicate device stops the sync of the pool, so its slice stays.
+	ctrl.Update(&DriverResources{
+		Pools: map[string]Pool{
+			"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{newDevice("device"), newDevice("device")}}}},
+		},
+	})
+	ctrl.run(ctx)
+	require.Equal(t, Stats{NumCreates: 1}, ctrl.GetStats())
+
+	ctrl.Update(nil)
+	ctrl.run(ctx)
+	assert.Equal(t, Stats{NumCreates: 1, NumDeletes: 1}, ctrl.GetStats())
 }
 
 func TestControllerPoolNameFieldSelector(t *testing.T) {
