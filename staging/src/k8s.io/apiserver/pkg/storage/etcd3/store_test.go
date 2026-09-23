@@ -677,15 +677,42 @@ func TestStats(t *testing.T) {
 
 func TestPrefix(t *testing.T) {
 	testcases := map[string]string{
-		"custom/prefix":     "/custom/prefix/",
-		"/custom//prefix//": "/custom/prefix/",
-		"/registry":         "/registry/",
+		"":                  "",
+		"/":                 "",
+		"///":               "",
+		"custom/prefix":     "/custom/prefix",
+		"/custom//prefix//": "/custom/prefix",
+		"/custom/./prefix":  "/custom/prefix",
+		"/custom/../prefix": "/prefix",
+		"/registry":         "/registry",
+		"/registry/":        "/registry",
 	}
 	for configuredPrefix, effectivePrefix := range testcases {
-		_, store, _ := testSetup(t, withPrefix(configuredPrefix))
-		if store.pathPrefix != effectivePrefix {
-			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, store.pathPrefix)
-		}
+		t.Run(configuredPrefix, func(t *testing.T) {
+			_, store, _ := testSetup(t, withPrefix(configuredPrefix), withResourcePrefix("/pods"))
+			if store.pathPrefix != effectivePrefix {
+				t.Errorf("expected effective prefix %q, got %q", effectivePrefix, store.pathPrefix)
+			}
+			for _, key := range []string{"/pods", "/pods/", "/pods/ns/pod", "/pods/ns/pod/", "/pods//pod", "/pods/ns/pod..name"} {
+				for _, recursive := range []bool{false, true} {
+					got, err := store.prepareKey(key, recursive)
+					if err != nil {
+						t.Fatalf("prepareKey(%q, %t): %v", key, recursive, err)
+					}
+					want := effectivePrefix + key
+					if recursive && !strings.HasSuffix(key, "/") {
+						want += "/"
+					}
+					if got != want {
+						t.Errorf("prepareKey(%q, %t) = %q, want %q", key, recursive, got, want)
+					}
+				}
+			}
+			// Root prefixes must also work when the store passes them to the estimator.
+			if err := store.EnableResourceSizeEstimation(store.getKeys); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
