@@ -684,6 +684,19 @@ func ReconcilePoolWithName(name string) Option {
 	}
 }
 
+// ValidateQualifiedNames enables or disables rejecting attribute and capacity
+// names that are redundantly qualified with the driver's own domain (e.g.
+// "<driverName>/foo" instead of just "foo"). See
+// [resourceslice.Options.ValidateQualifiedNames] for details.
+//
+// Enabled by default.
+func ValidateQualifiedNames(enabled bool) Option {
+	return func(o *options) error {
+		o.validateQualifiedNames = &enabled
+		return nil
+	}
+}
+
 // EnableDeviceMetadata enables the device metadata feature. When enabled,
 // the framework writes a metadata file per request under the plugin data
 // directory and a CDI spec per request under the CDI directory (see
@@ -862,6 +875,7 @@ type options struct {
 	healthV1alpha1             bool
 	healthV1                   bool
 	reconcilePoolWithName      string
+	validateQualifiedNames     *bool
 	enableDeviceMetadata       bool
 	metadataVersions           []schema.GroupVersion
 	cdiDir                     string
@@ -874,21 +888,22 @@ type Helper struct {
 	// backgroundCtx is for activities that are started later.
 	backgroundCtx context.Context
 	// cancel cancels the backgroundCtx.
-	cancel                func(cause error)
-	wg                    sync.WaitGroup
-	registrar             *nodeRegistrar
-	pluginServer          *grpcServer
-	plugin                DRAPlugin
-	driverName            string
-	nodeName              string
-	nodeUID               types.UID
-	kubeClient            kubernetes.Interface
-	resourceClient        cgoresource.ResourceV1Interface
-	serialize             bool
-	grpcMutex             sync.Mutex
-	grpcLockFilePath      string
-	reconcilePoolWithName string
-	metadataWriter        *metadataWriter
+	cancel                 func(cause error)
+	wg                     sync.WaitGroup
+	registrar              *nodeRegistrar
+	pluginServer           *grpcServer
+	plugin                 DRAPlugin
+	driverName             string
+	nodeName               string
+	nodeUID                types.UID
+	kubeClient             kubernetes.Interface
+	resourceClient         cgoresource.ResourceV1Interface
+	serialize              bool
+	grpcMutex              sync.Mutex
+	grpcLockFilePath       string
+	reconcilePoolWithName  string
+	validateQualifiedNames *bool
+	metadataWriter         *metadataWriter
 
 	// Information about resource publishing changes concurrently and thus
 	// must be protected by the mutex. The controller gets started only
@@ -959,14 +974,15 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	}
 
 	d := &Helper{
-		driverName:            o.driverName,
-		nodeName:              o.nodeName,
-		nodeUID:               o.nodeUID,
-		kubeClient:            o.kubeClient,
-		resourceClient:        draclient.New(o.kubeClient),
-		serialize:             o.serialize,
-		plugin:                plugin,
-		reconcilePoolWithName: o.reconcilePoolWithName,
+		driverName:             o.driverName,
+		nodeName:               o.nodeName,
+		nodeUID:                o.nodeUID,
+		kubeClient:             o.kubeClient,
+		resourceClient:         draclient.New(o.kubeClient),
+		serialize:              o.serialize,
+		plugin:                 plugin,
+		reconcilePoolWithName:  o.reconcilePoolWithName,
+		validateQualifiedNames: o.validateQualifiedNames,
 	}
 	if o.rollingUpdateUID != "" {
 		dir := o.pluginDataDirectoryPath
@@ -1247,7 +1263,8 @@ func (d *Helper) PublishResources(_ context.Context, resources resourceslice.Dri
 					// -> all errors are recoverable.
 					d.plugin.HandleError(ctx, recoverableError{error: err}, msg)
 				},
-				ReconcilePoolWithName: d.reconcilePoolWithName,
+				ReconcilePoolWithName:  d.reconcilePoolWithName,
+				ValidateQualifiedNames: d.validateQualifiedNames,
 			}); err != nil {
 			return fmt.Errorf("start ResourceSlice controller: %w", err)
 		}

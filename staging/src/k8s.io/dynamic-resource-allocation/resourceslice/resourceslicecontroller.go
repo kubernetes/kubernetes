@@ -127,6 +127,11 @@ type Controller struct {
 	// Optional pool name to reconcile.
 	reconcilePoolWithName string
 
+	// validateQualifiedNames controls whether validateDriverResources checks
+	// attribute and capacity names for redundant driver domain qualification.
+	// See [Options.ValidateQualifiedNames].
+	validateQualifiedNames bool
+
 	// usePoolNameFieldSelector is disabled when the API server rejects the
 	// spec.pool.name field selector. Access must be atomic because List and Watch
 	// can run concurrently.
@@ -283,7 +288,10 @@ type Options struct {
 
 	// ErrorHandler will get called whenever the controller encounters
 	// a problem while trying to publish ResourceSlices. The controller
-	// will retry once the handler returns. What the handler does with
+	// will retry transient errors once the handler returns. Publishing
+	// of invalid ResourceSlices stops until the slices are replaced.
+	//
+	// What the handler does with
 	// that information is up to the handler. It could log the error,
 	// replace the slices if they cannot be published (see below),
 	// or force the program running the controller to fail by exiting.
@@ -294,6 +302,19 @@ type Options struct {
 	// type:
 	//    var droppedFields *resourceslice.DroppedFieldsError
 	//    if errors.As(err, &droppedFields) { ... do something with droppedFields ... }
+	//
+	// Such truncated ResourceSlices do not get published automatically
+	// again. That such a situation occurred shows that the driver was not
+	// configured correctly or depends on features not supported by the
+	// cluster. The right solution would be to reconfigure or redeploy
+	// the driver. Upgrading a cluster to enable new features should be done
+	// in this order:
+	//
+	//  - apiserver with new feature enabled
+	//  - rest of control plane
+	//  - DRA driver using new feature
+	//
+	// Downgrading must follow the reverse order.
 	//
 	// The default is [utilruntime.HandleErrorWithContext] which just logs
 	// the problem.
@@ -313,6 +334,16 @@ type Options struct {
 	//
 	// Empty means the default behavior.
 	ReconcilePoolWithName string
+
+	// ValidateQualifiedNames enables rejecting attribute and capacity names
+	// that are explicitly qualified with the driver's own domain (e.g.
+	// "<driverName>/foo" instead of just "foo"). Such names are redundant
+	// and can lead to inconsistent conflict resolution if both the
+	// qualified and unqualified form are published for the same device.
+	//
+	// Enabled by default. Set to false only if a driver has an existing,
+	// intentional reason to publish qualified names for its own domain.
+	ValidateQualifiedNames *bool
 }
 
 // DroppedFieldsError is reported through the ErrorHandler in [Options] if
@@ -506,17 +537,18 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	c := &Controller{
-		cancel:                cancel,
-		resourceClient:        draclient.New(options.KubeClient),
-		coreClient:            options.KubeClient.CoreV1(),
-		driverName:            options.DriverName,
-		owner:                 options.Owner.DeepCopy(),
-		queue:                 options.Queue,
-		mutationCacheTTL:      ptr.Deref(options.MutationCacheTTL, DefaultMutationCacheTTL),
-		syncDelay:             ptr.Deref(options.SyncDelay, DefaultSyncDelay),
-		errorHandler:          options.ErrorHandler,
-		lastAddByPool:         make(map[string]time.Time),
-		reconcilePoolWithName: options.ReconcilePoolWithName,
+		cancel:                 cancel,
+		resourceClient:         draclient.New(options.KubeClient),
+		coreClient:             options.KubeClient.CoreV1(),
+		driverName:             options.DriverName,
+		owner:                  options.Owner.DeepCopy(),
+		queue:                  options.Queue,
+		mutationCacheTTL:       ptr.Deref(options.MutationCacheTTL, DefaultMutationCacheTTL),
+		syncDelay:              ptr.Deref(options.SyncDelay, DefaultSyncDelay),
+		errorHandler:           options.ErrorHandler,
+		lastAddByPool:          make(map[string]time.Time),
+		reconcilePoolWithName:  options.ReconcilePoolWithName,
+		validateQualifiedNames: ptr.Deref(options.ValidateQualifiedNames, true),
 	}
 	if c.queue == nil {
 		c.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -740,7 +772,11 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	c.mutex.RLock()
 	resources = c.resources
 	c.mutex.RUnlock()
-	if err := validateDriverResources(resources); err != nil {
+	validateDriverName := c.driverName
+	if !c.validateQualifiedNames {
+		validateDriverName = ""
+	}
+	if err := validateDriverResources(validateDriverName, resources); err != nil {
 		c.errorHandler(ctx, err, "pool validation failed")
 		// We only report the error through the error handler to prevent
 		// the controller from retrying.
