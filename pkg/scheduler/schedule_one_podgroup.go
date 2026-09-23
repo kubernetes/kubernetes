@@ -907,7 +907,6 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
-	partialResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
 
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
 	defer func() {
@@ -945,15 +944,13 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		// was typically set by a prior preemption cycle. This mirrors pod-by-pod NNN, which can
 		// pick a non-optimal node because it skips scoring. The tradeoff: when minCount < len(pods)
 		// we may prefer the nominated placement over one that fits the whole gang. For a standalone
-		// PodGroup a Success status implies at least minCount pods were placed. The anyScheduled
-		// check prevents short-circuiting when the placement is feasible only because minCount pods
-		// were already scheduled in previous cycles (for example minCount=3 with 3 pods already
-		// running), but we failed to place any newly arriving pods on the nominated placement.
-		if result.status.IsSuccess() && result.anyScheduled {
+		// PodGroup a Success or PartialSuccess status implies at least minCount pods were placed.
+		// The anyScheduled check prevents short-circuiting when the placement is feasible only because
+		// minCount pods were already scheduled in previous cycles (for example minCount=3 with 3 pods
+		// already running), but we failed to place any newly arriving pods on the nominated placement.
+		if (result.status.IsSuccess() || result.status.IsPartialSuccess()) && result.anyScheduled {
 			successfulResults[nominated] = result
 			nominatedFeasible = true
-		} else if result.status.IsPartialSuccess() && result.anyScheduled {
-			partialResults[nominated] = result
 		}
 	}
 
@@ -972,20 +969,13 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 				anyResult = result
 			}
 
-			if result.status.IsSuccess() {
+			if result.status.IsSuccess() || result.status.IsPartialSuccess() {
 				successfulResults[placement] = result
-			} else if result.status.IsPartialSuccess() {
-				partialResults[placement] = result
 			}
 		}
 	}
 
-	candidateResults := successfulResults
-	if len(candidateResults) == 0 {
-		candidateResults = partialResults
-	}
-
-	if len(candidateResults) == 0 {
+	if len(successfulResults) == 0 {
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// anyResult is the nominated placement's result when one was evaluated, otherwise the first
 		// placement tried. Which one we report is otherwise arbitrary and may change in the future.
@@ -1000,14 +990,14 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		return anyResult, nil
 	}
 
-	bestPlacement, status := sched.findBestPodGroupPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, candidateResults)
+	bestPlacement, status := sched.findBestPodGroupPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, successfulResults)
 	if !status.IsSuccess() {
 		return &podGroupAlgorithmResult{
 			podGroupInfo: podGroupInfo,
 			status:       status,
 		}, nil
 	}
-	bestResult := candidateResults[bestPlacement]
+	bestResult := successfulResults[bestPlacement]
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
 		revertFns, err = sched.assumeSubtreeWithRevert(ctx, schedFwk, podGroupInfo, map[fwk.EntityKey]*podGroupAlgorithmResult{podGroupInfo.GetKey(): bestResult})
@@ -1053,7 +1043,6 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 
 	var anyResultSubtree map[fwk.EntityKey]*podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult)
-	partialResults := make(map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult)
 
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
 	defer func() {
@@ -1092,19 +1081,12 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 			anyResultSubtree = subtreeResult
 		}
 
-		if result.status.IsSuccess() {
+		if result.status.IsSuccess() || result.status.IsPartialSuccess() {
 			successfulResults[placement] = subtreeResult
-		} else if result.status.IsPartialSuccess() {
-			partialResults[placement] = subtreeResult
 		}
 	}
 
-	candidateResults := successfulResults
-	if len(candidateResults) == 0 {
-		candidateResults = partialResults
-	}
-
-	if len(candidateResults) == 0 {
+	if len(successfulResults) == 0 {
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// The selection of which simulation we report is arbitrary for now, but may change in the future.
 		anyResultRoot := anyResultSubtree[podGroupInfo.GetKey()]
@@ -1119,7 +1101,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 		return anyResultRoot, nil
 	}
 
-	bestPlacement, status := sched.findBestCompositePodGroupPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, candidateResults)
+	bestPlacement, status := sched.findBestCompositePodGroupPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, successfulResults)
 	if !status.IsSuccess() {
 		return &podGroupAlgorithmResult{
 			podGroupInfo: podGroupInfo,
@@ -1127,7 +1109,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 		}, nil
 	}
 
-	bestResult := candidateResults[bestPlacement]
+	bestResult := successfulResults[bestPlacement]
 
 	revertFns, err = sched.assumeSubtreeWithRevert(ctx, schedFwk, podGroupInfo, bestResult)
 	if err != nil {

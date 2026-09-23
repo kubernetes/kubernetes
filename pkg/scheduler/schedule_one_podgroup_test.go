@@ -8351,7 +8351,7 @@ func TestPodGroupCycle_TASPlacementRankingWithPartialSuccess(t *testing.T) {
 		expectedBoundNodeByPod       map[string]string
 	}{
 		{
-			name: "Strictly prefers Success placement (placement2) over PartialSuccess placement (placement1) even when placement1 has higher score",
+			name: "Selects PartialSuccess placement (placement1) over Success placement (placement2) when placement1 has higher score",
 			allowedNodesByPod: map[string]sets.Set[string]{
 				// On placement1 (node1), only p3 fits (PartialSuccess).
 				// On placement2 (node2), both p3 and p4 fit (Success).
@@ -8362,6 +8362,23 @@ func TestPodGroupCycle_TASPlacementRankingWithPartialSuccess(t *testing.T) {
 				"placement1": 100,
 				"placement2": 10,
 			},
+			wantPodGroupPostFilterCalled: true,
+			expectedBoundNodeByPod: map[string]string{
+				"p3": "node1",
+			},
+		},
+		{
+			name: "Selects Success placement (placement2) over PartialSuccess placement (placement1) when placement2 has higher score",
+			allowedNodesByPod: map[string]sets.Set[string]{
+				// On placement1 (node1), only p3 fits (PartialSuccess).
+				// On placement2 (node2), both p3 and p4 fit (Success).
+				"p3": sets.New("node1", "node2"),
+				"p4": sets.New("node2"),
+			},
+			placementScores: map[string]int64{
+				"placement1": 10,
+				"placement2": 100,
+			},
 			wantPodGroupPostFilterCalled: false,
 			expectedBoundNodeByPod: map[string]string{
 				"p3": "node2",
@@ -8369,7 +8386,7 @@ func TestPodGroupCycle_TASPlacementRankingWithPartialSuccess(t *testing.T) {
 			},
 		},
 		{
-			name:          "Does not short-circuit NominatedNodeName on PartialSuccess placement (placement1); evaluates placement2 and binds full Success",
+			name:          "Short-circuits NominatedNodeName on PartialSuccess placement (placement1) when at least one pod is scheduled",
 			nominatedNode: "node1",
 			allowedNodesByPod: map[string]sets.Set[string]{
 				// Nominated placement1 (node1) only fits p3 (PartialSuccess).
@@ -8381,10 +8398,9 @@ func TestPodGroupCycle_TASPlacementRankingWithPartialSuccess(t *testing.T) {
 				"placement1": 10,
 				"placement2": 50,
 			},
-			wantPodGroupPostFilterCalled: false,
+			wantPodGroupPostFilterCalled: true,
 			expectedBoundNodeByPod: map[string]string{
-				"p3": "node2",
-				"p4": "node2",
+				"p3": "node1",
 			},
 		},
 		{
