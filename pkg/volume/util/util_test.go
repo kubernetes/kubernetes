@@ -172,6 +172,22 @@ func TestCalculateTimeoutForVolume(t *testing.T) {
 	if timeout != math.MaxInt32 {
 		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
 	}
+
+	// A large increment must not wrap the product. The increment is an int32
+	// flag with no validation bound, and at this size the Gi count is
+	// 8589934591, so anything above 1073741824 overflows the multiplication.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("100E")
+	timeout = CalculateTimeoutForVolume(50, math.MaxInt32, pv)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
+	}
+
+	// The product fits int64 but not int32.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("2Gi")
+	timeout = CalculateTimeoutForVolume(50, math.MaxInt32, pv)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
+	}
 }
 
 func TestFsUserFrom(t *testing.T) {
