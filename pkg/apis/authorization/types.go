@@ -179,6 +179,7 @@ type SubjectAccessReviewSpec struct {
 	UID string
 
 	// AuthorizationOptions contains options for specifying the client's authorization abilities.
+	// If unset, only unconditional authorization is supported, for backwards-compability.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
 	// +featureGate=ConditionalAuthorization
@@ -198,6 +199,7 @@ type SelfSubjectAccessReviewSpec struct {
 	NonResourceAttributes *NonResourceAttributes
 
 	// AuthorizationOptions contains options for specifying the client's authorization abilities.
+	// If unset, only unconditional authorization is supported, for backwards-compability.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
 	// +featureGate=ConditionalAuthorization
@@ -436,7 +438,8 @@ type ConditionsAwareDecision struct {
 	// Union forms an ordered tree of decisions, where the union decision is represented by
 	// an internal node, and all other decision types are leaf nodes. During evaluation, the
 	// leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found.
-	// The order of the decisions must match exactly the order of the authorizers in the union authorizer.
+	// The order of the decisions should match the order of the authorizers in the union authorizer
+	// for interpretability, but the authorizerName is the map key.
 	// At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially
 	// reduced to just a single Allow/Deny/NoOpinion.
 	//

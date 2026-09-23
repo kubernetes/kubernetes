@@ -230,10 +230,11 @@ type SubjectAccessReviewSpec struct {
 	UID string `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid"`
 
 	// authorizationOptions contains options for specifying the client's authorization abilities.
+	// If unset, only unconditional authorization is supported, for backwards-compability.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
-	// +k8s:optional
 	// +featureGate=ConditionalAuthorization
+	// +k8s:ifEnabled("ConditionalAuthorization")=+k8s:optional
 	// +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
 	AuthorizationOptions *AuthorizationOptions `json:"authorizationOptions,omitempty" protobuf:"bytes,7,opt,name=authorizationOptions"`
 }
@@ -262,10 +263,11 @@ type SelfSubjectAccessReviewSpec struct {
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
 
 	// authorizationOptions contains options for specifying the client's authorization abilities.
+	// If unset, only unconditional authorization is supported, for backwards-compability.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
-	// +k8s:optional
 	// +featureGate=ConditionalAuthorization
+	// +k8s:ifEnabled("ConditionalAuthorization")=+k8s:optional
 	// +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
 	AuthorizationOptions *AuthorizationOptions `json:"authorizationOptions,omitempty" protobuf:"bytes,3,opt,name=authorizationOptions"`
 }
@@ -299,8 +301,8 @@ type SubjectAccessReviewStatus struct {
 	// May only be set if spec.authorizationOptions.handledDecisionTypes includes `ConditionsMap` and `Union`.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
-	// +k8s:optional
 	// +featureGate=ConditionalAuthorization
+	// +k8s:ifEnabled("ConditionalAuthorization")=+k8s:optional
 	// +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
 	ConditionalDecision *ConditionsAwareDecision `json:"conditionalDecision,omitempty" protobuf:"bytes,5,opt,name=conditionalDecision"`
 }
@@ -450,6 +452,7 @@ type Condition struct {
 	// type describes the type of the condition, if there are multiple possibilities.
 	// Should be formatted as a Kubernetes label key.
 	// Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
+	// authorizer.kubernetes.io/cel is a conditions type for CEL, handled by kube-apiserver.
 	// Optional. Can be omitted if the authorizer already knows how to evaluate the condition.
 	// +k8s:format=k8s-prefixed-label-key
 	// +k8s:optional
@@ -537,7 +540,7 @@ const (
 // with variants described in ConditionsAwareDecisionType, plus a reason and error.
 type ConditionsAwareDecision struct {
 	// type describes the type of the decision, and acts as an enum discriminator.
-	// +k8s:beta=+k8s:unionDiscriminator
+	// +k8s:unionDiscriminator
 	// +k8s:required
 	// +required
 	Type ConditionsAwareDecisionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=ConditionsAwareDecisionType"`
@@ -573,7 +576,8 @@ type ConditionsAwareDecision struct {
 	// union forms an ordered tree of decisions, where the union decision is represented by
 	// an internal node, and all other decision types are leaf nodes. During evaluation, the
 	// leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found.
-	// The order of the decisions must match exactly the order of the authorizers in the union authorizer.
+	// The order of the decisions should match the order of the authorizers in the union authorizer
+	// for interpretability, but the authorizerName is the map key.
 	// At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially
 	// reduced to just a single Allow/Deny/NoOpinion.
 	//
