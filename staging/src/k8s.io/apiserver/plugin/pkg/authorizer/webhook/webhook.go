@@ -246,7 +246,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		return authorizer.DecisionNoOpinion, "", nil
 	}
 
-	r.Status, err = w.sendSARWebhook(ctx, r, attr)
+	r.Status, err = w.sendSARWebhook(ctx, r, attr, false)
 	if err != nil {
 		return w.decisionOnError, "", err
 	}
@@ -304,7 +304,7 @@ func (w *WebhookAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attr a
 		return authorizer.ConditionsAwareDecisionNoOpinion("", nil)
 	}
 
-	r.Status, err = w.sendSARWebhook(ctx, r, attr)
+	r.Status, err = w.sendSARWebhook(ctx, r, attr, true)
 	if err != nil {
 		return w.conditionsAwareFailureDecision(err)
 	}
@@ -343,7 +343,7 @@ func (w *WebhookAuthorizer) conditionsAwareFailureDecision(err error) authorizer
 	return authorizer.ConditionsAwareDecisionDeny("failed closed", err)
 }
 
-func (w *WebhookAuthorizer) sendSARWebhook(ctx context.Context, r *authorizationv1.SubjectAccessReview, attr authorizer.Attributes) (authorizationv1.SubjectAccessReviewStatus, error) {
+func (w *WebhookAuthorizer) sendSARWebhook(ctx context.Context, r *authorizationv1.SubjectAccessReview, attr authorizer.Attributes, handlesConditional bool) (authorizationv1.SubjectAccessReviewStatus, error) {
 	// If all evaluated successfully and ALL matchConditions evaluate to TRUE,
 	// then the webhook is called.
 	key, err := json.Marshal(r.Spec)
@@ -403,7 +403,7 @@ func (w *WebhookAuthorizer) sendSARWebhook(ctx context.Context, r *authorization
 		// TODO: There is a discrepancy between the if and the else branch, else writes into the r pointer, if does not.
 		r.Status = result.Status
 		if shouldCache(attr) {
-			if r.Status.Allowed {
+			if r.Status.Allowed || (handlesConditional && r.Status.ConditionalDecision != nil) {
 				w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
 			} else {
 				w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)

@@ -26,6 +26,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
@@ -45,14 +46,18 @@ import (
 )
 
 // fakeSubjectAccessReviewer implements subjectAccessReviewer for testing.
+// calls counts invocations, so a test can tell a cached answer from a second trip to the
+// webhook.
 type fakeSubjectAccessReviewer struct {
 	response *authorizationv1.SubjectAccessReview
 	err      error
 	received *authorizationv1.SubjectAccessReview
+	calls    int
 }
 
 func (f *fakeSubjectAccessReviewer) Create(_ context.Context, sar *authorizationv1.SubjectAccessReview, _ metav1.CreateOptions) (*authorizationv1.SubjectAccessReview, int, error) {
 	f.received = sar
+	f.calls++
 	if f.err != nil {
 		return nil, 0, f.err
 	}
@@ -1138,4 +1143,91 @@ func TestConditionsAwareAuthorize_V1beta1Downgrade(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestConditionalResponseCaching covers which TTL a conditional response is cached under.
+// A ConditionsMap is neither an allow nor a deny, so the choice depends on the caller: to
+// one that can evaluate conditions the response is as useful as an allow and is cached
+// under authorizedTTL, while to one that cannot it is not actionable and keeps the
+// shorter unauthorizedTTL.
+func TestConditionalResponseCaching(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
+	conditionalStatus := authorizationv1.SubjectAccessReviewStatus{
+		ConditionalDecision: &authorizationv1.ConditionsAwareDecision{
+			Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+			ConditionsMap: &authorizationv1.ConditionsMap{
+				AllowConditions: []authorizationv1.Condition{{ID: "example.com/allow", Type: "example.com/opaque"}},
+			},
+		},
+	}
+
+	// A long authorizedTTL against a zero unauthorizedTTL makes the branch observable: an
+	// entry cached as authorized answers the second call, an unauthorized one has already
+	// expired and the webhook is consulted again.
+	newAuthorizer := func(t *testing.T, sarReviewer subjectAccessReviewer) *WebhookAuthorizer {
+		t.Helper()
+		wh, err := newWithBackoff(sarReviewer, time.Hour, 0, testRetryBackoff,
+			authorizer.DecisionNoOpinion, nil, noopAuthorizerMetrics(),
+			authorizationcel.NewDefaultCompiler(), "test", nil)
+		if err != nil {
+			t.Fatalf("newWithBackoff failed: %v", err)
+		}
+		return wh
+	}
+
+	t.Run("conditions-aware caller caches a conditional response as authorized", func(t *testing.T) {
+		reviewer := &fakeSubjectAccessReviewer{
+			response: &authorizationv1.SubjectAccessReview{Status: conditionalStatus},
+		}
+		wh := newAuthorizer(t, reviewer)
+
+		for i := 1; i <= 2; i++ {
+			if got, want := wh.ConditionsAwareAuthorize(testCtx, testAttr).String(), "ConditionsMap(allows=1)"; got != want {
+				t.Errorf("call %d: expected decision %s, got %s", i, want, got)
+			}
+		}
+
+		if reviewer.calls != 1 {
+			t.Errorf("expected the second call to be served from the cache, got %d webhook calls", reviewer.calls)
+		}
+	})
+
+	t.Run("conditions-unaware caller does not cache a conditional response as authorized", func(t *testing.T) {
+		reviewer := &fakeSubjectAccessReviewer{
+			response: &authorizationv1.SubjectAccessReview{Status: conditionalStatus},
+		}
+		wh := newAuthorizer(t, reviewer)
+
+		for i := 1; i <= 2; i++ {
+			// Authorize cannot evaluate conditions, so it folds the decision down and
+			// reports the response as unrequested. Only the caching matters here.
+			if _, _, err := wh.Authorize(testCtx, testAttr); err == nil {
+				t.Errorf("call %d: expected an error for an unrequested conditional decision", i)
+			}
+		}
+
+		if reviewer.calls != 2 {
+			t.Errorf("expected the entry to have expired and the webhook to be called again, got %d webhook calls", reviewer.calls)
+		}
+	})
+
+	t.Run("conditions-aware caller still caches a denial as unauthorized", func(t *testing.T) {
+		reviewer := &fakeSubjectAccessReviewer{
+			response: &authorizationv1.SubjectAccessReview{
+				Status: authorizationv1.SubjectAccessReviewStatus{Denied: true, Reason: "denied"},
+			},
+		}
+		wh := newAuthorizer(t, reviewer)
+
+		for i := 1; i <= 2; i++ {
+			if got, want := wh.ConditionsAwareAuthorize(testCtx, testAttr).String(), `Deny(reason="denied")`; got != want {
+				t.Errorf("call %d: expected decision %s, got %s", i, want, got)
+			}
+		}
+
+		if reviewer.calls != 2 {
+			t.Errorf("expected the entry to have expired and the webhook to be called again, got %d webhook calls", reviewer.calls)
+		}
+	})
 }
