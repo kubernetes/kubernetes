@@ -21,6 +21,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
 // CanRescheduleElsewhere reports whether a replacement of pod, rebuilt from the
@@ -33,32 +34,23 @@ import (
 // topology spread) are deliberately not considered: a resource shortfall may
 // clear up by queueing, while a constraint mismatch cannot.
 func CanRescheduleElsewhere(logger klog.Logger, pod *v1.Pod, current string, nodes []*v1.Node, enableComparisonOperators bool) bool {
+	// Evaluate pod.Spec.NodeSelector and required nodeAffinity the same way as
+	// the nodeaffinity Filter plugin: build the matcher once per pod and reuse
+	// it for every node.
+	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
 	for _, node := range nodes {
 		if node == nil || node.Name == current {
 			continue
 		}
-		if podMatchesNodeConstraints(logger, pod, node, enableComparisonOperators) {
-			return true
+		if ok, err := requiredNodeAffinity.Match(node); err != nil || !ok {
+			continue
 		}
+		// Only NoSchedule and NoExecute taints prevent scheduling on a node;
+		// filter them the same way as the taint-toleration Filter plugin.
+		if _, untolerated := corev1helpers.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), enableComparisonOperators); untolerated {
+			continue
+		}
+		return true
 	}
 	return false
-}
-
-func podMatchesNodeConstraints(logger klog.Logger, pod *v1.Pod, node *v1.Node, enableComparisonOperators bool) bool {
-	// Reuse the same required node affinity evaluation as the nodeaffinity
-	// Filter plugin: pod.Spec.NodeSelector and required nodeAffinity together
-	// form the scheduler's node constraints for a pod.
-	if ok, err := nodeaffinity.NewRequiredNodeAffinity(pod.Spec.NodeSelector, pod.Spec.Affinity).Match(node); err != nil || !ok {
-		return false
-	}
-	if _, untolerated := corev1helpers.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations, doNotScheduleTaintsFilterFunc, enableComparisonOperators); untolerated {
-		return false
-	}
-	return true
-}
-
-// doNotScheduleTaintsFilterFunc mirrors the taint-toleration Filter plugin: only
-// NoSchedule and NoExecute taints prevent a pod from being scheduled on a node.
-func doNotScheduleTaintsFilterFunc(t *v1.Taint) bool {
-	return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
 }

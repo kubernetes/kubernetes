@@ -29,12 +29,15 @@ func TestCanRescheduleElsewhere(t *testing.T) {
 	node2 := makeNode("node2", map[string]string{"hostname": "node2"})
 	taintedNode := makeNode("node3", map[string]string{"hostname": "node3"})
 	taintedNode.Spec.Taints = []v1.Taint{{Key: "dedicated", Value: "foo", Effect: v1.TaintEffectNoSchedule}}
+	comparisonNode := makeNode("node4", map[string]string{"hostname": "node4"})
+	comparisonNode.Spec.Taints = []v1.Taint{{Key: "node.example.com/sla", Value: "950", Effect: v1.TaintEffectNoSchedule}}
 
 	testCases := map[string]struct {
-		pod         *v1.Pod
-		current     string
-		nodes       []*v1.Node
-		wantResched bool
+		pod                       *v1.Pod
+		current                   string
+		nodes                     []*v1.Node
+		enableComparisonOperators bool
+		wantResched               bool
 	}{
 		"unconstrained pod can move to another node": {
 			pod:         makePod("p", nil, nil, nil),
@@ -86,12 +89,30 @@ func TestCanRescheduleElsewhere(t *testing.T) {
 			nodes:       []*v1.Node{node1, taintedNode},
 			wantResched: true,
 		},
+		"number comparison toleration allows rescheduling when enabled": {
+			pod: makePod("p", nil, nil, []v1.Toleration{
+				{Key: "node.example.com/sla", Operator: v1.TolerationOpGt, Value: "750", Effect: v1.TaintEffectNoSchedule},
+			}),
+			current:                   "node1",
+			nodes:                     []*v1.Node{node1, comparisonNode},
+			enableComparisonOperators: true,
+			wantResched:               true,
+		},
+		"number comparison toleration does not match when disabled": {
+			pod: makePod("p", nil, nil, []v1.Toleration{
+				{Key: "node.example.com/sla", Operator: v1.TolerationOpGt, Value: "750", Effect: v1.TaintEffectNoSchedule},
+			}),
+			current:                   "node1",
+			nodes:                     []*v1.Node{node1, comparisonNode},
+			enableComparisonOperators: false,
+			wantResched:               false,
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			got := CanRescheduleElsewhere(logger, tc.pod, tc.current, tc.nodes, false)
+			got := CanRescheduleElsewhere(logger, tc.pod, tc.current, tc.nodes, tc.enableComparisonOperators)
 			if got != tc.wantResched {
 				t.Errorf("CanRescheduleElsewhere() = %v, want %v", got, tc.wantResched)
 			}
