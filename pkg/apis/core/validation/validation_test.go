@@ -14018,8 +14018,11 @@ func TestValidatePodUpdate(t *testing.T) {
 		fractionalGPULimit = podtest.SetContainerResources(core.ResourceRequirements{
 			Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
 		})
-		fractionalGPUPod     = *podtest.MakePod("pod", podtest.SetContainers(podtest.MakeContainer("container", fractionalGPULimit)))
-		fractionalGPUInitPod = *podtest.MakePod("pod", podtest.SetInitContainers(podtest.MakeContainer("init", fractionalGPULimit)))
+		fractionalGPUPod         = *podtest.MakePod("pod", podtest.SetContainers(podtest.MakeContainer("container", fractionalGPULimit)))
+		fractionalGPUInitPod     = *podtest.MakePod("pod", podtest.SetInitContainers(podtest.MakeContainer("init", fractionalGPULimit)))
+		fractionalGPUOverheadPod = *podtest.MakePod("pod", podtest.SetOverhead(core.ResourceList{
+			core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m"),
+		}))
 	)
 
 	tests := []struct {
@@ -14291,6 +14294,12 @@ func TestValidatePodUpdate(t *testing.T) {
 			opts: PodValidationOptions{StoredResourceQuantities: StoredResourceQuantitiesOf(&fractionalGPUInitPod.Spec)},
 			err:  "",
 			test: "unchanged fractional extended resource limit in init container",
+		}, {
+			new:  fractionalGPUOverheadPod,
+			old:  fractionalGPUOverheadPod,
+			opts: PodValidationOptions{StoredResourceQuantities: StoredResourceQuantitiesOf(&fractionalGPUOverheadPod.Spec)},
+			err:  "",
+			test: "unchanged fractional extended resource in overhead",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
@@ -15669,6 +15678,15 @@ func TestValidatePodTemplateUpdate(t *testing.T) {
 		old:  makeTemplate(nil, podtest.SetInitContainers(podtest.MakeContainer("init", fractionalGPULimit))),
 		new:  makeTemplate(nil, podtest.SetInitContainers(podtest.MakeContainer("init", fractionalGPULimit))),
 		err:  "",
+	}, {
+		// A pod template update can freely restructure the container lists (unlike a live pod
+		// update). The same name moving from initContainers to containers, even with the exact
+		// same value, is a different field, not the same field left unchanged, so it must still be
+		// validated rather than ratcheted.
+		test: "same name and value moving from an init container to a regular container is not unchanged",
+		old:  makeTemplate(nil, podtest.SetInitContainers(podtest.MakeContainer("worker", fractionalGPULimit))),
+		new:  makeTemplate(nil, podtest.SetContainers(podtest.MakeContainer("worker", fractionalGPULimit))),
+		err:  "must be an integer",
 	}}
 	for _, tc := range tests {
 		t.Run(tc.test, func(t *testing.T) {
@@ -23136,6 +23154,43 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	})
 
+	negativeAllocatedResources := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		AllocatedResources: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("-10G"),
+		},
+	})
+
+	negativeAllocatedResourcesConditionUpdate := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		AllocatedResources: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("-10G"),
+		},
+	})
+
 	noStoraegeClaimStatus := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
@@ -23347,6 +23402,12 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			isExpectedFailure: false,
 			oldClaim:          hugeNegativeCapacity,
 			newClaim:          hugeNegativeCapacityConditionUpdate,
+		},
+		"condition-update-with-unchanged-negative-allocatedResources": {
+			isExpectedFailure:          false,
+			oldClaim:                   negativeAllocatedResources,
+			newClaim:                   negativeAllocatedResourcesConditionUpdate,
+			enableRecoverFromExpansion: true,
 		},
 		"status-update-with-no-storage-update": {
 			isExpectedFailure:          true,
@@ -31423,6 +31484,73 @@ func TestValidatePodResize(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestStoredResourceQuantitySetMatching covers three properties StoredResourceQuantitySet and
+// StoredResourceQuantitiesOf must hold that no single ValidatePod*/ValidateNode*/ValidatePVC*
+// end-to-end test case exercises directly:
+//  1. Has compares by Quantity.Cmp, not by string equality, since Quantity.String() only
+//     canonicalizes within one format ("500m" and "5e-1" are equal quantities that format
+//     differently).
+//  2. a container's stored resources are keyed by both its kind (container/initContainer/
+//     ephemeralContainer) and its name, so moving a same-named container between those lists does
+//     not make its old resources look unchanged.
+//  3. spec.Overhead has its own location, distinct from the pod level's own spec.Resources, so an
+//     unchanged overhead value is matched by an unchanged overhead value and nothing else.
+func TestStoredResourceQuantitySetMatching(t *testing.T) {
+	t.Run("Has matches equal quantities spelled differently", func(t *testing.T) {
+		spec := &core.PodSpec{Containers: []core.Container{{
+			Name: "ctr",
+			Resources: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("500m")},
+			},
+		}}}
+		stored := StoredResourceQuantitiesOf(spec)
+		reSpelled := resource.MustParse("5e-1")
+		if reSpelled.String() == "500m" {
+			t.Fatalf("test assumption broken: %q now formats identically to %q, pick a pair whose String() differs", "5e-1", "500m")
+		}
+		original := resource.MustParse("500m")
+		if !stored.Has("container:ctr/limits", core.ResourceCPU, reSpelled) {
+			t.Errorf("Has(%q) = false, want true: %q and %q are equal quantities (Cmp=%d) that format differently", reSpelled.String(), "500m", reSpelled.String(), original.Cmp(reSpelled))
+		}
+	})
+
+	t.Run("a container moving from initContainers to containers is not treated as unchanged", func(t *testing.T) {
+		badQty := resource.MustParse("18446744073709551616m")
+		oldSpec := &core.PodSpec{InitContainers: []core.Container{{
+			Name:      "worker",
+			Resources: core.ResourceRequirements{Limits: core.ResourceList{core.ResourceName("example.com/gpu"): badQty}},
+		}}}
+		stored := StoredResourceQuantitiesOf(oldSpec)
+		if stored.Has("container:worker/limits", core.ResourceName("example.com/gpu"), badQty) {
+			t.Errorf("Has(\"container:worker/limits\") = true, want false: worker's stored value was under initContainer, not container")
+		}
+		if !stored.Has("initContainer:worker/limits", core.ResourceName("example.com/gpu"), badQty) {
+			t.Errorf("Has(\"initContainer:worker/limits\") = false, want true: that is where worker's value was actually stored")
+		}
+	})
+
+	t.Run("spec.Overhead and spec.Resources do not share a location", func(t *testing.T) {
+		qty := resource.MustParse("18446744073709551616m")
+		spec := &core.PodSpec{
+			Overhead:  core.ResourceList{core.ResourceName("example.com/gpu"): qty},
+			Resources: &core.ResourceRequirements{Limits: core.ResourceList{core.ResourceName("example.com/gpu"): qty}},
+		}
+		stored := StoredResourceQuantitiesOf(spec)
+		if !stored.Has("overhead:/limits", core.ResourceName("example.com/gpu"), qty) {
+			t.Errorf("Has(\"overhead:/limits\") = false, want true: spec.Overhead should be collected under its own location")
+		}
+		if !stored.Has("pod:/limits", core.ResourceName("example.com/gpu"), qty) {
+			t.Errorf("Has(\"pod:/limits\") = false, want true: spec.Resources should still be collected under its own location")
+		}
+		// The two locations must be distinct: overhead alone, with spec.Resources absent, must not
+		// satisfy a pod-level lookup, and vice versa.
+		overheadOnly := StoredResourceQuantitiesOf(&core.PodSpec{Overhead: core.ResourceList{core.ResourceName("example.com/gpu"): qty}})
+		if overheadOnly.Has("pod:/limits", core.ResourceName("example.com/gpu"), qty) {
+			t.Errorf("Has(\"pod:/limits\") = true, want false: only overhead was stored, not spec.Resources")
+		}
+	})
 }
 
 func TestValidateNodeSwapStatus(t *testing.T) {

@@ -60,9 +60,8 @@ func TestValidateUpdate(t *testing.T) {
 			},
 		},
 	}, {
-		// TODO(#141166): An unchanged stored overhead must pass on update. Expect no errors.
 		name:        "unchanged overhead example.com/gpu 18446744073709551616m",
-		expectError: true,
+		expectError: false,
 		old: node.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Handler:    "bar",
@@ -85,9 +84,8 @@ func TestValidateUpdate(t *testing.T) {
 			},
 		},
 	}, {
-		// TODO(#141166): An unchanged stored overhead must pass on update. Expect no errors.
 		name:        "unchanged overhead hugepages-2Mi 18446744073709551616",
-		expectError: true,
+		expectError: false,
 		old: node.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Handler:    "bar",
