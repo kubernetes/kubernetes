@@ -19,9 +19,13 @@ limitations under the License.
 package cm
 
 import (
+	"maps"
 	"path"
 	"reflect"
 	"testing"
+
+	libcontainercgroups "github.com/opencontainers/cgroups"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TestNewCgroupName tests confirms that #68416 is fixed
@@ -166,6 +170,61 @@ func TestParseSystemdToCgroupName(t *testing.T) {
 		if actual := ParseSystemdToCgroupName(testCase.input); !reflect.DeepEqual(actual, testCase.expected) {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
+	}
+}
+
+func TestMaybeSetHugetlb(t *testing.T) {
+	if libcontainercgroups.IsCgroup2UnifiedMode() && !getSupportedUnifiedControllers().Has("hugetlb") {
+		t.Skip("hugetlb controller is not available")
+	}
+	if len(libcontainercgroups.HugePageSizes()) == 0 {
+		t.Skip("no supported hugepage sizes")
+	}
+
+	const pageSize2MB = 2 * 1024 * 1024
+	zeroLimits := map[string]uint64{}
+	for _, pageSize := range libcontainercgroups.HugePageSizes() {
+		zeroLimits[pageSize] = 0
+	}
+	with2MBLimit := maps.Clone(zeroLimits)
+	with2MBLimit["2MB"] = 2 * pageSize2MB
+
+	testCases := []struct {
+		name          string
+		hugePageLimit map[int64]int64
+		expected      map[string]uint64
+	}{
+		{
+			name:          "nil map writes no limits",
+			hugePageLimit: nil,
+			expected:      map[string]uint64{},
+		},
+		{
+			name:          "empty map zeroes every supported page size",
+			hugePageLimit: map[int64]int64{},
+			expected:      zeroLimits,
+		},
+		{
+			name:          "set sizes keep their limit and omitted sizes are zeroed",
+			hugePageLimit: map[int64]int64{pageSize2MB: 2 * pageSize2MB},
+			expected:      with2MBLimit,
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	m := &cgroupCommon{subsystems: &CgroupSubsystems{MountPoints: map[string]string{"hugetlb": "/sys/fs/cgroup/hugetlb"}}}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			resources := &libcontainercgroups.Resources{}
+			m.maybeSetHugetlb(logger, &ResourceConfig{HugePageLimit: testCase.hugePageLimit}, resources)
+			actual := map[string]uint64{}
+			for _, limit := range resources.HugetlbLimit {
+				actual[limit.Pagesize] = limit.Limit
+			}
+			if !reflect.DeepEqual(actual, testCase.expected) {
+				t.Errorf("hugetlb limits: got %v, want %v", actual, testCase.expected)
+			}
+		})
 	}
 }
 
