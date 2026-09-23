@@ -17,8 +17,11 @@ limitations under the License.
 package node
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -477,48 +480,93 @@ func newHandlerForTest() (*defaulttolerationseconds.Plugin, error) {
 	return handler, admission.ValidateInitialization(handler)
 }
 
-// failDeleteAdmission is kept for other tests but is no longer used by
-// TestTaintEvictionDurableRetryEndToEnd, which injects failures at the
-// HTTP transport layer instead (see failDeleteWrapper below).
-type failDeleteAdmission struct {
-	*admission.Handler
-	failures *atomic.Int32
+// failDeleteWrapper is a client-side HTTP round-trip wrapper used by
+// TestTaintEvictionDurableRetryEndToEnd to inject exactly maxFail transient
+// DELETE failures for a specific pod, then allow subsequent requests through.
+//
+// During the burst phase (attempts < maxFail):
+//   - GET  for the pod path → returns a synthetic 200 with the cached pod JSON,
+//     so addConditionAndDeletePod completes its internal Get without a live
+//     round-trip and the burst loop runs in microseconds.
+//   - PATCH to the pod status subresource → same synthetic 200, so
+//     PatchPodStatus succeeds instantly without writing to etcd.
+//   - DELETE → returns a transient error and increments the failure counter.
+//
+// After maxFail DELETEs the wrapper passes every request to the real server,
+// so the durable retry's Get/Patch/Delete all hit the real API server and
+// the real pod is deleted.
+//
+// Keeping GET and PATCH synthetic during the burst phase is essential for
+// Prow stability: without it, 5 × (real GET + real PATCH) can consume the
+// test's entire time budget and leave the retry's Delete with a cancelled ctx.
+type failDeleteWrapper struct {
+	// podPath matches the URL path substring for the target pod.
+	// Example: "/pods/test-pod". Matches both "/pods/test-pod" and
+	// "/pods/test-pod/status" (for PATCH).
+	podPath string
+	// maxFail is the number of DELETE requests to reject before allowing through.
+	maxFail int32
+	// attempts counts every DELETE request that targets podPath.
+	attempts atomic.Int32
+	// podJSON holds a JSON-encoded copy of the created pod, used to serve
+	// synthetic GET and PATCH responses during the burst phase.
+	// Written once before the controller starts; safe to read concurrently.
+	podJSON []byte
 }
 
-func (f *failDeleteAdmission) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
-	if a.GetResource().Resource == "pods" && a.GetName() == "test-pod" && a.GetOperation() == admission.Delete {
-		if f.failures.Add(1) <= 5 {
-			return admission.NewForbidden(a, fmt.Errorf("injected failure for testing durable retry"))
-		}
+// setPod caches a JSON-encoded snapshot of pod for use in synthetic responses.
+// Must be called after pod creation and before the controller starts.
+func (w *failDeleteWrapper) setPod(pod *v1.Pod) error {
+	b, err := json.Marshal(pod)
+	if err != nil {
+		return err
 	}
+	w.podJSON = b
 	return nil
 }
 
-// failDeleteWrapper is a client-side HTTP round-trip wrapper that rejects the
-// first maxFail DELETE requests for a specific pod path by returning a 503.
-// Subsequent DELETE requests are forwarded to the real server. This approach
-// gives the test accurate, atomic failure counting without relying on
-// server-side admission state.
-type failDeleteWrapper struct {
-	// podPath is the HTTP path substring that identifies the target pod delete
-	// (e.g. "/pods/test-pod"). Only DELETE requests whose URL path contains
-	// this string are intercepted.
-	podPath string
-	// maxFail is the number of DELETE attempts to reject before allowing them.
-	maxFail int32
-	// attempts counts every DELETE request for the target pod seen by this wrapper.
-	attempts atomic.Int32
+// syntheticOK returns an *http.Response with status 200 and body b.
+func syntheticOK(b []byte) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewReader(b)),
+	}
 }
 
-// roundTrip implements testutils.RoundTripWrapper: it counts and optionally
-// rejects DELETE requests that target the configured pod path.
+// roundTrip implements testutils.RoundTripWrapper.
 func (w *failDeleteWrapper) roundTrip(inner http.RoundTripper, req *http.Request) (*http.Response, error) {
-	if req.Method == http.MethodDelete && strings.Contains(req.URL.Path, w.podPath) {
+	if !strings.Contains(req.URL.Path, w.podPath) {
+		return inner.RoundTrip(req)
+	}
+	// inBurst is true after the first DELETE has been counted and while
+	// fewer than maxFail DELETEs have been seen. During this window, GET and
+	// PATCH for the target pod are served from the cached JSON so that the
+	// burst loop iterations 2–maxFail complete without live server round-trips.
+	// Iteration 1's GET/PATCH pass through (attempts==0) so the DisruptionTarget
+	// condition is genuinely written to etcd on the first attempt.
+	cur := w.attempts.Load()
+	inBurst := cur >= 1 && cur < w.maxFail
+	switch req.Method {
+	case http.MethodDelete:
 		n := w.attempts.Add(1)
 		if n <= w.maxFail {
-			// Simulate a transient network failure so the controller burst loop
-			// retries (err != nil path) without any server-side side-effects.
+			// Transient failure: controller burst loop re-tries, eventually
+			// calls addPodEvictionRetry and enqueues the durable retry item.
 			return nil, fmt.Errorf("injected transient failure for DELETE attempt %d", n)
+		}
+		// Attempt 6+: pass to the real server so the pod is actually deleted.
+	case http.MethodGet:
+		if inBurst && len(w.podJSON) > 0 {
+			// Return the cached pod so addConditionAndDeletePod can read the
+			// UID and condition list without a live API call.
+			return syntheticOK(w.podJSON), nil
+		}
+	case http.MethodPatch:
+		if inBurst && len(w.podJSON) > 0 {
+			// Return the cached pod as the PATCH result so PatchPodStatus
+			// succeeds instantly without writing to etcd.
+			return syntheticOK(w.podJSON), nil
 		}
 	}
 	return inner.RoundTrip(req)
@@ -553,13 +601,15 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	testCtx := testutils.InitTestAPIServer(t, "taint-eviction-retry", nil)
 	cs := testCtx.ClientSet
 
-	// Install a client-side transport wrapper that rejects the first 5 DELETE
-	// requests for the pod under test. The wrapper counts all attempts so the
-	// test can assert at least 6 occurred (5 failures + 1 success via retry).
-	//
-	// Using a transport wrapper instead of a server-side admission plugin
-	// avoids admission-state races and guarantees that the failure count is
-	// accurate regardless of backoff or retry scheduling.
+	// Install a client-side transport wrapper that:
+	//   - Rejects the first 5 DELETE requests for the pod with a transient error,
+	//     so all 5 burst attempts in deletePodHandler fail and addPodEvictionRetry
+	//     is called, exercising the durable retry queue.
+	//   - Intercepts GET and PATCH for burst iterations 2–5 with synthetic
+	//     responses, so those iterations complete in microseconds rather than
+	//     making live round-trips that could consume the test's entire time budget.
+	//   - Passes every request (GET, PATCH, DELETE) through to the real API server
+	//     after maxFail DELETEs, so the retry queue's final deletion is real.
 	deleteWrapper := &failDeleteWrapper{
 		podPath: "/pods/test-pod",
 		maxFail: 5,
@@ -643,6 +693,11 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	createdPod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
+	}
+	// Cache the created pod's JSON so the wrapper can serve synthetic GET/PATCH
+	// responses during the burst phase (iterations 2-5) without hitting etcd.
+	if err := deleteWrapper.setPod(createdPod); err != nil {
+		t.Fatalf("Failed to cache pod JSON: %v", err)
 	}
 	t.Cleanup(func() { testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{createdPod}) })
 
