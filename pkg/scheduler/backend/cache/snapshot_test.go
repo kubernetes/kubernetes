@@ -1803,7 +1803,7 @@ func TestSnapshot_AddRemovePod(t *testing.T) {
 					features.GenericWorkload:                  true,
 					features.InterPodAffinityHostnameFastPath: fastPathEnabled,
 				})
-				s := NewTestSnapshotWithPodGroups(tt.initialPods, tt.initialNodes, tt.initialPodGroups)
+				s := NewTestSnapshotWithPodGroups(tt.initialPods, tt.initialNodes, tt.initialPodGroups, nil)
 
 				// Store original state for deep verification
 				origNodeInfoMap, origNodeInfoList, origAffinityList, origAntiAffinityList, origUsedPVCRefCounts, origPGStates, origNonHostScopedAntiAffinityList := simplifySnapshot(s)
@@ -2198,7 +2198,7 @@ func TestSnapshot_AddGenericPodGroups(t *testing.T) {
 			},
 		},
 		{
-			name:                     "add list of podGroups when parent is behind child on the list",
+			name:                     "add podGroups when parent is added after the child",
 			compositePodGroupEnabled: true,
 			gpgsToAdd: []*fwk.GenericPodGroup{
 				fwk.NewGenericPodGroup(pg1),
@@ -2240,12 +2240,10 @@ func TestSnapshot_AddGenericPodGroups(t *testing.T) {
 			},
 		},
 		{
-			name:                     "adding existing podGroup fails and rolls back all added groups in batch",
+			name:                     "adding existing podGroup fails",
 			compositePodGroupEnabled: true,
 			initialPGs:               []*schedulingv1beta1.PodGroup{pgStandalone},
 			gpgsToAdd: []*fwk.GenericPodGroup{
-				fwk.NewGenericPodGroup(pg1),
-				fwk.NewGenericCompositePodGroup(cpgMid),
 				fwk.NewGenericPodGroup(pgStandalone), // already exists
 			},
 			wantErr: true,
@@ -2256,11 +2254,10 @@ func TestSnapshot_AddGenericPodGroups(t *testing.T) {
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 		{
-			name:                     "adding existing compositePodGroup fails and rolls back all added groups in batch",
+			name:                     "adding existing compositePodGroup fails",
 			compositePodGroupEnabled: true,
 			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgRoot},
 			gpgsToAdd: []*fwk.GenericPodGroup{
-				fwk.NewGenericPodGroup(pg2),
 				fwk.NewGenericCompositePodGroup(cpgRoot), // already exists
 			},
 			wantErr: true,
@@ -2287,21 +2284,6 @@ func TestSnapshot_AddGenericPodGroups(t *testing.T) {
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
-		{
-			name:                     "adding existing podGroup when compositePodGroupEnabled is false fails and rolls back",
-			compositePodGroupEnabled: false,
-			initialPGs:               []*schedulingv1beta1.PodGroup{pgStandalone},
-			gpgsToAdd: []*fwk.GenericPodGroup{
-				fwk.NewGenericPodGroup(pg1),
-				fwk.NewGenericPodGroup(pgStandalone),
-			},
-			wantErr: true,
-			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				pgStandaloneKey: pgStandalone,
-			},
-			wantCPGs:     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{},
-			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
-		},
 	}
 
 	for _, tt := range tests {
@@ -2312,12 +2294,14 @@ func TestSnapshot_AddGenericPodGroups(t *testing.T) {
 				features.CompositePodGroup:               tt.compositePodGroupEnabled,
 			})
 
-			s := NewTestSnapshotWithCompositePodGroups(tt.initialPods, nil, tt.initialPGs, tt.initialCPGs)
+			s := NewTestSnapshotWithPodGroups(tt.initialPods, nil, tt.initialPGs, tt.initialCPGs)
 			s.compositePodGroupEnabled = tt.compositePodGroupEnabled
 
-			err := s.AddGenericPodGroups(tt.gpgsToAdd)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("AddGenericPodGroups() error = %v, wantErr %v", err, tt.wantErr)
+			for _, gpg := range tt.gpgsToAdd {
+				err := s.AddGenericPodGroup(gpg)
+				if (err != nil) != tt.wantErr {
+					t.Fatalf("AddGenericPodGroups() error = %v, wantErr %v", err, tt.wantErr)
+				}
 			}
 
 			gotPGs := make(map[fwk.EntityKey]*schedulingv1beta1.PodGroup)
@@ -2518,8 +2502,10 @@ func TestSnapshot_RemoveGenericPodGroup(t *testing.T) {
 			if len(tt.initialPods) > 0 {
 				s.podGroupStates = createPodGroupStates(tt.initialPods)
 			}
-			if err := s.AddGenericPodGroups(tt.initialGPGs); err != nil {
-				t.Fatalf("Setup AddGenericPodGroups() failed: %v", err)
+			for _, gpg := range tt.initialGPGs {
+				if err := s.AddGenericPodGroup(gpg); err != nil {
+					t.Fatalf("Setup AddGenericPodGroups() failed: %v", err)
+				}
 			}
 
 			err := s.RemoveGenericPodGroup(tt.gpgToRemove)

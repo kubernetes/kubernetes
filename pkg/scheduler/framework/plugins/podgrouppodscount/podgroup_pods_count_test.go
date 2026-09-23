@@ -286,7 +286,7 @@ func TestScorePlacement(t *testing.T) {
 					cpgPtrs[i] = &cpgs[i]
 				}
 
-				snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(pods, nil, pgPtrs, cpgPtrs)
+				snapshot := internalcache.NewTestSnapshotWithPodGroups(pods, nil, pgPtrs, cpgPtrs)
 
 				fh, _ := frameworkruntime.NewFramework(tCtx, nil, nil,
 					frameworkruntime.WithInformerFactory(informerFactory),

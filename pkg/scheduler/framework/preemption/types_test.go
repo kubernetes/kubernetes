@@ -753,11 +753,8 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 			}
 
 			var snapshot *internalcache.Snapshot
-			if tt.enableCompositePodGroup {
-				snapshot = internalcache.NewTestSnapshotWithCompositePodGroups(tt.pods, tt.nodes, pgs, cpgs)
-			} else {
-				snapshot = internalcache.NewTestSnapshotWithPodGroups(tt.pods, tt.nodes, pgs)
-			}
+			snapshot = internalcache.NewTestSnapshotWithPodGroups(tt.pods, tt.nodes, pgs, cpgs)
+
 			cache := internalcache.New(ctx, nil, true, tt.enableCompositePodGroup)
 
 			for _, node := range tt.nodes {

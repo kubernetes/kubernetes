@@ -234,7 +234,7 @@ func TestGetPodGroupStates(t *testing.T) {
 				wantPodGroups.Insert(pg.Name)
 			}
 
-			snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(pods, nil, tt.podGroups, tt.compositePodGroups)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(pods, nil, tt.podGroups, tt.compositePodGroups)
 			sharedLister := &fakeSharedLister{
 				SharedLister:     snapshot,
 				faultyEntityKeys: sets.New(tt.faultyEntityKeys...),
@@ -275,7 +275,7 @@ func TestGetPodGroupStates_EarlyBreak(t *testing.T) {
 		st.MakeCompositePodGroup().Name("cpg-root").Namespace("test").Obj(),
 	}
 
-	snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(nil, nil, podGroups, compositePodGroups)
+	snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nil, podGroups, compositePodGroups)
 	sharedLister := &fakeSharedLister{SharedLister: snapshot}
 	rootEntityKey := fwk.CompositePodGroupKey("test", "cpg-root")
 

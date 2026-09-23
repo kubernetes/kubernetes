@@ -2333,7 +2333,7 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			})
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(tt.initPods, nodes, tt.initPodGroups, tt.initCompositePodGroups)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, nodes, tt.initPodGroups, tt.initCompositePodGroups)
 			fh := &fakeHandleForLister{
 				informerFactory: informerFactory,
 				snapshot:        snapshot,

@@ -217,33 +217,22 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	return s
 }
 
-// NewTestSnapshotWithPodGroups initializes a Snapshot struct with pod groups and returns it.
+// NewTestSnapshotWithPodGroups initializes a Snapshot struct with pod groups and composite pod groups and returns it.
 // It should be used only in the tests.
-func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1beta1.PodGroup) *Snapshot {
+func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1beta1.PodGroup, compositePodGroups []*schedulingv1alpha3.CompositePodGroup) *Snapshot {
 	s := NewSnapshot(pods, nodes)
-	for _, podGroup := range podGroups {
-		key := fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)
-		pgs := s.getOrCreatePodGroupState(key)
-		pgs.podGroup = podGroup
-	}
-	return s
-}
-
-// NewTestSnapshotWithCompositePodGroups initializes a Snapshot struct with pod groups and composite pod groups and returns it.
-// It should be used only in the tests.
-func NewTestSnapshotWithCompositePodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1beta1.PodGroup, compositePodGroups []*schedulingv1alpha3.CompositePodGroup) *Snapshot {
-	s := NewSnapshot(pods, nodes)
-	genericPodGroups := make([]*fwk.GenericPodGroup, len(compositePodGroups)+len(podGroups))
-	i := 0
+	genericPodGroups := make([]*fwk.GenericPodGroup, 0, len(compositePodGroups)+len(podGroups))
 	for _, cpg := range compositePodGroups {
-		genericPodGroups[i] = fwk.NewGenericCompositePodGroup(cpg)
-		i++
+		genericPodGroups = append(genericPodGroups, fwk.NewGenericCompositePodGroup(cpg))
 	}
 	for _, pg := range podGroups {
-		genericPodGroups[i] = fwk.NewGenericPodGroup(pg)
-		i++
+		genericPodGroups = append(genericPodGroups, fwk.NewGenericPodGroup(pg))
 	}
-	s.AddGenericPodGroups(genericPodGroups)
+	for _, genericPodGroup := range genericPodGroups {
+		if err := s.AddGenericPodGroup(genericPodGroup); err != nil {
+			return nil
+		}
+	}
 	return s
 }
 
@@ -952,54 +941,34 @@ func (s *Snapshot) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManag
 	return s, nil
 }
 
-// AddGenericPodGroups adds generic pod group objects to the snapshot,
-// linking each to its parent composite pod group if CompositePodGroup is enabled.
-// In case of failure while adding any pod group, all previously added pod groups
-// from this call are rolled back and an error is returned.
-// NOTE: this function is meant to be use by simulation library ONLY.
-func (s *Snapshot) AddGenericPodGroups(genericPodGroups []*fwk.GenericPodGroup) error {
-	added := make([]*fwk.GenericPodGroup, 0, len(genericPodGroups))
-	rollback := func() {
-		for _, a := range slices.Backward(added) {
-			_ = s.RemoveGenericPodGroup(a)
+// AddGenericPodGroup adds generic pod group object to the snapshot,
+// linking it to its parent composite pod group if CompositePodGroup is enabled.
+// NOTE: this function is meant to be use by tests and simulation library ONLY.
+func (s *Snapshot) AddGenericPodGroup(genericPodGroup *fwk.GenericPodGroup) error {
+	key := genericPodGroup.GetKey()
+
+	switch genericPodGroup.GetType() {
+	case fwk.PodGroupKeyType:
+		pgs := s.getOrCreatePodGroupState(key)
+		if pgs.podGroup != nil {
+			return fmt.Errorf("pod group %s already exists in snapshot", key)
 		}
+		pgs.setPodGroup(genericPodGroup.PodGroup)
+	case fwk.CompositePodGroupKeyType:
+		cpgs := s.getOrCreateCompositePodGroupState(key)
+		if cpgs.compositePodGroup != nil {
+			return fmt.Errorf("composite pod group %s already exists in snapshot", key)
+		}
+		cpgs.setCompositePodGroup(genericPodGroup.CompositePodGroup)
+	default:
+		return fmt.Errorf("unsupported generic pod group type %q for %s", genericPodGroup.GetType(), key)
 	}
 
-	for _, gpg := range genericPodGroups {
-		if gpg == nil {
-			rollback()
-			return fmt.Errorf("cannot add nil GenericPodGroup to snapshot")
+	if s.compositePodGroupEnabled {
+		if parentKey, hasParent := genericPodGroup.GetParentKey(); hasParent {
+			parent := s.getOrCreateCompositePodGroupState(parentKey)
+			parent.addChild(key)
 		}
-		key := gpg.GetKey()
-
-		switch gpg.GetType() {
-		case fwk.PodGroupKeyType:
-			pgs := s.getOrCreatePodGroupState(key)
-			if pgs.podGroup != nil {
-				rollback()
-				return fmt.Errorf("pod group %s already exists in snapshot", key)
-			}
-			pgs.setPodGroup(gpg.PodGroup)
-		case fwk.CompositePodGroupKeyType:
-			cpgs := s.getOrCreateCompositePodGroupState(key)
-			if cpgs.compositePodGroup != nil {
-				rollback()
-				return fmt.Errorf("composite pod group %s already exists in snapshot", key)
-			}
-			cpgs.setCompositePodGroup(gpg.CompositePodGroup)
-		default:
-			rollback()
-			return fmt.Errorf("unsupported generic pod group type %q for %s", gpg.GetType(), key)
-		}
-
-		if s.compositePodGroupEnabled {
-			if parentKey, hasParent := gpg.GetParentKey(); hasParent {
-				parent := s.getOrCreateCompositePodGroupState(parentKey)
-				parent.addChild(key)
-			}
-		}
-
-		added = append(added, gpg)
 	}
 
 	return nil
@@ -1009,9 +978,6 @@ func (s *Snapshot) AddGenericPodGroups(genericPodGroups []*fwk.GenericPodGroup) 
 // unlinking it from its parent composite pod group if CompositePodGroup is enabled.
 // NOTE: this function is meant to be use by simulation library ONLY.
 func (s *Snapshot) RemoveGenericPodGroup(gpg *fwk.GenericPodGroup) error {
-	if gpg == nil {
-		return fmt.Errorf("cannot remove nil GenericPodGroup from snapshot")
-	}
 	key := gpg.GetKey()
 
 	switch gpg.GetType() {

@@ -428,7 +428,7 @@ func TestGeneratePlacements(t *testing.T) {
 					nodePtrs[i] = &nodes[i]
 				}
 
-				snapshot := cache.NewTestSnapshotWithCompositePodGroups(pods, nodePtrs, pgPtrs, cpgPtrs)
+				snapshot := cache.NewTestSnapshotWithPodGroups(pods, nodePtrs, pgPtrs, cpgPtrs)
 
 				fh, _ := runtime.NewFramework(tCtx, nil, nil,
 					runtime.WithInformerFactory(informerFactory),
