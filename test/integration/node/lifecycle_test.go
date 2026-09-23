@@ -494,7 +494,10 @@ func newHandlerForTest() (*defaulttolerationseconds.Plugin, error) {
 //
 // After maxFail DELETEs the wrapper passes every request to the real server,
 // so the durable retry's Get/Patch/Delete all hit the real API server and
-// the real pod is deleted.
+// the real pod is deleted. successfulDeletes records when such a DELETE has
+// received its response. The test must wait for that response before returning:
+// observing a deletion timestamp alone can race the apiserver's completion of
+// the DELETE request, and test cleanup cancels testCtx.Ctx.
 //
 // Keeping GET and PATCH synthetic during the burst phase is essential for
 // Prow stability: without it, 5 × (real GET + real PATCH) can consume the
@@ -508,6 +511,8 @@ type failDeleteWrapper struct {
 	maxFail int32
 	// attempts counts every DELETE request that targets podPath.
 	attempts atomic.Int32
+	// successfulDeletes counts real DELETE requests that completed successfully.
+	successfulDeletes atomic.Int32
 	// podJSON holds a JSON-encoded copy of the created pod, used to serve
 	// synthetic GET and PATCH responses during the burst phase.
 	// Written once before the controller starts; safe to read concurrently.
@@ -556,6 +561,11 @@ func (w *failDeleteWrapper) roundTrip(inner http.RoundTripper, req *http.Request
 			return nil, fmt.Errorf("injected transient failure for DELETE attempt %d", n)
 		}
 		// Attempt 6+: pass to the real server so the pod is actually deleted.
+		resp, err := inner.RoundTrip(req)
+		if err == nil && resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+			w.successfulDeletes.Add(1)
+		}
+		return resp, err
 	case http.MethodGet:
 		if inBurst && len(w.podJSON) > 0 {
 			// Return the cached pod so addConditionAndDeletePod can read the
@@ -732,10 +742,15 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	// will reject all 5 attempts with a transient network error. The controller
 	// will then hand off the eviction to the rate-limited durable retry queue
 	// (podEvictionQueue). We wait up to 30 seconds for the eventual successful
-	// deletion (the 6th attempt or later) via the durable retry queue.
+	// deletion (the 6th attempt or later) via the durable retry queue. Wait for
+	// the real DELETE round trip to finish, not merely for DeletionTimestamp:
+	// the latter is stored before the handler returns, while test cleanup cancels
+	// testCtx.Ctx as soon as this test function returns.
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 30*time.Second, true,
-		testutils.PodIsGettingEvicted(cs, testCtx.NS.Name, createdPod.Name)); err != nil {
-		t.Errorf("Pod was not evicted within expected window: %v", err)
+		func(context.Context) (bool, error) {
+			return deleteWrapper.successfulDeletes.Load() > 0, nil
+		}); err != nil {
+		t.Errorf("Pod was not deleted by a completed durable retry within expected window: %v", err)
 	}
 
 	// Verify that the transport wrapper actually saw at least 6 DELETE attempts:
@@ -745,5 +760,8 @@ func TestTaintEvictionDurableRetryEndToEnd(t *testing.T) {
 	totalAttempts := deleteWrapper.attempts.Load()
 	if totalAttempts < 6 {
 		t.Errorf("Expected at least 6 Delete attempts (5 failures + 1 success via retry queue), got %d", totalAttempts)
+	}
+	if completedDeletes := deleteWrapper.successfulDeletes.Load(); completedDeletes == 0 {
+		t.Error("Expected a real Delete request to complete successfully via the durable retry queue")
 	}
 }
