@@ -4894,64 +4894,6 @@ func TestValidateInvalidLabelValueInNodeSelectorOption(t *testing.T) {
 	}
 }
 
-func TestValidateAllowIndivisibleHugePagesValuesOption(t *testing.T) {
-	// 2^64 bytes overflows int64, so the divisibility check rejects it; validators
-	// that read it as zero accepted it, so a stored object can carry it and the
-	// option has to admit it.
-	hugePages := api.ResourceName(api.ResourceHugePagesPrefix + "2Mi")
-	indivisible := api.ResourceList{hugePages: resource.MustParse("18446744073709551616")}
-
-	testCases := []struct {
-		name       string
-		oldPodSpec *api.PodSpec
-		wantOption bool
-	}{
-		{
-			name:       "NoOldPodSpec",
-			oldPodSpec: nil,
-			wantOption: false,
-		},
-		{
-			name: "DivisibleContainerLimit",
-			oldPodSpec: &api.PodSpec{Containers: []api.Container{{Resources: api.ResourceRequirements{
-				Limits: api.ResourceList{hugePages: resource.MustParse("4Mi")},
-			}}}},
-			wantOption: false,
-		},
-		{
-			name: "ContainerLimit",
-			oldPodSpec: &api.PodSpec{Containers: []api.Container{{Resources: api.ResourceRequirements{
-				Limits: indivisible,
-			}}}},
-			wantOption: true,
-		},
-		{
-			name:       "PodLevelLimit",
-			oldPodSpec: &api.PodSpec{Resources: &api.ResourceRequirements{Limits: indivisible}},
-			wantOption: true,
-		},
-		{
-			name:       "PodLevelRequest",
-			oldPodSpec: &api.PodSpec{Resources: &api.ResourceRequirements{Requests: indivisible}},
-			wantOption: true,
-		},
-		{
-			name:       "Overhead",
-			oldPodSpec: &api.PodSpec{Overhead: indivisible},
-			wantOption: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
-			if tc.wantOption != gotOptions.AllowIndivisibleHugePagesValues {
-				t.Errorf("Got AllowIndivisibleHugePagesValues=%t, want %t", gotOptions.AllowIndivisibleHugePagesValues, tc.wantOption)
-			}
-		})
-	}
-}
-
 // A stored pod-level hugepage value that no longer passes the divisibility
 // check survives an update that leaves it unchanged, while a create rejects it.
 func TestPodLevelIndivisibleHugePagesValueSurvivesUpdate(t *testing.T) {
@@ -5008,6 +4950,67 @@ func TestPodLevelIndivisibleHugePagesValueSurvivesUpdate(t *testing.T) {
 	opts.PodLevelResourcesEnabled = true
 	if errs := apivalidation.ValidatePodUpdate(updated, stored, opts); len(errs) != 0 {
 		t.Errorf("update that only changes a label: %v", errs)
+	}
+}
+
+// A brand-new indivisible hugepages value in one container must not survive an update just
+// because a different, unrelated container already carries an old indivisible one: the ratchet
+// only exempts the exact stored (location, resource, quantity) it saw, not every hugepages entry
+// in the pod.
+func TestCrossContainerIndivisibleHugePagesValueDoesNotSurviveUpdate(t *testing.T) {
+	stored := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns", ResourceVersion: "1"},
+		Spec: api.PodSpec{
+			RestartPolicy:                 api.RestartPolicyAlways,
+			DNSPolicy:                     api.DNSClusterFirst,
+			TerminationGracePeriodSeconds: ptr.To[int64](30),
+			Containers: []api.Container{
+				{
+					Name:                     "a",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+					Resources: api.ResourceRequirements{
+						Limits: api.ResourceList{
+							api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+							api.ResourceMemory: resource.MustParse("64Mi"),
+						},
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+							api.ResourceMemory: resource.MustParse("64Mi"),
+						},
+					},
+				},
+				{
+					Name:                     "b",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+					Resources: api.ResourceRequirements{
+						Limits:   api.ResourceList{api.ResourceMemory: resource.MustParse("64Mi")},
+						Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("64Mi")},
+					},
+				},
+			},
+		},
+	}
+
+	updated := stored.DeepCopy()
+	// container a's hugepages-2Mi is left byte-for-byte unchanged. container b gets a brand-new
+	// hugepages-1Gi entry, never stored anywhere before and not itself a multiple of 1Gi.
+	updated.Spec.Containers[1].Resources.Limits[api.ResourceName(api.ResourceHugePagesPrefix+"1Gi")] = resource.MustParse("3Mi")
+	updated.Spec.Containers[1].Resources.Requests[api.ResourceName(api.ResourceHugePagesPrefix+"1Gi")] = resource.MustParse("3Mi")
+
+	opts := GetValidationOptionsFromPodSpecAndMeta(&updated.Spec, &stored.Spec, &updated.ObjectMeta, &stored.ObjectMeta)
+	errs := apivalidation.ValidatePodUpdate(updated, stored, opts)
+	found := false
+	for _, err := range errs {
+		if strings.Contains(err.Error(), "not positive integer multiple") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("a brand-new indivisible hugepages-1Gi value in container b ratcheted off an unrelated stored indivisible hugepages-2Mi value in container a: %v", errs)
 	}
 }
 
