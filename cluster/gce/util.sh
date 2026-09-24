@@ -1795,15 +1795,13 @@ function generate-certs {
     ./easyrsa --batch --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
     ./easyrsa --batch build-client-full kube-apiserver nopass
 
-    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+    kube::util::ensure-step "${KUBE_TEMP}/step" || exit 1
 
-    # make the config for the signer
-    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the kubelet client cert with the correct groups
-    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare kubelet
-    mv "kubelet-key.pem" "pki/private/kubelet.key"
-    mv "kubelet.pem" "pki/issued/kubelet.crt"
-    rm -f "kubelet.csr"
+    "${STEP_BIN}" certificate create kubelet pki/issued/kubelet.crt pki/private/kubelet.key \
+      --ca pki/ca.crt --ca-key pki/private/ca.key \
+      --template "${KUBE_ROOT}/hack/lib/step-client-template.json" --set 'organizations=["system:nodes"]' \
+      --kty RSA --size 2048 --not-after 43800h --no-password --insecure --force || exit 1
 
     # Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
     ./easyrsa --batch --dn-mode=org \
@@ -1860,15 +1858,13 @@ function generate-aggregator-certs {
     ./easyrsa --batch --subject-alt-name="${AGGREGATOR_SANS}" build-server-full "${AGGREGATOR_MASTER_NAME}" nopass
     ./easyrsa --batch build-client-full aggregator-apiserver nopass
 
-    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+    kube::util::ensure-step "${KUBE_TEMP}/step" || exit 1
 
-    # make the config for the signer
-    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the aggregator client cert with the correct groups
-    echo '{"CN":"aggregator","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare proxy-client
-    mv "proxy-client-key.pem" "pki/private/proxy-client.key"
-    mv "proxy-client.pem" "pki/issued/proxy-client.crt"
-    rm -f "proxy-client.csr"
+    "${STEP_BIN}" certificate create aggregator pki/issued/proxy-client.crt pki/private/proxy-client.key \
+      --ca pki/ca.crt --ca-key pki/private/ca.key \
+      --template "${KUBE_ROOT}/hack/lib/step-client-template.json" \
+      --kty RSA --size 2048 --not-after 43800h --no-password --insecure --force || exit 1
 
     # Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
     ./easyrsa --batch --dn-mode=org \
@@ -1921,13 +1917,13 @@ function generate-konnectivity-server-certs {
     ./easyrsa --batch --subject-alt-name="IP:127.0.0.1,${KONNECTIVITY_SERVER_SANS}" build-server-full server nopass
     ./easyrsa --batch build-client-full client nopass
 
-    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+    kube::util::ensure-step "${KUBE_TEMP}/step" || exit 1
 
-    # make the config for the signer
-    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the konnectivity server cert with the correct groups
-    echo '{"CN":"konnectivity-server","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-server
-    rm -f "konnectivity-server.csr"
+    "${STEP_BIN}" certificate create konnectivity-server konnectivity-server.pem konnectivity-server-key.pem \
+      --ca pki/ca.crt --ca-key pki/private/ca.key \
+      --template "${KUBE_ROOT}/hack/lib/step-client-template.json" \
+      --kty RSA --size 2048 --not-after 43800h --no-password --insecure --force || exit 1
 
     # Make the agent <-> konnectivity server side certificates.
     cd "${KUBE_TEMP}/easy-rsa/konnectivity-agent"
@@ -1937,13 +1933,13 @@ function generate-konnectivity-server-certs {
     ./easyrsa --batch --subject-alt-name="${KONNECTIVITY_SERVER_SANS}" build-server-full server nopass
     ./easyrsa --batch build-client-full client nopass
 
-    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+    kube::util::ensure-step "${KUBE_TEMP}/step" || exit 1
 
-    # make the config for the signer
-    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
     # create the konnectivity server cert with the correct groups
-    echo '{"CN":"koonectivity-server","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
-    rm -f "konnectivity-agent.csr"
+    "${STEP_BIN}" certificate create koonectivity-server konnectivity-agent.pem konnectivity-agent-key.pem \
+      --ca pki/ca.crt --ca-key pki/private/ca.key \
+      --template "${KUBE_ROOT}/hack/lib/step-client-template.json" \
+      --kty RSA --size 2048 --not-after 43800h --no-password --insecure --force || exit 1
 
     echo "completed main certificate section") &>"${cert_create_debug_output}" || true
 
@@ -1999,13 +1995,13 @@ function generate-cloud-pvl-admission-certs {
     ./easyrsa --batch --subject-alt-name="IP:127.0.0.1,${CLOUD_PVL_ADMISSION_SANS}" build-server-full server nopass
     ./easyrsa --batch build-client-full client nopass
 
-    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+    kube::util::ensure-step "${KUBE_TEMP}/step" || exit 1
 
-    # make the config for the signer
-    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the cloud-pvl-admission cert with the correct groups
-    echo '{"CN":"cloud-pvl-admission","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare cloud-pvl-admission
-    rm -f "cloud-pvl-admission.csr"
+    "${STEP_BIN}" certificate create cloud-pvl-admission cloud-pvl-admission.pem cloud-pvl-admission-key.pem \
+      --ca pki/ca.crt --ca-key pki/private/ca.key \
+      --template "${KUBE_ROOT}/hack/lib/step-client-template.json" \
+      --kty RSA --size 2048 --not-after 43800h --no-password --insecure --force || exit 1
 
     # Make the cloud-pvl-admission server side certificates.
     cd "${KUBE_TEMP}/easy-rsa/cloud-pvl-admission"
@@ -2015,13 +2011,13 @@ function generate-cloud-pvl-admission-certs {
     ./easyrsa --batch --subject-alt-name="${CLOUD_PVL_ADMISSION_SANS}" build-server-full server nopass
     ./easyrsa --batch build-client-full client nopass
 
-    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+    kube::util::ensure-step "${KUBE_TEMP}/step" || exit 1
 
-    # make the config for the signer
-    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
     # create the cloud-pvl-admission server cert with the correct groups
-    echo '{"CN":"cloud-pvl-admission","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
-    rm -f "konnectivity-agent.csr"
+    "${STEP_BIN}" certificate create cloud-pvl-admission konnectivity-agent.pem konnectivity-agent-key.pem \
+      --ca pki/ca.crt --ca-key pki/private/ca.key \
+      --template "${KUBE_ROOT}/hack/lib/step-client-template.json" \
+      --kty RSA --size 2048 --not-after 43800h --no-password --insecure --force || exit 1
 
     echo "completed main certificate section") &>"${cert_create_debug_output}" || true
 
@@ -2775,7 +2771,7 @@ function delete-subnetworks() {
   fi
 }
 
-# Generates SSL certificates for etcd cluster peer to peer communication. Uses cfssl program.
+# Generates SSL certificates for etcd cluster peer to peer communication using step.
 #
 # Assumed vars:
 #   KUBE_TEMP: temporary directory
@@ -2799,9 +2795,9 @@ function create-etcd-certs {
   local ca_key=${3:-}
 
   GEN_ETCD_CA_CERT="${ca_cert}" GEN_ETCD_CA_KEY="${ca_key}" \
-    generate-etcd-cert "${KUBE_TEMP}/cfssl" "${host}" "peer" "peer"
+    generate-etcd-cert "${KUBE_TEMP}/step" "${host}" "peer" "peer" || return 1
 
-  pushd "${KUBE_TEMP}/cfssl"
+  pushd "${KUBE_TEMP}/step"
   ETCD_CA_KEY_BASE64=$(base64 $BASE64_INPUT_FLAG "ca-key.pem" | tr -d '\r\n')
   ETCD_CA_CERT_BASE64=$(gzip -c "ca.pem" | base64 | tr -d '\r\n')
   ETCD_PEER_KEY_BASE64=$(base64 $BASE64_INPUT_FLAG "peer-key.pem" | tr -d '\r\n')
@@ -2809,7 +2805,7 @@ function create-etcd-certs {
   popd
 }
 
-# Generates SSL certificates for etcd-client and kube-apiserver communication. Uses cfssl program.
+# Generates SSL certificates for etcd-client and kube-apiserver communication using step.
 #
 # Assumed vars:
 #   KUBE_TEMP: temporary directory
@@ -2837,10 +2833,10 @@ function create-etcd-apiserver-certs {
   local etcd_apiserver_ca_key=${4:-}
 
   GEN_ETCD_CA_CERT="${etcd_apiserver_ca_cert}" GEN_ETCD_CA_KEY="${etcd_apiserver_ca_key}" \
-    generate-etcd-cert "${KUBE_TEMP}/cfssl" "${hostServer}" "server" "etcd-apiserver-server"
-    generate-etcd-cert "${KUBE_TEMP}/cfssl" "${hostClient}" "client" "etcd-apiserver-client"
+    generate-etcd-cert "${KUBE_TEMP}/step" "${hostServer}" "server" "etcd-apiserver-server" || return 1
+    generate-etcd-cert "${KUBE_TEMP}/step" "${hostClient}" "client" "etcd-apiserver-client" || return 1
 
-  pushd "${KUBE_TEMP}/cfssl"
+  pushd "${KUBE_TEMP}/step"
   ETCD_APISERVER_CA_KEY_BASE64=$(base64 $BASE64_INPUT_FLAG "ca-key.pem" | tr -d '\r\n')
   ETCD_APISERVER_CA_CERT_BASE64=$(gzip -c "ca.pem" | base64 | tr -d '\r\n')
   ETCD_APISERVER_SERVER_KEY_BASE64=$(base64 $BASE64_INPUT_FLAG "etcd-apiserver-server-key.pem" | tr -d '\r\n')
