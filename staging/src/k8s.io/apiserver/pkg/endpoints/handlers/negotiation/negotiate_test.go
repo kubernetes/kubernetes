@@ -20,11 +20,16 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 // statusError is an object that can be converted into an metav1.Status
@@ -294,6 +299,68 @@ func fakeSerializerInfoSlice() []runtime.SerializerInfo {
 		MediaTypeSubType: "vnd.kubernetes.protobuf",
 	}
 	return result
+}
+
+// tableEndpointRestrictions also allows conversion to Table.
+type tableEndpointRestrictions struct{ emptyEndpointRestrictions }
+
+func (tableEndpointRestrictions) AllowsMediaTypeTransform(_, _ string, gvk *schema.GroupVersionKind) bool {
+	return gvk == nil || *gvk == metav1.SchemeGroupVersion.WithKind("Table")
+}
+
+func TestNegotiateDrop(t *testing.T) {
+	testCases := []struct {
+		name         string
+		accept       string
+		gateDisabled bool
+		drop         []string
+	}{
+		{
+			name:   "managedFields",
+			accept: "application/json;drop=metadata.managedFields",
+			drop:   []string{"metadata.managedFields"},
+		},
+		{
+			name:         "ignored while the gate is disabled",
+			accept:       "application/json;drop=metadata.managedFields",
+			gateDisabled: true,
+		},
+		{
+			name:   "empty value",
+			accept: "application/json;drop=",
+		},
+		{
+			name:   "unsupported value falls back to the next clause",
+			accept: "application/json;drop=spec, application/json",
+		},
+		{
+			name:   "with pretty",
+			accept: "application/json;drop=metadata.managedFields;pretty=1",
+			drop:   []string{"metadata.managedFields"},
+		},
+		{
+			name:   "with Table",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1;drop=metadata.managedFields",
+			drop:   []string{"metadata.managedFields"},
+		},
+		{
+			name:   "protobuf",
+			accept: "application/vnd.kubernetes.protobuf;drop=metadata.managedFields",
+			drop:   []string{"metadata.managedFields"},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManagedFieldsOptOut, !tc.gateDisabled)
+			options, ok := NegotiateMediaTypeOptions(tc.accept, fakeSerializerInfoSlice(), tableEndpointRestrictions{})
+			if !ok {
+				t.Fatal("expected a match")
+			}
+			if !slices.Equal(options.Drop, tc.drop) {
+				t.Errorf("expected drop %v, got %v", tc.drop, options.Drop)
+			}
+		})
+	}
 }
 
 func BenchmarkNegotiateMediaTypeOptions(b *testing.B) {
