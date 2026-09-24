@@ -37,6 +37,7 @@ import (
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
@@ -57,11 +58,13 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/util/compatibility"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilversion "k8s.io/component-base/version"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	netutils "k8s.io/utils/net"
@@ -69,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -239,6 +243,77 @@ func newInstance(t *testing.T) (*Instance, *etcd3testing.EtcdTestServer, Complet
 	}
 
 	return apiserver, etcdserver, completed, assert
+}
+
+func TestNewFailsClosedOnIncoherentFeatureGateAPIs(t *testing.T) {
+	evictionRequests := lifecyclev1alpha1.SchemeGroupVersion.WithResource("evictionrequests")
+
+	tests := []struct {
+		name            string
+		featureGates    featuregatetesting.FeatureOverrides
+		resourceConfig  func(*serverstorage.ResourceConfig)
+		wantErrContains []string
+	}{
+		{
+			name:            "explicitly enabled gate without its API is rejected",
+			featureGates:    featuregatetesting.FeatureOverrides{features.EvictionRequestAPI: true},
+			wantErrContains: []string{"EvictionRequestAPI is enabled", "evictionrequests.lifecycle.k8s.io"},
+		},
+		{
+			name:         "explicitly enabled gate with its API starts",
+			featureGates: featuregatetesting.FeatureOverrides{features.EvictionRequestAPI: true},
+			resourceConfig: func(c *serverstorage.ResourceConfig) {
+				c.ExplicitlyEnableVersions(lifecyclev1alpha1.SchemeGroupVersion)
+			},
+		},
+		{
+			name: "explicitly enabled API resource without its gate is rejected",
+			resourceConfig: func(c *serverstorage.ResourceConfig) {
+				c.ExplicitlyEnableResources(evictionRequests)
+			},
+			wantErrContains: []string{"evictionrequests.lifecycle.k8s.io was explicitly enabled with --runtime-config", "EvictionRequestAPI"},
+		},
+		{
+			name: "explicitly enabled API version without its gate starts",
+			resourceConfig: func(c *serverstorage.ResourceConfig) {
+				c.ExplicitlyEnableVersions(lifecyclev1alpha1.SchemeGroupVersion)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			etcdserver, config, _ := setUp(t)
+			defer etcdserver.Terminate(t)
+
+			if len(tc.featureGates) > 0 {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates)
+			}
+			if tc.resourceConfig != nil {
+				tc.resourceConfig(config.ControlPlane.Extra.APIResourceConfigSource.(*serverstorage.ResourceConfig))
+			}
+
+			instance, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
+			if err == nil {
+				instance.ControlPlane.GenericAPIServer.Destroy()
+			}
+
+			if len(tc.wantErrContains) == 0 {
+				if err != nil {
+					t.Fatalf("New() = %v, want success", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("New() succeeded, want error")
+			}
+			for _, want := range tc.wantErrContains {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("New() error %q does not contain %q", err.Error(), want)
+				}
+			}
+		})
+	}
 }
 
 // TestVersion tests /version
