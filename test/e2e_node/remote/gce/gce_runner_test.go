@@ -19,11 +19,15 @@ package gce
 import (
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	"sigs.k8s.io/yaml"
+
+	"k8s.io/kubernetes/test/e2e_node/remote"
 )
 
 func TestPickNewestImage(t *testing.T) {
@@ -299,6 +303,78 @@ func TestGetGCEImage(t *testing.T) {
 			}
 			if got != tc.want {
 				t.Errorf("getGCEImage() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPrepareGceImagesExplicitImage(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    string
+		wantCalls int
+		want      string
+		wantErr   string
+	}{
+		{
+			name: "an explicit image is used without compiling or listing anything",
+			config: `images:
+  cos-example:
+    image: pinned-image
+    image_regex: "["
+    image_exclude_regex: "["
+    project: proj
+`,
+			wantCalls: 0,
+			want:      "pinned-image",
+		},
+		{
+			name: "without an explicit image the same selectors are compiled and rejected",
+			config: `images:
+  cos-example:
+    image_regex: "["
+    image_exclude_regex: "["
+    project: proj
+`,
+			wantCalls: 0,
+			wantErr:   "failed to compile image_regex",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			configPath := filepath.Join(t.TempDir(), "images.yaml")
+			if err := os.WriteFile(configPath, []byte(tc.config), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			for _, f := range []*string{zone, project} {
+				orig := *f
+				*f = "test"
+				defer func() { *f = orig }()
+			}
+			calls := 0
+			origLister := gceImageLister
+			gceImageLister = func(args ...string) ([]byte, error) {
+				calls++
+				return nil, errors.New("must not be called")
+			}
+			defer func() { gceImageLister = origLister }()
+
+			g := &GCERunner{cfg: remote.Config{ImageConfigFile: configPath}}
+			images, err := g.prepareGceImages()
+			if calls != tc.wantCalls {
+				t.Errorf("gcloud invocation count = %d, want %d", calls, tc.wantCalls)
+			}
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("prepareGceImages() error = %v, want it to contain %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("prepareGceImages() unexpected error: %v", err)
+			}
+			if got := images.images["cos-example"].image; got != tc.want {
+				t.Errorf("prepareGceImages() image = %q, want %q", got, tc.want)
 			}
 		})
 	}
