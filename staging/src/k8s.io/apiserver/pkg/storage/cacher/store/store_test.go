@@ -28,17 +28,11 @@ import (
 )
 
 func TestStoreSingleKey(t *testing.T) {
-	t.Run("cache.Indexer", func(t *testing.T) {
-		store := NewIndexer(testStoreIndexers())
-		testStoreSingleKey(t, store)
-	})
-	t.Run("btree", func(t *testing.T) {
-		store := newThreadedBtreeStoreIndexer(ElementIndexers(testStoreIndexers()), btreeDegree)
-		testStoreSingleKey(t, store)
-	})
+	store := NewWatchCacheStorage(nil, testStoreIndexers())
+	testStoreSingleKey(t, store)
 }
 
-func testStoreSingleKey(t *testing.T, store Indexer) {
+func testStoreSingleKey(t *testing.T, store *WatchCacheStorage) {
 	assertStoreEmpty(t, store, "foo")
 
 	prev, err := store.Add(testStorageElement("foo", "bar", 1))
@@ -70,17 +64,11 @@ func testStoreSingleKey(t *testing.T, store Indexer) {
 }
 
 func TestStoreIndexerSingleKey(t *testing.T) {
-	t.Run("cache.Indexer", func(t *testing.T) {
-		store := NewIndexer(testStoreIndexers())
-		testStoreIndexerSingleKey(t, store)
-	})
-	t.Run("btree", func(t *testing.T) {
-		store := newThreadedBtreeStoreIndexer(ElementIndexers(testStoreIndexers()), btreeDegree)
-		testStoreIndexerSingleKey(t, store)
-	})
+	store := NewWatchCacheStorage(nil, testStoreIndexers())
+	testStoreIndexerSingleKey(t, store)
 }
 
-func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
+func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
 	items, err := store.ByIndex("by_val", "bar")
 	require.NoError(t, err)
 	assert.Empty(t, items)
@@ -142,8 +130,8 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	assert.Nil(t, prev)
 }
 
-func assertStoreEmpty(t *testing.T, store Indexer, nonExistingKey string) {
-	item, ok, err := store.Get(testStorageElement(nonExistingKey, "", 0))
+func assertStoreEmpty(t *testing.T, store *WatchCacheStorage, nonExistingKey string) {
+	item, ok, err := store.get(testStorageElement(nonExistingKey, "", 0))
 	require.NoError(t, err)
 	assert.False(t, ok)
 	assert.Nil(t, item)
@@ -157,8 +145,8 @@ func assertStoreEmpty(t *testing.T, store Indexer, nonExistingKey string) {
 	assert.Empty(t, items)
 }
 
-func assertStoreSingleKey(t *testing.T, store Indexer, expectKey, expectValue string, expectRV int) {
-	item, ok, err := store.Get(testStorageElement(expectKey, "", expectRV))
+func assertStoreSingleKey(t *testing.T, store *WatchCacheStorage, expectKey, expectValue string, expectRV int) {
+	item, ok, err := store.get(testStorageElement(expectKey, "", expectRV))
 	require.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
