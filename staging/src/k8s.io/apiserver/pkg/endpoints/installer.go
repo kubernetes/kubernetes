@@ -17,6 +17,7 @@ limitations under the License.
 package endpoints
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -688,6 +689,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
+	if p, ok := storage.(rest.AdmissionEquivalentsProvider); ok {
+		eqs := p.AdmissionEquivalents()
+		if err := validateAdmissionEquivalents(subresource, eqs); err != nil {
+			return nil, nil, fmt.Errorf("invalid admission equivalents: %w", err)
+		}
+		reqScope.AdmissionEquivalents = eqs
+	}
 
 	// Strategies may ignore changes to some fields by resetting the field values.
 	//
@@ -1350,4 +1358,26 @@ func restfulConnectResource(connecter rest.Connecter, scope handlers.RequestScop
 	return func(req *restful.Request, res *restful.Response) {
 		handlers.ConnectResource(connecter, &scope, admit, restPath, isSubresource)(res.ResponseWriter, req.Request)
 	}
+}
+
+// validateAdmissionEquivalents checks the admission equivalents declared by the endpoint serving
+// subresource ("" for the resource itself) of some resource.
+func validateAdmissionEquivalents(subresource string, eqs []admission.Equivalent) error {
+	var errs []error
+	for i, eq := range eqs {
+		switch {
+		case eq.Subresource == subresource:
+			errs = append(errs, fmt.Errorf("[%d]: an endpoint may not declare itself (subresource %q) as an admission equivalent", i, eq.Subresource))
+		case eq.Subresource == "*" || strings.Contains(eq.Subresource, "/"):
+			errs = append(errs, fmt.Errorf(`[%d]: invalid subresource %q: must not be "*" or contain "/"`, i, eq.Subresource))
+		}
+		for _, op := range eq.Operations {
+			switch op {
+			case admission.Create, admission.Update, admission.Delete, admission.Connect:
+			default:
+				errs = append(errs, fmt.Errorf("[%d]: invalid operation %q for subresource %q: must be one of %s, %s, %s, %s", i, op, eq.Subresource, admission.Create, admission.Update, admission.Delete, admission.Connect))
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
