@@ -131,7 +131,7 @@ func TestIsPodTerminated(t *testing.T) {
 	}
 }
 
-func TestGetPod(t *testing.T) {
+func TestObjectOf(t *testing.T) {
 	tests := map[string]struct {
 		obj  interface{}
 		want bool
@@ -165,9 +165,9 @@ func TestGetPod(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := getPod(tc.obj)
+			got := objectOf[*v1.Pod](tc.obj)
 			if (got != nil) != tc.want {
-				t.Errorf("parsePod() returned pod=%v, want non-nil=%v", got, tc.want)
+				t.Errorf("objectOf() returned pod=%v, want non-nil=%v", got, tc.want)
 			}
 		})
 	}

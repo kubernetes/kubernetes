@@ -119,12 +119,16 @@ func NewPodGroupProtectionController(
 	return c, nil
 }
 
+func namespacedKey(namespace, name string) string {
+	return namespace + "/" + name
+}
+
 // addActivePodSchedulingGroupIndexer adds an indexer to look up active
 // pods by their schedulingGroup.podGroupName field so we can efficiently
 // determine whether a PodGroup still has active pods.
 func addActivePodSchedulingGroupIndexer(indexer cache.Indexer) error {
 	return indexer.AddIndexers(cache.Indexers{
-		activePodSchedulingGroupIndex: func(obj interface{}) ([]string, error) {
+		activePodSchedulingGroupIndex: func(obj any) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
 				return nil, nil
@@ -135,7 +139,7 @@ func addActivePodSchedulingGroupIndexer(indexer cache.Indexer) error {
 			if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
 				return nil, nil
 			}
-			return []string{pod.Namespace + "/" + *pod.Spec.SchedulingGroup.PodGroupName}, nil
+			return []string{namespacedKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)}, nil
 		},
 	})
 }
@@ -243,7 +247,7 @@ func (c *Controller) removeFinalizer(ctx context.Context, pg *schedulingv1beta1.
 // non-terminated pods, so a non-empty result means the PodGroup is still in use.
 func (c *Controller) hasActivePods(ctx context.Context, pg *schedulingv1beta1.PodGroup) (bool, error) {
 	logger := klog.FromContext(ctx)
-	indexKey := pg.Namespace + "/" + pg.Name
+	indexKey := namespacedKey(pg.Namespace, pg.Name)
 
 	objs, err := c.podIndexer.ByIndex(activePodSchedulingGroupIndex, indexKey)
 	if err != nil {
@@ -266,30 +270,24 @@ func isPodTerminated(pod *v1.Pod) bool {
 
 // handlePodGroupUpdate handles PodGroup add/update events.
 // Only deletion candidates which are being deleted and have the finalizer need processing.
-func (c *Controller) handlePodGroupUpdate(logger klog.Logger, obj interface{}) {
-	pg, ok := obj.(*schedulingv1beta1.PodGroup)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("PodGroup informer returned non-PodGroup object: %#v", obj))
+func (c *Controller) handlePodGroupUpdate(logger klog.Logger, obj any) {
+	pg := objectOf[*schedulingv1beta1.PodGroup](obj)
+	if pg == nil {
 		return
 	}
 	if !protectionutil.IsDeletionCandidate(pg, scheduling.PodGroupProtectionFinalizer) {
 		return
 	}
-	key, err := cache.MetaNamespaceKeyFunc(pg)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for PodGroup %#v: %w", pg, err))
-		return
-	}
 	logger.V(4).Info("Got event on PodGroup", "podGroup", klog.KObj(pg))
-	c.queue.Add(key)
+	c.queue.Add(namespacedKey(pg.Namespace, pg.Name))
 }
 
 // handlePodChange handles Pod add/delete/update events.
 // It enqueues the referenced PodGroup only when the event could affect
 // finalizer decisions where the pod is deleted or transitioned to a terminal phase.
-func (c *Controller) handlePodChange(logger klog.Logger, old, new interface{}) {
-	newPod := getPod(new)
-	oldPod := getPod(old)
+func (c *Controller) handlePodChange(logger klog.Logger, old, new any) {
+	newPod := objectOf[*v1.Pod](new)
+	oldPod := objectOf[*v1.Pod](old)
 
 	if newPod != nil && isPodTerminated(newPod) {
 		c.enqueuePodGroupForPod(logger, newPod)
@@ -316,27 +314,30 @@ func (c *Controller) enqueuePodGroupForPod(logger klog.Logger, pod *v1.Pod) {
 		return
 	}
 
-	pgKey := pod.Namespace + "/" + *pod.Spec.SchedulingGroup.PodGroupName
+	pgKey := namespacedKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	logger.V(4).Info("Enqueuing PodGroup for pod event", "pod", klog.KObj(pod), "podGroup", pgKey)
 	c.queue.Add(pgKey)
 }
 
-func getPod(obj interface{}) *v1.Pod {
+// objectOf extracts a typed object from an informer event payload or unwraps it
+// from a cache.DeletedFinalStateUnknown tombstone.
+func objectOf[T any](obj any) T {
+	var zero T
 	if obj == nil {
-		return nil
+		return zero
 	}
-	pod, ok := obj.(*v1.Pod)
+	if t, ok := obj.(T); ok {
+		return t
+	}
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return nil
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod %#v", obj))
-			return nil
-		}
+		utilruntime.HandleError(fmt.Errorf("expected %T or DeletedFinalStateUnknown, got %T", zero, obj))
+		return zero
 	}
-	return pod
+	t, ok := tombstone.Obj.(T)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("tombstone contained unexpected object: expected %T, got %T", zero, tombstone.Obj))
+		return zero
+	}
+	return t
 }
