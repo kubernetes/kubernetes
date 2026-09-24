@@ -18,10 +18,12 @@ package fieldmanager_test
 
 import (
 	"context"
+	_ "embed"
 	"reflect"
 	"testing"
 
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+	"sigs.k8s.io/yaml"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -30,6 +32,9 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 )
+
+//go:embed testdata/exemplar_pod.yaml
+var exemplarPodYAML []byte
 
 func TestAdmission(t *testing.T) {
 	wrap := &mockAdmissionController{}
@@ -99,6 +104,56 @@ func TestAdmission(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkAdmission(b *testing.B) {
+	pod := &v1.Pod{}
+	if err := yaml.Unmarshal(exemplarPodYAML, pod); err != nil {
+		b.Fatal(err)
+	}
+	entries := pod.ManagedFields
+	// Same content, distinct pointers, so the wrapper sees a change and decodes.
+	copied := pod.DeepCopy().ManagedFields
+
+	for _, tc := range []struct {
+		name  string
+		admit admitFunc
+	}{
+		{
+			name:  "unchanged",
+			admit: func(context.Context, admission.Attributes, admission.ObjectInterfaces) error { return nil },
+		},
+		{
+			name: "replaced",
+			admit: func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+				objectMeta, err := meta.Accessor(a.GetObject())
+				if err != nil {
+					return err
+				}
+				if &objectMeta.GetManagedFields()[0] == &entries[0] {
+					objectMeta.SetManagedFields(copied)
+				} else {
+					objectMeta.SetManagedFields(entries)
+				}
+				return nil
+			},
+		},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			ac := fieldmanager.NewManagedFieldsValidatingAdmissionController(&mockAdmissionController{admit: tc.admit})
+			obj := pod.DeepCopy()
+			obj.SetManagedFields(entries)
+			attrs := admission.NewAttributesRecord(obj, obj, schema.GroupVersionKind{}, "default", "", schema.GroupVersionResource{}, "", admission.Update, nil, false, nil)
+			b.ReportAllocs()
+			for b.Loop() {
+				if err := ac.(admission.MutationInterface).Admit(context.TODO(), attrs, nil); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+type admitFunc = func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error
 
 func replaceManagedFields(with []metav1.ManagedFieldsEntry) func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
