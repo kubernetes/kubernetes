@@ -398,7 +398,7 @@ type infDecAmount struct {
 func (a infDecAmount) AsScale(scale Scale) (infDecAmount, bool) {
 	tmp := &inf.Dec{}
 	tmp.Round(a.Dec, scale.infScale(), inf.RoundUp)
-	return infDecAmount{Dec: tmp}, tmp.Cmp(a.Dec) == 0
+	return infDecAmount{Dec: tmp, int64tainted: a.int64tainted}, tmp.Cmp(a.Dec) == 0
 }
 
 // AsCanonicalBytes accepts a buffer to write the base-10 string value of this field to, and returns

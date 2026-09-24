@@ -404,13 +404,11 @@ func ParseQuantity(str string) (Quantity, error) {
 	// the side effect of rounding values < .5n to zero.
 	int64tainted := false
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
-		if amount.Scale() <= Nano.infScale() {
+		if amount.Scale() <= Nano.infScale() { // // At most 9 digits (nano precision) after the decimal point? Trailing zeros count.
+			amount.Round(amount, Nano.infScale(), inf.RoundUp) // Pad with zeros to the nano scale. No precision is lost.
+		} else if amount.Round(amount, Nano.infScale(), inf.RoundExact) == nil { // nil means precision will be lost if rounded to nano scale
 			amount.Round(amount, Nano.infScale(), inf.RoundUp)
-		} else if exact := new(inf.Dec).Round(amount, Nano.infScale(), inf.RoundExact); exact != nil {
-			amount = exact
-		} else {
-			amount.Round(amount, Nano.infScale(), inf.RoundUp)
-			int64tainted = true // The value cannot be represented exactly as an int64
+			int64tainted = true
 		}
 	}
 
@@ -427,9 +425,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	}
 	if format == BinarySI {
 		// Store binary suffix values without fractional digits when possible.
-		if whole := new(inf.Dec).Round(amount, 0, inf.RoundExact); whole != nil {
-			amount = whole
-		}
+		amount.Round(amount, 0, inf.RoundExact)
 	}
 	if sign == -1 {
 		amount.Neg(amount)

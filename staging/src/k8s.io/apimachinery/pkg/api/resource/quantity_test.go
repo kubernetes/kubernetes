@@ -2034,14 +2034,21 @@ func TestQuantityRoundUpAsInt64(t *testing.T) {
 		// parsed straight to inf.Dec
 		{"1.5Gi", -3, 1610612736, true, 1610612736, true},
 		{"1.5Gi", 0, 1610612736, true, 1610612736, true},
-		{"1.5555555555555555Gi", -3, 0, false, 0, false},
-		{"1.5555555555555555Gi", 0, 1670265060, true, 1670265060, true},
-		// TODO(#141166): (math.MaxInt64, false) once the binarySI parse cap is removed.
-		{"8Ei", -3, 0, false, 0, false},
-		{"8Ei", 3, math.MaxInt64, false, math.MaxInt64, false},
-		{"9223372036854775808", 0, math.MaxInt64, false, math.MaxInt64, false},
 		{"1000000000000000000000m", -3, 0, false, 0, false},
 		{"1000000000000000000000m", 0, 1000000000000000000, true, 1000000000000000000, true},
+		{"9223372036854775808", 0, math.MaxInt64, false, math.MaxInt64, false},
+
+		// parse rounded up and taints the int64 value, so AsInt64 returns false
+		{"1.5555555555555555Gi", -3, 0, false, 0, false},
+		{"1.5555555555555555Gi", 0, 0, false, 0, false},
+		{"1.5555555555555555Gi", 3, 0, false, 0, false},
+		{"0.9999999999999", 0, 0, false, 0, false},
+		{"0.99999999999999999Ki", 0, 0, false, 0, false},
+		{"1.0000000001", 0, 0, false, 0, false},
+		{"-1.0000000001", 0, 0, false, 0, false},
+		// TODO(#141166): (math.MaxInt64, false) once the binarySI parse cap is removed.
+		{"8Ei", -3, 0, false, 0, false},
+		{"8Ei", 3, 0, false, 0, false},
 	}
 
 	for _, item := range table {
