@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -382,6 +383,28 @@ func appendDNSConfig(existingDNSConfig *runtimeapi.DNSConfig, dnsConfig *v1.PodD
 	return existingDNSConfig
 }
 
+func filterUnusableInheritedNameservers(logger klog.Logger, nameservers []string) []string {
+	filteredNameservers := make([]string, 0, len(nameservers))
+	for _, nameserver := range nameservers {
+		addr, err := netip.ParseAddr(nameserver)
+		// A nameserver line must be an IP address. Drop values that do not
+		// parse, they can never work as a pod nameserver.
+		// Ref: https://man7.org/linux/man-pages/man5/resolv.conf.5.html
+		if err != nil {
+			logger.V(4).Info("Removed inherited invalid nameserver from pod DNS config", "nameserver", nameserver)
+			continue
+		}
+		// Scoped/zoned addresses are associated to the host network namespace.
+		// The zone is a host interface index that does not exist in the pod netns.
+		if addr.Zone() != "" {
+			logger.V(4).Info("Removed inherited zoned nameserver from pod DNS config", "nameserver", nameserver)
+			continue
+		}
+		filteredNameservers = append(filteredNameservers, nameserver)
+	}
+	return filteredNameservers
+}
+
 // GetPodDNS returns DNS settings for the pod.
 func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 	logger := klog.FromContext(ctx)
@@ -440,6 +463,10 @@ func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DN
 				dnsConfig.Servers = append(dnsConfig.Servers, "127.0.0.1")
 			}
 			dnsConfig.Searches = []string{"."}
+		} else if !kubecontainer.IsHostNetworkPod(pod) {
+			// Filter only inherited host servers. Explicit pod.spec.dnsConfig
+			// nameservers are appended below and left untouched.
+			dnsConfig.Servers = filterUnusableInheritedNameservers(logger, dnsConfig.Servers)
 		}
 	}
 
