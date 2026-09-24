@@ -122,6 +122,42 @@ func TestConvertToRuntimeReadonlyPaths(t *testing.T) {
 	}
 }
 
+func TestDetermineEffectiveSecurityContextCgroupOptions(t *testing.T) {
+	writable := v1.CgroupMountModeWritable
+	containerSc := &v1.SecurityContext{CgroupOptions: &v1.CgroupOptions{MountMode: &writable}}
+
+	tests := []struct {
+		name   string
+		podSc  *v1.PodSecurityContext
+		expect *v1.CgroupOptions
+	}{
+		{
+			name:   "no pod security context",
+			podSc:  nil,
+			expect: &v1.CgroupOptions{MountMode: &writable},
+		},
+		{
+			// With a pod-level securityContext, the merge copies container fields one
+			// by one and has to include cgroupOptions.
+			name:   "pod security context set",
+			podSc:  &v1.PodSecurityContext{RunAsNonRoot: new(true)},
+			expect: &v1.CgroupOptions{MountMode: &writable},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Spec: v1.PodSpec{SecurityContext: tc.podSc}}
+			container := &v1.Container{Name: "test", SecurityContext: containerSc}
+
+			effectiveSc := DetermineEffectiveSecurityContext(pod, container)
+			if !reflect.DeepEqual(effectiveSc.CgroupOptions, tc.expect) {
+				t.Errorf("expected cgroupOptions %v, got %v", tc.expect, effectiveSc.CgroupOptions)
+			}
+		})
+	}
+}
+
 func TestDetermineEffectiveRunAsUser(t *testing.T) {
 	tests := []struct {
 		desc          string
