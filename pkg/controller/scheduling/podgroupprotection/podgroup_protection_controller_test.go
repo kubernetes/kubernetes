@@ -18,11 +18,13 @@ package podgroupprotection
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	schedulinginformersv1alpha3 "k8s.io/client-go/informers/scheduling/v1alpha3"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -37,6 +40,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -47,13 +51,7 @@ const (
 )
 
 func podGroup() *schedulingv1beta1.PodGroup {
-	return &schedulingv1beta1.PodGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      defaultPGName,
-			Namespace: defaultNS,
-			UID:       defaultPGUID,
-		},
-	}
+	return st.MakePodGroup().Name(defaultPGName).Namespace(defaultNS).UID(defaultPGUID).Obj()
 }
 
 func withFinalizer(pg *schedulingv1beta1.PodGroup) *schedulingv1beta1.PodGroup {
@@ -64,6 +62,39 @@ func withFinalizer(pg *schedulingv1beta1.PodGroup) *schedulingv1beta1.PodGroup {
 func deletedPodGroup(pg *schedulingv1beta1.PodGroup) *schedulingv1beta1.PodGroup {
 	pg.DeletionTimestamp = &metav1.Time{}
 	return pg
+}
+
+func withCPGFinalizer(cpg *schedulingv1alpha3.CompositePodGroup) *schedulingv1alpha3.CompositePodGroup {
+	cpg.Finalizers = append(cpg.Finalizers, scheduling.CompositePodGroupProtectionFinalizer)
+	return cpg
+}
+
+func deletedCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) *schedulingv1alpha3.CompositePodGroup {
+	cpg.DeletionTimestamp = &metav1.Time{}
+	return cpg
+}
+
+func podGroupNamed(name string) *schedulingv1beta1.PodGroup {
+	pg := podGroup()
+	pg.Name = name
+	pg.UID = types.UID(name + "-uid")
+	return pg
+}
+
+func podGroupWithParent(name string, parentName string) *schedulingv1beta1.PodGroup {
+	pg := podGroupNamed(name)
+	pg.Spec.ParentCompositePodGroupName = &parentName
+	return pg
+}
+
+func cpg(name string) *schedulingv1alpha3.CompositePodGroup {
+	return st.MakeCompositePodGroup().Name(name).Namespace(defaultNS).UID(name + "-uid").Obj()
+}
+
+func cpgWithParent(name, parentName string) *schedulingv1alpha3.CompositePodGroup {
+	group := cpg(name)
+	group.Spec.ParentCompositePodGroupName = &parentName
+	return group
 }
 
 func podForPG(name string, pgName string) *v1.Pod {
@@ -260,13 +291,13 @@ func TestHandlePodChange(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Controller{
-				queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
+				podGroupQueue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
 			}
-			defer c.queue.ShutDown()
+			defer c.podGroupQueue.ShutDown()
 			c.handlePodChange(logger, tc.old, tc.new)
 
-			if c.queue.Len() != tc.wantSize {
-				t.Errorf("queue size = %d, want %d", c.queue.Len(), tc.wantSize)
+			if c.podGroupQueue.Len() != tc.wantSize {
+				t.Errorf("podGroupQueue size = %d, want %d", c.podGroupQueue.Len(), tc.wantSize)
 			}
 		})
 	}
@@ -366,6 +397,118 @@ func TestPodGroupProtectionController(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		for _, cpgEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/cpgEnabled=%v", test.name, cpgEnabled), func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				t.Cleanup(cancel)
+
+				client := fake.NewClientset(test.initialObjects...)
+				informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+				pgInformer := informerFactory.Scheduling().V1beta1().PodGroups()
+				var cpgInformer schedulinginformersv1alpha3.CompositePodGroupInformer
+				if cpgEnabled {
+					cpgInformer = informerFactory.Scheduling().V1alpha3().CompositePodGroups()
+				}
+				podInformer := informerFactory.Core().V1().Pods()
+
+				ctrl, err := NewPodGroupProtectionController(klog.FromContext(ctx), pgInformer, cpgInformer, podInformer, client, cpgEnabled)
+				if err != nil {
+					t.Fatalf("unexpected error creating controller: %v", err)
+				}
+
+				informerFactory.StartWithContext(ctx)
+				informerFactory.WaitForCacheSyncWithContext(ctx)
+				go ctrl.Run(ctx, 1)
+
+				// In order to reduce test flakiness, make sure that the pod-to-delete is visible in the client set. Create a dummy pod to "warm up" the watch pipe.
+				// Since it's created after LIST (WaitForCacheSync), the informer must see it via WATCH.
+				syncPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "sync-pod", Namespace: defaultNS}}
+				_, err = client.CoreV1().Pods(defaultNS).Create(ctx, syncPod, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("creating sync pod: %v", err)
+				}
+
+				err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					_, err = podInformer.Lister().Pods(defaultNS).Get(syncPod.Name)
+					return err == nil, nil
+				})
+				if err != nil {
+					t.Fatalf("timed out waiting for informer to see the sync pod: %v", err)
+				}
+
+				if test.podToDelete != "" {
+					if err := client.CoreV1().Pods(defaultNS).Delete(ctx, test.podToDelete, metav1.DeleteOptions{}); err != nil {
+						t.Fatalf("deleting pod: %v", err)
+					}
+				}
+
+				if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					pg, err := client.SchedulingV1beta1().PodGroups(defaultNS).Get(ctx, defaultPGName, metav1.GetOptions{})
+					if apierrors.IsNotFound(err) {
+						return !test.expectFinalizer, nil
+					}
+					if err != nil {
+						return false, err
+					}
+					hasFinalizer := slices.Contains(pg.Finalizers, scheduling.PodGroupProtectionFinalizer)
+					return hasFinalizer == test.expectFinalizer, nil
+				}); err != nil {
+					t.Fatalf("timed out waiting for expected finalizer state (want present=%v): %v", test.expectFinalizer, err)
+				}
+			})
+		}
+	}
+}
+
+func TestCompositePodGroupProtectionController(t *testing.T) {
+	cpgRootName := "cpg-root"
+	cpgChildName := "cpg-child"
+	pgChildName := "pg-child"
+
+	tests := []struct {
+		name            string
+		initialObjects  []runtime.Object
+		pgToDelete      string
+		cpgToDelete     string
+		cpgToCheck      string
+		expectFinalizer bool
+	}{
+		{
+			name:            "deleted CompositePodGroup with finalizer, no children, finalizer is removed",
+			initialObjects:  []runtime.Object{deletedCompositePodGroup(withCPGFinalizer(cpg(cpgRootName)))},
+			cpgToCheck:      cpgRootName,
+			expectFinalizer: false,
+		},
+		{
+			name:            "deleted CompositePodGroup with finalizer, child PodGroup exists, finalizer is kept",
+			initialObjects:  []runtime.Object{deletedCompositePodGroup(withCPGFinalizer(cpg(cpgRootName))), podGroupWithParent(pgChildName, cpgRootName)},
+			cpgToCheck:      cpgRootName,
+			expectFinalizer: true,
+		},
+		{
+			name:            "deleted CompositePodGroup with finalizer, child CompositePodGroup exists, finalizer is kept",
+			initialObjects:  []runtime.Object{deletedCompositePodGroup(withCPGFinalizer(cpg(cpgRootName))), cpgWithParent(cpgChildName, cpgRootName)},
+			cpgToCheck:      cpgRootName,
+			expectFinalizer: true,
+		},
+		{
+			name:            "deleted CompositePodGroup with finalizer, child PodGroup is deleted, finalizer is removed",
+			initialObjects:  []runtime.Object{deletedCompositePodGroup(withCPGFinalizer(cpg(cpgRootName))), podGroupWithParent(pgChildName, cpgRootName)},
+			pgToDelete:      pgChildName,
+			cpgToCheck:      cpgRootName,
+			expectFinalizer: false,
+		},
+		{
+			name:            "deleted CompositePodGroup with finalizer, child CompositePodGroup is deleted, finalizer is removed",
+			initialObjects:  []runtime.Object{deletedCompositePodGroup(withCPGFinalizer(cpg(cpgRootName))), cpgWithParent(cpgChildName, cpgRootName)},
+			cpgToDelete:     cpgChildName,
+			cpgToCheck:      cpgRootName,
+			expectFinalizer: false,
+		},
+	}
+
+	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -374,51 +517,66 @@ func TestPodGroupProtectionController(t *testing.T) {
 			client := fake.NewClientset(test.initialObjects...)
 			informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 			pgInformer := informerFactory.Scheduling().V1beta1().PodGroups()
+			cpgInformer := informerFactory.Scheduling().V1alpha3().CompositePodGroups()
 			podInformer := informerFactory.Core().V1().Pods()
 
-			ctrl, err := NewPodGroupProtectionController(klog.FromContext(ctx), pgInformer, podInformer, client)
+			ctrl, err := NewPodGroupProtectionController(klog.FromContext(ctx), pgInformer, cpgInformer, podInformer, client, true)
 			if err != nil {
 				t.Fatalf("unexpected error creating controller: %v", err)
 			}
 
-			informerFactory.StartWithContext(ctx)
-			informerFactory.WaitForCacheSyncWithContext(ctx)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
 			go ctrl.Run(ctx, 1)
 
-			// In order to reduce test flakiness, make sure that the pod-to-delete is visible in the client set. Create a dummy pod to "warm up" the watch pipe.
-			// Since it's created after LIST (WaitForCacheSync), the informer must see it via WATCH.
-			syncPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "sync-pod", Namespace: defaultNS}}
-			_, err = client.CoreV1().Pods(defaultNS).Create(ctx, syncPod, metav1.CreateOptions{})
-			if err != nil {
-				t.Fatalf("creating sync pod: %v", err)
+			// In order to reduce test flakiness, make sure that the object-to-delete is visible in the client set. Create a dummy CPG and PG to "warm up" the watch pipe.
+			// Since they are created after LIST (WaitForCacheSync), the informer must see them via WATCH before any deletions occur.
+			syncCPG := cpg("sync-cpg")
+			if _, err := client.SchedulingV1alpha3().CompositePodGroups(defaultNS).Create(ctx, syncCPG, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("creating sync cpg: %v", err)
 			}
-
-			err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-				_, err = podInformer.Lister().Pods(defaultNS).Get(syncPod.Name)
+			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+				_, err := cpgInformer.Lister().CompositePodGroups(defaultNS).Get(syncCPG.Name)
 				return err == nil, nil
-			})
-			if err != nil {
-				t.Fatalf("timed out waiting for informer to see the sync pod: %v", err)
+			}); err != nil {
+				t.Fatalf("timed out waiting for informer to see the sync cpg: %v", err)
 			}
 
-			if test.podToDelete != "" {
-				if err := client.CoreV1().Pods(defaultNS).Delete(ctx, test.podToDelete, metav1.DeleteOptions{}); err != nil {
-					t.Fatalf("deleting pod: %v", err)
+			syncPG := podGroupNamed("sync-pg")
+			if _, err := client.SchedulingV1beta1().PodGroups(defaultNS).Create(ctx, syncPG, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("creating sync pg: %v", err)
+			}
+			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+				_, err := pgInformer.Lister().PodGroups(defaultNS).Get(syncPG.Name)
+				return err == nil, nil
+			}); err != nil {
+				t.Fatalf("timed out waiting for informer to see the sync pg: %v", err)
+			}
+
+			if test.pgToDelete != "" {
+				if err := client.SchedulingV1beta1().PodGroups(defaultNS).Delete(ctx, test.pgToDelete, metav1.DeleteOptions{}); err != nil {
+					t.Fatalf("deleting pod group: %v", err)
+				}
+			}
+
+			if test.cpgToDelete != "" {
+				if err := client.SchedulingV1alpha3().CompositePodGroups(defaultNS).Delete(ctx, test.cpgToDelete, metav1.DeleteOptions{}); err != nil {
+					t.Fatalf("deleting composite pod group: %v", err)
 				}
 			}
 
 			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-				pg, err := client.SchedulingV1beta1().PodGroups(defaultNS).Get(ctx, defaultPGName, metav1.GetOptions{})
+				cpg, err := client.SchedulingV1alpha3().CompositePodGroups(defaultNS).Get(ctx, test.cpgToCheck, metav1.GetOptions{})
 				if apierrors.IsNotFound(err) {
 					return !test.expectFinalizer, nil
 				}
 				if err != nil {
 					return false, err
 				}
-				hasFinalizer := slices.Contains(pg.Finalizers, scheduling.PodGroupProtectionFinalizer)
+				hasFinalizer := slices.Contains(cpg.Finalizers, scheduling.CompositePodGroupProtectionFinalizer)
 				return hasFinalizer == test.expectFinalizer, nil
 			}); err != nil {
-				t.Fatalf("timed out waiting for expected finalizer state (want present=%v): %v", test.expectFinalizer, err)
+				t.Fatalf("timed out waiting for expected CPG finalizer state (want present=%v): %v", test.expectFinalizer, err)
 			}
 		})
 	}
@@ -475,30 +633,29 @@ func TestHasActivePods(t *testing.T) {
 		want bool
 	}{
 		"no pods": {
-			pods: nil,
 			want: false,
 		},
-		"active pod referencing PodGroup": {
+		"active pod in cache referencing PodGroup": {
 			pods: []runtime.Object{
 				podForPG("pod-1", defaultPGName),
 			},
 			want: true,
 		},
-		"only terminated pods": {
+		"only terminated pods in cache": {
 			pods: []runtime.Object{
 				terminatedPod(podForPG("pod-1", defaultPGName), v1.PodSucceeded),
 				terminatedPod(podForPG("pod-2", defaultPGName), v1.PodFailed),
 			},
 			want: false,
 		},
-		"mix of active and terminated": {
+		"mix of active and terminated in cache": {
 			pods: []runtime.Object{
 				podForPG("pod-active", defaultPGName),
 				terminatedPod(podForPG("pod-done", defaultPGName), v1.PodSucceeded),
 			},
 			want: true,
 		},
-		"pods referencing different PodGroup": {
+		"pods in cache referencing different PodGroup": {
 			pods: []runtime.Object{
 				podForPG("pod-1", "other-pg"),
 			},
@@ -531,36 +688,288 @@ func TestHasActivePods(t *testing.T) {
 	}
 }
 
+func TestHasChildGroups(t *testing.T) {
+	tests := map[string]struct {
+		cachedPGs  []runtime.Object
+		cachedCPGs []runtime.Object
+		want       bool
+	}{
+		"no children": {
+			want: false,
+		},
+		"child PodGroup in cache": {
+			cachedPGs: []runtime.Object{
+				podGroupWithParent("child-pg", "parent-cpg"),
+			},
+			want: true,
+		},
+		"child CompositePodGroup in cache": {
+			cachedCPGs: []runtime.Object{
+				cpgWithParent("child-cpg", "parent-cpg"),
+			},
+			want: true,
+		},
+		"children referencing different parent": {
+			cachedPGs: []runtime.Object{
+				podGroupWithParent("other-child-pg", "different-parent"),
+			},
+			cachedCPGs: []runtime.Object{
+				cpgWithParent("other-child-cpg", "different-parent"),
+			},
+			want: false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			pgIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			if err := addChildIndexer(pgIndexer, podGroupByParentIndex, podGroupParent); err != nil {
+				t.Fatalf("unexpected error adding PG indexer: %v", err)
+			}
+			for _, obj := range tc.cachedPGs {
+				_ = pgIndexer.Add(obj)
+			}
+
+			cpgIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			if err := addChildIndexer(cpgIndexer, compositePodGroupByParentIndex, compositePodGroupParent); err != nil {
+				t.Fatalf("unexpected error adding CPG indexer: %v", err)
+			}
+			for _, obj := range tc.cachedCPGs {
+				_ = cpgIndexer.Add(obj)
+			}
+
+			ctrl := &Controller{
+				podGroupIndexer:          pgIndexer,
+				compositePodGroupIndexer: cpgIndexer,
+			}
+
+			parentCPG := cpg("parent-cpg")
+			got, err := ctrl.hasChildGroups(context.Background(), parentCPG)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("hasChildGroups() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestHandlePodGroupUpdate(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 
 	tests := map[string]struct {
-		pg       *schedulingv1beta1.PodGroup
-		wantSize int
+		old                        any
+		new                        any
+		isCompositePodGroupEnabled bool
+		wantPGQueueSize            int
+		wantCPGQueueSize           int
 	}{
-		"PodGroup without finalizer, not deleting/not enqueued": {
-			pg:       podGroup(),
-			wantSize: 0,
+		"both old and new are nil -> not enqueued, no panic": {
+			old:                        nil,
+			new:                        nil,
+			isCompositePodGroupEnabled: true,
 		},
-		"PodGroup is deletion candidate -> enqueued": {
-			pg:       deletedPodGroup(withFinalizer(podGroup())),
-			wantSize: 1,
+		"non-PodGroup object -> not enqueued, no panic": {
+			old:                        nil,
+			new:                        &v1.ConfigMap{},
+			isCompositePodGroupEnabled: true,
+		},
+		"invalid tombstone -> not enqueued, no panic": {
+			old: cache.DeletedFinalStateUnknown{
+				Key: "default/pg",
+				Obj: &v1.ConfigMap{},
+			},
+			new:                        nil,
+			isCompositePodGroupEnabled: true,
+		},
+		"PodGroup without finalizer, not deleting/not enqueued": {
+			new:                        podGroup(),
+			isCompositePodGroupEnabled: true,
+		},
+		"PodGroup is deletion candidate, CPG enabled -> enqueued": {
+			new:                        deletedPodGroup(withFinalizer(podGroup())),
+			isCompositePodGroupEnabled: true,
+			wantPGQueueSize:            1,
+		},
+		"PodGroup is deletion candidate, CPG disabled -> enqueued": {
+			new:                        deletedPodGroup(withFinalizer(podGroup())),
+			isCompositePodGroupEnabled: false,
+			wantPGQueueSize:            1,
 		},
 		"PodGroup has finalizer, not deleting -> not enqueued": {
-			pg:       withFinalizer(podGroup()),
-			wantSize: 0,
+			new:                        withFinalizer(podGroup()),
+			isCompositePodGroupEnabled: true,
+		},
+		"PodGroup with parent CompositePodGroup on add -> parent not enqueued": {
+			new:                        podGroupWithParent("pg-1", "cpg-parent"),
+			isCompositePodGroupEnabled: true,
+		},
+		"PodGroup with parent CompositePodGroup on delete, CPG enabled -> enqueued for parent": {
+			old:                        podGroupWithParent("pg-1", "cpg-parent"),
+			new:                        nil,
+			isCompositePodGroupEnabled: true,
+			wantCPGQueueSize:           1,
+		},
+		"PodGroup with parent CompositePodGroup on delete, CPG disabled -> parent not enqueued": {
+			old:                        podGroupWithParent("pg-1", "cpg-parent"),
+			new:                        nil,
+			isCompositePodGroupEnabled: false,
+		},
+		"PodGroup with parent CompositePodGroup on update (same UID) -> parent not enqueued": {
+			old:                        podGroupWithParent("pg-1", "cpg-parent"),
+			new:                        podGroupWithParent("pg-1", "cpg-parent"),
+			isCompositePodGroupEnabled: true,
+		},
+		"PodGroup with parent CompositePodGroup on update (same UID) and deletion candidate, CPG enabled -> only child enqueued": {
+			old:                        podGroupWithParent("pg-1", "cpg-parent"),
+			new:                        deletedPodGroup(withFinalizer(podGroupWithParent("pg-1", "cpg-parent"))),
+			isCompositePodGroupEnabled: true,
+			wantPGQueueSize:            1,
+		},
+		"PodGroup with parent CompositePodGroup on update (same UID) and deletion candidate, CPG disabled -> only child enqueued": {
+			old:                        podGroupWithParent("pg-1", "cpg-parent"),
+			new:                        deletedPodGroup(withFinalizer(podGroupWithParent("pg-1", "cpg-parent"))),
+			isCompositePodGroupEnabled: false,
+			wantPGQueueSize:            1,
+		},
+		"PodGroup with parent CompositePodGroup on update (UID mismatch), CPG enabled -> parent enqueued": {
+			old:                        podGroupWithParent("pg-1", "cpg-parent-1"),
+			new:                        podGroupWithParent("pg-2", "cpg-parent-2"),
+			isCompositePodGroupEnabled: true,
+			wantCPGQueueSize:           1,
+		},
+		"PodGroup with parent CompositePodGroup on update (UID mismatch), CPG disabled -> parent not enqueued": {
+			old:                        podGroupWithParent("pg-1", "cpg-parent-1"),
+			new:                        podGroupWithParent("pg-2", "cpg-parent-2"),
+			isCompositePodGroupEnabled: false,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Controller{
-				queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
+				isCompositePodGroupEnabled: tc.isCompositePodGroupEnabled,
+				podGroupQueue:              workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
+				compositePodGroupQueue:     workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
 			}
-			defer c.queue.ShutDown()
-			c.handlePodGroupUpdate(logger, tc.pg)
-			if c.queue.Len() != tc.wantSize {
-				t.Errorf("queue size = %d, want %d", c.queue.Len(), tc.wantSize)
+			defer c.podGroupQueue.ShutDown()
+			defer c.compositePodGroupQueue.ShutDown()
+			c.handlePodGroupUpdate(logger, tc.old, tc.new)
+			if c.podGroupQueue.Len() != tc.wantPGQueueSize {
+				t.Errorf("podGroupQueue size = %d, want %d", c.podGroupQueue.Len(), tc.wantPGQueueSize)
+			}
+			if c.compositePodGroupQueue.Len() != tc.wantCPGQueueSize {
+				t.Errorf("compositePodGroupQueue size = %d, want %d", c.compositePodGroupQueue.Len(), tc.wantCPGQueueSize)
+			}
+		})
+	}
+}
+
+func TestHandleCompositePodGroupUpdate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	tests := map[string]struct {
+		old                        any
+		new                        any
+		isCompositePodGroupEnabled bool
+		wantSize                   int
+	}{
+		"both old and new are nil -> not enqueued, no panic": {
+			old:                        nil,
+			new:                        nil,
+			isCompositePodGroupEnabled: true,
+			wantSize:                   0,
+		},
+		"non-CPG object -> not enqueued, no panic": {
+			old:                        nil,
+			new:                        &v1.ConfigMap{},
+			isCompositePodGroupEnabled: true,
+			wantSize:                   0,
+		},
+		"invalid tombstone -> not enqueued, no panic": {
+			old: cache.DeletedFinalStateUnknown{
+				Key: "default/cpg",
+				Obj: &v1.ConfigMap{},
+			},
+			new:                        nil,
+			isCompositePodGroupEnabled: true,
+			wantSize:                   0,
+		},
+		"CPG without finalizer, not deleting -> not enqueued": {
+			new:                        cpg("cpg-1"),
+			isCompositePodGroupEnabled: true,
+			wantSize:                   0,
+		},
+		"CPG is deletion candidate, CPG enabled -> enqueued": {
+			new:                        deletedCompositePodGroup(withCPGFinalizer(cpg("cpg-1"))),
+			isCompositePodGroupEnabled: true,
+			wantSize:                   1,
+		},
+		"CPG is deletion candidate, CPG disabled -> not enqueued": {
+			new:                        deletedCompositePodGroup(withCPGFinalizer(cpg("cpg-1"))),
+			isCompositePodGroupEnabled: false,
+			wantSize:                   0,
+		},
+		"CPG with parent CompositePodGroup on add -> parent not enqueued": {
+			new:                        cpgWithParent("cpg-child", "cpg-parent"),
+			isCompositePodGroupEnabled: true,
+			wantSize:                   0,
+		},
+		"CPG with parent CompositePodGroup on delete, CPG enabled -> enqueued for parent": {
+			old:                        cpgWithParent("cpg-child", "cpg-parent"),
+			new:                        nil,
+			isCompositePodGroupEnabled: true,
+			wantSize:                   1,
+		},
+		"CPG with parent CompositePodGroup on delete, CPG disabled -> not enqueued": {
+			old:                        cpgWithParent("cpg-child", "cpg-parent"),
+			new:                        nil,
+			isCompositePodGroupEnabled: false,
+			wantSize:                   0,
+		},
+		"CPG with parent CompositePodGroup on update (same UID) -> parent not enqueued": {
+			old:                        cpgWithParent("cpg-child", "cpg-parent"),
+			new:                        cpgWithParent("cpg-child", "cpg-parent"),
+			isCompositePodGroupEnabled: true,
+			wantSize:                   0,
+		},
+		"CPG with parent CompositePodGroup on update (same UID) and deletion candidate, CPG enabled -> only child enqueued": {
+			old:                        cpgWithParent("cpg-child", "cpg-parent"),
+			new:                        deletedCompositePodGroup(withCPGFinalizer(cpgWithParent("cpg-child", "cpg-parent"))),
+			isCompositePodGroupEnabled: true,
+			wantSize:                   1,
+		},
+		"CPG with parent CompositePodGroup on update (same UID) and deletion candidate, CPG disabled -> not enqueued": {
+			old:                        cpgWithParent("cpg-child", "cpg-parent"),
+			new:                        deletedCompositePodGroup(withCPGFinalizer(cpgWithParent("cpg-child", "cpg-parent"))),
+			isCompositePodGroupEnabled: false,
+			wantSize:                   0,
+		},
+		"CPG with parent CompositePodGroup on update (UID mismatch), CPG enabled -> parent enqueued": {
+			old:                        cpgWithParent("cpg-child-1", "cpg-parent-1"),
+			new:                        cpgWithParent("cpg-child-2", "cpg-parent-2"),
+			isCompositePodGroupEnabled: true,
+			wantSize:                   1,
+		},
+		"CPG with parent CompositePodGroup on update (UID mismatch), CPG disabled -> not enqueued": {
+			old:                        cpgWithParent("cpg-child-1", "cpg-parent-1"),
+			new:                        cpgWithParent("cpg-child-2", "cpg-parent-2"),
+			isCompositePodGroupEnabled: false,
+			wantSize:                   0,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := &Controller{
+				isCompositePodGroupEnabled: tc.isCompositePodGroupEnabled,
+				compositePodGroupQueue:     workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
+			}
+			defer c.compositePodGroupQueue.ShutDown()
+			c.handleCompositePodGroupUpdate(logger, tc.old, tc.new)
+			if c.compositePodGroupQueue.Len() != tc.wantSize {
+				t.Errorf("compositePodGroupQueue size = %d, want %d", c.compositePodGroupQueue.Len(), tc.wantSize)
 			}
 		})
 	}
