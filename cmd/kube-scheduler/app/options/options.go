@@ -404,7 +404,8 @@ func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, 
 // createClients creates a kube client, an event client, and an async client from the given kubeConfig.
 // client and asyncClient share the same client-side rate limiter to preserve the configured API request budget.
 func createClients(kubeConfig *restclient.Config) (clientset.Interface, clientset.Interface, clientset.Interface, error) {
-	clientConfig := restclient.AddUserAgent(kubeConfig, "scheduler")
+	clientConfig := restclient.CopyConfig(kubeConfig)
+	restclient.AddUserAgent(clientConfig, "scheduler")
 	if clientConfig.RateLimiter == nil && clientConfig.QPS > 0 {
 		burst := clientConfig.Burst
 		if burst == 0 {
@@ -423,7 +424,8 @@ func createClients(kubeConfig *restclient.Config) (clientset.Interface, clientse
 		return nil, nil, nil, err
 	}
 
-	asyncConfig := restclient.AddUserAgent(clientConfig, "scheduler-async")
+	asyncConfig := restclient.CopyConfig(clientConfig)
+	restclient.AddUserAgent(asyncConfig, "scheduler-async")
 	asyncClient, err := clientset.NewForConfig(asyncConfig)
 	if err != nil {
 		return nil, nil, nil, err
