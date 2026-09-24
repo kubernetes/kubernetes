@@ -220,10 +220,9 @@ type PodGroupManager interface {
 	CompositePodGroupStates() CompositePodGroupStateLister
 	// CompositePodGroups returns the CompositePodGroupLister.
 	CompositePodGroups() CompositePodGroupLister
-	// BuildHierarchySnapshotFromPod builds a hierarchy snapshot from the given pod.
-	BuildHierarchySnapshotFromPod(pod *v1.Pod) (PodGroupManager, error)
-	// GetRootKeyForGroup returns the root key of the given EntityKey.
-	GetRootKeyForGroup(key EntityKey) (EntityKey, bool, error)
+	// FindRootGroup returns the root *GenericPodGroup for the given EntityKey,
+	// or nil if the root group was not found.
+	FindRootGroup(key EntityKey) (*GenericPodGroup, error)
 }
 
 // PodGroupState provides an interface to view the state of a single pod group.
@@ -251,4 +250,24 @@ type PodGroupState interface {
 type CompositePodGroupState interface {
 	// GetChildren returns the keys of child groups.
 	GetChildren() []EntityKey
+}
+
+// RootGroupReadiness holds the resolved root GenericPodGroup and its readiness state.
+type RootGroupReadiness struct {
+	// RootGroup provides unified access to the underlying root PodGroup or CompositePodGroup object.
+	RootGroup *GenericPodGroup
+	// IsReady is true if the number of ready child groups/pods directly under this root group meets the group
+	// scheduling policy's minimum threshold.
+	IsReady bool
+}
+
+// PodGroupHierarchyTracker provides read access to readiness quorum counts aggregated across
+// PodGroup and CompositePodGroup hierarchies.
+type PodGroupHierarchyTracker interface {
+	// FindRootGroupReadiness traverses parent links from key to locate the root GenericPodGroup in the hierarchy.
+	// If the root group is found, it is returned along with information if the number of its children meets its scheduling policy's
+	// minimum threshold. If the root group cannot be resolved (or does not exist), nil is returned without an error.
+	FindRootGroupReadiness(key EntityKey) (*RootGroupReadiness, error)
+	// AreSameHierarchy checks whether two entities belong to the same hierarchy owned by the same root group.
+	AreSameHierarchy(key1, key2 EntityKey) (bool, error)
 }
