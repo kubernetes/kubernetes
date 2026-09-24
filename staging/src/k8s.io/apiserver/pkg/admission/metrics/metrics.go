@@ -123,6 +123,7 @@ type AdmissionMetrics struct {
 	matchConditionEvalErrors        *metrics.CounterVec
 	matchConditionExclusions        *metrics.CounterVec
 	matchConditionEvaluationSeconds *metricSet
+	equivalentCoverageRejections    *metrics.CounterVec
 }
 
 // newAdmissionMetrics create a new AdmissionMetrics, configured with default metric names.
@@ -257,6 +258,16 @@ func newAdmissionMetrics() *AdmissionMetrics {
 		latenciesSummary: nil,
 	}
 
+	equivalentCoverageRejections := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "equivalent_coverage_rejections_total",
+			Help:           "Number of times a dynamic admission hook caused a request to be rejected because it applies to an admission equivalent of the request but not to the request itself.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"plugin", "resource", "subresource", "name"})
+
 	step.mustRegister()
 	controller.mustRegister()
 	webhook.mustRegister()
@@ -266,7 +277,19 @@ func newAdmissionMetrics() *AdmissionMetrics {
 	legacyregistry.MustRegister(webhookRequest)
 	legacyregistry.MustRegister(matchConditionEvalError)
 	legacyregistry.MustRegister(matchConditionExclusions)
-	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection, webhookFailOpen: webhookFailOpen, webhookRequest: webhookRequest, matchConditionEvalErrors: matchConditionEvalError, matchConditionExclusions: matchConditionExclusions, matchConditionEvaluationSeconds: matchConditionEvaluationSeconds}
+	legacyregistry.MustRegister(equivalentCoverageRejections)
+	return &AdmissionMetrics{
+		step:                            step,
+		controller:                      controller,
+		webhook:                         webhook,
+		webhookRejection:                webhookRejection,
+		webhookFailOpen:                 webhookFailOpen,
+		webhookRequest:                  webhookRequest,
+		matchConditionEvalErrors:        matchConditionEvalError,
+		matchConditionExclusions:        matchConditionExclusions,
+		matchConditionEvaluationSeconds: matchConditionEvaluationSeconds,
+		equivalentCoverageRejections:    equivalentCoverageRejections,
+	}
 }
 
 func (m *AdmissionMetrics) reset() {
@@ -328,6 +351,13 @@ func (m *AdmissionMetrics) ObserveMatchConditionExclusion(ctx context.Context, n
 // ObserveMatchConditionEvaluationTime records duration of match condition evaluation process.
 func (m *AdmissionMetrics) ObserveMatchConditionEvaluationTime(ctx context.Context, elapsed time.Duration, name, kind, stepType, operation string) {
 	m.matchConditionEvaluationSeconds.observe(ctx, elapsed, name, kind, stepType, operation)
+}
+
+// ObserveEquivalentCoverageRejection records a dynamic admission hook that caused a request to be
+// rejected because it applies to an admission equivalent of the request but not to the request
+// itself.
+func (m *AdmissionMetrics) ObserveEquivalentCoverageRejection(ctx context.Context, plugin, resource, subresource, name string) {
+	m.equivalentCoverageRejections.WithContext(ctx).WithLabelValues(plugin, resource, subresource, name).Inc()
 }
 
 type metricSet struct {
