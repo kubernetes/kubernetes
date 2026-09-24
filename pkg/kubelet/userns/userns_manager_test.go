@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -528,4 +529,62 @@ func TestRecordBounds(t *testing.T) {
 	err = m.record(logger, types.UID(fmt.Sprintf("%d", 2)), uint32(2*65536), 65536)
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "out of range")
+}
+
+// When the kubelet ID range changes between restarts, a persisted mapping can
+// fall outside it and the kubelet refuses to start. The error is all the
+// operator gets, so it has to name the pod, the file and both ranges.
+func TestMakeUserNsManagerMappingOutsideRange(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
+
+	cases := []struct {
+		name           string
+		hostID         uint32
+		mappingFirstID uint32
+		mappingLen     uint32
+		wantMapping    string
+		wantRange      string
+	}{
+		{
+			// Allocated from the default range, then the kubelet moved to a
+			// delegated range that ends before that block.
+			name:           "past the end of a delegated range",
+			hostID:         112 * testUserNsLength,
+			mappingFirstID: testUserNsLength,
+			mappingLen:     testMaxPods * testUserNsLength,
+			wantMapping:    "[7340032, 7405568)",
+			wantRange:      "[65536, 7274496)",
+		},
+		{
+			// The default range ends at 2^32; the bound must not wrap to 0.
+			name:           "below the start of the default range",
+			hostID:         0,
+			mappingFirstID: testUserNsLength,
+			mappingLen:     uint32((1 << 32) - uint64(testUserNsLength)),
+			wantMapping:    "[0, 65536)",
+			wantRange:      "[65536, 4294967296)",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			podDir := t.TempDir()
+			mapping := fmt.Sprintf(`{"uidMappings":[{"hostId":%[1]d,"containerId":0,"length":65536}],"gidMappings":[{"hostId":%[1]d,"containerId":0,"length":65536}]}`, tc.hostID)
+			mappingPath := filepath.Join(podDir, mappingsFile)
+			require.NoError(t, os.WriteFile(mappingPath, []byte(mapping), 0o600))
+
+			kl := &testUserNsPodsManager{
+				podDir:         podDir,
+				podList:        []types.UID{"pod-a"},
+				mappingFirstID: tc.mappingFirstID,
+				mappingLen:     tc.mappingLen,
+			}
+			_, err := MakeUserNsManager(logger, kl, nil)
+			require.Error(t, err)
+			for _, want := range []string{`"pod-a"`, mappingPath, "out of range", tc.wantMapping, tc.wantRange} {
+				assert.ErrorContains(t, err, want)
+			}
+		})
+	}
 }

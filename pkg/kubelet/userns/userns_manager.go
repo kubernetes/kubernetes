@@ -185,7 +185,9 @@ func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int6
 	for _, podUID := range found {
 		logger.V(5).Info("reading pod from disk for user namespace", "podUID", podUID)
 		if err := m.recordPodMappings(logger, podUID); err != nil {
-			return nil, fmt.Errorf("record pod mappings for existing pod %q: %w", podUID, err)
+			// This stops the kubelet from starting, so name the file the
+			// operator has to look at.
+			return nil, fmt.Errorf("record pod mappings for existing pod %q from %s: %w", podUID, filepath.Join(kl.GetPodDir(podUID), mappingsFile), err)
 		}
 	}
 
@@ -251,7 +253,13 @@ func (m *UsernsManager) record(logger klog.Logger, pod types.UID, from, length u
 	}
 	index := int(from/m.userNsLength) - m.off
 	if index < 0 || index >= m.len {
-		return fmt.Errorf("id %v is out of range", from)
+		// A mapping only lands outside the range if it was allocated under a
+		// different one, e.g. after /etc/subuid or the kubelet user changed.
+		// uint64 because the default range ends at 2^32.
+		first := uint64(m.off) * uint64(m.userNsLength)
+		end := uint64(m.off+m.len) * uint64(m.userNsLength)
+		return fmt.Errorf("user namespace IDs [%d, %d) are out of range [%d, %d) available to the kubelet; if the kubelet ID range changed, restore the previous one",
+			from, uint64(from)+uint64(length), first, end)
 	}
 	// if the pod wasn't found then verify the range is free.
 	if !found && m.used.Has(index) {
