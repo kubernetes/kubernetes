@@ -111,6 +111,15 @@ STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 ENABLE_TRACING=${ENABLE_TRACING:-false}
 
+# Enable quantum-resistant cryptography (ML-DSA) for kubelet certificate rotation.
+# When true, generates an ML-DSA signing CA, enables the CertificateSigningRequestMLDSA
+# feature gate, and configures the kubelet to use ML-DSA keys for certificate rotation.
+ENABLE_QUANTUM_CRYPTO=${ENABLE_QUANTUM_CRYPTO:-false}
+QUANTUM_CRYPTO_ALGORITHM=${QUANTUM_CRYPTO_ALGORITHM:-"ML-DSA-65"}
+if [[ "${ENABLE_QUANTUM_CRYPTO}" == "true" ]]; then
+  FEATURE_GATES="${FEATURE_GATES},CertificateSigningRequestMLDSA=true,PodCertificateMLDSA=true"
+fi
+
 # enable Kubernetes-CSI snapshotter
 ENABLE_CSI_SNAPSHOTTER=${ENABLE_CSI_SNAPSHOTTER:-false}
 
@@ -601,13 +610,51 @@ function generate_certs {
 }
 
 function generate_kubeproxy_certs {
-    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-proxy system:kube-proxy system:nodes
+    if [[ "${ENABLE_QUANTUM_CRYPTO}" != "true" ]]; then
+        kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-proxy system:kube-proxy system:nodes
+    fi
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-proxy
 }
 
 function generate_kubelet_certs {
-    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kubelet "system:node:${HOSTNAME_OVERRIDE}" system:nodes
+    if [[ "${ENABLE_QUANTUM_CRYPTO}" != "true" ]]; then
+        kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kubelet "system:node:${HOSTNAME_OVERRIDE}" system:nodes
+    fi
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kubelet
+}
+
+function generate_quantum_certs {
+    echo "Generating quantum certificates (${QUANTUM_CRYPTO_ALGORITHM})..."
+
+    local out_dir="${TMP_DIR}/quantum-certs"
+
+    local mldsa_variant
+    case "${QUANTUM_CRYPTO_ALGORITHM}" in
+        ML-DSA-44) mldsa_variant="MLDSA44" ;;
+        ML-DSA-65) mldsa_variant="MLDSA65" ;;
+        ML-DSA-87) mldsa_variant="MLDSA87" ;;
+        *)
+            echo "Unsupported quantum crypto algorithm: ${QUANTUM_CRYPTO_ALGORITHM}" >&2
+            exit 1
+            ;;
+    esac
+
+    mkdir -p "${out_dir}"
+
+    (cd "${KUBE_ROOT}/hack/tools" && go run ./quantum-cert-gen "${mldsa_variant}" "${out_dir}" \
+        "api-dns=kubernetes.default,kubernetes.default.svc,localhost,${API_HOST}" \
+        "api-ips=${API_HOST_IP},${FIRST_SERVICE_CLUSTER_IP}" \
+        "agg-dns=api.kube-public.svc,localhost" \
+        "agg-ips=${API_HOST_IP}" \
+        "node-name=${HOSTNAME_OVERRIDE}")
+
+    # Copy all generated certs to CERT_DIR
+    ${CONTROLPLANE_SUDO} cp "${out_dir}"/*.crt "${out_dir}"/*.key "${CERT_DIR}/"
+
+    # Write kube-aggregator kubeconfig (same as generate_certs does)
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-aggregator
+
+    echo "Quantum certificates generated successfully"
 }
 
 function start_apiserver {
@@ -657,7 +704,11 @@ function start_apiserver {
       ${CONTROLPLANE_SUDO} rm -f "${CERT_DIR}"/kubelet-rotated.kubeconfig
 
       # Create Certs
-      generate_certs
+      if [[ "${ENABLE_QUANTUM_CRYPTO}" == "true" ]]; then
+        generate_quantum_certs
+      else
+        generate_certs
+      fi
     fi
 
     if [[ -z "${EGRESS_SELECTOR_CONFIG_FILE:-}" ]]; then
@@ -1049,6 +1100,13 @@ EOF
       # cpumanager policy options
       if [[ -n ${CPUMANAGER_POLICY_OPTIONS} ]]; then
 	parse_cpumanager_policy_options "${CPUMANAGER_POLICY_OPTIONS}"
+      fi
+
+      # quantum crypto key algorithm for certificate rotation
+      if [[ "${ENABLE_QUANTUM_CRYPTO}" == "true" ]]; then
+        echo "tlsMinVersion: \"VersionTLS13\""
+        echo "clientCertificateKeyAlgorithm: \"${QUANTUM_CRYPTO_ALGORITHM}\""
+        echo "serverCertificateKeyAlgorithm: \"${QUANTUM_CRYPTO_ALGORITHM}\""
       fi
 
     } >>"${TMP_DIR}"/kubelet.yaml
