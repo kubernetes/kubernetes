@@ -202,6 +202,7 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		}
 	}
 
+	reprieveFilter := ev.Handle.PreemptionManager().NewReprieveFilter(potentialVictims)
 	// reprieveVictim tries to reprieve a victim as a single unit.
 	// It adds all victim's pods back to snapshot and to CycleStates of preemptor pods
 	// It then goes through preemptor's proposed assignments and runs FilterPlugins for a given preemptor
@@ -214,6 +215,9 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	// - all previous preemptor pods assumed and reserved
 	// - no knowledge of upcoming preemptor pods
 	reprieveVictim := func(v fwk.PreemptionVictim, preemptorAssignments []fwk.ProposedAssignment) (fits bool, err error) {
+		if !reprieveFilter.CanReprieveVictim(v) {
+			return false, nil
+		}
 		if err = addVictimPodsWithPreFilter(v, preemptorAssignments); err != nil {
 			return false, err
 		}
@@ -225,7 +229,6 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 				}
 			}
 		}()
-		fits = true
 		for _, assignment := range preemptorAssignments {
 			nodeInfo, err := mutableLister.NodeInfos().Get(assignment.GetNodeName())
 			if err != nil {
@@ -255,7 +258,8 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 				return mutableLister.RemovePod(logger, assignment.GetPod(), assignment.GetNodeName())
 			})
 		}
-		return fits, nil
+		reprieveFilter.OnVictimReprieved(v)
+		return true, nil
 	}
 
 	// Try to reprieve as many pods as possible. The provided victims are ordered

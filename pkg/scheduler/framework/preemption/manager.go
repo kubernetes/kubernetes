@@ -82,6 +82,18 @@ func (m *defaultPreemptionManager) Executor() fwk.PreemptionExecutor {
 	return m.executor
 }
 
+func (m *defaultPreemptionManager) NewReprieveFilter(_ []fwk.PreemptionVictim) fwk.ReprieveFilter {
+	return m
+}
+
+func (m *defaultPreemptionManager) CanReprieveVictim(_ fwk.PreemptionVictim) bool {
+	return true
+}
+
+func (m *defaultPreemptionManager) OnVictimReprieved(_ fwk.PreemptionVictim) {
+	// no-op
+}
+
 func getPreemptionPolicy(pgInfo fwk.PodGroupInfo, enablePodGroupPreemptionPolicy bool) v1.PreemptionPolicy {
 	if enablePodGroupPreemptionPolicy {
 		return pgInfo.GetPreemptionPolicy()
