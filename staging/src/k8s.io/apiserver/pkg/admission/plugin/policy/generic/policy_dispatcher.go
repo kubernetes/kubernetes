@@ -78,19 +78,23 @@ type PolicyInvocation[P runtime.Object, B runtime.Object, E Evaluator] struct {
 type dispatcherDelegate[P, B runtime.Object, E Evaluator] func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, versionedAttributes webhookgeneric.VersionedAttributeAccessor, invocations []PolicyInvocation[P, B, E]) ([]PolicyError, *apierrors.StatusError)
 
 type policyDispatcher[P runtime.Object, B runtime.Object, E Evaluator] struct {
+	pluginName         string
 	newPolicyAccessor  func(P) PolicyAccessor
 	newBindingAccessor func(B) BindingAccessor
 	matcher            PolicyMatcher
 	delegate           dispatcherDelegate[P, B, E]
 }
 
+// NewPolicyDispatcher returns a Dispatcher for the admission plugin named pluginName.
 func NewPolicyDispatcher[P runtime.Object, B runtime.Object, E Evaluator](
+	pluginName string,
 	newPolicyAccessor func(P) PolicyAccessor,
 	newBindingAccessor func(B) BindingAccessor,
 	matcher *matching.Matcher,
 	delegate dispatcherDelegate[P, B, E],
 ) Dispatcher[PolicyHook[P, B, E]] {
 	return &policyDispatcher[P, B, E]{
+		pluginName:         pluginName,
 		newPolicyAccessor:  newPolicyAccessor,
 		newBindingAccessor: newBindingAccessor,
 		matcher:            NewPolicyMatcher(matcher),
@@ -111,6 +115,10 @@ func (d *policyDispatcher[P, B, E]) Start(ctx context.Context) error {
 // is expected to ignore the result of any policies whose match conditions dont pass.
 // This may be possible to refactor so matchconditions are checked here instead.
 func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, hooks []PolicyHook[P, B, E]) error {
+	if err := CheckAdmissionEquivalents(ctx, d.pluginName, a, o, d.matcher, hooks, d.newPolicyAccessor, d.newBindingAccessor); err != nil {
+		return err
+	}
+
 	var relevantHooks []PolicyInvocation[P, B, E]
 	// Construct all the versions we need to call our webhooks
 	versionedAttrAccessor := &versionedAttributeAccessor{
