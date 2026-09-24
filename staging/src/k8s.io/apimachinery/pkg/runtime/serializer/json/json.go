@@ -22,7 +22,6 @@ import (
 	jsonv2 "encoding/json/v2"
 	"io"
 	"strconv"
-	"sync"
 
 	kjson "sigs.k8s.io/json"
 	"sigs.k8s.io/yaml"
@@ -227,9 +226,6 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	return s.doEncode(obj, w)
 }
 
-// Reuse the buffer so ordinary responses do not allocate a full output copy.
-var encodePool = sync.Pool{New: func() any { return new(bytes.Buffer) }}
-
 func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	if s.options.Yaml {
 		json, err := jsonv2.Marshal(obj, json.DefaultOptionsV1())
@@ -266,16 +262,8 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 			return nil
 		}
 	}
-	// Buffer before writing so a marshaling error cannot leave a partial response.
-	buf := encodePool.Get().(*bytes.Buffer)
-	buf.Reset()
-	defer encodePool.Put(buf)
-	if err := jsonv2.MarshalWrite(buf, obj, json.DefaultOptionsV1()); err != nil {
-		return err
-	}
-	buf.WriteByte('\n')
-	_, err := w.Write(buf.Bytes())
-	return err
+	encoder := json.NewEncoder(w)
+	return encoder.Encode(obj)
 }
 
 // IsStrict indicates whether the serializer
