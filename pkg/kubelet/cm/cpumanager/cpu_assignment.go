@@ -1221,7 +1221,7 @@ func (a *cpuAccumulator) takeRemainingCPUsForResize() {
 // to honor the TopologyManager's topology hint. This ensures CPU allocation alignes with device
 // topology (e.g., GPUs, NICs that span multiple NUMA nodes). If the hint exceeds the maximum feasible NUMA count,
 // minNumNUMAsFromHint is ignored.
-func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int, minNumNUMAsFromHint int) (minNumNUMAs, maxNumNUMAs int) {
+func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int, minNumNUMAsFromHint int, totalCPUsNeeded int) (minNumNUMAs, maxNumNUMAs int) {
 	// Get the total number of NUMA nodes in the system.
 	numNUMANodes := a.topo.CPUDetails.NUMANodes().Size()
 
@@ -1239,7 +1239,15 @@ func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int, minNumN
 
 	// Calculate the number of available 'cpuGroups' across all NUMA nodes as
 	// well as the number of 'cpuGroups' that need to be allocated (rounding up).
-	numCPUGroupsNeeded := (a.numCPUsNeeded-1)/cpuGroupSize + 1
+
+	// For resize operations 'a.numCPUsNeeded' only counts the remaining CPUs
+	// to allocate, while retained CPUs already span NUMA nodes that the final
+	// allocation must cover. Capping 'maxNumNUMAs' by the remainder alone can
+	// push it below that span and leave no feasible NUMA combination, so the
+	// maximum is derived from the total CPU demand instead.
+	// For non-resize operations (e.g., pod add) 'totalCPUsNeeded' is identical
+	// to 'a.numCPUsNeeded', so this does not change existing behavior.
+	numCPUGroupsNeeded := (totalCPUsNeeded-1)/cpuGroupSize + 1
 
 	// Calculate the minimum number of numa nodes required to satisfy the
 	// allocation (rounding up).
@@ -1505,7 +1513,7 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 	// Calculate the minimum and maximum possible number of NUMA nodes that
 	// could satisfy this request. This is used to optimize how many iterations
 	// of the loop we need to go through below.
-	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize, minNUMAsFromHint)
+	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize, minNUMAsFromHint, numCPUs)
 
 	// Try combinations of 1,2,3,... NUMA nodes until we find a combination
 	// where we can evenly distribute CPUs across them. To optimize things, we
@@ -1811,7 +1819,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 	// Calculate the minimum and maximum possible number of NUMA nodes that
 	// could satisfy this request. This is used to optimize how many iterations
 	// of the loop we need to go through below.
-	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize, numCPUs)
+	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize, 0, numCPUs)
 	// For resize operations, minNUMAs should not be less than the number of
 	// NUMA nodes with retained CPUs, ensuring we consider combinations that
 	// include all NUMA nodes with retained CPUs.
