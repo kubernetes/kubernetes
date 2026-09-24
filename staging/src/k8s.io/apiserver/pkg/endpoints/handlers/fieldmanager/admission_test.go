@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/warning"
 )
 
 //go:embed testdata/exemplar_pod.yaml
@@ -79,29 +80,56 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
+	mutationStyles := []struct {
+		name      string
+		admitWith func(metav1.ManagedFieldsEntry) admitFunc
+	}{
+		{name: "replaceSlice", admitWith: replaceManagedFields},
+		{name: "overwriteElement", admitWith: overwriteManagedFieldsElement},
+	}
+
 	for name, mutate := range managedFieldsMutators {
-		t.Run(name, func(t *testing.T) {
-			mutated, shouldReset := mutate(validManagedFieldsEntry)
-			validEntries := []metav1.ManagedFieldsEntry{validManagedFieldsEntry}
-			mutatedEntries := []metav1.ManagedFieldsEntry{mutated}
+		for _, style := range mutationStyles {
+			t.Run(name+"/"+style.name, func(t *testing.T) {
+				mutated, shouldReset := mutate(validManagedFieldsEntry)
+				validEntries := []metav1.ManagedFieldsEntry{validManagedFieldsEntry}
 
-			obj := &v1.ConfigMap{}
-			obj.SetManagedFields(validEntries)
+				obj := &v1.ConfigMap{}
+				obj.SetManagedFields([]metav1.ManagedFieldsEntry{validManagedFieldsEntry})
 
-			wrap.admit = replaceManagedFields(mutatedEntries)
+				wrap.admit = style.admitWith(mutated)
 
-			attrs := admission.NewAttributesRecord(obj, obj, schema.GroupVersionKind{}, "default", "", schema.GroupVersionResource{}, "", admission.Update, nil, false, nil)
-			if err := ac.(admission.MutationInterface).Admit(context.TODO(), attrs, nil); err != nil {
-				t.Fatal(err)
-			}
+				attrs := admission.NewAttributesRecord(obj, obj, schema.GroupVersionKind{}, "default", "", schema.GroupVersionResource{}, "", admission.Update, nil, false, nil)
+				if err := ac.(admission.MutationInterface).Admit(context.TODO(), attrs, nil); err != nil {
+					t.Fatal(err)
+				}
 
-			if shouldReset && !reflect.DeepEqual(obj.GetManagedFields(), validEntries) {
-				t.Fatalf("expected: \n%v\ngot:\n%v", validEntries, obj.GetManagedFields())
-			}
-			if !shouldReset && reflect.DeepEqual(obj.GetManagedFields(), validEntries) {
-				t.Fatalf("expected: \n%v\ngot:\n%v", mutatedEntries, obj.GetManagedFields())
-			}
-		})
+				if shouldReset && !reflect.DeepEqual(obj.GetManagedFields(), validEntries) {
+					t.Fatalf("expected: \n%v\ngot:\n%v", validEntries, obj.GetManagedFields())
+				}
+				if !shouldReset && reflect.DeepEqual(obj.GetManagedFields(), validEntries) {
+					t.Fatalf("expected: \n%v\ngot:\n%v", []metav1.ManagedFieldsEntry{mutated}, obj.GetManagedFields())
+				}
+			})
+		}
+	}
+}
+
+func TestAdmissionSkipsValidationWhenUnchanged(t *testing.T) {
+	wrap := &mockAdmissionController{admit: func(context.Context, admission.Attributes, admission.ObjectInterfaces) error { return nil }}
+	ac := fieldmanager.NewManagedFieldsValidatingAdmissionController(wrap)
+
+	obj := &v1.ConfigMap{}
+	obj.SetManagedFields([]metav1.ManagedFieldsEntry{{Manager: "test", Operation: "invalid operation"}})
+
+	rec := &warningRecorder{}
+	ctx := warning.WithWarningRecorder(context.TODO(), rec)
+	attrs := admission.NewAttributesRecord(obj, obj, schema.GroupVersionKind{}, "default", "", schema.GroupVersionResource{}, "", admission.Update, nil, false, nil)
+	if err := ac.(admission.MutationInterface).Admit(ctx, attrs, nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.warnings) != 0 {
+		t.Errorf("managedFields were revalidated although admission did not change them: %v", rec.warnings)
 	}
 }
 
@@ -155,19 +183,38 @@ func BenchmarkAdmission(b *testing.B) {
 
 type admitFunc = func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error
 
-func replaceManagedFields(with []metav1.ManagedFieldsEntry) func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+type warningRecorder struct {
+	warnings []string
+}
+
+func (r *warningRecorder) AddWarning(_, text string) {
+	r.warnings = append(r.warnings, text)
+}
+
+func overwriteManagedFieldsElement(to metav1.ManagedFieldsEntry) admitFunc {
 	return func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 		objectMeta, err := meta.Accessor(a.GetObject())
 		if err != nil {
 			return err
 		}
-		objectMeta.SetManagedFields(with)
+		objectMeta.GetManagedFields()[0] = to
+		return nil
+	}
+}
+
+func replaceManagedFields(with metav1.ManagedFieldsEntry) admitFunc {
+	return func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+		objectMeta, err := meta.Accessor(a.GetObject())
+		if err != nil {
+			return err
+		}
+		objectMeta.SetManagedFields([]metav1.ManagedFieldsEntry{with})
 		return nil
 	}
 }
 
 type mockAdmissionController struct {
-	admit func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error
+	admit admitFunc
 }
 
 func (c *mockAdmissionController) Handles(operation admission.Operation) bool {

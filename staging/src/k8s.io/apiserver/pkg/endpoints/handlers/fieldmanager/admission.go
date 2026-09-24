@@ -19,6 +19,7 @@ package fieldmanager
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/managedfields"
@@ -66,11 +67,14 @@ func (admit *managedFieldsValidatingAdmissionController) Admit(ctx context.Conte
 		// just call the wrapped admission
 		return mutationInterface.Admit(ctx, a, o)
 	}
-	managedFieldsBeforeAdmission := objectMeta.GetManagedFields()
+	managedFieldsBeforeAdmission := slices.Clone(objectMeta.GetManagedFields())
 	if err := mutationInterface.Admit(ctx, a, o); err != nil {
 		return err
 	}
 	managedFieldsAfterAdmission := objectMeta.GetManagedFields()
+	if slices.Equal(managedFieldsBeforeAdmission, managedFieldsAfterAdmission) {
+		return nil
+	}
 	if err := managedfields.ValidateManagedFields(managedFieldsAfterAdmission); err != nil {
 		objectMeta.SetManagedFields(managedFieldsBeforeAdmission)
 		warning.AddWarning(ctx, "",
