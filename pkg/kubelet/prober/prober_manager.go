@@ -34,6 +34,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/utils/clock"
 )
@@ -300,7 +301,9 @@ func (m *manager) isContainerStarted(logger klog.Logger, pod *v1.Pod, containerS
 
 		// SyncPod generates the pod status before it calls AddPod, so on the first sync after
 		// a kubelet restart the worker lookup below misses the startup probe of a container.
-		if containerSpec := kubecontainer.GetContainerSpec(pod, containerStatus.Name); containerSpec != nil && containerSpec.StartupProbe != nil {
+		// A static pod is skipped: it carries no status to preserve Started from until its
+		// mirror pod arrives, so it would lose Started on every kubelet restart.
+		if containerSpec := kubecontainer.GetContainerSpec(pod, containerStatus.Name); containerSpec != nil && containerSpec.StartupProbe != nil && !kubetypes.IsStaticPod(pod) {
 			return false
 		}
 	}

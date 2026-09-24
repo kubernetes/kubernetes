@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -936,8 +937,11 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 		// from the API server.
 		readyBeforeRestart v1.ConditionStatus
 		readinessProbe     *v1.Probe
-		expectedStarted    bool
-		expectedReady      bool
+		// staticPod makes the pod a static pod, which carries no status from the
+		// API server.
+		staticPod       bool
+		expectedStarted bool
+		expectedReady   bool
 	}{
 		{
 			name:                 "feature is disabled, the container is still in its startup period",
@@ -967,6 +971,14 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 			readyBeforeRestart:   v1.ConditionTrue,
 			expectedStarted:      true,
 			expectedReady:        true,
+		},
+		{
+			// A static pod has no status to preserve Started from until its mirror
+			// pod arrives, so it keeps the legacy first-sync result.
+			name:            "feature is disabled, static pod",
+			staticPod:       true,
+			expectedStarted: true,
+			expectedReady:   true,
 		},
 		// The feature gate restores the legacy behavior: the startup probe is
 		// verified again after a restart, but the first sync, which runs before
@@ -1011,7 +1023,7 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 			startedBeforeKubeletRestart := metav1.Time{Time: kubeletRestartGracePeriod(m.start).Add(-time.Minute)}
 			// convertToAPIContainerStatuses preserves Started only while the gate is disabled.
 			var generatedStarted *bool
-			if !tc.featureEnabled {
+			if !tc.featureEnabled && !tc.staticPod {
 				generatedStarted = tc.startedBeforeRestart
 			}
 			podStatus := v1.PodStatus{
@@ -1047,6 +1059,11 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 						Started:     tc.startedBeforeRestart,
 					}},
 				},
+			}
+
+			if tc.staticPod {
+				pod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource}
+				pod.Status = v1.PodStatus{}
 			}
 
 			m.UpdatePodStatus(ctx, pod, &podStatus)
