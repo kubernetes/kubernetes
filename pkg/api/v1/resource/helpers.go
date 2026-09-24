@@ -159,33 +159,37 @@ func convertQuantityToString(q *resource.Quantity, divisor resource.Quantity) (s
 	qBig := new(big.Int).Set(qDec.UnscaledBig())
 	divBig := new(big.Int).Set(divDec.UnscaledBig())
 
-	qScale := int(qDec.Scale())
-	divScale := int(divDec.Scale())
+	// Scales are int32 and reach math.MinInt32, so the differences below need
+	// more room than an int has where it is 32 bits wide, such as linux/386.
+	qScale := int64(qDec.Scale())
+	divScale := int64(divDec.Scale())
 
 	// Bound the work before aligning scales. Aligning multiplies one side by
 	// 10^(scale difference), and a value written as 1e1000000 would make that
 	// a million digits wide, so compare magnitudes first: the bit length gives
 	// the decimal exponent without materializing anything.
-	qExp := decimalExponent(qBig, qScale)
-	divExp := decimalExponent(divBig, divScale)
+	// A bit length pins the digit count only to within one, so each side is a
+	// range and a shortcut is taken only where the ranges cannot overlap.
+	qLow, qHigh := decimalExponentBounds(qBig, qScale)
+	divLow, divHigh := decimalExponentBounds(divBig, divScale)
 	switch {
-	case qExp-divExp > maxResultDigits:
-		// The ratio cannot be expressed in the int64 that consumers of the
-		// downward API expect, so saturate instead of computing it.
+	case qLow-divHigh > maxResultDigits:
+		// Past what an int64 holds however the estimate landed, so saturate
+		// instead of building the intermediate.
 		return strconv.FormatInt(math.MaxInt64, 10), nil
-	case divExp-qExp > 1:
-		// The divisor is at least an order of magnitude larger, so the
-		// ceiling of this positive ratio is 1.
+	case divLow-qHigh > 1:
+		// The divisor is larger however the estimate landed, so the ceiling
+		// of this positive ratio is 1.
 		return "1", nil
 	}
 
 	sDiff := divScale - qScale
 
 	if sDiff > 0 {
-		exp := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(sDiff)), nil)
+		exp := new(big.Int).Exp(big.NewInt(10), big.NewInt(sDiff), nil)
 		qBig.Mul(qBig, exp)
 	} else if sDiff < 0 {
-		exp := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-sDiff)), nil)
+		exp := new(big.Int).Exp(big.NewInt(10), big.NewInt(-sDiff), nil)
 		divBig.Mul(divBig, exp)
 	}
 
@@ -198,6 +202,12 @@ func convertQuantityToString(q *resource.Quantity, divisor resource.Quantity) (s
 	tmp.Sub(tmp, big.NewInt(1))
 	res := new(big.Int).Quo(tmp, divBig)
 
+	// Saturate whatever the shortcut could not rule out, so every input maps
+	// to an int64 and the result stays monotonic across the boundary.
+	if !res.IsInt64() {
+		return strconv.FormatInt(math.MaxInt64, 10), nil
+	}
+
 	return res.String(), nil
 }
 
@@ -205,16 +215,22 @@ func convertQuantityToString(q *resource.Quantity, divisor resource.Quantity) (s
 // wider than this cannot be expressed as an int64, so it saturates.
 const maxResultDigits = 19
 
-// decimalExponent returns the approximate power of ten of unscaled/10^scale.
-// It reads the bit length rather than the digits so that measuring a value
-// like 1e1000000 stays cheap.
-func decimalExponent(unscaled *big.Int, scale int) int {
+// decimalExponentBounds brackets the power of ten of unscaled/10^scale. It
+// reads the bit length rather than the digits so that measuring a value like
+// 1e1000000 stays cheap, and returns a range because 2^(bits-1) <= v < 2^bits
+// pins the digit count only to within one. The bounds carry an extra digit of
+// slack so that a padded coefficient, which a parsed quantity never has but
+// NewDecimalQuantity allows, cannot push a caller onto the wrong side of a
+// shortcut.
+func decimalExponentBounds(unscaled *big.Int, scale int64) (low, high int64) {
 	if unscaled.Sign() == 0 {
-		return 0
+		return 0, 0
 	}
-	// log10(2) rounded up, so this stays an upper bound on the digit count.
-	digits := int(float64(unscaled.BitLen())*0.3011) + 1
-	return digits - scale
+	const log10of2 = 0.301029995663981195
+	bits := int64(unscaled.BitLen())
+	low = int64(float64(bits-1)*log10of2) - scale
+	high = int64(float64(bits)*log10of2) + 2 - scale
+	return low, high
 }
 
 // convertResourceCPUToString converts cpu value to the format of divisor and returns

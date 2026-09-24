@@ -17,6 +17,9 @@ limitations under the License.
 package resource
 
 import (
+	"math/big"
+
+	"gopkg.in/inf.v0"
 	"math"
 	"strconv"
 	"testing"
@@ -435,11 +438,19 @@ func getPodWithPodLevelResources(cname string, podResources resources, resources
 // digit intermediate, and a scale near math.MaxInt32 would try to allocate far
 // more than that. These cases must return promptly.
 func TestConvertQuantityToStringBounds(t *testing.T) {
+	// paddedOne is 1 written as 10^10000 scaled by 10000. A parsed quantity
+	// never carries a coefficient like this, but NewDecimalQuantity allows it,
+	// and it is the case where a bit length estimate is furthest from the
+	// value it describes.
+	paddedOne := resource.NewDecimalQuantity(*inf.NewDecBig(new(big.Int).Exp(big.NewInt(10), big.NewInt(10000), nil), 10000), resource.DecimalSI)
+
 	testCases := []struct {
-		name     string
-		quantity string
-		divisor  string
-		expected string
+		name      string
+		quantity  string
+		divisor   string
+		quantityQ *resource.Quantity
+		divisorQ  *resource.Quantity
+		expected  string
 	}{
 		{
 			name:     "huge exponent saturates instead of expanding",
@@ -477,13 +488,62 @@ func TestConvertQuantityToStringBounds(t *testing.T) {
 			divisor:  "1",
 			expected: "2",
 		},
+		{
+			name:     "one past int64 saturates",
+			quantity: "9223372036854775808",
+			divisor:  "1",
+			expected: strconv.FormatInt(math.MaxInt64, 10),
+		},
+		{
+			name:     "10E saturates",
+			quantity: "10E",
+			divisor:  "1",
+			expected: strconv.FormatInt(math.MaxInt64, 10),
+		},
+		{
+			// 7e19 and 8e19 straddle the shortcut, so both have to saturate
+			// for the result to stay monotonic.
+			name:     "below the shortcut but past int64",
+			quantity: "7e19",
+			divisor:  "1",
+			expected: strconv.FormatInt(math.MaxInt64, 10),
+		},
+		{
+			name:     "above the shortcut and past int64",
+			quantity: "8e19",
+			divisor:  "1",
+			expected: strconv.FormatInt(math.MaxInt64, 10),
+		},
+		{
+			// The scale here is math.MaxInt32 wide. Where int is 32 bits the
+			// scale difference wraps, so neither shortcut fires and the
+			// alignment asks for 10^2147483647.
+			name:     "scale too wide for a 32 bit int",
+			quantity: "8e2147483647",
+			divisor:  "1",
+			expected: strconv.FormatInt(math.MaxInt64, 10),
+		},
+		{
+			name:     "divisor with a padded coefficient is still one",
+			quantity: "2",
+			divisorQ: paddedOne,
+			expected: "2",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			q := resource.MustParse(tc.quantity)
-			divisor := resource.MustParse(tc.divisor)
-			got, err := convertQuantityToString(&q, divisor)
+			q := tc.quantityQ
+			if q == nil {
+				parsed := resource.MustParse(tc.quantity)
+				q = &parsed
+			}
+			divisor := tc.divisorQ
+			if divisor == nil {
+				parsed := resource.MustParse(tc.divisor)
+				divisor = &parsed
+			}
+			got, err := convertQuantityToString(q, *divisor)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
