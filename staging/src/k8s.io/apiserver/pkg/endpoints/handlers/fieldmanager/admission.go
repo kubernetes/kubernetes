@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/warning"
@@ -66,11 +68,21 @@ func (admit *managedFieldsValidatingAdmissionController) Admit(ctx context.Conte
 		// just call the wrapped admission
 		return mutationInterface.Admit(ctx, a, o)
 	}
-	managedFieldsBeforeAdmission := objectMeta.GetManagedFields()
+	before := objectMeta.GetManagedFields()
+	var managedFieldsBeforeAdmission []metav1.ManagedFieldsEntry
+	if before != nil {
+		managedFieldsBeforeAdmission = make([]metav1.ManagedFieldsEntry, len(before))
+		for i := range before {
+			before[i].DeepCopyInto(&managedFieldsBeforeAdmission[i])
+		}
+	}
 	if err := mutationInterface.Admit(ctx, a, o); err != nil {
 		return err
 	}
 	managedFieldsAfterAdmission := objectMeta.GetManagedFields()
+	if apiequality.Semantic.DeepEqual(managedFieldsBeforeAdmission, managedFieldsAfterAdmission) {
+		return nil
+	}
 	if err := managedfields.ValidateManagedFields(managedFieldsAfterAdmission); err != nil {
 		objectMeta.SetManagedFields(managedFieldsBeforeAdmission)
 		warning.AddWarning(ctx, "",
