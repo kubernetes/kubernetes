@@ -38,6 +38,7 @@ type defaultPreemptionManager struct {
 }
 
 var _ fwk.PreemptionManager = &defaultPreemptionManager{}
+var _ fwk.ReprieveFilter = &defaultPreemptionManager{}
 
 // NewPreemptionManager creates a PreemptionManager using the provided handle
 // and features for victim discovery and actuation.
@@ -80,6 +81,18 @@ func (m *defaultPreemptionManager) GenerateVictims(ctx context.Context, pgInfo f
 
 func (m *defaultPreemptionManager) Executor() fwk.PreemptionExecutor {
 	return m.executor
+}
+
+func (m *defaultPreemptionManager) NewReprieveFilter(_ context.Context, _ []fwk.PreemptionVictim) fwk.ReprieveFilter {
+	return m
+}
+
+func (m *defaultPreemptionManager) ShouldAttemptReprieval(_ context.Context, _ fwk.PreemptionVictim) (bool, error) {
+	return true, nil
+}
+
+func (m *defaultPreemptionManager) OnVictimReprieved(_ context.Context, _ fwk.PreemptionVictim) error {
+	return nil
 }
 
 func getPreemptionPolicy(pgInfo fwk.PodGroupInfo, enablePodGroupPreemptionPolicy bool) v1.PreemptionPolicy {
