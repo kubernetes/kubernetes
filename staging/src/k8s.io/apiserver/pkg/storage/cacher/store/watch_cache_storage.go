@@ -264,24 +264,25 @@ func (w *WatchCacheStorage) List() []interface{} {
 }
 
 // UpdateStoreLocked executes a mutation (Add, Update, Delete) on the underlying store.
-func (w *WatchCacheStorage) UpdateStoreLocked(eventType watch.EventType, elem *Element, resourceVersion uint64) (err error) {
+// It returns the element that was previously stored under the same key, if any.
+func (w *WatchCacheStorage) UpdateStoreLocked(eventType watch.EventType, elem *Element, resourceVersion uint64) (prev *Element, err error) {
 	switch eventType {
 	case watch.Added:
-		err = w.store.Add(elem)
+		prev, err = w.store.Add(elem)
 	case watch.Modified:
-		err = w.store.Update(elem)
+		prev, err = w.store.Update(elem)
 	case watch.Deleted:
-		err = w.store.Delete(elem)
+		prev, err = w.store.Delete(elem)
 	default:
 		err = fmt.Errorf("unexpected event type: %v", eventType)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if w.snapshots != nil && w.snapshottingEnabled.Load() {
 		w.snapshots.Add(resourceVersion, w.store.Clone())
 	}
-	return nil
+	return prev, nil
 }
 
 // CompactSnapshotsLocked prunes snapshots older than the oldest history version.

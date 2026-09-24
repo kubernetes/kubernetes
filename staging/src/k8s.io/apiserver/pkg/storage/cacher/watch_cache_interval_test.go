@@ -453,7 +453,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 			for i := n - 1; i >= 0; i-- {
 				key := fmt.Sprintf("pod-%08d", i)
 				elem := makeTestStoreElement(makeTestPod(key, uint64(i)))
-				err := tc.indexer.Add(elem)
+				_, err := tc.indexer.Add(elem)
 				if err != nil {
 					t.Fatal(err)
 				}

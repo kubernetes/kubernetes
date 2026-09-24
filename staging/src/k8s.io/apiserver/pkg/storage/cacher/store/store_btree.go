@@ -51,35 +51,35 @@ func (si *threadedStoreIndexer) Clone() Snapshot {
 	return si.store.Clone()
 }
 
-func (si *threadedStoreIndexer) Add(elem *Element) error {
+func (si *threadedStoreIndexer) Add(elem *Element) (*Element, error) {
 	return si.addOrUpdate(elem)
 }
 
-func (si *threadedStoreIndexer) Update(elem *Element) error {
+func (si *threadedStoreIndexer) Update(elem *Element) (*Element, error) {
 	return si.addOrUpdate(elem)
 }
 
-func (si *threadedStoreIndexer) addOrUpdate(newElem *Element) error {
+func (si *threadedStoreIndexer) addOrUpdate(newElem *Element) (*Element, error) {
 	if newElem == nil {
-		return fmt.Errorf("elem cannot be nil")
+		return nil, fmt.Errorf("elem cannot be nil")
 	}
 	si.lock.Lock()
 	defer si.lock.Unlock()
 	oldElem := si.store.addOrUpdateElem(newElem)
-	return si.indexer.updateElem(newElem.Key, oldElem, newElem)
+	return oldElem, si.indexer.updateElem(newElem.Key, oldElem, newElem)
 }
 
-func (si *threadedStoreIndexer) Delete(elem *Element) error {
+func (si *threadedStoreIndexer) Delete(elem *Element) (*Element, error) {
 	if elem == nil {
-		return fmt.Errorf("elem cannot be nil")
+		return nil, fmt.Errorf("elem cannot be nil")
 	}
 	si.lock.Lock()
 	defer si.lock.Unlock()
 	oldElem, existed := si.store.deleteElem(elem)
 	if !existed {
-		return nil
+		return nil, nil
 	}
-	return si.indexer.updateElem(elem.Key, oldElem, nil)
+	return oldElem, si.indexer.updateElem(elem.Key, oldElem, nil)
 }
 
 func (si *threadedStoreIndexer) List() []interface{} {
