@@ -130,6 +130,12 @@ const (
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
 
+	// owner: @everettraven
+	// issue: https://github.com/kubernetes/kubernetes/issues/141838
+	//
+	// Adds support for using ML-DSA signed certificate signing request data in the CertificateSigningRequest spec.request field.
+	CertificateSigningRequestMLDSA featuregate.Feature = "CertificateSigningRequestMLDSA"
+
 	// owner: @HirazawaUi
 	//
 	// Enabling this feature gate will cause the pod's status to change due to a kubelet restart.
@@ -1340,6 +1346,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	CertificateSigningRequestMLDSA: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.38")},
+	},
+
 	ChangeContainerStatusOnKubeletRestart: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Deprecated},
@@ -2422,6 +2433,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CSIServiceAccountTokenSecrets: {},
 
 	CSIVolumeHealth: {},
+
+	CertificateSigningRequestMLDSA: {},
 
 	ChangeContainerStatusOnKubeletRestart: {},
 

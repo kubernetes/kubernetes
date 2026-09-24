@@ -107,6 +107,17 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: CertificateSigningRequestMLDSA
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
+    minCompatibilityVersion: "1.38"
 - name: ChangeContainerStatusOnKubeletRestart
   versionedSpecs:
   - default: true
