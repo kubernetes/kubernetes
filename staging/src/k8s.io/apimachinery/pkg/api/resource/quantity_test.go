@@ -542,9 +542,9 @@ func TestQuantityParse(t *testing.T) {
 		"-3.01i",
 		"-3.01e-",
 
-		// an exponent outside the int32 scale is rejected rather than truncated
-		// to an unrelated value; 1e4294967297 would otherwise parse as 1e1
-		"1e4294967297",
+		// an exponent that narrows to a scale of math.MinInt32 is rejected,
+		// because negating that scale overflows int32
+		"1e2147483648",
 
 		// trailing whitespace is forbidden
 		" 1",
@@ -559,26 +559,26 @@ func TestQuantityParse(t *testing.T) {
 }
 
 func TestInterpretExponentInt32Bounds(t *testing.T) {
-	// interpret parses the exponent at 64 bits but stores it in an int32 scale
-	// that is later negated, so it accepts [-MaxInt32, MaxInt32] and rejects
-	// anything past it, instead of narrowing it to an unrelated value. This
-	// checks interpret's suffix-layer bounds only, not what the rest of
-	// ParseQuantity does with an accepted exponent.
+	// interpret parses the exponent at 64 bits and narrows it to the int32
+	// scale, the way a <=1.37 apiserver did, so that objects it wrote keep
+	// decoding. The exception is a scale of math.MinInt32, whose negation
+	// overflows int32. This checks interpret's suffix-layer behaviour only,
+	// not what the rest of ParseQuantity does with an accepted exponent.
 	cases := []struct {
 		suffix  string
 		wantExp int32
 		wantOK  bool
 	}{
 		{"e14", 14, true},
-		{"E2147483647", 2147483647, true},   // MaxInt32
-		{"E-2147483647", -2147483647, true}, // -MaxInt32
-		{"E2147483648", 0, false},           // MaxInt32 + 1
-		{"E-2147483648", 0, false},          // MinInt32; -MinInt32 overflows int32
-		{"E4294967297", 0, false},           // 2^32 + 1, truncated to 1 today
-		{"E8589934592", 0, false},           // 2^33, truncated to 0 today
-		{"E9223372036854775807", 0, false},  // MaxInt64, truncated to -1 today
-		{"E9223372036854775808", 0, false},  // MaxInt64 + 1, past int64: ParseInt range error
-		{"E6024865272343", 0, false},        // far past int32
+		{"E2147483647", 2147483647, true},     // MaxInt32
+		{"E-2147483647", -2147483647, true},   // -MaxInt32
+		{"E2147483648", math.MinInt32, true},  // narrows to MinInt32; ParseQuantity rejects that scale
+		{"E-2147483648", math.MinInt32, true}, // narrows to MinInt32 as well
+		{"E4294967297", 1, true},              // 2^32 + 1 narrows to 1
+		{"E8589934592", 0, true},              // 2^33 narrows to 0
+		{"E9223372036854775807", -1, true},    // MaxInt64 narrows to -1
+		{"E9223372036854775808", 0, false},    // MaxInt64 + 1, past int64: ParseInt range error
+		{"E6024865272343", -973843945, true},  // far past int32, narrows
 	}
 	for _, tc := range cases {
 		base, exp, format, ok := quantitySuffixer.interpret(suffix(tc.suffix))
