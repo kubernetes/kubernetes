@@ -32262,7 +32262,7 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 					},
 					"allocateLoadBalancerNodePorts": {
 						SchemaProps: spec.SchemaProps{
-							Description: "allocateLoadBalancerNodePorts defines if NodePorts will be automatically allocated for services with type LoadBalancer.  Default is \"true\". It may be set to \"false\" if the cluster load-balancer does not rely on NodePorts.  If the caller requests specific NodePorts (by specifying a value), those requests will be respected, regardless of this field. This field may only be set for services with type LoadBalancer and will be cleared if the type is changed to any other type.",
+							Description: "allocateLoadBalancerNodePorts defines if NodePorts will be automatically allocated for services with type LoadBalancer.  Default is \"true\". It may be set to \"false\" if the cluster load-balancer does not rely on NodePorts. Note that setting this to \"false\" does not prevent a user from explicitly setting NodePorts themselves, and setting it on an existing service will not cause its NodePorts to be deallocated. (You must set them to 0 explicitly). This field may only be set for services with type LoadBalancer and will be cleared if the type is changed to any other type.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
