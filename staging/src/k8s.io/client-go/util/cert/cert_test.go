@@ -17,10 +17,12 @@ limitations under the License.
 package cert_test
 
 import (
+	"bytes"
 	"crypto"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/pem"
 	"testing"
 
 	"k8s.io/client-go/util/cert"
@@ -165,6 +167,133 @@ func TestNewSelfSignedCACertKeyUsage(t *testing.T) {
 			}
 			if caCert.KeyUsage != tt.expectedKeyUsage {
 				t.Errorf("expected key usage %v, got %v", tt.expectedKeyUsage, caCert.KeyUsage)
+			}
+		})
+	}
+}
+
+func TestGenerateSelfSignedCertKeyWithOptionsGenerateKey(t *testing.T) {
+	testCases := map[string]struct {
+		keyPEM                string
+		expectKeyBlockType    string
+		expectKeyAlgorithm    x509.PublicKeyAlgorithm
+		expectKeyEncipherment bool
+	}{
+		"default": {
+			expectKeyBlockType:    keyutil.RSAPrivateKeyBlockType,
+			expectKeyAlgorithm:    x509.RSA,
+			expectKeyEncipherment: true,
+		},
+		"RSA": {
+			keyPEM:                rsaPrivateKey,
+			expectKeyBlockType:    keyutil.RSAPrivateKeyBlockType,
+			expectKeyAlgorithm:    x509.RSA,
+			expectKeyEncipherment: true,
+		},
+		"ECDSA": {
+			keyPEM:                ecdsaPrivateKey,
+			expectKeyBlockType:    keyutil.ECPrivateKeyBlockType,
+			expectKeyAlgorithm:    x509.ECDSA,
+			expectKeyEncipherment: false,
+		},
+		"ML-DSA": {
+			keyPEM:                mldsaPrivateKey,
+			expectKeyBlockType:    keyutil.PrivateKeyBlockType,
+			expectKeyAlgorithm:    x509.MLDSA,
+			expectKeyEncipherment: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var signer crypto.Signer
+			var generateKey func() (crypto.Signer, error)
+			calls := 0
+			if tc.keyPEM != "" {
+				key, err := keyutil.ParsePrivateKeyPEM([]byte(tc.keyPEM))
+				if err != nil {
+					t.Fatalf("failed to load key fixture: %v", err)
+				}
+				signer = key.(crypto.Signer)
+				generateKey = func() (crypto.Signer, error) {
+					calls++
+					return signer, nil
+				}
+			}
+
+			certPEM, keyPEM, err := cert.GenerateSelfSignedCertKeyWithOptions(cert.SelfSignedCertKeyOptions{
+				Host:        COMMON_NAME,
+				GenerateKey: generateKey,
+			})
+			if err != nil {
+				t.Fatalf("failed to generate self signed cert and key: %v", err)
+			}
+
+			keyBlock, _ := pem.Decode(keyPEM)
+			if keyBlock == nil {
+				t.Fatal("no PEM block in the generated key")
+			}
+			if keyBlock.Type != tc.expectKeyBlockType {
+				t.Errorf("key block type: got %q, want %q", keyBlock.Type, tc.expectKeyBlockType)
+			}
+			if _, err := keyutil.ParsePrivateKeyPEM(keyPEM); err != nil {
+				t.Errorf("generated key does not parse: %v", err)
+			}
+
+			var certs []*x509.Certificate
+			for rest := certPEM; ; {
+				var block *pem.Block
+				block, rest = pem.Decode(rest)
+				if block == nil {
+					break
+				}
+				parsed, err := x509.ParseCertificate(block.Bytes)
+				if err != nil {
+					t.Fatalf("generated certificate does not parse: %v", err)
+				}
+				certs = append(certs, parsed)
+			}
+			if len(certs) != 2 {
+				t.Fatalf("expected a serving certificate followed by its CA, got %d blocks", len(certs))
+			}
+
+			for _, parsed := range certs {
+				got := parsed.KeyUsage&x509.KeyUsageKeyEncipherment != 0
+				if got != tc.expectKeyEncipherment {
+					t.Errorf("%s: keyEncipherment = %v, want %v", parsed.Subject.CommonName, got, tc.expectKeyEncipherment)
+				}
+				if parsed.PublicKeyAlgorithm != tc.expectKeyAlgorithm {
+					t.Errorf("%s: public key algorithm = %v, want %v", parsed.Subject.CommonName, parsed.PublicKeyAlgorithm, tc.expectKeyAlgorithm)
+				}
+			}
+
+			if signer != nil {
+				if calls != 2 {
+					t.Errorf("expected the CA and the serving key to be generated, got %d calls", calls)
+				}
+				want, err := x509.MarshalPKIXPublicKey(signer.Public())
+				if err != nil {
+					t.Fatalf("could not marshal the fixture public key: %v", err)
+				}
+				for _, parsed := range certs {
+					got, err := x509.MarshalPKIXPublicKey(parsed.PublicKey)
+					if err != nil {
+						t.Fatalf("could not marshal the certificate public key: %v", err)
+					}
+					if !bytes.Equal(got, want) {
+						t.Errorf("%s does not carry the key the generator returned", parsed.Subject.CommonName)
+					}
+				}
+			}
+
+			roots := x509.NewCertPool()
+			roots.AddCert(certs[1])
+			if _, err := certs[0].Verify(x509.VerifyOptions{
+				Roots:     roots,
+				DNSName:   COMMON_NAME,
+				KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			}); err != nil {
+				t.Errorf("serving certificate does not verify against the generated CA: %v", err)
 			}
 		})
 	}

@@ -115,6 +115,10 @@ type SelfSignedCertKeyOptions struct {
 	// <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.key
 	// Certs/keys not existing in that directory are created with a duration of 100 years.
 	FixtureDirectory string
+
+	// GenerateKey generates the keys for the CA and the serving certificate.
+	// Defaults to a 2048 bit RSA key.
+	GenerateKey func() (crypto.Signer, error)
 }
 
 // GenerateSelfSignedCertKey creates a self-signed certificate and key for the given host.
@@ -173,10 +177,12 @@ func GenerateSelfSignedCertKeyWithOptions(opts SelfSignedCertKeyOptions) ([]byte
 		maxAge = 100 * time.Hour * 24 * 365 // 100 years fixtures
 	}
 
-	// If the key algorithm changes (and it doesn't support key encipherment)
-	// KeyUsageKeyEncipherment should be removed from the CA and serving
-	// certificate templates
-	caKey, err := rsa.GenerateKey(cryptorand.Reader, 2048)
+	generateKey := opts.GenerateKey
+	if generateKey == nil {
+		generateKey = func() (crypto.Signer, error) { return rsa.GenerateKey(cryptorand.Reader, 2048) }
+	}
+
+	caKey, err := generateKey()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -194,12 +200,15 @@ func GenerateSelfSignedCertKeyWithOptions(opts SelfSignedCertKeyOptions) ([]byte
 		NotBefore: validFrom,
 		NotAfter:  validFrom.Add(maxAge),
 
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 	}
+	if supportsKeyEncipherment(caKey) {
+		caTemplate.KeyUsage |= x509.KeyUsageKeyEncipherment
+	}
 
-	caDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &caTemplate, &caTemplate, &caKey.PublicKey, caKey)
+	caDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &caTemplate, &caTemplate, caKey.Public(), caKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -209,7 +218,7 @@ func GenerateSelfSignedCertKeyWithOptions(opts SelfSignedCertKeyOptions) ([]byte
 		return nil, nil, err
 	}
 
-	priv, err := rsa.GenerateKey(cryptorand.Reader, 2048)
+	priv, err := generateKey()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -227,9 +236,12 @@ func GenerateSelfSignedCertKeyWithOptions(opts SelfSignedCertKeyOptions) ([]byte
 		NotBefore: validFrom,
 		NotAfter:  validFrom.Add(maxAge),
 
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		KeyUsage:              x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
+	}
+	if supportsKeyEncipherment(priv) {
+		template.KeyUsage |= x509.KeyUsageKeyEncipherment
 	}
 
 	if ip := netutils.ParseIPSloppy(host); ip != nil {
@@ -241,7 +253,7 @@ func GenerateSelfSignedCertKeyWithOptions(opts SelfSignedCertKeyOptions) ([]byte
 	template.IPAddresses = append(template.IPAddresses, alternateIPs...)
 	template.DNSNames = append(template.DNSNames, alternateDNS...)
 
-	derBytes, err := x509.CreateCertificate(cryptorand.Reader, &template, caCertificate, &priv.PublicKey, caKey)
+	derBytes, err := x509.CreateCertificate(cryptorand.Reader, &template, caCertificate, priv.Public(), caKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -256,8 +268,8 @@ func GenerateSelfSignedCertKeyWithOptions(opts SelfSignedCertKeyOptions) ([]byte
 	}
 
 	// Generate key
-	keyBuffer := bytes.Buffer{}
-	if err := pem.Encode(&keyBuffer, &pem.Block{Type: keyutil.RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
+	keyPEM, err := keyutil.MarshalPrivateKeyToPEM(priv)
+	if err != nil {
 		return nil, nil, err
 	}
 
@@ -265,12 +277,19 @@ func GenerateSelfSignedCertKeyWithOptions(opts SelfSignedCertKeyOptions) ([]byte
 		if err := os.WriteFile(certFixturePath, certBuffer.Bytes(), 0644); err != nil {
 			return nil, nil, fmt.Errorf("failed to write cert fixture to %s: %v", certFixturePath, err)
 		}
-		if err := os.WriteFile(keyFixturePath, keyBuffer.Bytes(), 0600); err != nil {
+		if err := os.WriteFile(keyFixturePath, keyPEM, 0600); err != nil {
 			return nil, nil, fmt.Errorf("failed to write key fixture to %s: %v", certFixturePath, err)
 		}
 	}
 
-	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+	return certBuffer.Bytes(), keyPEM, nil
+}
+
+// supportsKeyEncipherment returns true if a public key supports key encipherment.
+// Currently only RSA certificates do, ECDSA and ML-DSA do not.
+func supportsKeyEncipherment(key crypto.Signer) bool {
+	_, ok := key.Public().(*rsa.PublicKey)
+	return ok
 }
 
 func ipsToStrings(ips []net.IP) []string {
