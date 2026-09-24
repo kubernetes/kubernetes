@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -382,6 +383,27 @@ func appendDNSConfig(existingDNSConfig *runtimeapi.DNSConfig, dnsConfig *v1.PodD
 	return existingDNSConfig
 }
 
+func filterUnusableInheritedNameservers(logger klog.Logger, nameservers []string) []string {
+	filteredNameservers := make([]string, 0, len(nameservers))
+	for _, nameserver := range nameservers {
+		addr, err := netip.ParseAddr(nameserver)
+		// A nameserver line must be an IP address. Drop values that do not
+		// parse, they can never work as a pod nameserver.
+		if err != nil {
+			logger.V(4).Info("Removed inherited invalid nameserver from pod DNS config", "nameserver", nameserver)
+			continue
+		}
+		// Remove inherited scoped IPv6 link-local nameservers. The zone is a
+		// host interface index that does not exist in the pod netns.
+		if addr.Is6() && addr.IsLinkLocalUnicast() && addr.Zone() != "" {
+			logger.V(4).Info("Removed inherited scoped IPv6 link-local nameserver from pod DNS config", "nameserver", nameserver)
+			continue
+		}
+		filteredNameservers = append(filteredNameservers, nameserver)
+	}
+	return filteredNameservers
+}
+
 // GetPodDNS returns DNS settings for the pod.
 func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 	logger := klog.FromContext(ctx)
@@ -389,6 +411,7 @@ func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DN
 	if err != nil {
 		return nil, err
 	}
+	allInheritedNameserversFiltered := false
 
 	dnsType, err := getPodDNSType(pod)
 	if err != nil {
@@ -441,10 +464,21 @@ func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DN
 			}
 			dnsConfig.Searches = []string{"."}
 		}
+
+		// Filter only inherited host servers. Explicit pod.spec.dnsConfig
+		// nameservers are appended below and left untouched.
+		if !kubecontainer.IsHostNetworkPod(pod) {
+			originalServerCount := len(dnsConfig.Servers)
+			dnsConfig.Servers = filterUnusableInheritedNameservers(logger, dnsConfig.Servers)
+			allInheritedNameserversFiltered = originalServerCount > 0 && len(dnsConfig.Servers) == 0
+		}
 	}
 
 	if pod.Spec.DNSConfig != nil {
 		dnsConfig = appendDNSConfig(dnsConfig, pod.Spec.DNSConfig)
+	}
+	if allInheritedNameserversFiltered && len(dnsConfig.Servers) == 0 {
+		logger.Error(nil, "All inherited nameservers were unusable (scoped IPv6 link-local or invalid) and were removed; no nameservers remain for pod DNS", "pod", klog.KObj(pod), "resolverConfig", c.ResolverConfig)
 	}
 	return c.formDNSConfigFitsLimits(logger, dnsConfig, pod), nil
 }
