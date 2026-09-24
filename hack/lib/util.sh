@@ -443,6 +443,16 @@ function kube::util::test_client_certificate_authentication_enabled {
   fi
 }
 
+function kube::util::cfssl_keyspec {
+  local key_algo="${KUBE_CERT_KEY_ALGO:-rsa}"
+  local key_size="${KUBE_CERT_KEY_SIZE:-2048}"
+  if [[ "${key_algo}" == mldsa* ]]; then
+    echo -n "{\"algo\":\"${key_algo}\"}"
+  else
+    echo -n "{\"algo\":\"${key_algo}\",\"size\":${key_size}}"
+  fi
+}
+
 # creates a client CA, args are sudo, dest-dir, ca-id, purpose
 # purpose is dropped in after "key encipherment", you usually want
 # '"client auth"'
@@ -453,15 +463,21 @@ function kube::util::create_signing_certkey {
     local dest_dir=$2
     local id=$3
     local purpose=$4
-    # Create client ca
+    local keyspec
+    keyspec=$(kube::util::cfssl_keyspec)
     ${sudo} /usr/bin/env bash -e <<EOF
     rm -f "${dest_dir}/${id}-ca.crt" "${dest_dir}/${id}-ca.key"
-    ${OPENSSL_BIN} req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${dest_dir}/${id}-ca.key" -out "${dest_dir}/${id}-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
-    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment",${purpose}]}}}' > "${dest_dir}/${id}-ca-config.json"
+    cd "${dest_dir}"
+    echo '{"CN":"${id}-ca","key":${keyspec}}' | ${CFSSL_BIN} gencert -initca - | ${CFSSLJSON_BIN} -bare ${id}-ca
+    mv "${id}-ca.pem" "${id}-ca.crt"
+    mv "${id}-ca-key.pem" "${id}-ca.key"
+    rm -f "${id}-ca.csr"
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","digital signature",${purpose}]}}}' > "${dest_dir}/${id}-ca-config.json"
 EOF
 }
 
 # signs a client certificate: args are sudo, dest-dir, CA, filename (roughly), username, groups...
+# When KUBE_CERT_KEY_ALGO is set (e.g. mldsa65), uses that algorithm instead of RSA-2048.
 function kube::util::create_client_certkey {
     local sudo=$1
     local dest_dir=$2
@@ -476,9 +492,11 @@ function kube::util::create_client_certkey {
         SEP=","
         shift 1
     done
+    local keyspec
+    keyspec=$(kube::util::cfssl_keyspec)
     ${sudo} /usr/bin/env bash -e <<EOF
     cd ${dest_dir}
-    echo '{"CN":"${cn}","names":[${groups}],"hosts":[],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare client-${id}
+    echo '{"CN":"${cn}","names":[${groups}],"hosts":[],"key":${keyspec}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare client-${id}
     mv "client-${id}-key.pem" "client-${id}.key"
     mv "client-${id}.pem" "client-${id}.crt"
     rm -f "client-${id}.csr"
@@ -486,6 +504,7 @@ EOF
 }
 
 # signs a serving certificate: args are sudo, dest-dir, ca, filename (roughly), subject, hosts...
+# When KUBE_CERT_KEY_ALGO is set (e.g. mldsa65), uses that algorithm instead of RSA-2048.
 function kube::util::create_serving_certkey {
     local sudo=$1
     local dest_dir=$2
@@ -500,9 +519,11 @@ function kube::util::create_serving_certkey {
         SEP=","
         shift 1
     done
+    local keyspec
+    keyspec=$(kube::util::cfssl_keyspec)
     ${sudo} /usr/bin/env bash -e <<EOF
     cd ${dest_dir}
-    echo '{"CN":"${cn}","hosts":[${hosts}],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare serving-${id}
+    echo '{"CN":"${cn}","hosts":[${hosts}],"key":${keyspec}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare serving-${id}
     mv "serving-${id}-key.pem" "serving-${id}.key"
     mv "serving-${id}.pem" "serving-${id}.crt"
     rm -f "serving-${id}.csr"
@@ -646,12 +667,12 @@ function kube::util::ensure-cfssl {
     kernel=$(uname -s)
     case "${kernel}" in
       Linux)
-        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssl_1.5.0_linux_amd64
-        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssljson_1.5.0_linux_amd64
+        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssl_1.7.0_linux_amd64
+        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssljson_1.7.0_linux_amd64
         ;;
       Darwin)
-        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssl_1.5.0_darwin_amd64
-        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssljson_1.5.0_darwin_amd64
+        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssl_1.7.0_darwin_amd64
+        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssljson_1.7.0_darwin_amd64
         ;;
       *)
         echo "Unknown, unsupported platform: ${kernel}." >&2
