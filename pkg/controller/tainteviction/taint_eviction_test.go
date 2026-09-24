@@ -1898,3 +1898,80 @@ func TestPodEvictionRetryRaceWithTimedWorker(t *testing.T) {
 		t.Fatalf("Expected exactly 1 delete attempt, got %d. The retry was incorrectly discarded due to the visible timed worker.", got)
 	}
 }
+
+// TestPodEvictionRetryHandoffSurvivesConcurrentUpdate verifies that a pod update
+// cannot cancel the durable retry while the fired timed worker is completing.
+func TestPodEvictionRetryHandoffSurvivesConcurrentUpdate(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tolerationSeconds := int64(5)
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	pod.Spec.Tolerations = []corev1.Toleration{{
+		Key:               "testTaint1",
+		Value:             "test1",
+		Effect:            corev1.TaintEffectNoExecute,
+		TolerationSeconds: &tolerationSeconds,
+	}}
+	fakeClientset := fake.NewSimpleClientset(pod)
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		deleteAction := action.(clienttesting.DeleteAction)
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+	})
+
+	controller, _, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	handoffReady := make(chan struct{})
+	releaseTimedWorker := make(chan struct{})
+	var releaseOnce sync.Once
+	deleteHandler := controller.deletePodHandler()
+	controller.taintEvictionQueue = CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
+		err := deleteHandler(ctx, fireAt, args)
+		close(handoffReady)
+		<-releaseTimedWorker
+		return err
+	})
+	controller.taintEvictionQueue.clock = fakeClock
+	t.Cleanup(func() {
+		releaseOnce.Do(func() { close(releaseTimedWorker) })
+		controller.taintEvictionQueue.CancelAndWait()
+	})
+
+	podRef := NamespacedObject{
+		NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+		UID:            pod.UID,
+	}
+	createdAt := fakeClock.Now()
+	fireAt := createdAt.Add(time.Duration(tolerationSeconds) * time.Second)
+	controller.taintEvictionQueue.AddWork(ctx, NewWorkArgsWithUID(pod.Name, pod.Namespace, pod.UID), createdAt, fireAt)
+	fakeClock.Step(time.Duration(tolerationSeconds) * time.Second)
+
+	select {
+	case <-handoffReady:
+	case <-time.After(time.Second):
+		t.Fatal("timed worker did not register its durable retry")
+	}
+	if _, ok := currentPodEvictionRetry(controller, podRef.NamespacedName); !ok {
+		t.Fatal("durable retry was not registered before timed worker completion")
+	}
+	if worker := controller.taintEvictionQueue.GetWorkerUnsafe(podRef.NamespacedName.String()); worker == nil {
+		t.Fatal("timed worker was removed before the handoff interleaving")
+	}
+
+	controller.processPodOnNode(ctx, podRef, pod.Spec.NodeName, pod.Spec.Tolerations, []corev1.Taint{createNoExecuteTaint(1)}, fakeClock.Now())
+	if _, ok := currentPodEvictionRetry(controller, podRef.NamespacedName); !ok {
+		t.Error("concurrent pod update canceled the durable retry during timed-worker handoff")
+	}
+
+	releaseOnce.Do(func() { close(releaseTimedWorker) })
+	controller.taintEvictionQueue.workerWG.Wait()
+	if worker := controller.taintEvictionQueue.GetWorkerUnsafe(podRef.NamespacedName.String()); worker != nil {
+		t.Fatalf("completed timed worker was not removed: %#v", worker)
+	}
+	if _, ok := currentPodEvictionRetry(controller, podRef.NamespacedName); !ok {
+		t.Error("pod requiring eviction has neither a timed worker nor a durable retry")
+	}
+}
