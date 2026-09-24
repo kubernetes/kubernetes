@@ -17,10 +17,12 @@ limitations under the License.
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -461,6 +463,13 @@ func (p *smpPatcher) applyPatchToCurrentObject(requestContext context.Context, c
 	if err != nil {
 		return nil, err
 	}
+	// Safe when currentVersionedObject != currentObject because ConvertToVersion allocated
+	// a new versioned wrapper and fieldManager.UpdateNoErrors reads ManagedFields from currentObject.
+	if currentVersionedObject != currentObject && !bytes.Contains(p.patchBytes, []byte("managedFields")) {
+		if a, err := meta.Accessor(currentVersionedObject); err == nil {
+			a.SetManagedFields(nil)
+		}
+	}
 	versionedObjToUpdate, err := p.creater.New(p.kind)
 	if err != nil {
 		return nil, err
@@ -550,8 +559,6 @@ func (p *applyPatcher) createNewObject(requestContext context.Context) (runtime.
 
 // strategicPatchObject applies a strategic merge patch of `patchBytes` to
 // `originalObject` and stores the result in `objToUpdate`.
-// It additionally returns the map[string]interface{} representation of the
-// `originalObject` and `patchBytes`.
 // NOTE: Both `originalObject` and `objToUpdate` are supposed to be versioned.
 func strategicPatchObject(
 	requestContext context.Context,
@@ -562,13 +569,9 @@ func strategicPatchObject(
 	schemaReferenceObj runtime.Object,
 	validationDirective string,
 ) error {
-	originalObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(originalObject)
-	if err != nil {
-		return err
-	}
-
 	patchMap := make(map[string]interface{})
 	var strictErrs []error
+	var err error
 	if validationDirective == metav1.FieldValidationWarn || validationDirective == metav1.FieldValidationStrict {
 		strictErrs, err = kjson.UnmarshalStrict(patchBytes, &patchMap)
 		if err != nil {
@@ -580,10 +583,42 @@ func strategicPatchObject(
 		}
 	}
 
-	if err := applyPatchToObject(requestContext, defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs, validationDirective); err != nil {
-		return err
+	var originalObjMap, topLevelKeys map[string]interface{}
+	if canPruneTopLevelPatch(originalObject, objToUpdate, patchMap) {
+		originalObjMap, err = runtime.DefaultUnstructuredConverter.ToUnstructuredTopLevel(originalObject, patchMap)
+		if err != nil {
+			return err
+		}
+		reflect.ValueOf(objToUpdate).Elem().Set(reflect.ValueOf(originalObject.DeepCopyObject()).Elem())
+		topLevelKeys = patchMap
+	} else {
+		originalObjMap, err = runtime.DefaultUnstructuredConverter.ToUnstructured(originalObject)
+		if err != nil {
+			return err
+		}
 	}
-	return nil
+
+	return applyPatchToObject(requestContext, defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs, validationDirective, topLevelKeys)
+}
+
+func canPruneTopLevelPatch(originalObject, objToUpdate runtime.Object, patchMap map[string]interface{}) bool {
+	if originalObject == nil || reflect.TypeOf(originalObject) != reflect.TypeOf(objToUpdate) {
+		return false
+	}
+	if _, ok := originalObject.(runtime.Unstructured); ok {
+		return false
+	}
+	if v := reflect.ValueOf(originalObject); v.Kind() != reflect.Pointer || v.IsNil() || v.Elem().Kind() != reflect.Struct || reflect.ValueOf(objToUpdate).IsNil() {
+		return false
+	}
+	// Reject top-level strategic merge directives (e.g. $patch, $retainKeys, $setElementOrder).
+	// This also guarantees StrategicMergeMapPatch will not delete top-level keys from patchMap.
+	for k := range patchMap {
+		if strings.HasPrefix(k, "$") {
+			return false
+		}
+	}
+	return true
 }
 
 // applyPatch is called every time GuaranteedUpdate asks for the updated object,
@@ -760,6 +795,7 @@ func applyPatchToObject(
 	schemaReferenceObj runtime.Object,
 	strictErrs []error,
 	validationDirective string,
+	topLevelKeys map[string]interface{},
 ) error {
 	patchedObjMap, err := strategicpatch.StrategicMergeMapPatch(originalMap, patchMap, schemaReferenceObj)
 	if err != nil {
@@ -769,7 +805,7 @@ func applyPatchToObject(
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
 	converter := runtime.DefaultUnstructuredConverter
 	returnUnknownFields := validationDirective == metav1.FieldValidationWarn || validationDirective == metav1.FieldValidationStrict
-	if err := converter.FromUnstructuredWithValidation(patchedObjMap, objToUpdate, returnUnknownFields); err != nil {
+	if err := converter.FromUnstructuredWithValidationTopLevel(patchedObjMap, objToUpdate, returnUnknownFields, topLevelKeys); err != nil {
 		strictError, isStrictError := runtime.AsStrictDecodingError(err)
 		switch {
 		case !isStrictError:
