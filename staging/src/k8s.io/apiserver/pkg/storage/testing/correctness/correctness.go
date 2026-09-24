@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 )
@@ -34,6 +35,7 @@ type testStep struct {
 	Name             string
 	Request          Request
 	CorrectResponse  Response
+	ExpectedEvent    *watch.Event
 	InvalidResponses []Response
 }
 
@@ -81,6 +83,10 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod1, "2"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Added,
 				Object: withRV(pod1, "2"),
 			},
 			InvalidResponses: []Response{
@@ -138,6 +144,10 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod2, "3"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Added,
 				Object: withRV(pod2, "3"),
 			},
 			InvalidResponses: []Response{
@@ -207,6 +217,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod1, "4"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Deleted,
+				Object: withRV(pod1, "4"),
+			},
 			InvalidResponses: []Response{
 				{Object: &example.Pod{}, Err: storage.NewKeyNotFoundError(pod1Key, 0)},
 				{Object: withRV(pod1, "2")},
@@ -255,6 +269,10 @@ func correctnessTestSteps() []testStep {
 				Delete: DeleteRequest{Preconditions: &storage.Preconditions{UID: &pod2UID, ResourceVersion: &pod2RV}},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod2, "5"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Deleted,
 				Object: withRV(pod2, "5"),
 			},
 			InvalidResponses: []Response{
@@ -370,6 +388,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod3v1, "6"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Added,
+				Object: withRV(pod3v1, "6"),
+			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v1, "5")},
 				{Object: withRV(pod3v1, "7")},
@@ -429,6 +451,10 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod3v2, "7"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
 				Object: withRV(pod3v2, "7"),
 			},
 			InvalidResponses: []Response{
@@ -505,6 +531,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod3v3, "8"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
+				Object: withRV(pod3v3, "8"),
+			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v3, "7")},
 				{Object: withRV(pod3v3, "9")},
@@ -528,6 +558,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod3v4, "9"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
+				Object: withRV(pod3v4, "9"),
+			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v4, "8")},
 				{Object: withRV(pod3v4, "10")},
@@ -549,6 +583,10 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod3v5, "10"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
 				Object: withRV(pod3v5, "10"),
 			},
 			InvalidResponses: []Response{
@@ -615,6 +653,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod3v6, "11"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
+				Object: withRV(pod3v6, "11"),
+			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v6, "10")},
 				{Object: withRV(pod3v6, "12")},
@@ -640,6 +682,10 @@ func correctnessTestSteps() []testStep {
 			CorrectResponse: Response{
 				Object: withRV(pod3v7, "12"),
 			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Modified,
+				Object: withRV(pod3v7, "12"),
+			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v7, "11")},
 				{Object: withRV(pod3v7, "13")},
@@ -654,6 +700,10 @@ func correctnessTestSteps() []testStep {
 				Delete: DeleteRequest{},
 			},
 			CorrectResponse: Response{
+				Object: withRV(pod3v7, "13"),
+			},
+			ExpectedEvent: &watch.Event{
+				Type:   watch.Deleted,
 				Object: withRV(pod3v7, "13"),
 			},
 			InvalidResponses: []Response{
@@ -687,6 +737,11 @@ func correctnessTestSteps() []testStep {
 func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interface, storagePrefix string) {
 	model := NewEmptyModel(storagePrefix, func() runtime.Object { return &example.Pod{} })
 
+	watcher, err := store.Watch(ctx, "/pods/", storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything, Recursive: true})
+	require.NoError(t, err)
+	defer watcher.Stop()
+
+	var expectEvents []watch.Event
 	for _, step := range correctnessTestSteps() {
 		out := &example.Pod{}
 		var err error
@@ -707,7 +762,7 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 			respObj = out
 		}
 		resp := Response{Object: respObj, Err: err}
-		ok, next := model.Step(step.Request, resp)
+		ok, next, event := model.Step(step.Request, resp)
 		if respObj != nil {
 			acc, _ := meta.Accessor(respObj)
 			t.Logf("Step: %s, State RV before: %d, Response RV: %s, Obj: %+v, err: %v", step.Name, model.ResourceVersion, acc.GetResourceVersion(), respObj, err)
@@ -716,7 +771,32 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 		}
 		require.True(t, ok, "step %s failed to match model state transition: req=%+v resp=%+v", step.Name, step.Request, resp)
 		model = next
+		if event != nil {
+			expectEvents = append(expectEvents, *event)
+		}
 	}
+
+	gotEvents := collectEventsTillRV(t, watcher, store.Versioner(), model.ResourceVersion)
+	require.Equal(t, expectEvents, gotEvents)
+}
+
+func collectEventsTillRV(t *testing.T, watcher watch.Interface, versioner storage.Versioner, targetRV uint64) []watch.Event {
+	events := []watch.Event{}
+	for e := range watcher.ResultChan() {
+		require.NotEqual(t, watch.Error, e.Type)
+		if cacheable, ok := e.Object.(runtime.CacheableObject); ok {
+			e.Object = cacheable.GetObject()
+		}
+		events = append(events, e)
+		accessor, err := meta.Accessor(e.Object)
+		require.NoError(t, err)
+		rv, err := versioner.ParseResourceVersion(accessor.GetResourceVersion())
+		require.NoError(t, err)
+		if rv >= targetRV {
+			break
+		}
+	}
+	return events
 }
 
 func newTestPod(name, namespace string, uid types.UID, rv string) *example.Pod {

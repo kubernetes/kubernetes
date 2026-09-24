@@ -124,7 +124,8 @@ func ToPorcupineModel(s *correctness.Model) porcupine.Model {
 			return s.Clone()
 		},
 		Step: func(state, input, output any) (bool, any) {
-			return state.(*correctness.Model).Step(input.(correctness.Request), output.(correctness.Response))
+			ok, next, _ := state.(*correctness.Model).Step(input.(correctness.Request), output.(correctness.Response))
+			return ok, next
 		},
 		Equal: func(state1, state2 any) bool {
 			return state1.(*correctness.Model).Equal(state2.(*correctness.Model))
