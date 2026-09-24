@@ -33,6 +33,9 @@ import (
 func dropManagedFields(obj runtime.Object) runtime.Object {
 	switch t := obj.(type) {
 	case *unstructured.Unstructured:
+		if t.IsList() {
+			return deepCopyWithoutManagedFields(t)
+		}
 		return &unstructured.Unstructured{Object: contentWithoutManagedFields(t.Object)}
 	case *unstructured.UnstructuredList:
 		for i := range t.Items {
@@ -82,7 +85,11 @@ func itemCopyWithoutManagedFields(obj runtime.Object) runtime.Object {
 }
 
 func listWithoutManagedFields(list runtime.Object) runtime.Object {
-	items := reflect.ValueOf(list).Elem().FieldByName("Items")
+	v := reflect.ValueOf(list)
+	if v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
+		return deepCopyWithoutManagedFields(list)
+	}
+	items := v.Elem().FieldByName("Items")
 	// Items reached through pointers may be shared; they take the fallback.
 	if items.Kind() != reflect.Slice || !hasValueObjectMeta(items.Type().Elem()) {
 		return deepCopyWithoutManagedFields(list)

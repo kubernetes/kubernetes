@@ -22,17 +22,25 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -41,16 +49,14 @@ func TestManagedFieldsOptOut(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
 
-	ctx, client, config, tearDownFn := setup(t)
-	defer tearDownFn()
+	// Unlike setup, this also serves CRDs.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	ctx, config := t.Context(), server.ClientConfig
+	client := clientset.NewForConfigOrDie(config)
 
 	ns := framework.CreateNamespaceOrDie(client, "managedfields-opt-out", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
-
-	sa := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
-	if _, err := client.CoreV1().ServiceAccounts(ns.Name).Create(ctx, sa, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("failed to create default service account: %v", err)
-	}
 
 	for _, tc := range []struct {
 		name      string
@@ -168,6 +174,83 @@ func TestManagedFieldsOptOut(t *testing.T) {
 			expectManagedFieldsInEvents(t, dropWatch, "pod-2", false)
 		})
 	}
+
+	crd, err := fixtures.CreateNewV1CustomResourceDefinition(
+		fixtures.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped),
+		apiextensionsclient.NewForConfigOrDie(config),
+		dynamic.NewForConfigOrDie(config))
+	if err != nil {
+		t.Fatalf("failed to create CRD: %v", err)
+	}
+	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: crd.Spec.Names.Plural}
+
+	// Custom resources aren't served as protobuf.
+	for _, tc := range []struct {
+		name      string
+		mediaType string
+	}{
+		{
+			name:      "json",
+			mediaType: "application/json",
+		},
+		{
+			name:      "cbor",
+			mediaType: "application/cbor",
+		},
+	} {
+		t.Run("custom resource/"+tc.name, func(t *testing.T) {
+			fullCRs := newDynamicClient(t, config, tc.mediaType).Resource(gvr)
+			dropCRs := newDynamicClient(t, config, tc.mediaType+";drop=metadata.managedFields").Resource(gvr)
+
+			initialList, err := fullCRs.List(ctx, metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("failed to list custom resources: %v", err)
+			}
+			watchOpts := metav1.ListOptions{ResourceVersion: initialList.GetResourceVersion()}
+
+			fullWatch, err := fullCRs.Watch(ctx, watchOpts)
+			if err != nil {
+				t.Fatalf("failed to start watch: %v", err)
+			}
+			defer fullWatch.Stop()
+			dropWatch, err := dropCRs.Watch(ctx, watchOpts)
+			if err != nil {
+				t.Fatalf("failed to start watch with drop: %v", err)
+			}
+			defer dropWatch.Stop()
+
+			name := "cr-" + tc.name
+			// managedFields only records the fields set, so it needs a spec.
+			cr := &unstructured.Unstructured{Object: map[string]interface{}{"spec": map[string]interface{}{"a": "b"}}}
+			cr.SetAPIVersion(gvr.GroupVersion().String())
+			cr.SetKind(crd.Spec.Names.Kind)
+			cr.SetName(name)
+			if _, err := fullCRs.Create(ctx, cr, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("failed to create custom resource: %v", err)
+			}
+
+			got, err := dropCRs.Get(ctx, name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("failed to get custom resource: %v", err)
+			}
+			expectManagedFields(t, "get", got, false)
+
+			list, err := dropCRs.List(ctx, metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("failed to list custom resources: %v", err)
+			}
+			if len(list.Items) != 1 {
+				t.Fatalf("expected 1 custom resource, got %d", len(list.Items))
+			}
+			expectManagedFields(t, "list", &list.Items[0], false)
+
+			if err := fullCRs.Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+				t.Fatalf("failed to delete custom resource: %v", err)
+			}
+			expectManagedFieldsInEvents(t, fullWatch, name, true)
+			expectManagedFieldsInEvents(t, dropWatch, name, false)
+		})
+	}
 }
 
 func TestManagedFieldsOptOutFeatureGateDisabled(t *testing.T) {
@@ -193,7 +276,20 @@ func TestManagedFieldsOptOutFeatureGateDisabled(t *testing.T) {
 	expectManagedFields(t, "create", cm, true)
 }
 
-// expectManagedFieldsInEvents checks every event up to the deletion of the pod named last.
+// newDynamicClient returns a dynamic client that accepts the given media
+// types, which dynamic.NewForConfig would override.
+func newDynamicClient(t *testing.T, config *restclient.Config, accept string) *dynamic.DynamicClient {
+	t.Helper()
+	config = dynamic.ConfigFor(config)
+	config.AcceptContentTypes = accept
+	client, err := restclient.UnversionedRESTClientFor(config)
+	if err != nil {
+		t.Fatalf("failed to create REST client: %v", err)
+	}
+	return dynamic.New(client)
+}
+
+// expectManagedFieldsInEvents checks every event up to the deletion of the object named last.
 func expectManagedFieldsInEvents(t *testing.T, w watch.Interface, last string, want bool) {
 	t.Helper()
 	for {
@@ -202,12 +298,12 @@ func expectManagedFieldsInEvents(t *testing.T, w watch.Interface, last string, w
 			if !ok {
 				t.Fatalf("watch closed before the deletion of %s", last)
 			}
-			pod, ok := event.Object.(*v1.Pod)
-			if !ok {
+			obj, err := meta.Accessor(event.Object)
+			if err != nil {
 				t.Fatalf("unexpected %s event: %#v", event.Type, event.Object)
 			}
-			expectManagedFields(t, fmt.Sprintf("%s event for %s", event.Type, pod.Name), pod, want)
-			if event.Type == watch.Deleted && pod.Name == last {
+			expectManagedFields(t, fmt.Sprintf("%s event for %s", event.Type, obj.GetName()), obj, want)
+			if event.Type == watch.Deleted && obj.GetName() == last {
 				return
 			}
 		case <-time.After(wait.ForeverTestTimeout):

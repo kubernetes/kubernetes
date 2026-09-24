@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -300,6 +301,13 @@ func fakeSerializerInfoSlice() []runtime.SerializerInfo {
 	return result
 }
 
+// tableEndpointRestrictions also allows conversion to Table.
+type tableEndpointRestrictions struct{ emptyEndpointRestrictions }
+
+func (tableEndpointRestrictions) AllowsMediaTypeTransform(_, _ string, gvk *schema.GroupVersionKind) bool {
+	return gvk == nil || *gvk == metav1.SchemeGroupVersion.WithKind("Table")
+}
+
 func TestNegotiateDrop(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -330,11 +338,21 @@ func TestNegotiateDrop(t *testing.T) {
 			accept: "application/json;drop=metadata.managedFields;pretty=1",
 			drop:   []string{"metadata.managedFields"},
 		},
+		{
+			name:   "with Table",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1;drop=metadata.managedFields",
+			drop:   []string{"metadata.managedFields"},
+		},
+		{
+			name:   "protobuf",
+			accept: "application/vnd.kubernetes.protobuf;drop=metadata.managedFields",
+			drop:   []string{"metadata.managedFields"},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManagedFieldsOptOut, !tc.gateDisabled)
-			options, ok := NegotiateMediaTypeOptions(tc.accept, fakeSerializerInfoSlice(), DefaultEndpointRestrictions)
+			options, ok := NegotiateMediaTypeOptions(tc.accept, fakeSerializerInfoSlice(), tableEndpointRestrictions{})
 			if !ok {
 				t.Fatal("expected a match")
 			}

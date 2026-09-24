@@ -151,7 +151,25 @@ func TestDropManagedFieldsUnstructured(t *testing.T) {
 	if !hasManagedFields(cached) {
 		t.Error("cached item mutated: managedFields removed from shared map")
 	}
+
+	newList := func() *unstructured.Unstructured {
+		return &unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": "example.com/v1",
+			"kind":       "WidgetList",
+			"items":      []interface{}{content("w")},
+		}}
+	}
+	for _, list := range []runtime.Object{newList(), valueUnstructured{newList()}} {
+		items := dropManagedFields(list).(runtime.Unstructured).UnstructuredContent()["items"].([]interface{})
+		if hasManagedFields(&unstructured.Unstructured{Object: items[0].(map[string]interface{})}) {
+			t.Errorf("%T: list item still has managedFields", list)
+		}
+	}
 }
+
+// valueUnstructured is a runtime.Unstructured that isn't a pointer, so its
+// fields can't be reached through reflect.Value.Elem.
+type valueUnstructured struct{ *unstructured.Unstructured }
 
 func TestDropManagedFieldsUnchanged(t *testing.T) {
 	pod := newPodWithManagedFields("a")
