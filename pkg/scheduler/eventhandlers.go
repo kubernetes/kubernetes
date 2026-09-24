@@ -236,6 +236,9 @@ func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 	logger := sched.logger
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.Cache.AddPodGroupMember(pod)
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.AddPod(logger, pod)
+	}
 	sched.SchedulingQueue.Add(klog.NewContext(context.Background(), logger), pod)
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, pod, nil)
@@ -292,6 +295,10 @@ func (sched *Scheduler) handleAssumedPodDeletion(pod *v1.Pod) {
 		}
 	}
 
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.DeletePod(logger, pod)
+	}
+
 	// The removal of this assumed pod may have freed up resources. We trigger the AssignedPodDelete event
 	// to move other unscheduled pods, giving them a chance to be scheduled.
 	// If the forgotten pod reserved some resources in memory,
@@ -323,6 +330,9 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 	}
 
 	sched.Cache.UpdatePodGroupMember(logger, oldPod, newPod)
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.UpdatePod(logger, oldPod, newPod)
+	}
 
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
 	if err != nil {
@@ -377,6 +387,9 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	}
 	// If the pod is not assumed, we must clean pod group state explicitly here.
 	sched.Cache.RemovePodGroupMember(pod)
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.DeletePod(logger, pod)
+	}
 	if pod.Status.NominatedNodeName != "" {
 		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
 		// because the lower or equal priority pods treat such a pod as if it was assigned.
@@ -402,6 +415,9 @@ func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {
 	if err := sched.Cache.AddPod(logger, pod); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.AddPod(logger, pod)
+	}
 
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodAdd, nil, pod, nil)
 }
@@ -421,6 +437,9 @@ func (sched *Scheduler) updateAssignedPodInCache(oldPod, newPod *v1.Pod) {
 	logger.V(4).Info("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 	if err := sched.Cache.UpdatePod(logger, oldPod, newPod); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
+	}
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.UpdatePod(logger, oldPod, newPod)
 	}
 
 	// This pod is assigned, so it cannot be a target pod.
@@ -445,6 +464,9 @@ func (sched *Scheduler) deleteAssignedPodFromCache(pod *v1.Pod) {
 	logger.V(3).Info("Delete event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.RemovePod(logger, pod); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
+	}
+	if sched.podGroupHierarchyTracker != nil {
+		sched.podGroupHierarchyTracker.DeletePod(logger, pod)
 	}
 
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
@@ -473,6 +495,7 @@ func (sched *Scheduler) addPodGroup(obj any) {
 	logger.V(3).Info("Add event for pod group", "podGroup", klog.KObj(pg))
 	gpg := fwk.NewGenericPodGroup(pg)
 	sched.Cache.AddGenericPodGroup(gpg)
+	sched.podGroupHierarchyTracker.AddGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.AddGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, pg, nil)
 }
@@ -499,6 +522,7 @@ func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 	logger.V(4).Info("Update event for pod group", "podGroup", klog.KObj(newPG))
 	gpg := fwk.NewGenericPodGroup(newPG)
 	sched.Cache.UpdateGenericPodGroup(logger, gpg)
+	sched.podGroupHierarchyTracker.UpdateGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.UpdateGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldPG, newPG, nil)
 }
@@ -527,6 +551,7 @@ func (sched *Scheduler) deletePodGroup(obj any) {
 	logger.V(3).Info("Delete event for pod group", "podGroup", klog.KObj(pg))
 	gpg := fwk.NewGenericPodGroup(pg)
 	sched.Cache.RemoveGenericPodGroup(logger, gpg)
+	sched.podGroupHierarchyTracker.DeleteGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.DeleteGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, pg, nil, nil)
 }
@@ -544,6 +569,7 @@ func (sched *Scheduler) addCompositePodGroup(obj any) {
 	logger.V(3).Info("Add event for composite pod group", "compositePodGroup", klog.KObj(cpg))
 	gpg := fwk.NewGenericCompositePodGroup(cpg)
 	sched.Cache.AddGenericPodGroup(gpg)
+	sched.podGroupHierarchyTracker.AddGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.AddGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, cpg, nil)
 }
@@ -570,6 +596,7 @@ func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
 	logger.V(4).Info("Update event for composite pod group", "compositePodGroup", klog.KObj(newCPG))
 	gpg := fwk.NewGenericCompositePodGroup(newCPG)
 	sched.Cache.UpdateGenericPodGroup(logger, gpg)
+	sched.podGroupHierarchyTracker.UpdateGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.UpdateGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldCPG, newCPG, nil)
 }
@@ -598,6 +625,7 @@ func (sched *Scheduler) deleteCompositePodGroup(obj any) {
 	logger.V(3).Info("Delete event for composite pod group", "compositePodGroup", klog.KObj(cpg))
 	gpg := fwk.NewGenericCompositePodGroup(cpg)
 	sched.Cache.RemoveGenericPodGroup(logger, gpg)
+	sched.podGroupHierarchyTracker.DeleteGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.DeleteGenericPodGroup(logger, gpg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, cpg, nil, nil)
 }
