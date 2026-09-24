@@ -1043,7 +1043,7 @@ type PodNominator interface {
 	// UpdateNominatedPod updates the <oldPod> with <newPod>.
 	UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo PodInfo)
 	// NominatedPodsForNode returns nominatedPods on the given node.
-	NominatedPodsForNode(nodeName string) []PodInfo
+	NominatedPodsForNode(logger klog.Logger, nodeName string) []PodInfo
 }
 
 // PluginsRunner abstracts operations to run some plugins.

@@ -1269,7 +1269,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			if scheduleAsPodGroup {
 				// For pod groups, the pod might be in pending pod group pods instead of backoffQ.
 				// We can check if it's still in the scheduling queue via GetPod.
-				_, ok := queue.GetPod(item.expectPodInBackoffQ.Name, item.expectPodInBackoffQ.Namespace, item.expectPodInBackoffQ.Spec.SchedulingGroup)
+				_, ok := queue.GetPod(ctx, item.expectPodInBackoffQ.Name, item.expectPodInBackoffQ.Namespace, item.expectPodInBackoffQ.Spec.SchedulingGroup)
 				if !ok {
 					t.Errorf("Expected to find pod in scheduling queue, but it's not there.\nWant: %v", item.expectPodInBackoffQ)
 				}
@@ -1390,7 +1390,7 @@ func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 	if got := queue.UnschedulablePods(); len(got) != 0 {
 		t.Fatalf("expected recreated pod to stay out of unschedulablePods, got %v", got)
 	}
-	if got := queue.NominatedPodsForNode("node1"); len(got) != 0 {
+	if got := queue.NominatedPodsForNode(logger, "node1"); len(got) != 0 {
 		t.Fatalf("expected recreated pod to stay out of nominated pods, got %v", got)
 	}
 
@@ -1468,7 +1468,7 @@ func TestHandleSchedulingFailureForDeferredResizePod(t *testing.T) {
 	sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
 
 	// Assert queue status: pod should be added back to the queue
-	_, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+	_, found := queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
 	if !found {
 		t.Errorf("expected pod to be in queue")
 	}
@@ -1563,11 +1563,11 @@ func TestHandleSchedulingFailure_PodGroupFitErrorCloned(t *testing.T) {
 		sched.handleSchedulingFailure(ctx, schedFramework, pInfo, status.Clone(), nil, time.Now())
 	}
 
-	queuedPod1, ok := queue.GetPod(pod1.Name, pod1.Namespace, pod1.Spec.SchedulingGroup)
+	queuedPod1, ok := queue.GetPod(ctx, pod1.Name, pod1.Namespace, pod1.Spec.SchedulingGroup)
 	if !ok {
 		t.Fatalf("Failed to get pod1 from the queue")
 	}
-	queuedPod2, ok := queue.GetPod(pod2.Name, pod2.Namespace, pod2.Spec.SchedulingGroup)
+	queuedPod2, ok := queue.GetPod(ctx, pod2.Name, pod2.Namespace, pod2.Spec.SchedulingGroup)
 	if !ok {
 		t.Fatalf("Failed to get pod2 from the queue")
 	}

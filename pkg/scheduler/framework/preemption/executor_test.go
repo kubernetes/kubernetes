@@ -241,7 +241,7 @@ type fakePodNominator struct {
 	requestStopper chan struct{}
 }
 
-func (f *fakePodNominator) NominatedPodsForNode(nodeName string) []fwk.PodInfo {
+func (f *fakePodNominator) NominatedPodsForNode(logger klog.Logger, nodeName string) []fwk.PodInfo {
 	<-f.requestStopper
 	return nil
 }

@@ -7764,7 +7764,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					}
 
 					for pod, expectedPlugins := range tt.expectedUnschedulablePlugins {
-						pInfo, ok := queue.GetPod(pod.Name, pod.Namespace, pod.Spec.SchedulingGroup)
+						pInfo, ok := queue.GetPod(ctx, pod.Name, pod.Namespace, pod.Spec.SchedulingGroup)
 						if !ok {
 							t.Fatalf("Failed to get pod %s from queue", pod.Name)
 						}
