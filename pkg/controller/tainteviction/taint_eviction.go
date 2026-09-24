@@ -814,7 +814,11 @@ func (tc *Controller) processPodOnNode(
 		return
 	case podEvictionLater:
 		if decision.keepExisting {
-			tc.cancelPodEvictionRetry(podNamespacedName)
+			// A fired timed worker remains visible until its callback returns. It
+			// may already have handed deletion responsibility to the durable retry,
+			// so an update must not cancel that retry during this handoff window.
+			// If the worker is still pending, processPodEvictionRetry will observe
+			// keepExisting and forget the redundant retry itself.
 			return
 		}
 		if decision.cancelScheduled {
