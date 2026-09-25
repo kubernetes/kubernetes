@@ -152,6 +152,7 @@ message FlowSchemaSpec {
   // if it is an empty slice, there will be no requests matching the FlowSchema.
   // +listType=atomic
   // +optional
+  // +k8s:alpha(since: "1.38")=+k8s:optional
   repeated PolicyRulesWithSubjects rules = 4;
 }
 
@@ -293,6 +294,7 @@ message PolicyRulesWithSubjects {
   // +listType=atomic
   // Required.
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
   repeated Subject subjects = 1;
 
   // resourceRules is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
@@ -521,16 +523,20 @@ message ServiceAccountSubject {
 
 // Subject matches the originator of a request, as identified by the request authentication system. There are three
 // ways of matching an originator; by user, group, or service account.
-// +union
 message Subject {
   // kind indicates which one of the other fields is non-empty.
   // Required
   // +required
   // +unionDiscriminator
+  // +k8s:alpha(since: "1.38")=+k8s:unionDiscriminator
+  // +k8s:alpha(since: "1.38")=+k8s:required
   optional string kind = 1;
 
   // user matches based on username.
   // +optional
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +unionMember=User
+  // +k8s:alpha(since: "1.38")=+k8s:unionMember(memberName: "User")
   optional UserSubject user = 2;
 
   // group matches based on user group name.
@@ -547,6 +553,7 @@ message UserSubject {
   // name is the username that matches, or "*" to match all usernames.
   // Required.
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
   optional string name = 1;
 }
 
