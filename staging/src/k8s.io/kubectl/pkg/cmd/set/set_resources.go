@@ -319,6 +319,8 @@ func parseResourceList(spec string) (v1.ResourceList, error) {
 		parts := strings.Split(resourceStatement, "=")
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
+		} else if parts[0] == "" {
+			return nil, fmt.Errorf("Resource name might not be empty, got %q", resourceStatement)
 		}
 		resourceName := v1.ResourceName(parts[0])
 		resourceQuantity, err := apiresource.ParseQuantity(parts[1])
