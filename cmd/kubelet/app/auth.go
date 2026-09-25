@@ -90,7 +90,7 @@ func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kub
 
 	if authn.Webhook.Enabled {
 		if client == nil {
-			return nil, nil, nil, errors.New("no client provided, cannot use webhook authentication")
+			return nil, nil, nil, errors.New("no client provided, cannot use webhook authentication. Set --authentication-webhook-client-ca-file or configure authentication in the kubelet config file")
 		}
 		authenticatorConfig.WebhookRetryBackoff = genericoptions.DefaultAuthWebhookRetryBackoff()
 		authenticatorConfig.TokenAccessReviewClient = client
@@ -126,7 +126,7 @@ func BuildAuthz(client authorizationclient.AuthorizationV1Interface, authz kubel
 
 	case kubeletconfig.KubeletAuthorizationModeWebhook:
 		if client == nil {
-			return nil, errors.New("no client provided, cannot use webhook authorization")
+			return nil, errors.New("no client provided, cannot use webhook authorization. Set --authorization-webhook-client-ca-file or configure authorization in the kubelet config file")
 		}
 		authorizerConfig := authorizerfactory.DelegatingAuthorizerConfig{
 			SubjectAccessReviewClient: client,

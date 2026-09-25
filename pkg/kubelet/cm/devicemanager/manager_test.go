@@ -144,6 +144,7 @@ func TestNewManagerImplStartProbeMode(t *testing.T) {
 func TestDevicePluginReRegistration(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/115269 merges.
+	// See https://github.com/kubernetes/kubernetes/issues/115478 for tracking.
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping test on Windows.")
 	}

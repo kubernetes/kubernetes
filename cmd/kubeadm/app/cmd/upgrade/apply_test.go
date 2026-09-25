@@ -108,7 +108,17 @@ func TestNewApplyData(t *testing.T) {
 			expectedError: "couldn't create a Kubernetes client from file",
 		},
 
-		// TODO: add more test cases here when the fake client for `kubeadm upgrade apply` can be injected
+		// TODO: add more test cases here when the fake client for `kubeadm upgrade apply` can be injected.
+		// See https://github.com/kubernetes/kubernetes/issues/115476 for tracking.
+		{
+			name: "fails if kubeconfig file is missing",
+			args: []string{"v1.1.0"},
+			flags: map[string]string{
+				options.CfgPath:        configFilePath,
+				options.KubeconfigPath: "invalid-kubeconfig-path",
+			},
+			expectedError: "couldn't create a Kubernetes client from file",
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
