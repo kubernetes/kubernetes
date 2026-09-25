@@ -284,6 +284,36 @@ func createCAValidTestConfig() *clientcmdapi.Config {
 	return config
 }
 
+func TestServiceAccountFilePath(t *testing.T) {
+	testCases := []struct {
+		name     string
+		goos     string
+		filename string
+		want     string
+	}{
+		{
+			name:     "linux",
+			goos:     "linux",
+			filename: "namespace",
+			want:     "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
+		},
+		{
+			name:     "windows",
+			goos:     "windows",
+			filename: "namespace",
+			want:     "c:/var/run/secrets/kubernetes.io/serviceaccount/namespace",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := serviceAccountFilePath(tc.goos, tc.filename); got != tc.want {
+				t.Fatalf("serviceAccountFilePath(%q, %q) = %q, want %q", tc.goos, tc.filename, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestDisableCompression(t *testing.T) {
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
