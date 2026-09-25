@@ -738,13 +738,18 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			ginkgo.By("wait for plugin2 NodePrepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodePrepareResourcesSucceeded)
 
+			// Restart only while plugin2 is inside NodeUnprepareResources, which is what this test is about.
+			ginkgo.By("wait for plugin2 NodeUnprepareResources call to be in progress")
+			gomega.Eventually(ctx, kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesInProgress)
+			callsBeforeRestart := len(kubeletPlugin2.GetGRPCCalls())
+
 			ginkgo.By("restart Kubelet")
 			restartKubelet(ctx, true)
 
 			unblockNodeUnprepareResources()
 
-			ginkgo.By("wait for plugin2 NodeUnprepareResources call to succeed")
-			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesSucceeded)
+			ginkgo.By("wait for a plugin2 NodeUnprepareResources call made after the restart to succeed")
+			gomega.Eventually(ctx, kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesSucceededAfter(callsBeforeRestart))
 
 			ginkgo.By("wait for pod to succeed")
 			err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
