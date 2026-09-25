@@ -1604,20 +1604,6 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
-- name: RelaxedEnvironmentVariableValidation
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.30"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.32"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: RelaxedServiceNameValidation
   versionedSpecs:
   - default: false
