@@ -1259,6 +1259,28 @@ func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework
 	}
 }
 
+// getNUMANodesForContainer returns the set of NUMA nodes the CPUs assigned to
+// cnt of pod belong to, as reported by the container itself.
+func getNUMANodesForContainer(ctx context.Context, f *framework.Framework, pod *v1.Pod, cnt *v1.Container, numaNodes int) sets.Set[int] {
+	ginkgo.GinkgoHelper()
+
+	logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+	framework.Logf("got pod logs: %v", logs)
+	podEnv, err := makeEnvMap(logs)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+	CPUToNUMANode, err := getCPUToNUMANodeMapFromEnv(f, pod, cnt, podEnv, numaNodes)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+	numaUsed := sets.New[int]()
+	for _, numa := range CPUToNUMANode {
+		numaUsed.Insert(numa)
+	}
+	return numaUsed
+}
+
 func runPreferClosestNUMATestSuite(ctx context.Context, f *framework.Framework, numaNodes int, distances map[int][]int) {
 	runPreferClosestNUMAOptimalAllocationTest(ctx, f, numaNodes, distances)
 	runPreferClosestNUMASubOptimalAllocationTest(ctx, f, numaNodes, distances)
@@ -1353,20 +1375,7 @@ func runPreferClosestNUMASubOptimalAllocationTest(ctx context.Context, f *framew
 
 	ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cntName, pod.Name))
 
-	logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cntName)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cntName, pod.Name)
-
-	framework.Logf("got pod logs: %v", logs)
-	podEnv, err := makeEnvMap(logs)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cntName, pod.Name)
-
-	CPUToNUMANode, err := getCPUToNUMANodeMapFromEnv(f, pod, &pod.Spec.Containers[0], podEnv, numaNodes)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cntName, pod.Name)
-
-	numaUsed := sets.New[int]()
-	for _, numa := range CPUToNUMANode {
-		numaUsed.Insert(numa)
-	}
+	numaUsed := getNUMANodesForContainer(ctx, f, pod, &pod.Spec.Containers[0], numaNodes)
 
 	numaList := numaUsed.UnsortedList()
 	gomega.Expect(numaList).To(gomega.HaveLen(2))
@@ -1382,20 +1391,7 @@ func valiidatePreferClosestNUMAOptimalAllocation(ctx context.Context, f *framewo
 		for _, cnt := range pod.Spec.Containers {
 			ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
 
-			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
-			framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
-
-			framework.Logf("got pod logs: %v", logs)
-			podEnv, err := makeEnvMap(logs)
-			framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
-
-			CPUToNUMANode, err := getCPUToNUMANodeMapFromEnv(f, pod, &cnt, podEnv, numaNodes)
-			framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
-
-			numaUsed := sets.New[int]()
-			for _, numa := range CPUToNUMANode {
-				numaUsed.Insert(numa)
-			}
+			numaUsed := getNUMANodesForContainer(ctx, f, pod, &cnt, numaNodes)
 
 			numaList := numaUsed.UnsortedList()
 			gomega.Expect(numaList).To(gomega.HaveLen(2))
