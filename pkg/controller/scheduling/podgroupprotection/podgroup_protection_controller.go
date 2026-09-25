@@ -23,15 +23,18 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
+	schedulinginformersv1alpha3 "k8s.io/client-go/informers/scheduling/v1alpha3"
+	schedulinginformersv1beta1 "k8s.io/client-go/informers/scheduling/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1beta1"
+	schedulinglistersv1alpha3 "k8s.io/client-go/listers/scheduling/v1alpha3"
+	schedulinglistersv1beta1 "k8s.io/client-go/listers/scheduling/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -44,17 +47,27 @@ const (
 	// The index name for looking up active pods by their
 	// schedulingGroup.podGroupName field.
 	activePodSchedulingGroupIndex = "activePodSchedulingGroup"
+
+	// The index name for looking up child PodGroups by their
+	// parentCompositePodGroupName field.
+	podGroupByParentIndex = "podGroupByParent"
+
+	// The index name for looking up child CompositePodGroups by their
+	// parentCompositePodGroupName field.
+	compositePodGroupByParentIndex = "compositePodGroupByParent"
 )
 
-// Controller manages the PodGroupProtectionFinalizer on PodGroup objects.
-// The finalizer is stamped at creation time by the PodGroupProtection admission
-// plugin; this controller removes it when the PodGroup is being deleted and no
-// active (non-terminated) pods still reference it.
+// Controller manages the PodGroupProtectionFinalizer on PodGroup objects and
+// CompositePodGroupProtectionFinalizer on CompositePodGroup objects.
+// Finalizers are stamped at creation time by the PodGroupProtection admission
+// plugin; this controller removes them when objects are being deleted and no
+// child resources still reference them.
 type Controller struct {
 	kubeClient clientset.Interface
 
-	podGroupLister schedulinglisters.PodGroupLister
-	podGroupSynced cache.InformerSynced
+	podGroupLister  schedulinglistersv1beta1.PodGroupLister
+	podGroupSynced  cache.InformerSynced
+	podGroupIndexer cache.Indexer
 
 	podSynced cache.InformerSynced
 
@@ -62,23 +75,34 @@ type Controller struct {
 	// limit iteration over pods to those of interest.
 	podIndexer cache.Indexer
 
-	queue workqueue.TypedRateLimitingInterface[string]
+	podGroupQueue workqueue.TypedRateLimitingInterface[string]
+
+	isCompositePodGroupEnabled bool
+	compositePodGroupLister    schedulinglistersv1alpha3.CompositePodGroupLister
+	compositePodGroupSynced    cache.InformerSynced
+	compositePodGroupIndexer   cache.Indexer
+
+	compositePodGroupQueue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewPodGroupProtectionController returns a new instance of the PodGroup protection controller.
 func NewPodGroupProtectionController(
 	logger klog.Logger,
-	podGroupInformer schedulinginformers.PodGroupInformer,
+	podGroupInformer schedulinginformersv1beta1.PodGroupInformer,
+	compositePodGroupInformer schedulinginformersv1alpha3.CompositePodGroupInformer,
 	podInformer coreinformers.PodInformer,
 	kubeClient clientset.Interface,
+	isCompositePodGroupEnabled bool,
 ) (*Controller, error) {
 	c := &Controller{
-		kubeClient:     kubeClient,
-		podGroupLister: podGroupInformer.Lister(),
-		podGroupSynced: podGroupInformer.Informer().HasSynced,
-		podIndexer:     podInformer.Informer().GetIndexer(),
-		podSynced:      podInformer.Informer().HasSynced,
-		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+		kubeClient:                 kubeClient,
+		isCompositePodGroupEnabled: isCompositePodGroupEnabled,
+		podGroupLister:             podGroupInformer.Lister(),
+		podGroupSynced:             podGroupInformer.Informer().HasSynced,
+		podGroupIndexer:            podGroupInformer.Informer().GetIndexer(),
+		podIndexer:                 podInformer.Informer().GetIndexer(),
+		podSynced:                  podInformer.Informer().HasSynced,
+		podGroupQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				Logger: &logger,
@@ -87,12 +111,50 @@ func NewPodGroupProtectionController(
 		),
 	}
 
+	if c.isCompositePodGroupEnabled {
+		c.compositePodGroupLister = compositePodGroupInformer.Lister()
+		c.compositePodGroupSynced = compositePodGroupInformer.Informer().HasSynced
+		c.compositePodGroupIndexer = compositePodGroupInformer.Informer().GetIndexer()
+
+		if err := addChildIndexer(c.compositePodGroupIndexer, compositePodGroupByParentIndex, compositePodGroupParent); err != nil {
+			return nil, fmt.Errorf("could not initialize CompositePodGroup parent indexer: %w", err)
+		}
+		if err := addChildIndexer(c.podGroupIndexer, podGroupByParentIndex, podGroupParent); err != nil {
+			return nil, fmt.Errorf("could not initialize PodGroup parent indexer: %w", err)
+		}
+
+		c.compositePodGroupQueue = workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "compositepodgroupprotection",
+			},
+		)
+
+		if _, err := compositePodGroupInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj any) {
+				c.handleCompositePodGroupUpdate(logger, nil, obj)
+			},
+			UpdateFunc: func(old, new any) {
+				c.handleCompositePodGroupUpdate(logger, old, new)
+			},
+			DeleteFunc: func(obj any) {
+				c.handleCompositePodGroupUpdate(logger, obj, nil)
+			},
+		}, cache.HandlerOptions{Logger: &logger}); err != nil {
+			return nil, err
+		}
+	}
+
 	if _, err := podGroupInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			c.handlePodGroupUpdate(logger, obj)
+		AddFunc: func(obj any) {
+			c.handlePodGroupUpdate(logger, nil, obj)
 		},
-		UpdateFunc: func(old, new interface{}) {
-			c.handlePodGroupUpdate(logger, new)
+		UpdateFunc: func(old, new any) {
+			c.handlePodGroupUpdate(logger, old, new)
+		},
+		DeleteFunc: func(obj any) {
+			c.handlePodGroupUpdate(logger, obj, nil)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
@@ -103,13 +165,13 @@ func NewPodGroupProtectionController(
 	}
 
 	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			c.handlePodChange(logger, nil, obj)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			c.handlePodChange(logger, obj, nil)
 		},
-		UpdateFunc: func(old, new interface{}) {
+		UpdateFunc: func(old, new any) {
 			c.handlePodChange(logger, old, new)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
@@ -121,6 +183,36 @@ func NewPodGroupProtectionController(
 
 func namespacedKey(namespace, name string) string {
 	return namespace + "/" + name
+}
+
+// podGroupParent extracts the namespace and parent CompositePodGroup name from a PodGroup
+// for hierarchical relationship indexing.
+func podGroupParent(pg *schedulingv1beta1.PodGroup) (string, *string) {
+	return pg.Namespace, pg.Spec.ParentCompositePodGroupName
+}
+
+// compositePodGroupParent extracts the namespace and parent CompositePodGroup name from a CompositePodGroup
+// for hierarchical relationship indexing.
+func compositePodGroupParent(cpg *schedulingv1alpha3.CompositePodGroup) (string, *string) {
+	return cpg.Namespace, cpg.Spec.ParentCompositePodGroupName
+}
+
+// addChildIndexer registers an indexer on the given cache to look up child resources
+// by their parent CompositePodGroup reference.
+func addChildIndexer[T any](indexer cache.Indexer, indexName string, parentOf func(T) (namespace string, parent *string)) error {
+	return indexer.AddIndexers(cache.Indexers{
+		indexName: func(obj any) ([]string, error) {
+			t, ok := obj.(T)
+			if !ok {
+				return nil, nil
+			}
+			ns, parent := parentOf(t)
+			if parent == nil {
+				return nil, nil
+			}
+			return []string{namespacedKey(ns, *parent)}, nil
+		},
+	})
 }
 
 // addActivePodSchedulingGroupIndexer adds an indexer to look up active
@@ -154,42 +246,66 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	var wg sync.WaitGroup
 	defer func() {
 		logger.Info("Shutting down PodGroup protection controller")
-		c.queue.ShutDown()
+		c.podGroupQueue.ShutDown()
+		if c.isCompositePodGroupEnabled {
+			c.compositePodGroupQueue.ShutDown()
+		}
 		wg.Wait()
 	}()
 
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.podGroupSynced, c.podSynced) {
+	synced := []cache.InformerSynced{c.podGroupSynced, c.podSynced}
+	if c.isCompositePodGroupEnabled {
+		synced = append(synced, c.compositePodGroupSynced)
+	}
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, synced...) {
 		return
 	}
 
 	for range workers {
 		wg.Go(func() {
-			wait.UntilWithContext(ctx, c.runWorker, time.Second)
+			wait.UntilWithContext(ctx, runWorker("PodGroup", c.podGroupQueue, c.processPodGroup), time.Second)
 		})
+		if c.isCompositePodGroupEnabled {
+			wg.Go(func() {
+				wait.UntilWithContext(ctx, runWorker("CompositePodGroup", c.compositePodGroupQueue, c.processCompositePodGroup), time.Second)
+			})
+		}
 	}
 	<-ctx.Done()
 }
 
-func (c *Controller) runWorker(ctx context.Context) {
-	for c.processNextWorkItem(ctx) {
+func runWorker(
+	kind string,
+	queue workqueue.TypedRateLimitingInterface[string],
+	processFunc func(context.Context, string) error,
+) func(context.Context) {
+	return func(ctx context.Context) {
+		for processNextWorkItem(ctx, kind, queue, processFunc) {
+		}
 	}
 }
 
-func (c *Controller) processNextWorkItem(ctx context.Context) bool {
-	pgKey, quit := c.queue.Get()
+func processNextWorkItem(
+	ctx context.Context,
+	kind string,
+	queue workqueue.TypedRateLimitingInterface[string],
+	processFunc func(context.Context, string) error,
+) bool {
+	key, quit := queue.Get()
 	if quit {
 		return false
 	}
-	defer c.queue.Done(pgKey)
+	defer queue.Done(key)
 
-	err := c.processPodGroup(ctx, pgKey)
-	if err == nil {
-		c.queue.Forget(pgKey)
+	err := processFunc(ctx, key)
+	if err != nil {
+		queue.Forget(key)
 		return true
 	}
 
-	c.queue.AddRateLimited(pgKey)
-	utilruntime.HandleError(fmt.Errorf("PodGroup %v failed with: %w", pgKey, err))
+	queue.AddRateLimited(key)
+	utilruntime.HandleError(fmt.Errorf("%v %v failed with: %w", kind, key, err))
 
 	return true
 }
@@ -205,7 +321,7 @@ func (c *Controller) processPodGroup(ctx context.Context, pgKey string) error {
 
 	pg, err := c.podGroupLister.PodGroups(pgNamespace).Get(pgName)
 	if apierrors.IsNotFound(err) {
-		logger.V(4).Info("PodGroup not found, ignoring", "podGroup", pgKey)
+		logger.V(4).Info("PodGroup not found, ignoring", "podGroup", klog.KRef(pgNamespace, pgName))
 		return nil
 	}
 	if err != nil {
@@ -221,24 +337,70 @@ func (c *Controller) processPodGroup(ctx context.Context, pgKey string) error {
 		return err
 	}
 	if !isUsed {
-		return c.removeFinalizer(ctx, pg)
+		return c.removePodGroupFinalizer(ctx, pg)
 	}
 	logger.V(4).Info("Keeping PodGroup finalizer because it is still being used by pods", "podGroup", klog.KObj(pg))
 	return nil
 }
 
-func (c *Controller) removeFinalizer(ctx context.Context, pg *schedulingv1beta1.PodGroup) error {
+func (c *Controller) processCompositePodGroup(ctx context.Context, cpgKey string) error {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Processing CompositePodGroup", "compositePodGroup", cpgKey)
+
+	cpgNamespace, cpgName, err := cache.SplitMetaNamespaceKey(cpgKey)
+	if err != nil {
+		return fmt.Errorf("error parsing CompositePodGroup key %q: %w", cpgKey, err)
+	}
+
+	cpg, err := c.compositePodGroupLister.CompositePodGroups(cpgNamespace).Get(cpgName)
+	if apierrors.IsNotFound(err) {
+		logger.V(4).Info("CompositePodGroup not found, ignoring", "compositePodGroup", cpgKey)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if !protectionutil.IsDeletionCandidate(cpg, scheduling.CompositePodGroupProtectionFinalizer) {
+		return nil
+	}
+
+	hasChildren, err := c.hasChildGroups(ctx, cpg)
+	if err != nil {
+		return err
+	}
+	if !hasChildren {
+		return c.removeCompositePodGroupFinalizer(ctx, cpg)
+	}
+	logger.V(4).Info("Keeping CompositePodGroup finalizer because it still has child pod groups or composite pod groups", "compositePodGroup", klog.KObj(cpg))
+	return nil
+}
+
+func (c *Controller) removePodGroupFinalizer(ctx context.Context, pg *schedulingv1beta1.PodGroup) error {
 	logger := klog.FromContext(ctx)
 	pgClone := pg.DeepCopy()
 
 	pgClone.Finalizers = slice.RemoveString(pgClone.Finalizers, scheduling.PodGroupProtectionFinalizer, nil)
 	_, err := c.kubeClient.SchedulingV1beta1().PodGroups(pgClone.Namespace).Update(ctx, pgClone, metav1.UpdateOptions{})
 	if err != nil {
-		logger.Error(err, "Error removing protection finalizer from PodGroup", "podGroup", klog.KObj(pg))
 		return err
 	}
 
 	logger.V(3).Info("Removed protection finalizer from PodGroup", "podGroup", klog.KObj(pg))
+	return nil
+}
+
+func (c *Controller) removeCompositePodGroupFinalizer(ctx context.Context, cpg *schedulingv1alpha3.CompositePodGroup) error {
+	logger := klog.FromContext(ctx)
+	cpgClone := cpg.DeepCopy()
+
+	cpgClone.Finalizers = slice.RemoveString(cpgClone.Finalizers, scheduling.CompositePodGroupProtectionFinalizer, nil)
+	_, err := c.kubeClient.SchedulingV1alpha3().CompositePodGroups(cpgClone.Namespace).Update(ctx, cpgClone, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+
+	logger.V(3).Info("Removed protection finalizer from CompositePodGroup", "compositePodGroup", klog.KObj(cpg))
 	return nil
 }
 
@@ -263,23 +425,78 @@ func (c *Controller) hasActivePods(ctx context.Context, pg *schedulingv1beta1.Po
 	return false, nil
 }
 
+// hasChildGroups returns true if any child PodGroups or child CompositePodGroups
+// reference the parent CompositePodGroup via spec.parentCompositePodGroupName.
+func (c *Controller) hasChildGroups(ctx context.Context, cpg *schedulingv1alpha3.CompositePodGroup) (bool, error) {
+	logger := klog.FromContext(ctx)
+	indexKey := namespacedKey(cpg.Namespace, cpg.Name)
+
+	pgObjs, err := c.podGroupIndexer.ByIndex(podGroupByParentIndex, indexKey)
+	if err != nil {
+		return false, fmt.Errorf("index-based list of child PodGroups failed for CompositePodGroup %s: %w", indexKey, err)
+	}
+	if len(pgObjs) > 0 {
+		logger.V(4).Info("Child PodGroup is using CompositePodGroup", "childPodGroup", klog.KObj(pgObjs[0].(*schedulingv1beta1.PodGroup)), "compositePodGroup", klog.KObj(cpg))
+		return true, nil
+	}
+
+	cpgObjs, err := c.compositePodGroupIndexer.ByIndex(compositePodGroupByParentIndex, indexKey)
+	if err != nil {
+		return false, fmt.Errorf("index-based list of child CompositePodGroups failed for CompositePodGroup %s: %w", indexKey, err)
+	}
+	if len(cpgObjs) > 0 {
+		logger.V(4).Info("Child CompositePodGroup is using CompositePodGroup", "childCompositePodGroup", klog.KObj(cpgObjs[0].(*schedulingv1alpha3.CompositePodGroup)), "compositePodGroup", klog.KObj(cpg))
+		return true, nil
+	}
+
+	logger.V(4).Info("No child PodGroups or CompositePodGroups found using CompositePodGroup", "compositePodGroup", klog.KObj(cpg))
+	return false, nil
+}
+
 // isPodTerminated returns true if the pod has completed (Succeeded or Failed).
 func isPodTerminated(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed
 }
 
-// handlePodGroupUpdate handles PodGroup add/update events.
-// Only deletion candidates which are being deleted and have the finalizer need processing.
-func (c *Controller) handlePodGroupUpdate(logger klog.Logger, obj any) {
-	pg := objectOf[*schedulingv1beta1.PodGroup](obj)
-	if pg == nil {
+// handlePodGroupUpdate handles PodGroup add/delete/update events.
+func (c *Controller) handlePodGroupUpdate(logger klog.Logger, old, new any) {
+	pg := objectOf[*schedulingv1beta1.PodGroup](new)
+	oldPg := objectOf[*schedulingv1beta1.PodGroup](old)
+
+	if pg != nil && protectionutil.IsDeletionCandidate(pg, scheduling.PodGroupProtectionFinalizer) {
+		logger.V(4).Info("Got event on PodGroup", "podGroup", klog.KObj(pg))
+		c.podGroupQueue.Add(namespacedKey(pg.Namespace, pg.Name))
+	}
+
+	if !c.isCompositePodGroupEnabled {
 		return
 	}
-	if !protectionutil.IsDeletionCandidate(pg, scheduling.PodGroupProtectionFinalizer) {
+
+	if oldPg != nil && (pg == nil || oldPg.UID != pg.UID) {
+		if oldPg.Spec.ParentCompositePodGroupName != nil {
+			c.compositePodGroupQueue.Add(namespacedKey(oldPg.Namespace, *oldPg.Spec.ParentCompositePodGroupName))
+		}
+	}
+}
+
+// handleCompositePodGroupUpdate handles CompositePodGroup add/delete/update events.
+func (c *Controller) handleCompositePodGroupUpdate(logger klog.Logger, old, new any) {
+	if !c.isCompositePodGroupEnabled {
 		return
 	}
-	logger.V(4).Info("Got event on PodGroup", "podGroup", klog.KObj(pg))
-	c.queue.Add(namespacedKey(pg.Namespace, pg.Name))
+	cpg := objectOf[*schedulingv1alpha3.CompositePodGroup](new)
+	oldCpg := objectOf[*schedulingv1alpha3.CompositePodGroup](old)
+
+	if cpg != nil && protectionutil.IsDeletionCandidate(cpg, scheduling.CompositePodGroupProtectionFinalizer) {
+		logger.V(4).Info("Got event on CompositePodGroup", "compositePodGroup", klog.KObj(cpg))
+		c.compositePodGroupQueue.Add(namespacedKey(cpg.Namespace, cpg.Name))
+	}
+
+	if oldCpg != nil && (cpg == nil || oldCpg.UID != cpg.UID) {
+		if oldCpg.Spec.ParentCompositePodGroupName != nil {
+			c.compositePodGroupQueue.Add(namespacedKey(oldCpg.Namespace, *oldCpg.Spec.ParentCompositePodGroupName))
+		}
+	}
 }
 
 // handlePodChange handles Pod add/delete/update events.
@@ -316,7 +533,7 @@ func (c *Controller) enqueuePodGroupForPod(logger klog.Logger, pod *v1.Pod) {
 
 	pgKey := namespacedKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	logger.V(4).Info("Enqueuing PodGroup for pod event", "pod", klog.KObj(pod), "podGroup", pgKey)
-	c.queue.Add(pgKey)
+	c.podGroupQueue.Add(pgKey)
 }
 
 // objectOf extracts a typed object from an informer event payload or unwraps it
