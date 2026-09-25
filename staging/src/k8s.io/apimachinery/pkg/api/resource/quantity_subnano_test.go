@@ -32,6 +32,12 @@ func TestParseQuantitySubNanoRoundsUp(t *testing.T) {
 		// magnitude below 1n rounds away from zero to the minimum unit
 		{"1e-2147483647", "1n"},
 		{"-1e-2147483647", "-1n"},
+		// fractional mantissa at the extreme exponent, on the Dec path: still 1n
+		{"1.5e-2147483647", "1n"},
+		{"-1.5e-2147483647", "-1n"},
+		{"0.5e-2147483647", "1n"},
+		{"0.1e-2147483647", "1n"},
+		{"-0.1e-2147483647", "-1n"},
 		{"1e-100", "1n"},
 		{"-1e-100", "-1n"},
 		{"1e-10", "1n"},
@@ -49,6 +55,9 @@ func TestParseQuantitySubNanoRoundsUp(t *testing.T) {
 		// zero is never rounded up, whatever the exponent
 		{"0e-2147483647", "0"},
 		{"0.0e-100", "0"},
+		// a fractional zero at the extreme exponent reaches the branch that records 1n
+		{"0.0e-2147483647", "0"},
+		{"-0.0e-2147483647", "0"},
 		// a BinarySI value below 1n rounds to 1n and its format flips to DecimalSI
 		{"0.00000000000000000000001Ki", "1n"},
 	} {
@@ -75,6 +84,11 @@ func TestParseQuantitySubNanoMatchesRound(t *testing.T) {
 		{"0.0000000000001", "1n", DecimalSI},
 		{"-0.0000000000001", "-1n", DecimalSI},
 		{"0.00000000000000000000001Ki", "1n", DecimalSI},
+		// fractional mantissas at the extreme exponent, through the branch that records 1n
+		{"1.5e-2147483647", "1e-9", DecimalExponent},
+		{"-0.1e-2147483647", "-1e-9", DecimalExponent},
+		{"0.0e-2147483647", "0", DecimalExponent},
+		{"-0.0e-2147483647", "0", DecimalExponent},
 	} {
 		if q := MustParse(tc.in); q.String() != tc.want || q.Format != tc.format {
 			t.Errorf("ParseQuantity(%q) = (%q, %v), want (%q, %v)", tc.in, q.String(), q.Format, tc.want, tc.format)
