@@ -54,6 +54,7 @@ import (
 	podtemplatestore "k8s.io/kubernetes/pkg/registry/core/podtemplate/storage"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
+	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	serviceallocator "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -224,11 +225,33 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 
 	// potentially override the generic serviceaccount storage with one that supports pods
 	var serviceAccountStorage *serviceaccountstore.REST
-	if p.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.Authorizer, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeStorage.Node.Store,
+	serviceAccountEnabled := apiResourceConfigSource.ResourceEnabled(serviceAccountsResource)
+	if p.ServiceAccountIssuer != nil && serviceAccountEnabled {
+		var secretGetter rest.Getter
+		var internalSecretStorage *secretstore.REST
+		if secretStorage, ok := storage["secrets"]; ok {
+			var ok bool
+			secretGetter, ok = secretStorage.(rest.Getter)
+			if !ok {
+				return genericapiserver.APIGroupInfo{}, fmt.Errorf("secrets storage does not implement rest.Getter")
+			}
+		} else {
+			internalSecretStorage, err = secretstore.NewREST(restOptionsGetter)
+			if err != nil {
+				return genericapiserver.APIGroupInfo{}, err
+			}
+			secretGetter = internalSecretStorage.Store
+		}
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.Authorizer, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, secretGetter, nodeStorage.Node.Store,
 			whClient.ValidatingWebhookConfigurations(), whClient.MutatingWebhookConfigurations(), p.ExtendExpiration, p.MaxExtendedExpiration)
 		if err != nil {
+			if internalSecretStorage != nil {
+				internalSecretStorage.Destroy()
+			}
 			return genericapiserver.APIGroupInfo{}, err
+		}
+		if internalSecretStorage != nil {
+			addStorageCleanup(serviceAccountStorage, internalSecretStorage)
 		}
 	}
 
@@ -271,7 +294,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	}
 
 	// use the storage for service account with pod support, built above
-	if resource := "serviceaccounts"; serviceAccountStorage != nil && apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "serviceaccounts"; serviceAccountStorage != nil && serviceAccountEnabled {
 		if _, ok := storage[resource]; ok {
 			return genericapiserver.APIGroupInfo{}, fmt.Errorf("%s storage was already built by the generic provider", resource)
 		}

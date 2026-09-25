@@ -29,12 +29,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/stretchr/testify/assert"
 
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
@@ -198,6 +200,44 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 	}
 }
 
+func TestLegacyRESTStorageWithSecretsDisabled(t *testing.T) {
+	_, etcdserver, apiserverCfg, _ := newInstance(t)
+	defer etcdserver.Terminate(t)
+
+	genericConfig := apiserverCfg.ControlPlane.NewCoreGenericConfig()
+	genericConfig.ServiceAccountIssuer = fakeTokenGenerator{}
+	storageProvider, err := corerest.New(corerest.Config{
+		GenericConfig: *genericConfig,
+		Proxy: corerest.ProxyConfig{
+			Transport:           apiserverCfg.ControlPlane.Extra.ProxyTransport,
+			KubeletClientConfig: apiserverCfg.Extra.KubeletClientConfig,
+		},
+		Services: corerest.ServicesConfig{
+			ClusterIPRange: apiserverCfg.Extra.ServiceIPRange,
+			NodePortRange:  apiserverCfg.Extra.ServiceNodePortRange,
+		},
+	}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+
+	resourceConfig := serverstorage.NewResourceConfig()
+	resourceConfig.EnableVersions(corev1.SchemeGroupVersion)
+	resourceConfig.DisableResources(corev1.SchemeGroupVersion.WithResource("secrets"))
+	apiGroupInfo, err := storageProvider.NewRESTStorage(resourceConfig, apiserverCfg.ControlPlane.Generic.RESTOptionsGetter)
+	if err != nil {
+		t.Fatalf("failed to create legacy REST storage: %v", err)
+	}
+
+	storage := apiGroupInfo.VersionedResourcesStorageMap[corev1.SchemeGroupVersion.Version]
+	if _, ok := storage["secrets"]; ok {
+		t.Error("secrets storage should not be served")
+	}
+	if _, ok := storage["serviceaccounts/token"]; !ok {
+		t.Error("serviceaccounts/token storage should be served")
+	}
+}
+
 func TestCertificatesRestStorageStrategies(t *testing.T) {
 	_, etcdserver, apiserverCfg, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
@@ -223,6 +263,12 @@ type fakeAuthorizer struct {
 	decision authorizer.Decision
 	reason   string
 	err      error
+}
+
+type fakeTokenGenerator struct{}
+
+func (fakeTokenGenerator) GenerateToken(context.Context, *jwt.Claims, interface{}) (string, error) {
+	return "", nil
 }
 
 func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
