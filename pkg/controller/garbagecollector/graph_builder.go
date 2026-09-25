@@ -18,6 +18,7 @@ package garbagecollector
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"slices"
@@ -752,6 +753,10 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 						"owner", observedIdentity,
 					)
 					gb.reportInvalidNamespaceOwnerRef(dep, observedIdentity.UID)
+				} else if ownerReferenceMatchesKind(dep.owners, existingNode.identity.OwnerReference, observedIdentity.OwnerReference) {
+					if err := gb.migrateOwnerReference(dep, existingNode.identity.OwnerReference, observedIdentity.OwnerReference); err != nil {
+						logger.V(2).Info("unable to migrate owner reference", "item", dep.identity, "owner", observedIdentity, "err", err)
+					}
 				}
 				gb.attemptToDelete.Add(dep)
 			}
@@ -887,6 +892,51 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 		}
 	}
 	return true
+}
+
+func ownerReferenceMatchesKind(owners []metav1.OwnerReference, oldOwner, newOwner metav1.OwnerReference) bool {
+	for _, owner := range owners {
+		if owner.UID == oldOwner.UID && owner.Kind == oldOwner.Kind && owner.Name == oldOwner.Name &&
+			owner.Kind == newOwner.Kind && owner.Name == newOwner.Name {
+			return true
+		}
+	}
+	return false
+}
+
+func (gb *GraphBuilder) migrateOwnerReference(dependent *node, oldOwner, newOwner metav1.OwnerReference) error {
+	dependentGVK := schema.FromAPIVersionAndKind(dependent.identity.APIVersion, dependent.identity.Kind)
+	mapping, err := gb.restMapper.RESTMapping(dependentGVK.GroupKind(), dependentGVK.Version)
+	if err != nil {
+		return err
+	}
+	var resourceClient metadata.ResourceInterface = gb.metadataClient.Resource(mapping.Resource)
+	if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+		resourceClient = resourceClient.Namespace(dependent.identity.Namespace)
+	}
+	accessor, err := resourceClient.Get(context.TODO(), dependent.identity.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	owners := make([]metav1.OwnerReference, len(accessor.OwnerReferences))
+	copy(owners, accessor.OwnerReferences)
+	for i := range owners {
+		if owners[i].UID == oldOwner.UID && owners[i].Kind == oldOwner.Kind && owners[i].APIVersion == oldOwner.APIVersion {
+			owners[i].APIVersion = newOwner.APIVersion
+		}
+	}
+	patch, err := json.Marshal(objectForPatch{ObjectMetaForPatch: ObjectMetaForPatch{
+		ResourceVersion: accessor.ResourceVersion,
+		OwnerReferences: owners,
+	}})
+	if err != nil {
+		return err
+	}
+	_, err = resourceClient.Patch(context.TODO(), dependent.identity.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+	if err == nil {
+		dependent.setOwners(owners)
+	}
+	return err
 }
 
 // partitionDependents divides the provided dependents into a list which have an ownerReference matching the provided identity,
