@@ -64,11 +64,6 @@ type PreferencesHandler interface {
 	Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error)
 }
 
-type cachedPreference struct {
-	value *config.Preference
-	read  bool
-}
-
 // Preferences stores the kuberc file coming either from environment variable
 // or file from set in flag or the default kuberc path.
 type Preferences struct {
@@ -76,8 +71,6 @@ type Preferences struct {
 
 	aliases map[string]struct{}
 	policy  clientcmdapi.PluginPolicy
-
-	cache cachedPreference
 }
 
 // NewPreferences returns initialized Preferences object.
@@ -102,10 +95,6 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 }
 
 func (p *Preferences) Read(args []string, errOut io.Writer) (*config.Preference, error) {
-	if p.cache.read {
-		return p.cache.value, nil
-	}
-
 	kubercPath, err := getExplicitKuberc(args)
 	if err != nil {
 		return nil, err
@@ -125,7 +114,6 @@ func (p *Preferences) Read(args []string, errOut io.Writer) (*config.Preference,
 		return nil, err
 	}
 
-	p.cache = cachedPreference{value: kuberc, read: true}
 	return kuberc, nil
 }
 
