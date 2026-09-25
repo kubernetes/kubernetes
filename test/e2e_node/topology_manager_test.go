@@ -1712,6 +1712,56 @@ func runNUMAPackingTest(ctx context.Context, f *framework.Framework, env numaAll
 	deletePodsAsync(ctx, f, map[string]*v1.Pod{busyPod.Name: busyPod, probePod.Name: probePod})
 }
 
+// runNUMAScopeSpreadingTest checks the documented interaction between
+// least-allocated and the topology manager scope. Hints are merged once per
+// container under the container scope but once per pod under the pod scope, so
+// the containers of a two-container pod are spread across NUMA nodes by the
+// former and kept together by the latter. See the "Interaction with Topology
+// Manager Scope" section of the KEP.
+//
+// Under the container scope the first container lands on the lowest-numbered
+// NUMA node, every node being idle and tied at the score floor, and lifts that
+// node above the floor, so least-allocated has to put the second container
+// somewhere else. Under the pod scope there is a single merge for the pod as a
+// whole, against a machine whose nodes are all still idle, so both containers
+// end up on whichever node the default tie-break picks.
+func runNUMAScopeSpreadingTest(ctx context.Context, f *framework.Framework, env numaAllocationTestEnv, scope string) {
+	// Both containers have to fit on one NUMA node together, otherwise the pod
+	// scope case is not admitted at all.
+	cpusPerCtn := env.cpusPerNUMA / 4
+
+	ginkgo.By(fmt.Sprintf("admitting a guaranteed pod with two containers asking for %d cpus each", cpusPerCtn))
+	pod, numaNodePerCtn := createGuPodAndGetNUMANodes(ctx, f, "gu-pod-two-cnt", []int{cpusPerCtn, cpusPerCtn}, env.numaNodes)
+
+	if scope == containerScopeTopology {
+		gomega.Expect(numaNodePerCtn[0]).ToNot(gomega.Equal(numaNodePerCtn[1]), "under the container scope least-allocated should have spread the two containers across NUMA nodes, both landed on %d", numaNodePerCtn[0])
+	} else {
+		gomega.Expect(numaNodePerCtn[0]).To(gomega.Equal(numaNodePerCtn[1]), "under the pod scope both containers should have shared one NUMA node, got %v", numaNodePerCtn)
+	}
+
+	deletePodsAsync(ctx, f, map[string]*v1.Pod{pod.Name: pod})
+}
+
+// runNUMAScopePackingTest checks that most-allocated co-locates the containers of
+// a pod on the NUMA node which is already the most allocated, under either
+// scope. Unlike spreading, packing does not pull the two scopes apart: the
+// container scope keeps sending containers to the busiest node, which is where
+// the pod scope places the pod as a whole anyway.
+func runNUMAScopePackingTest(ctx context.Context, f *framework.Framework, env numaAllocationTestEnv) {
+	cpusPerCtn := 1
+
+	busyPod, busyNode, idleNode := makeOneNUMANodeBusy(ctx, f, env)
+
+	ginkgo.By(fmt.Sprintf("admitting a guaranteed pod with two containers asking for %d cpu each", cpusPerCtn))
+	pod, numaNodePerCtn := createGuPodAndGetNUMANodes(ctx, f, "gu-pod-two-cnt", []int{cpusPerCtn, cpusPerCtn}, env.numaNodes)
+
+	for i, numaNode := range numaNodePerCtn {
+		gomega.Expect(numaNode).To(gomega.Equal(busyNode), "most-allocated should have packed container %d onto the most allocated NUMA node %d rather than the idle node %d", i, busyNode, idleNode)
+	}
+
+	deletePodsAsync(ctx, f, map[string]*v1.Pod{busyPod.Name: busyPod, pod.Name: pod})
+}
+
 func runNUMAAllocationStrategyTests(f *framework.Framework) {
 	var oldCfg *kubeletconfig.KubeletConfiguration
 	var err error
@@ -1727,9 +1777,11 @@ func runNUMAAllocationStrategyTests(f *framework.Framework) {
 
 			updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaAllocationStrategyOptions(topologymanager.NUMAAllocationStrategyLeastAllocated), true), true)
 			runNUMASpreadingTest(ctx, f, env, true)
+			runNUMAScopeSpreadingTest(ctx, f, env, scope)
 
 			updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaAllocationStrategyOptions(topologymanager.NUMAAllocationStrategyMostAllocated), true), true)
 			runNUMAPackingTest(ctx, f, env, true)
+			runNUMAScopePackingTest(ctx, f, env)
 
 			// Both fixtures must fall back to the default placement when the
 			// strategy is none, and when the alpha policy options are gated off.
