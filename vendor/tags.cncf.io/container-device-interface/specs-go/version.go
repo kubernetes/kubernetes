@@ -19,47 +19,46 @@ package specs
 import (
 	"fmt"
 	"strings"
-
-	"golang.org/x/mod/semver"
 )
 
+// CurrentVersion is the current version of the Spec.
+const CurrentVersion = "1.1.0"
+
 const (
-	// CurrentVersion is the current version of the Spec.
-	CurrentVersion = "1.1.0"
-
-	// vCurrent is the current version as a semver-comparable type
-	vCurrent version = "v" + CurrentVersion
-
 	// These represent the released versions of the CDI specification
-	v010 version = "v0.1.0"
-	v020 version = "v0.2.0"
-	v030 version = "v0.3.0"
-	v040 version = "v0.4.0"
-	v050 version = "v0.5.0"
-	v060 version = "v0.6.0"
-	v070 version = "v0.7.0"
-	v080 version = "v0.8.0"
-	v100 version = "v1.0.0"
-	v110 version = "v1.1.0"
+	v010 version = "0.1.0"
+	v020 version = "0.2.0"
+	v030 version = "0.3.0"
+	v040 version = "0.4.0"
+	v050 version = "0.5.0"
+	v060 version = "0.6.0"
+	v070 version = "0.7.0"
+	v080 version = "0.8.0"
+	v100 version = "1.0.0"
+	v110 version = "1.1.0"
 
 	// vEarliest is the earliest supported version of the CDI specification
 	vEarliest version = v030
 )
 
-// validSpecVersions stores a map of spec versions to functions to check the required versions.
+// validSpecVersions stores the known spec versions in newest-to-oldest order,
+// together with functions to check whether a version is required.
 // Adding new fields / spec versions requires that a `requiredFunc` be implemented and
-// this map be updated.
-var validSpecVersions = requiredVersionMap{
-	v010: nil,
-	v020: nil,
-	v030: nil,
-	v040: requiresV040,
-	v050: requiresV050,
-	v060: requiresV060,
-	v070: requiresV070,
-	v080: requiresV080,
-	v100: requiresV100,
-	v110: requiresV110,
+// this list be updated.
+var validSpecVersions = []struct {
+	version    version
+	isRequired requiredFunc
+}{
+	{v110, requiresV110},
+	{v100, requiresV100},
+	{v080, requiresV080},
+	{v070, requiresV070},
+	{v060, requiresV060},
+	{v050, requiresV050},
+	{v040, requiresV040},
+	{v030, nil},
+	{v020, nil},
+	{v010, nil},
 }
 
 // ValidateVersion checks whether the specified spec version is valid.
@@ -67,14 +66,15 @@ var validSpecVersions = requiredVersionMap{
 // the spec is inspected to determine whether the features used are available in specified
 // version.
 func ValidateVersion(spec *Spec) error {
-	if !validSpecVersions.isValidVersion(spec.Version) {
+	specVersion := newVersion(spec.Version)
+	if !isValidVersion(specVersion) {
 		return fmt.Errorf("invalid version %q", spec.Version)
 	}
 	minVersion, err := MinimumRequiredVersion(spec)
 	if err != nil {
 		return fmt.Errorf("could not determine minimum required version: %w", err)
 	}
-	if newVersion(minVersion).isGreaterThan(newVersion(spec.Version)) {
+	if versionIndex(version(minVersion)) < versionIndex(specVersion) {
 		return fmt.Errorf("the spec version must be at least v%v", minVersion)
 	}
 	return nil
@@ -82,64 +82,50 @@ func ValidateVersion(spec *Spec) error {
 
 // MinimumRequiredVersion determines the minimum spec version for the input spec.
 func MinimumRequiredVersion(spec *Spec) (string, error) {
-	minVersion := validSpecVersions.requiredVersion(spec)
-	return minVersion.String(), nil
+	minVersion := requiredVersion(spec)
+	return string(minVersion), nil
 }
 
-// version represents a semantic version string
+// version represents a CDI specification version.
 type version string
 
-// newVersion creates a version that can be used for semantic version comparisons.
+// newVersion normalizes a specification version by removing an optional leading v.
 func newVersion(v string) version {
-	return version("v" + strings.TrimPrefix(v, "v"))
-}
-
-// String returns the string representation of the version.
-// This trims a leading v if present.
-func (v version) String() string {
-	return strings.TrimPrefix(string(v), "v")
-}
-
-// isGreaterThan checks with a version is greater than the specified version.
-func (v version) isGreaterThan(o version) bool {
-	return semver.Compare(string(v), string(o)) > 0
-}
-
-// isLatest checks whether the version is the latest supported version
-func (v version) isLatest() bool {
-	return v == vCurrent
+	return version(strings.TrimPrefix(v, "v"))
 }
 
 type requiredFunc func(*Spec) bool
 
-type requiredVersionMap map[version]requiredFunc
-
 // isValidVersion checks whether the specified version is valid.
-// A version is valid if it is contained in the required version map.
-func (r requiredVersionMap) isValidVersion(specVersion string) bool {
-	_, ok := validSpecVersions[newVersion(specVersion)]
-
-	return ok
-}
-
-// requiredVersion returns the minimum version required for the given spec
-func (r requiredVersionMap) requiredVersion(spec *Spec) version {
-	minVersion := vEarliest
-
-	for v, isRequired := range validSpecVersions {
-		if isRequired == nil {
-			continue
-		}
-		if isRequired(spec) && v.isGreaterThan(minVersion) {
-			minVersion = v
-		}
-		// If we have already detected the latest version then no later version could be detected
-		if minVersion.isLatest() {
-			break
+// A version is valid if it is contained in the list of known spec versions.
+func isValidVersion(specVersion version) bool {
+	for _, known := range validSpecVersions {
+		if known.version == specVersion {
+			return true
 		}
 	}
+	return false
+}
 
-	return minVersion
+// requiredVersion returns the minimum version required for the given spec.
+func requiredVersion(spec *Spec) version {
+	for _, known := range validSpecVersions {
+		if known.isRequired != nil && known.isRequired(spec) {
+			return known.version
+		}
+	}
+	return vEarliest
+}
+
+// versionIndex returns the index of v in validSpecVersions, which is ordered
+// newest-to-oldest. It returns -1 for an unknown version.
+func versionIndex(v version) int {
+	for i, known := range validSpecVersions {
+		if known.version == v {
+			return i
+		}
+	}
+	return -1
 }
 
 // requiresV110 returns true if the spec uses v1.1.0 features.
@@ -209,23 +195,20 @@ func requiresV070(spec *Spec) bool {
 // requiresV060 returns true if the spec uses v0.6.0 features
 func requiresV060(spec *Spec) bool {
 	// The v0.6.0 spec allows annotations to be specified at a spec level
-	for range spec.Annotations {
+	if len(spec.Annotations) > 0 {
 		return true
 	}
 
 	// The v0.6.0 spec allows annotations to be specified at a device level
 	for _, d := range spec.Devices {
-		for range d.Annotations {
+		if len(d.Annotations) > 0 {
 			return true
 		}
 	}
 
 	// The v0.6.0 spec allows dots "." in Kind name label (class)
-	if !strings.Contains(spec.Kind, "/") {
-		return false
-	}
-	class := strings.SplitN(spec.Kind, "/", 2)[1]
-	return strings.Contains(class, ".")
+	_, class, ok := strings.Cut(spec.Kind, "/")
+	return ok && strings.Contains(class, ".")
 }
 
 // requiresV050 returns true if the spec uses v0.5.0 features

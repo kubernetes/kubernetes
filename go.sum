@@ -51,8 +51,8 @@ github.com/container-storage-interface/spec v1.13.0 h1:6ja3nYoACisewTPAAZkJ1pbf4
 github.com/container-storage-interface/spec v1.13.0/go.mod h1:fPZ7EFHYJwIwc9CMcoaT/yIhFTdToocYVtyafMG7EDM=
 github.com/containerd/containerd/api v1.12.0 h1:kuQm82SbDrCuO4n7hf2L8zsBtZLuympyq5X/VotfX2A=
 github.com/containerd/containerd/api v1.12.0/go.mod h1:EBcSzoi9Vl18cdODaXUCskf3D2NT8lsSXeZJnU5jIUc=
-github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
-github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
+github.com/containerd/log v0.2.0 h1:BewD/umNgVnoczglOpX8eRMyEy5t5iPlu5AIpnWDONc=
+github.com/containerd/log v0.2.0/go.mod h1:/M7L7CXKcPTfNC74XzaK+5H5KbO5+4lJVpuVI6vRLoM=
 github.com/containerd/ttrpc v1.2.10 h1:qQvy3mokhoXON7FXiOOc05O7Up6nrNj6amJF8urNvDc=
 github.com/containerd/ttrpc v1.2.10/go.mod h1:YrmEQKkMbBA4EM26AzVAIwHGIYgptkL4CJ/yVTaDyBE=
 github.com/containerd/typeurl/v2 v2.3.0 h1:HZHPhRWo5XMy3QGQoPrUzbW/2ckwjfweHmOwlkIrPAQ=
@@ -235,8 +235,8 @@ github.com/moby/spdystream v0.5.1 h1:9sNYeYZUcci9R6/w7KDaFWEWeV4LStVG78Mpyq/Zm/Y
 github.com/moby/spdystream v0.5.1/go.mod h1:xBAYlnt/ay+11ShkdFKNAG7LsyK/tmNBVvVOwrfMgdI=
 github.com/moby/sys/mountinfo v0.7.2 h1:1shs6aH5s4o5H2zQLn796ADW1wMrIwHsyJ2v9KouLrg=
 github.com/moby/sys/mountinfo v0.7.2/go.mod h1:1YOa8w8Ih7uW0wALDUgT1dTTSBrZ+HiBLGws92L2RU4=
-github.com/moby/sys/userns v0.1.0 h1:tVLXkFOxVu9A64/yh59slHVv9ahO9UIev4JZusOLG/g=
-github.com/moby/sys/userns v0.1.0/go.mod h1:IHUYgu/kao6N8YZlp9Cf444ySSvCmDlmzUcYfDHOl28=
+github.com/moby/sys/userns v0.2.1 h1:4OvdM7BcPkASbuouHsbW3aeMJSFlYDldBRnXVZhaRk8=
+github.com/moby/sys/userns v0.2.1/go.mod h1:IHUYgu/kao6N8YZlp9Cf444ySSvCmDlmzUcYfDHOl28=
 github.com/moby/term v0.5.2 h1:6qk3FJAFDs6i/q3W/pQ97SX192qKfZgGjCQqfCJkgzQ=
 github.com/moby/term v0.5.2/go.mod h1:d3djjFCrjnB+fl8NJux+EJzu0msscUP+f8it8hPkFLc=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
@@ -252,8 +252,8 @@ github.com/onsi/ginkgo/v2 v2.33.0 h1:C8gBA6Uc2ZEubiV+SXiu5tZnMTwEmXHgkJwGozKtZf8
 github.com/onsi/ginkgo/v2 v2.33.0/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
 github.com/onsi/gomega v1.43.1 h1:vGIPFuYrIO6/0Z09s0I0QQQgFchiX4+tb1re3MScJYo=
 github.com/onsi/gomega v1.43.1/go.mod h1:e/C2HwaZ1DhvjzXXuFhcR7hY7Sh9pl7MmoWKEjzwcdA=
-github.com/opencontainers/cgroups v0.0.7 h1:FqhggFhigAMgKKwy39jweWX3h7Ha6VBF/qNR6Sso3oc=
-github.com/opencontainers/cgroups v0.0.7/go.mod h1:hPBRvnBhLZueEN0eJyozMeM3HeFGYlZW9KnO//px6G4=
+github.com/opencontainers/cgroups v0.1.0 h1:6W05KiDvgj1yi/6D13SJCvYx8TAESz67szvHPxhfcrs=
+github.com/opencontainers/cgroups v0.1.0/go.mod h1:hPBRvnBhLZueEN0eJyozMeM3HeFGYlZW9KnO//px6G4=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
@@ -502,5 +502,5 @@ sigs.k8s.io/structured-merge-diff/v7 v7.0.0 h1:LnKTE1vO6tDITDMVOJ5oCsWauLIAPJnV9
 sigs.k8s.io/structured-merge-diff/v7 v7.0.0/go.mod h1:xKoMSgtnJnkfRR+CTNSQ1dBVhkKJR5OQl5RxX/OqHbI=
 sigs.k8s.io/yaml v1.6.0 h1:G8fkbMSAFqgEFgh4b1wmtzDnioxFCUgTZhlbj5P9QYs=
 sigs.k8s.io/yaml v1.6.0/go.mod h1:796bPqUfzR/0jLAl6XjHl3Ck7MiyVv8dbTdyT3/pMf4=
-tags.cncf.io/container-device-interface/specs-go v1.1.0 h1:QRZVeAceQM+zTZe12eyfuJuuzp524EKYwhmvLd+h+yQ=
-tags.cncf.io/container-device-interface/specs-go v1.1.0/go.mod h1:u86hoFWqnh3hWz3esofRFKbI261bUlvUfLKGrDhJkgQ=
+tags.cncf.io/container-device-interface/specs-go v1.1.1 h1:3xjaytilFeCBVFJsJTaT9uOFahoqJMVuYG7gYqi2+NY=
+tags.cncf.io/container-device-interface/specs-go v1.1.1/go.mod h1:BhJIkjjPh4qpys+qm4DAYtUyryaTDg9zris+AczXyws=

@@ -40,11 +40,11 @@ require (
 	github.com/ishidawataru/sctp v0.0.0-20250521072954-ae8eb7fa7995
 	github.com/lithammer/dedent v1.1.0
 	github.com/moby/ipvs v1.1.0
-	github.com/moby/sys/userns v0.1.0
+	github.com/moby/sys/userns v0.2.1
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.43.1
-	github.com/opencontainers/cgroups v0.0.7
+	github.com/opencontainers/cgroups v0.1.0
 	github.com/opencontainers/selinux v1.15.1
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/prometheus/client_model v0.6.2
@@ -123,7 +123,7 @@ require (
 	sigs.k8s.io/randfill v1.0.0
 	sigs.k8s.io/structured-merge-diff/v7 v7.0.0
 	sigs.k8s.io/yaml v1.6.0
-	tags.cncf.io/container-device-interface/specs-go v1.1.0
+	tags.cncf.io/container-device-interface/specs-go v1.1.1
 )
 
 require (
@@ -139,7 +139,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/containerd/containerd/api v1.12.0 // indirect
-	github.com/containerd/log v0.1.0 // indirect
+	github.com/containerd/log v0.2.0 // indirect
 	github.com/containerd/ttrpc v1.2.10 // indirect
 	github.com/coredns/caddy v1.1.1 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect

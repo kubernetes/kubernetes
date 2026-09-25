@@ -25,7 +25,7 @@ require (
 	k8s.io/kubelet v0.0.0
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
 	sigs.k8s.io/randfill v1.0.0
-	tags.cncf.io/container-device-interface/specs-go v1.1.0
+	tags.cncf.io/container-device-interface/specs-go v1.1.1
 )
 
 require (
@@ -69,7 +69,6 @@ require (
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
-	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
