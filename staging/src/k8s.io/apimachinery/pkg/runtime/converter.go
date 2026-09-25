@@ -150,6 +150,9 @@ type fromUnstructuredContext struct {
 	// the full path to each unknown field in the
 	// object.
 	unknownFieldErrors []error
+	// topLevelKeys, when non-nil, restricts top-level struct conversion to only
+	// fields present in topLevelKeys (leaving pre-populated DeepCopy fields intact).
+	topLevelKeys map[string]interface{}
 }
 
 // pushMatchedKeyTracker adds a placeholder set for tracking
@@ -237,6 +240,12 @@ func (c *fromUnstructuredContext) pushKey(key string) {
 // It uses encoding/json/Unmarshaler if object implements it or reflection if not.
 // It takes a validationDirective that indicates how to behave when it encounters unknown fields.
 func (c *unstructuredConverter) FromUnstructuredWithValidation(u map[string]interface{}, obj interface{}, returnUnknownFields bool) error {
+	return c.FromUnstructuredWithValidationTopLevel(u, obj, returnUnknownFields, nil)
+}
+
+// FromUnstructuredWithValidationTopLevel converts an object from map[string]interface{} representation into a concrete type.
+// When topLevelKeys is non-nil, top-level struct fields not present in topLevelKeys are left untouched on obj.
+func (c *unstructuredConverter) FromUnstructuredWithValidationTopLevel(u map[string]interface{}, obj interface{}, returnUnknownFields bool, topLevelKeys map[string]interface{}) error {
 	t := reflect.TypeOf(obj)
 	value := reflect.ValueOf(obj)
 	if t.Kind() != reflect.Pointer || value.IsNil() {
@@ -245,9 +254,10 @@ func (c *unstructuredConverter) FromUnstructuredWithValidation(u map[string]inte
 
 	fromUnstructuredContext := &fromUnstructuredContext{
 		returnUnknownFields: returnUnknownFields,
+		topLevelKeys:        topLevelKeys,
 	}
 	err := fromUnstructured(reflect.ValueOf(u), value.Elem(), fromUnstructuredContext)
-	if c.mismatchDetection {
+	if c.mismatchDetection && topLevelKeys == nil {
 		newObj := reflect.New(t.Elem()).Interface()
 		newErr := fromUnstructuredViaJSON(u, newObj)
 		if (err != nil) != (newErr != nil) {
@@ -555,15 +565,24 @@ func structFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) 
 			// the parentPath to indicate that we are one level
 			// deeper.
 			ctx.recordMatchedKey(fieldInfo.name)
+			if !svInlined && ctx.topLevelKeys != nil {
+				if _, ok := ctx.topLevelKeys[fieldInfo.name]; !ok {
+					continue
+				}
+			}
 			value := unwrapInterface(sv.MapIndex(fieldInfo.nameValue))
 			if value.IsValid() {
+				savedTopLevelKeys := ctx.topLevelKeys
+				ctx.topLevelKeys = nil
 				ctx.isInlined = false
 				ctx.pushKey(fieldInfo.name)
-				if err := fromUnstructured(value, fv, ctx); err != nil {
-					return err
-				}
+				err := fromUnstructured(value, fv, ctx)
 				ctx.parentPath = ctx.parentPath[:pathLen]
 				ctx.isInlined = svInlined
+				ctx.topLevelKeys = savedTopLevelKeys
+				if err != nil {
+					return err
+				}
 			} else {
 				fv.Set(reflect.Zero(fv.Type()))
 			}
@@ -611,6 +630,48 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 	}
 	if err != nil {
 		return nil, err
+	}
+	return u, nil
+}
+
+// ToUnstructuredTopLevel converts the top-level struct fields of obj into map[string]interface{},
+// only including fields whose json tags appear in topLevelKeys (plus inlined TypeMeta).
+func (c *unstructuredConverter) ToUnstructuredTopLevel(obj interface{}, topLevelKeys map[string]interface{}) (map[string]interface{}, error) {
+	t := reflect.TypeOf(obj)
+	value := reflect.ValueOf(obj)
+	if t.Kind() != reflect.Pointer || value.IsNil() {
+		return nil, fmt.Errorf("ToUnstructuredTopLevel requires a non-nil pointer to an object, got %v", t)
+	}
+	sv := value.Elem()
+	st := sv.Type()
+	if st.Kind() != reflect.Struct {
+		return c.ToUnstructured(obj)
+	}
+	u := make(map[string]interface{}, len(topLevelKeys)+2)
+	dv := reflect.ValueOf(&u).Elem()
+	for i := 0; i < st.NumField(); i++ {
+		fieldInfo := fieldInfoFromField(st, i)
+		if fieldInfo.name == "-" {
+			continue
+		}
+		fv := sv.Field(i)
+		if len(fieldInfo.name) == 0 {
+			if err := toUnstructured(fv, dv); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if _, ok := topLevelKeys[fieldInfo.name]; !ok {
+			continue
+		}
+		if (fieldInfo.omitempty && isEmpty(fv)) || (fieldInfo.omitzero != nil && fieldInfo.omitzero(fv)) {
+			continue
+		}
+		subv := reflect.New(dv.Type().Elem()).Elem()
+		if err := toUnstructured(fv, subv); err != nil {
+			return nil, err
+		}
+		dv.SetMapIndex(fieldInfo.nameValue, subv)
 	}
 	return u, nil
 }

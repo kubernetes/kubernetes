@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -562,28 +563,73 @@ func strategicPatchObject(
 	schemaReferenceObj runtime.Object,
 	validationDirective string,
 ) error {
-	originalObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(originalObject)
+	patchMap, strictErrs, err := decodePatchMap(patchBytes, validationDirective)
 	if err != nil {
 		return err
 	}
 
+	if canPruneTopLevelPatch(patchMap) {
+		reflect.ValueOf(objToUpdate).Elem().Set(reflect.ValueOf(originalObject.DeepCopyObject()).Elem())
+		var accessor metav1.Object
+		var savedManagedFields []metav1.ManagedFieldsEntry
+		if canSkipManagedFields(patchMap) {
+			if a, err := meta.Accessor(objToUpdate); err == nil {
+				accessor = a
+				savedManagedFields = accessor.GetManagedFields()
+				accessor.SetManagedFields(nil)
+			}
+		}
+		originalObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructuredTopLevel(objToUpdate, patchMap)
+		if err != nil {
+			return err
+		}
+		return applyPatchToObject(requestContext, defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs, validationDirective, patchMap, accessor, savedManagedFields)
+	}
+
+	originalObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(originalObject)
+	if err != nil {
+		return err
+	}
+	return applyPatchToObject(requestContext, defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs, validationDirective, nil, nil, nil)
+}
+
+func canPruneTopLevelPatch(patchMap map[string]interface{}) bool {
+	for k := range patchMap {
+		if strings.HasPrefix(k, "$") {
+			return false
+		}
+	}
+	return true
+}
+
+func canSkipManagedFields(patchMap map[string]interface{}) bool {
+	metadataPatch, ok := patchMap["metadata"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	for k := range metadataPatch {
+		if k == "managedFields" || strings.HasPrefix(k, "$") {
+			return false
+		}
+	}
+	return true
+}
+
+func decodePatchMap(patchBytes []byte, validationDirective string) (map[string]interface{}, []error, error) {
 	patchMap := make(map[string]interface{})
 	var strictErrs []error
+	var err error
 	if validationDirective == metav1.FieldValidationWarn || validationDirective == metav1.FieldValidationStrict {
 		strictErrs, err = kjson.UnmarshalStrict(patchBytes, &patchMap)
 		if err != nil {
-			return errors.NewBadRequest(err.Error())
+			return nil, nil, errors.NewBadRequest(err.Error())
 		}
 	} else {
 		if err = kjson.UnmarshalCaseSensitivePreserveInts(patchBytes, &patchMap); err != nil {
-			return errors.NewBadRequest(err.Error())
+			return nil, nil, errors.NewBadRequest(err.Error())
 		}
 	}
-
-	if err := applyPatchToObject(requestContext, defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs, validationDirective); err != nil {
-		return err
-	}
-	return nil
+	return patchMap, strictErrs, nil
 }
 
 // applyPatch is called every time GuaranteedUpdate asks for the updated object,
@@ -760,6 +806,9 @@ func applyPatchToObject(
 	schemaReferenceObj runtime.Object,
 	strictErrs []error,
 	validationDirective string,
+	topLevelKeys map[string]interface{},
+	accessor metav1.Object,
+	savedManagedFields []metav1.ManagedFieldsEntry,
 ) error {
 	patchedObjMap, err := strategicpatch.StrategicMergeMapPatch(originalMap, patchMap, schemaReferenceObj)
 	if err != nil {
@@ -769,7 +818,11 @@ func applyPatchToObject(
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
 	converter := runtime.DefaultUnstructuredConverter
 	returnUnknownFields := validationDirective == metav1.FieldValidationWarn || validationDirective == metav1.FieldValidationStrict
-	if err := converter.FromUnstructuredWithValidation(patchedObjMap, objToUpdate, returnUnknownFields); err != nil {
+	err = converter.FromUnstructuredWithValidationTopLevel(patchedObjMap, objToUpdate, returnUnknownFields, topLevelKeys)
+	if accessor != nil {
+		accessor.SetManagedFields(savedManagedFields)
+	}
+	if err != nil {
 		strictError, isStrictError := runtime.AsStrictDecodingError(err)
 		switch {
 		case !isStrictError:
