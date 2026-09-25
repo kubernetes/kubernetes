@@ -106,8 +106,10 @@ type watchChan struct {
 	initialRev     int64
 	recursive      bool
 	progressNotify bool
-	// recordTimestamps enables wrapping watch events with decode timestamps and
-	// etcd client-side watch response buffer logging.
+	// recordTimestamps enables wrapping watch events with their storage-layer
+	// lifecycle timestamps (see storage.WatchEventTimestamps) for dispatch
+	// latency telemetry, and etcd client-side watch response buffer logging.
+	// Set only by the watch cache's ingest path.
 	recordTimestamps         bool
 	internalPred             storage.SelectionPredicate
 	ctx                      context.Context
@@ -464,7 +466,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 	}
 	if initialEventsEndBookmarkRequired {
 		wc.queueEvent(func() *event {
-			e := progressNotifyEvent(wc.initialRev)
+			e := progressNotifyEvent(wc.initialRev, time.Now())
 			e.isInitialEventsEndBookmark = true
 			return e
 		}())
@@ -484,6 +486,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
 	estimator := wc.getResourceSizeEstimator()
 	for wres := range wch {
+		receivedAt := time.Now()
 		if wres.Err() != nil {
 			err := wres.Err()
 			// If there is an error on server (e.g. compaction), the channel will return it before closed.
@@ -497,7 +500,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 			return
 		}
 		if wres.IsProgressNotify() {
-			wc.queueEvent(progressNotifyEvent(wres.Header.GetRevision()))
+			wc.queueEvent(progressNotifyEvent(wres.Header.GetRevision(), receivedAt))
 			metrics.RecordEtcdBookmark(wc.watcher.groupResource)
 			continue
 		}
@@ -512,7 +515,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 				}
 			}
 			metrics.RecordEtcdEvent(wc.watcher.groupResource)
-			parsedEvent, err := parseEvent(e)
+			parsedEvent, err := parseEvent(e, receivedAt)
 			if err != nil {
 				logWatchChannelErr(err)
 				// sendError doesn't guarantee that no more items will be put into resultChan.
@@ -666,6 +669,10 @@ func (wc *watchChan) acceptAll() bool {
 
 // transform transforms an event into a result for user if not filtered.
 func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
+	var decodeStartedAt time.Time
+	if wc.recordTimestamps {
+		decodeStartedAt = time.Now()
+	}
 	curObj, oldObj, err := wc.prepareObjs(e)
 	if err != nil {
 		klog.Errorf("failed to prepare current and previous objects: %v", err)
@@ -733,22 +740,29 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 		}
 	}
 	if res != nil && wc.recordTimestamps && !e.isInitialEvent {
-		res.Object = &timedWatchEvent{Object: res.Object, recordTime: e.recordTime}
+		res.Object = &timedWatchEvent{
+			Object: res.Object,
+			timestamps: storage.WatchEventTimestamps{
+				Received:      e.receivedAt,
+				DecodeStarted: decodeStartedAt,
+				Decoded:       time.Now(),
+			},
+		}
 	}
 	return res, nil
 }
 
-// timedWatchEvent wraps a decoded watch object with the timestamp at which the
-// storage layer decoded it, so the watch cache can measure end-to-end dispatch
-// latency. It exists only on the watch cache's ingest path (opened with
-// ListOptions.RecordTimestamps) and MUST be unwrapped by the watch cache before
-// the object is stored or serialized.
+// timedWatchEvent wraps a decoded watch object with the storage-layer
+// timestamps of its lifecycle, so the watch cache can measure per-stage and
+// end-to-end dispatch latency. It exists only on the watch cache's ingest path
+// (opened with ListOptions.RecordTimestamps) and MUST be unwrapped by the watch
+// cache before the object is stored or serialized.
 type timedWatchEvent struct {
 	runtime.Object
-	recordTime time.Time
+	timestamps storage.WatchEventTimestamps
 }
 
-var _ storage.WatchEventWithRecordTime = &timedWatchEvent{}
+var _ storage.WatchEventWithTimestamps = &timedWatchEvent{}
 
 func (t *timedWatchEvent) GetObjectMeta() metav1.Object {
 	m, _ := meta.Accessor(t.Object)
@@ -756,11 +770,11 @@ func (t *timedWatchEvent) GetObjectMeta() metav1.Object {
 }
 
 func (t *timedWatchEvent) DeepCopyObject() runtime.Object {
-	return &timedWatchEvent{Object: t.Object.DeepCopyObject(), recordTime: t.recordTime}
+	return &timedWatchEvent{Object: t.Object.DeepCopyObject(), timestamps: t.timestamps}
 }
 
-func (t *timedWatchEvent) RecordTime() time.Time {
-	return t.recordTime
+func (t *timedWatchEvent) Timestamps() storage.WatchEventTimestamps {
+	return t.timestamps
 }
 
 func (t *timedWatchEvent) Unwrap() runtime.Object {

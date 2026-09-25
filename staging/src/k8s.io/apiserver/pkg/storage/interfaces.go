@@ -338,22 +338,36 @@ type ListOptions struct {
 	// continues streaming events.
 	SendInitialEvents *bool
 	// RecordTimestamps requests that the storage layer wrap each emitted watch
-	// object in a WatchEventWithRecordTime carrying its decode timestamp, for dispatch
-	// latency telemetry. This is intended for internal clients only (the watch
-	// cache); external clients cannot set it. The watch cache strips the wrapper
-	// before storing or serializing the object, so it never reaches other watchers.
+	// object in a WatchEventWithTimestamps carrying the timestamps of its
+	// storage-layer lifecycle, for dispatch latency telemetry. This is intended
+	// for internal clients only (the watch cache); external clients cannot set
+	// it. The watch cache strips the wrapper before storing or serializing the
+	// object, so it never reaches other watchers.
 	RecordTimestamps bool
 }
 
-// WatchEventWithRecordTime wraps a runtime.Object with the timestamp at which the
-// storage layer decoded the corresponding watch event. It is produced by the
+// WatchEventTimestamps tracks storage queueing and decode latency before an
+// event reaches the watch cache.
+type WatchEventTimestamps struct {
+	// Received is when the backend response arrived. Events in the same response
+	// share a timestamp so queueing delays are included.
+	Received time.Time
+	// DecodeStarted is when event transformation and decoding began.
+	DecodeStarted time.Time
+	// Decoded is when transformation and decoding finished, just before sending
+	// the event to the result channel.
+	Decoded time.Time
+}
+
+// WatchEventWithTimestamps wraps a runtime.Object with the storage-layer
+// lifecycle timestamps of the corresponding watch event. It is produced by the
 // storage layer only when ListOptions.RecordTimestamps is set, and is consumed
 // and stripped by the watch cache before the underlying object is stored or
 // serialized. It is never sent to watch clients.
-type WatchEventWithRecordTime interface {
+type WatchEventWithTimestamps interface {
 	runtime.Object
-	// RecordTime returns the decode timestamp of the wrapped event.
-	RecordTime() time.Time
+	// Timestamps returns the storage-layer timestamps of the wrapped event.
+	Timestamps() WatchEventTimestamps
 	// Unwrap returns the underlying object.
 	Unwrap() runtime.Object
 }
