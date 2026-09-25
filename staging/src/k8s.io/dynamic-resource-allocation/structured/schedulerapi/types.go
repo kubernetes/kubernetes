@@ -17,6 +17,8 @@ limitations under the License.
 package schedulerapi
 
 import (
+	"strings"
+
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -95,8 +97,12 @@ type AllocatedState struct {
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.
 // This type is used in consumable capacity features and the scheduler.
-// ConsumedCapacity defines consumable capacity values
-type ConsumedCapacity map[resourceapi.QualifiedName]*resource.Quantity
+// ConsumedCapacity defines consumable capacity values.
+//
+// Keys are fully-qualified names, so capacity in different domains is never conflated
+// regardless of whether a name's domain was given explicitly or left implicit.
+// Values are pointers to support in-place updates, for example via Add.
+type ConsumedCapacity map[draapi.FullyQualifiedName]*resource.Quantity
 
 // NewConsumedCapacity creates a new ConsumedCapacity.
 // This function is used in consumable capacity features and the scheduler.
@@ -197,17 +203,50 @@ type DeviceConsumedCapacity struct {
 	ConsumedCapacity
 }
 
-// NewDeviceConsumedCapacity creates a new DeviceConsumedCapacity.
-// This function is used in consumable capacity features and the scheduler.
-// NewDeviceConsumedCapacity creates DeviceConsumedCapacity instance from device ID and its consumed capacity.
+// NewDeviceConsumedCapacity creates a new DeviceConsumedCapacity for deviceID from
+// consumedCapacity as found in a DeviceRequestAllocationResult.
+// Each key is resolved against deviceID.Driver so that the returned
+// DeviceConsumedCapacity, like the rest of the internal ConsumedCapacity tracking, is
+// always keyed by fully-qualified names.
+//
+// consumedCapacity is not guaranteed to be free of names that resolve to the same
+// fully-qualified name: a 1.37 allocator could persist both "cap" and "<driver>/cap" for a
+// device that published both. Resolving each name independently and inserting it into
+// normalized would then make the outcome depend on map iteration order, whichever entry
+// is visited last would win. To make the result deterministic, consumedCapacity is
+// iterated twice instead: the first pass only handles entries explicitly qualified with
+// deviceID.Driver, the second pass handles all other entries and skips any that would
+// collide with one already recorded in the first pass. This mirrors buildCapacity in
+// staging/src/k8s.io/dynamic-resource-allocation/cel/compile.go.
+//
+// Callers that already have a ConsumedCapacity (for example, the allocators
+// themselves, while computing what a request would consume) do not need this
+// conversion and can construct a DeviceConsumedCapacity directly instead.
 func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	allocatedCapacity := NewConsumedCapacity()
-	for name, quantity := range consumedCapacity {
-		allocatedCapacity[name] = &quantity
+	normalized := make(ConsumedCapacity, len(consumedCapacity))
+	driverPrefix := deviceID.Driver.String() + "/"
+	for name, val := range consumedCapacity {
+		identifier, ok := strings.CutPrefix(string(name), driverPrefix)
+		if !ok {
+			continue
+		}
+		normalized[draapi.FullyQualifiedName{Domain: deviceID.Driver, Identifier: draapi.MakeUniqueString(identifier)}] = new(val)
+	}
+	for name, val := range consumedCapacity {
+		if strings.HasPrefix(string(name), driverPrefix) {
+			continue // already handled above
+		}
+		key := draapi.MakeFullyQualifiedName(name, deviceID.Driver, draapi.MakeUniqueString)
+		if _, alreadyResolved := normalized[key]; alreadyResolved {
+			// An entry explicitly qualified with the driver's own domain takes
+			// precedence over this implicit one for the same identifier.
+			continue
+		}
+		normalized[key] = new(val)
 	}
 	return DeviceConsumedCapacity{
 		DeviceID:         deviceID,
-		ConsumedCapacity: allocatedCapacity,
+		ConsumedCapacity: normalized,
 	}
 }
 

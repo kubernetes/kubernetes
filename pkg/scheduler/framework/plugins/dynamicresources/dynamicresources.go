@@ -303,18 +303,24 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 // and never waits for their creation.
 func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
-	if !ok {
+	if !ok || len(pod.Spec.ResourceClaims) == 0 {
+		// An index function that returns an error panics the informer, so we
+		// tolerate an unexpected object type by indexing it under no keys.
+		//
+		// Return early without allocating the set when there are no
+		// resource claims.
 		return nil, nil
 	}
-	keySet := sets.New[string]()
+	keys := make([]string, 0, len(pod.Spec.ResourceClaims))
 	for _, podClaim := range pod.Spec.ResourceClaims {
 		claimName, _, err := resourceclaim.Name(pod, &podClaim)
 		if err != nil || claimName == nil {
 			continue
 		}
-		keySet.Insert(pod.Namespace + "/" + *claimName)
+		// Duplicates are fine for the indexer
+		keys = append(keys, pod.Namespace+"/"+*claimName)
 	}
-	return keySet.UnsortedList(), nil
+	return keys, nil
 }
 
 // preQueueingHint returns the pods affected by a ResourceClaim event.
@@ -345,6 +351,8 @@ func (pl *DynamicResources) preQueueingHint(logger klog.Logger, oldObj, newObj i
 	}
 	claim, ok := obj.(*resourceapi.ResourceClaim)
 	if !ok {
+		// Unexpected object type: we can't identify the affected pods, so
+		// conservatively evaluate all of them rather than returning an error.
 		return fwk.PreQueueingHintResult{AllPods: true}, nil
 	}
 	objs, err := pl.podIndexer.ByIndex(pl.podResourceClaimIndex, claim.Namespace+"/"+claim.Name)
@@ -353,6 +361,8 @@ func (pl *DynamicResources) preQueueingHint(logger klog.Logger, oldObj, newObj i
 	}
 	pods := make([]types.NamespacedName, 0, len(objs))
 	for _, obj := range objs {
+		// The indexer only ever stores *v1.Pod, so the cast always succeeds;
+		// the check is defensive.
 		if pod, ok := obj.(*v1.Pod); ok {
 			pods = append(pods, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace})
 		}

@@ -17,7 +17,7 @@ limitations under the License.
 package stable
 
 import (
-	resourceapi "k8s.io/api/resource/v1"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
 // sliceUsesCompatibilityGroups reports whether any device in the slice declares
@@ -30,7 +30,7 @@ import (
 // pool's other devices, too. Whether any of the devices are already allocated
 // is deliberately irrelevant, keeping the outcome independent of allocation
 // order. This lets the feature be enabled later without deleting pods.
-func sliceUsesCompatibilityGroups(slice *resourceapi.ResourceSlice) bool {
+func sliceUsesCompatibilityGroups(slice *draapi.ResourceSlice) bool {
 	for _, device := range slice.Spec.Devices {
 		for _, deviceCounterConsumption := range device.ConsumesCounters {
 			if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
@@ -43,8 +43,8 @@ func sliceUsesCompatibilityGroups(slice *resourceapi.ResourceSlice) bool {
 
 // slicesWithoutCompatibilityGroups returns the slices which do not match
 // sliceUsesCompatibilityGroups, preserving their order.
-func slicesWithoutCompatibilityGroups(slices []*resourceapi.ResourceSlice) []*resourceapi.ResourceSlice {
-	filtered := make([]*resourceapi.ResourceSlice, 0, len(slices))
+func slicesWithoutCompatibilityGroups(slices []*draapi.ResourceSlice) []*draapi.ResourceSlice {
+	filtered := make([]*draapi.ResourceSlice, 0, len(slices))
 	for _, slice := range slices {
 		if sliceUsesCompatibilityGroups(slice) {
 			continue
