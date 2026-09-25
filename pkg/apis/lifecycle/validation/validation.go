@@ -488,8 +488,28 @@ func ValidateEvictionStatusResponder(status, oldStatus *lifecycle.ResponderStatu
 	}
 
 	if oldStatus != nil && !validate.SemanticDeepEqual(status, oldStatus) && opts.responderState != lifecycle.ResponderStateActive {
-		// immutable; changes to the ResponderStatus are only allowed by the active responder or during initialization
+		// immutable; changes to the ResponderStatus are only allowed by the active responder
 		return append(allErrs, field.Invalid(fldPath, status, validation.FieldImmutableErrorMsg).WithOrigin("immutable"))
+	}
+
+	// First sync: non-active responders may only set name; active responders may only set
+	// name and startTime. Otherwise a racing writer can pre-populate completionTime and
+	// later skip heartbeat deadline checks that gate state transitions.
+	if oldStatus == nil {
+		allowed := lifecycle.ResponderStatus{Name: status.Name}
+		if opts.responderState == lifecycle.ResponderStateActive {
+			allowed.StartTime = status.StartTime
+		}
+		if !validate.SemanticDeepEqual(status, &allowed) {
+			msg := "can only set name during initialization when not active"
+			if opts.responderState == lifecycle.ResponderStateActive {
+				msg = "can only set name and startTime during initialization when active"
+			}
+			return append(allErrs, field.Invalid(fldPath, status, msg))
+		}
+		if opts.responderState != lifecycle.ResponderStateActive {
+			return allErrs
+		}
 	}
 
 	// name covered by DV
