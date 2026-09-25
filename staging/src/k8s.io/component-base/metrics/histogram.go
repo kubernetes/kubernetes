@@ -230,6 +230,37 @@ func (v *HistogramVec) ObserveSince(start time.Time, lvs ...string) func() {
 	}
 }
 
+// ExemplarMaxRunes is the maximum combined rune count of an exemplar's label names and values,
+// as enforced by Prometheus. Exceeding this causes ObserveWithExemplar to panic internally,
+// which ObserveWithExemplar (below) recovers from.
+const ExemplarMaxRunes = prometheus.ExemplarMaxRunes
+
+// ObserveWithExemplar records an observation on observer and, where supported, attaches
+// exemplarLabels as a Prometheus exemplar on that observation. This is useful for carrying a
+// small amount of high-cardinality context (e.g. a specific resource name) alongside a
+// low-cardinality metric, without growing the metric's own label set -- unlike labels,
+// exemplars don't add permanent time series.
+//
+// Falls back to a plain Observe if observer doesn't support exemplars (e.g. before the
+// underlying histogram is registered), or if attaching the exemplar fails for any reason (e.g.
+// the combined label length exceeds ExemplarMaxRunes) -- the observation itself must always be
+// recorded even if the exemplar can't be.
+func ObserveWithExemplar(observer ObserverMetric, value float64, exemplarLabels map[string]string) {
+	eo, ok := observer.(prometheus.ExemplarObserver)
+	if !ok {
+		observer.Observe(value)
+		return
+	}
+	defer func() {
+		// ObserveWithExemplar always records the observation itself before attempting to
+		// attach the exemplar (see client_golang's histogram.ObserveWithExemplar), so if
+		// attaching the exemplar panics (e.g. label validation), the observation already
+		// succeeded and there's nothing left to recover.
+		_ = recover()
+	}()
+	eo.ObserveWithExemplar(value, prometheus.Labels(exemplarLabels))
+}
+
 // Delete deletes the metric where the variable labels are the same as those
 // passed in as labels. It returns true if a metric was deleted.
 //

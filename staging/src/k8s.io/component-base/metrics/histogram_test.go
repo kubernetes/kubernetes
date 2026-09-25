@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -655,6 +656,155 @@ func TestHistogramVecWithExemplar(t *testing.T) {
 		default:
 			t.Fatalf("Got unexpected label %s", *l.Name)
 		}
+	}
+}
+
+func TestObserveWithExemplar(t *testing.T) {
+	// Arrange.
+	value := float64(10)
+
+	// ObserveWithExemplar is designed to be called on the result of WithLabelValues/With
+	// (as ObserveSince and the rest of this package's call sites do), which for a
+	// HistogramVec resolves to the underlying client_golang observer directly. Passing a
+	// *Histogram or *HistogramVec wrapper itself would not implement
+	// prometheus.ExemplarObserver and would silently fall back to a plain Observe -- see
+	// TestObserveWithExemplarFallsBackWithoutExemplarSupport.
+	histogramVec := NewHistogramVec(&HistogramOpts{
+		Name:    "observe_with_exemplar_test",
+		Help:    "helpless",
+		Buckets: []float64{100},
+	}, []string{"group"})
+
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.MustRegister(histogramVec)
+
+	// Act.
+	ObserveWithExemplar(histogramVec.WithLabelValues("foo"), value, map[string]string{"image_ref": "gcr.io/project/app:v1"})
+
+	// Assert.
+	mfs, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("Gather failed %v", err)
+	}
+	if len(mfs) != 1 {
+		t.Fatalf("Got %v metric families, Want: 1 metric family", len(mfs))
+	}
+
+	m := mfs[0].GetMetric()[0]
+
+	got := m.GetHistogram().GetSampleSum()
+	if got != value {
+		t.Fatalf("Got %f, wanted %f as the count", got, value)
+	}
+
+	buckets := m.GetHistogram().GetBucket()
+	if len(buckets) == 0 {
+		t.Fatalf("Got 0 buckets, wanted 1")
+	}
+
+	e := buckets[0].GetExemplar()
+	if e == nil {
+		t.Fatalf("Got nil exemplar, wanted an exemplar")
+	}
+
+	eLabels := e.GetLabel()
+	if len(eLabels) != 1 {
+		t.Fatalf("Got %v exemplar labels, wanted 1 exemplar label", len(eLabels))
+	}
+	if eLabels[0].GetName() != "image_ref" || eLabels[0].GetValue() != "gcr.io/project/app:v1" {
+		t.Fatalf("Got exemplar label %s=%s, wanted image_ref=gcr.io/project/app:v1", eLabels[0].GetName(), eLabels[0].GetValue())
+	}
+}
+
+// countingObserver is an ObserverMetric that does not implement prometheus.ExemplarObserver,
+// used to exercise ObserveWithExemplar's fallback path.
+type countingObserver struct {
+	value float64
+}
+
+func (c *countingObserver) Observe(v float64) {
+	c.value = v
+}
+
+func TestObserveWithExemplarFallsBackWithoutExemplarSupport(t *testing.T) {
+	obs := &countingObserver{}
+	ObserveWithExemplar(obs, 5, map[string]string{"foo": "bar"})
+	if obs.value != 5 {
+		t.Fatalf("Got %v, wanted 5 recorded via the plain Observe fallback", obs.value)
+	}
+}
+
+// TestObserveWithExemplarHistogramWrapperFallsBackSafely documents a real gotcha: passing the
+// *Histogram wrapper itself (rather than the result of WithLabelValues/With on a HistogramVec,
+// or the wrapper's own ObserverMetric field) does not implement prometheus.ExemplarObserver, so
+// the exemplar is silently dropped -- but the observation itself is still correctly recorded via
+// the plain Observe fallback, so this degrades safely rather than failing.
+func TestObserveWithExemplarHistogramWrapperFallsBackSafely(t *testing.T) {
+	value := float64(10)
+
+	histogram := NewHistogram(&HistogramOpts{
+		Name:    "observe_with_exemplar_wrapper_fallback_test",
+		Help:    "helpless",
+		Buckets: []float64{100},
+	})
+
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.MustRegister(histogram)
+
+	ObserveWithExemplar(histogram, value, map[string]string{"image_ref": "gcr.io/project/app:v1"})
+
+	mfs, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("Gather failed %v", err)
+	}
+
+	got := mfs[0].GetMetric()[0].GetHistogram().GetSampleSum()
+	if got != value {
+		t.Fatalf("Got %f, wanted %f -- the observation must still be recorded", got, value)
+	}
+
+	e := mfs[0].GetMetric()[0].GetHistogram().GetBucket()[0].GetExemplar()
+	if e != nil {
+		t.Fatalf("Got an exemplar, wanted nil -- *Histogram does not implement prometheus.ExemplarObserver, so no exemplar should be attached")
+	}
+}
+
+func TestObserveWithExemplarOversizedLabelDoesNotPanic(t *testing.T) {
+	// Exemplar labels exceeding ExemplarMaxRunes must not panic, and the observation
+	// itself must still be recorded even though the exemplar can't be attached.
+	value := float64(10)
+
+	histogramVec := NewHistogramVec(&HistogramOpts{
+		Name:    "observe_with_exemplar_oversized_test",
+		Help:    "helpless",
+		Buckets: []float64{100},
+	}, []string{"group"})
+
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.MustRegister(histogramVec)
+
+	ObserveWithExemplar(histogramVec.WithLabelValues("foo"), value, map[string]string{"image_ref": strings.Repeat("a", 500)})
+
+	mfs, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("Gather failed %v", err)
+	}
+
+	got := mfs[0].GetMetric()[0].GetHistogram().GetSampleSum()
+	if got != value {
+		t.Fatalf("Got %f, wanted %f -- the observation must still be recorded even if exemplar attachment fails", got, value)
 	}
 }
 
