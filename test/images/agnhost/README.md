@@ -211,6 +211,32 @@ Usage:
     kubectl exec test-agnhost -- /agnhost fake-gitserver
 ```
 
+### fake-metrics-server
+
+Starts an HTTPS server that implements the resource metrics API for testing
+Horizontal Pod Autoscaler (HPA). The server supports the `v1` and `v1beta1`
+versions of the `metrics.k8s.io` API group.
+
+The server exposes the following endpoints:
+
+- `/healthz` and `/readyz`: Health and readiness endpoints.
+- `GET /apis/metrics.k8s.io`: Discover the supported API versions.
+- `GET /apis/metrics.k8s.io/{version}`: Discover resources for an API version.
+- `GET /apis/metrics.k8s.io/{version}/namespaces/{namespace}/pods`: List the
+  configured Pod metrics in a namespace.
+- `POST /configure`: Replace the configured Pod metrics using a `metrics.k8s.io/v1`
+  `PodMetricsList` request body.
+
+The supported values for `{version}` are `v1` and `v1beta1`.
+
+The server generates self-signed TLS certificates automatically on startup.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost fake-metrics-server [--port <port>]
+```
+
 ### fake-registry-server
 
 Starts a fake OCI registry server that serves static image files. This can be used to test
