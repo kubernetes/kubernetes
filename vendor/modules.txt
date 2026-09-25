@@ -73,7 +73,7 @@ github.com/chai2010/gettext-go/po
 # github.com/container-storage-interface/spec v1.13.0
 ## explicit; go 1.25.0
 github.com/container-storage-interface/spec/lib/go/csi
-# github.com/containerd/containerd/api v1.12.0-rc.0
+# github.com/containerd/containerd/api v1.12.0
 ## explicit; go 1.25.0
 github.com/containerd/containerd/api/services/containers/v1
 github.com/containerd/containerd/api/services/tasks/v1
