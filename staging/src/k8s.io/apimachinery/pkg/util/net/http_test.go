@@ -200,6 +200,18 @@ func TestProxierWithNoProxyCIDR(t *testing.T) {
 			url:               "https://[2001:db8:1::1]:8443/api",
 			expectedDelegated: true,
 		},
+		{
+			name:              "IPv4 request with IPv6 CIDR",
+			noProxy:           "2001:db8::/48",
+			url:               "http://192.168.1.1/api",
+			expectedDelegated: true,
+		},
+		{
+			name:              "IPv4 request outside IPv4 CIDR",
+			noProxy:           "10.0.0.0/8",
+			url:               "http://192.168.1.1/api",
+			expectedDelegated: true,
+		},
 	}
 
 	for _, test := range testCases {
