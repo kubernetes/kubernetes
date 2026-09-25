@@ -27,6 +27,8 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestRecordDecodeError(t *testing.T) {
@@ -291,10 +293,27 @@ func TestStorageSizeCollector(t *testing.T) {
 }
 
 func TestUpdateStoreStats(t *testing.T) {
+	newObjectCounts.ClearState()
+	resourceSizeEstimate.ClearState()
+	defer func() {
+		newObjectCounts.ClearState()
+		newObjectCounts.Reset()
+		resourceSizeEstimate.ClearState()
+		resourceSizeEstimate.Reset()
+	}()
 	registry := metrics.NewKubeRegistry()
 	registry.Register(objectCounts)
-	registry.MustRegister(newObjectCounts)
-	registry.MustRegister(resourceSizeEstimate)
+	registry.CustomMustRegister(newObjectCounts)
+	registry.CustomMustRegister(resourceSizeEstimate)
+
+	staticTime := time.UnixMilli(1234567890000)
+	fakeClock := testingclock.NewFakePassiveClock(staticTime)
+	newObjectCounts.setClock(fakeClock)
+	resourceSizeEstimate.setClock(fakeClock)
+	defer func() {
+		newObjectCounts.setClock(clock.RealClock{})
+		resourceSizeEstimate.setClock(clock.RealClock{})
+	}()
 
 	testCases := []struct {
 		desc     string
@@ -307,12 +326,9 @@ func TestUpdateStoreStats(t *testing.T) {
 			desc:     "successful object count",
 			resource: schema.GroupResource{Group: "foo", Resource: "bar"},
 			stats:    storage.Stats{ObjectCount: 10},
-			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
 # TYPE apiserver_resource_objects gauge
-apiserver_resource_objects{group="foo",resource="bar"} 10
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
-# TYPE apiserver_resource_size_estimate_bytes gauge
-apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} -1
+apiserver_resource_objects{group="foo",resource="bar"} 10 1234567890000
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_storage_objects gauge
 apiserver_storage_objects{resource="bar.foo"} 10
@@ -322,12 +338,12 @@ apiserver_storage_objects{resource="bar.foo"} 10
 			desc:     "successful object count and size",
 			resource: schema.GroupResource{Group: "foo", Resource: "bar"},
 			stats:    storage.Stats{ObjectCount: 10, EstimatedAverageObjectSizeBytes: 10},
-			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
 # TYPE apiserver_resource_objects gauge
-apiserver_resource_objects{group="foo",resource="bar"} 10
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
+apiserver_resource_objects{group="foo",resource="bar"} 10 1234567890000
+# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
 # TYPE apiserver_resource_size_estimate_bytes gauge
-apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 100
+apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 100 1234567890000
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_storage_objects gauge
 apiserver_storage_objects{resource="bar.foo"} 10
@@ -337,12 +353,12 @@ apiserver_storage_objects{resource="bar.foo"} 10
 			desc:     "empty object count",
 			resource: schema.GroupResource{Group: "foo", Resource: "bar"},
 			stats:    storage.Stats{ObjectCount: 0, EstimatedAverageObjectSizeBytes: 0},
-			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
 # TYPE apiserver_resource_objects gauge
-apiserver_resource_objects{group="foo",resource="bar"} 0
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
+apiserver_resource_objects{group="foo",resource="bar"} 0 1234567890000
+# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
 # TYPE apiserver_resource_size_estimate_bytes gauge
-apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 0
+apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 0 1234567890000
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_storage_objects gauge
 apiserver_storage_objects{resource="bar.foo"} 0
@@ -352,15 +368,9 @@ apiserver_storage_objects{resource="bar.foo"} 0
 			desc:     "failed fetch",
 			resource: schema.GroupResource{Group: "foo", Resource: "bar"},
 			err:      errors.New("dummy"),
-			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
-# TYPE apiserver_resource_objects gauge
-apiserver_resource_objects{group="foo",resource="bar"} -1
-# HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+			want: `# HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_storage_objects gauge
 apiserver_storage_objects{resource="bar.foo"} -1
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
-# TYPE apiserver_resource_size_estimate_bytes gauge
-apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} -1
 `,
 		},
 	}
@@ -377,22 +387,38 @@ apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} -1
 }
 
 func TestDeleteStoreStats(t *testing.T) {
+	newObjectCounts.ClearState()
+	resourceSizeEstimate.ClearState()
+	defer func() {
+		newObjectCounts.ClearState()
+		newObjectCounts.Reset()
+		resourceSizeEstimate.ClearState()
+		resourceSizeEstimate.Reset()
+	}()
 	registry := metrics.NewKubeRegistry()
 	registry.MustRegister(objectCounts)
-	registry.MustRegister(newObjectCounts)
-	registry.MustRegister(resourceSizeEstimate)
+	registry.CustomMustRegister(newObjectCounts)
+	registry.CustomMustRegister(resourceSizeEstimate)
+
+	staticTime := time.UnixMilli(1234567890000)
+	fakeClock := testingclock.NewFakePassiveClock(staticTime)
+	newObjectCounts.setClock(fakeClock)
+	resourceSizeEstimate.setClock(fakeClock)
+	defer func() {
+		newObjectCounts.setClock(clock.RealClock{})
+		resourceSizeEstimate.setClock(clock.RealClock{})
+	}()
 
 	UpdateStoreStats(schema.GroupResource{Group: "foo1", Resource: "bar1"}, storage.Stats{ObjectCount: 10}, nil)
 	UpdateStoreStats(schema.GroupResource{Group: "foo2", Resource: "bar2"}, storage.Stats{ObjectCount: 20, EstimatedAverageObjectSizeBytes: 10}, nil)
 
-	expectedMetrics := `# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
-# TYPE apiserver_resource_size_estimate_bytes gauge
-apiserver_resource_size_estimate_bytes{group="foo1",resource="bar1"} -1
-apiserver_resource_size_estimate_bytes{group="foo2",resource="bar2"} 200
-# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+	expectedMetrics := `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
 # TYPE apiserver_resource_objects gauge
-apiserver_resource_objects{group="foo1",resource="bar1"} 10
-apiserver_resource_objects{group="foo2",resource="bar2"} 20
+apiserver_resource_objects{group="foo1",resource="bar1"} 10 1234567890000
+apiserver_resource_objects{group="foo2",resource="bar2"} 20 1234567890000
+# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# TYPE apiserver_resource_size_estimate_bytes gauge
+apiserver_resource_size_estimate_bytes{group="foo2",resource="bar2"} 200 1234567890000
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_storage_objects gauge
 apiserver_storage_objects{resource="bar1.foo1"} 10
@@ -404,12 +430,12 @@ apiserver_storage_objects{resource="bar2.foo2"} 20
 
 	DeleteStoreStats(schema.GroupResource{Group: "foo1", Resource: "bar1"})
 
-	expectedMetrics = `# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
-# TYPE apiserver_resource_size_estimate_bytes gauge
-apiserver_resource_size_estimate_bytes{group="foo2",resource="bar2"} 200
-# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+	expectedMetrics = `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
 # TYPE apiserver_resource_objects gauge
-apiserver_resource_objects{group="foo2",resource="bar2"} 20
+apiserver_resource_objects{group="foo2",resource="bar2"} 20 1234567890000
+# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# TYPE apiserver_resource_size_estimate_bytes gauge
+apiserver_resource_size_estimate_bytes{group="foo2",resource="bar2"} 200 1234567890000
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_storage_objects gauge
 apiserver_storage_objects{resource="bar2.foo2"} 20
@@ -421,10 +447,208 @@ apiserver_storage_objects{resource="bar2.foo2"} 20
 	DeleteStoreStats(schema.GroupResource{Group: "foo2", Resource: "bar2"})
 	expectedMetrics = `# HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
 # TYPE apiserver_storage_objects gauge
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.
-# TYPE apiserver_resource_size_estimate_bytes gauge
 `
 	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), "apiserver_storage_objects", "apiserver_resource_objects", "apiserver_resource_size_estimate_bytes"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestResourceObjectsPreservedOnError(t *testing.T) {
+	newObjectCounts.ClearState()
+	defer func() {
+		newObjectCounts.ClearState()
+		newObjectCounts.Reset()
+	}()
+	registry := metrics.NewKubeRegistry()
+	registry.CustomMustRegister(newObjectCounts)
+
+	t1 := time.UnixMilli(1000000000000)
+	t2 := time.UnixMilli(2000000000000)
+	t3 := time.UnixMilli(3000000000000)
+	fakeClock := testingclock.NewFakePassiveClock(t1)
+	newObjectCounts.setClock(fakeClock)
+	defer func() {
+		newObjectCounts.setClock(clock.RealClock{})
+	}()
+
+	gr := schema.GroupResource{Group: "foo", Resource: "bar"}
+	UpdateStoreStats(gr, storage.Stats{ObjectCount: 10}, nil)
+
+	wantT1 := `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
+# TYPE apiserver_resource_objects gauge
+apiserver_resource_objects{group="foo",resource="bar"} 10 1000000000000
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT1), "apiserver_resource_objects"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Advance time and simulate a failed stats update. The previous sample and timestamp (t1) should be preserved.
+	fakeClock.SetTime(t2)
+	UpdateStoreStats(gr, storage.Stats{}, errors.New("failed to fetch stats"))
+
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT1), "apiserver_resource_objects"); err != nil {
+		t.Fatalf("expected metric to retain previous value and timestamp on fetch error: %v", err)
+	}
+
+	// Successful update at t3 updates value and timestamp.
+	fakeClock.SetTime(t3)
+	UpdateStoreStats(gr, storage.Stats{ObjectCount: 20}, nil)
+	wantT3 := `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
+# TYPE apiserver_resource_objects gauge
+apiserver_resource_objects{group="foo",resource="bar"} 20 3000000000000
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT3), "apiserver_resource_objects"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestResourceObjectsRepeatedScrapes(t *testing.T) {
+	newObjectCounts.ClearState()
+	defer func() {
+		newObjectCounts.ClearState()
+		newObjectCounts.Reset()
+	}()
+	registry := metrics.NewKubeRegistry()
+	registry.CustomMustRegister(newObjectCounts)
+
+	t1 := time.UnixMilli(1000000000000)
+	t2 := time.UnixMilli(2000000000000)
+	t3 := time.UnixMilli(3000000000000)
+	fakeClock := testingclock.NewFakePassiveClock(t1)
+	newObjectCounts.setClock(fakeClock)
+	defer func() {
+		newObjectCounts.setClock(clock.RealClock{})
+	}()
+
+	gr := schema.GroupResource{Group: "foo", Resource: "bar"}
+	UpdateStoreStats(gr, storage.Stats{ObjectCount: 10}, nil)
+
+	wantT1 := `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
+# TYPE apiserver_resource_objects gauge
+apiserver_resource_objects{group="foo",resource="bar"} 10 1000000000000
+`
+	// First scrape at t1.
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT1), "apiserver_resource_objects"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Advance time to t2 without updating the metric. Scraper should receive the same value and original timestamp (t1).
+	fakeClock.SetTime(t2)
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT1), "apiserver_resource_objects"); err != nil {
+		t.Fatalf("expected metric to retain original value and timestamp when not updated: %v", err)
+	}
+
+	// Update at t3 updates value and timestamp.
+	fakeClock.SetTime(t3)
+	UpdateStoreStats(gr, storage.Stats{ObjectCount: 20}, nil)
+	wantT3 := `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
+# TYPE apiserver_resource_objects gauge
+apiserver_resource_objects{group="foo",resource="bar"} 20 3000000000000
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT3), "apiserver_resource_objects"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestResourceSizeEstimatePreservedOnError(t *testing.T) {
+	resourceSizeEstimate.ClearState()
+	defer func() {
+		resourceSizeEstimate.ClearState()
+		resourceSizeEstimate.Reset()
+	}()
+	registry := metrics.NewKubeRegistry()
+	registry.CustomMustRegister(resourceSizeEstimate)
+
+	t1 := time.UnixMilli(1000000000000)
+	t2 := time.UnixMilli(2000000000000)
+	t3 := time.UnixMilli(3000000000000)
+	fakeClock := testingclock.NewFakePassiveClock(t1)
+	resourceSizeEstimate.setClock(fakeClock)
+	defer func() {
+		resourceSizeEstimate.setClock(clock.RealClock{})
+	}()
+
+	gr := schema.GroupResource{Group: "foo", Resource: "bar"}
+	UpdateStoreStats(gr, storage.Stats{ObjectCount: 10, EstimatedAverageObjectSizeBytes: 10}, nil)
+
+	wantT1 := `# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# TYPE apiserver_resource_size_estimate_bytes gauge
+apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 100 1000000000000
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT1), "apiserver_resource_size_estimate_bytes"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Advance time and simulate a failed stats update. The previous sample and timestamp (t1) should be preserved.
+	fakeClock.SetTime(t2)
+	UpdateStoreStats(gr, storage.Stats{}, errors.New("failed to fetch stats"))
+
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT1), "apiserver_resource_size_estimate_bytes"); err != nil {
+		t.Fatalf("expected metric to retain previous value and timestamp on fetch error: %v", err)
+	}
+
+	// Successful update at t3 updates value and timestamp.
+	fakeClock.SetTime(t3)
+	UpdateStoreStats(gr, storage.Stats{ObjectCount: 20, EstimatedAverageObjectSizeBytes: 10}, nil)
+	wantT3 := `# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# TYPE apiserver_resource_size_estimate_bytes gauge
+apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 200 3000000000000
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT3), "apiserver_resource_size_estimate_bytes"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update with ObjectCount > 0 and EstimatedAverageObjectSizeBytes == 0 should also preserve the previous sample (t3).
+	UpdateStoreStats(gr, storage.Stats{ObjectCount: 5, EstimatedAverageObjectSizeBytes: 0}, nil)
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT3), "apiserver_resource_size_estimate_bytes"); err != nil {
+		t.Fatalf("expected metric to retain previous value and timestamp when average size is 0: %v", err)
+	}
+}
+
+func TestResourceSizeEstimateRepeatedScrapes(t *testing.T) {
+	resourceSizeEstimate.ClearState()
+	defer func() {
+		resourceSizeEstimate.ClearState()
+		resourceSizeEstimate.Reset()
+	}()
+	registry := metrics.NewKubeRegistry()
+	registry.CustomMustRegister(resourceSizeEstimate)
+
+	t1 := time.UnixMilli(1000000000000)
+	t2 := time.UnixMilli(2000000000000)
+	t3 := time.UnixMilli(3000000000000)
+	fakeClock := testingclock.NewFakePassiveClock(t1)
+	resourceSizeEstimate.setClock(fakeClock)
+	defer func() {
+		resourceSizeEstimate.setClock(clock.RealClock{})
+	}()
+
+	gr := schema.GroupResource{Group: "foo", Resource: "bar"}
+	UpdateStoreStats(gr, storage.Stats{ObjectCount: 10, EstimatedAverageObjectSizeBytes: 10}, nil)
+
+	wantT1 := `# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# TYPE apiserver_resource_size_estimate_bytes gauge
+apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 100 1000000000000
+`
+	// First scrape at t1.
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT1), "apiserver_resource_size_estimate_bytes"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Advance time to t2 without updating the metric. Scraper should receive the same value and original timestamp (t1).
+	fakeClock.SetTime(t2)
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT1), "apiserver_resource_size_estimate_bytes"); err != nil {
+		t.Fatalf("expected metric to retain original value and timestamp when not updated: %v", err)
+	}
+
+	// Update at t3 updates value and timestamp.
+	fakeClock.SetTime(t3)
+	UpdateStoreStats(gr, storage.Stats{ObjectCount: 20, EstimatedAverageObjectSizeBytes: 10}, nil)
+	wantT3 := `# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# TYPE apiserver_resource_size_estimate_bytes gauge
+apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 200 3000000000000
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantT3), "apiserver_resource_size_estimate_bytes"); err != nil {
 		t.Fatal(err)
 	}
 }

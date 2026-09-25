@@ -30,6 +30,7 @@ import (
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 /*
@@ -80,22 +81,24 @@ var (
 		},
 		[]string{"resource"},
 	)
-	resourceSizeEstimate = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_resource_size_estimate_bytes",
-			Help:           "Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
+	resourceSizeEstimateDesc = compbasemetrics.NewDesc(
+		"apiserver_resource_size_estimate_bytes",
+		"Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.",
 		[]string{"group", "resource"},
+		nil,
+		compbasemetrics.ALPHA,
+		"",
 	)
-	newObjectCounts = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_resource_objects",
-			Help:           "Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
+	resourceSizeEstimate = newTimestampedResourceGaugeCollector(resourceSizeEstimateDesc, clock.RealClock{})
+	resourceObjectsDesc  = compbasemetrics.NewDesc(
+		"apiserver_resource_objects",
+		"Number of stored objects at the time of last check split by kind.",
 		[]string{"group", "resource"},
+		nil,
+		compbasemetrics.ALPHA,
+		"",
 	)
+	newObjectCounts          = newTimestampedResourceGaugeCollector(resourceObjectsDesc, clock.RealClock{})
 	storageSizeDescription   = compbasemetrics.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"storage_cluster_id"}, nil, compbasemetrics.STABLE, "")
 	storageMonitor           = &monitorCollector{monitorGetter: func() ([]Monitor, error) { return nil, nil }}
 	etcdEventsReceivedCounts = compbasemetrics.NewCounterVec(
@@ -165,8 +168,8 @@ func Register() {
 		legacyregistry.MustRegister(etcdRequestCounts)
 		legacyregistry.MustRegister(etcdRequestErrorCounts)
 		legacyregistry.MustRegister(objectCounts)
-		legacyregistry.MustRegister(resourceSizeEstimate)
-		legacyregistry.MustRegister(newObjectCounts)
+		legacyregistry.CustomMustRegister(resourceSizeEstimate)
+		legacyregistry.CustomMustRegister(newObjectCounts)
 		legacyregistry.CustomMustRegister(storageMonitor)
 		legacyregistry.MustRegister(etcdEventsReceivedCounts)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
@@ -181,19 +184,13 @@ func Register() {
 func UpdateStoreStats(groupResource schema.GroupResource, stats storage.Stats, err error) {
 	if err != nil {
 		objectCounts.WithLabelValues(groupResource.String()).Set(-1)
-		newObjectCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
-		if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
-		}
 		return
 	}
 	objectCounts.WithLabelValues(groupResource.String()).Set(float64(stats.ObjectCount))
-	newObjectCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(stats.ObjectCount))
+	newObjectCounts.set(groupResource, stats.ObjectCount)
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		if stats.ObjectCount > 0 && stats.EstimatedAverageObjectSizeBytes == 0 {
-			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
-		} else {
-			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(stats.EstimatedAverageObjectSizeBytes * stats.ObjectCount))
+		if stats.ObjectCount == 0 || stats.EstimatedAverageObjectSizeBytes > 0 {
+			resourceSizeEstimate.set(groupResource, stats.EstimatedAverageObjectSizeBytes*stats.ObjectCount)
 		}
 	}
 }
@@ -201,9 +198,9 @@ func UpdateStoreStats(groupResource schema.GroupResource, stats storage.Stats, e
 // DeleteStoreStats delete the stats metrics.
 func DeleteStoreStats(groupResource schema.GroupResource) {
 	objectCounts.Delete(map[string]string{"resource": groupResource.String()})
-	newObjectCounts.Delete(map[string]string{"group": groupResource.Group, "resource": groupResource.Resource})
+	newObjectCounts.delete(groupResource)
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		resourceSizeEstimate.DeleteLabelValues(groupResource.Group, groupResource.Resource)
+		resourceSizeEstimate.delete(groupResource)
 	}
 }
 
@@ -245,6 +242,8 @@ func RecordDecodeError(groupResource schema.GroupResource) {
 // Reset resets the etcd_request_duration_seconds metric.
 func Reset() {
 	etcdRequestLatency.Reset()
+	newObjectCounts.Reset()
+	resourceSizeEstimate.Reset()
 }
 
 // sinceInSeconds gets the time since the specified start in seconds.
