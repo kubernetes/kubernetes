@@ -188,6 +188,10 @@ func unpackSVCBResource(msg []byte, off int, length uint16) (SVCBResource, error
 	paramsOff := off
 	bodyEnd := off + int(length)
 
+	if bodyEnd > len(msg) {
+		return SVCBResource{}, errResourceLen
+	}
+
 	var err error
 	if r.Priority, paramsOff, err = unpackUint16(msg, paramsOff); err != nil {
 		return SVCBResource{}, &nestedError{"Priority", err}
