@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	resourcehelper "k8s.io/component-helpers/resource"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -64,6 +65,13 @@ const (
 	minNumaNodesPreferClosestNUMA = 4
 	minCoreCount                  = 4
 	minSriovResource              = 7 // This is the min number of SRIOV VFs needed on the system under test.
+
+	// The numa-allocation-strategy fixtures need a NUMA node to hold a filler
+	// pod of cpusPerNUMA-1 cpus, and then, once the filler is gone, a busy pod
+	// of cpusPerNUMA/2 cpus and a probe pod of 2 cpus side by side, with one cpu
+	// to spare for the kubelet reserved cpus. 8 cpus per NUMA node is the
+	// smallest count which satisfies that.
+	minCPUsPerNUMAAllocationStrategy = 8
 )
 
 // Helper for makeTopologyManagerPod().
@@ -1512,6 +1520,206 @@ func runPreferClosestNUMATests(f *framework.Framework) {
 	})
 }
 
+// numaAllocationTestEnv describes the host the numa-allocation-strategy tests
+// size their pods against.
+type numaAllocationTestEnv struct {
+	numaNodes   int
+	cpusPerNUMA int
+}
+
+func numaAllocationStrategyPrecheck() numaAllocationTestEnv {
+	ginkgo.GinkgoHelper()
+
+	numaNodes := detectNUMANodes()
+	if numaNodes < minNumaNodes {
+		e2eskipper.Skipf("this test is intended to be run on a multi-node NUMA system")
+	}
+
+	cpus, err := getCPUsPerNUMANode(0)
+	framework.ExpectNoError(err)
+	cpusPerNUMA := len(cpus)
+	if cpusPerNUMA < minCPUsPerNUMAAllocationStrategy {
+		e2eskipper.Skipf("this test is intended to be run on a system with at least %d cpus per NUMA node", minCPUsPerNUMAAllocationStrategy)
+	}
+
+	// The pod sizes are derived from a single NUMA node's CPU count, so on an
+	// asymmetric machine they would be wrong for every node but the first.
+	for nodeNum := 1; nodeNum < numaNodes; nodeNum++ {
+		otherCPUs, err := getCPUsPerNUMANode(nodeNum)
+		framework.ExpectNoError(err)
+		if len(otherCPUs) != cpusPerNUMA {
+			e2eskipper.Skipf("this test is intended to be run on a system with a uniform cpu count per NUMA node, found %d on node 0 and %d on node %d", cpusPerNUMA, len(otherCPUs), nodeNum)
+		}
+	}
+
+	return numaAllocationTestEnv{
+		numaNodes:   numaNodes,
+		cpusPerNUMA: cpusPerNUMA,
+	}
+}
+
+// configureNUMAAllocationInKubelet returns a kubelet configuration running the
+// single-numa-node topology manager policy in the given scope. The alpha policy
+// options feature gate is set explicitly because numa-allocation-strategy and
+// numa-score-weights are alpha options: with the gate off the kubelet refuses to
+// start rather than ignoring them, so the gate-off baseline has to be run with
+// no options at all.
+//
+// The single-numa-node policy is used throughout so that every pod is aligned to
+// exactly one NUMA node and the node the topology manager picked can be read
+// straight off the container's cpuset.
+func configureNUMAAllocationInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, scope string, topologyOptions map[string]string, alphaOptionsEnabled bool) *kubeletconfig.KubeletConfiguration {
+	newCfg, _ := configureTopologyManagerInKubelet(oldCfg, topologymanager.PolicySingleNumaNode, scope, topologyOptions, nil, 0)
+	newCfg.FeatureGates[string(features.TopologyManagerPolicyAlphaOptions)] = alphaOptionsEnabled
+	return newCfg
+}
+
+func numaAllocationStrategyOptions(strategy string) map[string]string {
+	return map[string]string{topologymanager.NUMAAllocationStrategy: strategy}
+}
+
+// createGuPodAndGetNUMANode admits a guaranteed pod with a single container
+// asking for cpuCount exclusive CPUs, and returns it together with the NUMA node
+// the topology manager aligned it to.
+func createGuPodAndGetNUMANode(ctx context.Context, f *framework.Framework, podName string, cpuCount, numaNodes int) (*v1.Pod, int) {
+	ginkgo.GinkgoHelper()
+
+	coresReq := fmt.Sprintf("%dm", cpuCount*1000)
+	ctnAttrs := []tmCtnAttribute{
+		{
+			ctnName:    podName + "-cnt",
+			cpuRequest: coresReq,
+			cpuLimit:   coresReq,
+		},
+	}
+
+	framework.Logf("creating pod %s asking for %d cpus", podName, cpuCount)
+	pod := e2epod.NewPodClient(f).CreateSync(ctx, makeTopologyManagerTestPod(podName, ctnAttrs, nil))
+
+	numaUsed := getNUMANodesForContainer(ctx, f, pod, &pod.Spec.Containers[0], numaNodes)
+	numaList := numaUsed.UnsortedList()
+	gomega.Expect(numaList).To(gomega.HaveLen(1), "pod %s was expected to be aligned to a single NUMA node, got %v", podName, numaList)
+
+	framework.Logf("pod %s was aligned to NUMA node %d", podName, numaList[0])
+	return pod, numaList[0]
+}
+
+// runNUMASpreadingTest checks whether numa-allocation-strategy=least-allocated
+// steers a pod away from the NUMA node an earlier pod is already using.
+//
+// The first pod takes half a NUMA node, which is enough to lift that node's
+// score clear of the floor score of 1 that every idle node reports. The second
+// pod is small enough to fit either next to it or on an idle node. Without the
+// option the topology manager keeps it on the first pod's node, because
+// Narrowest settles the tie between two equally wide masks in favour of the
+// lowest-numbered NUMA node; with least-allocated it has to move elsewhere.
+func runNUMASpreadingTest(ctx context.Context, f *framework.Framework, env numaAllocationTestEnv, spreadingExpected bool) {
+	busyCPUs := env.cpusPerNUMA / 2
+
+	ginkgo.By(fmt.Sprintf("admitting a guaranteed pod asking for %d cpus, allocating half of one NUMA node", busyCPUs))
+	busyPod, busyNode := createGuPodAndGetNUMANode(ctx, f, "gu-pod-busy", busyCPUs, env.numaNodes)
+
+	ginkgo.By("admitting a guaranteed pod asking for 1 cpu, which fits both the allocated NUMA node and an idle one")
+	probePod, probeNode := createGuPodAndGetNUMANode(ctx, f, "gu-pod-probe", 1, env.numaNodes)
+
+	if spreadingExpected {
+		gomega.Expect(probeNode).ToNot(gomega.Equal(busyNode), "least-allocated should have spread the second pod away from the already allocated NUMA node %d", busyNode)
+	} else {
+		gomega.Expect(probeNode).To(gomega.Equal(busyNode), "without least-allocated the second pod should have stayed on NUMA node %d, the lowest-numbered node with room for it", busyNode)
+	}
+
+	deletePodsAsync(ctx, f, map[string]*v1.Pod{busyPod.Name: busyPod, probePod.Name: probePod})
+}
+
+// runNUMAPackingTest checks whether numa-allocation-strategy=most-allocated
+// steers a pod towards the NUMA node which is already the most allocated.
+//
+// The fixture has to work against the default tie-break rather than with it.
+// Narrowest settles a tie between two equally wide masks in favour of the
+// lowest-numbered NUMA node, and pods naturally fill the low-numbered nodes
+// first, so in a naive fixture most-allocated agrees with the baseline and the
+// test proves nothing. Instead:
+//
+//   - a filler pod takes all but one cpu of the first NUMA node;
+//   - a busy pod, too big for what the filler left behind, is pushed onto
+//     another node and becomes the only allocation on the machine that scores
+//     above the floor;
+//   - the filler is deleted, so the first node is idle again and is once more
+//     the node the default tie-break picks.
+//
+// A small probe pod then fits on either node. With most-allocated it has to land
+// on the busy node; without it, on the idle lowest-numbered one.
+func runNUMAPackingTest(ctx context.Context, f *framework.Framework, env numaAllocationTestEnv, packingExpected bool) {
+	// One cpu per node can be taken by the kubelet reserved cpus, so the filler
+	// asks for one less than the node holds and leaves at most one cpu behind.
+	// The busy pod asks for more than that, so it cannot fit alongside the
+	// filler; minCPUsPerNUMAAllocationStrategy keeps both it and the probe
+	// within what one node can hold.
+	fillerCPUs := env.cpusPerNUMA - 1
+	busyCPUs := env.cpusPerNUMA / 2
+	probeCPUs := 2
+
+	ginkgo.By(fmt.Sprintf("admitting a guaranteed filler pod asking for %d cpus, taking up all but one cpu of one NUMA node", fillerCPUs))
+	fillerPod, fillerNode := createGuPodAndGetNUMANode(ctx, f, "gu-pod-filler", fillerCPUs, env.numaNodes)
+
+	ginkgo.By(fmt.Sprintf("admitting a guaranteed pod asking for %d cpus, too many to fit beside the filler", busyCPUs))
+	busyPod, busyNode := createGuPodAndGetNUMANode(ctx, f, "gu-pod-busy", busyCPUs, env.numaNodes)
+	gomega.Expect(busyNode).ToNot(gomega.Equal(fillerNode), "the busy pod was expected to be pushed off NUMA node %d by the filler; had it landed there the most-allocated node would also be the default choice and the check below would prove nothing", fillerNode)
+
+	ginkgo.By(fmt.Sprintf("deleting the filler pod, leaving NUMA node %d idle and NUMA node %d the most allocated", fillerNode, busyNode))
+	deletePodSyncAndWait(ctx, f, fillerPod.Namespace, fillerPod.Name)
+
+	ginkgo.By(fmt.Sprintf("admitting a guaranteed pod asking for %d cpus, which fits both NUMA nodes", probeCPUs))
+	probePod, probeNode := createGuPodAndGetNUMANode(ctx, f, "gu-pod-probe", probeCPUs, env.numaNodes)
+
+	if packingExpected {
+		gomega.Expect(probeNode).To(gomega.Equal(busyNode), "most-allocated should have packed the last pod onto the most allocated NUMA node %d", busyNode)
+	} else {
+		gomega.Expect(probeNode).To(gomega.Equal(fillerNode), "without most-allocated the last pod should have landed on NUMA node %d, the lowest-numbered node with room for it", fillerNode)
+	}
+
+	deletePodsAsync(ctx, f, map[string]*v1.Pod{busyPod.Name: busyPod, probePod.Name: probePod})
+}
+
+func runNUMAAllocationStrategyTests(f *framework.Framework) {
+	var oldCfg *kubeletconfig.KubeletConfiguration
+	var err error
+
+	ginkgo.It("run the Topology Manager numa-allocation-strategy policy option test suite", func(ctx context.Context) {
+		env := numaAllocationStrategyPrecheck()
+
+		oldCfg, err = getCurrentKubeletConfig(ctx)
+		framework.ExpectNoError(err)
+
+		for _, scope := range []string{containerScopeTopology, podScopeTopology} {
+			ginkgo.By(fmt.Sprintf("running the numa-allocation-strategy tests with the %s topology manager scope", scope))
+
+			updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaAllocationStrategyOptions(topologymanager.NUMAAllocationStrategyLeastAllocated), true), true)
+			runNUMASpreadingTest(ctx, f, env, true)
+
+			updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaAllocationStrategyOptions(topologymanager.NUMAAllocationStrategyMostAllocated), true), true)
+			runNUMAPackingTest(ctx, f, env, true)
+
+			// Both fixtures must fall back to the default placement when the
+			// strategy is none, and when the alpha policy options are gated off.
+			updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaAllocationStrategyOptions(topologymanager.NUMAAllocationStrategyNone), true), true)
+			runNUMASpreadingTest(ctx, f, env, false)
+			runNUMAPackingTest(ctx, f, env, false)
+
+			updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, map[string]string{}, false), true)
+			runNUMASpreadingTest(ctx, f, env, false)
+			runNUMAPackingTest(ctx, f, env, false)
+		}
+	})
+
+	ginkgo.AfterEach(func(ctx context.Context) {
+		if oldCfg != nil {
+			// restore kubelet config
+			updateKubeletConfig(ctx, f, oldCfg, true)
+		}
+	})
+}
+
 func hostPrecheck() (int, int) {
 	// this is a very rough check. We just want to rule out system that does NOT have
 	// any SRIOV device. A more proper check will be done in runTopologyManagerPositiveTest
@@ -1548,6 +1756,9 @@ var _ = SIGDescribe("Topology Manager", framework.WithSerial(), feature.Topology
 	})
 	ginkgo.Context("With kubeconfig's prefer-closes-numa-nodes topologyOptions enabled run the Topology Manager tests", ginkgo.Label("PreferClosestNUMANodes"), func() {
 		runPreferClosestNUMATests(f)
+	})
+	ginkgo.Context("With kubeconfig's numa-allocation-strategy topologyOptions enabled run the Topology Manager tests", ginkgo.Label("NUMAAllocationStrategy"), func() {
+		runNUMAAllocationStrategyTests(f)
 	})
 })
 
