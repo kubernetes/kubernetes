@@ -83,7 +83,7 @@ github.com/containerd/containerd/api/types/task
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
-# github.com/containerd/ttrpc v1.2.9
+# github.com/containerd/ttrpc v1.2.10
 ## explicit; go 1.25.0
 github.com/containerd/ttrpc
 # github.com/coredns/caddy v1.1.1
