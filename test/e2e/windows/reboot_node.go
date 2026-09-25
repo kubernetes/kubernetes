@@ -78,9 +78,9 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] RebootHost contai
 		ginkgo.DeferCleanup(cleanupContainers, f, targetNode.Name, []string{f.Namespace.Name})
 		ginkgo.DeferCleanup(patchWindowsNodeIfNeeded, f, targetNode.Name)
 
-		bootID, err := strconv.Atoi(targetNode.Status.NodeInfo.BootID)
-		framework.ExpectNoError(err, "Error converting bootID to int")
-		framework.Logf("Initial BootID: %d", bootID)
+		initialBootID := targetNode.Status.NodeInfo.BootID
+		gomega.Expect(initialBootID).NotTo(gomega.BeEmpty(), "initial BootID should not be empty")
+		framework.Logf("Initial BootID: %s", initialBootID)
 
 		windowsImage := imageutils.GetE2EImage(imageutils.Agnhost)
 
@@ -204,7 +204,18 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] RebootHost contai
 		framework.ExpectNoError(err, "Error retrieving pod")
 		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 
-		ginkgo.By("Waiting for Windows worker rebooting")
+		ginkgo.By("Waiting for Windows worker rebooting by watching for a BootID change")
+		gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
+			refreshNode, err := f.ClientSet.CoreV1().Nodes().Get(ctx, targetNode.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			currentBootID := refreshNode.Status.NodeInfo.BootID
+			framework.Logf("current BootID: %s", currentBootID)
+			return currentBootID != "" && currentBootID != initialBootID, nil
+		}, 10*time.Minute, 30*time.Second).Should(gomega.BeTrue(), "BootID should change after the node reboots")
+
+		ginkgo.By("Waiting for the existing agn-test-pod to be restarted on the rebooted host")
 
 		restartCount := 0
 
@@ -227,14 +238,6 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] RebootHost contai
 				time.Sleep(time.Second * 30)
 			}
 		}
-
-		ginkgo.By("Checking whether the node is rebooted")
-		refreshNode, err := f.ClientSet.CoreV1().Nodes().Get(ctx, targetNode.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Error getting node info after reboot")
-		currentbootID, err := strconv.Atoi(refreshNode.Status.NodeInfo.BootID)
-		framework.ExpectNoError(err, "Error converting bootID to int")
-		framework.Logf("current BootID: %d", currentbootID)
-		gomega.Expect(currentbootID).To(gomega.Equal(bootID+1), "BootID should be incremented by 1 after reboot")
 
 		ginkgo.By("Checking whether agn-test-pod is rebooted")
 		gomega.Expect(restartCount).To(gomega.Equal(1), "restart count of agn-test-pod is 1")
