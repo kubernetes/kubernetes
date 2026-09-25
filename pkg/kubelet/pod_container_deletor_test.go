@@ -151,6 +151,37 @@ func TestGetContainersToDeleteInPod(t *testing.T) {
 	}
 }
 
+func TestGetContainersToDeleteInPodWithClockSkew(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	now := time.Now()
+	pod := kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:           kubecontainer.ContainerID{Type: "test", ID: "1"},
+				Name:         "bar",
+				CreatedAt:    now.Add(time.Hour),
+				RestartCount: 0,
+				State:        kubecontainer.ContainerStateExited,
+			},
+			{
+				ID:           kubecontainer.ContainerID{Type: "test", ID: "2"},
+				Name:         "bar",
+				CreatedAt:    now,
+				RestartCount: 1,
+				State:        kubecontainer.ContainerStateExited,
+			},
+		},
+	}
+
+	candidates := getContainersToDeleteInPod(logger, "", &pod, 1)
+	if len(candidates) != 1 {
+		t.Fatalf("expected 1 candidate, got %d", len(candidates))
+	}
+	if candidates[0].ID.ID != "1" {
+		t.Errorf("expected container 1 (lower RestartCount) to be deleted, got %s", candidates[0].ID.ID)
+	}
+}
+
 func TestGetContainersToDeleteInPodWithNoMatch(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	pod := kubecontainer.PodStatus{
