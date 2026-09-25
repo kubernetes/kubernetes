@@ -14,11 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cfssl gencert -initca root.csr.json | cfssljson -bare root
+set -o errexit
+set -o nounset
+set -o pipefail
 
-cfssl gencert -initca intermediate.csr.json | cfssljson -bare intermediate
-cfssl sign -ca root.pem -ca-key root-key.pem -config intermediate.config.json intermediate.csr | cfssljson -bare intermediate
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
-cfssl gencert -ca intermediate.pem -ca-key intermediate-key.pem -config client.config.json --profile=valid   client.csr.json | cfssljson -bare client-valid
-cfssl gencert -ca intermediate.pem -ca-key intermediate-key.pem -config client.config.json --profile=expired client.csr.json | cfssljson -bare client-expired
+# Requires smallstep step CLI 0.30.6. These commands sign locally without a step-ca server.
+# Unencrypted keys and long lifetimes are only suitable for test fixtures.
+flags=(--kty EC --curve P-256 --no-password --insecure --force)
 
+step certificate create Root-CA root.pem root-key.pem \
+  --template root.template.json --not-after 876000h "${flags[@]}"
+step certificate create Intermediate-CA intermediate.pem intermediate-key.pem \
+  --ca root.pem --ca-key root-key.pem --template intermediate.template.json \
+  --not-after 876000h "${flags[@]}"
+step certificate create "My Client" client-valid.pem client-valid-key.pem \
+  --ca intermediate.pem --ca-key intermediate-key.pem --template client.template.json \
+  --not-after 876000h "${flags[@]}"
+# Keep the zero-length validity interval used by the expired-certificate tests.
+step certificate create "My Client" client-expired.pem client-expired-key.pem \
+  --ca intermediate.pem --ca-key intermediate-key.pem --template client.template.json \
+  --not-before 1990-12-31T23:59:00Z --not-after 1990-12-31T23:59:00Z "${flags[@]}"

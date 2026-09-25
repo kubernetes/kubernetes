@@ -1,6 +1,11 @@
 {
-    "CN": "Server-CA",
-    "ca": {
-        "expiry": "876000h"
+    "subject": {
+        "commonName": "Server-CA"
+    },
+    "sans": [],
+    "keyUsage": ["certSign", "crlSign"],
+    "basicConstraints": {
+        "isCA": true,
+        "maxPathLen": -1
     }
 }

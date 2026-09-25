@@ -371,22 +371,20 @@ function find-release-tars() {
   fi
 }
 
-# Run the cfssl command to generates certificate files for etcd service, the
+# Run the step command to generate certificate files for the etcd service; the
 # certificate files will save in $1 directory.
 #
 # Optional vars:
 #   GEN_ETCD_CA_CERT (CA cert encode with base64 and ZIP compression)
 #   GEN_ETCD_CA_KEY (CA key encode with base64)
-#   ca_cert (require when GEN_ETCD_CA_CERT and GEN_ETCD_CA_KEY is set)
-#   ca_key (require when GEN_ETCD_CA_CERT and GEN_ETCD_CA_KEY is set)
-# If GEN_ETCD_CA_CERT or GEN_ETCD_CA_KEY is not specified, it will generates certs for CA.
+# If no CA is supplied, reuse the existing CA files or generate a new CA.
 #
 # Args:
 #   $1 (the directory that certificate files to save)
 #   $2 (the ip of etcd member)
 #   $3 (the type of etcd certificates, must be one of client, server, peer)
 #   $4 (the prefix of the certificate filename, default is $3)
-function generate-etcd-cert() {
+function generate-etcd-cert() (
   local cert_dir=${1}
   local member_ip=${2}
   local type_cert=${3}
@@ -395,101 +393,35 @@ function generate-etcd-cert() {
   local GEN_ETCD_CA_CERT=${GEN_ETCD_CA_CERT:-}
   local GEN_ETCD_CA_KEY=${GEN_ETCD_CA_KEY:-}
 
-  mkdir -p "${cert_dir}"
-  pushd "${cert_dir}"
+  umask 077
+  mkdir -p "${cert_dir}" || return 1
+  cd "${cert_dir}" || return 1
 
-  kube::util::ensure-cfssl .
-
-  if [ ! -r "ca-config.json" ]; then
-    cat >ca-config.json <<EOF
-{
-    "signing": {
-        "default": {
-            "expiry": "43800h"
-        },
-        "profiles": {
-            "server": {
-                "expiry": "43800h",
-                "usages": [
-                    "signing",
-                    "key encipherment",
-                    "server auth",
-                    "client auth"
-                ]
-            },
-            "client": {
-                "expiry": "43800h",
-                "usages": [
-                    "signing",
-                    "key encipherment",
-                    "client auth"
-                ]
-            },
-            "peer": {
-                "expiry": "43800h",
-                "usages": [
-                    "signing",
-                    "key encipherment",
-                    "server auth",
-                    "client auth"
-                ]
-            }
-        }
-    }
-}
-EOF
-  fi
-
-  if [ ! -r "ca-csr.json" ]; then
-    cat >ca-csr.json <<EOF
-{
-    "CN": "Kubernetes",
-    "key": {
-        "algo": "ecdsa",
-        "size": 256
-    },
-    "names": [
-        {
-            "C": "US",
-            "L": "CA",
-            "O": "kubernetes.io"
-        }
-    ]
-}
-EOF
-  fi
+  kube::util::ensure-step . || return 1
 
   if [[ -n "${GEN_ETCD_CA_CERT}" && -n "${GEN_ETCD_CA_KEY}" ]]; then
-    # ca_cert and ca_key are optional external vars supplied in cluster/gce/util.sh,
-    # so it's ok to disable shellcheck here
-    # shellcheck disable=SC2154
-    echo "${ca_cert}" | base64 --decode | gunzip > ca.pem
-    # shellcheck disable=SC2154
-    echo "${ca_key}" | base64 --decode > ca-key.pem
+    echo "${GEN_ETCD_CA_CERT}" | base64 --decode | gunzip > ca.pem || return 1
+    touch ca-key.pem && chmod 600 ca-key.pem || return 1
+    echo "${GEN_ETCD_CA_KEY}" | base64 --decode > ca-key.pem || return 1
   fi
 
   if [[ ! -r "ca.pem" || ! -r "ca-key.pem" ]]; then
-    ${CFSSL_BIN} gencert -initca ca-csr.json | ${CFSSLJSON_BIN} -bare ca -
+    "${STEP_BIN}" certificate create Kubernetes ca.pem ca-key.pem \
+      --template "${KUBE_ROOT}/cluster/etcd-ca-template.json" \
+      --kty EC --curve P-256 --not-after 43800h --no-password --insecure --force || return 1
   fi
 
+  local subject="${member_ip}"
+  local -a cert_args
   case "${type_cert}" in
     client)
       echo "Generate client certificates..."
-      echo '{"CN":"client","hosts":["*"],"key":{"algo":"ecdsa","size":256}}' \
-       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client - \
-       | ${CFSSLJSON_BIN} -bare "${prefix}"
+      subject=client
+      cert_args=(--san '*' --set 'extKeyUsage=["clientAuth"]')
       ;;
-    server)
-      echo "Generate server certificates..."
-      echo '{"CN":"'"${member_ip}"'","hosts":[],"key":{"algo":"ecdsa","size":256}}' \
-       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server -hostname="${member_ip},127.0.0.1" - \
-       | ${CFSSLJSON_BIN} -bare "${prefix}"
-      ;;
-    peer)
-      echo "Generate peer certificates..."
-      echo '{"CN":"'"${member_ip}"'","hosts":[],"key":{"algo":"ecdsa","size":256}}' \
-       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=peer -hostname="${member_ip},127.0.0.1" - \
-       | ${CFSSLJSON_BIN} -bare "${prefix}"
+    server|peer)
+      echo "Generate ${type_cert} certificates..."
+      cert_args=(--san "${member_ip}" --san 127.0.0.1 --set 'extKeyUsage=["serverAuth","clientAuth"]')
       ;;
     *)
       echo "Unknow, unsupported etcd certs type: ${type_cert}" >&2
@@ -497,10 +429,11 @@ EOF
       exit 2
   esac
 
-  # the popd will access `directory stack`, no `real` parameters is actually needed
-  # shellcheck disable=SC2119
-  popd
-}
+  "${STEP_BIN}" certificate create "${subject}" "${prefix}.pem" "${prefix}-key.pem" \
+    --ca ca.pem --ca-key ca-key.pem --template "${KUBE_ROOT}/cluster/etcd-leaf-template.json" \
+    --kty EC --curve P-256 --not-after 43800h --no-password --insecure --force \
+    "${cert_args[@]}" || return 1
+)
 
 # Check whether required binaries exist, prompting to download
 # if missing.

@@ -1,4 +1,11 @@
 {
-    "CN": "test-service2.test-ns.svc",
-    "hosts": ["test-service2.test-ns.svc"]
+    "subject": {
+        "commonName": "test-service2.test-ns.svc"
+    },
+    "dnsNames": ["test-service2.test-ns.svc"],
+    "keyUsage": ["digitalSignature", "keyEncipherment"],
+    "extKeyUsage": ["serverAuth"],
+    "basicConstraints": {
+        "isCA": false
+    }
 }

@@ -1,0 +1,12 @@
+{
+    "subject": {
+        "commonName": "Intermediate-CA"
+    },
+    "sans": [],
+    "keyUsage": ["digitalSignature", "keyEncipherment", "certSign", "crlSign"],
+    "extKeyUsage": ["clientAuth"],
+    "basicConstraints": {
+        "isCA": true,
+        "maxPathLen": -1
+    }
+}
