@@ -17,6 +17,7 @@ limitations under the License.
 package mutatingwebhookconfiguration
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,9 +28,34 @@ import (
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
+func TestMutatingWebhookConfigurationStrategy(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	if Strategy.NamespaceScoped() {
+		t.Error("MutatingWebhookConfiguration strategy must be cluster scoped")
+	}
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
+		t.Errorf("MutatingWebhookConfiguration should not allow create on update")
+	}
+
+	configuration := validMutatingWebhookConfiguration()
+	Strategy.PrepareForCreate(ctx, configuration)
+	errs := Strategy.Validate(ctx, configuration)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error validating %v", errs)
+	}
+	invalidConfiguration := &admissionregistration.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: ""},
+	}
+	Strategy.PrepareForUpdate(ctx, invalidConfiguration, configuration)
+	errs = Strategy.ValidateUpdate(ctx, invalidConfiguration, configuration)
+	if len(errs) == 0 {
+		t.Errorf("Expected a validation error")
+	}
+}
 func validMutatingWebhookConfiguration() *admissionregistration.MutatingWebhookConfiguration {
 	ignore := admissionregistration.Ignore
 	exact := admissionregistration.Exact
+	never := admissionregistration.NeverReinvocationPolicy
 	thirty := int32(30)
 	none := admissionregistration.SideEffectClassNone
 	servicePath := "/"
@@ -49,11 +75,12 @@ func validMutatingWebhookConfiguration() *admissionregistration.MutatingWebhookC
 			},
 			FailurePolicy:           &ignore,
 			MatchPolicy:             &exact,
+			ReinvocationPolicy:      &never,
 			TimeoutSeconds:          &thirty,
 			NamespaceSelector:       &metav1.LabelSelector{},
 			ObjectSelector:          &metav1.LabelSelector{},
 			SideEffects:             &none,
-			AdmissionReviewVersions: []string{"v1beta1"},
+			AdmissionReviewVersions: []string{"v1"},
 		}},
 	}
 }
