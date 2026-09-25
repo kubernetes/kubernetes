@@ -28,17 +28,17 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/klog/v2/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func newTokenCleaner(t *testing.T) (*TokenCleaner, *fake.Clientset, coreinformers.SecretInformer, error) {
-	tCtx := ktesting.Init(t)
+	logger, _ := ktesting.NewTestContext(t)
 	options := DefaultTokenCleanerOptions()
 	cl := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(cl, options.SecretResync)
 	secrets := informerFactory.Core().V1().Secrets()
-	tcc, err := NewTokenCleaner(tCtx, cl, secrets, options)
+	tcc, err := NewTokenCleaner(logger, cl, secrets, options)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -104,6 +104,7 @@ func TestCleanerNotExpired(t *testing.T) {
 }
 
 func TestCleanerExpiredAt(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	cleaner, cl, secrets, err := newTokenCleaner(t)
 	if err != nil {
 		t.Fatalf("error creating TokenCleaner: %v", err)
@@ -112,7 +113,7 @@ func TestCleanerExpiredAt(t *testing.T) {
 	secret := newTokenSecret("tokenID", "tokenSecret")
 	addSecretExpiration(secret, timeString(2*time.Second))
 	secrets.Informer().GetIndexer().Add(secret)
-	cleaner.enqueueSecrets(secret)
+	cleaner.enqueueSecrets(logger, secret)
 	expected := []core.Action{}
 	verifyFunc := func() {
 		cleaner.processNextWorkItem(context.TODO())
