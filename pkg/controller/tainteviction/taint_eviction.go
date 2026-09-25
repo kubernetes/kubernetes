@@ -69,6 +69,42 @@ type podUpdateItem struct {
 	nodeName     string
 }
 
+// podEvictionItem represents a single pod eviction that is waiting in the
+// durable rate-limited retry queue (podEvictionQueue). It carries the
+// original createdAt/fireAt timestamps from the timed worker that produced
+// it so that processPodEvictionRetry can determine whether the original
+// toleration window has already expired.
+type podEvictionItem struct {
+	podRef    NamespacedObject
+	createdAt time.Time // when the timed worker was originally created
+	fireAt    time.Time // when the timed worker was scheduled to fire
+}
+
+// podEvictionDecisionKind is the outcome of evaluating a pod against the
+// current set of NoExecute taints on its node.
+type podEvictionDecisionKind int
+
+const (
+	// podEvictionNone means the pod tolerates all taints indefinitely; no
+	// eviction action is needed.
+	podEvictionNone podEvictionDecisionKind = iota
+	// podEvictionNow means the pod does not tolerate at least one taint and
+	// must be deleted immediately.
+	podEvictionNow
+	// podEvictionLater means the pod tolerates all taints but only for a
+	// finite TolerationSeconds window; deletion should be scheduled for when
+	// that window expires.
+	podEvictionLater
+)
+
+type podEvictionDecision struct {
+	kind            podEvictionDecisionKind
+	startTime       time.Time
+	triggerTime     time.Time
+	keepExisting    bool
+	cancelScheduled bool
+}
+
 func hash(val string, max int) int {
 	hasher := fnv.New32a()
 	io.WriteString(hasher, val)
@@ -100,37 +136,61 @@ type Controller struct {
 	nodeUpdateChannels []chan nodeUpdateItem
 	podUpdateChannels  []chan podUpdateItem
 
-	nodeUpdateQueue workqueue.TypedInterface[nodeUpdateItem]
-	podUpdateQueue  workqueue.TypedInterface[podUpdateItem]
+	nodeUpdateQueue  workqueue.TypedInterface[nodeUpdateItem]
+	podUpdateQueue   workqueue.TypedInterface[podUpdateItem]
+	podEvictionQueue workqueue.TypedRateLimitingInterface[podEvictionItem]
+	podEvictionLock  sync.Mutex
+	// podEvictionTokens is the authoritative set of pod eviction retries
+	// currently in flight. It is keyed by NamespacedName.String() and
+	// guarded by podEvictionLock. A retry item in podEvictionQueue is
+	// considered valid only if its exact value is still present here.
+	podEvictionTokens map[string]podEvictionItem
 }
 
-func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName), controllerName string) func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
+func (tc *Controller) deletePodHandler() func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
 	return func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
-		ns := args.Object.Namespace
-		name := args.Object.Name
-		klog.FromContext(ctx).Info("Deleting pod", "controller", controllerName, "pod", args.Object)
-		if emitEventFunc != nil {
-			emitEventFunc(args.Object.NamespacedName)
-		}
+		klog.FromContext(ctx).Info("Deleting pod", "controller", tc.name, "pod", args.Object)
+		tc.emitPodDeletionEvent(args.Object.NamespacedName)
+
 		var err error
 		for i := 0; i < retries; i++ {
-			err = addConditionAndDeletePod(ctx, c, name, ns)
+			var deleted bool
+			deleted, err = tc.addConditionAndDeletePod(ctx, args.Object)
 			if err == nil {
-				metrics.PodDeletionsTotal.Inc()
-				metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt) * time.Second))
-				break
+				if deleted {
+					metrics.PodDeletionsTotal.Inc()
+					metrics.PodDeletionsLatency.Observe(time.Since(fireAt).Seconds())
+				}
+				return nil
 			}
 			time.Sleep(10 * time.Millisecond)
 		}
+		tc.addPodEvictionRetry(args.Object, args.CreatedAt, fireAt)
 		return err
 	}
 }
 
-func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, ns string) (err error) {
-	pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return err
+// addConditionAndDeletePod sets the DisruptionTarget pod condition and then
+// deletes the pod identified by podRef. It returns (true, nil) when the pod
+// was successfully deleted, (false, nil) when the pod was already gone or
+// otherwise does not need deletion (wrong UID, already terminating), and
+// (false, err) on a retryable failure. A NotFound error on the Delete call
+// is treated as a clean success — a concurrent deletion raced us to it.
+func (tc *Controller) addConditionAndDeletePod(ctx context.Context, podRef NamespacedObject) (bool, error) {
+	pod, err := tc.client.CoreV1().Pods(podRef.Namespace).Get(ctx, podRef.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return false, nil
 	}
+	if err != nil {
+		return false, err
+	}
+	if podRef.UID != "" && pod.UID != podRef.UID {
+		return false, nil
+	}
+	if pod.DeletionTimestamp != nil {
+		return false, nil
+	}
+
 	newStatus := pod.Status.DeepCopy()
 	updated := apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
 		Type:               v1.DisruptionTarget,
@@ -140,11 +200,98 @@ func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, 
 		Message:            "Taint manager: deleting due to NoExecute taint",
 	})
 	if updated {
-		if _, _, _, err := utilpod.PatchPodStatus(ctx, c, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
-			return err
+		if _, _, _, err := utilpod.PatchPodStatus(ctx, tc.client, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
+			return false, err
 		}
 	}
-	return c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
+	deleteOptions := metav1.DeleteOptions{}
+	if podRef.UID != "" {
+		deleteOptions.Preconditions = &metav1.Preconditions{UID: &podRef.UID}
+	}
+	if err := tc.client.CoreV1().Pods(podRef.Namespace).Delete(ctx, podRef.Name, deleteOptions); err != nil {
+		// A concurrent deletion between our Get and Delete means the pod is already
+		// gone; treat it as a success rather than a retryable failure.
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// addPodEvictionRetry registers a durable eviction retry for podRef and
+// enqueues it in the rate-limited podEvictionQueue. createdAt and fireAt
+// are the original timestamps from the timed worker that exhausted its
+// burst attempts; they are stored so that the retry path can determine
+// whether the pod's toleration window has already expired.
+//
+// If a newer retry is already registered for the same pod (higher createdAt),
+// the call is a no-op and returns (item, false). Otherwise the new item
+// replaces any stale entry and returns (item, true).
+func (tc *Controller) addPodEvictionRetry(podRef NamespacedObject, createdAt, fireAt time.Time) (podEvictionItem, bool) {
+	key := podRef.NamespacedName.String()
+	item := podEvictionItem{podRef: podRef, createdAt: createdAt, fireAt: fireAt}
+	tc.podEvictionLock.Lock()
+	if current, ok := tc.podEvictionTokens[key]; ok && item.createdAt.Before(current.createdAt) {
+		tc.podEvictionLock.Unlock()
+		return item, false
+	}
+	tc.podEvictionTokens[key] = item
+	tc.podEvictionLock.Unlock()
+
+	tc.podEvictionQueue.AddRateLimited(item)
+	return item, true
+}
+
+// cancelPodEvictionRetry removes any active retry token for nsName.
+// Returns true if a token was present and removed.
+func (tc *Controller) cancelPodEvictionRetry(nsName types.NamespacedName) bool {
+	key := nsName.String()
+	tc.podEvictionLock.Lock()
+	defer tc.podEvictionLock.Unlock()
+	if _, ok := tc.podEvictionTokens[key]; !ok {
+		return false
+	}
+	delete(tc.podEvictionTokens, key)
+	return true
+}
+
+// podEvictionRetryMatches reports whether item is still the current,
+// authoritative retry token for its pod. An item that has been superseded
+// by a newer producer or explicitly cancelled returns false and must be
+// discarded by the worker without performing any deletion.
+func (tc *Controller) podEvictionRetryMatches(item podEvictionItem) bool {
+	key := item.podRef.NamespacedName.String()
+	tc.podEvictionLock.Lock()
+	defer tc.podEvictionLock.Unlock()
+	current, ok := tc.podEvictionTokens[key]
+	return ok && current == item
+}
+
+// hasPodEvictionRetryForPod reports whether there is an active retry token
+// whose pod reference (including UID) matches podRef exactly. This is used
+// to avoid scheduling a duplicate timed eviction when a retry is already
+// in flight for the same pod object.
+func (tc *Controller) hasPodEvictionRetryForPod(podRef NamespacedObject) bool {
+	key := podRef.NamespacedName.String()
+	tc.podEvictionLock.Lock()
+	defer tc.podEvictionLock.Unlock()
+	current, ok := tc.podEvictionTokens[key]
+	return ok && current.podRef == podRef
+}
+
+// forgetPodEvictionRetry removes item from podEvictionTokens if and only if
+// it is still the current token (i.e. it has not been replaced by a newer
+// producer). This is the normal completion path: called after a successful
+// deletion or after deciding that no deletion is needed.
+func (tc *Controller) forgetPodEvictionRetry(item podEvictionItem) {
+	key := item.podRef.NamespacedName.String()
+	tc.podEvictionLock.Lock()
+	defer tc.podEvictionLock.Unlock()
+	current, ok := tc.podEvictionTokens[key]
+	if ok && current == item {
+		delete(tc.podEvictionTokens, key)
+	}
 }
 
 func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {
@@ -215,12 +362,17 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 			}
 			return pods, nil
 		},
-		taintedNodes: make(map[string][]v1.Taint),
+		taintedNodes:      make(map[string][]v1.Taint),
+		podEvictionTokens: make(map[string]podEvictionItem),
 
 		nodeUpdateQueue: workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[nodeUpdateItem]{Name: "noexec_taint_node"}),
 		podUpdateQueue:  workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[podUpdateItem]{Name: "noexec_taint_pod"}),
+		podEvictionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[podEvictionItem](),
+			workqueue.TypedRateLimitingQueueConfig[podEvictionItem]{Name: "noexec_taint_pod_eviction"},
+		),
 	}
-	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, tm.name))
+	tm.taintEvictionQueue = CreateWorkerQueue(tm.deletePodHandler())
 
 	_, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -293,6 +445,7 @@ func (tc *Controller) Run(ctx context.Context) {
 		logger.Info("Shutting down controller", "controller", tc.name)
 		tc.nodeUpdateQueue.ShutDown()
 		tc.podUpdateQueue.ShutDown()
+		tc.podEvictionQueue.ShutDown()
 		tc.taintEvictionQueue.CancelAndWait()
 		wg.Wait()
 	}()
@@ -351,7 +504,145 @@ func (tc *Controller) Run(ctx context.Context) {
 			tc.worker(ctx, i)
 		})
 	}
+	for range UpdateWorkerSize {
+		wg.Go(func() {
+			tc.podEvictionWorker(ctx)
+		})
+	}
 	<-ctx.Done()
+}
+
+// podEvictionWorker drains podEvictionQueue. For each item it verifies that
+// the retry token is still current (via podEvictionRetryMatches) before
+// delegating to processPodEvictionRetry. Stale items are discarded without
+// any deletion attempt. Failures are re-queued with rate limiting so that
+// the retry respects the configured back-off.
+func (tc *Controller) podEvictionWorker(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	for {
+		item, shutdown := tc.podEvictionQueue.Get()
+		if shutdown {
+			return
+		}
+
+		func() {
+			defer tc.podEvictionQueue.Done(item)
+
+			if !tc.podEvictionRetryMatches(item) {
+				tc.podEvictionQueue.Forget(item)
+				return
+			}
+
+			if err := tc.processPodEvictionRetry(ctx, item); err != nil {
+				logger.V(3).Info("Pod eviction failed, will retry", "pod", item.podRef, "err", err)
+				tc.podEvictionQueue.AddRateLimited(item)
+				return
+			}
+			tc.podEvictionQueue.Forget(item)
+		}()
+	}
+}
+
+// processPodEvictionRetry handles one retry attempt for item. It re-evaluates
+// the pod's current state and toleration against the node's taints and takes
+// one of the following actions:
+//
+//   - podEvictionNone / taint gone / pod vanished: forget the retry (no-op).
+//   - podEvictionNow (pod does not tolerate taint): delete the pod directly.
+//   - podEvictionLater, keepExisting (timed worker already scheduled): forget
+//     the retry and let the timed worker handle the deadline.
+//   - podEvictionLater, timed eviction (item.fireAt > item.createdAt): the
+//     original toleration window has already expired (the retry is only
+//     created after the timed worker fires). Delete directly rather than
+//     creating a new timed worker that would extend the grace period.
+//   - podEvictionLater, immediate-burst retry (item.fireAt == item.createdAt):
+//     the pod may have gained a finite toleration since the burst failure.
+//     Schedule a fresh timed worker via taintEvictionQueue.
+//
+// Returns a non-nil error only for transient failures that should be retried.
+func (tc *Controller) processPodEvictionRetry(ctx context.Context, item podEvictionItem) error {
+	logger := klog.FromContext(ctx)
+	podRef := item.podRef
+	pod, err := tc.podLister.Pods(podRef.Namespace).Get(podRef.Name)
+	if apierrors.IsNotFound(err) {
+		tc.forgetPodEvictionRetry(item)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if pod.UID != podRef.UID || pod.DeletionTimestamp != nil || pod.Spec.NodeName == "" {
+		tc.forgetPodEvictionRetry(item)
+		return nil
+	}
+	taints, ok := func() ([]v1.Taint, bool) {
+		tc.taintedNodesLock.Lock()
+		defer tc.taintedNodesLock.Unlock()
+		taints, ok := tc.taintedNodes[pod.Spec.NodeName]
+		return taints, ok
+	}()
+	if !ok || len(taints) == 0 {
+		tc.forgetPodEvictionRetry(item)
+		return nil
+	}
+
+	now := time.Now()
+	decision := tc.getPodEvictionDecision(logger, podRef, pod.Spec.Tolerations, taints, now)
+	switch decision.kind {
+	case podEvictionNone:
+		tc.forgetPodEvictionRetry(item)
+		return nil
+	case podEvictionLater:
+		// The original toleration window expired at item.fireAt. If this was a
+		// timed eviction (item.fireAt > item.createdAt), the window has already
+		// expired by the time this retry runs — the retry is only enqueued by
+		// deletePodHandler after the timed worker fires at item.fireAt. Scheduling
+		// a new timed worker here would grant the pod a fresh grace period it was
+		// never entitled to. Delete directly instead.
+		// Immediate-burst retries (item.fireAt == item.createdAt) fall through to
+		// the AddWork path below so that a toleration the pod may have gained since
+		// the burst failure can still be respected via taintEvictionQueue.
+		if item.fireAt.After(item.createdAt) {
+			deleted, err := tc.addConditionAndDeletePod(ctx, podRef)
+			if err != nil {
+				return err
+			}
+			if deleted {
+				metrics.PodDeletionsTotal.Inc()
+				metrics.PodDeletionsLatency.Observe(time.Since(item.fireAt).Seconds())
+			}
+			tc.forgetPodEvictionRetry(item)
+			return nil
+		}
+		if decision.keepExisting {
+			tc.forgetPodEvictionRetry(item)
+			return nil
+		}
+		if decision.cancelScheduled {
+			tc.cancelWorkWithEvent(logger, podRef.NamespacedName)
+		}
+		tc.taintEvictionQueue.AddWork(ctx, NewWorkArgsWithUID(podRef.Name, podRef.Namespace, podRef.UID), decision.startTime, decision.triggerTime)
+		if tc.taintEvictionQueue.GetWorkerUnsafe(podRef.NamespacedName.String()) != nil {
+			tc.forgetPodEvictionRetry(item)
+			return nil
+		}
+		return fmt.Errorf("pod eviction retry for %s could not schedule future eviction", podRef)
+	case podEvictionNow:
+		deleted, err := tc.addConditionAndDeletePod(ctx, podRef)
+		if err != nil {
+			return err
+		}
+		if deleted {
+			metrics.PodDeletionsTotal.Inc()
+			metrics.PodDeletionsLatency.Observe(time.Since(item.fireAt).Seconds())
+		}
+		tc.forgetPodEvictionRetry(item)
+		return nil
+	default:
+		utilruntime.HandleError(fmt.Errorf("unexpected pod eviction decision for %s: %d", podRef, decision.kind))
+		tc.forgetPodEvictionRetry(item)
+		return nil
+	}
 }
 
 func (tc *Controller) worker(ctx context.Context, worker int) {
@@ -385,7 +676,10 @@ func (tc *Controller) worker(ctx context.Context, worker int) {
 	}
 }
 
-// PodUpdated is used to notify NoExecuteTaintManager about Pod changes.
+// PodUpdated is used to notify the controller about Pod changes.
+// oldPod is nil for pod additions; newPod is nil for pod deletions.
+// The call is a no-op when neither the pod's tolerations nor its node name
+// have changed, to avoid spurious queue entries on unrelated updates.
 func (tc *Controller) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 	podName := ""
 	podNamespace := ""
@@ -417,7 +711,9 @@ func (tc *Controller) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 	tc.podUpdateQueue.Add(updateItem)
 }
 
-// NodeUpdated is used to notify NoExecuteTaintManager about Node changes.
+// NodeUpdated is used to notify the controller about Node changes.
+// oldNode is nil for node additions; newNode is nil for node deletions.
+// The call is a no-op when the set of NoExecute taints has not changed.
 func (tc *Controller) NodeUpdated(oldNode *v1.Node, newNode *v1.Node) {
 	nodeName := ""
 	oldTaints := []v1.Taint{}
@@ -443,50 +739,98 @@ func (tc *Controller) NodeUpdated(oldNode *v1.Node, newNode *v1.Node) {
 }
 
 func (tc *Controller) cancelWorkWithEvent(logger klog.Logger, nsName types.NamespacedName) {
-	if tc.taintEvictionQueue.CancelWork(logger, nsName.String()) {
+	cancelledTimedWork, cancelledRetry := tc.cancelWork(logger, nsName)
+	if cancelledTimedWork || cancelledRetry {
 		tc.emitCancelPodDeletionEvent(nsName)
 	}
 }
 
+func (tc *Controller) cancelWork(logger klog.Logger, nsName types.NamespacedName) (bool, bool) {
+	cancelledTimedWork := tc.taintEvictionQueue.CancelWork(logger, nsName.String())
+	cancelledRetry := tc.cancelPodEvictionRetry(nsName)
+	return cancelledTimedWork, cancelledRetry
+}
+
+func (tc *Controller) getPodEvictionDecision(logger klog.Logger, podRef NamespacedObject, tolerations []v1.Toleration, taints []v1.Taint, now time.Time) podEvictionDecision {
+	if len(taints) == 0 {
+		return podEvictionDecision{kind: podEvictionNone}
+	}
+	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(logger, taints, tolerations)
+	if !allTolerated {
+		return podEvictionDecision{kind: podEvictionNow}
+	}
+	minTolerationTime := getMinTolerationTime(usedTolerations)
+	// getMinTolerationTime returns negative value to denote infinite toleration.
+	if minTolerationTime < 0 {
+		return podEvictionDecision{kind: podEvictionNone}
+	}
+	if minTolerationTime == 0 {
+		return podEvictionDecision{kind: podEvictionNow}
+	}
+
+	startTime := now
+	triggerTime := startTime.Add(minTolerationTime)
+	scheduledEviction := tc.taintEvictionQueue.GetWorkerUnsafe(podRef.NamespacedName.String())
+	if scheduledEviction == nil {
+		return podEvictionDecision{kind: podEvictionLater, startTime: startTime, triggerTime: triggerTime}
+	}
+	if scheduledEviction.WorkItem.Object.UID != podRef.UID {
+		return podEvictionDecision{kind: podEvictionLater, startTime: startTime, triggerTime: triggerTime, cancelScheduled: true}
+	}
+
+	startTime = scheduledEviction.CreatedAt
+	if startTime.Add(minTolerationTime).Before(triggerTime) {
+		return podEvictionDecision{kind: podEvictionLater, startTime: startTime, triggerTime: scheduledEviction.FireAt, keepExisting: true}
+	}
+	return podEvictionDecision{kind: podEvictionLater, startTime: startTime, triggerTime: triggerTime, cancelScheduled: true}
+}
+
 func (tc *Controller) processPodOnNode(
 	ctx context.Context,
-	podNamespacedName types.NamespacedName,
+	podRef NamespacedObject,
 	nodeName string,
 	tolerations []v1.Toleration,
 	taints []v1.Taint,
 	now time.Time,
 ) {
 	logger := klog.FromContext(ctx)
-	if len(taints) == 0 {
+	podNamespacedName := podRef.NamespacedName
+	decision := tc.getPodEvictionDecision(logger, podRef, tolerations, taints, now)
+	switch decision.kind {
+	case podEvictionNone:
+		logger.V(4).Info("Current tolerations for pod tolerate forever or node has no taints, cancelling any scheduled deletion", "pod", podNamespacedName.String())
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
-	}
-	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(logger, taints, tolerations)
-	if !allTolerated {
+		return
+	case podEvictionNow:
 		logger.V(2).Info("Not all taints are tolerated after update for pod on node", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName))
-		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
-		tc.cancelWorkWithEvent(logger, podNamespacedName)
-		tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), now, now)
-		return
-	}
-	minTolerationTime := getMinTolerationTime(usedTolerations)
-	// getMinTolerationTime returns negative value to denote infinite toleration.
-	if minTolerationTime < 0 {
-		logger.V(4).Info("Current tolerations for pod tolerate forever, cancelling any scheduled deletion", "pod", podNamespacedName.String())
-		tc.cancelWorkWithEvent(logger, podNamespacedName)
-		return
-	}
-
-	startTime := now
-	triggerTime := startTime.Add(minTolerationTime)
-	scheduledEviction := tc.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String())
-	if scheduledEviction != nil {
-		startTime = scheduledEviction.CreatedAt
-		if startTime.Add(minTolerationTime).Before(triggerTime) {
+		if tc.taintEvictionQueue.CancelWork(logger, podNamespacedName.String()) {
+			tc.emitCancelPodDeletionEvent(podNamespacedName)
+		}
+		if tc.hasPodEvictionRetryForPod(podRef) {
 			return
 		}
-		tc.cancelWorkWithEvent(logger, podNamespacedName)
+		tc.cancelPodEvictionRetry(podNamespacedName)
+		tc.taintEvictionQueue.AddWork(ctx, NewWorkArgsWithUID(podNamespacedName.Name, podNamespacedName.Namespace, podRef.UID), now, now)
+		return
+	case podEvictionLater:
+		if decision.keepExisting {
+			// A fired timed worker remains visible until its callback returns. It
+			// may already have handed deletion responsibility to the durable retry,
+			// so an update must not cancel that retry during this handoff window.
+			// If the worker is still pending, processPodEvictionRetry will observe
+			// keepExisting and forget the redundant retry itself.
+			return
+		}
+		if decision.cancelScheduled {
+			tc.cancelWorkWithEvent(logger, podNamespacedName)
+		}
+		tc.taintEvictionQueue.AddWork(ctx, NewWorkArgsWithUID(podNamespacedName.Name, podNamespacedName.Namespace, podRef.UID), decision.startTime, decision.triggerTime)
+		if tc.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()) != nil {
+			tc.cancelPodEvictionRetry(podNamespacedName)
+		}
+	default:
+		utilruntime.HandleError(fmt.Errorf("unexpected pod eviction decision for %s: %d", podRef, decision.kind))
 	}
-	tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime)
 }
 
 func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateItem) {
@@ -514,6 +858,7 @@ func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateIt
 	logger.V(4).Info("Noticed pod update", "pod", podNamespacedName)
 	nodeName := pod.Spec.NodeName
 	if nodeName == "" {
+		tc.cancelWorkWithEvent(logger, podNamespacedName)
 		return
 	}
 	taints, ok := func() ([]v1.Taint, bool) {
@@ -525,9 +870,10 @@ func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateIt
 	// It's possible that Node was deleted, or Taints were removed before, which triggered
 	// eviction cancelling if it was needed.
 	if !ok {
+		tc.cancelWorkWithEvent(logger, podNamespacedName)
 		return
 	}
-	tc.processPodOnNode(ctx, podNamespacedName, nodeName, pod.Spec.Tolerations, taints, time.Now())
+	tc.processPodOnNode(ctx, NamespacedObject{NamespacedName: podNamespacedName, UID: pod.UID}, nodeName, pod.Spec.Tolerations, taints, time.Now())
 }
 
 func (tc *Controller) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdateItem) {
@@ -583,7 +929,7 @@ func (tc *Controller) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdat
 	now := time.Now()
 	for _, pod := range pods {
 		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-		tc.processPodOnNode(ctx, podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
+		tc.processPodOnNode(ctx, NamespacedObject{NamespacedName: podNamespacedName, UID: pod.UID}, node.Name, pod.Spec.Tolerations, taints, now)
 	}
 }
 

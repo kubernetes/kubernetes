@@ -22,22 +22,28 @@ import (
 	goruntime "runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 var timeForControllerToProgressForSanityCheck = 20 * time.Millisecond
@@ -103,6 +109,55 @@ func setupNewController(ctx context.Context, fakeClientSet *fake.Clientset) (*Co
 	mgr.nodeListerSynced = alwaysReady
 	mgr.getPodsAssignedToNode = getPodsAssignedToNode(ctx, fakeClientSet)
 	return mgr, podIndexer, nodeIndexer
+}
+
+func useFakePodEvictionQueue(controller *Controller, fakeClock *testingclock.FakeClock) {
+	useFakePodEvictionQueueWithBackoff(controller, fakeClock, time.Second, time.Second)
+}
+
+func useFakePodEvictionQueueWithBackoff(controller *Controller, fakeClock *testingclock.FakeClock, baseDelay, maxDelay time.Duration) {
+	controller.podEvictionQueue.ShutDown()
+	controller.podEvictionQueue = workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.NewTypedItemExponentialFailureRateLimiter[podEvictionItem](baseDelay, maxDelay),
+		workqueue.TypedRateLimitingQueueConfig[podEvictionItem]{
+			Name:  "test_noexec_taint_pod_eviction",
+			Clock: fakeClock,
+		},
+	)
+	controller.taintEvictionQueue.clock = fakeClock
+}
+
+func currentPodEvictionRetry(controller *Controller, podNamespacedName types.NamespacedName) (podEvictionItem, bool) {
+	controller.podEvictionLock.Lock()
+	defer controller.podEvictionLock.Unlock()
+	item, ok := controller.podEvictionTokens[podNamespacedName.String()]
+	return item, ok
+}
+
+func waitForPodEvictionRetry(controller *Controller, podRef NamespacedObject) (podEvictionItem, error) {
+	var item podEvictionItem
+	err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		var ok bool
+		item, ok = currentPodEvictionRetry(controller, podRef.NamespacedName)
+		return ok && item.podRef == podRef, nil
+	})
+	return item, err
+}
+
+func waitForTimedWorkerAfterRetry(controller *Controller, fakeClock *testingclock.FakeClock, podNamespacedName types.NamespacedName, delay time.Duration) error {
+	var lastErr error
+	for range 3 {
+		fakeClock.Step(time.Second)
+		if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 200*time.Millisecond, true, func(context.Context) (bool, error) {
+			worker := controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String())
+			return worker != nil && worker.FireAt.Sub(worker.CreatedAt) == delay, nil
+		}); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+	}
+	return lastErr
 }
 
 type timestampedPod struct {
@@ -173,6 +228,15 @@ func TestCreatePod(t *testing.T) {
 			expectDelete: false,
 		},
 		{
+			description: "schedule on tainted Node with zero-second toleration",
+			pod:         addToleration(testutil.NewPod("pod1", "node1"), 1, 0),
+			taintedNodes: map[string][]corev1.Taint{
+				"node1": {createNoExecuteTaint(1)},
+			},
+			expectPatch:  true,
+			expectDelete: true,
+		},
+		{
 			description: "schedule on tainted Node with infinite toleration",
 			pod:         addToleration(testutil.NewPod("pod1", "node1"), 1, -1),
 			taintedNodes: map[string][]corev1.Taint{
@@ -217,6 +281,715 @@ func TestCreatePod(t *testing.T) {
 	}
 }
 
+func TestPodEvictionDeletionFailureRetriesDurably(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	// The old implementation gave up after five immediate attempts.
+	deniedAttempts := int32(6)
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		attempt := deleteAttempts.Add(1)
+		if attempt <= deniedAttempts {
+			deleteAction := action.(clienttesting.DeleteAction)
+			return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+		}
+		return false, nil, nil
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	useFakePodEvictionQueue(controller, fakeClock)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+	controller.PodUpdated(nil, pod)
+
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() >= 1, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for first delete attempt: %v", err)
+	}
+
+	podRef := NamespacedObject{NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, UID: pod.UID}
+	if _, err := waitForPodEvictionRetry(controller, podRef); err != nil {
+		t.Fatalf("Timed out waiting for durable retry handoff: %v", err)
+	}
+
+	for deleteAttempts.Load() <= deniedAttempts {
+		previous := deleteAttempts.Load()
+		fakeClock.Step(time.Second)
+		if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+			return deleteAttempts.Load() > previous, nil
+		}); err != nil {
+			t.Fatalf("Timed out waiting for durable retry after %d attempts: %v", previous, err)
+		}
+	}
+
+	if got, want := deleteAttempts.Load(), deniedAttempts+1; got != want {
+		t.Fatalf("Unexpected delete attempts: got %d, want %d", got, want)
+	}
+}
+
+func TestPodEvictionDurableRetryKeepsRateLimiterState(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		deleteAction := action.(clienttesting.DeleteAction)
+		deleteAttempts.Add(1)
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	recorder := testutil.NewFakeRecorder()
+	controller.recorder = recorder
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	useFakePodEvictionQueueWithBackoff(controller, fakeClock, time.Second, 10*time.Second)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+	controller.PodUpdated(nil, pod)
+
+	podRef := NamespacedObject{NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, UID: pod.UID}
+	item, err := waitForPodEvictionRetry(controller, podRef)
+	if err != nil {
+		t.Fatalf("Timed out waiting for durable retry handoff: %v", err)
+	}
+	if got, want := deleteAttempts.Load(), int32(retries); got != want {
+		t.Fatalf("Initial timed worker should perform the legacy burst: got %d delete attempts, want %d", got, want)
+	}
+	if got := controller.podEvictionQueue.NumRequeues(item); got != 1 {
+		t.Fatalf("Unexpected initial NumRequeues: got %d, want 1", got)
+	}
+
+	for i, step := range []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second} {
+		fakeClock.Step(step)
+		wantAttempts := int32(retries + i + 1)
+		if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+			return deleteAttempts.Load() == wantAttempts, nil
+		}); err != nil {
+			t.Fatalf("Timed out waiting for durable retry %d after %s: %v", i+1, step, err)
+		}
+
+		current, ok := currentPodEvictionRetry(controller, podRef.NamespacedName)
+		if !ok {
+			t.Fatalf("Durable retry state disappeared after retry %d", i+1)
+		}
+		if current != item {
+			t.Fatalf("Durable retry item changed after retry %d: got %#v, want %#v", i+1, current, item)
+		}
+		if got, want := controller.podEvictionQueue.NumRequeues(item), i+2; got != want {
+			t.Fatalf("Unexpected NumRequeues after retry %d: got %d, want %d", i+1, got, want)
+		}
+	}
+
+	recorder.Lock()
+	defer recorder.Unlock()
+	deletionEvents := 0
+	for _, event := range recorder.Events {
+		if event.Message == "Marking for deletion Pod default/pod1" {
+			deletionEvents++
+		}
+	}
+	if deletionEvents != 1 {
+		t.Fatalf("Unexpected deletion event count after initial burst and durable retries: got %d, want 1", deletionEvents)
+	}
+}
+
+func TestPodEvictionRetryRejectsOlderProducer(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	controller := &Controller{
+		podEvictionTokens: make(map[string]podEvictionItem),
+		podEvictionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedItemExponentialFailureRateLimiter[podEvictionItem](time.Second, 10*time.Second),
+			workqueue.TypedRateLimitingQueueConfig[podEvictionItem]{
+				Name:  "test_noexec_taint_pod_eviction",
+				Clock: fakeClock,
+			},
+		),
+	}
+
+	podRef := NamespacedObject{NamespacedName: types.NamespacedName{Namespace: "default", Name: "pod1"}, UID: "pod1-uid"}
+	olderCreatedAt := fakeClock.Now()
+	olderFireAt := olderCreatedAt.Add(10 * time.Second)
+	newerCreatedAt := olderCreatedAt.Add(time.Second)
+	newerFireAt := olderCreatedAt.Add(5 * time.Second)
+
+	newerItem, added := controller.addPodEvictionRetry(podRef, newerCreatedAt, newerFireAt)
+	if !added {
+		t.Fatalf("Expected newer retry producer to be accepted")
+	}
+	olderItem, added := controller.addPodEvictionRetry(podRef, olderCreatedAt, olderFireAt)
+	if added {
+		t.Fatalf("Expected older retry producer to be rejected")
+	}
+
+	current, ok := currentPodEvictionRetry(controller, podRef.NamespacedName)
+	if !ok {
+		t.Fatalf("Expected durable retry state to remain")
+	}
+	if current != newerItem {
+		t.Fatalf("Older producer replaced newer retry state: got %#v, want %#v", current, newerItem)
+	}
+	if controller.podEvictionRetryMatches(olderItem) {
+		t.Fatalf("Older retry item unexpectedly matched current retry state")
+	}
+	if !controller.podEvictionRetryMatches(newerItem) {
+		t.Fatalf("Newer retry item did not match current retry state")
+	}
+	if got := controller.podEvictionQueue.NumRequeues(newerItem); got != 1 {
+		t.Fatalf("Unexpected newer item NumRequeues: got %d, want 1", got)
+	}
+	if got := controller.podEvictionQueue.NumRequeues(olderItem); got != 0 {
+		t.Fatalf("Older item should not have been rate limited: got NumRequeues %d, want 0", got)
+	}
+}
+
+func TestPodEvictionDurableRetryWithZeroSecondTolerationDeletesDirectly(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		deleteAction := action.(clienttesting.DeleteAction)
+		deleteAttempts.Add(1)
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	useFakePodEvictionQueueWithBackoff(controller, fakeClock, time.Second, 10*time.Second)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+	controller.PodUpdated(nil, pod)
+
+	podRef := NamespacedObject{NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, UID: pod.UID}
+	item, err := waitForPodEvictionRetry(controller, podRef)
+	if err != nil {
+		t.Fatalf("Timed out waiting for durable retry handoff: %v", err)
+	}
+	if got, want := deleteAttempts.Load(), int32(retries); got != want {
+		t.Fatalf("Initial timed worker should perform the legacy burst: got %d delete attempts, want %d", got, want)
+	}
+
+	zero := int64(0)
+	zeroToleratingPod := pod.DeepCopy()
+	zeroToleratingPod.Spec.Tolerations = []corev1.Toleration{{
+		Key:               "testTaint1",
+		Value:             "test1",
+		Effect:            corev1.TaintEffectNoExecute,
+		TolerationSeconds: &zero,
+	}}
+	if _, err := fakeClientset.CoreV1().Pods(zeroToleratingPod.Namespace).Update(ctx, zeroToleratingPod, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Failed to update pod in fake client: %v", err)
+	}
+	if err := podIndexer.Update(zeroToleratingPod); err != nil {
+		t.Fatalf("Failed to update pod in indexer: %v", err)
+	}
+
+	fakeClock.Step(time.Second)
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == int32(retries+1), nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for one durable retry delete attempt: %v", err)
+	}
+
+	current, ok := currentPodEvictionRetry(controller, podRef.NamespacedName)
+	if !ok {
+		t.Fatalf("Durable retry state disappeared after zero-second toleration retry")
+	}
+	if current != item {
+		t.Fatalf("Durable retry item changed after zero-second toleration retry: got %#v, want %#v", current, item)
+	}
+	if got := controller.taintEvictionQueue.GetWorkerUnsafe(podRef.NamespacedName.String()); got != nil {
+		t.Fatalf("Unexpected timed worker handoff for zero-second toleration retry: %#v", got)
+	}
+	if got, want := controller.podEvictionQueue.NumRequeues(item), 2; got != want {
+		t.Fatalf("Unexpected NumRequeues after zero-second toleration retry: got %d, want %d", got, want)
+	}
+
+	fakeClock.Step(2 * time.Second)
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == int32(retries+2), nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for second durable retry delete attempt: %v", err)
+	}
+	if got := controller.taintEvictionQueue.GetWorkerUnsafe(podRef.NamespacedName.String()); got != nil {
+		t.Fatalf("Unexpected timed worker after second zero-second toleration retry: %#v", got)
+	}
+	if current, ok := currentPodEvictionRetry(controller, podRef.NamespacedName); !ok || current != item {
+		t.Fatalf("Durable retry item changed or disappeared after second zero-second toleration retry: got %#v, ok=%v, want %#v", current, ok, item)
+	}
+	if got, want := controller.podEvictionQueue.NumRequeues(item), 3; got != want {
+		t.Fatalf("Unexpected NumRequeues after second zero-second toleration retry: got %d, want %d", got, want)
+	}
+}
+
+func TestPodEvictionRetryDoesNotDeleteReplacementPod(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		attempt := deleteAttempts.Add(1)
+		if attempt <= retries {
+			deleteAction := action.(clienttesting.DeleteAction)
+			return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+		}
+		return false, nil, nil
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	useFakePodEvictionQueue(controller, fakeClock)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+	controller.PodUpdated(nil, pod)
+
+	podRef := NamespacedObject{NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, UID: pod.UID}
+	if _, err := waitForPodEvictionRetry(controller, podRef); err != nil {
+		t.Fatalf("Timed out waiting for durable retry handoff: %v", err)
+	}
+
+	replacement := pod.DeepCopy()
+	replacement.UID = "pod1-replacement-uid"
+	if _, err := fakeClientset.CoreV1().Pods(replacement.Namespace).Update(ctx, replacement, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Failed to replace pod in fake client: %v", err)
+	}
+	if err := podIndexer.Update(replacement); err != nil {
+		t.Fatalf("Failed to replace pod in indexer: %v", err)
+	}
+
+	fakeClock.Step(time.Second)
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		_, ok := currentPodEvictionRetry(controller, podRef.NamespacedName)
+		return !ok, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for stale retry to be forgotten: %v", err)
+	}
+
+	if got := deleteAttempts.Load(); got != retries {
+		t.Fatalf("Unexpected delete retry for replacement pod: got %d delete attempts, want %d", got, retries)
+	}
+}
+
+func TestPodEvictionRetryCancelledWhenTaintRemoved(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		attempt := deleteAttempts.Add(1)
+		if attempt <= retries {
+			deleteAction := action.(clienttesting.DeleteAction)
+			return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+		}
+		return false, nil, nil
+	})
+
+	controller, podIndexer, nodeIndexer := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	useFakePodEvictionQueue(controller, fakeClock)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+	controller.PodUpdated(nil, pod)
+
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == retries, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for initial delete attempts: %v", err)
+	}
+
+	if err := nodeIndexer.Add(testutil.NewNode("node1")); err != nil {
+		t.Fatalf("Failed to add node to indexer: %v", err)
+	}
+	controller.handleNodeUpdate(ctx, nodeUpdateItem{"node1"})
+
+	fakeClock.Step(time.Second)
+	podRef := NamespacedObject{NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, UID: pod.UID}
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		_, ok := currentPodEvictionRetry(controller, podRef.NamespacedName)
+		return !ok, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for retry cancellation: %v", err)
+	}
+
+	if got := deleteAttempts.Load(); got != retries {
+		t.Fatalf("Unexpected delete retry after taint removal: got %d delete attempts, want %d", got, retries)
+	}
+}
+
+func TestPodEvictionRetrySchedulesNewDeadlineForFiniteToleration(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		attempt := deleteAttempts.Add(1)
+		if attempt <= retries {
+			deleteAction := action.(clienttesting.DeleteAction)
+			return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+		}
+		return false, nil, nil
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	useFakePodEvictionQueue(controller, fakeClock)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+	controller.PodUpdated(nil, pod)
+
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == retries, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for initial delete attempts: %v", err)
+	}
+
+	tolerationSeconds := int64(5)
+	toleratingPod := pod.DeepCopy()
+	toleratingPod.Spec.Tolerations = []corev1.Toleration{{
+		Key:               "testTaint1",
+		Value:             "test1",
+		Effect:            corev1.TaintEffectNoExecute,
+		TolerationSeconds: &tolerationSeconds,
+	}}
+	if _, err := fakeClientset.CoreV1().Pods(toleratingPod.Namespace).Update(ctx, toleratingPod, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Failed to update pod in fake client: %v", err)
+	}
+	if err := podIndexer.Update(toleratingPod); err != nil {
+		t.Fatalf("Failed to update pod in indexer: %v", err)
+	}
+	controller.handlePodUpdate(ctx, podUpdateItem{
+		podName:      toleratingPod.Name,
+		podNamespace: toleratingPod.Namespace,
+		nodeName:     toleratingPod.Spec.NodeName,
+	})
+
+	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+	if err := waitForTimedWorkerAfterRetry(controller, fakeClock, podNamespacedName, time.Duration(tolerationSeconds)*time.Second); err != nil {
+		t.Fatalf("Timed out waiting for new finite toleration deadline: %v", err)
+	}
+
+	fakeClock.Step(time.Second)
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 200*time.Millisecond, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == retries, nil
+	}); err != nil {
+		t.Fatalf("Pod was deleted before the new toleration deadline: %v", err)
+	}
+
+	fakeClock.Step(time.Duration(tolerationSeconds) * time.Second)
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() > retries, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for delete after new toleration deadline: %v", err)
+	}
+}
+
+func TestPodEvictionRetrySchedulesNewDeadlineForChangedTaint(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		attempt := deleteAttempts.Add(1)
+		if attempt <= retries {
+			deleteAction := action.(clienttesting.DeleteAction)
+			return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+		}
+		return false, nil, nil
+	})
+
+	controller, podIndexer, nodeIndexer := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	useFakePodEvictionQueue(controller, fakeClock)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+	controller.PodUpdated(nil, pod)
+
+	podRef := NamespacedObject{NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, UID: pod.UID}
+	if _, err := waitForPodEvictionRetry(controller, podRef); err != nil {
+		t.Fatalf("Timed out waiting for durable retry handoff: %v", err)
+	}
+
+	tolerationSeconds := int64(5)
+	toleratingPod := pod.DeepCopy()
+	toleratingPod.Spec.Tolerations = []corev1.Toleration{{
+		Key:               "testTaint2",
+		Value:             "test2",
+		Effect:            corev1.TaintEffectNoExecute,
+		TolerationSeconds: &tolerationSeconds,
+	}}
+	if _, err := fakeClientset.CoreV1().Pods(toleratingPod.Namespace).Update(ctx, toleratingPod, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Failed to update pod in fake client: %v", err)
+	}
+	if err := podIndexer.Update(toleratingPod); err != nil {
+		t.Fatalf("Failed to update pod in indexer: %v", err)
+	}
+
+	newNode := addTaintsToNode(testutil.NewNode("node1"), "testTaint2", "taint2", []int{2})
+	if err := nodeIndexer.Add(newNode); err != nil {
+		t.Fatalf("Failed to add node to indexer: %v", err)
+	}
+	controller.handleNodeUpdate(ctx, nodeUpdateItem{nodeName: newNode.Name})
+
+	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+	if err := waitForTimedWorkerAfterRetry(controller, fakeClock, podNamespacedName, time.Duration(tolerationSeconds)*time.Second); err != nil {
+		t.Fatalf("Timed out waiting for new taint deadline: %v", err)
+	}
+
+	fakeClock.Step(time.Second)
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 200*time.Millisecond, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == retries, nil
+	}); err != nil {
+		t.Fatalf("Pod was deleted before the new taint deadline: %v", err)
+	}
+
+	fakeClock.Step(time.Duration(tolerationSeconds) * time.Second)
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() > retries, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for delete after new taint deadline: %v", err)
+	}
+}
+
+// TestPodEvictionRetryWithExpiredTolerationDeletesDirectly verifies that a durable
+// retry occurring after a finite TolerationSeconds window has already expired does
+// NOT restart that toleration window. The retry must delete the pod immediately
+// rather than scheduling a fresh timed worker for another N seconds.
+//
+// Regression test for: https://github.com/kubernetes/kubernetes/issues/140639
+func TestPodEvictionRetryWithExpiredTolerationDeletesDirectly(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Pod starts with TolerationSeconds: 5 for the matching taint so the initial
+	// eviction goes through the timed-worker path (podEvictionLater), not the
+	// immediate path (podEvictionNow).
+	tolerationSeconds := int64(5)
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	pod.Spec.Tolerations = []corev1.Toleration{{
+		Key:               "testTaint1",
+		Value:             "test1",
+		Effect:            corev1.TaintEffectNoExecute,
+		TolerationSeconds: &tolerationSeconds,
+	}}
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	// All delete attempts fail so the durable retry queue is exercised.
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		deleteAction := action.(clienttesting.DeleteAction)
+		deleteAttempts.Add(1)
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+	// Use 1s/10s backoff so each retry step can be driven deterministically
+	// by advancing the fake clock by exactly one backoff period.
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	useFakePodEvictionQueueWithBackoff(controller, fakeClock, time.Second, 10*time.Second)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+	// Trigger the initial eviction decision. Because the pod has TolerationSeconds: 5,
+	// getPodEvictionDecision returns podEvictionLater and a timed worker is created.
+	controller.PodUpdated(nil, pod)
+
+	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+
+	// Wait for the timed worker to appear in the queue with the 5s window.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		w := controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String())
+		return w != nil && w.FireAt.Sub(w.CreatedAt) == time.Duration(tolerationSeconds)*time.Second, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for initial timed worker with 5s window: %v", err)
+	}
+
+	// No delete attempts should have happened yet — the pod is still in its
+	// toleration window.
+	if got := deleteAttempts.Load(); got != 0 {
+		t.Fatalf("Delete should not have been attempted before toleration window expires: got %d attempts", got)
+	}
+
+	// Advance the fake clock past the 5-second toleration window to fire the
+	// timed worker.
+	fakeClock.Step(time.Duration(tolerationSeconds) * time.Second)
+
+	// Wait for the initial burst of delete attempts to be exhausted.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == int32(retries), nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for initial burst of %d delete attempts: %v", retries, err)
+	}
+
+	// Wait for the durable retry to be registered in podEvictionTokens. The
+	// item carries the original createdAt/fireAt so the retry path knows when
+	// the toleration window actually expired.
+	podRef := NamespacedObject{NamespacedName: podNamespacedName, UID: pod.UID}
+	item, err := waitForPodEvictionRetry(controller, podRef)
+	if err != nil {
+		t.Fatalf("Timed out waiting for durable retry handoff: %v", err)
+	}
+
+	// The timed worker slot must be empty at this point — the worker that fired
+	// at T+5s has already completed and removed itself.
+	if w := controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()); w != nil {
+		t.Fatalf("Timed worker still present after initial burst: %#v", w)
+	}
+
+	// Advance the fake clock by the first backoff period (1s) to release the
+	// rate-limited retry item from podEvictionQueue.
+	fakeClock.Step(time.Second)
+
+	// The retry must delete directly (attempt count goes to retries+1) without
+	// creating a new 5-second timed worker. Under the bug, the retry would call
+	// AddWork with a future triggerTime and no new delete attempt would happen
+	// within the 200ms window below; the test would time out here.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 200*time.Millisecond, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == int32(retries+1), nil
+	}); err != nil {
+		t.Fatalf("Durable retry did not delete directly after expired toleration window: %v", err)
+	}
+
+	// Confirm no new timed worker was created. Under the bug a fresh 5-second
+	// worker would have been created here.
+	if w := controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()); w != nil {
+		t.Fatalf("Retry incorrectly created a new timed worker, granting a fresh grace period: FireAt=%v CreatedAt=%v", w.FireAt, w.CreatedAt)
+	}
+
+	// The retry item must still be active (the delete failed again).
+	if current, ok := currentPodEvictionRetry(controller, podNamespacedName); !ok || current != item {
+		t.Fatalf("Durable retry item changed or disappeared: ok=%v got=%#v want=%#v", ok, current, item)
+	}
+
+	// Verify the second retry also deletes directly (2s backoff step).
+	fakeClock.Step(2 * time.Second)
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 200*time.Millisecond, true, func(context.Context) (bool, error) {
+		return deleteAttempts.Load() == int32(retries+2), nil
+	}); err != nil {
+		t.Fatalf("Second durable retry did not delete directly: %v", err)
+	}
+	if w := controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()); w != nil {
+		t.Fatalf("Second retry created an unexpected timed worker: %#v", w)
+	}
+}
+
 func TestDeletePod(t *testing.T) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -235,6 +1008,64 @@ func TestDeletePod(t *testing.T) {
 	controller.PodUpdated(testutil.NewPod("pod1", "node1"), nil)
 	// wait a bit to see if nothing will panic
 	time.Sleep(timeForControllerToProgressForSanityCheck)
+}
+
+// TestAddConditionAndDeletePodNotFoundIsSuccess verifies that a NotFound error
+// returned by the Delete API call is treated as a clean success. This covers
+// the race window between our Get and Delete calls where another actor may
+// concurrently delete the pod. The controller must not enter the durable retry
+// queue when this happens.
+func TestAddConditionAndDeletePodNotFoundIsSuccess(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	fakeClientset := fake.NewSimpleClientset(pod)
+
+	var deleteCalls atomic.Int32
+	// Simulate concurrent deletion: the Get succeeds (pod exists in fake store)
+	// but the Delete call returns NotFound as if another actor deleted it first.
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		deleteCalls.Add(1)
+		return true, nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, action.(clienttesting.DeleteAction).GetName())
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+
+	// Trigger eviction. Pod has no tolerations so it will be deleted immediately.
+	controller.PodUpdated(nil, pod)
+
+	// Wait for the delete reactor to be called.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
+		return deleteCalls.Load() > 0, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for Delete call: %v", err)
+	}
+
+	// Give the controller a moment to process the result.
+	time.Sleep(timeForControllerToProgressForSanityCheck)
+
+	// The NotFound result must be treated as success: no retry token should
+	// have been registered in podEvictionTokens.
+	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+	if _, ok := currentPodEvictionRetry(controller, podNamespacedName); ok {
+		t.Errorf("NotFound on Delete incorrectly registered a durable retry token")
+	}
 }
 
 func TestUpdatePod(t *testing.T) {
@@ -1001,4 +1832,146 @@ func TestPodDeletionEvent(t *testing.T) {
 			t.Errorf("emitPodDeletionEvent() returned data (-want,+got):\n%s", diff)
 		}
 	})
+}
+
+// TestPodEvictionRetryRaceWithTimedWorker verifies that if the durable retry queue
+// executes while the original timed worker is still in the active workers map,
+// the retry correctly deletes the pod without restarting the TolerationSeconds window.
+//
+// Regression test for race condition where processPodEvictionRetry checked
+// decision.keepExisting BEFORE item.fireAt.After(item.createdAt).
+func TestPodEvictionRetryRaceWithTimedWorker(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tolerationSeconds := int64(5)
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	pod.Spec.Tolerations = []corev1.Toleration{{
+		Key:               "testTaint1",
+		Value:             "test1",
+		Effect:            corev1.TaintEffectNoExecute,
+		TolerationSeconds: &tolerationSeconds,
+	}}
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var deleteAttempts atomic.Int32
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		deleteAttempts.Add(1)
+		return true, nil, nil // Delete succeeds
+	})
+
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+	controller.taintedNodes = map[string][]corev1.Taint{
+		"node1": {createNoExecuteTaint(1)},
+	}
+
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatalf("Failed to add pod to indexer: %v", err)
+	}
+
+	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+
+	realNow := time.Now()
+	createdAt := realNow.Add(-10 * time.Second)
+	fireAt := realNow.Add(-5 * time.Second) // 5s toleration, already expired 5s ago
+
+	// 1. Simulate the state where the timed worker has fired, but hasn't returned yet,
+	//    so it is still present in taintEvictionQueue.workers.
+	controller.taintEvictionQueue.AddWork(ctx, NewWorkArgsWithUID(podNamespacedName.Name, podNamespacedName.Namespace, pod.UID), createdAt, fireAt)
+
+	// 2. The retry item (created by the timed worker) is processed.
+	item := podEvictionItem{
+		podRef:    NamespacedObject{NamespacedName: podNamespacedName, UID: pod.UID},
+		createdAt: createdAt,
+		fireAt:    fireAt,
+	}
+
+	// This direct call represents the podEvictionWorker processing the retry asynchronously
+	// while the timed worker is still in the map.
+	err := controller.processPodEvictionRetry(ctx, item)
+	if err != nil {
+		t.Fatalf("processPodEvictionRetry failed: %v", err)
+	}
+
+	if got := deleteAttempts.Load(); got != 1 {
+		t.Fatalf("Expected exactly 1 delete attempt, got %d. The retry was incorrectly discarded due to the visible timed worker.", got)
+	}
+}
+
+// TestPodEvictionRetryHandoffSurvivesConcurrentUpdate verifies that a pod update
+// cannot cancel the durable retry while the fired timed worker is completing.
+func TestPodEvictionRetryHandoffSurvivesConcurrentUpdate(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tolerationSeconds := int64(5)
+	pod := testutil.NewPod("pod1", "node1")
+	pod.UID = "pod1-uid"
+	pod.Spec.Tolerations = []corev1.Toleration{{
+		Key:               "testTaint1",
+		Value:             "test1",
+		Effect:            corev1.TaintEffectNoExecute,
+		TolerationSeconds: &tolerationSeconds,
+	}}
+	fakeClientset := fake.NewSimpleClientset(pod)
+	fakeClientset.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		deleteAction := action.(clienttesting.DeleteAction)
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, deleteAction.GetName(), fmt.Errorf("denied by test"))
+	})
+
+	controller, _, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	handoffReady := make(chan struct{})
+	releaseTimedWorker := make(chan struct{})
+	var releaseOnce sync.Once
+	deleteHandler := controller.deletePodHandler()
+	controller.taintEvictionQueue = CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
+		err := deleteHandler(ctx, fireAt, args)
+		close(handoffReady)
+		<-releaseTimedWorker
+		return err
+	})
+	controller.taintEvictionQueue.clock = fakeClock
+	t.Cleanup(func() {
+		releaseOnce.Do(func() { close(releaseTimedWorker) })
+		controller.taintEvictionQueue.CancelAndWait()
+	})
+
+	podRef := NamespacedObject{
+		NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+		UID:            pod.UID,
+	}
+	createdAt := fakeClock.Now()
+	fireAt := createdAt.Add(time.Duration(tolerationSeconds) * time.Second)
+	controller.taintEvictionQueue.AddWork(ctx, NewWorkArgsWithUID(pod.Name, pod.Namespace, pod.UID), createdAt, fireAt)
+	fakeClock.Step(time.Duration(tolerationSeconds) * time.Second)
+
+	select {
+	case <-handoffReady:
+	case <-time.After(time.Second):
+		t.Fatal("timed worker did not register its durable retry")
+	}
+	if _, ok := currentPodEvictionRetry(controller, podRef.NamespacedName); !ok {
+		t.Fatal("durable retry was not registered before timed worker completion")
+	}
+	if worker := controller.taintEvictionQueue.GetWorkerUnsafe(podRef.NamespacedName.String()); worker == nil {
+		t.Fatal("timed worker was removed before the handoff interleaving")
+	}
+
+	controller.processPodOnNode(ctx, podRef, pod.Spec.NodeName, pod.Spec.Tolerations, []corev1.Taint{createNoExecuteTaint(1)}, fakeClock.Now())
+	if _, ok := currentPodEvictionRetry(controller, podRef.NamespacedName); !ok {
+		t.Error("concurrent pod update canceled the durable retry during timed-worker handoff")
+	}
+
+	releaseOnce.Do(func() { close(releaseTimedWorker) })
+	controller.taintEvictionQueue.workerWG.Wait()
+	if worker := controller.taintEvictionQueue.GetWorkerUnsafe(podRef.NamespacedName.String()); worker != nil {
+		t.Fatalf("completed timed worker was not removed: %#v", worker)
+	}
+	if _, ok := currentPodEvictionRetry(controller, podRef.NamespacedName); !ok {
+		t.Error("pod requiring eviction has neither a timed worker nor a durable retry")
+	}
 }
