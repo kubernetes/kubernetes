@@ -225,8 +225,9 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		}
 	}
 
+	ctx := wait.ContextForChannel(stopCh)
+
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		ctx := wait.ContextForChannel(stopCh)
 		run(ctx, controllerInitializers)
 		<-stopCh
 		return nil
@@ -254,7 +255,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	}
 
 	// Start the main lock
-	go leaderElectAndRun(c, id, electionChecker,
+	go leaderElectAndRun(ctx, c, id, electionChecker,
 		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		leaderelection.LeaderCallbacks{
@@ -272,7 +273,9 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 			},
 			OnStoppedLeading: func() {
 				klog.ErrorS(nil, "leaderelection lost")
-				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+				if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
+					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+				}
 			},
 		})
 
@@ -282,7 +285,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		<-leaderMigrator.MigrationReady
 
 		// Start the migration lock.
-		go leaderElectAndRun(c, id, electionChecker,
+		go leaderElectAndRun(ctx, c, id, electionChecker,
 			c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
 			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
 			leaderelection.LeaderCallbacks{
@@ -292,7 +295,9 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 				},
 				OnStoppedLeading: func() {
 					klog.ErrorS(nil, "migration leaderelection lost")
-					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+					if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
+						klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+					}
 				},
 			})
 	}
@@ -518,7 +523,7 @@ func ResyncPeriod(c *cloudcontrollerconfig.CompletedConfig) func() time.Duration
 
 // leaderElectAndRun runs the leader election, and runs the callbacks once the leader lease is acquired.
 // TODO: extract this function into staging/controller-manager
-func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
+func leaderElectAndRun(ctx context.Context, c *cloudcontrollerconfig.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
 	rl, err := resourcelock.NewFromKubeconfig(resourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
 		leaseName,
@@ -532,17 +537,29 @@ func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity st
 		klog.Fatalf("error creating lock: %v", err)
 	}
 
-	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
-		Callbacks:     callbacks,
-		WatchDog:      electionChecker,
-		Name:          leaseName,
-	})
+	leaderelection.RunOrDie(ctx, newLeaderElectionConfig(rl,
+		c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+		callbacks, electionChecker, leaseName))
 
 	panic("unreachable")
+}
+
+// newLeaderElectionConfig builds the LeaderElectionConfig used by the cloud-controller-manager.
+// ReleaseOnCancel is gated on the ControllerManagerReleaseLeaderElectionLockOnExit feature gate
+// so the lease is released on context cancellation (see KEP-5366).
+func newLeaderElectionConfig(lock resourcelock.Interface, leaseDuration, renewDeadline, retryPeriod time.Duration, callbacks leaderelection.LeaderCallbacks, electionChecker *leaderelection.HealthzAdaptor, leaseName string) leaderelection.LeaderElectionConfig {
+	return leaderelection.LeaderElectionConfig{
+		Lock:            lock,
+		LeaseDuration:   leaseDuration,
+		RenewDeadline:   renewDeadline,
+		RetryPeriod:     retryPeriod,
+		Callbacks:       callbacks,
+		WatchDog:        electionChecker,
+		ReleaseOnCancel: utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit),
+		Name:            leaseName,
+	}
 }
 
 // filterInitializers returns initializers that has filterFunc(name) == expected.
