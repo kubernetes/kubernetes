@@ -3363,6 +3363,38 @@ func TestSetDefaultEnableServiceLinks(t *testing.T) {
 	}
 }
 
+func TestSetDefaultHermeticPod(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Hermetic: ptr.To(true),
+		},
+	}
+	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+	if output.Spec.EnableServiceLinks == nil || *output.Spec.EnableServiceLinks != false {
+		t.Errorf("Expected enableServiceLinks to be false, got: %+v", output.Spec.EnableServiceLinks)
+	}
+	if output.Spec.DNSPolicy != v1.DNSNone {
+		t.Errorf("Expected DNSPolicy to be %q, got: %q", v1.DNSNone, output.Spec.DNSPolicy)
+	}
+}
+
+func TestSetDefaultHermeticPodTemplateSpec(t *testing.T) {
+	template := &v1.PodTemplate{
+		Template: v1.PodTemplateSpec{
+			Spec: v1.PodSpec{
+				Hermetic: ptr.To(true),
+			},
+		},
+	}
+	output := roundTrip(t, runtime.Object(template)).(*v1.PodTemplate)
+	if output.Template.Spec.EnableServiceLinks == nil || *output.Template.Spec.EnableServiceLinks != false {
+		t.Errorf("Expected template enableServiceLinks to be false, got: %+v", output.Template.Spec.EnableServiceLinks)
+	}
+	if output.Template.Spec.DNSPolicy != v1.DNSNone {
+		t.Errorf("Expected template DNSPolicy to be %q, got: %q", v1.DNSNone, output.Template.Spec.DNSPolicy)
+	}
+}
+
 func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 	cluster := v1.ServiceInternalTrafficPolicyCluster
 	local := v1.ServiceInternalTrafficPolicyLocal

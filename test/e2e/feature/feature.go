@@ -185,6 +185,10 @@ var (
 	// TODO: document the feature (when to use this feature for a test)
 	HPA = framework.WithFeature(framework.ValidFeatures.Add("HPA"))
 
+	// Owner: sig-network, sig-node
+	// Marks tests that exercise hermetic pod sandboxes.
+	Hermetic = framework.WithFeature(framework.ValidFeatures.Add("Hermetic"))
+
 	// Owner: sig-node
 	HostAccess = framework.WithFeature(framework.ValidFeatures.Add("HostAccess"))
 

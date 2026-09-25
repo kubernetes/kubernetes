@@ -24,6 +24,9 @@ const (
 	RuntimeReady = "RuntimeReady"
 	// NetworkReady means the runtime network is up and ready to accept containers which require network.
 	NetworkReady = "NetworkReady"
+
+	// SandboxHermeticAnnotation is the annotation key used to pass the hermetic intent to the runtime.
+	SandboxHermeticAnnotation = "io.kubernetes.cri.sandbox.hermetic"
 )
 
 // LogStreamType is the type of the stream in CRI container log.

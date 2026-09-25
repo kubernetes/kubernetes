@@ -623,6 +623,12 @@ message PodSandboxConfig {
     LinuxPodSandboxConfig linux = 8;
     // Optional configurations specific to Windows hosts.
     WindowsPodSandboxConfig windows = 9;
+    // hermetic indicates that the sandbox must be created in strict isolation.
+    // When set to true, the container runtime must provision the sandbox 
+    // (based on the NamespaceOption) but MUST bypass all default network plumbing 
+    // and external interface attachment (e.g., bypassing CNI execution).
+    // The sandbox will only possess a loopback interface.
+    bool hermetic = 10;
 }
 
 message RunPodSandboxRequest {

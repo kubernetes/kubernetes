@@ -218,6 +218,12 @@ func SetDNSConfig(config *api.PodDNSConfig) Tweak {
 	}
 }
 
+func SetEnableServiceLinks(enable *bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.EnableServiceLinks = enable
+	}
+}
+
 func SetRestartPolicy(policy api.RestartPolicy) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.RestartPolicy = policy
@@ -372,6 +378,34 @@ func SetContainerRestartPolicy(policy api.ContainerRestartPolicy) TweakContainer
 func SetContainerRestartPolicyRules(rules ...api.ContainerRestartRule) TweakContainer {
 	return func(cnr *api.Container) {
 		cnr.RestartPolicyRules = rules
+	}
+}
+
+func SetContainerLivenessProbe(probe *api.Probe) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.LivenessProbe = probe
+	}
+}
+
+func SetContainerReadinessProbe(probe *api.Probe) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.ReadinessProbe = probe
+	}
+}
+
+func SetContainerStartupProbe(probe *api.Probe) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.StartupProbe = probe
+	}
+}
+
+func SetHermetic(b *bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.Hermetic = b
+		if b != nil && *b {
+			pod.Spec.DNSPolicy = api.DNSNone
+			pod.Spec.EnableServiceLinks = ptr.To(false)
+		}
 	}
 }
 
