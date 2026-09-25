@@ -677,7 +677,7 @@ func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) 
 	// When not matching a single key, an immutable snapshot lets us
 	// defer the O(N) interval build off the watchCache lock.
 	if !matchesSingle {
-		if snapshot, ok := w.storage.LatestSnapshotLocked(); ok {
+		if snapshot, ok := w.storage.LatestSnapshot(); ok {
 			return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot), nil
 		}
 	}
