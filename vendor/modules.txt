@@ -1115,6 +1115,8 @@ k8s.io/klog/v2/test
 k8s.io/klog/v2/textlogger
 # k8s.io/kms v0.0.0 => ./staging/src/k8s.io/kms
 ## explicit; go 1.27.0
+# k8s.io/ktesting v0.0.0 => ./staging/src/k8s.io/ktesting
+## explicit; go 1.27.0
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 ## explicit; go 1.27.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager

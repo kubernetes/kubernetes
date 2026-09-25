@@ -94,5 +94,6 @@ replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
+	k8s.io/ktesting => ../ktesting
 	k8s.io/streaming => ../streaming
 )
