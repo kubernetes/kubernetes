@@ -1244,16 +1244,6 @@ const (
 	// co-ordinate better with cluster-autoscaler for storage limits.
 	VolumeLimitScaling featuregate.Feature = "VolumeLimitScaling"
 
-	// owner: @ksubrmnn
-	//
-	// Allows kube-proxy to create DSR loadbalancers for Windows
-	WinDSR featuregate.Feature = "WinDSR"
-
-	// owner: @ksubrmnn
-	//
-	// Allows kube-proxy to run in Overlay mode for Windows
-	WinOverlay featuregate.Feature = "WinOverlay"
-
 	// owner: @jsturtevant
 	// kep: https://kep.k8s.io/4885
 	//
@@ -2172,18 +2162,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	WinDSR: {
-		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
-	WinOverlay: {
-		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.20"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	WindowsCPUAndMemoryAffinity: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2766,10 +2744,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	VolumeBindMountOptions: {},
 
 	VolumeLimitScaling: {},
-
-	WinDSR: {},
-
-	WinOverlay: {},
 
 	WindowsCPUAndMemoryAffinity: {},
 
