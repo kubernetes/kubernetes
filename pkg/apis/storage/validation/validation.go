@@ -333,7 +333,7 @@ func validateStorageHealthCondition(condition storage.StorageHealthCondition, fl
 func validateStorageHealth(health storage.StorageHealth, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(health.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "")).MarkCoveredByDeclarative().MarkAlpha()
 	} else {
 		allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(health.Name, fldPath.Child("name"))...)
 	}
