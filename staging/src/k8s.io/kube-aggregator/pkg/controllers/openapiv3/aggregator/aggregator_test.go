@@ -78,75 +78,6 @@ func (h testV3APIService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type testV2APIService struct{}
-
-var _ http.Handler = testV2APIService{}
-
-func (h testV2APIService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Create an APIService with a handler for one group/version
-	if r.URL.Path == "/openapi/v2" {
-		w.Write([]byte(`{"swagger":"2.0","info":{"title":"Kubernetes","version":"unversioned"}}`))
-		return
-	}
-	w.WriteHeader(404)
-}
-
-func TestV2APIService(t *testing.T) {
-	downloader := Downloader{}
-	pathHandler := mux.NewPathRecorderMux("aggregator_test")
-	var serveHandler http.Handler = pathHandler
-	specProxier, err := BuildAndRegisterAggregator(downloader, genericapiserver.NewEmptyDelegate(), nil, nil, pathHandler)
-	if err != nil {
-		t.Error(err)
-	}
-	handler := testV2APIService{}
-	apiService := &v1.APIService{
-		Spec: v1.APIServiceSpec{
-			Group:   "group.example.com",
-			Version: "v1",
-		},
-	}
-	apiService.Name = "v1.group.example.com"
-	specProxier.AddUpdateAPIService(handler, apiService)
-	specProxier.UpdateAPIServiceSpec("v1.group.example.com")
-
-	data := sendReq(t, serveHandler, "/openapi/v3")
-	groupVersionList := handler3.OpenAPIV3Discovery{}
-	if err := json.Unmarshal(data, &groupVersionList); err != nil {
-		t.Fatal(err)
-	}
-
-	// A legacy APIService will not publish OpenAPI V3
-	// Ensure that we can still aggregate its V2 spec and convert it to V3.
-	path, ok := groupVersionList.Paths["apis/group.example.com/v1"]
-	if !ok {
-		t.Error("Expected group.example.com/v1 to be in group version list")
-	}
-	gotSpecJSON := sendReq(t, serveHandler, path.ServerRelativeURL)
-
-	expectedV3Bytes := []byte(`{"openapi":"3.0.0","info":{"title":"Kubernetes","version":"unversioned"},"components":{}}`)
-
-	if bytes.Compare(gotSpecJSON, expectedV3Bytes) != 0 {
-		t.Errorf("Spec mismatch, expected %s, got %s", expectedV3Bytes, gotSpecJSON)
-	}
-
-	apiServiceNames := specProxier.GetAPIServiceNames()
-	assert.ElementsMatch(t, []string{openAPIV2Converter, apiService.Name}, apiServiceNames)
-
-	// Ensure that OpenAPI v3 for legacy APIService is removed.
-	specProxier.RemoveAPIServiceSpec(apiService.Name)
-	data = sendReq(t, serveHandler, "/openapi/v3")
-	groupVersionList = handler3.OpenAPIV3Discovery{}
-	if err := json.Unmarshal(data, &groupVersionList); err != nil {
-		t.Fatal(err)
-	}
-
-	path, ok = groupVersionList.Paths["apis/group.example.com/v1"]
-	if ok {
-		t.Error("Expected group.example.com/v1 not to be in group version list")
-	}
-}
-
 func TestV3APIService(t *testing.T) {
 	downloader := Downloader{}
 
@@ -186,7 +117,7 @@ func TestV3APIService(t *testing.T) {
 	}
 
 	apiServiceNames := specProxier.GetAPIServiceNames()
-	assert.ElementsMatch(t, []string{openAPIV2Converter, apiService.Name}, apiServiceNames)
+	assert.ElementsMatch(t, []string{apiService.Name}, apiServiceNames)
 }
 
 func TestV3RootAPIService(t *testing.T) {
@@ -234,7 +165,7 @@ func TestV3RootAPIService(t *testing.T) {
 	}
 
 	apiServiceNames := specProxier.GetAPIServiceNames()
-	assert.ElementsMatch(t, []string{"k8s_internal_local_kube_aggregator_types", openAPIV2Converter}, apiServiceNames)
+	assert.ElementsMatch(t, []string{"k8s_internal_local_kube_aggregator_types"}, apiServiceNames)
 }
 
 func TestOpenAPIRequestMetrics(t *testing.T) {
