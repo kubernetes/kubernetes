@@ -161,8 +161,8 @@ func (w *waitingPod) Preempt(pluginName, msg string) bool {
 }
 
 func (w *waitingPod) stopWithStatus(status fwk.Code, pluginName, msg string) bool {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	for _, timer := range w.pendingPlugins {
 		timer.Stop()
 	}
