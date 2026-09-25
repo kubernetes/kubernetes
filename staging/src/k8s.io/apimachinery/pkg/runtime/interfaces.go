@@ -100,6 +100,16 @@ type EncoderWithAllocator interface {
 	EncodeWithAllocator(obj Object, w io.Writer, memAlloc MemoryAllocator) error
 }
 
+// StreamingCollectionEncoder is implemented by encoders that can serialize a
+// list one item at a time, keeping the amount of memory held at once bounded
+// regardless of the collection size.
+type StreamingCollectionEncoder interface {
+	// SupportsStreamingCollectionEncoding returns true if, for the way this
+	// encoder is currently configured, encoding a collection streams its items
+	// individually instead of materializing the whole collection in memory.
+	SupportsStreamingCollectionEncoding() bool
+}
+
 // Decoder attempts to load an object from data.
 type Decoder interface {
 	// Decode attempts to deserialize the provided data using either the innate typing of the scheme or the
