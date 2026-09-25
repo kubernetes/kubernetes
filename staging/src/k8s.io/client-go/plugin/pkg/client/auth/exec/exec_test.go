@@ -849,6 +849,79 @@ func TestRefreshCreds(t *testing.T) {
 	}
 }
 
+func TestDecodeMetaV1Status(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{
+			name: "valid metav1 status",
+			input: `{
+				"kind": "Status",
+				"apiVersion": "v1",
+				"status": "Failure",
+				"message": "plugin failed",
+				"reason": "Forbidden",
+				"code": 403
+			}`,
+		},
+		{
+			name: "empty message",
+			input: `{
+				"kind": "Status",
+				"apiVersion": "v1",
+				"status": "Failure"
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "successful status",
+			input: `{
+				"kind": "Status",
+				"apiVersion": "v1",
+				"status": "Success",
+				"message": "plugin failed"
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "wrong kind",
+			input: `{
+				"kind": "Config",
+				"apiVersion": "v1"
+			}`,
+			wantErr: true,
+		},
+		{
+			name:    "too large",
+			input:   strings.Repeat("a", maxExecStatusErrorStdoutLen+1),
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			status, err := decodeMetaV1Status([]byte(test.input))
+			if test.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got status %#v", status)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if status.Message != "plugin failed" {
+				t.Errorf("expected message %q, got %q", "plugin failed", status.Message)
+			}
+			if status.Status != v1.StatusFailure {
+				t.Errorf("expected status %q, got %q", v1.StatusFailure, status.Status)
+			}
+		})
+	}
+}
+
 type pluginPolicyTest struct {
 	name             string
 	wantErr          bool
