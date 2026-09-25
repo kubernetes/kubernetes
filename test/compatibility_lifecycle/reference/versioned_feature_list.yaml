@@ -923,6 +923,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.37"
+- name: InsecurePodWarnings
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: InterPodAffinityHostnameFastPath
   versionedSpecs:
   - default: false

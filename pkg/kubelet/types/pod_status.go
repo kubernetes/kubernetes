@@ -49,6 +49,11 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 			return true
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InsecurePodWarnings) {
+		if conditionType == v1.InsecureUserID || conditionType == v1.InsecureGroupID {
+			return true
+		}
+	}
 	return false
 }
 
