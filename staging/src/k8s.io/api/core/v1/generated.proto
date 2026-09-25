@@ -87,6 +87,7 @@ message AppArmorProfile {
   //   RuntimeDefault - the container runtime's default profile.
   //   Unconfined - no AppArmor enforcement.
   // +unionDiscriminator
+  // +required
   optional string type = 1;
 
   // localhostProfile indicates a profile loaded on the node that should be used.
@@ -605,6 +606,7 @@ message ConfigMapKeySelector {
 
   // key is the key to select from the ConfigMap's Data field.
   // Keys in the BinaryData field are not currently propagated to container env vars.
+  // +required
   optional string key = 2;
 
   // optional specifies whether the ConfigMap or its key must be defined
@@ -721,6 +723,7 @@ message Container {
   // name of the container specified as a DNS_LABEL.
   // Each container in a pod must have a unique name (DNS_LABEL).
   // Cannot be updated.
+  // +required
   optional string name = 1;
 
   // image is the container image name.
@@ -948,12 +951,15 @@ message Container {
 // extended resource name to the device request name.
 message ContainerExtendedResourceRequest {
   // containerName is the name of the container requesting resources.
+  // +required
   optional string containerName = 1;
 
   // resourceName is the name of the extended resource in that container which gets backed by DRA.
+  // +required
   optional string resourceName = 2;
 
   // requestName is the name of the request in the special ResourceClaim which corresponds to the extended resource.
+  // +required
   optional string requestName = 3;
 }
 
@@ -987,6 +993,7 @@ message ContainerPort {
 
   // containerPort is the number of port to expose on the pod's IP address.
   // This must be a valid port number, 0 < x < 65536.
+  // +required
   optional int32 containerPort = 3;
 
   // protocol is the protocol for port. Must be UDP, TCP, or SCTP.
@@ -1004,10 +1011,12 @@ message ContainerPort {
 message ContainerResizePolicy {
   // resourceName is the name of the resource to which this resource resize policy applies.
   // Supported values: cpu, memory.
+  // +required
   optional string resourceName = 1;
 
   // restartPolicy is the restart policy to apply when specified resource is resized.
   // If not specified, it defaults to NotRequired.
+  // +required
   optional string restartPolicy = 2;
 }
 
@@ -1071,6 +1080,7 @@ message ContainerStateRunning {
 // ContainerStateTerminated is a terminated state of a container.
 message ContainerStateTerminated {
   // exitCode is the exit status from the last termination of the container
+  // +optional
   optional int32 exitCode = 1;
 
   // signal from the last termination of the container
@@ -1114,6 +1124,7 @@ message ContainerStatus {
   // name is a DNS_LABEL representing the unique name of the container.
   // Each container in a pod must have a unique name across all container types.
   // Cannot be updated.
+  // +optional
   optional string name = 1;
 
   // state holds details about the container's current condition.
@@ -1133,23 +1144,27 @@ message ContainerStatus {
   //
   // The value is typically used to determine whether a container is ready to
   // accept traffic.
+  // +optional
   optional bool ready = 4;
 
   // restartCount holds the number of times the container has been restarted.
   // Kubelet makes an effort to always increment the value, but there
   // are cases when the state may be lost due to node restarts and then the value
   // may be reset to 0. The value is never negative.
+  // +optional
   optional int32 restartCount = 5;
 
   // image is the name of container image that the container is running.
   // The container image may not match the image used in the PodSpec,
   // as it may have been resolved by the runtime.
   // More info: https://kubernetes.io/docs/concepts/containers/images.
+  // +optional
   optional string image = 6;
 
   // imageID is the image ID of the container's image. The image ID may not
   // match the image ID of the image used in the PodSpec, as it may have been
   // resolved by the runtime.
+  // +optional
   optional string imageID = 7;
 
   // containerID is the ID of the container in the format '<type>://<container_id>'.
@@ -1489,6 +1504,7 @@ message EnvFromSource {
 message EnvVar {
   // name is the name of the environment variable.
   // May consist of any printable ASCII characters except '='.
+  // +required
   optional string name = 1;
 
   // value is the value of the environment variable. Variable references $(VAR_NAME) are expanded
@@ -1568,10 +1584,12 @@ message EphemeralContainer {
 message EphemeralContainerCommon {
   // name of the ephemeral container specified as a DNS_LABEL.
   // This name must be unique among all containers, init containers and ephemeral containers.
+  // +required
   optional string name = 1;
 
   // image is the container image name.
   // More info: https://kubernetes.io/docs/concepts/containers/images
+  // +required
   optional string image = 2;
 
   // command is the entrypoint array. Not executed within a shell.
@@ -2101,6 +2119,7 @@ message GCEPersistentDiskVolumeSource {
 // GRPCAction specifies an action involving a GRPC service.
 message GRPCAction {
   // port is the number of the gRPC service. Number must be in the range 1 to 65535.
+  // +required
   optional int32 port = 1;
 
   // service is the name of the service to place in the gRPC HealthCheckRequest
@@ -2198,6 +2217,7 @@ message HTTPGetAction {
   // port is the name or number of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
+  // +required
   optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
 
   // host is the host name to connect to, defaults to the pod IP. You probably want to set
@@ -2226,9 +2246,11 @@ message HTTPGetAction {
 message HTTPHeader {
   // name is the header field name.
   // This will be canonicalized upon output, so case-variant names will be understood as the same header.
+  // +required
   optional string name = 1;
 
   // value is the header field value
+  // +optional
   optional string value = 2;
 }
 
@@ -2241,6 +2263,7 @@ message HostAlias {
 
   // hostnames for the above IP address.
   // +listType=atomic
+  // +optional
   repeated string hostnames = 2;
 }
 
@@ -2562,9 +2585,11 @@ message LimitRangeSpec {
 // LinuxContainerUser represents user identity information in Linux containers
 message LinuxContainerUser {
   // uid is the primary uid initially attached to the first process in the container
+  // +optional
   optional int64 uid = 1;
 
   // gid is the primary gid initially attached to the first process in the container
+  // +optional
   optional int64 gid = 2;
 
   // supplementalGroups are the supplemental groups initially attached to the first process in the container
@@ -3083,6 +3108,7 @@ message NodeSelector {
   // nodeSelectorTerms is a list of node selector terms. The terms are ORed.
   // Required. A list of node selector terms. The terms are ORed.
   // +listType=atomic
+  // +required
   repeated NodeSelectorTerm nodeSelectorTerms = 1;
 }
 
@@ -3090,10 +3116,12 @@ message NodeSelector {
 // that relates the key and values.
 message NodeSelectorRequirement {
   // key is the label key that the selector applies to.
+  // +required
   optional string key = 1;
 
   // operator represents a key's relationship to a set of values.
   // Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+  // +required
   optional string operator = 2;
 
   // values is an array of string values. If the operator is In or NotIn,
@@ -3322,6 +3350,7 @@ message ObjectFieldSelector {
   optional string apiVersion = 1;
 
   // fieldPath is the path of the field to select in the specified API version.
+  // +required
   optional string fieldPath = 2;
 }
 
@@ -3955,7 +3984,7 @@ message Pod {
 
   // spec is the specification of the desired behavior of the pod.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional PodSpec spec = 2;
 
   // status is the most recently observed status of the pod.
@@ -4020,6 +4049,7 @@ message PodAffinityTerm {
   // whose value of the label with key topologyKey matches that of any node on which any of the
   // selected pods is running.
   // Empty topologyKey is not allowed.
+  // +required
   optional string topologyKey = 3;
 
   // namespaceSelector is a label query over the set of namespaces that the term applies to.
@@ -4219,6 +4249,7 @@ message PodCertificateProjection {
 message PodCondition {
   // type is the type of the condition.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+  // +required
   optional string type = 1;
 
   // observedGeneration if set, this represents the .metadata.generation that the pod condition was set based upon.
@@ -4228,6 +4259,7 @@ message PodCondition {
   // status is the status of the condition.
   // Can be True, False, Unknown.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+  // +optional
   optional string status = 2;
 
   // lastProbeTime is the last time we probed the condition.
@@ -4277,6 +4309,7 @@ message PodDNSConfig {
 message PodDNSConfigOption {
   // name is this DNS resolver option's name.
   // Required.
+  // +required
   optional string name = 1;
 
   // value is this DNS resolver option's value.
@@ -4324,10 +4357,12 @@ message PodExtendedResourceClaimStatus {
   // requestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request
   // in the generated ResourceClaim.
   // +listType=atomic
+  // +required
   repeated ContainerExtendedResourceRequest requestMappings = 1;
 
   // resourceClaimName is the name of the ResourceClaim that was
   // generated for the Pod in the namespace of the Pod.
+  // +required
   optional string resourceClaimName = 2;
 }
 
@@ -4419,6 +4454,7 @@ message PodOS {
   // Additional value may be defined in future and can be one of:
   // https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
   // Clients should expect to handle additional values and treat unrecognized values in this field as os: null
+  // +required
   optional string name = 1;
 }
 
@@ -4446,6 +4482,7 @@ message PodProxyOptions {
 // PodReadinessGate contains the reference to a pod condition
 message PodReadinessGate {
   // conditionType refers to a condition in the pod's condition list with matching type.
+  // +required
   optional string conditionType = 1;
 }
 
@@ -4466,6 +4503,7 @@ message PodReadinessGate {
 message PodResourceClaim {
   // name uniquely identifies this resource claim inside the pod.
   // This must be a DNS_LABEL.
+  // +required
   optional string name = 1;
 
   // resourceClaimName is the name of a ResourceClaim object in the same
@@ -4473,6 +4511,7 @@ message PodResourceClaim {
   //
   // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
   // be set.
+  // +optional
   optional string resourceClaimName = 3;
 
   // resourceClaimTemplateName is the name of a ResourceClaimTemplate
@@ -4500,6 +4539,7 @@ message PodResourceClaim {
   //
   // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
   // be set.
+  // +optional
   optional string resourceClaimTemplateName = 4;
 }
 
@@ -4510,6 +4550,7 @@ message PodResourceClaimStatus {
   // name uniquely identifies this resource claim inside the pod.
   // This must match the name of an entry in pod.spec.resourceClaims,
   // which implies that the string must be a DNS_LABEL.
+  // +required
   optional string name = 1;
 
   // resourceClaimName is the name of the ResourceClaim that was
@@ -4532,6 +4573,7 @@ message PodResourceClaimStatus {
 message PodSchedulingGate {
   // name of the scheduling gate.
   // Each scheduling gate must have a unique name field.
+  // +required
   optional string name = 1;
 }
 
@@ -4720,6 +4762,7 @@ message PodSpec {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
+  // +optional
   repeated Container initContainers = 20;
 
   // containers is the list of containers belonging to the pod.
@@ -4730,6 +4773,7 @@ message PodSpec {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
+  // +required
   repeated Container containers = 2;
 
   // ephemeralContainers is the list of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
@@ -5218,6 +5262,7 @@ message PodStatus {
   // ignored.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
   // +listType=atomic
+  // +optional
   repeated ContainerStatus initContainerStatuses = 10;
 
   // Statuses of containers in this pod.
@@ -5324,7 +5369,7 @@ message PodTemplate {
 
   // template defines the pods that will be created from this pod template.
   // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional PodTemplateSpec template = 2;
 }
 
@@ -5349,7 +5394,7 @@ message PodTemplateSpec {
 
   // spec is the specification of the desired behavior of the pod.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional PodSpec spec = 2;
 }
 
@@ -5454,9 +5499,11 @@ message PreferAvoidPodsEntry {
 // (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
 message PreferredSchedulingTerm {
   // weight is the weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
+  // +required
   optional int32 weight = 1;
 
   // preference is a node selector term, associated with the corresponding weight.
+  // +optional
   optional NodeSelectorTerm preference = 2;
 }
 
@@ -5847,6 +5894,7 @@ message ResourceClaim {
   // name must match the name of one entry in pod.spec.resourceClaims of
   // the Pod where this field is used. It makes that resource available
   // inside a container.
+  // +required
   optional string name = 1;
 
   // request is the name chosen for a request in the referenced claim.
@@ -5865,6 +5913,7 @@ message ResourceFieldSelector {
   optional string containerName = 1;
 
   // resource is the resource to select
+  // +required
   optional string resource = 2;
 
   // divisor optionally indicates how the resource from the container should be scaled.
@@ -5877,6 +5926,7 @@ message ResourceFieldSelector {
 // This is a part of KEP https://kep.k8s.io/4680.
 message ResourceHealth {
   // resourceID is the unique identifier of the resource. See the ResourceID type for more information.
+  // +optional
   optional string resourceID = 1;
 
   // health of the resource.
@@ -5889,6 +5939,7 @@ message ResourceHealth {
   //             For example, Device Plugin got unregistered and hasn't been re-registered since.
   //
   // In future we may want to introduce the PermanentlyUnhealthy Status.
+  // +required
   optional string health = 2;
 
   // message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
@@ -6005,6 +6056,7 @@ message ResourceStatus {
   // See ResourceID type definition for a specific format it has in various use cases.
   // +listType=map
   // +listMapKey=resourceID
+  // +optional
   repeated ResourceHealth resources = 2;
 }
 
@@ -6171,6 +6223,7 @@ message SeccompProfile {
   // RuntimeDefault - the container runtime default profile should be used.
   // Unconfined - no profile should be applied.
   // +unionDiscriminator
+  // +required
   optional string type = 1;
 
   // localhostProfile indicates a profile defined in a file on the node should be used.
@@ -6240,6 +6293,7 @@ message SecretKeySelector {
   optional LocalObjectReference localObjectReference = 1;
 
   // key is the key of the secret to select from.  Must be a valid secret key.
+  // +required
   optional string key = 2;
 
   // optional specifies whether the Secret or its key must be defined
@@ -6904,6 +6958,7 @@ message SessionAffinityConfig {
 // SleepAction describes a "sleep" action.
 message SleepAction {
   // seconds is the number of seconds to sleep.
+  // +optional
   optional int64 seconds = 1;
 }
 
@@ -6976,9 +7031,11 @@ message StorageOSVolumeSource {
 // Sysctl defines a kernel parameter to be set
 message Sysctl {
   // name of a property to set
+  // +required
   optional string name = 1;
 
   // value of a property to set
+  // +optional
   optional string value = 2;
 }
 
@@ -6987,6 +7044,7 @@ message TCPSocketAction {
   // port is the number or name of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
+  // +required
   optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 1;
 
   // host is the optional host name to connect to, defaults to the pod IP.
@@ -6999,6 +7057,7 @@ message TCPSocketAction {
 message Taint {
   // key is the taint key to be applied to a node. Required.
   // The taint key to be applied to a node.
+  // +required
   optional string key = 1;
 
   // value is the taint value corresponding to the taint key.
@@ -7008,6 +7067,7 @@ message Taint {
   // effect is the effect of the taint on pods
   // that do not tolerate the taint. Required.
   // Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
+  // +required
   optional string effect = 3;
 
   // timeAdded represents the time at which the taint was added.
@@ -7055,11 +7115,13 @@ message Toleration {
 // This is an alpha feature and may change in the future.
 message TopologySelectorLabelRequirement {
   // key is the label key that the selector applies to.
+  // +required
   optional string key = 1;
 
   // values is an array of string values. One value must match the label to be selected.
   // Each entry in values is ORed.
   // +listType=atomic
+  // +required
   repeated string values = 2;
 }
 
@@ -7100,6 +7162,7 @@ message TopologySpreadConstraint {
   // When `whenUnsatisfiable=ScheduleAnyway`, it is used to give higher precedence
   // to topologies that satisfy it.
   // It's a required field. Default value is 1 and 0 is not allowed.
+  // +required
   optional int32 maxSkew = 1;
 
   // topologyKey is the key of node labels. Nodes that have a label with this key
@@ -7112,6 +7175,7 @@ message TopologySpreadConstraint {
   // e.g. If TopologyKey is "kubernetes.io/hostname", each Node is a domain of that topology.
   // And, if TopologyKey is "topology.kubernetes.io/zone", each zone is a domain of that topology.
   // It's a required field.
+  // +required
   optional string topologyKey = 2;
 
   // whenUnsatisfiable indicates how to deal with a pod if it doesn't satisfy
@@ -7135,6 +7199,7 @@ message TopologySpreadConstraint {
   // MaxSkew(1). In other words, the cluster can still be imbalanced, but scheduler
   // won't make it *more* imbalanced.
   // It's a required field.
+  // +required
   optional string whenUnsatisfiable = 3;
 
   // labelSelector is used to find matching pods.
@@ -7765,9 +7830,11 @@ message VsphereVirtualDiskVolumeSource {
 message WeightedPodAffinityTerm {
   // weight associated with matching the corresponding podAffinityTerm,
   // in the range 1-100.
+  // +required
   optional int32 weight = 1;
 
   // podAffinityTerm is a pod affinity term, associated with the corresponding weight. required.
+  // +required
   optional PodAffinityTerm podAffinityTerm = 2;
 }
 
