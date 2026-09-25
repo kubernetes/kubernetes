@@ -135,10 +135,7 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 		//nolint:logcheck // Should be rare, not worth converting.
 		klog.Info("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
-		if err := configureHTTP2Transport(t); err != nil {
-			//nolint:logcheck // Should be rare, not worth converting.
-			klog.Warningf("Transport failed http2 configuration: %v", err)
-		}
+		configureHTTP2Transport(t)
 	}
 	return t
 }
@@ -175,11 +172,14 @@ func pingTimeoutSeconds() int {
 	return ret
 }
 
-func configureHTTP2Transport(t *http.Transport) error {
-	t2, err := http2.ConfigureTransports(t)
-	if err != nil {
-		return err
+func configureHTTP2Transport(t *http.Transport) {
+	// net/http does not enable HTTP/2 for a transport with a custom
+	// TLSClientConfig or dialer unless Protocols says so.
+	if t.Protocols == nil {
+		t.Protocols = new(http.Protocols)
+		t.Protocols.SetHTTP1(true)
 	}
+	t.Protocols.SetHTTP2(true)
 	// The following enables the HTTP/2 connection health check added in
 	// https://github.com/golang/net/pull/55. The health check detects and
 	// closes broken transport layer connections. Without the health check,
@@ -188,9 +188,11 @@ func configureHTTP2Transport(t *http.Transport) error {
 	// by default, which caused
 	// https://github.com/kubernetes/client-go/issues/374 and
 	// https://github.com/kubernetes/kubernetes/issues/87615.
-	t2.ReadIdleTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
-	t2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
-	return nil
+	if t.HTTP2 == nil {
+		t.HTTP2 = new(http.HTTP2Config)
+	}
+	t.HTTP2.SendPingTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
+	t.HTTP2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
 }
 
 func allowsHTTP2(t *http.Transport) bool {
