@@ -283,8 +283,9 @@ func processJSONPathInput(input string) (string, string, error) {
 	return relaxedJSONPathExp, jsonPathValue, nil
 }
 
-// splitJSONPathInput splits the provided input string on single '='. Double '==' will not cause the string to be
-// split. E.g., "a.b.c====d.e.f===g.h.i===" will split to ["a.b.c====d.e.f==","g.h.i==",""].
+// splitJSONPathInput splits the provided input string on single '='. An '=' that forms part of a comparison operator
+// ('==', '!=', '<=' or '>=') will not cause the string to be split, so that filter expressions survive intact.
+// E.g., "a.b.c====d.e.f===g.h.i===" will split to ["a.b.c====d.e.f==","g.h.i==",""].
 func splitJSONPathInput(input string) []string {
 	var output []string
 	var element strings.Builder
@@ -293,6 +294,10 @@ func splitJSONPathInput(input string) []string {
 			if i < len(input)-1 && input[i+1] == '=' {
 				element.WriteString("==")
 				i++
+				continue
+			}
+			if i > 0 && (input[i-1] == '!' || input[i-1] == '<' || input[i-1] == '>') {
+				element.WriteByte('=')
 				continue
 			}
 			output = append(output, element.String())
