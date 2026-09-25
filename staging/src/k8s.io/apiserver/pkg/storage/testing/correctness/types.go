@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -134,5 +135,16 @@ const (
 // Response represents the output/result from the storage interface invocation.
 type Response struct {
 	Object runtime.Object
+	Err    error
+}
+
+// WatchRequest contains parameters for a watch stream.
+type WatchRequest struct {
+	ResourceVersion string
+}
+
+// WatchResponse contains the events and any terminal error received from a watch stream.
+type WatchResponse struct {
+	Events []watch.Event
 	Err    error
 }
