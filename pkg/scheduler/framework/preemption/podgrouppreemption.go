@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -186,7 +187,8 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	}
 
 	// If the scheduling failed after removing all potential victims, return the status.
-	podGroupAssignments, status := podGroupSchedulingFunc(ctx)
+	preemptionState := NewPodGroupPreemptionState(potentialVictims)
+	podGroupAssignments, status := podGroupSchedulingFunc(WithPodGroupPreemptionState(ctx, preemptionState))
 	if !status.IsSuccess() {
 		return nil, status
 	}
@@ -336,4 +338,98 @@ func isGroupVictim(v fwk.PreemptionVictim) bool {
 	// It is only valid for the default preemption manager which groups by PGs.
 	// The assumption is that custom preemption managers will only be supplied in contexts where this metric isn't recorded.
 	return pods[0].GetPod().Spec.SchedulingGroup != nil
+}
+
+type podGroupPreemptionStateKey struct{}
+
+// PodGroupPreemptionState tracks dynamic victim eviction state across sequential
+// pod scheduling attempts within a single PodGroup preemption evaluation.
+type PodGroupPreemptionState struct {
+	mu sync.RWMutex
+
+	// victimsByNode maps nodeName -> list of potential PreemptionVictims that have
+	// at least one pod scheduled on that node, ordered in reprieve priority order.
+	victimsByNode map[string][]fwk.PreemptionVictim
+
+	// condemnedRefCount tracks how many assumed preemptor pods require a given
+	// PreemptionVictim to be evicted. Reference counting ensures clean rollback on Unreserve.
+	condemnedRefCount map[fwk.PreemptionVictim]int
+}
+
+// NewPodGroupPreemptionState initializes dynamic victim tracking state for a PodGroup preemption cycle.
+// The provided potentialVictims slice is expected to be ordered from least important to most important
+// (as returned by PreemptionManager.GenerateVictims).
+func NewPodGroupPreemptionState[T fwk.PreemptionVictim](potentialVictims []T) *PodGroupPreemptionState {
+	victimsByNode := make(map[string][]fwk.PreemptionVictim)
+	for _, v := range slices.Backward(potentialVictims) {
+		var pv fwk.PreemptionVictim = v
+		for _, pi := range pv.Pods() {
+			// Pre-populate cached resource requests before parallel PreScore workers read PodInfo.
+			pi.CalculateResource()
+			nodeName := pi.GetPod().Spec.NodeName
+			if !slices.Contains(victimsByNode[nodeName], pv) {
+				victimsByNode[nodeName] = append(victimsByNode[nodeName], pv)
+			}
+		}
+	}
+	return &PodGroupPreemptionState{
+		victimsByNode:     victimsByNode,
+		condemnedRefCount: make(map[fwk.PreemptionVictim]int),
+	}
+}
+
+// WithPodGroupPreemptionState attaches PodGroupPreemptionState to the context.
+func WithPodGroupPreemptionState(ctx context.Context, state *PodGroupPreemptionState) context.Context {
+	return context.WithValue(ctx, podGroupPreemptionStateKey{}, state)
+}
+
+// PodGroupPreemptionStateFromContext retrieves PodGroupPreemptionState from the context, or nil if not present.
+func PodGroupPreemptionStateFromContext(ctx context.Context) *PodGroupPreemptionState {
+	state, _ := ctx.Value(podGroupPreemptionStateKey{}).(*PodGroupPreemptionState)
+	return state
+}
+
+// SurvivingVictimsOnNode returns all potential victims on nodeName that have not yet been condemned.
+func (s *PodGroupPreemptionState) SurvivingVictimsOnNode(nodeName string) []fwk.PreemptionVictim {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	victims := s.victimsByNode[nodeName]
+	if len(victims) == 0 {
+		return nil
+	}
+	var surviving []fwk.PreemptionVictim
+	for _, v := range victims {
+		if s.condemnedRefCount[v] == 0 {
+			surviving = append(surviving, v)
+		}
+	}
+	return surviving
+}
+
+// AddCondemned marks the given victims as condemned by incrementing their reference counts.
+func (s *PodGroupPreemptionState) AddCondemned(victims []fwk.PreemptionVictim) {
+	if len(victims) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, v := range victims {
+		s.condemnedRefCount[v]++
+	}
+}
+
+// RemoveCondemned decrements the reference counts for the given victims when a pod assumption is unreserved.
+func (s *PodGroupPreemptionState) RemoveCondemned(victims []fwk.PreemptionVictim) {
+	if len(victims) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, v := range victims {
+		if count := s.condemnedRefCount[v]; count > 1 {
+			s.condemnedRefCount[v] = count - 1
+		} else {
+			delete(s.condemnedRefCount, v)
+		}
+	}
 }

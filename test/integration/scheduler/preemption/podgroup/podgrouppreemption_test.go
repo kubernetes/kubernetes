@@ -183,10 +183,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			// With custom scoring, preemptor pods will prefer high-1 node
-			// which will force preemption of low-1 pod.
-			expectedScheduled:               []string{"high-1", "high-2", "high-3", "very-low-1"},
-			expectedCandidatesForPreemption: []string{"low-1"},
+			// Even though custom scoring prefers node1, victim-aware preemption scoring
+			// prefers node2 to preempt very-low-1 (priority 5) instead of low-1 (priority 10).
+			expectedScheduled:               []string{"high-1", "high-2", "high-3", "low-1"},
+			expectedCandidatesForPreemption: []string{"very-low-1"},
 			expectedToHaveNNNInfo:           []string{},
 			expectedPodsPreemptedByWAP:      1,
 			customPluginName:                "mockScorePlugin",
@@ -1122,6 +1122,55 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedToHaveNNNInfo:           nil,
 			expectedPodsPreemptedByWAP:      0,
 			tempRemovePG:                    true,
+		},
+		{
+			name: "Victim-aware scoring: reuse capacity freed across nodes by DisruptionModeAll PodGroup victim",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(2).Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").DisruptionModeAll().Priority(10).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("v-pg1-1").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-victim").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("v-pg1-2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-victim").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("v-high").Node("node3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(20).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:               []string{"p1", "p2", "v-high"},
+			expectedCandidatesForPreemption: []string{"v-pg1-1", "v-pg1-2"},
+			expectedToHaveNNNInfo:           []string{"p1", "p2"},
+			expectedPodsPreemptedByWAP:      2,
+		},
+		{
+			name: "Victim-aware scoring: reuse leftover capacity from large victim on same node",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(2).Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").DisruptionModeAll().Priority(10).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("v-large").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("v-med-1").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-victim").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("v-med-2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-victim").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:               []string{"p1", "p2", "v-med-1", "v-med-2"},
+			expectedCandidatesForPreemption: []string{"v-large"},
+			expectedToHaveNNNInfo:           []string{"p1", "p2"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 	}
 
