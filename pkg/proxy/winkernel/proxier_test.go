@@ -2890,4 +2890,102 @@ func TestCreateServiceWhereFrontEndSameAsExistingLB(t *testing.T) {
 	lb, err := proxier.hcn.GetLoadBalancerByID(loadbalancerGuid1)
 	assert.Equal(t, nil, err, fmt.Sprintf("Failed to fetch loadbalancer: %s. Error: %v", loadbalancerGuid1, err))
 	assert.NotNil(t, lb, "Loadbalancer object should not be nil")
+func TestLoadBalancerIngressIPModeProxyVSVIP(t *testing.T) {
+	testCases := []struct {
+		name               string
+		lbIP               string
+		ipMode             *v1.LoadBalancerIPMode
+		shouldCreateLBRule bool
+	}{
+		{
+			name:               "ipMode Proxy",
+			lbIP:               "11.21.31.41",
+			ipMode:             ptr.To(v1.LoadBalancerIPModeProxy),
+			shouldCreateLBRule: false,
+		},
+		{
+			name:               "ipMode VIP",
+			lbIP:               "11.21.31.42",
+			ipMode:             ptr.To(v1.LoadBalancerIPModeVIP),
+			shouldCreateLBRule: true,
+		},
+		{
+			name:               "ipMode nil (default VIP)",
+			lbIP:               "11.21.31.43",
+			ipMode:             nil,
+			shouldCreateLBRule: true,
+		},
+	}
+
+	svcPort := 80
+	svcNodePort := 3001
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+			if proxier == nil {
+				t.Error("Failed to create proxier")
+				return
+			}
+
+			svcIP := "10.20.30.41"
+			svcPortName := proxy.ServicePortName{
+				NamespacedName: makeNSN("ns1", "svc1"),
+				Port:           "p80",
+				Protocol:       v1.ProtocolTCP,
+			}
+
+			makeServiceMap(proxier,
+				makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+					svc.Spec.Type = "LoadBalancer"
+					svc.Spec.ClusterIP = svcIP
+					svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
+						NodePort: int32(svcNodePort),
+					}}
+					svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+						IP:     tc.lbIP,
+						IPMode: tc.ipMode,
+					}}
+				}),
+			)
+
+			populateEndpointSlices(proxier,
+				makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+					eps.AddressType = discovery.AddressTypeIPv4
+					eps.Endpoints = []discovery.Endpoint{{
+						Addresses: []string{epIpAddressRemote},
+						NodeName:  ptr.To(testNodeName),
+					}}
+					eps.Ports = []discovery.EndpointPort{{
+						Name:     ptr.To(svcPortName.Port),
+						Port:     ptr.To(int32(svcPort)),
+						Protocol: ptr.To(v1.ProtocolTCP),
+					}}
+				}),
+			)
+
+			hcn := (proxier.hcn).(*fakehcn.HcnMock)
+			proxier.rootHnsEndpointName = endpointGw
+			hcn.PopulateQueriedEndpoints(endpointLocal1, guid, epIpAddressRemote, macAddress, prefixLen)
+			hcn.PopulateQueriedEndpoints(endpointGw, guid, epIpAddressGw, epMacAddressGw, prefixLen)
+			proxier.setInitialized(true)
+			proxier.syncProxyRules()
+
+			svc := proxier.svcPortMap[svcPortName]
+			svcInfo, ok := svc.(*serviceInfo)
+			if !ok {
+				t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+				return
+			}
+
+			hasLoadBalancerIngress := len(svcInfo.loadBalancerIngressIPs) > 0
+			if hasLoadBalancerIngress != tc.shouldCreateLBRule {
+				t.Errorf("Expected LoadBalancer ingress rule: %v, got: %v for ipMode %v", tc.shouldCreateLBRule, hasLoadBalancerIngress, tc.ipMode)
+			}
+		})
+	}
 }
