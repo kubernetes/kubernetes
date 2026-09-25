@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,13 +48,16 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	basecompatibility "k8s.io/component-base/compatibility"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -355,6 +359,15 @@ func TestPrepareRun(t *testing.T) {
 }
 
 func TestUpdateOpenAPISpec(t *testing.T) {
+	for _, lazyBuild := range []bool{false, true} {
+		t.Run(fmt.Sprintf("OpenAPIV2LazyBuild=%v", lazyBuild), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIV2LazyBuild, lazyBuild)
+			testUpdateOpenAPISpec(t, lazyBuild)
+		})
+	}
+}
+
+func testUpdateOpenAPISpec(t *testing.T, lazyBuild bool) {
 	_, ctx := ktesting.NewTestContext(t)
 	s, _, assert := newMaster(t)
 	s.PrepareRun()
@@ -363,18 +376,26 @@ func TestUpdateOpenAPISpec(t *testing.T) {
 	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
 
-	// verify the static spec in record is what we currently serve
-	oldSpec, err := json.Marshal(s.StaticOpenAPISpec)
-	assert.NoError(err)
-
 	resp, err := http.Get(server.URL + "/openapi/v2")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(err)
-	assert.Equal(oldSpec, body)
 	resp.Body.Close()
+
+	if lazyBuild {
+		// With lazy build no parsed spec is retained; the first request
+		// above triggered the build.
+		assert.Nil(s.StaticOpenAPISpec)
+		assert.NotNil(s.OpenAPIVersionedService)
+		assert.NotEmpty(body)
+	} else {
+		// verify the static spec in record is what we currently serve
+		oldSpec, err := json.Marshal(s.StaticOpenAPISpec)
+		require.NoError(t, err)
+		assert.Equal(oldSpec, body)
+	}
 
 	// verify we are able to update the served spec using the exposed service
 	newSpec := []byte(`{"swagger":"2.0","info":{"title":"Test Updated Generic API Server Swagger","version":"v0.1.0"},"paths":null}`)
