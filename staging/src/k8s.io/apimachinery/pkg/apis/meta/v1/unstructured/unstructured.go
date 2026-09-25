@@ -227,12 +227,30 @@ func (u *Unstructured) SetAPIVersion(version string) {
 	u.setNestedField(version, "apiVersion")
 }
 
+// WithAPIVersion sets the apiVersion and returns u, which allows an object with
+// type information to be constructed in a single expression:
+//
+//	obj := (&unstructured.Unstructured{}).WithAPIVersion("v1").WithKind("Pod")
+func (u *Unstructured) WithAPIVersion(version string) *Unstructured {
+	u.SetAPIVersion(version)
+	return u
+}
+
 func (u *Unstructured) GetKind() string {
 	return getNestedString(u.Object, "kind")
 }
 
 func (u *Unstructured) SetKind(kind string) {
 	u.setNestedField(kind, "kind")
+}
+
+// WithKind sets the kind and returns u, which allows an object with type
+// information to be constructed in a single expression:
+//
+//	obj := (&unstructured.Unstructured{}).WithAPIVersion("v1").WithKind("Pod")
+func (u *Unstructured) WithKind(kind string) *Unstructured {
+	u.SetKind(kind)
+	return u
 }
 
 func (u *Unstructured) GetNamespace() string {
@@ -257,6 +275,24 @@ func (u *Unstructured) SetName(name string) {
 		return
 	}
 	u.setNestedField(name, "metadata", "name")
+}
+
+// WithName sets the name and returns u, which allows an object with type and
+// identity information to be constructed in a single expression:
+//
+//	obj := (&unstructured.Unstructured{}).WithGroupVersionKind(gvk).WithNamespace("ns").WithName("n")
+func (u *Unstructured) WithName(name string) *Unstructured {
+	u.SetName(name)
+	return u
+}
+
+// WithNamespace sets the namespace and returns u, which allows an object with type
+// and identity information to be constructed in a single expression:
+//
+//	obj := (&unstructured.Unstructured{}).WithGroupVersionKind(gvk).WithNamespace("ns").WithName("n")
+func (u *Unstructured) WithNamespace(namespace string) *Unstructured {
+	u.SetNamespace(namespace)
+	return u
 }
 
 func (u *Unstructured) GetGenerateName() string {
@@ -425,6 +461,15 @@ func (u *Unstructured) SetAnnotations(annotations map[string]string) {
 func (u *Unstructured) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	u.SetAPIVersion(gvk.GroupVersion().String())
 	u.SetKind(gvk.Kind)
+}
+
+// WithGroupVersionKind sets the apiVersion and kind from gvk and returns u, which
+// allows an object with type information to be constructed in a single expression:
+//
+//	obj := (&unstructured.Unstructured{}).WithGroupVersionKind(gvk)
+func (u *Unstructured) WithGroupVersionKind(gvk schema.GroupVersionKind) *Unstructured {
+	u.SetGroupVersionKind(gvk)
+	return u
 }
 
 func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
