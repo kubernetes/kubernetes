@@ -344,8 +344,18 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 				}
 
 				freshPod, err := getPodFn(activePod.Namespace, activePod.Name)
+				if apierrors.IsNotFound(err) {
+					returnCh <- nil
+					return
+				}
 				// we ignore errors and let eviction sort it out with the original pod.
-				if err == nil {
+				if err == nil && freshPod != nil {
+					// If the pod has been recreated with a different UID or rescheduled to a different node,
+					// the original pod on the draining node has already been terminated.
+					if freshPod.ObjectMeta.UID != pod.ObjectMeta.UID || (len(pod.Spec.NodeName) > 0 && len(freshPod.Spec.NodeName) > 0 && freshPod.Spec.NodeName != pod.Spec.NodeName) {
+						returnCh <- nil
+						return
+					}
 					activePod = *freshPod
 				}
 			}
