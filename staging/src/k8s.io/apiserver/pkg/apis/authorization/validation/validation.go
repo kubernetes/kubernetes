@@ -17,13 +17,20 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // ValidateSubjectAccessReviewSpec validates a SubjectAccessReviewSpec and returns an
@@ -41,6 +48,9 @@ func ValidateSubjectAccessReviewSpec(spec authorizationv1.SubjectAccessReviewSpe
 	}
 	allErrs = append(allErrs, validateResourceAttributes(spec.ResourceAttributes, field.NewPath("spec.resourceAttributes"))...)
 
+	if spec.AuthorizationOptions != nil {
+		allErrs = append(allErrs, validateAuthorizationOptions(spec.AuthorizationOptions, fldPath.Child("authorizationOptions"))...)
+	}
 	return allErrs
 }
 
@@ -56,6 +66,71 @@ func ValidateSelfSubjectAccessReviewSpec(spec authorizationv1.SelfSubjectAccessR
 	}
 	allErrs = append(allErrs, validateResourceAttributes(spec.ResourceAttributes, field.NewPath("spec.resourceAttributes"))...)
 
+	if spec.AuthorizationOptions != nil {
+		allErrs = append(allErrs, validateAuthorizationOptions(spec.AuthorizationOptions, fldPath.Child("authorizationOptions"))...)
+	}
+	return allErrs
+}
+
+// validateAuthorizationOptions validates a AuthorizationOptions and returns an
+// ErrorList with any errors.
+func validateAuthorizationOptions(ao *authorizationv1.AuthorizationOptions, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// Only run the validation for HandledDecisionTypes when it is set, declarative validation already covers the "handledDecisionTypes is required case"
+	if 0 < len(ao.HandledDecisionTypes) && len(ao.HandledDecisionTypes) <= 32 {
+		if !sets.New(ao.HandledDecisionTypes...).IsSuperset(authorizationv1.UnconditionalAuthorizationDecisionTypes()) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("handledDecisionTypes"), ao.HandledDecisionTypes, "set must at least contain {Allow, Deny, NoOpinion}"))
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateSubjectAccessReviewStatus validates a SubjectAccessReviewSpec and returns an
+// ErrorList with any errors.
+func ValidateSubjectAccessReviewStatus(status authorizationv1.SubjectAccessReviewStatus, clientIsConditionsAware bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if status.Allowed && status.Denied {
+		allErrs = append(allErrs, field.Invalid(fldPath, authorizationv1.SubjectAccessReviewStatus{Allowed: status.Allowed, Denied: status.Denied},
+			"allowed and denied are mutually exclusive"))
+	}
+
+	if status.ConditionalDecision != nil {
+
+		// If status.ConditionalDecision is set, but the client did _not_ opt-into conditions, the server did not respect the wish of the client to be unconditional-only
+		if !clientIsConditionsAware {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("conditionalDecision"), "can only be set when the client opted into conditions-awareness"))
+		}
+
+		switch status.ConditionalDecision.Type {
+		// Avoid confusion; don't make it possible to specify [Allow, Deny, NoOpinion] top-level using status.conditionalDecision
+		case authorizationv1.ConditionsAwareDecisionTypeDeny, authorizationv1.ConditionsAwareDecisionTypeAllow, authorizationv1.ConditionsAwareDecisionTypeNoOpinion:
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("conditionalDecision", "type"), status.ConditionalDecision.Type,
+				"cannot be one of [Allow, Deny, NoOpinion], these decisions must be expressed using status.allowed and status.denied"))
+
+		// Enforce status.allowed=false && status.denied=false for a conditional decision
+		case authorizationv1.ConditionsAwareDecisionTypeConditionsMap, authorizationv1.ConditionsAwareDecisionTypeUnion:
+			if status.Allowed {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("allowed"),
+					fmt.Sprintf("must be false when status.conditionalDecision.type=%s", status.ConditionalDecision.Type)))
+			}
+			if status.Denied {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("denied"),
+					fmt.Sprintf("must be false when status.conditionalDecision.type=%s", status.ConditionalDecision.Type)))
+			}
+			if len(status.EvaluationError) != 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("evaluationError"),
+					fmt.Sprintf("must be empty when status.conditionalDecision.type=%s", status.ConditionalDecision.Type)))
+			}
+			if len(status.Reason) != 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("reason"),
+					fmt.Sprintf("must be empty when status.conditionalDecision.type=%s", status.ConditionalDecision.Type)))
+			}
+			// unrecognized modes are covered by declarative validation
+		}
+	}
+
 	return allErrs
 }
 
@@ -63,6 +138,8 @@ func ValidateSelfSubjectAccessReviewSpec(spec authorizationv1.SelfSubjectAccessR
 // ErrorList with any errors.
 func ValidateSubjectAccessReview(sar *authorizationv1.SubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
+	allErrs = append(allErrs, ValidateSubjectAccessReviewStatus(sar.Status, sar.Spec.AuthorizationOptions.SupportsConditionalAuthorization(), field.NewPath("status"))...)
+
 	objectMetaShallowCopy := sar.ObjectMeta
 	objectMetaShallowCopy.ManagedFields = nil
 	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
@@ -75,6 +152,7 @@ func ValidateSubjectAccessReview(sar *authorizationv1.SubjectAccessReview) field
 // ErrorList with any errors.
 func ValidateSelfSubjectAccessReview(sar *authorizationv1.SelfSubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSelfSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
+	allErrs = append(allErrs, ValidateSubjectAccessReviewStatus(sar.Status, sar.Spec.AuthorizationOptions.SupportsConditionalAuthorization(), field.NewPath("status"))...)
 	objectMetaShallowCopy := sar.ObjectMeta
 	objectMetaShallowCopy.ManagedFields = nil
 	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
@@ -87,6 +165,7 @@ func ValidateSelfSubjectAccessReview(sar *authorizationv1.SelfSubjectAccessRevie
 // ErrorList with any errors.
 func ValidateLocalSubjectAccessReview(sar *authorizationv1.LocalSubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
+	allErrs = append(allErrs, ValidateSubjectAccessReviewStatus(sar.Status, sar.Spec.AuthorizationOptions.SupportsConditionalAuthorization(), field.NewPath("status"))...)
 
 	objectMetaShallowCopy := sar.ObjectMeta
 	objectMetaShallowCopy.Namespace = ""
@@ -159,4 +238,102 @@ func validateLabelSelectorAttributes(selector *authorizationv1.LabelSelectorAttr
 	}
 
 	return allErrs
+}
+
+// ValidateAuthorizationConditionsReview validates a AuthorizationConditionsReview and returns an
+// ErrorList with any errors.
+func ValidateAuthorizationConditionsReview(acr *authorizationv1alpha1.AuthorizationConditionsReview) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if acr.Request != nil {
+		allErrs = append(allErrs, ValidateAuthorizationConditionsRequest(acr.Request, field.NewPath("request"))...)
+	}
+	if acr.Response != nil {
+		allErrs = append(allErrs, ValidateAuthorizationConditionsResponse(acr.Response, field.NewPath("response"))...)
+	}
+
+	objectMetaShallowCopy := acr.ObjectMeta
+	objectMetaShallowCopy.ManagedFields = nil
+	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), acr.ObjectMeta, `must be empty`))
+	}
+	return allErrs
+}
+
+// ValidateAuthorizationConditionsRequest validates a AuthorizationConditionsRequest and returns an
+// ErrorList with any errors.
+func ValidateAuthorizationConditionsRequest(req *authorizationv1alpha1.AuthorizationConditionsRequest, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	// conditionalDecision does not need any handwritten validation.
+	// That a ConditionsMap has between 1 and 128 conditions is enforced by authorizer.ConditionsAwareDecisionConditionsMap(...)
+
+	// Note: One could consider validating request.admissionRequest here, either declaratively or manually.
+	// However, the original AdmissionRequest does not have any validation.
+	return allErrs
+}
+
+// ValidateAuthorizationConditionsResponse validates a AuthorizationConditionsResponse and returns an
+// ErrorList with any errors.
+func ValidateAuthorizationConditionsResponse(resp *authorizationv1alpha1.AuthorizationConditionsResponse, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Declarative validation covers type being required, only validate if set
+	if len(resp.Decision.Type) != 0 {
+		switch resp.Decision.Type {
+		case authorizationv1.ConditionsAwareDecisionTypeDeny,
+			authorizationv1.ConditionsAwareDecisionTypeNoOpinion,
+			authorizationv1.ConditionsAwareDecisionTypeAllow:
+			// ok
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("decision", "type"), resp.Decision.Type, "currently must evaluate to an unconditional decision"))
+		}
+	}
+
+	return allErrs
+}
+
+// GetDeclarativeValidationOptions returns the options used in the authorization.k8s.io API group
+// DeclarativeValidationConfig returns the declarative validation config for the
+// authorization.k8s.io API group.
+func DeclarativeValidationConfig() rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{
+		Options: map[string]bool{
+			string(genericfeatures.ConditionalAuthorization): utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization),
+		},
+	}
+}
+
+// CombinedValidateSubjectAccessReviewCreate calls both the handwritten and declarative validations for SubjectAccessReview.
+func CombinedValidateSubjectAccessReviewCreate(ctx context.Context, sar *authorizationv1.SubjectAccessReview) (errs field.ErrorList) {
+	defer func() {
+		if r := recover(); r != nil {
+			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during SAR validation: %v", r)))
+		}
+	}()
+	errs = ValidateSubjectAccessReview(sar)
+
+	op := operation.Operation{
+		Type:    operation.Create,
+		Options: DeclarativeValidationConfig().Options,
+	}
+	declarativeErrs := authorizationv1.Validate_SubjectAccessReview(ctx, op, nil /* fldPath */, sar, nil)
+	errs = append(errs, declarativeErrs...)
+	return errs
+}
+
+// CombinedValidateAuthorizationConditionsReviewCreate calls both the handwritten and declarative validations for AuthorizationConditionsReview.
+func CombinedValidateAuthorizationConditionsReviewCreate(ctx context.Context, acr *authorizationv1alpha1.AuthorizationConditionsReview) (errs field.ErrorList) {
+	defer func() {
+		if r := recover(); r != nil {
+			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during ACR validation: %v", r)))
+		}
+	}()
+	errs = ValidateAuthorizationConditionsReview(acr)
+
+	op := operation.Operation{
+		Type:    operation.Create,
+		Options: DeclarativeValidationConfig().Options,
+	}
+	declarativeErrs := authorizationv1alpha1.Validate_AuthorizationConditionsReview(ctx, op, nil /* fldPath */, acr, nil)
+	errs = append(errs, declarativeErrs...)
+	return errs
 }
