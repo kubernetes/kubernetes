@@ -1,12 +1,16 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otelrestful // import "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
+package otelrestful
 
 import (
+	"strconv"
+
 	"github.com/emicklei/go-restful/v3"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
+	otelsemconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful/internal/semconv"
@@ -69,7 +73,18 @@ func OTelFilter(service string, opts ...Option) restful.FilterFunction {
 		chain.ProcessFilter(req, resp)
 
 		status := resp.StatusCode()
-		span.SetStatus(semconvServer.Status(status))
+		err := ctx.Err()
+		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
+			span.SetAttributes(otelsemconv.ErrorType(err))
+		} else {
+			stCode, stMsg := semconvServer.Status(status)
+			span.SetStatus(stCode, stMsg)
+			if status >= 500 && status < 600 {
+				span.SetAttributes(otelsemconv.ErrorTypeKey.String(strconv.Itoa(status)))
+			}
+		}
+
 		span.SetAttributes(semconvServer.ResponseTraceAttrs(semconv.ResponseTelemetry{
 			StatusCode: status,
 		})...)

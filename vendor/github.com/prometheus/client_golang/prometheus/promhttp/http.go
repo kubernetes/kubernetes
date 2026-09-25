@@ -372,12 +372,15 @@ func HandlerForTransactional(reg prometheus.TransactionalGatherer, opts HandlerO
 			return false
 		}
 
-		// Build metric name filter set from query params (if any)
+		// Build metric name filter set from query params (if any). The URL
+		// can be nil on hand-constructed requests.
 		var metricFilter map[string]struct{}
-		if metricNames := req.URL.Query()["name[]"]; len(metricNames) > 0 {
-			metricFilter = make(map[string]struct{}, len(metricNames))
-			for _, name := range metricNames {
-				metricFilter[name] = struct{}{}
+		if req.URL != nil {
+			if metricNames := req.URL.Query()["name[]"]; len(metricNames) > 0 {
+				metricFilter = make(map[string]struct{}, len(metricNames))
+				for _, name := range metricNames {
+					metricFilter[name] = struct{}{}
+				}
 			}
 		}
 
