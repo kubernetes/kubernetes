@@ -22,6 +22,7 @@ import (
 	"iter"
 	"maps"
 	"math/rand"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -40,6 +41,16 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
+)
+
+const (
+	// minFeasiblePlacementsToFind is the minimum number of placements that would be scored
+	// in each scheduling cycle.
+	minFeasiblePlacementsToFind = 1
+	// minFeasiblePlacementsPercentageToFind is the minimum adaptive percentage used when
+	// PercentageOfPlacementsToScore is 0. An explicitly configured lower value, such as 3,
+	// overrides this adaptive minimum.
+	minFeasiblePlacementsPercentageToFind = 5
 )
 
 // scheduleOnePodGroup does the entire workload-aware scheduling workflow for a single pod group.
@@ -839,9 +850,8 @@ func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
 // First it runs placement generator plugins to create a list of placements.
 // Placement is a set of nodes that will be considered when scheduling a pod group.
 // For a standalone PodGroup it evaluates the placement matching the pods' NominatedNodeName first
-// and uses it if the gang is feasible there, short-circuiting the rest. Otherwise (or for a
-// PodGroup that is part of a CompositePodGroup) it tries every placement through
-// podGroupSchedulingDefaultAlgorithm and runs placement scorer plugins to select the best one.
+// and uses it if the gang is feasible there, short-circuiting the rest. Otherwise it evaluates
+// candidates up to the feasible-placement limit and runs placement scorer plugins to select the best one.
 func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) (finalResult *podGroupAlgorithmResult, revertFns revertFns) {
 	allNodes, err := sched.nodeInfoSnapshot.ListNodesInPlacement()
 	if err != nil {
@@ -865,6 +875,18 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
 
+	numPlacementsToFind := 1
+	if schedFwk.HasPlacementScorePlugins() {
+		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
+	}
+
+	// Only a subset of placements will be evaluated, so shuffle to avoid favoring the order
+	// returned by the PlacementGenerate plugin. Clone the slice to avoid mutating plugin data.
+	if sched.shufflePlacements != nil && numPlacementsToFind < len(placements) {
+		placements = slices.Clone(placements)
+		sched.shufflePlacements(placements)
+	}
+
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
 	defer func() {
 		sched.nodeInfoSnapshot.ForgetPlacement()
@@ -884,7 +906,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	// CompositePodGroup defers its feasibility verdict to the CPG root, where a Success status
 	// with nothing scheduled is still meaningful. Short-circuiting on it (or dropping it) here
 	// could wrongly report the whole CPG Unschedulable and stop sibling groups from being
-	// evaluated, so CPG children evaluate every placement as before.
+	// evaluated, so CPG children use the regular placement search.
 	// TODO(kubernetes/kubernetes#140863): extend NNN support to CompositePodGroups.
 	nominatedFeasible := false
 	var nominated *fwk.Placement
@@ -928,6 +950,10 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 
 			if result.status.IsSuccess() {
 				successfulResults[placement] = result
+			}
+
+			if len(successfulResults) >= numPlacementsToFind {
+				break
 			}
 		}
 	}
@@ -1080,6 +1106,46 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 	return bestResult[podGroupInfo.GetKey()], revertFns
 }
 
+// randShufflePlacements is the default placement shuffler, randomizing placement order in place.
+func randShufflePlacements(placements []*fwk.Placement) {
+	rand.Shuffle(len(placements), func(i, j int) {
+		placements[i], placements[j] = placements[j], placements[i]
+	})
+}
+
+// numFeasiblePlacementsToFind returns the number of feasible placements that once found, the scheduler stops
+// its search for more feasible placements.
+func (sched *Scheduler) numFeasiblePlacementsToFind(percentageOfPlacementsToScore *int32, placements []*fwk.Placement) (numPlacements int) {
+	numAllPlacements := len(placements)
+
+	if numAllPlacements < minFeasiblePlacementsToFind {
+		return numAllPlacements
+	}
+
+	// Use profile percentageOfPlacementsToScore if it's set. Otherwise, use global percentageOfPlacementsToScore.
+	var percentage int
+	if percentageOfPlacementsToScore != nil {
+		percentage = int(*percentageOfPlacementsToScore)
+	} else {
+		percentage = int(sched.percentageOfPlacementsToScore)
+	}
+
+	// If percentage is 0, linearly interpolate from 100% to 10% as the summed node count
+	// across generated placements grows from 0 to 5000, with a 5% floor.
+	if percentage == 0 {
+		numAllNodes := 0
+		for _, placement := range placements {
+			// Placements may overlap or omit cluster nodes, so use their summed node count.
+			numAllNodes += len(placement.Nodes)
+		}
+		percentage = max(minFeasiblePlacementsPercentageToFind, 100-numAllNodes*9/500)
+	}
+
+	numPlacements = max(minFeasiblePlacementsToFind, numAllPlacements*percentage/100)
+
+	return numPlacements
+}
+
 func (sched *Scheduler) findBestPodGroupPlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState fwk.PodGroupCycleState, podGroupInfo *framework.PodGroupInfo, successfulResults map[*fwk.Placement]*podGroupAlgorithmResult) (*fwk.Placement, *fwk.Status) {
 	if len(successfulResults) == 1 {
 		for placement := range successfulResults {
@@ -1139,8 +1205,7 @@ func (sched *Scheduler) evaluatePlacement(ctx context.Context, schedFwk framewor
 //
 // The framework contract permits overlapping placements, so a nominated node can appear in more
 // than one. NNN alone can't tell which placement WAP picked last cycle, so we only take the fast
-// path when exactly one placement matches; otherwise the caller scores every placement, which is
-// deterministic regardless of the order the generator returned them.
+// path when exactly one placement matches; otherwise the caller uses the regular placement search.
 func nominatedPlacement(placements []*fwk.Placement, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) *fwk.Placement {
 	// Collect nominated nodes across the pods of the currently evaluated pod group node
 	// (podGroupInfo), which for CPG TAS is the CPG or PG carrying the TAS constraints, not the
@@ -1160,7 +1225,7 @@ func nominatedPlacement(placements []*fwk.Placement, podGroupInfo *framework.Pod
 		for _, node := range placement.Nodes {
 			if nominatedNodes.Has(node.Node().Name) {
 				if matched != nil {
-					// Overlap: fall back to scoring all placements.
+					// Overlap: fall back to the regular placement search.
 					return nil
 				}
 				matched = placement

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
@@ -68,7 +69,8 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 		errs = append(errs, validateCommonQueueSort(profilesPath, cc.Profiles)...)
 	}
 
-	errs = append(errs, validatePercentageOfNodesToScore(field.NewPath("percentageOfNodesToScore"), cc.PercentageOfNodesToScore))
+	errs = append(errs, validatePercentage(field.NewPath("percentageOfNodesToScore"), cc.PercentageOfNodesToScore))
+	errs = append(errs, validatePercentageOfPlacementsToScore(field.NewPath("percentageOfPlacementsToScore"), cc.PercentageOfPlacementsToScore))
 
 	if cc.PodInitialBackoffSeconds <= 0 {
 		errs = append(errs, field.Invalid(field.NewPath("podInitialBackoffSeconds"),
@@ -83,13 +85,22 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 	return utilerrors.Flatten(utilerrors.NewAggregate(errs))
 }
 
-func validatePercentageOfNodesToScore(path *field.Path, percentageOfNodesToScore *int32) error {
-	if percentageOfNodesToScore != nil {
-		if *percentageOfNodesToScore < 0 || *percentageOfNodesToScore > 100 {
-			return field.Invalid(path, *percentageOfNodesToScore, "not in valid range [0-100]")
+func validatePercentage(path *field.Path, percentage *int32) error {
+	if percentage != nil {
+		if *percentage < 0 || *percentage > 100 {
+			return field.Invalid(path, *percentage, "not in valid range [0-100]")
 		}
 	}
 	return nil
+}
+
+func validatePercentageOfPlacementsToScore(path *field.Path, percentageOfPlacementsToScore *int32) error {
+	if percentageOfPlacementsToScore != nil {
+		if !feature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+			return field.Forbidden(path, "percentageOfPlacementsToScore requires TopologyAwareWorkloadScheduling feature gate to be enabled")
+		}
+	}
+	return validatePercentage(path, percentageOfPlacementsToScore)
 }
 
 type invalidPlugins struct {
@@ -143,7 +154,8 @@ func validateKubeSchedulerProfile(path *field.Path, apiVersion string, profile *
 	if len(profile.SchedulerName) == 0 {
 		errs = append(errs, field.Required(path.Child("schedulerName"), ""))
 	}
-	errs = append(errs, validatePercentageOfNodesToScore(path.Child("percentageOfNodesToScore"), profile.PercentageOfNodesToScore))
+	errs = append(errs, validatePercentage(path.Child("percentageOfNodesToScore"), profile.PercentageOfNodesToScore))
+	errs = append(errs, validatePercentageOfPlacementsToScore(path.Child("percentageOfPlacementsToScore"), profile.PercentageOfPlacementsToScore))
 	errs = append(errs, validatePluginConfig(path, apiVersion, profile)...)
 	return errs
 }
