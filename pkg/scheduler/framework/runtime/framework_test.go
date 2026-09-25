@@ -196,6 +196,29 @@ func newTestPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk
 	return &TestPlugin{name: testPlugin}, nil
 }
 
+const testPluginToWriteState = "test-plugin-to-write-state"
+
+type testCycleState struct {
+	message string
+}
+
+func (t *testCycleState) Clone() fwk.StateData {
+	return &testCycleState{t.message}
+}
+
+type TestPluginToWriteState struct {
+	name string
+}
+
+func (pl *TestPluginToWriteState) Name() string {
+	return pl.name
+}
+
+func (pl *TestPluginToWriteState) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	state.Write(testPluginToWriteState, &testCycleState{"Filter has been called!"})
+	return nil
+}
+
 // TestPlugin implements all Plugin interfaces.
 type TestPlugin struct {
 	name string
@@ -3475,12 +3498,13 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 	tests := []struct {
 		name            string
 		preFilterPlugin *TestPlugin
-		filterPlugin    *TestPlugin
+		filterPlugin    fwk.Plugin
 		pod             *v1.Pod
 		nominatedPod    *v1.Pod
 		node            *v1.Node
 		nodeInfo        *framework.NodeInfo
 		wantStatus      *fwk.Status
+		wantState       *testCycleState // if non-nil, verify the CycleState content written by the filter plugin
 	}{
 		{
 			name:            "node has no nominated pod",
@@ -3567,6 +3591,26 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			nodeInfo:     framework.NewNodeInfo(pod),
 			wantStatus:   nil,
 		},
+		{
+			name: "lower-priority nominated pod does not clone CycleState",
+			preFilterPlugin: &TestPlugin{
+				name: "TestPlugin1",
+				inj: injectedResult{
+					PreFilterAddPodStatus: int(fwk.Unschedulable),
+				},
+			},
+			filterPlugin: &TestPluginToWriteState{
+				name: "TestPlugin2",
+			},
+			pod:          highPriorityPod,
+			nominatedPod: lowPriorityPod,
+			node:         node,
+			nodeInfo:     framework.NewNodeInfo(pod),
+			wantStatus:   nil,
+			wantState: &testCycleState{
+				message: "Filter has been called!",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -3588,15 +3632,15 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				)
 			}
 			if tt.filterPlugin != nil {
-				if err := registry.Register(tt.filterPlugin.name,
+				if err := registry.Register(tt.filterPlugin.Name(),
 					func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 						return tt.filterPlugin, nil
 					}); err != nil {
-					t.Fatalf("fail to register filter plugin (%s)", tt.filterPlugin.name)
+					t.Fatalf("fail to register filter plugin (%s)", tt.filterPlugin.Name())
 				}
 				cfgPls.Filter.Enabled = append(
 					cfgPls.Filter.Enabled,
-					config.Plugin{Name: tt.filterPlugin.name},
+					config.Plugin{Name: tt.filterPlugin.Name()},
 				)
 			}
 
@@ -3631,9 +3675,19 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				_ = f.Close()
 			}()
 			tt.nodeInfo.SetNode(tt.node)
+			state := framework.NewCycleState()
 			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, state, tt.pod, tt.nodeInfo)
 			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("Unexpected status: (-want,+got):\n%s", diff)
+			}
+			if tt.wantState != nil {
+				gotState, err := state.Read(testPluginToWriteState)
+				if err != nil {
+					t.Fatalf("Failed to read state key %q: %v", testPluginToWriteState, err)
+				}
+				if diff := cmp.Diff(tt.wantState, gotState, cmp.AllowUnexported(testCycleState{})); diff != "" {
+					t.Errorf("Unexpected state: (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}
