@@ -938,6 +938,452 @@ func TestCPGTopologyAwareScheduling(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "CPG schedules on a single rack, choosing placement with highest allocation percentage (NodeResourcesFit placement scoring)",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in two racks, each rack with 4 CPU capacity",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-z1-r1", "rack-1", "zone-1"),
+						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+						makeNode("node3-z1-r2", "rack-2", "zone-1"),
+						makeNode("node4-z1-r2", "rack-2", "zone-1"),
+					},
+				},
+				{
+					Name: "Create a preexisting pod consuming 1 CPU on rack-1 leaving 3 CPU free",
+					CreatePods: []*v1.Pod{
+						makeAssignedPod("existing", "node1-z1-r1", "1"),
+					},
+				},
+				{
+					Name:                    "Create root CompositePodGroup (Gang minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1 (Gang minCount=1, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "", 1),
+				},
+				{
+					Name:           "Create child PodGroup pg2 (Gang minCount=2, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 2),
+				},
+				{
+					Name: "Create pods for pg1 (1 pod) and pg2 (2 pods), requiring 3 CPU total",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg2"),
+						makePod("p3", "pg2"),
+					},
+				},
+				{
+					Name:                 "Verify all pods in the composite group are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name: "Verify all pods scheduled on rack-1 due to highest allocation percentage scoring",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3"},
+						Nodes: sets.New("node1-z1-r1", "node2-z1-r1"),
+					},
+				},
+			},
+		},
+		{
+			name: "CPG schedules on a single rack, choosing placement that accommodates more descendant pods (PodGroupPodsCount placement scoring)",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in two racks, each rack with 4 CPU capacity",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-z1-r1", "rack-1", "zone-1"),
+						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+						makeNode("node3-z1-r2", "rack-2", "zone-1"),
+						makeNode("node4-z1-r2", "rack-2", "zone-1"),
+					},
+				},
+				{
+					Name: "Create a preexisting pod consuming 1 CPU on rack-1 leaving only 3 CPU free",
+					CreatePods: []*v1.Pod{
+						makeAssignedPod("existing", "node1-z1-r1", "1"),
+					},
+				},
+				{
+					Name:           "Create child PodGroup pg1 (Gang minCount=2, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg2 (Gang minCount=2, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 2),
+				},
+				{
+					Name: "Create 4 pods across pg1 and pg2 requiring 4 CPU total",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg2"),
+						makePod("p4", "pg2"),
+					},
+				},
+				{
+					Name:                    "Create root CompositePodGroup (Gang minGroupCount=1, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 1),
+				},
+				{
+					Name:                 "Verify all 4 pods are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
+				},
+				{
+					Name: "Verify all pods scheduled on rack-2 which fits all 4 pods",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3", "p4"},
+						Nodes: sets.New("node3-z1-r2", "node4-z1-r2"),
+					},
+				},
+			},
+		},
+		{
+			name: "CPG with minGroupCount < total children schedules satisfying subset on a single rack",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in two racks, each rack with 4 CPU capacity",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-z1-r1", "rack-1", "zone-1"),
+						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+						makeNode("node3-z1-r2", "rack-2", "zone-1"),
+						makeNode("node4-z1-r2", "rack-2", "zone-1"),
+					},
+				},
+				{
+					Name: "Occupy rack-2 completely with preexisting pods",
+					CreatePods: []*v1.Pod{
+						makeAssignedPod("existing1", "node3-z1-r2", "2"),
+						makeAssignedPod("existing2", "node4-z1-r2", "2"),
+					},
+				},
+				{
+					Name:                    "Create root CompositePodGroup (Gang minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1 (Gang minCount=2, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg2 (Gang minCount=2, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg3 (Gang minCount=2, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg3", "cpg-root", "", 2),
+				},
+				{
+					Name: "Create pods for pg1, pg2, and pg3 (6 pods total)",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg2"),
+						makePod("p4", "pg2"),
+						makePod("p5", "pg3"),
+						makePod("p6", "pg3"),
+					},
+				},
+				{
+					Name:                 "Verify pods for pg1 and pg2 are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
+				},
+				{
+					Name:                     "Verify pods for pg3 remain unschedulable",
+					WaitForPodsUnschedulable: []string{"p5", "p6"},
+				},
+				{
+					Name: "Verify scheduled pods are on rack-1",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3", "p4"},
+						Nodes: sets.New("node1-z1-r1", "node2-z1-r1"),
+					},
+				},
+			},
+		},
+		{
+			name: "basic CPG schedules available pods on a single rack and continues scheduling as resources become available",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in rack-1 with 4 CPU total capacity",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-z1-r1", "rack-1", "zone-1"),
+						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+					},
+				},
+				{
+					Name: "Create a preexisting pod consuming 2 CPU on node1 leaving only 2 CPU on node2",
+					CreatePods: []*v1.Pod{
+						makeAssignedPod("existing", "node1-z1-r1", "2"),
+					},
+				},
+				{
+					Name:                    "Create root CompositePodGroup (Basic policy, TopologyKey=rack)",
+					CreateCompositePodGroup: makeBasicCompositePodGroup("cpg-root", "", "rack"),
+				},
+				{
+					Name:           "Create child PodGroup pg1 (Basic policy, Parent=cpg-root)",
+					CreatePodGroup: makeBasicPodGroupWithParent("pg1", "cpg-root", ""),
+				},
+				{
+					Name:           "Create child PodGroup pg2 (Basic policy, Parent=cpg-root)",
+					CreatePodGroup: makeBasicPodGroupWithParent("pg2", "cpg-root", ""),
+				},
+				{
+					Name: "Create pods for pg1 and pg2 (4 pods total)",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg2"),
+						makePod("p4", "pg2"),
+					},
+				},
+				{
+					Name:                 "Verify pods for pg1 are scheduled on the available node",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name:                     "Verify pods for pg2 remain unschedulable",
+					WaitForPodsUnschedulable: []string{"p3", "p4"},
+				},
+				{
+					Name:       "Delete the preexisting pod to free up resources on rack-1",
+					DeletePods: []string{"existing"},
+				},
+				{
+					Name:                 "Verify pods for pg2 are now scheduled",
+					WaitForPodsScheduled: []string{"p3", "p4"},
+				},
+				{
+					Name: "Verify all pods across pg1 and pg2 are scheduled on rack-1",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3", "p4"},
+						Nodes: sets.New("node1-z1-r1", "node2-z1-r1"),
+					},
+				},
+			},
+		},
+		{
+			name: "two CPG hierarchies schedule consecutively, each on a separate rack",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in two racks, each rack with 4 CPU capacity",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-z1-r1", "rack-1", "zone-1"),
+						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+						makeNode("node3-z1-r2", "rack-2", "zone-1"),
+						makeNode("node4-z1-r2", "rack-2", "zone-1"),
+					},
+				},
+				{
+					Name:                    "Create first CompositePodGroup cpg-root1 (Gang minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root1", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1-1 (Gang minCount=2, Parent=cpg-root1)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1-1", "cpg-root1", "", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1-2 (Gang minCount=2, Parent=cpg-root1)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1-2", "cpg-root1", "", 2),
+				},
+				{
+					Name: "Create pods for cpg-root1",
+					CreatePods: []*v1.Pod{
+						makePod("p1-1", "pg1-1"),
+						makePod("p1-2", "pg1-1"),
+						makePod("p1-3", "pg1-2"),
+						makePod("p1-4", "pg1-2"),
+					},
+				},
+				{
+					Name:                 "Verify all pods for cpg-root1 are scheduled",
+					WaitForPodsScheduled: []string{"p1-1", "p1-2", "p1-3", "p1-4"},
+				},
+				{
+					Name: "Verify all pods for cpg-root1 are assigned in a single rack",
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
+						Pods:        []string{"p1-1", "p1-2", "p1-3", "p1-4"},
+						TopologyKey: "rack",
+					},
+				},
+				{
+					Name:                    "Create second CompositePodGroup cpg-root2 (Gang minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root2", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg2-1 (Gang minCount=2, Parent=cpg-root2)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2-1", "cpg-root2", "", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg2-2 (Gang minCount=2, Parent=cpg-root2)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2-2", "cpg-root2", "", 2),
+				},
+				{
+					Name: "Create pods for cpg-root2",
+					CreatePods: []*v1.Pod{
+						makePod("p2-1", "pg2-1"),
+						makePod("p2-2", "pg2-1"),
+						makePod("p2-3", "pg2-2"),
+						makePod("p2-4", "pg2-2"),
+					},
+				},
+				{
+					Name:                 "Verify all pods for cpg-root2 are scheduled",
+					WaitForPodsScheduled: []string{"p2-1", "p2-2", "p2-3", "p2-4"},
+				},
+				{
+					Name: "Verify all pods for cpg-root2 are assigned in a single rack",
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
+						Pods:        []string{"p2-1", "p2-2", "p2-3", "p2-4"},
+						TopologyKey: "rack",
+					},
+				},
+			},
+		},
+		{
+			name: "two CPG hierarchies schedule consecutively, second remains pending when no additional rack is available",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in a single rack with 4 CPU capacity",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-z1-r1", "rack-1", "zone-1"),
+						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+					},
+				},
+				{
+					Name:                    "Create first CompositePodGroup cpg-root1 (Gang minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root1", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1-1 (Gang minCount=2, Parent=cpg-root1)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1-1", "cpg-root1", "", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1-2 (Gang minCount=2, Parent=cpg-root1)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1-2", "cpg-root1", "", 2),
+				},
+				{
+					Name: "Create pods for cpg-root1",
+					CreatePods: []*v1.Pod{
+						makePod("p1-1", "pg1-1"),
+						makePod("p1-2", "pg1-1"),
+						makePod("p1-3", "pg1-2"),
+						makePod("p1-4", "pg1-2"),
+					},
+				},
+				{
+					Name:                 "Verify all pods for cpg-root1 are scheduled",
+					WaitForPodsScheduled: []string{"p1-1", "p1-2", "p1-3", "p1-4"},
+				},
+				{
+					Name:                    "Create second CompositePodGroup cpg-root2 (Gang minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root2", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg2-1 (Gang minCount=2, Parent=cpg-root2)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2-1", "cpg-root2", "", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg2-2 (Gang minCount=2, Parent=cpg-root2)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2-2", "cpg-root2", "", 2),
+				},
+				{
+					Name: "Create pods for cpg-root2",
+					CreatePods: []*v1.Pod{
+						makePod("p2-1", "pg2-1"),
+						makePod("p2-2", "pg2-1"),
+						makePod("p2-3", "pg2-2"),
+						makePod("p2-4", "pg2-2"),
+					},
+				},
+				{
+					Name:                     "Verify pods for cpg-root2 remain unschedulable",
+					WaitForPodsUnschedulable: []string{"p2-1", "p2-2", "p2-3", "p2-4"},
+				},
+			},
+		},
+		{
+			name: "CPG hierarchy with mixed sub-CPG and direct child PGs and different topology constraints",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes across zones and racks",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-z1-r1", "rack-1", "zone-1"),
+						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+						makeNode("node3-z1-r2", "rack-2", "zone-1"),
+						makeNode("node4-z1-r2", "rack-2", "zone-1"),
+						makeNode("node5-z2-r1", "rack-1", "zone-2"),
+						makeNode("node6-z2-r2", "rack-2", "zone-2"),
+					},
+				},
+				{
+					Name:                    "Create root CompositePodGroup (Gang minGroupCount=3, TopologyKey=zone)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "zone", 3),
+				},
+				{
+					Name:                    "Create sub CompositePodGroup cpg-sub1 (Gang minGroupCount=2, TopologyKey=rack, Parent=cpg-root)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-sub1", "cpg-root", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1 (Gang minCount=2, without topology constraints, Parent=cpg-sub1)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-sub1", "", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg2 (Gang minCount=2, without topology constraints, Parent=cpg-sub1)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-sub1", "", 2),
+				},
+				{
+					Name:           "Create direct child PodGroup pg3 (Gang minCount=2, TopologyKey=rack, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg3", "cpg-root", "rack", 2),
+				},
+				{
+					Name:           "Create direct child PodGroup pg4 (Gang minCount=2, without topology constraints, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg4", "cpg-root", "", 2),
+				},
+				{
+					Name: "Create all pods across pg1, pg2, pg3, and pg4 (8 pods total)",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg2"),
+						makePod("p4", "pg2"),
+						makePod("p5", "pg3"),
+						makePod("p6", "pg3"),
+						makePod("p7", "pg4"),
+						makePod("p8", "pg4"),
+					},
+				},
+				{
+					Name:                 "Verify all 8 pods across all child groups are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"},
+				},
+				{
+					Name: "Verify all pods are assigned in the same zone",
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
+						Pods:        []string{"p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"},
+						TopologyKey: "zone",
+					},
+				},
+				{
+					Name: "Verify cpg-sub1 pods are assigned in the same rack",
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
+						Pods:        []string{"p1", "p2", "p3", "p4"},
+						TopologyKey: "rack",
+					},
+				},
+				{
+					Name: "Verify pg3 pods are assigned in the same rack",
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
+						Pods:        []string{"p5", "p6"},
+						TopologyKey: "rack",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
