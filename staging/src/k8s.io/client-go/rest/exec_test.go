@@ -322,7 +322,7 @@ func TestConfigToExecClusterRoundtrip(t *testing.T) {
 				t.Fatalf("failed to get url from actual proxy func: %s", actualErr.Error())
 			}
 			if expectedErr != nil {
-				t.Fatalf("failed to get url from expected proxy func: %s", actualErr.Error())
+				t.Fatalf("failed to get url from expected proxy func: %s", expectedErr.Error())
 			}
 			if diff := cmp.Diff(actualURL, expectedURL); diff != "" {
 				t.Fatal("we dropped the Config.Proxy field during conversion")
