@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -95,31 +94,31 @@ func (s *Model) Equal(other *Model) bool {
 	return s.ResourceVersion == other.ResourceVersion && s.Prefix == other.Prefix && reflect.DeepEqual(s.Items, other.Items)
 }
 
-// Step applies an operation to the sequential state machine. event is the watch
-// event the operation produced, or nil if the operation didn't write.
-func (s *Model) Step(input Request, output Response) (ok bool, next *Model, event *watch.Event) {
+// Step applies an operation to the sequential state machine. change is the
+// write the operation made, or nil if the operation didn't write.
+func (s *Model) Step(input Request, output Response) (ok bool, next *Model, change *Change) {
 	next = s
 	var expected Response
 	switch input.Op {
 	case OpCreate:
 		next = s.Clone()
-		expected, event = next.create(input.Key, input.Create.Object)
+		expected, change = next.create(input.Key, input.Create.Object)
 	case OpDelete:
 		next = s.Clone()
-		expected, event = next.delete(context.Background(), input.Key, input.Delete.Preconditions, nil)
+		expected, change = next.delete(context.Background(), input.Key, input.Delete.Preconditions, nil)
 	case OpGet:
 		expected = s.get(input.Key, input.Get.Options)
 	case OpUpdate:
 		next = s.Clone()
-		expected, event = next.update(context.Background(), input.Key, input.Update.IgnoreNotFound, input.Update.Preconditions, input.Update.UpdateFunc, input.Update.CachedExistingObject)
+		expected, change = next.update(context.Background(), input.Key, input.Update.IgnoreNotFound, input.Update.Preconditions, input.Update.UpdateFunc, input.Update.CachedExistingObject)
 	}
 	if !reflect.DeepEqual(expected, output) {
 		return false, s, nil
 	}
-	return true, next, event
+	return true, next, change
 }
 
-func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) (Response, *watch.Event) {
+func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) (Response, *Change) {
 	stored, exists := s.Items[key]
 	var currentObj runtime.Object
 	var currentRV uint64
@@ -174,15 +173,11 @@ func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, pre
 	}
 	accessor.SetResourceVersion(strconv.FormatUint(s.ResourceVersion, 10))
 	s.Items[key] = copied
-	// An update with ignoreNotFound on a missing key creates the object.
-	eventType := watch.Modified
-	if !exists {
-		eventType = watch.Added
-	}
-	return Response{Object: copied, Err: nil}, &watch.Event{Type: eventType, Object: copied}
+	// With ignoreNotFound on a missing key, stored is nil and this is a create.
+	return Response{Object: copied, Err: nil}, &Change{ResourceVersion: s.ResourceVersion, Object: copied, PrevObject: stored}
 }
 
-func (s *Model) create(key string, obj runtime.Object) (Response, *watch.Event) {
+func (s *Model) create(key string, obj runtime.Object) (Response, *Change) {
 	if _, exists := s.Items[key]; exists {
 		return Response{Object: nil, Err: storage.NewKeyExistsError(s.Prefix+key, 0)}, nil
 	}
@@ -194,7 +189,7 @@ func (s *Model) create(key string, obj runtime.Object) (Response, *watch.Event) 
 	}
 	accessor.SetResourceVersion(strconv.FormatUint(s.ResourceVersion, 10))
 	s.Items[key] = copied
-	return Response{Object: copied, Err: nil}, &watch.Event{Type: watch.Added, Object: copied}
+	return Response{Object: copied, Err: nil}, &Change{ResourceVersion: s.ResourceVersion, Object: copied}
 }
 
 func (s *Model) get(key string, opts storage.GetOptions) Response {
@@ -208,7 +203,7 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 	return Response{Object: stored.DeepCopyObject(), Err: nil}
 }
 
-func (s *Model) delete(ctx context.Context, key string, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) (Response, *watch.Event) {
+func (s *Model) delete(ctx context.Context, key string, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) (Response, *Change) {
 	stored, exists := s.Items[key]
 	if !exists {
 		return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, int64(s.ResourceVersion))}, nil
@@ -229,7 +224,7 @@ func (s *Model) delete(ctx context.Context, key string, preconditions *storage.P
 	}
 	accessor.SetResourceVersion(strconv.FormatUint(s.ResourceVersion, 10))
 	delete(s.Items, key)
-	return Response{Object: deletedObj, Err: nil}, &watch.Event{Type: watch.Deleted, Object: deletedObj}
+	return Response{Object: deletedObj, Err: nil}, &Change{ResourceVersion: s.ResourceVersion, PrevObject: stored}
 }
 
 func (s *Model) Describe() string {

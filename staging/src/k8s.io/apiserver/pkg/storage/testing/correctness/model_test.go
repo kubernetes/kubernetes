@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/storage"
 )
 
 func TestCorrectness(t *testing.T) {
@@ -40,10 +41,12 @@ func TestCorrectness(t *testing.T) {
 				require.False(t, ok, "alternative response #%d should return ok=false: req=%+v resp=%+v", i, step.Request, invalidResponse)
 			}
 
-			ok, next, event := model.Step(step.Request, step.CorrectResponse)
+			ok, next, change := model.Step(step.Request, step.CorrectResponse)
 			require.True(t, ok, "valid response should return ok=true: req=%+v resp=%+v", step.Request, step.CorrectResponse)
 			model = next
-			if event != nil {
+			if change != nil {
+				event, err := change.toWatchEvent(storage.APIObjectVersioner{}, storage.Everything)
+				require.NoError(t, err)
 				gotEvents = append(gotEvents, *event)
 			}
 		})

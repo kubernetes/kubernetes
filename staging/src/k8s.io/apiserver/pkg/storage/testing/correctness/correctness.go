@@ -742,7 +742,7 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 	require.NoError(t, err)
 	defer watcher.Stop()
 
-	var expectEvents []watch.Event
+	var history []Change
 	for _, step := range correctnessTestSteps() {
 		out := &example.Pod{}
 		var err error
@@ -763,7 +763,7 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 			respObj = out
 		}
 		resp := Response{Object: respObj, Err: err}
-		ok, next, event := model.Step(step.Request, resp)
+		ok, next, change := model.Step(step.Request, resp)
 		if respObj != nil {
 			acc, _ := meta.Accessor(respObj)
 			t.Logf("Step: %s, State RV before: %d, Response RV: %s, Obj: %+v, err: %v", step.Name, model.ResourceVersion, acc.GetResourceVersion(), respObj, err)
@@ -772,14 +772,13 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 		}
 		require.True(t, ok, "step %s failed to match model state transition: req=%+v resp=%+v", step.Name, step.Request, resp)
 		model = next
-		if event != nil {
-			expectEvents = append(expectEvents, *event)
+		if change != nil {
+			history = append(history, *change)
 		}
 	}
 
 	gotEvents := collectEventsTillRV(t, watcher, store.Versioner(), model.ResourceVersion)
-	require.Equal(t, expectEvents, gotEvents)
-	validator := NewWatchValidator(store.Versioner(), keyFunc, expectEvents)
+	validator := NewWatchValidator(store.Versioner(), keyFunc, history)
 	require.NoError(t, validator.ValidateWatch(watchRequest, WatchResponse{Events: gotEvents}))
 }
 
@@ -813,6 +812,20 @@ func newTestPod(name, namespace string, uid types.UID, rv string) *example.Pod {
 
 func withRV(pod *example.Pod, rv string) *example.Pod {
 	new := pod.DeepCopy()
+	new.ResourceVersion = rv
+	return new
+}
+
+func withLabel(pod *example.Pod, rv string, label string, value string) *example.Pod {
+	new := pod.DeepCopy()
+	new.Labels = map[string]string{label: value}
+	new.ResourceVersion = rv
+	return new
+}
+
+func dropLabel(pod *example.Pod, rv string, label string) *example.Pod {
+	new := pod.DeepCopy()
+	delete(new.Labels, label)
 	new.ResourceVersion = rv
 	return new
 }
