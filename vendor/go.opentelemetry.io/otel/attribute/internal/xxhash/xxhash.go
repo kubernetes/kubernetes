@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package xxhash provides a wrapper around the xxhash library for attribute hashing.
-package xxhash // import "go.opentelemetry.io/otel/attribute/internal/xxhash"
+package xxhash
 
 import (
 	"encoding/binary"
@@ -61,4 +61,9 @@ func (h Hash) String(val string) Hash {
 // Sum64 returns the current hash value.
 func (h Hash) Sum64() uint64 {
 	return h.d.Sum64()
+}
+
+// Reset resets the hash to its initial state.
+func (h Hash) Reset() {
+	h.d.Reset()
 }

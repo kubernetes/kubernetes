@@ -1,14 +1,16 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package attribute // import "go.opentelemetry.io/otel/attribute"
+package attribute
 
 import (
+	"cmp"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -18,10 +20,10 @@ import (
 
 //go:generate stringer -type=Type
 
-// Type describes the type of the data Value holds.
+// Type describes the kind of data a [Value] holds.
 type Type int // nolint: revive  // redefines builtin Type.
 
-// Value represents the value part in key-value pairs.
+// Value represents the value in key-value pairs.
 //
 // Note that the zero value is a valid empty value.
 type Value struct {
@@ -32,35 +34,40 @@ type Value struct {
 }
 
 const (
-	// EMPTY is used for a Value with no value set.
+	// EMPTY identifies a Value with no data.
 	EMPTY Type = iota
-	// BOOL is a boolean Type Value.
+	// BOOL identifies a Value containing a bool.
 	BOOL
-	// INT64 is a 64-bit signed integral Type Value.
+	// INT64 identifies a Value containing an int64.
 	INT64
-	// FLOAT64 is a 64-bit floating point Type Value.
+	// FLOAT64 identifies a Value containing a float64.
 	FLOAT64
-	// STRING is a string Type Value.
+	// STRING identifies a Value containing a string.
 	STRING
-	// BOOLSLICE is a slice of booleans Type Value.
+	// BOOLSLICE identifies a Value containing a []bool.
 	BOOLSLICE
-	// INT64SLICE is a slice of 64-bit signed integral numbers Type Value.
+	// INT64SLICE identifies a Value containing a []int64.
 	INT64SLICE
-	// FLOAT64SLICE is a slice of 64-bit floating point numbers Type Value.
+	// FLOAT64SLICE identifies a Value containing a []float64.
 	FLOAT64SLICE
-	// STRINGSLICE is a slice of strings Type Value.
+	// STRINGSLICE identifies a Value containing a []string.
 	STRINGSLICE
-	// BYTESLICE is a slice of bytes Type Value.
+	// BYTESLICE identifies a Value containing a []byte.
 	BYTESLICE
-	// SLICE is a slice of Value Type values.
+	// SLICE identifies a Value containing a []Value.
 	SLICE
+	// MAP identifies a Value containing a []KeyValue representation of a map.
+	//
+	// Note that MAP values may contain duplicate keys if duplicate keys are
+	// provided when creating the value.
+	MAP
 	// INVALID is used for a Value with no value set.
 	//
 	// Deprecated: Use EMPTY instead as an empty value is a valid value.
 	INVALID = EMPTY
 )
 
-// BoolValue creates a BOOL Value.
+// BoolValue returns a [Value] for a bool value.
 func BoolValue(v bool) Value {
 	return Value{
 		vtype:   BOOL,
@@ -68,17 +75,31 @@ func BoolValue(v bool) Value {
 	}
 }
 
-// BoolSliceValue creates a BOOLSLICE Value.
+// BoolSliceValue returns a [Value] for a []bool value.
+//
+// Note that many observability backends are not optimized to query, index, or
+// aggregate complex attribute values. Complex values may also carry
+// additional performance overhead. Prefer primitive values when
+// possible.
 func BoolSliceValue(v []bool) Value {
 	return Value{vtype: BOOLSLICE, slice: attribute.SliceValue(v)}
 }
 
-// IntValue creates an INT64 Value.
+// IntValue returns a [Value] for an int value.
+//
+// It is provided as a convenience for [Int64Value].
 func IntValue(v int) Value {
 	return Int64Value(int64(v))
 }
 
-// IntSliceValue creates an INT64SLICE Value.
+// IntSliceValue returns a [Value] for a []int value.
+//
+// It is provided as a convenience for [Int64SliceValue].
+//
+// Note that many observability backends are not optimized to query, index, or
+// aggregate complex attribute values. Complex values may also carry
+// additional performance overhead. Prefer primitive values when
+// possible.
 func IntSliceValue(v []int) Value {
 	val := Value{vtype: INT64SLICE}
 
@@ -104,7 +125,7 @@ func IntSliceValue(v []int) Value {
 	return val
 }
 
-// Int64Value creates an INT64 Value.
+// Int64Value returns a [Value] for an int64 value.
 func Int64Value(v int64) Value {
 	return Value{
 		vtype:   INT64,
@@ -112,12 +133,17 @@ func Int64Value(v int64) Value {
 	}
 }
 
-// Int64SliceValue creates an INT64SLICE Value.
+// Int64SliceValue returns a [Value] for a []int64 value.
+//
+// Note that many observability backends are not optimized to query, index, or
+// aggregate complex attribute values. Complex values may also carry
+// additional performance overhead. Prefer primitive values when
+// possible.
 func Int64SliceValue(v []int64) Value {
 	return Value{vtype: INT64SLICE, slice: attribute.SliceValue(v)}
 }
 
-// Float64Value creates a FLOAT64 Value.
+// Float64Value returns a [Value] for a float64 value.
 func Float64Value(v float64) Value {
 	return Value{
 		vtype:   FLOAT64,
@@ -125,12 +151,17 @@ func Float64Value(v float64) Value {
 	}
 }
 
-// Float64SliceValue creates a FLOAT64SLICE Value.
+// Float64SliceValue returns a [Value] for a []float64 value.
+//
+// Note that many observability backends are not optimized to query, index, or
+// aggregate complex attribute values. Complex values may also carry
+// additional performance overhead. Prefer primitive values when
+// possible.
 func Float64SliceValue(v []float64) Value {
 	return Value{vtype: FLOAT64SLICE, slice: attribute.SliceValue(v)}
 }
 
-// StringValue creates a STRING Value.
+// StringValue returns a [Value] for a string value.
 func StringValue(v string) Value {
 	return Value{
 		vtype:    STRING,
@@ -138,12 +169,22 @@ func StringValue(v string) Value {
 	}
 }
 
-// StringSliceValue creates a STRINGSLICE Value.
+// StringSliceValue returns a [Value] for a []string value.
+//
+// Note that many observability backends are not optimized to query, index, or
+// aggregate complex attribute values. Complex values may also carry
+// additional performance overhead. Prefer primitive values when
+// possible.
 func StringSliceValue(v []string) Value {
 	return Value{vtype: STRINGSLICE, slice: attribute.SliceValue(v)}
 }
 
-// ByteSliceValue creates a BYTESLICE Value.
+// ByteSliceValue returns a [Value] for a []byte value.
+//
+// Note that many observability backends are not optimized to query, index, or
+// aggregate complex attribute values. Complex values may also carry
+// additional performance overhead. Prefer primitive values when
+// possible.
 func ByteSliceValue(v []byte) Value {
 	return Value{
 		vtype:    BYTESLICE,
@@ -151,12 +192,32 @@ func ByteSliceValue(v []byte) Value {
 	}
 }
 
-// SliceValue creates a SLICE Value.
+// SliceValue returns a [Value] for a []Value value.
+//
+// Note that many observability backends are not optimized to query, index, or
+// aggregate complex attribute values. Complex values may also carry
+// additional performance overhead. Prefer primitive values when
+// possible.
 func SliceValue(v ...Value) Value {
 	return Value{vtype: SLICE, slice: sliceValue(v)}
 }
 
-// Type returns a type of the Value.
+// MapValue returns a [Value] for a []KeyValue value.
+//
+// Note that many observability backends are not optimized to query, index, or
+// aggregate complex attribute values. Complex values may also carry
+// additional performance overhead. Prefer primitive values when
+// possible.
+//
+// Users should avoid providing duplicate keys; many receivers handle maps
+// containing duplicate keys unpredictably.
+//
+// The order of v is not preserved.
+func MapValue(v ...KeyValue) Value {
+	return Value{vtype: MAP, slice: mapValue(v)}
+}
+
+// Type returns v's type.
 func (v Value) Type() Type {
 	return v.vtype
 }
@@ -277,6 +338,53 @@ func asValueSliceReflect(v any) []Value {
 	return cpy
 }
 
+// AsMap returns the []KeyValue value. Make sure that the Value's type is
+// MAP.
+//
+// The returned slice is sorted by key and may differ from the order
+// provided when creating the map value.
+//
+// The returned slice may contain duplicate keys if duplicate keys were
+// provided when creating the map value. Callers should not assume the returned
+// keys are unique.
+func (v Value) AsMap() []KeyValue {
+	if v.vtype != MAP {
+		return nil
+	}
+	return v.asMap()
+}
+
+func (v Value) asMap() []KeyValue {
+	switch vals := v.slice.(type) {
+	case [0]KeyValue:
+		return []KeyValue{}
+	case [1]KeyValue:
+		return []KeyValue{vals[0]}
+	case [2]KeyValue:
+		return []KeyValue{vals[0], vals[1]}
+	case [3]KeyValue:
+		return []KeyValue{vals[0], vals[1], vals[2]}
+	case [4]KeyValue:
+		return []KeyValue{vals[0], vals[1], vals[2], vals[3]}
+	case [5]KeyValue:
+		return []KeyValue{vals[0], vals[1], vals[2], vals[3], vals[4]}
+	default:
+		return asKeyValueSliceReflect(v.slice)
+	}
+}
+
+func asKeyValueSliceReflect(v any) []KeyValue {
+	rv := reflect.ValueOf(v)
+	if !rv.IsValid() || rv.Kind() != reflect.Array || rv.Type().Elem() != reflect.TypeFor[KeyValue]() {
+		return nil
+	}
+	cpy := make([]KeyValue, rv.Len())
+	if len(cpy) > 0 {
+		_ = reflect.Copy(reflect.ValueOf(cpy), rv)
+	}
+	return cpy
+}
+
 // AsByteSlice returns the bytes value. Make sure that the Value's type
 // is BYTESLICE.
 func (v Value) AsByteSlice() []byte {
@@ -315,6 +423,8 @@ func (v Value) AsInterface() any {
 		return v.asByteSlice()
 	case SLICE:
 		return v.asSlice()
+	case MAP:
+		return v.asMap()
 	case EMPTY:
 		return nil
 	}
@@ -327,10 +437,10 @@ func (v Value) AsInterface() any {
 // Strings are returned as-is without JSON quoting, booleans and integers use
 // JSON literals, floating-point values use JSON numbers except that NaN and
 // ±Inf are rendered as NaN, Infinity, and -Infinity, byte slices are
-// base64-encoded, empty values are the empty string, and slices are encoded as
-// JSON arrays. String, byte, and special floating-point values inside arrays
-// are encoded as JSON strings, and empty values inside arrays are encoded as
-// null.
+// base64-encoded, empty values are the empty string, slices are encoded as JSON
+// arrays, and maps are encoded as JSON objects. String, byte, and special
+// floating-point values inside arrays and maps are encoded as JSON strings, and
+// empty values inside arrays and maps are encoded as null.
 //
 // [OpenTelemetry AnyValue representation for non-OTLP protocols]: https://opentelemetry.io/docs/specs/otel/common/#anyvalue-representation-for-non-otlp-protocols
 func (v Value) String() string {
@@ -355,6 +465,8 @@ func (v Value) String() string {
 		return formatByteSlice(v.stringly)
 	case SLICE:
 		return formatValueSliceValue(v.slice)
+	case MAP:
+		return formatMapValue(v.slice)
 	case EMPTY:
 		return ""
 	default:
@@ -399,6 +511,8 @@ func (v Value) Emit() string {
 		return formatByteSlice(v.stringly)
 	case SLICE:
 		return formatValueSliceValue(v.slice)
+	case MAP:
+		return formatMapValue(v.slice)
 	case EMPTY:
 		return ""
 	default:
@@ -437,6 +551,47 @@ func sliceValueReflect(v []Value) any {
 	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[Value]())).Elem()
 	reflect.Copy(cp, reflect.ValueOf(v))
 	return cp.Interface()
+}
+
+func mapValue(v []KeyValue) any {
+	switch len(v) {
+	case 0:
+		return [0]KeyValue{}
+	case 1:
+		return [1]KeyValue{v[0]}
+	case 2:
+		vals := [2]KeyValue{v[0], v[1]}
+		sortKeyValues(vals[:])
+		return vals
+	case 3:
+		vals := [3]KeyValue{v[0], v[1], v[2]}
+		sortKeyValues(vals[:])
+		return vals
+	case 4:
+		vals := [4]KeyValue{v[0], v[1], v[2], v[3]}
+		sortKeyValues(vals[:])
+		return vals
+	case 5:
+		vals := [5]KeyValue{v[0], v[1], v[2], v[3], v[4]}
+		sortKeyValues(vals[:])
+		return vals
+	default:
+		return mapValueReflect(v)
+	}
+}
+
+func mapValueReflect(v []KeyValue) any {
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[KeyValue]())).Elem()
+	reflect.Copy(cp, reflect.ValueOf(v))
+	vals := cp.Slice(0, len(v)).Interface().([]KeyValue)
+	sortKeyValues(vals)
+	return cp.Interface()
+}
+
+func sortKeyValues(vals []KeyValue) {
+	slices.SortStableFunc(vals, func(a, b KeyValue) int {
+		return cmp.Compare(a.Key, b.Key)
+	})
 }
 
 func formatBoolSliceValue(v any) string {
@@ -807,6 +962,37 @@ func formatValueSliceReflect(v any) string {
 	return b.String()
 }
 
+func formatMapValue(v any) string {
+	switch vals := v.(type) {
+	case [0]KeyValue:
+		return "{}"
+	case [1]KeyValue:
+		return formatMap(vals[:])
+	case [2]KeyValue:
+		return formatMap(vals[:])
+	case [3]KeyValue:
+		return formatMap(vals[:])
+	case [4]KeyValue:
+		return formatMap(vals[:])
+	case [5]KeyValue:
+		return formatMap(vals[:])
+	default:
+		return formatMapReflect(v)
+	}
+}
+
+func formatMap(vals []KeyValue) string {
+	var b strings.Builder
+	appendMap(&b, vals)
+	return b.String()
+}
+
+func formatMapReflect(v any) string {
+	var b strings.Builder
+	appendMapReflect(&b, reflect.ValueOf(v))
+	return b.String()
+}
+
 func appendValueSliceValue(dst *strings.Builder, v any) {
 	switch vals := v.(type) {
 	case [0]Value:
@@ -852,6 +1038,68 @@ func appendValueSliceReflect(dst *strings.Builder, rv reflect.Value) {
 	_ = dst.WriteByte(']')
 }
 
+func appendMapValue(dst *strings.Builder, v any) {
+	switch vals := v.(type) {
+	case [0]KeyValue:
+		_, _ = dst.WriteString("{}")
+	case [1]KeyValue:
+		appendMap(dst, vals[:])
+	case [2]KeyValue:
+		appendMap(dst, vals[:])
+	case [3]KeyValue:
+		appendMap(dst, vals[:])
+	case [4]KeyValue:
+		appendMap(dst, vals[:])
+	case [5]KeyValue:
+		appendMap(dst, vals[:])
+	default:
+		appendMapReflect(dst, reflect.ValueOf(v))
+	}
+}
+
+func appendMap(dst *strings.Builder, vals []KeyValue) {
+	// Estimate 32 bytes per value for small values, plus key quotes, colon,
+	// and commas. Escaped keys and larger values grow the builder as needed.
+	size := len("{}") + len(vals)*commaLen + len(vals)*32
+	for _, val := range vals {
+		size += len(val.Key) + len(`"":`)
+	}
+
+	dst.Grow(size)
+	_ = dst.WriteByte('{')
+	for i, val := range vals {
+		if i > 0 {
+			_ = dst.WriteByte(',')
+		}
+		appendJSONString(dst, string(val.Key))
+		_ = dst.WriteByte(':')
+		appendJSONValue(dst, val.Value)
+	}
+	_ = dst.WriteByte('}')
+}
+
+func appendMapReflect(dst *strings.Builder, rv reflect.Value) {
+	// Estimate 32 bytes per value for small values, plus key quotes, colon,
+	// and commas. Escaped keys and larger values grow the builder as needed.
+	size := len("{}") + rv.Len()*commaLen + rv.Len()*32
+	for i := 0; i < rv.Len(); i++ {
+		size += len(rv.Index(i).Field(0).String()) + len(`"":`)
+	}
+
+	dst.Grow(size)
+	_ = dst.WriteByte('{')
+	for i := 0; i < rv.Len(); i++ {
+		if i > 0 {
+			_ = dst.WriteByte(',')
+		}
+		val := rv.Index(i).Interface().(KeyValue)
+		appendJSONString(dst, string(val.Key))
+		_ = dst.WriteByte(':')
+		appendJSONValue(dst, val.Value)
+	}
+	_ = dst.WriteByte('}')
+}
+
 func appendJSONValue(dst *strings.Builder, v Value) {
 	switch v.Type() {
 	case BOOL:
@@ -894,6 +1142,8 @@ func appendJSONValue(dst *strings.Builder, v Value) {
 		_ = dst.WriteByte('"')
 	case SLICE:
 		appendValueSliceValue(dst, v.slice)
+	case MAP:
+		appendMapValue(dst, v.slice)
 	case EMPTY:
 		_, _ = dst.WriteString("null")
 	default:

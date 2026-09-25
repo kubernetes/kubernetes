@@ -14,4 +14,4 @@ require (
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
 )
 
-require github.com/go-logr/logr v1.4.3 // indirect
+require github.com/go-logr/logr v1.4.4 // indirect
