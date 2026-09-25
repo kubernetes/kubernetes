@@ -1578,30 +1578,45 @@ func numaAllocationStrategyOptions(strategy string) map[string]string {
 	return map[string]string{topologymanager.NUMAAllocationStrategy: strategy}
 }
 
+// createGuPodAndGetNUMANodes admits a guaranteed pod with one container per entry
+// of cpuCounts, each asking for that many exclusive CPUs, and returns it together
+// with the NUMA node the topology manager aligned each container to.
+func createGuPodAndGetNUMANodes(ctx context.Context, f *framework.Framework, podName string, cpuCounts []int, numaNodes int) (*v1.Pod, []int) {
+	ginkgo.GinkgoHelper()
+
+	var ctnAttrs []tmCtnAttribute
+	for i, cpuCount := range cpuCounts {
+		coresReq := fmt.Sprintf("%dm", cpuCount*1000)
+		ctnAttrs = append(ctnAttrs, tmCtnAttribute{
+			ctnName:    fmt.Sprintf("%s-cnt-%d", podName, i),
+			cpuRequest: coresReq,
+			cpuLimit:   coresReq,
+		})
+	}
+
+	framework.Logf("creating pod %s asking for %v cpus", podName, cpuCounts)
+	pod := e2epod.NewPodClient(f).CreateSync(ctx, makeTopologyManagerTestPod(podName, ctnAttrs, nil))
+
+	numaNodePerCtn := make([]int, 0, len(pod.Spec.Containers))
+	for i := range pod.Spec.Containers {
+		cnt := &pod.Spec.Containers[i]
+		numaList := getNUMANodesForContainer(ctx, f, pod, cnt, numaNodes).UnsortedList()
+		gomega.Expect(numaList).To(gomega.HaveLen(1), "container %s of pod %s was expected to be aligned to a single NUMA node, got %v", cnt.Name, podName, numaList)
+
+		framework.Logf("container %s of pod %s was aligned to NUMA node %d", cnt.Name, podName, numaList[0])
+		numaNodePerCtn = append(numaNodePerCtn, numaList[0])
+	}
+	return pod, numaNodePerCtn
+}
+
 // createGuPodAndGetNUMANode admits a guaranteed pod with a single container
 // asking for cpuCount exclusive CPUs, and returns it together with the NUMA node
 // the topology manager aligned it to.
 func createGuPodAndGetNUMANode(ctx context.Context, f *framework.Framework, podName string, cpuCount, numaNodes int) (*v1.Pod, int) {
 	ginkgo.GinkgoHelper()
 
-	coresReq := fmt.Sprintf("%dm", cpuCount*1000)
-	ctnAttrs := []tmCtnAttribute{
-		{
-			ctnName:    podName + "-cnt",
-			cpuRequest: coresReq,
-			cpuLimit:   coresReq,
-		},
-	}
-
-	framework.Logf("creating pod %s asking for %d cpus", podName, cpuCount)
-	pod := e2epod.NewPodClient(f).CreateSync(ctx, makeTopologyManagerTestPod(podName, ctnAttrs, nil))
-
-	numaUsed := getNUMANodesForContainer(ctx, f, pod, &pod.Spec.Containers[0], numaNodes)
-	numaList := numaUsed.UnsortedList()
-	gomega.Expect(numaList).To(gomega.HaveLen(1), "pod %s was expected to be aligned to a single NUMA node, got %v", podName, numaList)
-
-	framework.Logf("pod %s was aligned to NUMA node %d", podName, numaList[0])
-	return pod, numaList[0]
+	pod, numaNodePerCtn := createGuPodAndGetNUMANodes(ctx, f, podName, []int{cpuCount}, numaNodes)
+	return pod, numaNodePerCtn[0]
 }
 
 // runNUMASpreadingTest checks whether numa-allocation-strategy=least-allocated
@@ -1631,14 +1646,15 @@ func runNUMASpreadingTest(ctx context.Context, f *framework.Framework, env numaA
 	deletePodsAsync(ctx, f, map[string]*v1.Pod{busyPod.Name: busyPod, probePod.Name: probePod})
 }
 
-// runNUMAPackingTest checks whether numa-allocation-strategy=most-allocated
-// steers a pod towards the NUMA node which is already the most allocated.
+// makeOneNUMANodeBusy leaves the machine with exactly one NUMA node allocated
+// above the score floor, and arranges for that node *not* to be the one the
+// default tie-break would pick, which is what makes the most-allocated
+// assertions built on top of it meaningful.
 //
-// The fixture has to work against the default tie-break rather than with it.
 // Narrowest settles a tie between two equally wide masks in favour of the
 // lowest-numbered NUMA node, and pods naturally fill the low-numbered nodes
-// first, so in a naive fixture most-allocated agrees with the baseline and the
-// test proves nothing. Instead:
+// first, so in a naive fixture the most allocated node is also the default
+// choice and most-allocated cannot be told apart from the baseline. Instead:
 //
 //   - a filler pod takes all but one cpu of the first NUMA node;
 //   - a busy pod, too big for what the filler left behind, is pushed onto
@@ -1647,27 +1663,42 @@ func runNUMASpreadingTest(ctx context.Context, f *framework.Framework, env numaA
 //   - the filler is deleted, so the first node is idle again and is once more
 //     the node the default tie-break picks.
 //
-// A small probe pod then fits on either node. With most-allocated it has to land
-// on the busy node; without it, on the idle lowest-numbered one.
-func runNUMAPackingTest(ctx context.Context, f *framework.Framework, env numaAllocationTestEnv, packingExpected bool) {
+// It returns the busy pod, for the caller to delete, along with the busy node
+// and the now idle node the default tie-break prefers.
+func makeOneNUMANodeBusy(ctx context.Context, f *framework.Framework, env numaAllocationTestEnv) (*v1.Pod, int, int) {
+	ginkgo.GinkgoHelper()
+
 	// One cpu per node can be taken by the kubelet reserved cpus, so the filler
 	// asks for one less than the node holds and leaves at most one cpu behind.
 	// The busy pod asks for more than that, so it cannot fit alongside the
-	// filler; minCPUsPerNUMAAllocationStrategy keeps both it and the probe
-	// within what one node can hold.
+	// filler; minCPUsPerNUMAAllocationStrategy keeps it, and the pods the
+	// callers place next to it, within what one node can hold.
 	fillerCPUs := env.cpusPerNUMA - 1
 	busyCPUs := env.cpusPerNUMA / 2
-	probeCPUs := 2
 
 	ginkgo.By(fmt.Sprintf("admitting a guaranteed filler pod asking for %d cpus, taking up all but one cpu of one NUMA node", fillerCPUs))
 	fillerPod, fillerNode := createGuPodAndGetNUMANode(ctx, f, "gu-pod-filler", fillerCPUs, env.numaNodes)
 
 	ginkgo.By(fmt.Sprintf("admitting a guaranteed pod asking for %d cpus, too many to fit beside the filler", busyCPUs))
 	busyPod, busyNode := createGuPodAndGetNUMANode(ctx, f, "gu-pod-busy", busyCPUs, env.numaNodes)
-	gomega.Expect(busyNode).ToNot(gomega.Equal(fillerNode), "the busy pod was expected to be pushed off NUMA node %d by the filler; had it landed there the most-allocated node would also be the default choice and the check below would prove nothing", fillerNode)
+	gomega.Expect(busyNode).ToNot(gomega.Equal(fillerNode), "the busy pod was expected to be pushed off NUMA node %d by the filler; had it landed there the most allocated node would also be the default choice and the checks built on this fixture would prove nothing", fillerNode)
 
 	ginkgo.By(fmt.Sprintf("deleting the filler pod, leaving NUMA node %d idle and NUMA node %d the most allocated", fillerNode, busyNode))
 	deletePodSyncAndWait(ctx, f, fillerPod.Namespace, fillerPod.Name)
+
+	return busyPod, busyNode, fillerNode
+}
+
+// runNUMAPackingTest checks whether numa-allocation-strategy=most-allocated
+// steers a pod towards the NUMA node which is already the most allocated.
+//
+// A small probe pod fits on either the busy node makeOneNUMANodeBusy left behind
+// or the idle one. With most-allocated it has to land on the busy node; without
+// it, on the idle lowest-numbered one.
+func runNUMAPackingTest(ctx context.Context, f *framework.Framework, env numaAllocationTestEnv, packingExpected bool) {
+	probeCPUs := 2
+
+	busyPod, busyNode, idleNode := makeOneNUMANodeBusy(ctx, f, env)
 
 	ginkgo.By(fmt.Sprintf("admitting a guaranteed pod asking for %d cpus, which fits both NUMA nodes", probeCPUs))
 	probePod, probeNode := createGuPodAndGetNUMANode(ctx, f, "gu-pod-probe", probeCPUs, env.numaNodes)
@@ -1675,7 +1706,7 @@ func runNUMAPackingTest(ctx context.Context, f *framework.Framework, env numaAll
 	if packingExpected {
 		gomega.Expect(probeNode).To(gomega.Equal(busyNode), "most-allocated should have packed the last pod onto the most allocated NUMA node %d", busyNode)
 	} else {
-		gomega.Expect(probeNode).To(gomega.Equal(fillerNode), "without most-allocated the last pod should have landed on NUMA node %d, the lowest-numbered node with room for it", fillerNode)
+		gomega.Expect(probeNode).To(gomega.Equal(idleNode), "without most-allocated the last pod should have landed on NUMA node %d, the lowest-numbered node with room for it", idleNode)
 	}
 
 	deletePodsAsync(ctx, f, map[string]*v1.Pod{busyPod.Name: busyPod, probePod.Name: probePod})
