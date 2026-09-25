@@ -2087,12 +2087,12 @@ func (p *staticPolicy) takeByTopologyForResize(logger klog.Logger, availableCPUs
 
 func (p *staticPolicy) getTopologyHintsForResize(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) || !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		logger.V(2).Info("CPU Manager hint generation skipped, operation not supported by the static CPU manager policy, InPlacePodVerticalScaling and/or InPlacePodVerticalScalingExclusiveCPUs are not enabled")
+		logger.V(2).Info("CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy, InPlacePodVerticalScaling and/or InPlacePodVerticalScalingExclusiveCPUs are not enabled")
 		return nil
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		logger.V(2).Info("CPU Manager hint generation skipped, pod is using pod-level resources which are not supported for resize operations by the static CPU manager policy")
+		logger.V(2).Info("CPU Manager container-level hint generation skipped, pod is using pod-level resources which are not supported for resize operations by the static CPU manager policy")
 		return nil
 	}
 
