@@ -14,19 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package main defines the protoc-gen-gogo binary we use to generate our proto go files,
-// as well as takes dependencies on the correct gogo/protobuf packages for godeps.
+// Package main defines the protoc-gen-gogo binary we use to generate our proto go files.
+// It is built on the in-tree fork of gogo/protobuf under internal/third_party.
 package main
 
 import (
 	"strings"
 
-	"github.com/gogo/protobuf/vanity/command"
-
-	// dependencies that are required for our packages
-	_ "github.com/gogo/protobuf/gogoproto"
-	_ "github.com/gogo/protobuf/proto"
-	_ "github.com/gogo/protobuf/sortkeys"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/vanity/command"
 )
 
 func main() {

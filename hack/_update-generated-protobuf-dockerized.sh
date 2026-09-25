@@ -43,6 +43,6 @@ PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
   --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
   --output-dir="${KUBE_ROOT}/staging/src" \
   --proto-import="${KUBE_ROOT}/staging/src" \
-  --proto-import="${KUBE_ROOT}/vendor" `# required for gogo.proto` \
+  --proto-import="${KUBE_ROOT}/staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party" `# required for gogo.proto` \
   --proto-import="${KUBE_ROOT}/third_party/protobuf" \
   --packages="$(IFS=, ; echo "$*")"
