@@ -119,7 +119,7 @@ func TestCachingAuthorizer(t *testing.T) {
 			},
 		},
 		{
-			name: "hit with differently-ordered extra",
+			name: "hit with differently-ordered extra values",
 			calls: []invocation{
 				{
 					attributes: authorizer.AttributesRecord{
