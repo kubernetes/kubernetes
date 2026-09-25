@@ -572,8 +572,20 @@ func convertToVersionedKubeletConfig(kc *kubeletconfiginternal.KubeletConfigurat
 	return versioned, nil
 }
 
+// maskSensitiveKubeletConfig returns a copy of kc with the credential-bearing fields
+// replaced, so the result is safe to serve or log. StaticPodURLHeader holds the headers
+// passed to --manifest-url-header, which are usually an Authorization header or an API
+// key. The caller's config is left unchanged.
+func maskSensitiveKubeletConfig(kc *kubeletconfiginternal.KubeletConfiguration) *kubeletconfiginternal.KubeletConfiguration {
+	safe := kc.DeepCopy()
+	for k := range safe.StaticPodURLHeader {
+		safe.StaticPodURLHeader[k] = []string{"<masked>"}
+	}
+	return safe
+}
+
 func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfiguration) error {
-	versioned, err := convertToVersionedKubeletConfig(kc)
+	versioned, err := convertToVersionedKubeletConfig(maskSensitiveKubeletConfig(kc))
 	if err != nil {
 		return err
 	}
@@ -581,15 +593,10 @@ func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfigurati
 }
 
 // marshalKubeletConfigForLog renders the effective KubeletConfiguration as a human-readable
-// YAML string for startup logging. The output mirrors what /configz serves except the
-// sensitive field StaticPodURLHeader is masked while /configz outputs it.
+// YAML string for startup logging. The output mirrors what /configz serves, masking of the
+// sensitive field StaticPodURLHeader included.
 func marshalKubeletConfigForLog(kc *kubeletconfiginternal.KubeletConfiguration) (string, error) {
-	// Make the config safe for logging without mutating the caller's copy.
-	safe := kc.DeepCopy()
-	for k := range safe.StaticPodURLHeader {
-		safe.StaticPodURLHeader[k] = []string{"<masked>"}
-	}
-	versioned, err := convertToVersionedKubeletConfig(safe)
+	versioned, err := convertToVersionedKubeletConfig(maskSensitiveKubeletConfig(kc))
 	if err != nil {
 		return "", err
 	}
