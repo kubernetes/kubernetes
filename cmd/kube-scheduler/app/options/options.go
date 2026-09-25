@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
 	cliflag "k8s.io/component-base/cli/flag"
 	basecompatibility "k8s.io/component-base/compatibility"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -316,7 +317,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	}
 
 	// Prepare kube clients.
-	client, eventClient, err := createClients(c.KubeConfig)
+	client, eventClient, asyncClient, err := createClients(c.KubeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -339,6 +340,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	}
 
 	c.Client = client
+	c.AsyncClient = asyncClient
 	c.InformerFactory = scheduler.NewInformerFactory(client, 0, o.InformerName)
 	dynClient := dynamic.NewForConfigOrDie(c.KubeConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
@@ -399,17 +401,35 @@ func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, 
 	return kubeConfig, nil
 }
 
-// createClients creates a kube client and an event client from the given kubeConfig
-func createClients(kubeConfig *restclient.Config) (clientset.Interface, clientset.Interface, error) {
-	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler"))
+// createClients creates a kube client, an event client, and an async client from the given kubeConfig.
+// client and asyncClient share the same client-side rate limiter to preserve the configured API request budget.
+func createClients(kubeConfig *restclient.Config) (clientset.Interface, clientset.Interface, clientset.Interface, error) {
+	clientConfig := restclient.CopyConfig(kubeConfig)
+	restclient.AddUserAgent(clientConfig, "scheduler")
+	if clientConfig.RateLimiter == nil && clientConfig.QPS > 0 {
+		burst := clientConfig.Burst
+		if burst == 0 {
+			burst = int(clientConfig.QPS * 10)
+		}
+		clientConfig.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(clientConfig.QPS, burst)
+	}
+
+	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	eventClient, err := clientset.NewForConfig(kubeConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return client, eventClient, nil
+	asyncConfig := restclient.CopyConfig(clientConfig)
+	restclient.AddUserAgent(asyncConfig, "scheduler-async")
+	asyncClient, err := clientset.NewForConfig(asyncConfig)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return client, eventClient, asyncClient, nil
 }
