@@ -371,6 +371,7 @@ type IngressClassSpec struct {
 	// +required
 	// +k8s:alpha(since: "1.38")=+k8s:required
 	// +k8s:alpha(since: "1.38")=+k8s:immutable
+	// +k8s:alpha(since: "1.38")=+k8s:maxLength=250
 	Controller string `json:"controller,omitempty" protobuf:"bytes,1,opt,name=controller"`
 
 	// parameters is a link to a custom resource containing additional

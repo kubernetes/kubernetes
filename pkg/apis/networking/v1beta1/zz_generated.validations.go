@@ -393,6 +393,9 @@ func Validate_IngressClassSpec(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 250).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
