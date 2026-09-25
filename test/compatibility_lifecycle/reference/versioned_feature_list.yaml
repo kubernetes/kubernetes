@@ -1197,6 +1197,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: MemoryManagerDriftTolerance
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: MemoryQoS
   versionedSpecs:
   - default: false

@@ -491,6 +491,12 @@ type KubeletConfiguration struct {
 	// Default: "none"
 	// +optional
 	MemoryManagerPolicy string `json:"memoryManagerPolicy,omitempty"`
+	// memoryManagerPolicyOptions is a set of key=value which allows to set extra options
+	// to fine tune the behaviour of the memory manager policies.
+	// Requires the MemoryManagerDriftTolerance feature gate to be enabled.
+	// Default: nil
+	// +optional
+	MemoryManagerPolicyOptions map[string]string `json:"memoryManagerPolicyOptions,omitempty"`
 	// topologyManagerPolicy is the name of the topology manager policy to use.
 	// Valid values include:
 	//

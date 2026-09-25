@@ -424,6 +424,13 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
+	if in.MemoryManagerPolicyOptions != nil {
+		in, out := &in.MemoryManagerPolicyOptions, &out.MemoryManagerPolicyOptions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.TopologyManagerPolicyOptions != nil {
 		in, out := &in.TopologyManagerPolicyOptions, &out.TopologyManagerPolicyOptions
 		*out = make(map[string]string, len(*in))

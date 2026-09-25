@@ -909,6 +909,13 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
 				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
+		var memoryManagerPolicyOptions map[string]string
+		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManagerDriftTolerance) {
+			memoryManagerPolicyOptions = s.MemoryManagerPolicyOptions
+		} else if s.MemoryManagerPolicyOptions != nil {
+			return fmt.Errorf("memory manager policy options %v require feature gate %q enabled",
+				s.MemoryManagerPolicyOptions, features.MemoryManagerDriftTolerance)
+		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
 			if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == string(kubelettypes.LimitedSwap) {
 				// This feature is not supported for cgroupv1 so we are failing early.
@@ -949,6 +956,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				CPUManagerPolicyOptions:      s.CPUManagerPolicyOptions,
 				CPUManagerReconcilePeriod:    s.CPUManagerReconcilePeriod.Duration,
 				MemoryManagerPolicy:          s.MemoryManagerPolicy,
+				MemoryManagerPolicyOptions:   memoryManagerPolicyOptions,
 				MemoryManagerReservedMemory:  s.ReservedMemory,
 				MemoryReservationPolicy:      s.MemoryReservationPolicy,
 				MemoryThrottlingFactor:       s.MemoryThrottlingFactor,
