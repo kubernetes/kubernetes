@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -116,10 +117,38 @@ func retrieveDeviceAuth(ctx context.Context, c *Config, v url.Values) (*DeviceAu
 		return nil, fmt.Errorf("oauth2: cannot auth device: %v", err)
 	}
 	if code := r.StatusCode; code < 200 || code > 299 {
-		return nil, &RetrieveError{
+		retrieveError := &RetrieveError{
 			Response: r,
 			Body:     body,
 		}
+
+		content, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		switch content {
+		case "application/x-www-form-urlencoded", "text/plain":
+			// some endpoints return a query string
+			vals, err := url.ParseQuery(string(body))
+			if err != nil {
+				return nil, retrieveError
+			}
+			retrieveError.ErrorCode = vals.Get("error")
+			retrieveError.ErrorDescription = vals.Get("error_description")
+			retrieveError.ErrorURI = vals.Get("error_uri")
+		default:
+			var tj struct {
+				// https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
+				ErrorCode        string `json:"error"`
+				ErrorDescription string `json:"error_description"`
+				ErrorURI         string `json:"error_uri"`
+			}
+			if json.Unmarshal(body, &tj) != nil {
+				return nil, retrieveError
+			}
+			retrieveError.ErrorCode = tj.ErrorCode
+			retrieveError.ErrorDescription = tj.ErrorDescription
+			retrieveError.ErrorURI = tj.ErrorURI
+		}
+
+		return nil, retrieveError
 	}
 
 	da := &DeviceAuthResponse{}

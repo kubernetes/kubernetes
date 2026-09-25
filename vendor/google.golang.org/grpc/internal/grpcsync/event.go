@@ -21,28 +21,25 @@
 package grpcsync
 
 import (
-	"sync"
 	"sync/atomic"
 )
 
 // Event represents a one-time event that may occur in the future.
 type Event struct {
-	fired int32
+	fired atomic.Bool
 	c     chan struct{}
-	o     sync.Once
 }
 
 // Fire causes e to complete.  It is safe to call multiple times, and
 // concurrently.  It returns true iff this call to Fire caused the signaling
-// channel returned by Done to close.
+// channel returned by Done to close. If Fire returns false, it is possible
+// the Done channel has not been closed yet.
 func (e *Event) Fire() bool {
-	ret := false
-	e.o.Do(func() {
-		atomic.StoreInt32(&e.fired, 1)
+	if e.fired.CompareAndSwap(false, true) {
 		close(e.c)
-		ret = true
-	})
-	return ret
+		return true
+	}
+	return false
 }
 
 // Done returns a channel that will be closed when Fire is called.
@@ -52,7 +49,7 @@ func (e *Event) Done() <-chan struct{} {
 
 // HasFired returns true if Fire has been called.
 func (e *Event) HasFired() bool {
-	return atomic.LoadInt32(&e.fired) == 1
+	return e.fired.Load()
 }
 
 // NewEvent returns a new, ready-to-use Event.
