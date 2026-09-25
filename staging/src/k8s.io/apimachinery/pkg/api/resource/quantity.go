@@ -384,7 +384,16 @@ func ParseQuantity(str string) (Quantity, error) {
 			// cannot survive, so the quantity has no representation here.
 			return Quantity{}, ErrSuffix
 		}
-		amount.SetScale(amount.Scale() + Scale(exponent).infScale())
+		// A sum past inf.Scale means the value is under 1n; set 1n now, where it fits.
+		// amount.Scale() is never negative here, so the sum cannot fall below MinInt32.
+		if newScale := int64(amount.Scale()) - int64(exponent); newScale > math.MaxInt32 {
+			if s := amount.Sign(); s != 0 {
+				amount.SetUnscaled(int64(s))
+			}
+			amount.SetScale(Nano.infScale())
+		} else {
+			amount.SetScale(inf.Scale(newScale))
+		}
 	} else if base == 2 {
 		// numericSuffix = 2 ** exponent
 		numericSuffix := big.NewInt(1).Lsh(bigOne, uint(exponent))
