@@ -101,3 +101,40 @@ func TestWaitingPodMultipleActions(t *testing.T) {
 		t.Fatalf("Expected preempt to fail, but it succeeded")
 	}
 }
+
+// TestWaitingPodConcurrentStop drives Reject and Preempt from several
+// goroutines at once. Both write w.done, so they must take the write lock;
+// under the race detector a read lock here is reported as a data race, and
+// functionally only the first stop may report success.
+func TestWaitingPodConcurrentStop(t *testing.T) {
+	pod := st.MakePod().Name("test-pod").UID("test-uid").Obj()
+	wp := newWaitingPod(pod, map[string]time.Duration{
+		"plugin1": 10 * time.Second,
+		"plugin2": 10 * time.Second,
+	})
+
+	const callers = 8
+	start := make(chan struct{})
+	results := make(chan bool, callers)
+	for i := 0; i < callers; i++ {
+		go func(i int) {
+			<-start
+			if i%2 == 0 {
+				results <- wp.Reject("reject-plugin", "rejected")
+			} else {
+				results <- wp.Preempt("preemption-plugin", "preempted")
+			}
+		}(i)
+	}
+	close(start)
+
+	succeeded := 0
+	for i := 0; i < callers; i++ {
+		if <-results {
+			succeeded++
+		}
+	}
+	if succeeded != 1 {
+		t.Fatalf("expected exactly one concurrent stop to succeed, got %d", succeeded)
+	}
+}
