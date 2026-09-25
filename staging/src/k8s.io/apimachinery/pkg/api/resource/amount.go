@@ -360,13 +360,13 @@ func (a int64Amount) AsCanonicalBytes(out []byte) (result []byte, exponent int32
 	case 1, -2:
 		amount, ok = int64MultiplyScale10(amount)
 		if !ok {
-			return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
+			return infDecAmount{Dec: a.AsDec()}.AsCanonicalBytes(out)
 		}
 		exponent = exponent - 1
 	case 2, -1:
 		amount, ok = int64MultiplyScale100(amount)
 		if !ok {
-			return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
+			return infDecAmount{Dec: a.AsDec()}.AsCanonicalBytes(out)
 		}
 		exponent = exponent - 2
 	}
@@ -379,7 +379,7 @@ func (a int64Amount) AsCanonicalBytes(out []byte) (result []byte, exponent int32
 func (a int64Amount) AsCanonicalBase1024Bytes(out []byte) (result []byte, exponent int32) {
 	value, ok := a.AsScaledInt64(0)
 	if !ok {
-		return infDecAmount{a.AsDec()}.AsCanonicalBase1024Bytes(out)
+		return infDecAmount{Dec: a.AsDec()}.AsCanonicalBase1024Bytes(out)
 	}
 	amount, exponent := removeInt64Factors(value, 1024)
 	return strconv.AppendInt(out, amount, 10), exponent
@@ -389,6 +389,8 @@ func (a int64Amount) AsCanonicalBase1024Bytes(out []byte) (result []byte, expone
 // representation.
 type infDecAmount struct {
 	*inf.Dec
+	// int64tainted tracks if quantity is a capped or rounded value.
+	int64tainted bool
 }
 
 // AsScale adjusts this amount to set a minimum scale, rounding up, and returns true iff no precision
@@ -396,7 +398,7 @@ type infDecAmount struct {
 func (a infDecAmount) AsScale(scale Scale) (infDecAmount, bool) {
 	tmp := &inf.Dec{}
 	tmp.Round(a.Dec, scale.infScale(), inf.RoundUp)
-	return infDecAmount{tmp}, tmp.Cmp(a.Dec) == 0
+	return infDecAmount{Dec: tmp, int64tainted: a.int64tainted}, tmp.Cmp(a.Dec) == 0
 }
 
 // AsCanonicalBytes accepts a buffer to write the base-10 string value of this field to, and returns

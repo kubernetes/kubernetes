@@ -116,40 +116,40 @@ func quantityAccessorCases() []accessorCase {
 			wantMilli:      math.MaxInt64,
 			wantScaledKilo: 9223372036854776,
 			wantAsInt64:    0, wantAsInt64OK: false,
-			wantFloat:       9.223372036854776e+18,
-			wantString:      "9223372036854775807",
+			wantFloat:  9.223372036854776e+18,
+			wantString: "9223372036854775807", stringTODO: `want "8Ei" once #141166 removes the binarySI parse cap`,
 			atInt64Boundary: true,
 		},
 		{
 			name: "binary-negative-8Ei-caps-at-negative-max", load: func() Quantity { return MustParse("-8Ei") },
-			wantSign:       -1,
-			wantValue:      -math.MaxInt64,
+			wantSign:  -1,
+			wantValue: -math.MaxInt64, valueTODO: "want math.MinInt64 once #141166 removes the binarySI parse cap",
 			wantMilli:      math.MinInt64,
 			wantScaledKilo: -9223372036854776,
-			wantAsInt64:    0, wantAsInt64OK: false,
+			wantAsInt64:    0, wantAsInt64OK: false, asInt64TODO: "want (math.MinInt64, true) once #141166 removes the binarySI parse cap",
 			wantFloat:  -9.223372036854776e+18,
-			wantString: "-9223372036854775807",
+			wantString: "-9223372036854775807", stringTODO: `want "-8Ei once #141166 removes the binarySI parse cap"`,
 		},
 		{
 			name: "binary-20Ei-caps-at-max", load: func() Quantity { return MustParse("20Ei") },
 			wantSign:       1,
 			wantValue:      math.MaxInt64,
 			wantMilli:      math.MaxInt64,
-			wantScaledKilo: 9223372036854776,
-			wantAsInt64:    0, wantAsInt64OK: false,
-			wantFloat:       9.223372036854776e+18,
-			wantString:      "9223372036854775807",
+			wantScaledKilo: 9223372036854776, scaledTODO: "want 23058430092136940 once #141166 removes the binarySI parse cap",
+			wantAsInt64: 0, wantAsInt64OK: false,
+			wantFloat: 9.223372036854776e+18, floatTODO: "want 2.305843009213694e+19 once #141166 removes the binarySI parse cap",
+			wantString: "9223372036854775807", stringTODO: `want "20Ei" once #141166 removes the binarySI parse cap`,
 			atInt64Boundary: true,
 		},
 		{
 			name: "binary-negative-20Ei-caps-at-negative-max", load: func() Quantity { return MustParse("-20Ei") },
-			wantSign:       -1,
-			wantValue:      -math.MaxInt64,
+			wantSign:  -1,
+			wantValue: -math.MaxInt64, valueTODO: "want math.MinInt64 once #141166 removes the binarySI parse cap",
 			wantMilli:      math.MinInt64,
-			wantScaledKilo: -9223372036854776,
-			wantAsInt64:    0, wantAsInt64OK: false,
-			wantFloat:  -9.223372036854776e+18,
-			wantString: "-9223372036854775807",
+			wantScaledKilo: -9223372036854776, scaledTODO: "want -23058430092136940 once #141166 removes the binarySI parse cap",
+			wantAsInt64: 0, wantAsInt64OK: false,
+			wantFloat: -9.223372036854776e+18, floatTODO: "want -2.305843009213694e+19 once #141166 removes the binarySI parse cap",
+			wantString: "-9223372036854775807", stringTODO: `want "-20Ei" once #141166 removes the binarySI parse cap`,
 		},
 
 		// --- Positive magnitude over int64: Value and MilliValue wrap or truncate. ---
@@ -298,7 +298,7 @@ func quantityAccessorCases() []accessorCase {
 			wantValue:      -10200547328,
 			wantMilli:      -10200547328000,
 			wantScaledKilo: -10200548,
-			wantAsInt64:    0, wantAsInt64OK: false,
+			wantAsInt64:    -10200547328, wantAsInt64OK: true,
 			wantFloat:  -1.0200547328e+10,
 			wantString: "-9728Mi",
 		},
@@ -377,7 +377,7 @@ func quantityAccessorCases() []accessorCase {
 			wantValue:      0,
 			wantMilli:      0,
 			wantScaledKilo: 0,
-			wantAsInt64:    0, wantAsInt64OK: false,
+			wantAsInt64:    0, wantAsInt64OK: true,
 			wantFloat:  0,
 			wantString: "0",
 		},
@@ -505,7 +505,7 @@ func assertAccessors(t *testing.T, tc accessorCase) {
 		// ok=false means the fast int64 path declined (Dec-backed or inexact), not
 		// overflow, and leaves the returned int64 unspecified; pin it only when ok.
 		if ok && got != tc.wantAsInt64 {
-			t.Errorf("AsInt64() value = %d, want %d", got, tc.wantAsInt64)
+			t.Errorf("AsInt64() value = %d, want %d%s", got, tc.wantAsInt64, todoSuffix(tc.asInt64TODO))
 		}
 	})
 	t.Run(tc.name+"/AsApproximateFloat64", func(t *testing.T) {
