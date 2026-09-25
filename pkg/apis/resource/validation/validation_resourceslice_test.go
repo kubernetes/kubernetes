@@ -797,6 +797,18 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"bad-attribute-extra-slash": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes"), "x.example.com/y/z", "must not contain more than one slash"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 2)
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("x.example.com/y/z"): {StringValue: ptr.To("z")},
+				}
+				return slice
+			}(),
+		},
 		"combined-attributes-capacity-length": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(3), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
@@ -1703,6 +1715,44 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
+		"bad-node-allocatable-resources-capacity-key-extra-slash": {
+			// A malformed key can never be found in the capacity map, so the
+			// format problem is reported instead of "not found".
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityKey"), "dra.example.com/cpu/extra", "must not contain more than one slash"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu/extra"),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-capacity-key-bad-name": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityKey"), "1cpu", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/1cpu"),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
 		"bad-node-allocatable-resources-invalid-device-multiplier-negative": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("deviceMultiplier"), "-1", "must be positive"),
@@ -2077,6 +2127,105 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			},
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), name+"-update", "field is immutable")},
 		},
+		"valid-update-keeps-stored-attribute-name-with-extra-slash": {
+			// A slice stored before the key format was enforced keeps working
+			// as long as its device list is not changed.
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := validResourceSlice.DeepCopy()
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("x.example.com/y/z"): {StringValue: ptr.To("v")},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"valid-update-keeps-stored-attribute-name-with-extra-slash-while-bumping-generation": {
+			// The device list is what gets compared, so the rest of the spec
+			// can still be updated.
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := validResourceSlice.DeepCopy()
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("x.example.com/y/z"): {StringValue: ptr.To("v")},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Pool.Generation++
+				return slice
+			},
+		},
+		"invalid-update-touches-stored-attribute-name-with-extra-slash": {
+			// Changing the device list revalidates all of it, so the stored key
+			// is reported.
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes"), "x.example.com/y/z", "must not contain more than one slash"),
+			},
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := validResourceSlice.DeepCopy()
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("x.example.com/y/z"): {StringValue: ptr.To("v")},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].Attributes[resourceapi.QualifiedName("x.example.com/other")] = resourceapi.DeviceAttribute{StringValue: ptr.To("v")}
+				return slice
+			},
+		},
+		"invalid-update-adds-device-next-to-stored-attribute-name-with-extra-slash": {
+			// The device list is atomic, so adding a device also revalidates
+			// the devices which are unchanged.
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes"), "x.example.com/y/z", "must not contain more than one slash"),
+			},
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := validResourceSlice.DeepCopy()
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("x.example.com/y/z"): {StringValue: ptr.To("v")},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				device := validResourceSlice.Spec.Devices[0].DeepCopy()
+				device.Name += "-other"
+				slice.Spec.Devices = append(slice.Spec.Devices, *device)
+				return slice
+			},
+		},
+		"invalid-update-sets-per-device-node-selection-keeps-stored-attribute-name-with-extra-slash": {
+			// Changing perDeviceNodeSelection revalidates only the node selection
+			// of the unchanged devices, not the rest of them.
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set to true in the ResourceSlice spec"),
+			},
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := validResourceSlice.DeepCopy()
+				slice.Spec.NodeName = nil
+				slice.Spec.AllNodes = ptr.To(true)
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("x.example.com/y/z"): {StringValue: ptr.To("v")},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.AllNodes = nil
+				slice.Spec.PerDeviceNodeSelection = ptr.To(true)
+				return slice
+			},
+		},
+		// The handwritten validation only consults the name format to decide
+		// whether looking for the attribute on each device is worthwhile, so a
+		// stored malformed name produces no error here. The declarative side
+		// skips the field because it is unchanged.
+		"valid-update-keeps-stored-partition-type-attribute-with-extra-slash": {
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := validResourceSlice.DeepCopy()
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName("x.example.com/y/z"))
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
 		"invalid-update-nodename": {
 			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "nodeName"), ptr.To(name+"-updated"), "field is immutable")},
 			oldResourceSlice: validResourceSlice,
@@ -2140,13 +2289,21 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 		},
 		"valid-old-effect": {
 			oldResourceSlice: invalidResourceSliceWithTaints,
+			update:           func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"invalid-old-effect-with-changed-spec": {
+			wantFailures:     field.ErrorList{field.NotSupported(field.NewPath("spec", "devices").Index(0).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone})}.MarkCoveredByDeclarative(),
+			oldResourceSlice: invalidResourceSliceWithTaints,
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				slice.Spec.Devices[0].Attributes["foo"] = resourceapi.DeviceAttribute{StringValue: ptr.To("bar")}
 				return slice
 			},
 		},
 		"invalid-new-effect-in-new-device": {
-			wantFailures:     field.ErrorList{field.NotSupported(field.NewPath("spec", "devices").Index(1).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone})}.MarkCoveredByDeclarative(),
+			wantFailures: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "devices").Index(0).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone}),
+				field.NotSupported(field.NewPath("spec", "devices").Index(1).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone}),
+			}.MarkCoveredByDeclarative(),
 			oldResourceSlice: invalidResourceSliceWithTaints,
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				device := slice.Spec.Devices[0].DeepCopy()
