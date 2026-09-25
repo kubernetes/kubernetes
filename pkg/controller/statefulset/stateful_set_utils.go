@@ -130,8 +130,10 @@ func getPersistentVolumeClaimName(set *apps.StatefulSet, claim *v1.PersistentVol
 
 // isMemberOf tests if pod is a member of set.
 func isMemberOf(set *apps.StatefulSet, pod *v1.Pod) bool {
-	parent, _ := getParentNameAndOrdinal(pod)
-	return parent == set.Name
+	parent, ordinal := getParentNameAndOrdinal(pod)
+	return ordinal >= 0 &&
+		parent == set.Name &&
+		pod.Name == getPodName(set, ordinal)
 }
 
 // identityMatches returns true if pod has a valid identity and network identity for a member of set.
