@@ -345,7 +345,6 @@ aliases:
     - RainbowMango
     - serathius
     - dgrisonnet
-    - rexagod
     - richabanker
     - pohly
   # sig-instrumentation-emeritus
@@ -353,6 +352,7 @@ aliases:
   # - DirectXMan12
   # - ehashman
   # - logicalhan
+  # - rexagod
   sig-instrumentation-reviewers:
     - dashpole
     - s-urbaniak
@@ -363,7 +363,6 @@ aliases:
     - pohly
     - mengjiao-liu
     - nmn3m
-    - rexagod
     - richabanker
   api-approvers:
     - deads2k
@@ -596,7 +595,6 @@ aliases:
     - msau42 # Storage
     - omerap12 # Autoscaling
     - pohly # Instrumentation
-    - rexagod # Instrumentation
     - richabanker # Instrumentation
     - saad-ali # Storage
     - sanposhiho # Scheduling
@@ -611,6 +609,7 @@ aliases:
     - wojtek-t # Scalability
   # feature-approvers-emeritus:
   # - logicalhan # Instrumentation
+  # - rexagod # Instrumentation
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
   conformance-behavior-approvers:
     - BenTheElder
