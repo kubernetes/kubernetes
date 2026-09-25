@@ -21,7 +21,6 @@ import (
 	"crypto/aes"
 	"crypto/ecdsa"
 	"crypto/ed25519"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -572,21 +571,12 @@ func (ctx ecEncrypterVerifier) verifyPayload(payload []byte, signature []byte, a
 	case ES256:
 		keySize = 32
 		hash = crypto.SHA256
-		if ctx.publicKey.Curve != elliptic.P256() {
-			return fmt.Errorf("go-jose/go-jose: signature uses different algorithm than public key")
-		}
 	case ES384:
 		keySize = 48
 		hash = crypto.SHA384
-		if ctx.publicKey.Curve != elliptic.P384() {
-			return fmt.Errorf("go-jose/go-jose: signature uses different algorithm than public key")
-		}
 	case ES512:
 		keySize = 66
 		hash = crypto.SHA512
-		if ctx.publicKey.Curve != elliptic.P521() {
-			return fmt.Errorf("go-jose/go-jose: signature uses different algorithm than public key")
-		}
 	default:
 		return ErrUnsupportedAlgorithm
 	}

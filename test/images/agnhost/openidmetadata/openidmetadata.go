@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
@@ -133,7 +134,7 @@ func validate(ctx context.Context, raw string) error {
 
 	validTok, err := iss.Verifier(&oidc.Config{
 		ClientID:             audience,
-		SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256, oidc.ES384, oidc.ES512},
+		SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256, oidc.ES384, oidc.ES512, string(jose.ML_DSA_44), string(jose.ML_DSA_65), string(jose.ML_DSA_87)},
 	}).Verify(ctx, raw)
 	if err != nil {
 		return err

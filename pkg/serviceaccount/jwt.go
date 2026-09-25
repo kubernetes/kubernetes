@@ -21,6 +21,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -80,6 +81,11 @@ func JWTTokenGenerator(iss string, privateKey interface{}) (TokenGenerator, erro
 		if err != nil {
 			return nil, fmt.Errorf("could not generate signer for OpaqueSigner: %v", err)
 		}
+	case *mldsa.PrivateKey:
+		signer, err = signerFromMLDSAPrivateKey(pk)
+		if err != nil {
+			return nil, fmt.Errorf("could not generate signer for ML-DSA keypair: %v", err)
+		}
 	default:
 		return nil, fmt.Errorf("unknown private key type %T, must be *rsa.PrivateKey, *ecdsa.PrivateKey, or jose.OpaqueSigner", privateKey)
 	}
@@ -88,6 +94,49 @@ func JWTTokenGenerator(iss string, privateKey interface{}) (TokenGenerator, erro
 		iss:    iss,
 		signer: signer,
 	}, nil
+}
+
+func signerFromMLDSAPrivateKey(pk *mldsa.PrivateKey) (jose.Signer, error) {
+	keyID, err := keyIDFromPublicKey(pk.PublicKey())
+
+	alg := ""
+	var joseAlg jose.SignatureAlgorithm
+
+	switch pk.PublicKey().Parameters() {
+	case mldsa.MLDSA44():
+		alg = string(jose.ML_DSA_44)
+		joseAlg = jose.ML_DSA_44
+	case mldsa.MLDSA65():
+		alg = string(jose.ML_DSA_65)
+		joseAlg = jose.ML_DSA_65
+	case mldsa.MLDSA87():
+		alg = string(jose.ML_DSA_87)
+		joseAlg = jose.ML_DSA_87
+	default:
+		return nil, fmt.Errorf("unknown mldsa key parameter: %v", pk.PublicKey().Parameters().String())
+	}
+
+	privateJWK := &jose.JSONWebKey{
+		Algorithm: alg,
+		Key:       pk,
+		KeyID:     keyID,
+		Use:       "sig",
+	}
+
+	signer, err := jose.NewSigner(
+		jose.SigningKey{
+			Algorithm: joseAlg,
+			Key:       privateJWK,
+		},
+		nil,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer: %v", err)
+	}
+
+	return signer, nil
+
 }
 
 // keyIDFromPublicKey derives a key ID non-reversibly from a public key.
@@ -348,6 +397,9 @@ var AcceptableServiceAccountSignatureAlgorithms = []jose.SignatureAlgorithm{
 	jose.ES384,
 	jose.ES512,
 	jose.RS256,
+	jose.ML_DSA_44,
+	jose.ML_DSA_65,
+	jose.ML_DSA_87,
 }
 
 func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {

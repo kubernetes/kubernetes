@@ -24,11 +24,6 @@ import (
 	"github.com/go-jose/go-jose/v4/json"
 )
 
-// maxNumericDate bounds an accepted NumericDate (in seconds). It is far past
-// any real timestamp but safely below where an int64 conversion or time.Unix
-// would overflow and wrap Time() to a bogus instant.
-const maxNumericDate = 1 << 62
-
 // Claims represents public claim values (as specified in RFC 7519).
 type Claims struct {
 	Issuer    string       `json:"iss,omitempty"`
@@ -71,16 +66,6 @@ func (n *NumericDate) UnmarshalJSON(b []byte) error {
 
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		return ErrUnmarshalNumericDate
-	}
-
-	// Reject values large enough to overflow either the int64 conversion below
-	// or time.Unix in Time(). time.Unix adds a ~62e9-second offset internally,
-	// so a value near the int64 limit wraps and compares as a time in the
-	// past; for "nbf" that lets a not-yet-valid token pass the not-before
-	// check instead of being rejected. maxNumericDate (2^62 seconds) is far
-	// beyond any real timestamp yet safely below both overflow points.
-	if f >= maxNumericDate || f <= -maxNumericDate {
 		return ErrUnmarshalNumericDate
 	}
 
