@@ -103,7 +103,7 @@ func validatePoolName(name string, fldPath *field.Path, opts ...validatePoolName
 	if name == "" {
 		err := field.Required(fldPath, "")
 		if slices.Contains(opts, poolNameRequiredCovered) {
-			err = err.MarkAlpha().MarkCoveredByDeclarative()
+			err = err.MarkCoveredByDeclarative()
 		}
 		allErrs = append(allErrs, err)
 	} else {
@@ -818,8 +818,8 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	allErrs = append(allErrs, validateDriverName(spec.Driver, fldPath.Child("driver"), corevalidation.RequiredCovered)...)
 	allErrs = append(allErrs, validateResourcePool(spec.Pool, fldPath.Child("pool"))...)
 	if oldSpec != nil {
-		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Pool.Name, oldSpec.Pool.Name, fldPath.Child("pool", "name")).WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()...)
-		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Driver, oldSpec.Driver, fldPath.Child("driver")).WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Pool.Name, oldSpec.Pool.Name, fldPath.Child("pool", "name")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Driver, oldSpec.Driver, fldPath.Child("driver")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.NodeName, oldSpec.NodeName, fldPath.Child("nodeName"))...)
 	}
 

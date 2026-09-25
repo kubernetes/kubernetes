@@ -628,12 +628,42 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "driver"), "other.driver.io", "field is immutable").WithOrigin("immutable").MarkAlpha(),
 					},
 				},
+				"invalid update: driver set from unset": {
+					old:    mkResourceSliceWithDevices(tweakDriver("")),
+					update: mkResourceSliceWithDevices(),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "driver"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"invalid update: driver unset from set": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDriver("")),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "driver"), "").MarkAlpha(),
+						field.Invalid(field.NewPath("spec", "driver"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
 				// spec.pool.name
 				"invalid update: pool name changed": {
 					old:    mkResourceSliceWithDevices(),
 					update: mkResourceSliceWithDevices(tweakPoolName("other-pool")),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "pool", "name"), "other-pool", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"invalid update: pool name set from unset": {
+					old:    mkResourceSliceWithDevices(tweakPoolName("")),
+					update: mkResourceSliceWithDevices(),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "pool", "name"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"invalid update: pool name unset from set": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakPoolName("")),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "pool", "name"), "").MarkAlpha(),
+						field.Invalid(field.NewPath("spec", "pool", "name"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
 					},
 				},
 				// spec.devices[%d].bindingConditions
