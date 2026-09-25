@@ -156,7 +156,6 @@
         "k8s.io/code-generator"
       ],
       "github.com/golang/protobuf": [
-        "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
