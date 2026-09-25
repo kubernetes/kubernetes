@@ -496,14 +496,23 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 // calculatePodLevelRequests computes the requests for the specific resource at
 // the pod level.
 func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
-	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
-		ExcludeOverhead: true,
-	})
-	podRequest, ok := podLevelRequests[resource]
-	if !ok {
-		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
+	// A pod-level request for one resource must not bypass actuated container
+	// requests for a different resource that is only specified on containers.
+	if pod.Spec.Resources == nil || pod.Spec.Resources.Requests == nil {
+		return calculatePodRequestsFromContainers(pod, "", resource)
 	}
-	return podRequest.MilliValue(), nil
+	podSpecRequest, ok := pod.Spec.Resources.Requests[resource]
+	if !ok || !resourcehelpers.IsSupportedPodLevelResource(resource) {
+		return calculatePodRequestsFromContainers(pod, "", resource)
+	}
+	if feature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		if pod.Status.Resources != nil && pod.Status.Resources.Requests != nil {
+			if podRequest, ok := pod.Status.Resources.Requests[resource]; ok {
+				return podRequest.MilliValue(), nil
+			}
+		}
+	}
+	return podSpecRequest.MilliValue(), nil
 }
 
 // calculatePodRequestsFromContainers computes the requests for the specified
@@ -520,11 +529,11 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 	request := int64(0)
 	for _, c := range containers {
 		if container == "" || container == c.Name {
-			containerRequest, ok := c.Resources.Requests[resource]
+			containerRequest, ok := getContainerRequest(pod, &c, resource)
 			if !ok {
 				return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
 			}
-			request += containerRequest.MilliValue()
+			request += containerRequest
 		}
 		// container names are unique inside the pod
 		if container == c.Name {
@@ -538,6 +547,40 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 	}
 
 	return request, nil
+}
+
+// getContainerRequest returns the request in millivalue for the given container and resource.
+// If the container has actuated resources reported in pod.Status, that actuated request
+// is returned. Otherwise, it falls back to the requested resources from container.Resources.Requests
+// in pod.Spec.
+func getContainerRequest(pod *v1.Pod, c *v1.Container, resource v1.ResourceName) (int64, bool) {
+	cs := findContainerStatus(pod, c.Name)
+	if cs != nil && cs.Resources != nil && cs.Resources.Requests != nil {
+		if req, ok := cs.Resources.Requests[resource]; ok {
+			return req.MilliValue(), true
+		}
+	}
+	req, ok := c.Resources.Requests[resource]
+	if !ok {
+		return 0, false
+	}
+	return req.MilliValue(), true
+}
+
+// findContainerStatus finds the container status for a given container name
+// in pod.Status.ContainerStatuses or pod.Status.InitContainerStatuses.
+func findContainerStatus(pod *v1.Pod, name string) *v1.ContainerStatus {
+	for i := range pod.Status.ContainerStatuses {
+		if pod.Status.ContainerStatuses[i].Name == name {
+			return &pod.Status.ContainerStatuses[i]
+		}
+	}
+	for i := range pod.Status.InitContainerStatuses {
+		if pod.Status.InitContainerStatuses[i].Name == name {
+			return &pod.Status.InitContainerStatuses[i]
+		}
+	}
+	return nil
 }
 
 func removeMetricsForPods(metrics metricsclient.PodMetricsInfo, pods sets.Set[string]) {
