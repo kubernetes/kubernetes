@@ -478,7 +478,11 @@ func (cfgCtlr *configController) updateBorrowingLocked(setCompleters bool, plSta
 		}
 		relChange := relDiff(float64(currentCL), float64(plState.currentCL))
 		plState.currentCL = currentCL
-		metrics.NotePriorityLevelConcurrencyAdjustment(plState.pl.Name, float64(plState.seatDemandStats.highWatermark), plState.seatDemandStats.avg, plState.seatDemandStats.stdDev, plState.seatDemandStats.smoothed, float64(items[idx].target), currentCL)
+		seatDemandTarget := float64(currentCL)
+		if isNonExempt {
+			seatDemandTarget = items[idx].target
+		}
+		metrics.NotePriorityLevelConcurrencyAdjustment(plState.pl.Name, float64(plState.seatDemandStats.highWatermark), plState.seatDemandStats.avg, plState.seatDemandStats.stdDev, plState.seatDemandStats.smoothed, seatDemandTarget, currentCL)
 		logLevel := klog.Level(4)
 		if relChange >= 0.05 {
 			logLevel = 2
