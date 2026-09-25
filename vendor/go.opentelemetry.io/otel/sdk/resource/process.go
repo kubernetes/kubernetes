@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 )
 
 type (
@@ -112,19 +112,19 @@ type (
 
 // Detect returns a *Resource that describes the process identifier (PID) of the
 // executing process.
-func (processPIDDetector) Detect(ctx context.Context) (*Resource, error) {
+func (processPIDDetector) Detect(context.Context) (*Resource, error) {
 	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessPID(pid())), nil
 }
 
 // Detect returns a *Resource that describes the name of the process executable.
-func (processExecutableNameDetector) Detect(ctx context.Context) (*Resource, error) {
+func (processExecutableNameDetector) Detect(context.Context) (*Resource, error) {
 	executableName := filepath.Base(commandArgs()[0])
 
 	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessExecutableName(executableName)), nil
 }
 
 // Detect returns a *Resource that describes the full path of the process executable.
-func (processExecutablePathDetector) Detect(ctx context.Context) (*Resource, error) {
+func (processExecutablePathDetector) Detect(context.Context) (*Resource, error) {
 	executablePath, err := executablePath()
 	if err != nil {
 		return nil, err
@@ -135,13 +135,13 @@ func (processExecutablePathDetector) Detect(ctx context.Context) (*Resource, err
 
 // Detect returns a *Resource that describes all the command arguments as received
 // by the process.
-func (processCommandArgsDetector) Detect(ctx context.Context) (*Resource, error) {
+func (processCommandArgsDetector) Detect(context.Context) (*Resource, error) {
 	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessCommandArgs(commandArgs()...)), nil
 }
 
 // Detect returns a *Resource that describes the username of the user that owns the
 // process.
-func (processOwnerDetector) Detect(ctx context.Context) (*Resource, error) {
+func (processOwnerDetector) Detect(context.Context) (*Resource, error) {
 	owner, err := owner()
 	if err != nil {
 		return nil, err
@@ -152,17 +152,17 @@ func (processOwnerDetector) Detect(ctx context.Context) (*Resource, error) {
 
 // Detect returns a *Resource that describes the name of the compiler used to compile
 // this process image.
-func (processRuntimeNameDetector) Detect(ctx context.Context) (*Resource, error) {
+func (processRuntimeNameDetector) Detect(context.Context) (*Resource, error) {
 	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessRuntimeName(runtimeName())), nil
 }
 
 // Detect returns a *Resource that describes the version of the runtime of this process.
-func (processRuntimeVersionDetector) Detect(ctx context.Context) (*Resource, error) {
+func (processRuntimeVersionDetector) Detect(context.Context) (*Resource, error) {
 	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessRuntimeVersion(runtimeVersion())), nil
 }
 
 // Detect returns a *Resource that describes the runtime of this process.
-func (processRuntimeDescriptionDetector) Detect(ctx context.Context) (*Resource, error) {
+func (processRuntimeDescriptionDetector) Detect(context.Context) (*Resource, error) {
 	runtimeDescription := fmt.Sprintf(
 		"go version %s %s/%s", runtimeVersion(), runtimeOS(), runtimeArch())
 

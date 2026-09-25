@@ -46,9 +46,25 @@ func (c *codecV2) Marshal(v any) (data mem.BufferSlice, err error) {
 		return nil, fmt.Errorf("proto: failed to marshal, message is %T, want proto.Message", v)
 	}
 
+	// Important: if we remove this Size call then we cannot use
+	// UseCachedSize in MarshalOptions below.
 	size := proto.Size(vv)
+
+	// MarshalOptions with UseCachedSize allows reusing the result from the
+	// previous Size call. This is safe here because:
+	//
+	// 1. We just computed the size.
+	// 2. We assume the message is not being mutated concurrently.
+	//
+	// Important: If the proto.Size call above is removed, using UseCachedSize
+	// becomes unsafe and may lead to incorrect marshaling.
+	//
+	// For more details, see the doc of UseCachedSize:
+	// https://pkg.go.dev/google.golang.org/protobuf/proto#MarshalOptions
+	marshalOptions := proto.MarshalOptions{UseCachedSize: true}
+
 	if mem.IsBelowBufferPoolingThreshold(size) {
-		buf, err := proto.Marshal(vv)
+		buf, err := marshalOptions.Marshal(vv)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +72,7 @@ func (c *codecV2) Marshal(v any) (data mem.BufferSlice, err error) {
 	} else {
 		pool := mem.DefaultBufferPool()
 		buf := pool.Get(size)
-		if _, err := (proto.MarshalOptions{}).MarshalAppend((*buf)[:0], vv); err != nil {
+		if _, err := marshalOptions.MarshalAppend((*buf)[:0], vv); err != nil {
 			pool.Put(buf)
 			return nil, err
 		}

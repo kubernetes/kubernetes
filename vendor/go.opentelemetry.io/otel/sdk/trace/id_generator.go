@@ -32,7 +32,7 @@ type randomIDGenerator struct{}
 var _ IDGenerator = &randomIDGenerator{}
 
 // NewSpanID returns a non-zero span ID from a randomly-chosen sequence.
-func (gen *randomIDGenerator) NewSpanID(ctx context.Context, traceID trace.TraceID) trace.SpanID {
+func (*randomIDGenerator) NewSpanID(context.Context, trace.TraceID) trace.SpanID {
 	sid := trace.SpanID{}
 	for {
 		binary.NativeEndian.PutUint64(sid[:], rand.Uint64())
@@ -45,7 +45,7 @@ func (gen *randomIDGenerator) NewSpanID(ctx context.Context, traceID trace.Trace
 
 // NewIDs returns a non-zero trace ID and a non-zero span ID from a
 // randomly-chosen sequence.
-func (gen *randomIDGenerator) NewIDs(ctx context.Context) (trace.TraceID, trace.SpanID) {
+func (*randomIDGenerator) NewIDs(context.Context) (trace.TraceID, trace.SpanID) {
 	tid := trace.TraceID{}
 	sid := trace.SpanID{}
 	for {
