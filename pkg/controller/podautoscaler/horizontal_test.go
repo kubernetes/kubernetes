@@ -6986,6 +6986,7 @@ func TestUpdateHPAEnqueueBehavior(t *testing.T) {
 }
 
 func TestUpdateHPAFallsBackWhenFeatureDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, false)
 
 	spy := newSpyWorkQueue(10 * time.Minute)
