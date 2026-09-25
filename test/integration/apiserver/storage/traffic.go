@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -48,7 +50,19 @@ const (
 	RequestTypeUpdateWithCachedObject RequestType = "UpdateWithCachedObject"
 )
 
-type TraffiConfig struct {
+// WatchRequestType selects the resource version a watch starts from.
+type WatchRequestType string
+
+const (
+	RVEmpty   WatchRequestType = "RVEmpty"
+	RVZero    WatchRequestType = "RVZero"
+	RVOne     WatchRequestType = "RVOne"
+	RVCurrent WatchRequestType = "RVCurrent"
+	RVPast    WatchRequestType = "RVPast"
+	RVFuture  WatchRequestType = "RVFuture"
+)
+
+type UnaryConfig struct {
 	Concurrency         int
 	MaxOperations       int
 	Namespaces          int
@@ -56,7 +70,14 @@ type TraffiConfig struct {
 	RequestDistribution []ChoiceWeight[RequestType]
 }
 
-func generateKeys(cfg TraffiConfig) []types.NamespacedName {
+type WatchConfig struct {
+	Concurrency         int
+	Duration            time.Duration
+	MaxEvents           int
+	RequestDistribution []ChoiceWeight[WatchRequestType]
+}
+
+func generateKeys(cfg UnaryConfig) []types.NamespacedName {
 	numNamespaces := cfg.Namespaces
 	if numNamespaces <= 0 {
 		numNamespaces = 1
@@ -73,8 +94,8 @@ func generateKeys(cfg TraffiConfig) []types.NamespacedName {
 	return keys
 }
 
-// RunTraffic drives concurrent storage operations and records all invocations.
-func RunTraffic(ctx context.Context, store storage.Interface, cfg TraffiConfig) ([]correctness.Operation, error) {
+// RunUnaryTraffic drives concurrent storage operations and records all invocations.
+func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConfig) ([]correctness.Operation, error) {
 	if cfg.Concurrency <= 0 {
 		return nil, fmt.Errorf("concurrency must be positive")
 	}
@@ -140,6 +161,36 @@ func RunTraffic(ctx context.Context, store storage.Interface, cfg TraffiConfig) 
 
 	wg.Wait()
 	return operations, nil
+}
+
+// RunWatchTraffic keeps cfg.Concurrency watches open until stop is closed and
+// records what each of them received. Watches still open at that point run to
+// their own deadline, so the events they already collected are not discarded.
+func RunWatchTraffic(ctx context.Context, store storage.Interface, cfg WatchConfig, stop <-chan struct{}) []correctness.WatchOperation {
+	var mu sync.Mutex
+	var watches []correctness.WatchOperation
+	var wg sync.WaitGroup
+	for range cfg.Concurrency {
+		wg.Go(func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-stop:
+					return
+				default:
+				}
+				request := randomWatchRequest(ctx, store, cfg.RequestDistribution)
+				response := runWatch(ctx, store, request, cfg)
+
+				mu.Lock()
+				watches = append(watches, correctness.WatchOperation{Request: request, Response: response})
+				mu.Unlock()
+			}
+		})
+	}
+	wg.Wait()
+	return watches
 }
 
 func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType], cached runtime.Object) *correctness.Request {
@@ -298,6 +349,75 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		Object: out,
 	}
 	return response
+}
+
+func randomWatchRequest(ctx context.Context, store storage.Interface, distribution []ChoiceWeight[WatchRequestType]) correctness.WatchRequest {
+	var offset int64
+	switch selected := PickRandom(distribution); selected {
+	case RVEmpty:
+		return correctness.WatchRequest{ResourceVersion: ""}
+	case RVZero:
+		return correctness.WatchRequest{ResourceVersion: "0"}
+	case RVOne:
+		return correctness.WatchRequest{ResourceVersion: "1"}
+	case RVCurrent:
+		offset = 0
+	case RVPast:
+		offset = -int64(1 + rand.Intn(10))
+	case RVFuture:
+		offset = int64(1 + rand.Intn(10))
+	default:
+		panic(fmt.Sprintf("%v: unknown watch request type", selected))
+	}
+	currentRV, err := store.GetCurrentResourceVersion(ctx)
+	if err != nil {
+		panic(err)
+	}
+	rv := max(int64(currentRV)+offset, 1)
+	return correctness.WatchRequest{ResourceVersion: strconv.FormatInt(rv, 10)}
+}
+
+func runWatch(ctx context.Context, store storage.Interface, req correctness.WatchRequest, cfg WatchConfig) correctness.WatchResponse {
+	// Without SendInitialEvents=false, ResourceVersion="0" or "" causes storage
+	// to emit synthetic ADDED events for existing objects at their current RV.
+	sendInitialEvents := false
+	w, err := store.Watch(ctx, "/pods/", storage.ListOptions{
+		ResourceVersion:   req.ResourceVersion,
+		Predicate:         storage.Everything,
+		Recursive:         true,
+		SendInitialEvents: &sendInitialEvents,
+	})
+	if err != nil {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok {
+			return correctness.WatchResponse{Err: err}
+		}
+		panic(err)
+	}
+	defer w.Stop()
+
+	timer := time.NewTimer(cfg.Duration)
+	defer timer.Stop()
+
+	var events []watch.Event
+	for {
+		select {
+		case <-ctx.Done():
+			return correctness.WatchResponse{Events: events, Err: ctx.Err()}
+		case <-timer.C:
+			return correctness.WatchResponse{Events: events}
+		case event, open := <-w.ResultChan():
+			if !open {
+				return correctness.WatchResponse{Events: events}
+			}
+			if cacheable, ok := event.Object.(runtime.CacheableObject); ok {
+				event.Object = cacheable.GetObject()
+			}
+			events = append(events, event)
+			if cfg.MaxEvents > 0 && len(events) >= cfg.MaxEvents {
+				return correctness.WatchResponse{Events: events}
+			}
+		}
+	}
 }
 
 func validPod(namespace, name string) *api.Pod {
