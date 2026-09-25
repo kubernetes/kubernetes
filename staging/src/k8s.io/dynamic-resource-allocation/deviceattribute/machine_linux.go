@@ -17,7 +17,6 @@ limitations under the License.
 package deviceattribute
 
 import (
-	"io/fs"
 	"os"
 )
 
@@ -26,5 +25,5 @@ const (
 )
 
 func initDefaultMachine(mc *machine) {
-	mc.sysfs = os.DirFS(SysfsRoot).(fs.ReadLinkFS)
+	mc.sysfs = os.DirFS(SysfsRoot).(SysFS)
 }
