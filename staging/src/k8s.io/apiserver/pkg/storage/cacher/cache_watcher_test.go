@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -730,5 +731,42 @@ func gatherWithoutBuckets(gatherer compbasemetrics.Gatherer) testutil.GathererFu
 			}
 		}
 		return got, err
+	}
+}
+
+type copyCountingPod struct {
+	*v1.Pod
+	copies *atomic.Int64
+}
+
+func (p copyCountingPod) DeepCopyObject() runtime.Object {
+	p.copies.Add(1)
+	return copyCountingPod{Pod: p.Pod.DeepCopy(), copies: p.copies}
+}
+
+func TestStoppedWatcherDoesNotCopyInitEvents(t *testing.T) {
+	const numObjects = 10
+	var copies atomic.Int64
+	store := store.NewWatchCacheStorage(nil, nil)
+	for i := 0; i < numObjects; i++ {
+		pod := makeTestPod(fmt.Sprintf("pod-%d", i), uint64(i))
+		elem := makeTestStoreElement(pod)
+		elem.Object = copyCountingPod{Pod: pod, copies: &copies}
+		store.Add(elem)
+	}
+	wci, err := newCacheIntervalFromStore(numObjects, store, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	filter := func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true }
+	forget := func(_ bool) {}
+	deadline := time.Now().Add(time.Minute)
+	w := newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
+	w.stopLocked()
+	w.processInterval(context.Background(), wci, 0)
+
+	if got := copies.Load(); got != 0 {
+		t.Errorf("stopped watcher deep-copied %d of %d init objects, want 0", got, numObjects)
 	}
 }
