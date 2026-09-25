@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -524,6 +525,39 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		return nil, NewNotRegisteredErrForType(s.schemeName, t)
 	}
 
+	// If the object has a GVK set and multiple kinds are registered for the same Go type,
+	// reorder kinds so the object's group/kind is preferred. This ensures KindForGroupVersionKinds
+	// still receives the full list for priority decisions, but "first match" tie-breaking favors
+	// the object's actual kind. The stable sort keeps registration order within each bucket.
+	originalKinds := kinds
+	reordered := false
+	if len(kinds) > 1 {
+		objGVK := in.GetObjectKind().GroupVersionKind()
+		if len(objGVK.Version) > 0 && len(objGVK.Kind) > 0 {
+			rank := func(k schema.GroupVersionKind) int {
+				switch {
+				case k == objGVK:
+					return 0
+				case k.Group == objGVK.Group && k.Kind == objGVK.Kind:
+					return 1
+				default:
+					return 2
+				}
+			}
+			for _, k := range kinds {
+				if rank(k) < 2 {
+					sorted := slices.Clone(kinds)
+					slices.SortStableFunc(sorted, func(a, b schema.GroupVersionKind) int {
+						return rank(a) - rank(b)
+					})
+					kinds = sorted
+					reordered = true
+					break
+				}
+			}
+		}
+	}
+
 	gvk, ok := target.KindForGroupVersionKinds(kinds)
 	if !ok {
 		// try to see if this type is listed as unversioned (for legacy support)
@@ -541,6 +575,19 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	for _, kind := range kinds {
 		if gvk == kind {
 			return copyAndSetTargetKind(copy, in, gvk)
+		}
+	}
+
+	// If we reordered kinds and gvk was not found in the list, the target may have
+	// constructed a fallback GVK from the first element (e.g., InternalGroupVersioner).
+	// Reordering can change which element is first, producing an incorrect GVK.
+	// Retry with the original order to get the correct fallback.
+	if reordered {
+		if gvk2, ok := target.KindForGroupVersionKinds(originalKinds); ok {
+			if slices.Contains(originalKinds, gvk2) {
+				return copyAndSetTargetKind(copy, in, gvk2)
+			}
+			gvk = gvk2
 		}
 	}
 
