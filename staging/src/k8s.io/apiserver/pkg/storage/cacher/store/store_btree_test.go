@@ -91,7 +91,7 @@ func TestStoreListPrefix(t *testing.T) {
 }
 
 func TestStoreSnapshotter(t *testing.T) {
-	cache := NewSnapshotter()
+	cache := newSnapshotter()
 	cache.Add(10, fakeSnapshot{rv: 10})
 	cache.Add(20, fakeSnapshot{rv: 20})
 	cache.Add(30, fakeSnapshot{rv: 30})
@@ -159,26 +159,4 @@ func (f fakeSnapshot) OrderedListPrefix(prefixKey, continueKey string) ([]interf
 
 func (f fakeSnapshot) RangePrefix(prefixKey, continueKey string) Range {
 	return nil
-}
-
-type fakeSnapshotter struct {
-	getLessOrEqual func(rv uint64) (Snapshot, bool)
-}
-
-var _ Snapshotter = (*fakeSnapshotter)(nil)
-
-func (f *fakeSnapshotter) Reset() {}
-func (f *fakeSnapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
-	if f.getLessOrEqual == nil {
-		return nil, false
-	}
-	return f.getLessOrEqual(rv)
-}
-func (f *fakeSnapshotter) Latest() (Snapshot, bool) {
-	return nil, false
-}
-func (f *fakeSnapshotter) Add(rv uint64, snapshot Snapshot) {}
-func (f *fakeSnapshotter) RemoveLess(rv uint64)             {}
-func (f *fakeSnapshotter) Len() int {
-	return 0
 }

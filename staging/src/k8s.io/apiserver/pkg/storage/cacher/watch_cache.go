@@ -604,7 +604,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	// Empty the cyclic buffer, ensuring startIndex doesn't decrease.
 	w.history.ResetLocked()
 
-	if err := w.storage.ReplaceLocked(toReplace, resourceVersion, version); err != nil {
+	if err := w.storage.Replace(toReplace, resourceVersion, version); err != nil {
 		return err
 	}
 	w.resourceVersion = version
