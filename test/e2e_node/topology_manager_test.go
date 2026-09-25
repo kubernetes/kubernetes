@@ -1578,6 +1578,13 @@ func numaAllocationStrategyOptions(strategy string) map[string]string {
 	return map[string]string{topologymanager.NUMAAllocationStrategy: strategy}
 }
 
+func numaScoreWeightsOptions(strategy, weights string) map[string]string {
+	return map[string]string{
+		topologymanager.NUMAAllocationStrategy: strategy,
+		topologymanager.NUMAScoreWeights:       weights,
+	}
+}
+
 // createGuPodAndGetNUMANodes admits a guaranteed pod with one container per entry
 // of cpuCounts, each asking for that many exclusive CPUs, and returns it together
 // with the NUMA node the topology manager aligned each container to.
@@ -1803,6 +1810,57 @@ func runNUMAAllocationStrategyTests(f *framework.Framework) {
 	})
 }
 
+func runNUMAScoreWeightsTests(f *framework.Framework) {
+	var oldCfg *kubeletconfig.KubeletConfiguration
+	var err error
+
+	ginkgo.It("run the Topology Manager numa-score-weights policy option test suite", func(ctx context.Context) {
+		env := numaAllocationStrategyPrecheck()
+
+		oldCfg, err = getCurrentKubeletConfig(ctx)
+		framework.ExpectNoError(err)
+
+		// The CPU Manager is the only hint provider scoring anything here: the
+		// Memory Manager runs the none policy and none of these pods ask for a
+		// device. Weighting cpu at 0 therefore drops the only contributor, the
+		// merged hints come back unscored and the allocation strategy has
+		// nothing to act on, so both fixtures fall back to the default
+		// placement. That is the same outcome as leaving the strategy off, but
+		// reached through the weights rather than through the strategy, which
+		// is what makes it worth asserting: it is the selected NUMA node
+		// changing in response to numa-score-weights alone.
+		//
+		// The weights are scope-independent, they are applied while the hints
+		// are merged and both scopes share that path, so the container scope is
+		// enough here. The scope coverage lives with the strategy tests.
+		scope := containerScopeTopology
+
+		ginkgo.By("checking that weighting cpu at 0 leaves least-allocated with nothing to spread on")
+		updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaScoreWeightsOptions(topologymanager.NUMAAllocationStrategyLeastAllocated, "cpu=0"), true), true)
+		runNUMASpreadingTest(ctx, f, env, false)
+
+		ginkgo.By("checking that weighting cpu at 0 leaves most-allocated with nothing to pack on")
+		updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaScoreWeightsOptions(topologymanager.NUMAAllocationStrategyMostAllocated, "cpu=0"), true), true)
+		runNUMAPackingTest(ctx, f, env, false)
+
+		// A weight which does not exclude cpu leaves a single contributor
+		// normalized against itself, which is the equal-weight average the
+		// strategy tests already run against. Only the ratios matter, so the
+		// value itself is irrelevant, and spreading has to behave exactly as it
+		// does with no weights configured at all.
+		ginkgo.By("checking that weights which do not exclude cpu leave least-allocated alone")
+		updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaScoreWeightsOptions(topologymanager.NUMAAllocationStrategyLeastAllocated, "cpu=50,memory=50"), true), true)
+		runNUMASpreadingTest(ctx, f, env, true)
+	})
+
+	ginkgo.AfterEach(func(ctx context.Context) {
+		if oldCfg != nil {
+			// restore kubelet config
+			updateKubeletConfig(ctx, f, oldCfg, true)
+		}
+	})
+}
+
 func hostPrecheck() (int, int) {
 	// this is a very rough check. We just want to rule out system that does NOT have
 	// any SRIOV device. A more proper check will be done in runTopologyManagerPositiveTest
@@ -1842,6 +1900,9 @@ var _ = SIGDescribe("Topology Manager", framework.WithSerial(), feature.Topology
 	})
 	ginkgo.Context("With kubeconfig's numa-allocation-strategy topologyOptions enabled run the Topology Manager tests", ginkgo.Label("NUMAAllocationStrategy"), func() {
 		runNUMAAllocationStrategyTests(f)
+	})
+	ginkgo.Context("With kubeconfig's numa-score-weights topologyOptions enabled run the Topology Manager tests", ginkgo.Label("NUMAScoreWeights"), func() {
+		runNUMAScoreWeightsTests(f)
 	})
 })
 
