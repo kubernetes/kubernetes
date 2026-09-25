@@ -488,6 +488,9 @@ func (a *Allocator) DryRun() Interface {
 func (a *Allocator) EnableMetrics() {
 	registerMetrics()
 	a.metrics = &metricsRecorder{}
+	// Seed gauges so metrics are non-zero before the first allocation.
+	a.metrics.setAllocated(a.metricLabel, a.Used())
+	a.metrics.setAvailable(a.metricLabel, a.Free())
 }
 
 // dryRunRange is a shim to satisfy Interface without persisting state.
