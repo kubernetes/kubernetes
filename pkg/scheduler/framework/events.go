@@ -84,9 +84,7 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod, isTargetPod b
 		extractPodScaleUp,
 		extractPodSchedulingGateEliminatedChange,
 		extractPodTolerationChange,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		podChangeExtractors = append(podChangeExtractors, extractPodGeneratedResourceClaimChange)
+		extractPodGeneratedResourceClaimChange,
 	}
 
 	for _, fn := range podChangeExtractors {

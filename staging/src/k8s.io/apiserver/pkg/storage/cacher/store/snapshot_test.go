@@ -43,11 +43,13 @@ func TestSnapshotListPrefix(t *testing.T) {
 		{
 			name: "Indexer",
 			newSnapshot: func(t *testing.T) Snapshot {
-				indexer := newThreadedBtreeStoreIndexer(nil, btreeDegree)
+				indexer := NewWatchCacheStorage(nil, nil)
 				for _, elem := range elements {
-					require.NoError(t, indexer.Add(elem))
+					prev, err := indexer.Add(elem)
+					require.NoError(t, err)
+					assert.Nil(t, prev)
 				}
-				return indexer.Clone()
+				return indexer.store.Clone()
 			},
 		},
 		{
@@ -55,7 +57,7 @@ func TestSnapshotListPrefix(t *testing.T) {
 			newSnapshot: func(t *testing.T) Snapshot {
 				store := newBtreeStore(btreeDegree)
 				for _, elem := range elements {
-					require.NoError(t, store.Add(elem))
+					store.addOrUpdateElem(elem)
 				}
 				return &store
 			},
@@ -112,6 +114,28 @@ func TestSnapshotListPrefix(t *testing.T) {
 					assert.Equal(t, len(tc.expectKeys), r.Count(), "Count")
 				})
 			}
+		})
+	}
+}
+
+func TestSingleElementRange(t *testing.T) {
+	elem := testStorageElement("/pods/ns1/a", "a", 1)
+	for _, tc := range []struct {
+		name       string
+		r          Range
+		expectKeys []string
+	}{
+		{name: "single", r: SingleElementRange(elem), expectKeys: []string{"/pods/ns1/a"}},
+		{name: "empty", r: EmptyRange(), expectKeys: nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var keys []string
+			for e, err := range tc.r.All() {
+				require.NoError(t, err)
+				keys = append(keys, e.Key)
+			}
+			assert.Equal(t, tc.expectKeys, keys)
+			assert.Equal(t, len(tc.expectKeys), tc.r.Count())
 		})
 	}
 }

@@ -743,6 +743,65 @@ func TestWarnings(t *testing.T) {
 			expected: nil,
 		},
 		{
+			name: "large integer no warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "large fractional warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808.001"),
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.resources.requests[storage]: fractional byte value "9223372036854775808001m" is invalid, must be an integer`,
+			},
+		},
+		{
+			name: "whole byte value whose milli projection overflows int64",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854776"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "fractional byte value within a milli of the next whole byte",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("1.9999"),
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.resources.requests[storage]: fractional byte value "1999900u" is invalid, must be an integer`,
+			},
+		},
+		{
 			name: "storageclass annotations warning",
 			template: &core.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{

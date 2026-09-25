@@ -198,48 +198,39 @@ func TestInFlightEventAsync(t *testing.T) {
 	}
 }
 
-func TestEntityToLabel(t *testing.T) {
+func TestEntityTypeToLabel(t *testing.T) {
 	tests := []struct {
-		name      string
-		entity    Entity
-		wantLabel string
-		wantOK    bool
+		name       string
+		entityType fwk.EntityKeyType
+		wantLabel  string
 	}{
 		{
-			name:   "nil entity",
-			entity: nil,
-			wantOK: false,
+			name:       "pod entity",
+			entityType: fwk.PodKeyType,
+			wantLabel:  Pod,
 		},
 		{
-			name:      "pod entity",
-			entity:    &testEntity{t: "pod"},
-			wantLabel: Pod,
-			wantOK:    true,
+			name:       "podgroup entity",
+			entityType: fwk.PodGroupKeyType,
+			wantLabel:  PodGroup,
 		},
 		{
-			name:      "podgroup entity",
-			entity:    &testEntity{t: "podgroup"},
-			wantLabel: PodGroup,
-			wantOK:    true,
+			name:       "compositepodgroup entity",
+			entityType: fwk.CompositePodGroupKeyType,
+			wantLabel:  CompositePodGroup,
 		},
 		{
-			name:      "compositepodgroup entity",
-			entity:    &testEntity{t: "compositepodgroup"},
-			wantLabel: CompositePodGroup,
-			wantOK:    true,
-		},
-		{
-			name:   "unknown entity type",
-			entity: &testEntity{t: "unknown"},
-			wantOK: false,
+			name:       "unknown entity type",
+			entityType: "unknown",
+			wantLabel:  "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotLabel, gotOK := EntityToLabel(tt.entity)
-			if gotLabel != tt.wantLabel || gotOK != tt.wantOK {
-				t.Errorf("EntityToLabel() = (%v, %v), want (%v, %v)", gotLabel, gotOK, tt.wantLabel, tt.wantOK)
+			gotLabel := EntityTypeToLabel(tt.entityType)
+			if gotLabel != tt.wantLabel {
+				t.Errorf("Unexpected EntityToLabel, want: %v, got: %v", tt.wantLabel, gotLabel)
 			}
 		})
 	}

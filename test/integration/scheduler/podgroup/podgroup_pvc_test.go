@@ -88,7 +88,7 @@ func TestPodGroupSchedulingWithReadWriteOncePodPVC(t *testing.T) {
 
 	workload := st.MakeWorkload().Name("workload").
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(2).Obj()).Obj()
-	podGroup := st.MakePodGroup().Name("pg").WorkloadRef("t", "workload").Priority(200).MinCount(2).Obj()
+	podGroup := st.MakePodGroup().Name("pg").WorkloadRef("workload", "t").Priority(200).MinCount(2).Obj()
 
 	tests := []struct {
 		name string

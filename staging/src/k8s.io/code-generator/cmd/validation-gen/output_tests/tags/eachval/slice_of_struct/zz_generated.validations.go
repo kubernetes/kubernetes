@@ -144,5 +144,53 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listNonComparableField"), obj.ListNonComparableField, oldVal, oldObj != nil)...)
 	}
 
+	{ // field Struct.ShortCircuitField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []ShortCircuitStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ShortCircuitStruct) field.ErrorList {
+					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "a",
+						func(o *ShortCircuitStruct) *string { return &o.A }, validate.DirectEqual, validate.RequiredValue)
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ShortCircuitStruct) field.ErrorList {
+					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "a",
+						func(o *ShortCircuitStruct) *string { return &o.A }, validate.DirectEqual,
+						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+							return validate.MaxLength(ctx, op, fldPath, obj, oldObj, 3)
+						})
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ShortCircuitStruct) field.ErrorList {
+					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "b",
+						func(o *ShortCircuitStruct) *string { return &o.B }, validate.DirectEqual,
+						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+							return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ShortCircuitField[*].b")
+						})
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []ShortCircuitStruct {
+				return oldObj.ShortCircuitField
+			})
+		errs = append(errs, fn(fldPath.Child("shortCircuitField"), obj.ShortCircuitField, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }

@@ -246,6 +246,7 @@ func init() {
 		TransportCacheGCCalls:        &transportCacheGCCallsAdapter{m: transportCacheGCCalls},
 		RegisterFn: func() {
 			legacyregistry.MustRegister(requestLatency)
+			legacyregistry.MustRegister(resolverLatency)
 			legacyregistry.MustRegister(requestSize)
 			legacyregistry.MustRegister(responseSize)
 			legacyregistry.MustRegister(rateLimiterLatency)

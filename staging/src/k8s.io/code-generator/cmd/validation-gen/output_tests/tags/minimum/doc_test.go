@@ -18,6 +18,7 @@ package minimum
 
 import (
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
@@ -29,9 +30,10 @@ func TestBasicStruct(t *testing.T) {
 	// Test that zero values are rejected because they are below the minimum of 1.
 	st.Value(&BasicStruct{
 		// all zero values
-		IntPtrField:     ptr.To(0),
-		UintPtrField:    ptr.To(uint(0)),
-		TypedefPtrField: ptr.To(IntType(0)),
+		IntPtrField:      ptr.To(0),
+		UintPtrField:     ptr.To(uint(0)),
+		DurationPtrField: ptr.To(time.Duration(0)),
+		TypedefPtrField:  ptr.To(IntType(0)),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("intField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("intPtrField"), nil, "").WithOrigin("minimum"),
@@ -43,6 +45,8 @@ func TestBasicStruct(t *testing.T) {
 		field.Invalid(field.NewPath("uint16Field"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("uint32Field"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("uint64Field"), nil, "").WithOrigin("minimum"),
+		field.Invalid(field.NewPath("durationField"), nil, "").WithOrigin("minimum"),
+		field.Invalid(field.NewPath("durationPtrField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("typedefField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("typedefPtrField"), nil, "").WithOrigin("minimum"),
 	})
@@ -60,45 +64,53 @@ func TestBasicStruct(t *testing.T) {
 
 	// Changed invalid data is still rejected.
 	st.Value(&BasicStruct{
-		IntField:        -1,
-		IntPtrField:     ptr.To(-1),
-		Int16Field:      -1,
-		Int32Field:      -1,
-		Int64Field:      -1,
-		TypedefField:    IntType(-1),
-		TypedefPtrField: ptr.To(IntType(-1)),
+		IntField:         -1,
+		IntPtrField:      ptr.To(-1),
+		Int16Field:       -1,
+		Int32Field:       -1,
+		Int64Field:       -1,
+		DurationField:    time.Second - 1,
+		DurationPtrField: ptr.To(100*time.Millisecond - 1),
+		TypedefField:     IntType(-1),
+		TypedefPtrField:  ptr.To(IntType(-1)),
 	}).OldValue(&BasicStruct{
-		IntField:        0,
-		IntPtrField:     ptr.To(0),
-		Int16Field:      0,
-		Int32Field:      0,
-		Int64Field:      0,
-		TypedefField:    IntType(0),
-		TypedefPtrField: ptr.To(IntType(0)),
+		IntField:         0,
+		IntPtrField:      ptr.To(0),
+		Int16Field:       0,
+		Int32Field:       0,
+		Int64Field:       0,
+		DurationField:    0,
+		DurationPtrField: ptr.To(time.Duration(0)),
+		TypedefField:     IntType(0),
+		TypedefPtrField:  ptr.To(IntType(0)),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("intField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("intPtrField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("int16Field"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("int32Field"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("int64Field"), nil, "").WithOrigin("minimum"),
+		field.Invalid(field.NewPath("durationField"), nil, "").WithOrigin("minimum"),
+		field.Invalid(field.NewPath("durationPtrField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("typedefField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("typedefPtrField"), nil, "").WithOrigin("minimum"),
 	})
 
 	// Test that values meeting the minimum of 1 are valid.
 	st.Value(&BasicStruct{
-		IntField:        1,
-		IntPtrField:     ptr.To(1),
-		Int16Field:      1,
-		Int32Field:      1,
-		Int64Field:      1,
-		UintField:       1,
-		Uint16Field:     1,
-		Uint32Field:     1,
-		Uint64Field:     1,
-		UintPtrField:    ptr.To(uint(1)),
-		TypedefField:    IntType(1),
-		TypedefPtrField: ptr.To(IntType(1)),
+		IntField:         1,
+		IntPtrField:      ptr.To(1),
+		Int16Field:       1,
+		Int32Field:       1,
+		Int64Field:       1,
+		UintField:        1,
+		Uint16Field:      1,
+		Uint32Field:      1,
+		Uint64Field:      1,
+		UintPtrField:     ptr.To(uint(1)),
+		DurationField:    time.Second,
+		DurationPtrField: ptr.To(100 * time.Millisecond),
+		TypedefField:     IntType(1),
+		TypedefPtrField:  ptr.To(IntType(1)),
 	}).ExpectValid()
 }
 

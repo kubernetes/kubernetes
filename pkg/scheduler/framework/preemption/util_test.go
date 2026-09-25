@@ -17,6 +17,7 @@ limitations under the License.
 package preemption
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -31,6 +32,28 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
+
+type mockPodGroupLister struct {
+	podGroups map[string]*schedulingv1beta1.PodGroup
+}
+
+func (m *mockPodGroupLister) Get(namespace, name string) (*schedulingv1beta1.PodGroup, error) {
+	if pg, ok := m.podGroups[name]; ok {
+		return pg, nil
+	}
+	return nil, fmt.Errorf("pod group %s not found", name)
+}
+
+type mockCompositePodGroupLister struct {
+	compositePodGroups map[string]*schedulingv1alpha3.CompositePodGroup
+}
+
+func (m *mockCompositePodGroupLister) Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error) {
+	if cpg, ok := m.compositePodGroups[name]; ok {
+		return cpg, nil
+	}
+	return nil, fmt.Errorf("composite pod group %s not found", name)
+}
 
 func TestFilterVictimsWithPDBViolation(t *testing.T) {
 	newPodInfo := func(p *v1.Pod) fwk.PodInfo {
@@ -1018,9 +1041,9 @@ func TestGetPodPriority(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetPodPriority(tt.pod, tt.podGroupLister, tt.compositePodGroupLister)
+			got := getPodPriority(tt.pod, tt.podGroupLister, tt.compositePodGroupLister)
 			if got != tt.expectedPriority {
-				t.Errorf("GetPodPriority() = %v, want %v", got, tt.expectedPriority)
+				t.Errorf("getPodPriority() = %v, want %v", got, tt.expectedPriority)
 			}
 		})
 	}
@@ -1038,22 +1061,30 @@ func TestTraverseHierarchyUp(t *testing.T) {
 		expectedVisitedKeys     []fwk.EntityKey
 	}{
 		{
-			name:                    "nil podGroupLister",
-			startKey:                fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister:          nil,
-			compositePodGroupLister: nil,
-			expectedVisitedKeys:     nil,
-		},
-		{
 			name:     "nil compositePodGroupLister",
 			startKey: fwk.PodGroupKey(namespace, "pg1"),
 			podGroupLister: &mockPodGroupLister{
 				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Name("pg1").Obj(),
+					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").Obj(),
 				},
 			},
 			compositePodGroupLister: nil,
-			expectedVisitedKeys:     nil,
+			expectedVisitedKeys: []fwk.EntityKey{
+				fwk.PodGroupKey(namespace, "pg1"),
+			},
+		},
+		{
+			name:     "nil compositePodGroupLister with PG pointing to a parent CPG",
+			startKey: fwk.PodGroupKey(namespace, "pg1"),
+			podGroupLister: &mockPodGroupLister{
+				podGroups: map[string]*schedulingv1beta1.PodGroup{
+					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").ParentCompositePodGroup("cpg").Obj(),
+				},
+			},
+			compositePodGroupLister: nil,
+			expectedVisitedKeys: []fwk.EntityKey{
+				fwk.PodGroupKey(namespace, "pg1"),
+			},
 		},
 		{
 			name:                    "unsupported key type",
@@ -1206,11 +1237,12 @@ func TestTraverseHierarchyUp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var visitedKeys []fwk.EntityKey
-			traverseFn := func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
-				visitedKeys = append(visitedKeys, key)
-				return key.Name == tt.stopAt
+			for gpg := range traverseHierarchyUp(namespace, tt.startKey, tt.podGroupLister, tt.compositePodGroupLister) {
+				visitedKeys = append(visitedKeys, gpg.GetKey())
+				if gpg.GetName() == tt.stopAt {
+					break
+				}
 			}
-			TraverseHierarchyUp(namespace, tt.startKey, tt.podGroupLister, tt.compositePodGroupLister, traverseFn)
 			if diff := cmp.Diff(tt.expectedVisitedKeys, visitedKeys); diff != "" {
 				t.Errorf("TraverseHierarchyUp() mismatch (-want, +got):\n%s", diff)
 			}

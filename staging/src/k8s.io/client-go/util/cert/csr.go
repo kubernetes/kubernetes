@@ -26,7 +26,7 @@ import (
 )
 
 // MakeCSR generates a PEM-encoded CSR using the supplied private key, subject, and SANs.
-// All key types that are implemented via crypto.Signer are supported (This includes *rsa.PrivateKey and *ecdsa.PrivateKey.)
+// All key types that are implemented via crypto.Signer are supported (This includes *rsa.PrivateKey, *ecdsa.PrivateKey and *mldsa.PrivateKey.)
 func MakeCSR(privateKey interface{}, subject *pkix.Name, dnsSANs []string, ipSANs []net.IP) (csr []byte, err error) {
 	template := &x509.CertificateRequest{
 		Subject:     *subject,
@@ -39,8 +39,8 @@ func MakeCSR(privateKey interface{}, subject *pkix.Name, dnsSANs []string, ipSAN
 
 // MakeCSRFromTemplate generates a PEM-encoded CSR using the supplied private
 // key and certificate request as a template. All key types that are
-// implemented via crypto.Signer are supported (This includes *rsa.PrivateKey
-// and *ecdsa.PrivateKey.)
+// implemented via crypto.Signer are supported (This includes *rsa.PrivateKey,
+// *ecdsa.PrivateKey and *mldsa.PrivateKey.)
 func MakeCSRFromTemplate(privateKey interface{}, template *x509.CertificateRequest) ([]byte, error) {
 	t := *template
 	t.SignatureAlgorithm = sigType(privateKey)

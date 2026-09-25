@@ -597,7 +597,6 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				}
 			}
 			driver := drautils.NewDriverInstance(tCtx)
-			b := drautils.NewBuilderNow(tCtx, driver)
 
 			// Run driver with these custom devices
 			driverResources := map[string]resourceslice.DriverResources{
@@ -612,6 +611,8 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				},
 			}
 			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, driverResources)
+			// Initialize the builder after driver.Run() so LIFO cleanup deletes pods/claims before the driver.
+			b := drautils.NewBuilderNow(tCtx, driver)
 
 			// Create claims and classes
 			createdClaims := createClaims(tCtx, b, tc.containers, tc.unreferencedClaims)
@@ -697,7 +698,7 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 		expectedPodCgroupAfterResize                    cgroups.ContainerResources
 		expectedContainersCgroupAfterResize             []cgroups.ContainerResources // per container
 		expectedPodAllocatedResourcesAfterResize        v1.ResourceList
-		expectedContainersAllocatedResourcesAfterResize []v1.ResourceList
+		expectedContainersAllocatedResourcesAfterResize []v1.ResourceList // ordered by container name to match pod.Status.ContainerStatuses
 	}{
 		{
 			name:                 "direct mappings with resize",
@@ -843,7 +844,6 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			tCtx := f.TContext(ctx)
 			nodes := drautils.NewNodesNow(tCtx, 1, 4)
 			driver := drautils.NewDriverInstance(tCtx)
-			b := drautils.NewBuilderNow(tCtx, driver)
 
 			driverResources := map[string]resourceslice.DriverResources{
 				nodes.NodeNames[0]: {
@@ -857,6 +857,8 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 				},
 			}
 			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, driverResources)
+			// Initialize the builder after driver.Run() so LIFO cleanup deletes pods/claims before the driver.
+			b := drautils.NewBuilderNow(tCtx, driver)
 
 			createdClaims := createClaims(tCtx, b, tc.containers, tc.unreferencedClaims)
 
@@ -888,7 +890,9 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting for resize actuation to complete")
-			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, pod, desiredContainers)
+			// Pass nil for expectedContainers to skip standard spec-based cgroup/status
+			// checks, as DRA claims inflate cgroup limits and are verified explicitly below.
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, pod, nil)
 
 			ginkgo.By("verifying updated pod cgroup limits after resize")
 			err = cgroups.VerifyPodCgroups(ctx, f, resizedPod, &tc.expectedPodCgroupAfterResize)
@@ -909,7 +913,8 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			}
 
 			ginkgo.By("verifying pod status updates match spec after resize")
-			framework.ExpectNoError(verifyDRAPodLevelStatusResources(resizedPod, tc.expectedPodAllocatedResourcesAfterResize))
+			framework.ExpectNoError(verifyPodStatusResourcesWithDRA(resizedPod, tc.expectedPodAllocatedResourcesAfterResize, tc.expectedContainersAllocatedResourcesAfterResize))
+			framework.ExpectNoError(podresize.VerifyPodRestarts(ctx, f, resizedPod, desiredContainers))
 
 			ginkgo.By("verifying pod spec resources after patch")
 			podresize.VerifyPodResources(patchedPod, desiredContainers, desiredPodResources)
@@ -1014,12 +1019,18 @@ func createClaims(tCtx ktesting.TContext, b *drautils.Builder, containers []draC
 	return createdClaims
 }
 
-func verifyDRAPodLevelStatusResources(gotPod *v1.Pod, wantAllocatedResources v1.ResourceList) error {
+func verifyPodStatusResourcesWithDRA(gotPod *v1.Pod, wantPodAllocatedResources v1.ResourceList, wantContainersAllocatedResources []v1.ResourceList) error {
 	ginkgo.GinkgoHelper()
 	var errs []error
-	if wantAllocatedResources != nil {
-		if err := framework.Gomega().Expect(gotPod.Status.AllocatedResources).To(gomega.BeComparableTo(wantAllocatedResources)); err != nil {
+	if wantPodAllocatedResources != nil {
+		if err := framework.Gomega().Expect(gotPod.Status.AllocatedResources).To(gomega.BeComparableTo(wantPodAllocatedResources)); err != nil {
 			errs = append(errs, fmt.Errorf("pod[%s] status allocatedResources mismatch: %w", gotPod.Name, err))
+		}
+	}
+	for i, wantAllocatedReqs := range wantContainersAllocatedResources {
+		gotCtrStatus := gotPod.Status.ContainerStatuses[i]
+		if err := framework.Gomega().Expect(gotCtrStatus.AllocatedResources).To(gomega.BeComparableTo(wantAllocatedReqs)); err != nil {
+			errs = append(errs, fmt.Errorf("container[%s] status allocatedResources mismatch: %w", gotCtrStatus.Name, err))
 		}
 	}
 	return errors.NewAggregate(errs)

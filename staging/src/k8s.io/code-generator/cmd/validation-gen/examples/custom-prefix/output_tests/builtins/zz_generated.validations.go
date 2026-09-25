@@ -258,14 +258,6 @@ func Validate_Struct(
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *Item, b *Item) bool { return a.Name == b.Name }, validate.DirectEqual,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-						func(o *Item) *string { return &o.Name }, validate.DirectEqual, validate.RequiredValue)
-				}).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
 			}

@@ -92,16 +92,11 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *OtherStruct, b *OtherStruct) bool {
 					return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-				}, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+				}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
 			}
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
@@ -131,16 +126,11 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *OtherTypedefStruct, b *OtherTypedefStruct) bool {
 					return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-				}, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+				}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
 			}
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
@@ -170,16 +160,11 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *OtherStruct, b *OtherStruct) bool {
 					return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-				}, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+				}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ListType(ctx, op, fldPath, obj, oldObj)...)

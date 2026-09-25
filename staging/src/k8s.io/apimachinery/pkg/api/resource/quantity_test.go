@@ -542,9 +542,9 @@ func TestQuantityParse(t *testing.T) {
 		"-3.01i",
 		"-3.01e-",
 
-		// an exponent outside the int32 scale is rejected rather than truncated
-		// to an unrelated value; 1e4294967297 would otherwise parse as 1e1
-		"1e4294967297",
+		// an exponent that narrows to a scale of math.MinInt32 is rejected,
+		// because negating that scale overflows int32
+		"1e2147483648",
 
 		// trailing whitespace is forbidden
 		" 1",
@@ -559,26 +559,26 @@ func TestQuantityParse(t *testing.T) {
 }
 
 func TestInterpretExponentInt32Bounds(t *testing.T) {
-	// interpret parses the exponent at 64 bits but stores it in an int32 scale
-	// that is later negated, so it accepts [-MaxInt32, MaxInt32] and rejects
-	// anything past it, instead of narrowing it to an unrelated value. This
-	// checks interpret's suffix-layer bounds only, not what the rest of
-	// ParseQuantity does with an accepted exponent.
+	// interpret parses the exponent at 64 bits and narrows it to the int32
+	// scale, the way a <=1.37 apiserver did, so that objects it wrote keep
+	// decoding. The exception is a scale of math.MinInt32, whose negation
+	// overflows int32. This checks interpret's suffix-layer behaviour only,
+	// not what the rest of ParseQuantity does with an accepted exponent.
 	cases := []struct {
 		suffix  string
 		wantExp int32
 		wantOK  bool
 	}{
 		{"e14", 14, true},
-		{"E2147483647", 2147483647, true},   // MaxInt32
-		{"E-2147483647", -2147483647, true}, // -MaxInt32
-		{"E2147483648", 0, false},           // MaxInt32 + 1
-		{"E-2147483648", 0, false},          // MinInt32; -MinInt32 overflows int32
-		{"E4294967297", 0, false},           // 2^32 + 1, truncated to 1 today
-		{"E8589934592", 0, false},           // 2^33, truncated to 0 today
-		{"E9223372036854775807", 0, false},  // MaxInt64, truncated to -1 today
-		{"E9223372036854775808", 0, false},  // MaxInt64 + 1, past int64: ParseInt range error
-		{"E6024865272343", 0, false},        // far past int32
+		{"E2147483647", 2147483647, true},     // MaxInt32
+		{"E-2147483647", -2147483647, true},   // -MaxInt32
+		{"E2147483648", math.MinInt32, true},  // narrows to MinInt32; ParseQuantity rejects that scale
+		{"E-2147483648", math.MinInt32, true}, // narrows to MinInt32 as well
+		{"E4294967297", 1, true},              // 2^32 + 1 narrows to 1
+		{"E8589934592", 0, true},              // 2^33 narrows to 0
+		{"E9223372036854775807", -1, true},    // MaxInt64 narrows to -1
+		{"E9223372036854775808", 0, false},    // MaxInt64 + 1, past int64: ParseInt range error
+		{"E6024865272343", -973843945, true},  // far past int32, narrows
 	}
 	for _, tc := range cases {
 		base, exp, format, ok := quantitySuffixer.interpret(suffix(tc.suffix))
@@ -655,6 +655,14 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 		{intQuantity(mostNegative, -18, DecimalSI), intQuantity(-1, 0, DecimalSI), -1},
 		{intQuantity(mostNegative, -19, DecimalSI), intQuantity(-1, 0, DecimalSI), 1},
 
+		// TODO(#141166): 1e-2147483648 is below 1, so this must be -1.
+		{intQuantity(1, math.MinInt32, DecimalSI), intQuantity(1, 0, DecimalSI), 1},
+		// TODO(#141166): -1e-2147483648 is above -1, so this must be 1.
+		{intQuantity(-1, math.MinInt32, DecimalSI), intQuantity(-1, 0, DecimalSI), -1},
+		// TODO(#141166): 1e-2147483648 is below 1e-2147483630, so this must be -1.
+		{intQuantity(1, math.MinInt32, DecimalSI), intQuantity(1, math.MinInt32+18, DecimalSI), 1},
+		{intQuantity(1, math.MinInt32+1, DecimalSI), intQuantity(1, 0, DecimalSI), -1},
+
 		{intQuantity(1*1000000*1000000*1000000, -17, DecimalSI), intQuantity(1, 1, DecimalSI), 0},
 		{intQuantity(1*1000000*1000000*1000000, -17, DecimalSI), intQuantity(-10, 0, DecimalSI), 1},
 		{intQuantity(-1*1000000*1000000*1000000, -17, DecimalSI), intQuantity(-10, 0, DecimalSI), 0},
@@ -704,6 +712,34 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 		}
 		if cmp := b.Cmp(a); cmp != -item.cmp {
 			t.Errorf("%#v: unexpected inverted Cmp: %d", item, cmp)
+		}
+	}
+}
+
+func TestQuantityCmpInt64(t *testing.T) {
+	table := []struct {
+		a   Quantity
+		b   int64
+		cmp int
+	}{
+		{intQuantity(901, -2, DecimalSI), 9, 1},
+		{intQuantity(901, -2, DecimalSI), 10, -1},
+		{intQuantity(1000, -3, DecimalSI), 1, 0},
+		{intQuantity(mostPositive, 0, DecimalSI), mostPositive, 0},
+		{intQuantity(mostNegative, 0, DecimalSI), mostNegative, 0},
+		{decQuantity(901, -2, DecimalSI), 9, 1},
+		{decQuantity(901, -2, DecimalSI), 10, -1},
+
+		// TODO(#141166): 1e-2147483648 is below 1, so this must be -1.
+		{intQuantity(1, math.MinInt32, DecimalSI), 1, 1},
+		// TODO(#141166): -1e-2147483648 is above -1, so this must be 1.
+		{intQuantity(-1, math.MinInt32, DecimalSI), -1, -1},
+		{intQuantity(1, math.MinInt32+1, DecimalSI), 1, -1},
+	}
+
+	for _, item := range table {
+		if cmp := item.a.CmpInt64(item.b); cmp != item.cmp {
+			t.Errorf("%#v: unexpected CmpInt64(%d): %d", item, item.b, cmp)
 		}
 	}
 }
@@ -903,6 +939,17 @@ func TestQuantityStringBelowNano(t *testing.T) {
 	}{
 		{decQuantity(1, -12, DecimalSI), "1e-12"},
 		{decQuantity(1, -10, DecimalSI), "100e-12"},
+		{intQuantity(1, math.MinInt32+2, BinarySI), "1e-2147483646"},
+		{intQuantity(1024, math.MinInt32+2, BinarySI), "1024e-2147483646"},
+		{intQuantity(math.MaxInt64, math.MinInt32+2, BinarySI), "9223372036854775807e-2147483646"},
+		// TODO(#141166): Must print the exact value, 1024e-2147483647.
+		{intQuantity(1024, math.MinInt32+1, BinarySI), "102400e2147483647"},
+		// TODO(#141166): Must print the exact value, 1e-2147483648.
+		{intQuantity(1, math.MinInt32, BinarySI), "1"},
+		// TODO(#141166): Must print the exact value, 1024e-2147483648.
+		{intQuantity(1024, math.MinInt32, BinarySI), "1Ki"},
+		// TODO(#141166): Must print the exact value, 9223372036854775807e-2147483648.
+		{intQuantity(math.MaxInt64, math.MinInt32, BinarySI), "9223372036854775807"},
 	}
 	for _, item := range table {
 		if e, a := item.expect, item.in.String(); e != a {

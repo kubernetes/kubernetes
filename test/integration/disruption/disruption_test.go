@@ -116,8 +116,7 @@ func setup(ctx context.Context, t *testing.T) (*kubeapiservertesting.TestServer,
 func TestPDBWithScaleSubresource(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	s, pdbc, informers, clientSet, apiExtensionClient, dynamicClient := setup(tCtx, t)
-	defer s.TearDownFn()
-	defer tCtx.Cancel("test has completed")
+	tCtx.Cleanup(s.TearDownFn)
 
 	nsName := "pdb-scale-subresource"
 	createNs(tCtx, t, nsName, clientSet)
@@ -248,8 +247,7 @@ func TestEmptySelector(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			s, pdbc, informers, clientSet, _, _ := setup(tCtx, t)
-			defer s.TearDownFn()
-			defer tCtx.Cancel("test has completed")
+			tCtx.Cleanup(s.TearDownFn)
 
 			nsName := fmt.Sprintf("pdb-empty-selector-%d", i)
 			createNs(tCtx, t, nsName, clientSet)
@@ -362,8 +360,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			s, pdbc, informers, clientSet, _, _ := setup(tCtx, t)
-			defer s.TearDownFn()
-			defer tCtx.Cancel("test has completed")
+			tCtx.Cleanup(s.TearDownFn)
 
 			nsName := fmt.Sprintf("pdb-selectors-%d", i)
 			createNs(tCtx, t, nsName, clientSet)
@@ -535,12 +532,9 @@ func createPDBUsingRemovedAPI(ctx context.Context, etcdClient *clientv3.Client, 
 func TestPatchCompatibility(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	s, pdbc, _, clientSet, _, _ := setup(tCtx, t)
-	defer s.TearDownFn()
-	// Even though pdbc isn't used in this test, its creation is already
-	// spawning some goroutines. So we need to run it to ensure they won't leak.
-	// We can't cancel immediately but later, because when the context is canceled,
-	// the event broadcaster will be shut down .
-	defer tCtx.Cancel("cleaning up")
+	tCtx.Cleanup(s.TearDownFn)
+	// Even though pdbc isn't used in this test, its creation already spawns
+	// goroutines, so run it and let test cleanup stop it with tCtx cancellation.
 	go pdbc.Run(tCtx, 1)
 
 	testcases := []struct {
@@ -638,8 +632,7 @@ func TestPatchCompatibility(t *testing.T) {
 func TestStalePodDisruption(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	s, pdbc, informers, clientSet, _, _ := setup(tCtx, t)
-	defer s.TearDownFn()
-	defer tCtx.Cancel("test has completed")
+	tCtx.Cleanup(s.TearDownFn)
 
 	nsName := "pdb-stale-pod-disruption"
 	createNs(tCtx, t, nsName, clientSet)

@@ -90,7 +90,7 @@ func Test_buildClientCertificateManager(t *testing.T) {
 
 	nodeName := types.NodeName("test")
 	tCtx := ktesting.Init(t)
-	m, err := buildClientCertificateManager(tCtx.Logger(), config1, config2, testDir, nodeName)
+	m, err := buildClientCertificateManager(tCtx.Logger(), config1, config2, testDir, nodeName, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
 	}
 	nodeName := types.NodeName("test")
 	tCtx := ktesting.Init(t)
-	if _, err := buildClientCertificateManager(tCtx.Logger(), config1, config2, testDir, nodeName); err != nil {
+	if _, err := buildClientCertificateManager(tCtx.Logger(), config1, config2, testDir, nodeName, nil); err != nil {
 		t.Fatal(err)
 	}
 	fi := getFileInfo(testDir)
@@ -170,7 +170,7 @@ func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
 	// an invalid cert should be ignored
 	config2.CertData = []byte("invalid contents")
 	config2.KeyData = []byte("invalid contents")
-	if _, err := buildClientCertificateManager(tCtx.Logger(), config1, config2, testDir, nodeName); err == nil {
+	if _, err := buildClientCertificateManager(tCtx.Logger(), config1, config2, testDir, nodeName, nil); err == nil {
 		t.Fatal("unexpected non error")
 	}
 	fi = getFileInfo(testDir)
@@ -181,7 +181,7 @@ func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
 	// an expired client certificate should be written to disk, because the cert manager can
 	// use config1 to refresh it and the cert manager won't return it for clients.
 	config2.CertData, config2.KeyData = genClientCert(t, time.Now().Add(-2*time.Hour), time.Now().Add(-time.Hour))
-	if _, err := buildClientCertificateManager(tCtx.Logger(), config1, config2, testDir, nodeName); err != nil {
+	if _, err := buildClientCertificateManager(tCtx.Logger(), config1, config2, testDir, nodeName, nil); err != nil {
 		t.Fatal(err)
 	}
 	fi = getFileInfo(testDir)
@@ -191,7 +191,7 @@ func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
 
 	// a valid, non-expired client certificate should be written to disk
 	config2.CertData, config2.KeyData = genClientCert(t, time.Now().Add(-time.Hour), time.Now().Add(24*time.Hour))
-	if _, err := buildClientCertificateManager(tCtx.Logger(), config1, config2, testDir, nodeName); err != nil {
+	if _, err := buildClientCertificateManager(tCtx.Logger(), config1, config2, testDir, nodeName, nil); err != nil {
 		t.Fatal(err)
 	}
 	fi = getFileInfo(testDir)
@@ -427,7 +427,7 @@ func genClientCert(t *testing.T, from, to time.Time) ([]byte, []byte) {
 		NotBefore:    from,
 		NotAfter:     to,
 
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		KeyUsage:              x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 	}

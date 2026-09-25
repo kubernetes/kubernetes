@@ -80,7 +80,7 @@ func Validate_Struct(
 				func(a *Item, b *Item) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "target"}"
+			func() { // cohort = "{"key": "target"}.stringField"
 				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
@@ -91,6 +91,21 @@ func Validate_Struct(
 							})
 					}); len(e) != 0 {
 					errs = append(errs, e...)
+				}
+			}()
+			func() { // cohort = "{"key": "target"}.otherField"
+				earlyReturn := false
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "otherField",
+							func(o *Item) *string { return &o.OtherField }, validate.DirectEqual, validate.RequiredValue)
+					}).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
 				}
 			}()
 			return
@@ -119,7 +134,7 @@ func Validate_Struct(
 				func(a *RatchetItem, b *RatchetItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "ratchet"}"
+			func() { // cohort = "{"key": "ratchet"}.status"
 				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *RatchetItem) bool { return item.Key == "ratchet" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *RatchetItem) field.ErrorList {

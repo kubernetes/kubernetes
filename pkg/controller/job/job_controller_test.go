@@ -5521,6 +5521,37 @@ func TestUpdateJobRequeue(t *testing.T) {
 	}
 }
 
+func TestDeleteJobClearsPodExpectations(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+
+	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
+	if err := sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job); err != nil {
+		t.Fatalf("Failed to add Job to informer: %v", err)
+	}
+	key, err := controller.KeyFunc(job)
+	if err != nil {
+		t.Fatalf("Unexpected error getting job key: %v", err)
+	}
+
+	// Simulate a Pod creation that the controller has requested but not observed.
+	if err := manager.expectations.ExpectCreations(logger, key, 1); err != nil {
+		t.Fatalf("ExpectCreations() error = %v", err)
+	}
+	if manager.expectations.SatisfiedExpectations(logger, key) {
+		t.Fatal("expectations should be unsatisfied before deleting the Job")
+	}
+
+	manager.deleteJob(logger, job)
+
+	if !manager.expectations.SatisfiedExpectations(logger, key) {
+		t.Error("expectations should be cleared after deleting the Job")
+	}
+}
+
 func TestGetPodCreationInfoForIndependentIndexes(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	now := time.Now()

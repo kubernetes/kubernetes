@@ -31,8 +31,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/go-jose/go-jose.v2"
 
 	"k8s.io/kubernetes/test/utils/oidc/handlers"
 )

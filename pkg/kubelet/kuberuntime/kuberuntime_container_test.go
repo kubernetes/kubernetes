@@ -40,6 +40,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
+	apitest "k8s.io/cri-api/pkg/apis/testing"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -1078,41 +1079,148 @@ func TestKillContainerGracePeriod(t *testing.T) {
 
 // TestUpdateContainerResources tests updating a container in a Pod.
 func TestUpdateContainerResources(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, errCreate := createTestRuntimeManager(tCtx)
 	require.NoError(t, errCreate)
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "foo",
-					Image:           "busybox",
-					ImagePullPolicy: v1.PullIfNotPresent,
+	m.cpuCFSQuota = true
+
+	tests := []struct {
+		name                   string
+		newResources           v1.ResourceRequirements
+		expectedLinuxResources *runtimeapi.LinuxContainerResources
+	}{
+		{
+			name: "Increase CPU and Memory limits and requests",
+			newResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("200m"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
 				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("400m"),
+					v1.ResourceMemory: resource.MustParse("400Mi"),
+				},
+			},
+			expectedLinuxResources: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           40000,
+				CpuShares:          204,
+				MemoryLimitInBytes: 419430400,
+			},
+		},
+		{
+			name: "Request CPU only, no CPU limits",
+			newResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("100m"),
+				},
+			},
+			expectedLinuxResources: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           0,
+				CpuShares:          102,
+				MemoryLimitInBytes: 0,
+			},
+		},
+		{
+			name: "Limit CPU only, requests default to limit",
+			newResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("200m"),
+				},
+			},
+			expectedLinuxResources: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           20000,
+				CpuShares:          204,
+				MemoryLimitInBytes: 0,
+			},
+		},
+		{
+			name: "Limit Memory only, no CPU limits/requests",
+			newResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("500Mi"),
+				},
+			},
+			expectedLinuxResources: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuShares:          2,
+				MemoryLimitInBytes: 524288000,
 			},
 		},
 	}
 
-	// Create fake sandbox and container
-	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
-	assert.Len(t, fakeContainers, 1)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "bar",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "busybox",
+							ImagePullPolicy: v1.PullIfNotPresent,
+						},
+					},
+				},
+			}
 
-	runtimePod, err := m.GetPod(tCtx, pod.UID)
-	require.NoError(t, err)
-	cStatus, _, err := m.getPodContainerStatuses(tCtx, runtimePod, "")
-	require.NoError(t, err)
-	containerID := cStatus[0].ID
+			// Create fake sandbox and container
+			_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+			require.Len(t, fakeContainers, 1)
+			t.Cleanup(func() {
+				fakeRuntime.Containers = make(map[string]*apitest.FakeContainer)
+				fakeRuntime.Sandboxes = make(map[string]*apitest.FakePodSandbox)
+			})
 
-	err = m.updateContainerResources(tCtx, pod, &pod.Spec.Containers[0], containerID)
-	assert.NoError(t, err)
+			runtimePod, err := m.GetPod(tCtx, pod.UID)
+			require.NoError(t, err)
+			cStatus, _, err := m.getPodContainerStatuses(tCtx, runtimePod, "")
+			require.NoError(t, err)
+			containerID := cStatus[0].ID
 
-	// Verify container is updated
-	assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources")
+			// Perform resource update
+			container := pod.Spec.Containers[0].DeepCopy()
+			container.Resources = tc.newResources
+			err = m.updateContainerResources(tCtx, pod, container, containerID)
+			require.NoError(t, err)
+
+			// Verify container config resources inside the fake runtime
+			c, ok := fakeRuntime.Containers[containerID.ID]
+			require.True(t, ok)
+			require.NotNil(t, c.LinuxResources)
+			type linuxResources struct {
+				CPUPeriod          int64
+				CPUQuota           int64
+				CPUShares          int64
+				MemoryLimitInBytes int64
+			}
+			expected := linuxResources{
+				CPUPeriod:          tc.expectedLinuxResources.CpuPeriod,
+				CPUQuota:           tc.expectedLinuxResources.CpuQuota,
+				CPUShares:          tc.expectedLinuxResources.CpuShares,
+				MemoryLimitInBytes: tc.expectedLinuxResources.MemoryLimitInBytes,
+			}
+			actual := linuxResources{
+				CPUPeriod:          c.LinuxResources.CpuPeriod,
+				CPUQuota:           c.LinuxResources.CpuQuota,
+				CPUShares:          c.LinuxResources.CpuShares,
+				MemoryLimitInBytes: c.LinuxResources.MemoryLimitInBytes,
+			}
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("Unexpected linux resources (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
 
 func TestMakeMountsBindMountOptions(t *testing.T) {

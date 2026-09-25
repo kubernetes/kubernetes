@@ -62,10 +62,10 @@ func TestLexicographicalAllocator(t *testing.T,
 			slices: unwrapResourceSlices(
 				// pools with binding conditions will be considered after pools without binding conditions.
 				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
-					device(device1, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
+					device(device1).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
 				),
-				sliceWithDevices(slice3, node1, resourcePool(pool3, 1), driverA, device(device3, nil, nil)),
-				sliceWithDevices(slice2, node1, resourcePool(pool2, 1), driverA, device(device2, nil, nil)),
+				sliceWithDevices(slice3, node1, resourcePool(pool3, 1), driverA, device(device3)),
+				sliceWithDevices(slice2, node1, resourcePool(pool2, 1), driverA, device(device2)),
 			),
 			node: node(node1, region1),
 
@@ -80,9 +80,9 @@ func TestLexicographicalAllocator(t *testing.T,
 			classes:          objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(
 				// slice-3 before slice-2 before slice-1 in input.
-				sliceWithDevices(slice3, node1, resourcePool(pool1, 3), driverA, device(device3, nil, nil)),
-				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2, nil, nil)),
-				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1, nil, nil)),
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 3), driverA, device(device3)),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2)),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1)),
 			),
 			node: node(node1, region1),
 
@@ -100,10 +100,10 @@ func TestLexicographicalAllocator(t *testing.T,
 			classes:          objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(
 				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA,
-					device(device1, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
+					device(device1).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
 				),
-				sliceWithDevices(slice3, node1, resourcePool(pool1, 3), driverA, device(device3, nil, nil)),
-				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2, nil, nil)),
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 3), driverA, device(device3)),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2)),
 			),
 			node: node(node1, region1),
 

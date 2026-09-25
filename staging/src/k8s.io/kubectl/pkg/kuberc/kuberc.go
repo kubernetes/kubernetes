@@ -178,7 +178,8 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 			fmt.Fprintf(errOut, "Warning: command %q not found to set kuberc override\n", c.Command)
 			continue
 		}
-		if overrideCmd.Name() != cmd.Name() {
+
+		if overrideCmd.CommandPath() != cmd.CommandPath() {
 			continue
 		}
 

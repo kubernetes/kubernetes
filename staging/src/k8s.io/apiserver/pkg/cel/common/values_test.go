@@ -1592,6 +1592,363 @@ func TestListAdd(t *testing.T) {
 	}
 }
 
+func TestSchemalessAndUnstructuredToVal(t *testing.T) {
+	type fields struct {
+		P *int           `json:"p"`
+		L []int          `json:"l"`
+		M map[string]int `json:"m"`
+		B []byte         `json:"b"`
+	}
+	type pointers struct {
+		Plain *int `json:"plain"`
+		Empty *int `json:"empty,omitempty"`
+		Zero  *int `json:"zero,omitzero"`
+	}
+	type scalars struct {
+		Plain int `json:"plain"`
+		Empty int `json:"empty,omitempty"`
+		Zero  int `json:"zero,omitzero"`
+	}
+	type nested struct {
+		N int `json:"n"`
+	}
+	type structs struct {
+		Empty nested `json:"empty,omitempty"`
+		Zero  nested `json:"zero,omitzero"`
+	}
+	type collections struct {
+		EmptyList []int          `json:"emptyList,omitempty"`
+		ZeroList  []int          `json:"zeroList,omitzero"`
+		EmptyMap  map[string]int `json:"emptyMap,omitempty"`
+		ZeroMap   map[string]int `json:"zeroMap,omitzero"`
+	}
+	objectSchema := func(properties map[string]spec.Schema) *spec.Schema {
+		return &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, Properties: properties}}
+	}
+	fieldSchema := objectSchema(map[string]spec.Schema{
+		"p": *int64Schema, "l": *intArraySchema, "m": *intMapSchema, "b": bytesFormat,
+	})
+	omissionSchema := objectSchema(map[string]spec.Schema{
+		"plain": *int64Schema, "empty": *int64Schema, "zero": *int64Schema,
+	})
+	nestedSchema := objectSchema(map[string]spec.Schema{"n": *int64Schema})
+	structsSchema := objectSchema(map[string]spec.Schema{"empty": *nestedSchema, "zero": *nestedSchema})
+	collectionsSchema := objectSchema(map[string]spec.Schema{
+		"emptyList": *intArraySchema, "zeroList": *intArraySchema,
+		"emptyMap": *intMapSchema, "zeroMap": *intMapSchema,
+	})
+	nullableInt := *int64Schema
+	nullableInt.Nullable = true
+	yes, no := types.True, types.False
+	missing := func(key string) ref.Val { return types.NewErr("no such key: %s", key) }
+	invalidNull := types.NewErr("invalid data, got null for schema with nullable=false")
+	zero, one := 0, 1
+	type check struct {
+		expression   string
+		schemaless   ref.Val
+		unstructured ref.Val
+	}
+	type comparison struct {
+		name   string
+		value  any
+		schema *spec.Schema
+		checks []check
+	}
+	tests := []comparison{
+		{
+			name: "nil fields", value: fields{}, schema: fieldSchema,
+			checks: []check{
+				{"has(x.p)", yes, no},
+				{"'p' in x", yes, no},
+				{"x.p == null", yes, missing("p")},
+				{"x['p'] == null", yes, missing("p")},
+				{"has(x.l)", yes, no},
+				{"x.l == null", yes, missing("l")},
+				{"x['l'] == null", yes, missing("l")},
+				{"has(x.m)", yes, no},
+				{"x.m == null", yes, missing("m")},
+				{"x['m'] == null", yes, missing("m")},
+				{"has(x.b)", yes, no},
+				{"x.b == null", yes, missing("b")},
+				{"x['b'] == null", yes, missing("b")},
+				{"has(x.p.child)", no, missing("p")},
+				{"has(x.p) && x.p != null", no, no},
+				{"size(x) == 4", yes, yes},
+			},
+		},
+		{
+			name: "empty fields", value: fields{P: &zero, L: []int{}, M: map[string]int{}, B: []byte{}}, schema: fieldSchema,
+			checks: []check{
+				{"has(x.p) && x.p == 0 && x['p'] == 0", yes, yes},
+				{"has(x.l) && x.l == [] && x.l != null", yes, yes},
+				{"has(x.m) && x.m == {} && x.m != null", yes, yes},
+				{"has(x.b) && x.b != null && size(x.b) == 0", yes, yes},
+				{"type(x.b) == string", yes, no},
+				{"type(x.b) == bytes", no, yes},
+				{"has(x.p) && x.p != null", yes, yes},
+			},
+		},
+		{
+			name: "missing struct field", value: fields{}, schema: fieldSchema,
+			checks: []check{
+				{"has(x.missing)", no, no},
+				{"'missing' in x", no, no},
+				{"x.missing == null", missing("missing"), missing("missing")},
+				{"x['missing'] == null", missing("missing"), missing("missing")},
+				{"has(x.missing.child)", missing("missing"), missing("missing")},
+				{"has(x.missing) && x.missing != null", no, no},
+			},
+		},
+		{
+			name: "nil pointers with omission tags", value: pointers{}, schema: omissionSchema,
+			checks: []check{
+				{"has(x.plain)", yes, no},
+				{"has(x.empty)", no, no},
+				{"has(x.zero)", no, no},
+				{"x.empty == null", missing("empty"), missing("empty")},
+				{"x['zero'] == null", missing("zero"), missing("zero")},
+			},
+		},
+		{
+			name: "pointers to zero with omission tags", value: pointers{&zero, &zero, &zero}, schema: omissionSchema,
+			checks: []check{
+				{"has(x.plain) && x.plain == 0", yes, yes},
+				{"has(x.empty) && x.empty == 0", yes, yes},
+				{"has(x.zero) && x.zero == 0", yes, yes},
+			},
+		},
+		{
+			name: "zero scalars with omission tags", value: scalars{}, schema: omissionSchema,
+			checks: []check{
+				{"has(x.plain) && x.plain == 0", yes, yes},
+				{"has(x.empty)", no, no},
+				{"has(x.zero)", no, no},
+			},
+		},
+		{
+			name: "nonzero scalars with omission tags", value: scalars{1, 1, 1}, schema: omissionSchema,
+			checks: []check{{"has(x.plain) && has(x.empty) && has(x.zero) && x.empty == 1 && x.zero == 1", yes, yes}},
+		},
+		{
+			name: "zero structs with omission tags", value: structs{}, schema: structsSchema,
+			checks: []check{
+				{"has(x.empty) && x.empty.n == 0", yes, yes},
+				{"has(x.zero)", no, no},
+				{"x.zero == null", missing("zero"), missing("zero")},
+			},
+		},
+		{
+			name: "zero struct pointer", value: &nested{}, schema: nestedSchema,
+			checks: []check{
+				{"has(x.n) && x.n == 0 && x['n'] == 0", yes, yes},
+				{"type(x) == map", yes, yes},
+			},
+		},
+		{
+			name: "nonzero structs with omission tags", value: structs{nested{1}, nested{1}}, schema: structsSchema,
+			checks: []check{{"has(x.empty) && has(x.zero) && x.empty.n == 1 && x.zero.n == 1", yes, yes}},
+		},
+		{
+			name: "nil collections with omission tags", value: collections{}, schema: collectionsSchema,
+			checks: []check{{"!has(x.emptyList) && !has(x.zeroList) && !has(x.emptyMap) && !has(x.zeroMap)", yes, yes}},
+		},
+		{
+			name: "empty collections with omission tags", value: collections{[]int{}, []int{}, map[string]int{}, map[string]int{}}, schema: collectionsSchema,
+			checks: []check{
+				{"has(x.emptyList)", no, no},
+				{"has(x.emptyMap)", no, no},
+				{"has(x.zeroList) && x.zeroList == []", yes, yes},
+				{"has(x.zeroMap) && x.zeroMap == {}", yes, yes},
+			},
+		},
+		{
+			name: "missing map key", value: map[string]*int{}, schema: spec.MapProperty(&nullableInt),
+			checks: []check{
+				{"has(x.p)", no, no},
+				{"'p' in x", no, no},
+				{"x.p == null", missing("p"), missing("p")},
+				{"x['p'] == null", missing("p"), missing("p")},
+			},
+		},
+		{
+			name: "nonnull map entry", value: map[string]*int{"p": &one}, schema: spec.MapProperty(int64Schema),
+			checks: []check{{"has(x.p) && 'p' in x && x.p == 1 && x['p'] == 1", yes, yes}},
+		},
+		{
+			name: "schema visibility", value: struct {
+				Extra int `json:"extra"`
+			}{1}, schema: objectSchema(map[string]spec.Schema{}),
+			checks: []check{
+				{"has(x.extra)", yes, no},
+				{"'extra' in x", yes, no},
+				{"x.extra == 1", yes, missing("extra")},
+				{"x['extra'] == 1", yes, missing("extra")},
+			},
+		},
+		{
+			name: "escaped property names", value: struct {
+				If string `json:"if"`
+			}{"value"}, schema: objectSchema(map[string]spec.Schema{"if": *stringSchema}),
+			checks: []check{
+				{"has(x.__if__)", no, yes},
+				{"x['if'] == 'value'", yes, yes},
+				{"x.__if__ == 'value'", missing("__if__"), yes},
+				{"x['__if__'] == 'value'", missing("__if__"), yes},
+				{"'__if__' in x", no, yes},
+			},
+		},
+		{
+			name: "unescaped map keys", value: map[string]string{"if": "value"}, schema: stringMapSchema,
+			checks: []check{
+				{"has(x.__if__)", no, no},
+				{"x['if'] == 'value'", yes, yes},
+				{"x['__if__'] == 'value'", missing("__if__"), missing("__if__")},
+			},
+		},
+		{
+			name: "invalid struct keys", value: fields{}, schema: fieldSchema,
+			checks: []check{
+				{"x[1]", types.NewErr("unsupported map key type: types.Int"), types.NewErr("no such overload")},
+				{"1 in x", types.NewErr("unsupported map key type: types.Int"), types.NewErr("no such overload")},
+			},
+		},
+		{
+			name: "bytes format", value: []byte("bytes1"), schema: &bytesFormat,
+			checks: []check{
+				{"x == 'Ynl0ZXMx'", yes, no},
+				{"x == b'bytes1'", no, yes},
+			},
+		},
+		{
+			name: "timestamp format", value: metav1.NewTime(time.Date(2000, 1, 1, 12, 0, 0, 0, time.UTC)), schema: &timeFormat,
+			checks: []check{
+				{"x == '2000-01-01T12:00:00Z'", yes, no},
+				{"x == timestamp('2000-01-01T12:00:00Z')", no, yes},
+			},
+		},
+		{
+			name: "microtime format", value: metav1.MicroTime{Time: time.Date(2000, 1, 1, 12, 0, 0, 1000, time.UTC)}, schema: &timeFormat,
+			checks: []check{
+				{"x == '2000-01-01T12:00:00.000001Z'", yes, no},
+				{"x == timestamp('2000-01-01T12:00:00.000001Z')", no, yes},
+			},
+		},
+		{
+			name: "duration format", value: metav1.Duration{Duration: 5 * time.Second}, schema: &durationFormat,
+			checks: []check{
+				{"x == '5s'", yes, no},
+				{"x == duration('5s')", no, yes},
+			},
+		},
+	}
+
+	// Null object properties are absent even when their schema permits null;
+	// null map values and list items instead consult that schema's nullability.
+	for _, nullable := range []bool{false, true} {
+		valueSchema := *int64Schema
+		valueSchema.Nullable = nullable
+		name, wantNull := "nonnullable", ref.Val(invalidNull)
+		if nullable {
+			name, wantNull = "nullable", yes
+		}
+		tests = append(tests,
+			comparison{
+				name: name + " null property", value: struct {
+					P *int `json:"p"`
+				}{}, schema: objectSchema(map[string]spec.Schema{"p": valueSchema}),
+				checks: []check{
+					{"size(x) == 1", yes, yes},
+					{"has(x.p)", yes, no},
+					{"x.p == null", yes, missing("p")},
+					{"x['p'] == null", yes, missing("p")},
+					{"x.all(k, x[k] == null)", yes, missing("p")},
+				},
+			},
+			comparison{
+				name: name + " null map entry", value: map[string]*int{"p": nil}, schema: spec.MapProperty(&valueSchema),
+				checks: []check{
+					{"has(x.p)", yes, wantNull},
+					{"'p' in x", yes, wantNull},
+					{"x.p == null", yes, wantNull},
+					{"x['p'] == null", yes, wantNull},
+				},
+			},
+			comparison{
+				name: name + " null interface map entry", value: map[string]interface{}{"p": nil}, schema: spec.MapProperty(&valueSchema),
+				checks: []check{
+					{"has(x.p)", yes, wantNull},
+					{"'p' in x", yes, wantNull},
+					{"x.p == null", yes, wantNull},
+					{"x['p'] == null", yes, wantNull},
+				},
+			},
+			comparison{
+				name: name + " null list item", value: []*int{nil}, schema: spec.ArrayProperty(&valueSchema),
+				checks: []check{{"x[0] == null", yes, wantNull}},
+			},
+		)
+		for _, root := range []struct {
+			name   string
+			value  any
+			schema *spec.Schema
+		}{
+			{"nil interface", nil, int64Schema},
+			{"nil scalar pointer", (*int)(nil), int64Schema},
+			{"nil struct pointer", (*nested)(nil), nestedSchema},
+			{"nil slice", []int(nil), intArraySchema},
+			{"nil map", map[string]int(nil), intMapSchema},
+			{"nil bytes", []byte(nil), &bytesFormat},
+		} {
+			rootSchema := *root.schema
+			rootSchema.Nullable = nullable
+			tests = append(tests, comparison{
+				name: name + " root " + root.name, value: root.value, schema: &rootSchema,
+				checks: []check{{"x == null", yes, wantNull}},
+			})
+		}
+	}
+
+	env, err := cel.NewEnv(cel.Variable("x", cel.DynType))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The existing activation helper bypasses UnstructuredToVal for null.
+			// Pass it through here so direct root-null validation is exercised.
+			u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&wrap{Value: tt.value})
+			if err != nil {
+				t.Fatalf("converting fixture to unstructured: %v", err)
+			}
+			for _, c := range tt.checks {
+				t.Run(c.expression, func(t *testing.T) {
+					for _, converter := range []struct {
+						name string
+						val  ref.Val
+						want ref.Val
+					}{
+						{"SchemalessTypedToVal", common.SchemalessTypedToVal(tt.value), c.schemaless},
+						{"UnstructuredToVal", common.UnstructuredToVal(u["value"], &openapi.Schema{Schema: tt.schema}), c.unstructured},
+					} {
+						t.Run(converter.name, func(t *testing.T) {
+							out, err := evalExpression(t, env, c.expression, map[string]interface{}{"x": converter.val})
+							if wantErr, ok := converter.want.(*types.Err); ok {
+								if err == nil || err.Error() != wantErr.Error() {
+									t.Fatalf("got value %v, error %v; want error %q", out, err, wantErr.Error())
+								}
+								return
+							}
+							if err != nil || out != converter.want {
+								t.Fatalf("got value %v, error %v; want %v", out, err, converter.want)
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
 func schemalessTypedToValActivation(vals map[string]typedValue) map[string]interface{} {
 	activation := make(map[string]interface{}, len(vals))
 	for k, tv := range vals {

@@ -198,7 +198,6 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 // Run runs the KubeControllerManagerOptions.
 func Run(ctx context.Context, c *config.CompletedConfig) error {
 	logger := klog.FromContext(ctx)
-	stopCh := ctx.Done()
 
 	// To help debugging, immediately log version
 	logger.Info("Starting", "version", utilversion.Get())
@@ -255,8 +254,11 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
+		// ctx.Done() is nil for context.Background(), so derive a channel that is closed when Run returns.
+		servingCtx, cancelServingCtx := context.WithCancel(ctx)
+		defer cancelServingCtx()
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
-		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		if _, _, err := c.SecureServing.Serve(handler, 0, servingCtx.Done()); err != nil {
 			return err
 		}
 	}

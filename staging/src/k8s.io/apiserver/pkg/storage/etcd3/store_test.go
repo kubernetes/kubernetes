@@ -37,6 +37,7 @@ import (
 	"go.etcd.io/etcd/server/v3/embed"
 	"google.golang.org/grpc/grpclog"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -73,6 +74,7 @@ func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	utilruntime.Must(example.AddToScheme(scheme))
 	utilruntime.Must(examplev1.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
 
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, os.Stderr))
 }
@@ -907,6 +909,34 @@ func withDefaults(options *setupOptions) {
 
 var _ setupOption = withDefaults
 
+func benchmarkSetup(b *testing.B) (context.Context, *store) {
+	client := testserver.RunEtcd(b, func(cfg *embed.Config) {
+		cfg.QuotaBackendBytes = 4 << 30 // 4 GiB (default 2 GiB is too small for 150k pods)
+	})
+	config := storagetesting.StoreConfigForBenchmarks()
+	compactor := NewCompactor(client.Client, 0, clock.RealClock{}, nil)
+	b.Cleanup(compactor.Stop)
+	store, err := New(
+		client,
+		compactor,
+		config.Codec,
+		config.NewFunc,
+		config.NewListFunc,
+		"",
+		config.ResourcePrefix,
+		config.GroupResource,
+		newTestTransformer(),
+		newTestLeaseManagerConfig(),
+		NewDefaultDecoder(config.Codec, config.Versioner),
+		config.Versioner,
+	)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(store.Close)
+	return context.Background(), store
+}
+
 func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kubernetes.Client) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
@@ -1195,7 +1225,7 @@ func BenchmarkStoreWriteThroughput(b *testing.B) {
 	}
 	for _, dims := range dimensions {
 		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
-			ctx, store, _ := testSetup(b)
+			ctx, store := benchmarkSetup(b)
 			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
 			b.ResetTimer()
 			storagetesting.RunBenchmarkWriteThroughput(ctx, b, store, data, false, nil)
@@ -1232,7 +1262,7 @@ func BenchmarkStoreList(b *testing.B) {
 			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedEnabled)
 			b.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v/Namespaces=%d/Pods=%d/Nodes=%d", sizeBasedEnabled, dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
 				data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
-				ctx, store, _ := testSetup(b)
+				ctx, store := benchmarkSetup(b)
 				require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 				storagetesting.RunBenchmarkStoreList(ctx, b, store, data, false)
 			})
@@ -1293,7 +1323,7 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 func BenchmarkStoreStats(b *testing.B) {
 	klog.SetLogger(logr.Discard())
 	data := storagetesting.PrepareBenchmarkData(50, 3_000, 5_000)
-	ctx, store, _ := testSetup(b)
+	ctx, store := benchmarkSetup(b)
 	require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 	storagetesting.RunBenchmarkStoreStats(ctx, b, store)
 }
@@ -1304,10 +1334,10 @@ func BenchmarkStatsCacheCleanKeys(b *testing.B) {
 	namespaceCount := 50
 	podPerNamespaceCount := 3_000
 	data := storagetesting.PrepareBenchmarkData(namespaceCount, podPerNamespaceCount, 5_000)
-	ctx, store, _ := testSetup(b)
+	ctx, store := benchmarkSetup(b)
 	require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 	// List to fetch object sizes for statsCache.
-	listOut := &example.PodList{}
+	listOut := &corev1.PodList{}
 	err := store.GetList(ctx, "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, listOut)
 	if err != nil {
 		b.Fatal(err)

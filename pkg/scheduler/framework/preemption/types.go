@@ -21,146 +21,15 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kube-scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
-
-type podGroupPreemptor struct {
-	priority          int32
-	pods              []*v1.Pod
-	podGroup          *schedulingv1beta1.PodGroup
-	compositePodGroup *schedulingv1alpha3.CompositePodGroup
-	preemptionPolicy  schedulingv1beta1.PreemptionPolicy
-}
-
-func newPodGroupPreemptor(pgInfo fwk.PodGroupInfo, enablePodGroupPreemptionPolicy bool) *podGroupPreemptor {
-	p := &podGroupPreemptor{
-		pods: pgInfo.GetUnscheduledPods(),
-	}
-	if pgInfo.GetCompositePodGroup() != nil {
-		cpg := pgInfo.GetCompositePodGroup()
-		p.compositePodGroup = cpg
-		p.priority = util.CompositePodGroupPriority(cpg)
-		p.preemptionPolicy = resolveCompositePreemptionPolicy(cpg, p.pods, enablePodGroupPreemptionPolicy)
-	} else {
-		pg := pgInfo.GetPodGroup()
-		p.podGroup = pg
-		p.priority = util.PodGroupPriority(pg)
-		p.preemptionPolicy = resolvePreemptionPolicy(pg, p.pods, enablePodGroupPreemptionPolicy)
-	}
-	return p
-}
-
-func (p *podGroupPreemptor) getType() string {
-	if p.compositePodGroup != nil {
-		return string(fwk.CompositePodGroupKeyType)
-	}
-	return string(fwk.PodGroupKeyType)
-}
-
-func (p *podGroupPreemptor) getObj() klog.KMetadata {
-	if p.compositePodGroup != nil {
-		return p.compositePodGroup
-	}
-	return p.podGroup
-}
-
-func resolvePreemptionPolicy(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) schedulingv1beta1.PreemptionPolicy {
-	if enablePodGroupPreemptionPolicy {
-		// If the PodGroup was created with PodGroupPreemptionPolicy feature disabled, the PreemptionPolicy field will be nil.
-		// In this case the default policy value should be returned.
-		if pg.Spec.PreemptionPolicy != nil {
-			return *pg.Spec.PreemptionPolicy
-		}
-	} else {
-		for _, pod := range pods {
-			if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
-				return schedulingv1beta1.PreemptNever
-			}
-		}
-	}
-	return schedulingv1beta1.PreemptLowerPriority
-}
-
-func resolveCompositePreemptionPolicy(cpg *schedulingv1alpha3.CompositePodGroup, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) schedulingv1beta1.PreemptionPolicy {
-	if enablePodGroupPreemptionPolicy {
-		if cpg.Spec.PreemptionPolicy != nil {
-			if *cpg.Spec.PreemptionPolicy == schedulingv1alpha3.PreemptLowerPriority {
-				return schedulingv1beta1.PreemptLowerPriority
-			}
-			return schedulingv1beta1.PreemptNever
-		}
-	} else {
-		for _, pod := range pods {
-			if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
-				return schedulingv1beta1.PreemptNever
-			}
-		}
-	}
-	return schedulingv1beta1.PreemptLowerPriority
-}
-
-// Priority returns the scheduling priority of the preemptor.
-// This value is used to identify potential victims (which must have lower priority).
-func (p *podGroupPreemptor) Priority() int32 {
-	return p.priority
-}
-
-// Members returns the list of Pods that belong to this preemptor.
-func (p *podGroupPreemptor) Members() []*v1.Pod {
-	return p.pods
-}
-
-// PodGroup returns a pod group connected with this preemptor.
-func (p *podGroupPreemptor) PodGroup() *schedulingv1beta1.PodGroup {
-	return p.podGroup
-}
-
-// CompositePodGroup returns a composite pod group connected with this preemptor.
-func (p *podGroupPreemptor) CompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
-	return p.compositePodGroup
-}
-
-// PreemptionPolicy returns a preemption policy of this preemptor.
-func (p *podGroupPreemptor) PreemptionPolicy() schedulingv1beta1.PreemptionPolicy {
-	return p.preemptionPolicy
-}
-
-// domain represents the boundary or scope within which the preemption logic is evaluated.
-// It abstracts the scheduling domain, which can range from a single Node (for standard Pod preemption)
-// to a group of Nodes or the entire Cluster (for PodGroup preemption).
-type domain struct {
-	nodes              map[string]fwk.NodeInfo
-	name               string
-	allPossibleVictims []*DomainVictim
-}
-
-// Nodes returns a map of NodeInfo objects by node name that belong to this domain.
-// The preemption logic uses this to check feasibility and resource availability
-// within the specific scope.
-func (d *domain) Nodes() map[string]fwk.NodeInfo {
-	return d.nodes
-}
-
-// GetAllPossibleVictims returns all potential victims running within this domain (individual Pods or PodGroups).
-func (d *domain) GetAllPossibleVictims() []*DomainVictim {
-	return d.allPossibleVictims
-}
-
-// GetName returns a unique identifier for the domain.
-// This is primarily used for logging and debugging purposes.
-func (d *domain) GetName() string {
-	return d.name
-}
 
 // getHighestAllAncestor returns the key of the highest ancestor in the hierarchy that has disruption mode All.
 // It returns (key, true) if found, or (empty, false) if not found.
@@ -169,35 +38,16 @@ func getHighestAllAncestor(pod *v1.Pod, pgLister fwk.PodGroupLister, cpgLister f
 	if pod.Spec.SchedulingGroup == nil || pgLister == nil {
 		return fwk.EntityKey{}, false
 	}
-	if cpgLister == nil {
-		pg, err := pgLister.Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-		if err != nil || pg == nil {
-			return fwk.EntityKey{}, false
-		}
-		if pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil {
-			return fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName), true
-		}
-		return fwk.EntityKey{}, false
-	}
-
 	startKey := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	var highestAllKey fwk.EntityKey
 	var hasAll bool
 
-	TraverseHierarchyUp(pod.Namespace, startKey, pgLister, cpgLister, func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
-		if pg != nil {
-			if pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil {
-				highestAllKey = key
-				hasAll = true
-			}
-		} else if cpg != nil {
-			if cpg.Spec.DisruptionMode != nil && cpg.Spec.DisruptionMode.All != nil {
-				highestAllKey = key
-				hasAll = true
-			}
+	for gpg := range traverseHierarchyUp(pod.Namespace, startKey, pgLister, cpgLister) {
+		if gpg.HasDisruptionModeAll() {
+			highestAllKey = gpg.GetKey()
+			hasAll = true
 		}
-		return false
-	})
+	}
 
 	return highestAllKey, hasAll
 }
@@ -217,42 +67,24 @@ func createDomainVictims(snapshot fwk.SharedLister, victims []Victim) ([]*Domain
 	return allPossibleVictims, nil
 }
 
-// newDomainForWorkloadPreemption creates a new domain for workload preemption.
-// The domain is the whole cluster and it contains victims that are computed based
-// on the pods and their scheduling groups.
+// getWorkloadPreemptionVictims discovers all candidate victims across the cluster snapshot for workload preemption.
 // Pods that are part of a pod group or composite pod group with disruption mode All are grouped
 // together into a single victim. Otherwise, they are treated as individual victims.
 // In both cases, the priority of the victim is determined by the pod group or composite pod group priority.
-func newDomainForWorkloadPreemption(logger klog.Logger, snapshot fwk.SharedLister, podGroupSnapshot fwk.PodGroupLister, compositePodGroupSnapshot fwk.CompositePodGroupLister, name string) (*domain, error) {
+func getWorkloadPreemptionVictims(logger klog.Logger, snapshot fwk.SharedLister, podGroupSnapshot fwk.PodGroupLister, compositePodGroupSnapshot fwk.CompositePodGroupLister) ([]Victim, error) {
 	nodes, err := snapshot.NodeInfos().List()
 	if err != nil {
 		return nil, err
 	}
 
-	allPossibleVictims, err := getCrossNodesVictims(logger, snapshot, podGroupSnapshot, compositePodGroupSnapshot, nodes)
-	if err != nil {
-		return nil, err
-	}
-
-	nodesMap := make(map[string]fwk.NodeInfo, len(nodes))
-	for _, nodeInfo := range nodes {
-		if nodeInfo != nil && nodeInfo.Node() != nil {
-			nodesMap[nodeInfo.Node().Name] = nodeInfo
-		}
-	}
-
-	return &domain{
-		nodes:              nodesMap,
-		allPossibleVictims: allPossibleVictims,
-		name:               name,
-	}, nil
+	return getCrossNodesVictims(logger, snapshot, podGroupSnapshot, compositePodGroupSnapshot, nodes), nil
 }
 
 // getCrossNodesVictims aggregates pods across the provided nodes into cluster-wide preemption candidates.
 // When a pod belongs to a group hierarchy where any ancestor has disruption mode All, it groups all scheduled pods of that hierarchy
 // across the cluster into a single victim so that preemption evaluates the total cluster-wide cost
 // and blast radius of evicting the entire group.
-func getCrossNodesVictims(logger klog.Logger, snapshot fwk.SharedLister, podGroupSnapshot fwk.PodGroupLister, compositePodGroupSnapshot fwk.CompositePodGroupLister, nodes []fwk.NodeInfo) ([]*DomainVictim, error) {
+func getCrossNodesVictims(logger klog.Logger, snapshot fwk.SharedLister, podGroupSnapshot fwk.PodGroupLister, compositePodGroupSnapshot fwk.CompositePodGroupLister, nodes []fwk.NodeInfo) []Victim {
 	existing := sets.New[fwk.EntityKey]()
 	var victims []Victim
 	for _, node := range nodes {
@@ -276,7 +108,7 @@ func getCrossNodesVictims(logger klog.Logger, snapshot fwk.SharedLister, podGrou
 		}
 	}
 
-	return createDomainVictims(snapshot, victims)
+	return victims
 }
 
 // searchCrossNodesVictimPods searches and collects all scheduled pods belonging to the leaf pod groups
@@ -324,7 +156,7 @@ func searchCrossNodesVictimPods(
 		podInfos[i], _ = framework.NewPodInfo(p)
 	}
 
-	priority := GetPodPriority(podInfo.GetPod(), podGroupSnapshot, compositePodGroupSnapshot)
+	priority := getPodPriority(podInfo.GetPod(), podGroupSnapshot, compositePodGroupSnapshot)
 	// It can only return an error for empty podInfos, which is guaranteed not to be empty here.
 	victim, _ := NewVictim(podInfos, priority, pgKey.Type)
 	return victim
@@ -345,10 +177,6 @@ type Victim interface {
 
 	// EarliestStartTime returns the earliest start time of all Pods in this preemption unit.
 	EarliestStartTime() *metav1.Time
-
-	// IsGroup returns true if the preemption unit represents a PodGroup or a CompositePodGroup.
-	// This function should be executed only when GenericWorkload feature is enabled.
-	IsGroup() bool
 
 	// Type returns the type of the preemption unit.
 	Type() fwk.EntityKeyType
@@ -384,12 +212,6 @@ func (v *victim) EarliestStartTime() *metav1.Time {
 	return v.earliestStartTime
 }
 
-// IsGroup returns true if the preemption unit represents a PodGroup or a CompositePodGroup.
-// This function should be executed only when GenericWorkload feature is enabled.
-func (v *victim) IsGroup() bool {
-	return v.keyType == fwk.PodGroupKeyType || v.keyType == fwk.CompositePodGroupKeyType
-}
-
 // Type returns the type of the preemption unit.
 func (v *victim) Type() fwk.EntityKeyType {
 	return v.keyType
@@ -407,7 +229,7 @@ func (v *victim) Type() fwk.EntityKeyType {
 //
 // We should fix this on the occasion of adding support for CompositePodGroup WAP-related metrics.
 func NewPodVictim(podInfo fwk.PodInfo, pgLister fwk.PodGroupLister, cpgLister fwk.CompositePodGroupLister) Victim {
-	priority := GetPodPriority(podInfo.GetPod(), pgLister, cpgLister)
+	priority := getPodPriority(podInfo.GetPod(), pgLister, cpgLister)
 	keyType := fwk.PodKeyType
 	if podInfo.GetPod().Spec.SchedulingGroup != nil && pgLister != nil {
 		keyType = fwk.PodGroupKeyType
@@ -487,23 +309,19 @@ func newDomainVictim(snapshot fwk.SharedLister, pods []fwk.PodInfo, priority int
 	}, nil
 }
 
-// Candidate represents a nominated node on which the preemptor can be scheduled,
+// candidate represents a nominated node on which the preemptor can be scheduled,
 // along with the list of victims that should be evicted for the preemptor to fit the node.
-type Candidate interface {
-	// Victims wraps a list of to-be-preempted Pods and the number of PDB violation.
-	Victims() *extenderv1.Victims
-	// Name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
-	Name() string
-	// NumPodGroupDisruptions returns the number of preemption units that affect pod groups.
+type candidate struct {
+	// victims wraps a list of to-be-preempted Pods and the number of PDB violation.
+	victims *extenderv1.Victims
+	// name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
+	name string
+	// numPodGroupDisruptions returns the number of preemption units that affect pod groups.
 	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
-	NumPodGroupDisruptions() int
+	numPodGroupDisruptions int
 }
 
-type candidate struct {
-	victims                *extenderv1.Victims
-	numPodGroupDisruptions int
-	name                   string
-}
+var _ fwk.PreemptionCandidate = &candidate{}
 
 // Victims returns s.victims.
 func (s *candidate) Victims() *extenderv1.Victims {
@@ -522,18 +340,18 @@ func (s *candidate) NumPodGroupDisruptions() int {
 
 type candidateList struct {
 	idx   int32
-	items []Candidate
+	items []fwk.PreemptionCandidate
 }
 
 // newCandidateList creates a new candidate list with the given capacity.
 func newCandidateList(capacity int32) *candidateList {
-	return &candidateList{idx: -1, items: make([]Candidate, capacity)}
+	return &candidateList{idx: -1, items: make([]fwk.PreemptionCandidate, capacity)}
 }
 
 // add adds a new candidate to the internal array atomically.
 // Note: in case the list has reached its capacity, the candidate is disregarded
 // and not added to the internal array.
-func (cl *candidateList) add(c *candidate) {
+func (cl *candidateList) add(c fwk.PreemptionCandidate) {
 	if idx := atomic.AddInt32(&cl.idx, 1); idx < int32(len(cl.items)) {
 		cl.items[idx] = c
 	}
@@ -549,7 +367,7 @@ func (cl *candidateList) size() int32 {
 
 // get returns the internal candidate array. This function is NOT atomic and
 // assumes that all add() operations have been completed.
-func (cl *candidateList) get() []Candidate {
+func (cl *candidateList) get() []fwk.PreemptionCandidate {
 	return cl.items[:cl.size()]
 }
 

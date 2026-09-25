@@ -772,42 +772,36 @@ func addAllEventHandlers(
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.ResourceClaim:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				handlerRegistration = resourceClaimCache.AddEventHandler(
-					buildEvtResHandler(at, fwk.ResourceClaim),
-				)
-				handlers = append(handlers, handlerRegistration)
-			}
+			handlerRegistration = resourceClaimCache.AddEventHandler(
+				buildEvtResHandler(at, fwk.ResourceClaim),
+			)
+			handlers = append(handlers, handlerRegistration)
 		case fwk.ResourceSlice:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = resourceSliceTracker.AddEventHandler(
-					buildEvtResHandler(at, fwk.ResourceSlice),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
+			if handlerRegistration, err = resourceSliceTracker.AddEventHandler(
+				buildEvtResHandler(at, fwk.ResourceSlice),
+			); err != nil {
+				return err
 			}
+			handlers = append(handlers, handlerRegistration)
 		case fwk.DeviceClass:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				handler := cache.ResourceEventHandler(buildEvtResHandler(at, fwk.DeviceClass))
-				if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-					// Inject updating of the cache before the scheduler event handlers ("chaining")
-					// to ensure that the cache gets updated before the scheduler kicks off
-					// pod scheduling based on a DeviceClass event.
-					//
-					// We know that this is a DefaultDRAManager and we know that it
-					// uses an ExtendedResourceCache, so no need for type checks.
-					erCache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-					erCache.AddEventHandler(handler)
-					handler = erCache
-				}
-				if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(
-					handler,
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
+			handler := cache.ResourceEventHandler(buildEvtResHandler(at, fwk.DeviceClass))
+			if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+				// Inject updating of the cache before the scheduler event handlers ("chaining")
+				// to ensure that the cache gets updated before the scheduler kicks off
+				// pod scheduling based on a DeviceClass event.
+				//
+				// We know that this is a DefaultDRAManager and we know that it
+				// uses an ExtendedResourceCache, so no need for type checks.
+				erCache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+				erCache.AddEventHandler(handler)
+				handler = erCache
 			}
+			if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(
+				handler,
+			); err != nil {
+				return err
+			}
+			handlers = append(handlers, handlerRegistration)
 		case fwk.StorageClass:
 			if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
 				buildEvtResHandler(at, fwk.StorageClass),

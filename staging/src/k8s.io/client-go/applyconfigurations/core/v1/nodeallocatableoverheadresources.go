@@ -28,13 +28,13 @@ import (
 //
 // NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.
 type NodeAllocatableOverheadResourcesApplyConfiguration struct {
-	// Name is the name of the resource (e.g., cpu, memory).
+	// name is the name of the resource (e.g., cpu, memory).
 	Name *corev1.ResourceName `json:"name,omitempty"`
-	// PerPod is the flat overhead quantity allocated per pod.
+	// perPod is the flat overhead quantity allocated per pod.
 	// Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once.
 	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
 	PerPod *resource.Quantity `json:"perPod,omitempty"`
-	// PerContainer is the variable overhead quantity applied for each container referencing the claim.
+	// perContainer is the variable overhead quantity applied for each container referencing the claim.
 	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
 	// The total overhead quantity allocated for the claim is computed as:
 	// Quantity = PerPod + (PerContainer * NumReferences)

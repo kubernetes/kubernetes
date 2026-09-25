@@ -148,11 +148,6 @@ linters:
       - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
         path: "staging/src/k8s.io/api/resource/"
       
-      # Commentstart - Ignore commentstart issues for existing API group
-      # TODO: For each existing API group, we aim to remove it over time.
-      - text: "godoc for field .* should start with '.* ...'"
-        path: "staging/src/k8s.io/api/(core|resource|storagemigration)"
-      
       # notimestamp: Legacy 'Timestamp' fields retained for backward compatibility
       - text: 'notimestamp: naming convention "notimestamp": field TokenRequestStatus.ExpirationTimestamp: prefer use of the term ''time'' over ''timestamp'''
         path: "staging/src/k8s.io/api/authentication/v1/types.go"
@@ -382,6 +377,7 @@ linters:
             contextual k8s.io/sample-apiserver/.*
             contextual k8s.io/sample-cli-plugin/.*
             contextual k8s.io/sample-controller/.*
+            contextual k8s.io/kubernetes/cmd/kube-controller-manager/.*
             contextual k8s.io/kubernetes/cmd/kube-proxy/.*
             contextual k8s.io/kubernetes/cmd/kube-scheduler/.*
             contextual k8s.io/kubernetes/cmd/kubelet/.*

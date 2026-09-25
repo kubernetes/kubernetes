@@ -20,21 +20,33 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/apis/example"
 )
 
 func TestCorrectness(t *testing.T) {
-	model := NewEmptyModel("")
+	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} })
 
+	var expectEvents, gotEvents []watch.Event
 	for _, step := range correctnessTestSteps() {
 		t.Run(step.Name, func(t *testing.T) {
+			if step.ExpectedEvent != nil {
+				expectEvents = append(expectEvents, *step.ExpectedEvent)
+			}
+
 			for i, invalidResponse := range step.InvalidResponses {
-				ok, _ := model.Step(step.Request, invalidResponse)
+				ok, _, _ := model.Step(step.Request, invalidResponse)
 				require.False(t, ok, "alternative response #%d should return ok=false: req=%+v resp=%+v", i, step.Request, invalidResponse)
 			}
 
-			ok, next := model.Step(step.Request, step.CorrectResponse)
+			ok, next, event := model.Step(step.Request, step.CorrectResponse)
 			require.True(t, ok, "valid response should return ok=true: req=%+v resp=%+v", step.Request, step.CorrectResponse)
 			model = next
+			if event != nil {
+				gotEvents = append(gotEvents, *event)
+			}
 		})
 	}
+	require.Equal(t, expectEvents, gotEvents)
 }
