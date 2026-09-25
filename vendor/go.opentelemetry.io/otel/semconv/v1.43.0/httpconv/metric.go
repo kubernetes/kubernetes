@@ -438,18 +438,18 @@ func (m ClientConnectionDuration) RecordSet(ctx context.Context, val float64, se
 	m.Float64Histogram.Record(ctx, val, *o...)
 }
 
-// AttrNetworkPeerAddress returns an optional attribute for the
-// "network.peer.address" semantic convention. It represents the peer address of
-// the network connection - IP address or Unix domain socket name.
-func (ClientConnectionDuration) AttrNetworkPeerAddress(val string) attribute.KeyValue {
-	return attribute.String("network.peer.address", val)
-}
-
 // AttrNetworkProtocolVersion returns an optional attribute for the
 // "network.protocol.version" semantic convention. It represents the actual
 // version of the protocol used for network communication.
 func (ClientConnectionDuration) AttrNetworkProtocolVersion(val string) attribute.KeyValue {
 	return attribute.String("network.protocol.version", val)
+}
+
+// AttrNetworkPeerAddress returns an optional attribute for the
+// "network.peer.address" semantic convention. It represents the peer address of
+// the network connection - IP address or Unix domain socket name.
+func (ClientConnectionDuration) AttrNetworkPeerAddress(val string) attribute.KeyValue {
+	return attribute.String("network.peer.address", val)
 }
 
 // AttrURLScheme returns an optional attribute for the "url.scheme" semantic
@@ -586,18 +586,18 @@ func (m ClientOpenConnections) AddSet(ctx context.Context, incr int64, set attri
 	m.Int64UpDownCounter.Add(ctx, incr, *o...)
 }
 
-// AttrNetworkPeerAddress returns an optional attribute for the
-// "network.peer.address" semantic convention. It represents the peer address of
-// the network connection - IP address or Unix domain socket name.
-func (ClientOpenConnections) AttrNetworkPeerAddress(val string) attribute.KeyValue {
-	return attribute.String("network.peer.address", val)
-}
-
 // AttrNetworkProtocolVersion returns an optional attribute for the
 // "network.protocol.version" semantic convention. It represents the actual
 // version of the protocol used for network communication.
 func (ClientOpenConnections) AttrNetworkProtocolVersion(val string) attribute.KeyValue {
 	return attribute.String("network.protocol.version", val)
+}
+
+// AttrNetworkPeerAddress returns an optional attribute for the
+// "network.peer.address" semantic convention. It represents the peer address of
+// the network connection - IP address or Unix domain socket name.
+func (ClientOpenConnections) AttrNetworkPeerAddress(val string) attribute.KeyValue {
+	return attribute.String("network.peer.address", val)
 }
 
 // AttrURLScheme returns an optional attribute for the "url.scheme" semantic
@@ -689,18 +689,18 @@ func (ClientOpenConnectionsObservable) AttrServerPort(val int) attribute.KeyValu
 	return attribute.Int("server.port", val)
 }
 
-// AttrNetworkPeerAddress returns an optional attribute for the
-// "network.peer.address" semantic convention. It represents the peer address of
-// the network connection - IP address or Unix domain socket name.
-func (ClientOpenConnectionsObservable) AttrNetworkPeerAddress(val string) attribute.KeyValue {
-	return attribute.String("network.peer.address", val)
-}
-
 // AttrNetworkProtocolVersion returns an optional attribute for the
 // "network.protocol.version" semantic convention. It represents the actual
 // version of the protocol used for network communication.
 func (ClientOpenConnectionsObservable) AttrNetworkProtocolVersion(val string) attribute.KeyValue {
 	return attribute.String("network.protocol.version", val)
+}
+
+// AttrNetworkPeerAddress returns an optional attribute for the
+// "network.peer.address" semantic convention. It represents the peer address of
+// the network connection - IP address or Unix domain socket name.
+func (ClientOpenConnectionsObservable) AttrNetworkPeerAddress(val string) attribute.KeyValue {
+	return attribute.String("network.peer.address", val)
 }
 
 // AttrURLScheme returns an optional attribute for the "url.scheme" semantic
