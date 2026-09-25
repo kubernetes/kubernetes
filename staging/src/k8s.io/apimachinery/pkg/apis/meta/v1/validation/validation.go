@@ -218,7 +218,7 @@ func ValidateFieldManager(fieldManager string, fldPath *field.Path) field.ErrorL
 	// considered as not set and is defaulted by the rest of the process
 	// (unless apply is used, in which case it is required).
 	if len(fieldManager) > FieldManagerMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, FieldManagerMaxLength))
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, FieldManagerMaxLength).WithOrigin("maxBytes"))
 	}
 	// Verify that all characters are printable.
 	for i, r := range fieldManager {
@@ -305,10 +305,22 @@ func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *fiel
 		if len(fields.FieldsType) > 0 && fields.FieldsType != "FieldsV1" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
 		}
-		allErrs = append(allErrs, ValidateFieldManager(fields.Manager, fldPath.Child("manager"))...)
+		managerErrs := ValidateFieldManager(fields.Manager, fldPath.Child("manager"))
+		if coveredByDeclarative {
+			for _, err := range managerErrs {
+				if err.Type == field.ErrorTypeTooLong {
+					_ = err.MarkCoveredByDeclarative()
+				}
+			}
+		}
+		allErrs = append(allErrs, managerErrs...)
 
 		if len(fields.Subresource) > MaxSubresourceNameLength {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("subresource"), "" /*unused*/, MaxSubresourceNameLength))
+			err := field.TooLong(fldPath.Child("subresource"), "" /*unused*/, MaxSubresourceNameLength).WithOrigin("maxBytes")
+			if coveredByDeclarative {
+				_ = err.MarkCoveredByDeclarative()
+			}
+			allErrs = append(allErrs, err)
 		}
 	}
 	return allErrs
