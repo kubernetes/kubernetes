@@ -1,7 +1,9 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package env // import "go.opentelemetry.io/otel/sdk/internal/env"
+// Package env provides types and functionality for environment variable support
+// in the OpenTelemetry SDK.
+package env // import "go.opentelemetry.io/otel/sdk/trace/internal/env"
 
 import (
 	"os"
