@@ -20,6 +20,10 @@ package grpc
 
 import (
 	"context"
+	"io"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Invoke sends the RPC request on the wire and returns after response is
@@ -67,8 +71,27 @@ func invoke(ctx context.Context, method string, req, reply any, cc *ClientConn, 
 	if err != nil {
 		return err
 	}
-	if err := cs.SendMsg(req); err != nil {
+	// In case of nil or io.EOF error, call RecvMsg.
+	if err := cs.SendMsg(req); err != nil && err != io.EOF {
 		return err
 	}
-	return cs.RecvMsg(reply)
+	// CloseSend is needed because in some scenarios (e.g., xDS), the same
+	// interceptors are used to process both unary and streaming RPCs. Calling
+	// CloseSend signals to those interceptors that no more messages are on the
+	// way.
+	if err := cs.CloseSend(); err != nil && err != io.EOF {
+		return err
+	}
+	if err := cs.RecvMsg(reply); err != nil {
+		return err
+	}
+	// Call RecvMsg again to get the trailers.
+	err = cs.RecvMsg(reply)
+	if err == io.EOF {
+		return nil
+	}
+	if err == nil {
+		return status.Error(codes.Internal, "cardinality violation: expected <EOF> for non server-streaming RPCs, but received another message")
+	}
+	return err
 }

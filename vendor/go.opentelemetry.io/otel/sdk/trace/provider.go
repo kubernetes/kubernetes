@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package trace // import "go.opentelemetry.io/otel/sdk/trace"
+package trace
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
+	"go.opentelemetry.io/otel/sdk/internal/attrnorm"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace/internal/observ"
 	"go.opentelemetry.io/otel/trace"
@@ -42,22 +43,27 @@ type tracerProviderConfig struct {
 
 	// resource contains attributes representing an entity that produces telemetry.
 	resource *resource.Resource
+
+	// panicRecordingDisabled disables recording exception events from panics.
+	panicRecordingDisabled bool
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Provider.
 func (cfg tracerProviderConfig) MarshalLog() any {
 	return struct {
-		SpanProcessors  []SpanProcessor
-		SamplerType     string
-		IDGeneratorType string
-		SpanLimits      SpanLimits
-		Resource        *resource.Resource
+		SpanProcessors         []SpanProcessor
+		SamplerType            string
+		IDGeneratorType        string
+		SpanLimits             SpanLimits
+		Resource               *resource.Resource
+		PanicRecordingDisabled bool
 	}{
-		SpanProcessors:  cfg.processors,
-		SamplerType:     fmt.Sprintf("%T", cfg.sampler),
-		IDGeneratorType: fmt.Sprintf("%T", cfg.idGenerator),
-		SpanLimits:      cfg.spanLimits,
-		Resource:        cfg.resource,
+		SpanProcessors:         cfg.processors,
+		SamplerType:            fmt.Sprintf("%T", cfg.sampler),
+		IDGeneratorType:        fmt.Sprintf("%T", cfg.idGenerator),
+		SpanLimits:             cfg.spanLimits,
+		Resource:               cfg.resource,
+		PanicRecordingDisabled: cfg.panicRecordingDisabled,
 	}
 }
 
@@ -74,10 +80,11 @@ type TracerProvider struct {
 
 	// These fields are not protected by the lock mu. They are assumed to be
 	// immutable after creation of the TracerProvider.
-	sampler     Sampler
-	idGenerator IDGenerator
-	spanLimits  SpanLimits
-	resource    *resource.Resource
+	sampler                Sampler
+	idGenerator            IDGenerator
+	spanLimits             SpanLimits
+	resource               *resource.Resource
+	panicRecordingDisabled bool
 }
 
 var _ trace.TracerProvider = &TracerProvider{}
@@ -112,11 +119,12 @@ func NewTracerProvider(opts ...TracerProviderOption) *TracerProvider {
 	o = ensureValidTracerProviderConfig(o)
 
 	tp := &TracerProvider{
-		namedTracer: make(map[instrumentation.Scope]*tracer),
-		sampler:     o.sampler,
-		idGenerator: o.idGenerator,
-		spanLimits:  o.spanLimits,
-		resource:    o.resource,
+		namedTracer:            make(map[instrumentation.Scope]*tracer),
+		sampler:                o.sampler,
+		idGenerator:            o.idGenerator,
+		spanLimits:             o.spanLimits,
+		resource:               o.resource,
+		panicRecordingDisabled: o.panicRecordingDisabled,
 	}
 	global.Info("TracerProvider created", "config", o)
 
@@ -142,6 +150,7 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 		return noop.NewTracerProvider().Tracer(name, opts...)
 	}
 	c := trace.NewTracerConfig(opts...)
+	attrs, _ := attrnorm.Set(c.InstrumentationAttributes())
 	if name == "" {
 		name = defaultTracerName
 	}
@@ -149,7 +158,7 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 		Name:       name,
 		Version:    c.InstrumentationVersion(),
 		SchemaURL:  c.SchemaURL(),
-		Attributes: c.InstrumentationAttributes(),
+		Attributes: attrs,
 	}
 
 	t, ok := func() (trace.Tracer, bool) {
@@ -353,6 +362,16 @@ func WithBatcher(e SpanExporter, opts ...BatchSpanProcessorOption) TracerProvide
 func WithSpanProcessor(sp SpanProcessor) TracerProviderOption {
 	return traceProviderOptionFunc(func(cfg tracerProviderConfig) tracerProviderConfig {
 		cfg.processors = append(cfg.processors, sp)
+		return cfg
+	})
+}
+
+// WithoutPanicRecording configures the TracerProvider to not record exception
+// events when a Span is ended while panicking. The panic continues to
+// propagate, and the span is ended without adding the event.
+func WithoutPanicRecording() TracerProviderOption {
+	return traceProviderOptionFunc(func(cfg tracerProviderConfig) tracerProviderConfig {
+		cfg.panicRecordingDisabled = true
 		return cfg
 	})
 }
