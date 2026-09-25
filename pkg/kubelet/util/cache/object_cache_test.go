@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -62,6 +63,51 @@ func TestAddAndGet(t *testing.T) {
 		t.Errorf("Expected to get cached value: %#v, but got: %s", testObj.val, value.(string))
 	}
 
+}
+
+func TestGetPopulatesCacheOnMiss(t *testing.T) {
+	calls := 0
+	objectCache := NewObjectCache(func() (interface{}, error) {
+		calls++
+		return "bar", nil
+	}, 1*time.Hour)
+
+	value, err := objectCache.Get("foo")
+	if err != nil {
+		t.Errorf("Unable to get object by key: %s", "foo")
+	}
+	if value.(string) != "bar" {
+		t.Errorf("Expected to get updated value: %#v, but got: %s", "bar", value.(string))
+	}
+	if calls != 1 {
+		t.Errorf("Expected updater to be called once, got %d", calls)
+	}
+
+	value, err = objectCache.Get("foo")
+	if err != nil {
+		t.Errorf("Unable to get cached object by key: %s", "foo")
+	}
+	if value.(string) != "bar" {
+		t.Errorf("Expected to get cached value: %#v, but got: %s", "bar", value.(string))
+	}
+	if calls != 1 {
+		t.Errorf("Expected cached value to avoid another updater call, got %d calls", calls)
+	}
+}
+
+func TestGetReturnsUpdaterError(t *testing.T) {
+	expectedErr := errors.New("updater failed")
+	objectCache := NewObjectCache(func() (interface{}, error) {
+		return nil, expectedErr
+	}, 1*time.Hour)
+
+	value, err := objectCache.Get("foo")
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("Expected updater error %v, got %v", expectedErr, err)
+	}
+	if value != nil {
+		t.Errorf("Expected nil value when updater fails, got %#v", value)
+	}
 }
 
 func TestExpirationBasic(t *testing.T) {
