@@ -78,10 +78,12 @@ func (d authenticatedDataString) AuthenticatedData() []byte {
 var _ value.Context = authenticatedDataString("")
 
 type store struct {
-	client             *kubernetes.Client
-	codec              runtime.Codec
-	versioner          storage.Versioner
-	transformer        value.Transformer
+	client      *kubernetes.Client
+	codec       runtime.Codec
+	versioner   storage.Versioner
+	transformer value.Transformer
+	// pathPrefix is empty for the root, otherwise it starts with '/' and has no trailing '/'.
+	// Resource keys already start with '/', so prepareKey can concatenate them directly.
 	pathPrefix         string
 	groupResource      schema.GroupResource
 	watcher            *watcher
@@ -150,11 +152,9 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
 	// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
-	pathPrefix := path.Join("/", prefix)
-	if !strings.HasSuffix(pathPrefix, "/") {
-		// Ensure the pathPrefix ends in "/" here to simplify key concatenation later.
-		pathPrefix += "/"
-	}
+	// Resource keys start with '/', so omit the trailing slash. A root prefix
+	// becomes empty to avoid adding a second leading slash to resource keys.
+	pathPrefix := strings.TrimSuffix(path.Join("/", prefix), "/")
 	if resourcePrefix == "" {
 		return nil, fmt.Errorf("resourcePrefix cannot be empty")
 	}
@@ -1308,12 +1308,8 @@ func (s *store) prepareKey(key string, recursive bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// We ensured that pathPrefix ends in '/' in construction, so skip any leading '/' in the key now.
-	startIndex := 0
-	if key[0] == '/' {
-		startIndex = 1
-	}
-	return s.pathPrefix + key[startIndex:], nil
+	// New requires a leading '/' in resourcePrefix, which PrepareKey enforces on key.
+	return s.pathPrefix + key, nil
 }
 
 // recordDecodeError record decode error split by object type.
