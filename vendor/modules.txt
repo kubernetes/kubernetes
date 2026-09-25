@@ -2,7 +2,7 @@
 # bitbucket.org/bertimus9/systemstat v0.5.0
 ## explicit; go 1.17
 bitbucket.org/bertimus9/systemstat
-# cel.dev/expr v0.25.1
+# cel.dev/expr v0.25.2
 ## explicit; go 1.23.0
 cel.dev/expr
 # cyphar.com/go-pathrs v0.2.5
@@ -145,8 +145,8 @@ github.com/exponent-io/jsonpath
 # github.com/fatih/camelcase v1.0.0
 ## explicit
 github.com/fatih/camelcase
-# github.com/felixge/httpsnoop v1.0.4
-## explicit; go 1.13
+# github.com/felixge/httpsnoop v1.1.0
+## explicit; go 1.25
 github.com/felixge/httpsnoop
 # github.com/fsnotify/fsnotify v1.9.0
 ## explicit; go 1.17
@@ -747,8 +747,6 @@ go.opentelemetry.io/otel/sdk/trace
 go.opentelemetry.io/otel/sdk/trace/internal/env
 go.opentelemetry.io/otel/sdk/trace/internal/observ
 go.opentelemetry.io/otel/sdk/trace/tracetest
-# go.opentelemetry.io/otel/sdk/metric v1.44.0
-## explicit; go 1.25.0
 # go.opentelemetry.io/otel/trace v1.44.0
 ## explicit; go 1.25.0
 go.opentelemetry.io/otel/trace
@@ -914,17 +912,17 @@ golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
 # golang.org/x/tools/go/expect v0.1.1-deprecated
 ## explicit; go 1.23.0
-# google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa
+# google.golang.org/genproto/googleapis/api v0.0.0-20260706201446-f0a921348800
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/api
 google.golang.org/genproto/googleapis/api/annotations
 google.golang.org/genproto/googleapis/api/expr/v1alpha1
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.82.2
+# google.golang.org/grpc v1.84.0
 ## explicit; go 1.25.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes

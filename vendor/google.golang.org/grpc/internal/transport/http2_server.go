@@ -407,7 +407,7 @@ func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeade
 		st:               t,
 		headerWireLength: int(frame.Header().Length),
 	}
-	s.Stream.buf.init()
+	s.Stream.buf.init(t.bufferPool)
 	var (
 		// if false, content-type was missing or invalid
 		isGRPC      = false
@@ -531,6 +531,7 @@ func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeade
 	if frame.StreamEnded() {
 		// s is just created by the caller. No lock needed.
 		s.state = streamReadDone
+		s.write(recvMsg{err: io.EOF})
 	}
 	if timeoutSet {
 		s.ctx, s.cancel = context.WithTimeout(ctx, timeout)
