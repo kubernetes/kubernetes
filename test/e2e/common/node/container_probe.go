@@ -163,6 +163,114 @@ var _ = SIGDescribe("Probing container", func() {
 	})
 
 	/*
+		Testname: Pod liveness probe, multiple containers, parallel kill and restart
+		Description: Create a Pod with multiple containers that each configure an
+		exec liveness probe which fails shortly after startup, together with a
+		preStop hook. When the containers' liveness probes fail at the same time,
+		the kubelet MUST kill every failed container - running each container's
+		preStop hook - and restart all of them, and the Pod MUST recover to Ready.
+		This exercises the parallel container-kill path in SyncPod: a single
+		slow-terminating container (its preStop hook holds the kill open) must not
+		block its siblings from being killed and restarted.
+	*/
+	f.It("should kill and restart every container of a multi-container pod when they simultaneously fail liveness probes", f.WithSlow(), func(ctx context.Context) {
+		const numContainers = 3
+		containerNames := make([]string, 0, numContainers)
+		containers := make([]v1.Container, 0, numContainers)
+		for i := range numContainers {
+			name := fmt.Sprintf("liveness-%d", i)
+			containerNames = append(containerNames, name)
+			// First instance: become healthy briefly, then delete the health
+			// file so the liveness probe fails and the container is killed. On
+			// restart the per-container marker in the shared volume (an emptyDir
+			// survives container restarts) is already present, so the container
+			// stays healthy and the Pod stabilizes and can be inspected. Each
+			// preStop hook records that it ran into the shared volume and sleeps
+			// briefly, so the kill takes real time and would serialize the
+			// sibling kills if Step 3 were not parallelized.
+			cmd := fmt.Sprintf(
+				"if [ -f /shared/started-%[1]s ]; then echo ok >/tmp/health; sleep 600; "+
+					"else touch /shared/started-%[1]s; echo ok >/tmp/health; sleep 8; rm -f /tmp/health; sleep 600; fi",
+				name)
+			preStop := fmt.Sprintf("echo %s >> /shared/prestop.log; sleep 2", name)
+			containers = append(containers, v1.Container{
+				Name:    name,
+				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+				Command: []string{"/bin/sh", "-c", cmd},
+				LivenessProbe: &v1.Probe{
+					ProbeHandler:        execHandler([]string{"cat", "/tmp/health"}),
+					InitialDelaySeconds: 15,
+					TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
+					FailureThreshold:    1,
+				},
+				Lifecycle: &v1.Lifecycle{
+					PreStop: &v1.LifecycleHandler{
+						Exec: &v1.ExecAction{
+							Command: []string{"/bin/sh", "-c", preStop},
+						},
+					},
+				},
+				VolumeMounts: []v1.VolumeMount{{Name: "shared", MountPath: "/shared"}},
+			})
+		}
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "liveness-parallel-kill-" + string(uuid.NewUUID()),
+				Labels: map[string]string{"test": "liveness-parallel-kill"},
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				Containers:    containers,
+				Volumes: []v1.Volume{{
+					Name:         "shared",
+					VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+				}},
+			},
+		}
+
+		podClient := e2epod.NewPodClient(f)
+		ginkgo.DeferCleanup(func(ctx context.Context) error {
+			ginkgo.By("deleting the pod")
+			return podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
+		})
+
+		ginkgo.By("creating the multi-container pod")
+		podClient.Create(ctx, pod)
+
+		ginkgo.By("waiting for every container to be killed and restarted exactly once")
+		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "all containers restarted", defaultObservationTimeout, func(p *v1.Pod) (bool, error) {
+			restarted := 0
+			for _, name := range containerNames {
+				for _, cs := range p.Status.ContainerStatuses {
+					if cs.Name != name {
+						continue
+					}
+					// Require an actual prior termination, not just a bumped
+					// counter, so we know the kill path (including the preStop
+					// hook) ran for this container.
+					if cs.RestartCount >= 1 && cs.LastTerminationState.Terminated != nil {
+						restarted++
+					}
+				}
+			}
+			return restarted == numContainers, nil
+		}))
+
+		ginkgo.By("waiting for the pod to become ready again after all containers restarted")
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, defaultObservationTimeout))
+
+		ginkgo.By("verifying every container's preStop hook ran during the parallel kill")
+		gomega.Eventually(ctx, func() (string, error) {
+			stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, containerNames[0], "cat", "/shared/prestop.log")
+			return stdout, err
+		}, defaultObservationTimeout, 2*time.Second).Should(gomega.SatisfyAll(
+			gomega.ContainSubstring(containerNames[0]),
+			gomega.ContainSubstring(containerNames[1]),
+			gomega.ContainSubstring(containerNames[2]),
+		), "each killed container's preStop hook must have recorded that it ran")
+	})
+
+	/*
 		Release: v1.9
 		Testname: Pod liveness probe, using http endpoint, restart
 		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1.
