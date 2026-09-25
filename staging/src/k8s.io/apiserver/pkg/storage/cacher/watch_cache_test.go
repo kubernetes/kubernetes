@@ -109,7 +109,7 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 	w.RLock()
 	defer w.RUnlock()
 
-	return w.getAllEventsSinceLocked(resourceVersion, "", opts)
+	return w.getAllEventsSinceLocked(context.Background(), resourceVersion, "", opts)
 }
 
 // newTestWatchCache just adds a fake clock.
@@ -550,6 +550,140 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	}
 	if indexUsed != "" {
 		t.Errorf("Used index %q but expected none to be used", indexUsed)
+	}
+}
+
+func TestGetAllEventsSinceLockedWithIndexAndPrefix(t *testing.T) {
+	ctx := context.Background()
+	store := newTestWatchCache(5, DefaultEventFreshDuration, &cache.Indexers{
+		"l:label": func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return nil, fmt.Errorf("not a pod %#v", obj)
+			}
+			if value, ok := pod.Labels["label"]; ok {
+				return []string{value}, nil
+			}
+			return nil, nil
+		},
+		"f:spec.nodeName": func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return nil, fmt.Errorf("not a pod %#v", obj)
+			}
+			return []string{pod.Spec.NodeName}, nil
+		},
+	})
+	defer store.Stop()
+
+	makeNamespacedPod := func(namespace, name string, rv uint64, nodeName string, podLabels map[string]string) *v1.Pod {
+		pod := makeTestPodDetails(name, rv, nodeName, podLabels)
+		pod.Namespace = namespace
+		return pod
+	}
+
+	if err := store.Add(makeNamespacedPod("ns1", "pod1", 2, "node1", map[string]string{"label": "value1"})); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Add(makeNamespacedPod("ns1", "pod2", 3, "node2", map[string]string{"label": "value1"})); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Add(makeNamespacedPod("ns2", "pod3", 5, "node1", map[string]string{"label": "value2"})); err != nil {
+		t.Fatal(err)
+	}
+
+	sendInitialEventsTrue := true
+	testCases := []struct {
+		name              string
+		rv                uint64
+		sendInitialEvents *bool
+		key               string
+		predicate         storage.SelectionPredicate
+		wantKeys          []string
+	}{
+		{
+			name:      "rv=0 empty MatchValues all namespaces",
+			rv:        0,
+			key:       "/prefix/",
+			predicate: storage.Everything,
+			wantKeys:  []string{"/prefix/ns1/pod1", "/prefix/ns1/pod2", "/prefix/ns2/pod3"},
+		},
+		{
+			name:              "SendInitialEvents=true with spec.nodeName index",
+			rv:                5,
+			sendInitialEvents: &sendInitialEventsTrue,
+			key:               "/prefix/",
+			predicate: storage.SelectionPredicate{
+				Label:       labels.Everything(),
+				Field:       fields.SelectorFromSet(map[string]string{"spec.nodeName": "node1"}),
+				IndexFields: []string{"spec.nodeName"},
+			},
+			wantKeys: []string{"/prefix/ns1/pod1", "/prefix/ns2/pod3"},
+		},
+		{
+			name:              "SendInitialEvents=true with spec.nodeName index and namespace prefix",
+			rv:                5,
+			sendInitialEvents: &sendInitialEventsTrue,
+			key:               "/prefix/ns1/",
+			predicate: storage.SelectionPredicate{
+				Label:       labels.Everything(),
+				Field:       fields.SelectorFromSet(map[string]string{"spec.nodeName": "node1"}),
+				IndexFields: []string{"spec.nodeName"},
+			},
+			wantKeys: []string{"/prefix/ns1/pod1"},
+		},
+		{
+			name:              "SendInitialEvents=true with label index",
+			rv:                5,
+			sendInitialEvents: &sendInitialEventsTrue,
+			key:               "/prefix/",
+			predicate: storage.SelectionPredicate{
+				Label:       labels.SelectorFromSet(map[string]string{"label": "value1"}),
+				Field:       fields.Everything(),
+				IndexLabels: []string{"label"},
+			},
+			wantKeys: []string{"/prefix/ns1/pod1", "/prefix/ns1/pod2"},
+		},
+		{
+			name:              "SendInitialEvents=true with non-existent index falls back to prefix scan",
+			rv:                5,
+			sendInitialEvents: &sendInitialEventsTrue,
+			key:               "/prefix/ns2/",
+			predicate: storage.SelectionPredicate{
+				Label:       labels.SelectorFromSet(map[string]string{"not-exist-label": "whatever"}),
+				Field:       fields.Everything(),
+				IndexLabels: []string{"label"},
+			},
+			wantKeys: []string{"/prefix/ns2/pod3"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := storage.ListOptions{
+				Recursive:         true,
+				SendInitialEvents: tc.sendInitialEvents,
+				Predicate:         tc.predicate,
+			}
+			store.RLock()
+			interval, err := store.getAllEventsSinceLocked(ctx, tc.rv, tc.key, opts)
+			store.RUnlock()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			var gotKeys []string
+			for {
+				ev, err := interval.Next()
+				if err != nil {
+					t.Fatalf("unexpected error from Next(): %v", err)
+				}
+				if ev == nil {
+					break
+				}
+				gotKeys = append(gotKeys, ev.Key)
+			}
+			require.Equal(t, tc.wantKeys, gotKeys)
+		})
 	}
 }
 
