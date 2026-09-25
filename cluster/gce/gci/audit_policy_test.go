@@ -125,7 +125,7 @@ func TestCreateMasterAuditPolicy(t *testing.T) {
 	at.testResources(none, ingress, "get", sysConfigmaps)
 	at.testResources(metadata, ingress, "get", configmaps)
 
-	at.testResources(none, kubelet, node, "get", nodes, nodeStatus)
+	at.testResources(request, kubelet, node, "get", nodes, nodeStatus)
 	at.testResources(metadata, kubelet, node, "get", sysConfigmaps, secrets)
 	at.testResources(response, kubelet, node, "create", deployments, pods)
 
