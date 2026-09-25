@@ -68,13 +68,17 @@ func NewGVKParser(models proto.Models, preserveUnknownFields bool) (*GvkParser, 
 		}
 		gvkList := parseGroupVersionKind(model)
 		for _, gvk := range gvkList {
-			if len(gvk.Kind) > 0 {
-				_, ok := parser.gvks[gvk]
-				if ok {
-					return nil, fmt.Errorf("duplicate entry for %v", gvk)
-				}
-				parser.gvks[gvk] = modelName
+			if len(gvk.Kind) == 0 {
+				continue
 			}
+			if _, ok := parser.gvks[gvk]; ok {
+				// duplicate GVK entries can occur when aggregated API servers
+				// serve overlapping OpenAPI definitions (e.g. Calico
+				// operator duplicating APIResourceList). Keep first
+				// occurrence to allow parser construction to succeed.
+				continue
+			}
+			parser.gvks[gvk] = modelName
 		}
 	}
 	return &parser, nil
