@@ -5,10 +5,10 @@
 # - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
 #
 # Specifically, the CIs use labels like the following:
-# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
-# It basically covers all test cases but with their smallest workload. 
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime.
+# It basically covers all test cases but with their smallest workload.
 # - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
-# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds)
 # to provide meaningful samples for the pod scheduling rate.
 #
 # Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
@@ -136,12 +136,12 @@
       blockerPods: 480 # Must be slightly below initNodes * 10 to be stable
       measurePods: 500 # Must be initNodes * 10
 
-# This test case is used to measure the performance of queuing hints when handling the pod update events: 
+# This test case is used to measure the performance of queuing hints when handling the pod update events:
 # UpdatePodLabel, UpdatePodScaleDown, UpdatePodToleration and UpdatePodSchedulingGatesEliminated.
 # It has a few stages, but general idea is to make a node and block some pods on it
 # or to create additional blocker pods that will prevent the other ones from being scheduled.
 # Then, updating the blocker pods or the unschedulable pods themselves generate cluster events,
-# that through QHints make the pods schedulable. 
+# that through QHints make the pods schedulable.
 # Plugins covered: InterPodAffinity, NodeResources, NodeUnschedulable, PodTopologySpread, SchedulingGates and TaintToleration.
 - name: EventHandlingPodUpdate
   featureGates:
@@ -213,7 +213,7 @@
     skipWaitToCompletion: true
     namespace: noderesources
   # Created pods blocked using PodTopologySpread plugin.
-  # Count has to match $blockerPods as pod uses it as a maxSkew value, 
+  # Count has to match $blockerPods as pod uses it as a maxSkew value,
   # that must be equal to number of blocker pods.
   - opcode: createPods
     countParam: $blockerPods
@@ -382,7 +382,7 @@
   - opcode: createNodes
     count: 2
     nodeTemplatePath: templates/podadd-node.yaml
-  # Create one pod with label that will block topology spreading pods 
+  # Create one pod with label that will block topology spreading pods
   # from being scheduled on one node using pod anti affinity.
   - opcode: createPods
     count: 1
@@ -395,7 +395,7 @@
     labelSelector:
       type: unsched
   # Create pods blocked using PodTopologySpread plugin.
-  # Max skew is configured to 1, so more pods need to be created on the first node 
+  # Max skew is configured to 1, so more pods need to be created on the first node
   # (with the pod created above), to fill up the second node with these pods.
   - opcode: createPods
     countParam: $measurePods
@@ -403,7 +403,7 @@
     skipWaitToCompletion: true
     namespace: podtopologyspread
   # Create pods blocked using InterPodAffinity plugin.
-  # They don't have the affinity to themselves, 
+  # They don't have the affinity to themselves,
   # so have to wait for another pods with matching labels to be created at first.
   - opcode: createPods
     countParam: $measurePods
@@ -527,7 +527,7 @@
     updatePerSecond: 100
   # Wait on barrier for InterPodAffinity, NodeAffinity and PodTopologySpread pods to be scheduled.
   - opcode: barrier
-  # Create nodes with taints not matching the tolerations of pods below. 
+  # Create nodes with taints not matching the tolerations of pods below.
   - opcode: createNodes
     countParam: $nodes
     nodeTemplatePath: templates/nodeupdate-node-without-taints.yaml
@@ -559,3 +559,75 @@
     params:
       nodes: 100
       measurePods: 1000 # Must be initNodes * 10
+
+# This test case is used to measure the performance of queuing hints when handling the Node/Delete events.
+# Blocker pods are placed in zone-a, while zone-c is kept empty. The pods being measured can only
+# run in zone-a, but PodTopologySpread also considers zone-c when calculating skew, making them
+# unschedulable. Deleting all nodes in zone-c removes that topology domain and makes the pods schedulable.
+# Plugins covered: PodTopologySpread (the only plugin that registers for Node/Delete events).
+- name: EventHandlingNodeDelete
+  workloadTemplate:
+  # Create the nodes that remain throughout the test in zone-a.
+  - opcode: createNodes
+    countParam: $keepNodes
+    labelNodePrepareStrategy:
+      labelKey: topology.kubernetes.io/zone
+      labelValues: ["zone-a"]
+  # Create the nodes that will be deleted in an empty zone-c.
+  - opcode: createNodes
+    countParam: $deleteNodes
+    labelNodePrepareStrategy:
+      labelKey: topology.kubernetes.io/zone
+      labelValues: ["zone-c"]
+  # Create blocker pods in zone-a to cause a topology skew between zone-a and zone-c.
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: templates/nodedelete-pod-blocker.yaml
+    namespace: podtopologyspread
+  # Collect metrics for the unschedulable pods created below.
+  - opcode: startCollectingMetrics
+    name: unschedPods
+    namespaces: [podtopologyspread]
+    labelSelector:
+      type: unsched
+  # Create pods which can only run in zone-a. PodTopologySpread also considers zone-c when
+  # calculating skew, so these pods remain unschedulable while zone-c exists.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodedelete-pod-topologyspread-unsched.yaml
+    skipWaitToCompletion: true
+    namespace: podtopologyspread
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+    namespaces: [podtopologyspread]
+    labelSelector:
+      type: unsched
+  # Delete all nodes in zone-c to trigger Node/Delete event handling. The pods remain
+  # unschedulable until the last node, and therefore the zone-c topology domain, is gone.
+  - opcode: deleteNodes
+    countParam: $deleteNodes
+    deleteNodesPerSecond: 10
+    labelSelector:
+      "topology.kubernetes.io/zone": "zone-c"
+  # Wait for the previously unschedulable pods to be scheduled in zone-a.
+  - opcode: barrier
+    namespaces: [podtopologyspread]
+    labelSelector:
+      type: unsched
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 30Nodes_100Pods_Delete10Nodes
+    labels: [integration-test, short]
+    params:
+      keepNodes: 20
+      deleteNodes: 10
+      blockerPods: 60
+      measurePods: 100
+  - name: 150Nodes_500Pods_Delete50Nodes
+    labels: [performance, short]
+    params:
+      keepNodes: 100
+      deleteNodes: 50
+      blockerPods: 300
+      measurePods: 500
