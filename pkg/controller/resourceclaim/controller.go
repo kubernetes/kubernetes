@@ -474,33 +474,9 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj any, deleted bool) {
 	if needsClaims {
 		logger.V(6).Info("Not touching claims", "pod", klog.KObj(pod), "reason", reason)
 	} else {
-		for _, podClaim := range pod.Spec.ResourceClaims {
-			claimName, _, err := resourceclaim.Name(pod, &podClaim)
-			switch {
-			case err != nil:
-				// Either the claim was not created (nothing to do here) or
-				// the API changed. The later will also get reported elsewhere,
-				// so here it's just a debug message.
-				logger.V(6).Info("Nothing to do for claim during pod change", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "err", err, "reason", reason)
-			case claimName != nil:
-				key := claimKeyPrefix + pod.Namespace + "/" + *claimName
-				logger.V(6).Info("Process claim", "pod", klog.KObj(pod), "claim", klog.KRef(pod.Namespace, *claimName), "key", key, "reason", reason)
-				ec.queue.Add(key)
-			default:
-				// Nothing to do, claim wasn't generated.
-				logger.V(6).Info("Nothing to do for skipped claim during pod change", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "reason", reason)
-			}
-		}
-
-		// Process extended resource claims for completed/deleted pods.
-		// Extended resource claims are created by the scheduler and stored in
-		// pod.Status.ExtendedResourceClaimStatus, not in pod.Spec.ResourceClaims.
-		// Without this, extended resource claims would never be cleaned up when
-		// pods complete, causing device resources to remain allocated indefinitely.
-		if hasExtendedResourceClaims {
-			claimName := pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
+		for claimName := range resourceclaim.PodClaims(pod) {
 			key := claimKeyPrefix + pod.Namespace + "/" + claimName
-			logger.V(6).Info("Process extended resource claim", "pod", klog.KObj(pod), "claim", klog.KRef(pod.Namespace, claimName), "key", key, "reason", reason)
+			logger.V(6).Info("Process claim", "pod", klog.KObj(pod), "claim", klog.KRef(pod.Namespace, claimName), "key", key, "reason", reason)
 			ec.queue.Add(key)
 		}
 	}
@@ -1754,6 +1730,10 @@ func podResourceClaimTemplateIndexFunc(obj any) ([]string, error) {
 
 // podResourceClaimIndexFunc is an index function that returns ResourceClaim keys (=
 // namespace/name) for ResourceClaim or ResourceClaimTemplates in a given pod.
+// Extended resource claims in pod.Status.ExtendedResourceClaimStatus are
+// intentionally not indexed because the scheduler creates and reserves them
+// during PreBind, and claim cleanup is triggered directly by Pod or
+// ResourceClaim events.
 func podResourceClaimIndexFunc(obj any) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
