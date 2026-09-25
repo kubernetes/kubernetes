@@ -17,7 +17,9 @@ limitations under the License.
 package json
 
 import (
+	"bytes"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"io"
 	"strconv"
 
@@ -68,7 +70,7 @@ func identifier(options SerializerOptions) runtime.Identifier {
 		"pretty": strconv.FormatBool(options.Pretty),
 		"strict": strconv.FormatBool(options.Strict),
 	}
-	identifier, err := json.Marshal(result)
+	identifier, err := jsonv2.Marshal(result, json.DefaultOptionsV1())
 	if err != nil {
 		//nolint:logcheck // Should not be reached.
 		klog.Fatalf("Failed marshaling identifier for json Serializer: %v", err)
@@ -226,7 +228,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 
 func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	if s.options.Yaml {
-		json, err := json.Marshal(obj)
+		json, err := jsonv2.Marshal(obj, json.DefaultOptionsV1())
 		if err != nil {
 			return err
 		}
@@ -239,11 +241,16 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	}
 
 	if s.options.Pretty {
-		data, err := json.MarshalIndent(obj, "", "  ")
+		data, err := jsonv2.Marshal(obj, json.DefaultOptionsV1())
 		if err != nil {
 			return err
 		}
-		_, err = w.Write(data)
+		// Retain the legacy indentation of custom marshaler output.
+		var indented bytes.Buffer
+		if err := json.Indent(&indented, data, "", "  "); err != nil {
+			return err
+		}
+		_, err = w.Write(indented.Bytes())
 		return err
 	}
 	if s.options.StreamingCollectionsEncoding {
