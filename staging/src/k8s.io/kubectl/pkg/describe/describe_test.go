@@ -7661,6 +7661,125 @@ func TestDescribeProjectedVolumesOptionalSecret(t *testing.T) {
 	}
 }
 
+func TestDescribeProjectedVolumeSources(t *testing.T) {
+	testCases := []struct {
+		name    string
+		sources []corev1.VolumeProjection
+		expect  []string
+	}{
+		{
+			name: "cluster trust bundle selected by name",
+			sources: []corev1.VolumeProjection{
+				{
+					ClusterTrustBundle: &corev1.ClusterTrustBundleProjection{
+						Name: ptr.To("my-bundle"),
+						Path: "trust-bundle.pem",
+					},
+				},
+			},
+			expect: []string{
+				"ClusterTrustBundleName:  my-bundle",
+				"Path:                    trust-bundle.pem",
+				"Optional:                false",
+			},
+		},
+		{
+			name: "cluster trust bundle selected by signer name",
+			sources: []corev1.VolumeProjection{
+				{
+					ClusterTrustBundle: &corev1.ClusterTrustBundleProjection{
+						SignerName: ptr.To("example.com/signer"),
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "value"},
+						},
+						Path:     "trust-bundle.pem",
+						Optional: ptr.To(true),
+					},
+				},
+			},
+			expect: []string{
+				"ClusterTrustBundleSignerName:  example.com/signer",
+				"LabelSelector:                 key=value",
+				"Path:                          trust-bundle.pem",
+				"Optional:                      true",
+			},
+		},
+		{
+			name: "pod certificate with a credential bundle",
+			sources: []corev1.VolumeProjection{
+				{
+					PodCertificate: &corev1.PodCertificateProjection{
+						SignerName:           "example.com/signer",
+						KeyType:              "ED25519",
+						MaxExpirationSeconds: ptr.To(int32(86400)),
+						CredentialBundlePath: "credentials.pem",
+					},
+				},
+			},
+			expect: []string{
+				"PodCertificateSignerName:  example.com/signer",
+				"KeyType:                   ED25519",
+				"MaxExpirationSeconds:      86400",
+				"CredentialBundlePath:      credentials.pem",
+			},
+		},
+		{
+			name: "pod certificate with separate key and chain paths",
+			sources: []corev1.VolumeProjection{
+				{
+					PodCertificate: &corev1.PodCertificateProjection{
+						SignerName:           "example.com/signer",
+						KeyType:              "RSA3072",
+						KeyPath:              "key.pem",
+						CertificateChainPath: "chain.pem",
+					},
+				},
+			},
+			expect: []string{
+				"PodCertificateSignerName:  example.com/signer",
+				"KeyType:                   RSA3072",
+				"KeyPath:                   key.pem",
+				"CertificateChainPath:      chain.pem",
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{
+						{
+							Name: "projected",
+							VolumeSource: corev1.VolumeSource{
+								Projected: &corev1.ProjectedVolumeSource{
+									Sources: testCase.sources,
+								},
+							},
+						},
+					},
+				},
+			}
+			fake := fake.NewClientset(pod)
+			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("foo", "bar", DescriberSettings{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
+	}
+}
+
 func TestSmartLabelFor(t *testing.T) {
 	tests := []struct {
 		input    string
