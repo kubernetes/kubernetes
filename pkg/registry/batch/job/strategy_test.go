@@ -704,10 +704,10 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 		}
 	}
 	cases := map[string]struct {
-		enableMutablePodResourcesForSuspendedJobs bool
-		job                                       *batch.Job
-		update                                    func(*batch.Job)
-		wantErrs                                  field.ErrorList
+		disableMutablePodResourcesForSuspendedJobs bool
+		job                                        *batch.Job
+		update                                     func(*batch.Job)
+		wantErrs                                   field.ErrorList
 	}{
 		"update parallelism": {
 			job: &batch.Job{
@@ -750,7 +750,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"updating node selector for unsuspended job disallowed with MutablePodResourcesForSuspendedJobs disabled": {
-			enableMutablePodResourcesForSuspendedJobs: false,
+			disableMutablePodResourcesForSuspendedJobs: true,
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "myjob",
@@ -773,7 +773,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"updating node selector for suspended but previously started job disallowed with MutablePodResourcesForSuspendedJobs disabled": {
-			enableMutablePodResourcesForSuspendedJobs: false,
+			disableMutablePodResourcesForSuspendedJobs: true,
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "myjob",
@@ -945,7 +945,10 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, tc.enableMutablePodResourcesForSuspendedJobs)
+			if tc.disableMutablePodResourcesForSuspendedJobs {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.35"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, false)
+			}
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
 			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
