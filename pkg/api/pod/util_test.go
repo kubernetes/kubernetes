@@ -4345,6 +4345,136 @@ func TestDropSupplementalGroupsPolicy(t *testing.T) {
 	}
 }
 
+func TestDropCgroupOptions(t *testing.T) {
+	emptyCgroupOptions := &api.SecurityContext{CgroupOptions: &api.CgroupOptions{}}
+	readOnlyCgroups := &api.SecurityContext{
+		CgroupOptions: &api.CgroupOptions{MountMode: ptr.To(api.CgroupMountModeReadOnly)},
+	}
+	writableCgroups := &api.SecurityContext{
+		CgroupOptions: &api.CgroupOptions{MountMode: ptr.To(api.CgroupMountModeWritable)},
+	}
+	makePod := func(initSC, containerSC, ephemeralSC *api.SecurityContext) *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers: []api.Container{{Name: "i1", Image: "image", SecurityContext: initSC}},
+				Containers:     []api.Container{{Name: "c1", Image: "image", SecurityContext: containerSC}},
+				EphemeralContainers: []api.EphemeralContainer{{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1", Image: "image", SecurityContext: ephemeralSC},
+				}},
+			},
+		}
+	}
+	podWithEmptyCgroupOptions := makePod(emptyCgroupOptions, emptyCgroupOptions, emptyCgroupOptions)
+	podWithReadOnlyCgroups := makePod(readOnlyCgroups, readOnlyCgroups, readOnlyCgroups)
+	podWithCgroupOptions := makePod(writableCgroups, writableCgroups, writableCgroups)
+	podWithEphemeralCgroupOptions := makePod(&api.SecurityContext{}, &api.SecurityContext{}, writableCgroups)
+	podWithoutCgroupOptions := makePod(&api.SecurityContext{}, &api.SecurityContext{}, &api.SecurityContext{})
+
+	testcases := []struct {
+		description string
+		enabled     bool
+		oldPod      *api.Pod
+		newPod      *api.Pod
+		wantPod     *api.Pod
+	}{
+		{
+			description: "old with cgroupOptions / new with cgroupOptions / disabled",
+			oldPod:      podWithCgroupOptions,
+			newPod:      podWithCgroupOptions,
+			wantPod:     podWithCgroupOptions,
+		},
+		{
+			description: "old with empty cgroupOptions / new with cgroupOptions / disabled",
+			oldPod:      podWithEmptyCgroupOptions,
+			newPod:      podWithCgroupOptions,
+			wantPod:     podWithCgroupOptions,
+		},
+		{
+			description: "old with read-only cgroupOptions / new with cgroupOptions / disabled",
+			oldPod:      podWithReadOnlyCgroups,
+			newPod:      podWithCgroupOptions,
+			wantPod:     podWithCgroupOptions,
+		},
+		{
+			description: "old with cgroupOptions on the ephemeral container only / new with cgroupOptions / disabled",
+			oldPod:      podWithEphemeralCgroupOptions,
+			newPod:      podWithCgroupOptions,
+			wantPod:     podWithCgroupOptions,
+		},
+		{
+			description: "old without cgroupOptions / new with cgroupOptions / disabled",
+			oldPod:      podWithoutCgroupOptions,
+			newPod:      podWithCgroupOptions,
+			wantPod:     podWithoutCgroupOptions,
+		},
+		{
+			description: "nil old pod / new with cgroupOptions / disabled",
+			oldPod:      nil,
+			newPod:      podWithCgroupOptions,
+			wantPod:     podWithoutCgroupOptions,
+		},
+		{
+			description: "old without cgroupOptions / new with cgroupOptions on the ephemeral container only / disabled",
+			oldPod:      podWithoutCgroupOptions,
+			newPod:      podWithEphemeralCgroupOptions,
+			wantPod:     podWithoutCgroupOptions,
+		},
+		{
+			description: "old with cgroupOptions / new without cgroupOptions / disabled",
+			oldPod:      podWithCgroupOptions,
+			newPod:      podWithoutCgroupOptions,
+			wantPod:     podWithoutCgroupOptions,
+		},
+		{
+			description: "old without cgroupOptions / new without cgroupOptions / disabled",
+			oldPod:      podWithoutCgroupOptions,
+			newPod:      podWithoutCgroupOptions,
+			wantPod:     podWithoutCgroupOptions,
+		},
+
+		{
+			description: "old without cgroupOptions / new with cgroupOptions / enabled",
+			enabled:     true,
+			oldPod:      podWithoutCgroupOptions,
+			newPod:      podWithCgroupOptions,
+			wantPod:     podWithCgroupOptions,
+		},
+		{
+			description: "nil old pod / new with cgroupOptions / enabled",
+			enabled:     true,
+			oldPod:      nil,
+			newPod:      podWithCgroupOptions,
+			wantPod:     podWithCgroupOptions,
+		},
+		{
+			description: "old with cgroupOptions / new without cgroupOptions / enabled",
+			enabled:     true,
+			oldPod:      podWithCgroupOptions,
+			newPod:      podWithoutCgroupOptions,
+			wantPod:     podWithoutCgroupOptions,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupOptions, tc.enabled)
+
+			oldPod := tc.oldPod.DeepCopy()
+			newPod := tc.newPod.DeepCopy()
+			DropDisabledPodFields(newPod, oldPod)
+
+			// old pod should never be changed
+			if diff := cmp.Diff(oldPod, tc.oldPod); diff != "" {
+				t.Errorf("old pod changed: %s", diff)
+			}
+
+			if diff := cmp.Diff(tc.wantPod, newPod); diff != "" {
+				t.Errorf("new pod changed (- want, + got): %s", diff)
+			}
+		})
+	}
+}
+
 func TestDropImageVolumes(t *testing.T) {
 	const (
 		volumeNameImage = "volume"

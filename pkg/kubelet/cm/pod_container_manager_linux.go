@@ -29,6 +29,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -118,6 +119,47 @@ func (m *podContainerManagerImpl) applyPodLevelMemoryHigh(pod *v1.Pod, rc *Resou
 	if m.memoryThrottlingFactor != nil {
 		ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
 	}
+}
+
+const (
+	// These limits apply to the pod subtree, including all containers.
+	defaultWritableCgroupMaxDescendants = "250"
+	defaultWritableCgroupMaxDepth       = "50"
+)
+
+// EnsureWritableCgroupLimits limits the cgroups that a pod requesting writable
+// cgroups can create by setting cgroup.max.descendants and cgroup.max.depth on
+// its pod cgroup.
+func (m *podContainerManagerImpl) EnsureWritableCgroupLimits(pod *v1.Pod) error {
+	if !podNeedsWritableCgroupLimits(pod) {
+		return nil
+	}
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	limits := map[string]string{
+		Cgroup2MaxDescendants: defaultWritableCgroupMaxDescendants,
+		Cgroup2MaxDepth:       defaultWritableCgroupMaxDepth,
+	}
+	return m.cgroupManager.EnsureUnified(podCgroupName, limits)
+}
+
+func podNeedsWritableCgroupLimits(pod *v1.Pod) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CgroupOptions) &&
+		libcontainercgroups.IsCgroup2UnifiedMode() &&
+		podRequestsWritableCgroups(pod)
+}
+
+func containerRequestsWritableCgroups(sc *v1.SecurityContext) bool {
+	if sc == nil || sc.CgroupOptions == nil || sc.CgroupOptions.MountMode == nil {
+		return false
+	}
+	return *sc.CgroupOptions.MountMode == v1.CgroupMountModeWritable
+}
+
+func podRequestsWritableCgroups(pod *v1.Pod) bool {
+	// Validation forbids cgroupOptions on ephemeral containers.
+	return !podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(c *v1.Container, _ podutil.ContainerType) bool {
+		return !containerRequestsWritableCgroups(c.SecurityContext)
+	})
 }
 
 // GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.
@@ -337,6 +379,10 @@ func (m *podContainerManagerNoop) Exists(_ *v1.Pod) bool {
 }
 
 func (m *podContainerManagerNoop) EnsureExists(_ klog.Logger, _ *v1.Pod) error {
+	return nil
+}
+
+func (m *podContainerManagerNoop) EnsureWritableCgroupLimits(_ *v1.Pod) error {
 	return nil
 }
 
