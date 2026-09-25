@@ -59,6 +59,7 @@ message LeaseCandidateSpec {
   // leaseName is the name of the lease for which this candidate is contending.
   // This field is immutable.
   // +required
+  // +k8s:beta(since: "1.37")=+k8s:required
   optional string leaseName = 1;
 
   // pingTime is the last time that the server has requested the LeaseCandidate
