@@ -84,7 +84,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		fakeKubeClient, informerFactory.Core().V1().Nodes().Lister(), asw)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 
 	// Act
 	go reconciler.Run(ctx)
@@ -121,7 +121,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -176,7 +176,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -265,7 +265,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -350,7 +350,7 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -430,7 +430,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -526,7 +526,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -620,7 +620,7 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -679,7 +679,7 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	rc := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	reconciliationLoopFunc := rc.(*reconciler).reconciliationLoopFunc(ctx)
 	podName1 := "pod-uid1"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -740,7 +740,7 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	podName3 := "pod-uid3"
@@ -822,7 +822,7 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -906,7 +906,7 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxLongWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad,
-		nsu, nodeLister, fakeRecorder)
+		nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName1 := "pod-uid1"
 	volumeName1 := v1.UniqueVolumeName("volume-name1")
 	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
@@ -916,6 +916,12 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 		Spec: v1.NodeSpec{
 			Taints: []v1.Taint{{Key: v1.TaintNodeOutOfService, Effect: v1.TaintEffectNoExecute}},
 		},
+	}
+	// The reconciler now revalidates the out-of-service taint against a live
+	// read of the node before skipping the safe-to-detach check, so the fake
+	// clientset needs to carry the taint too, not just the informer cache.
+	if _, err := fakeKubeClient.CoreV1().Nodes().Create(ctx, node1, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create node1: %v", err)
 	}
 	informerFactory.Core().V1().Nodes().Informer().GetStore().Add(node1)
 	dsw.AddNode(nodeName1)
@@ -964,6 +970,98 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 	testForceDetachMetric(t, int(initialForceDetachCountTimeout), metrics.ForceDetachReasonTimeout)
 }
 
+// Populates the informer cache (rc.nodeLister) with a node carrying the
+// node.kubernetes.io/out-of-service taint, while the live node tracked by the
+// fake clientset never had that taint - simulating an operator removing the
+// taint (the node recovered) before the reconciler's node informer has caught
+// up with the change.
+//
+// Verifies that the volume is NOT force detached: acting on the stale cached
+// taint instead of the live Node would skip the safe-to-detach check for a
+// volume that may still be in active use.
+func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode_StaleCacheIsNotTrusted(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	registerMetrics.Do(func() {
+		legacyregistry.MustRegister(metrics.ForceDetachMetricCounter)
+	})
+
+	initialForceDetachCountOutOfService, err := metricstestutil.GetCounterMetricValue(metrics.ForceDetachMetricCounter.WithLabelValues(metrics.ForceDetachReasonOutOfService))
+	if err != nil {
+		t.Errorf("Error getting initialForceDetachCountOutOfService")
+	}
+
+	// Arrange
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		fakeKubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		fakeHandler))
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	// A long timeout so the timeout-based force-detach path can't fire during
+	// this test: any detach we observe must be due to the (stale) taint.
+	reconciler := NewReconciler(
+		reconcilerLoopPeriod, maxLongWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad,
+		nsu, nodeLister, fakeRecorder, fakeKubeClient)
+	podName1 := "pod-uid1"
+	volumeName1 := v1.UniqueVolumeName("volume-name1")
+	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
+	nodeName1 := k8stypes.NodeName("worker-0")
+
+	// The live node (fake clientset) has recovered: no out-of-service taint.
+	liveNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: string(nodeName1)},
+	}
+	if _, err := fakeKubeClient.CoreV1().Nodes().Create(ctx, liveNode, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create liveNode: %v", err)
+	}
+
+	// The cached node (informer store) hasn't caught up yet: it still carries
+	// the out-of-service taint.
+	cachedNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: string(nodeName1)},
+		Spec: v1.NodeSpec{
+			Taints: []v1.Taint{{Key: v1.TaintNodeOutOfService, Effect: v1.TaintEffectNoExecute}},
+		},
+	}
+	informerFactory.Core().V1().Nodes().Informer().GetStore().Add(cachedNode)
+	dsw.AddNode(nodeName1)
+
+	generatedVolumeName, podErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1,
+		podName1), volumeSpec1, nodeName1)
+	if podErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podErr)
+	}
+
+	// Act
+	go reconciler.Run(ctx)
+
+	// Assert
+	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
+	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
+
+	// Delete the pod. If the stale cached taint were trusted, this would force
+	// detach immediately, same as Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode
+	// above. Since the live node has no taint, it must not.
+	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
+	time.Sleep(reconcilerLoopPeriod * 20)
+
+	// Assert -- no detach was triggered, and no force-detach metric was recorded.
+	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
+	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
+	testForceDetachMetric(t, int(initialForceDetachCountOutOfService), metrics.ForceDetachReasonOutOfService)
+}
+
 // Populates desiredStateOfWorld cache with one node/volume/pod tuple.
 // The node does not have the node.kubernetes.io/out-of-service taint present.
 //
@@ -996,7 +1094,7 @@ func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxLongWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad,
-		nsu, nodeLister, fakeRecorder)
+		nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName1 := "pod-uid1"
 	volumeName1 := v1.UniqueVolumeName("volume-name1")
 	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
@@ -1080,7 +1178,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad,
-		nsu, nodeLister, fakeRecorder)
+		nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName1 := "pod-uid1"
 	volumeName1 := v1.UniqueVolumeName("volume-name1")
 	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
@@ -1200,7 +1298,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, true, dsw, asw, ad,
-		nsu, nodeLister, fakeRecorder)
+		nsu, nodeLister, fakeRecorder, fakeKubeClient)
 	podName1 := "pod-uid1"
 	volumeName1 := v1.UniqueVolumeName("volume-name1")
 	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
@@ -1215,6 +1313,9 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 				},
 			},
 		},
+	}
+	if _, err := fakeKubeClient.CoreV1().Nodes().Create(ctx, node1, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create node1: %v", err)
 	}
 	addErr := informerFactory.Core().V1().Nodes().Informer().GetStore().Add(node1)
 	if addErr != nil {
@@ -1284,6 +1385,12 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	// Taint the node
 	node3 := node2.DeepCopy()
 	node3.Spec.Taints = append(node3.Spec.Taints, v1.Taint{Key: v1.TaintNodeOutOfService, Effect: v1.TaintEffectNoExecute})
+	// The reconciler now revalidates the out-of-service taint against a live
+	// read of the node before skipping the safe-to-detach check, so the fake
+	// clientset needs to carry the taint too, not just the informer cache.
+	if _, err := fakeKubeClient.CoreV1().Nodes().Update(ctx, node3, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Failed to update node3: %v", err)
+	}
 	updateErr = informerFactory.Core().V1().Nodes().Informer().GetStore().Update(node3)
 	if updateErr != nil {
 		t.Fatalf("Update node failed. Expected: <no error> Actual: <%v>", updateErr)
@@ -1365,7 +1472,7 @@ func Test_ReportWaitingOnDetach(t *testing.T) {
 		nodeLister := informerFactory.Core().V1().Nodes().Lister()
 		nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 		rc := NewReconciler(
-			reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+			reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder, fakeKubeClient)
 
 		nodes := []k8stypes.NodeName{}
 		for _, n := range test.nodes {
