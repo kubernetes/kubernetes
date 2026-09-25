@@ -12,6 +12,8 @@
   - opcode: createNodes
     countParam: $initNodes
     nodeTemplatePath: templates/node.yaml
+    templateParams:
+      nodesPerRack: $nodesPerRack|100
   - opcode: createNamespaces
     prefix: tas-ns
     count: 1
@@ -21,7 +23,7 @@
     # Each group has gang policy, min count, and topology constraints specified in the pod group template.
     countParam: $initPodGroups
     namespace: tas-ns-0
-    templatePath: templates/podgroup.yaml
+    templatePath: templates/gang-podgroup.yaml
     templateParams:
       podsPerGroup: $podsPerGroup
   - opcode: createPods
@@ -34,109 +36,272 @@
     templateParams:
       podsPerGroup: $podsPerGroup
   workloads:
-  - name: 10Nodes_3Gangs
+  - name: 10Nodes_5Racks_3Groups
     labels: [integration-test, short]
     params:
       initNodes: 10
+      nodesPerRack: 2
       initPodGroups: 3
       podsPerGroup: 3
-  - name: 100Nodes_10Gangs
+  - name: 100Nodes_10Racks_10Groups
     labels: [integration-test]
     params:
       initNodes: 100
+      nodesPerRack: 10
       initPodGroups: 10
       podsPerGroup: 3
-  - name: 100Nodes_10Gangs_CompositePodGroupEnabled
+  - name: 100Nodes_10Racks_10Groups_CompositePodGroupEnabled
     labels: [integration-test]
     params:
       initNodes: 100
+      nodesPerRack: 10
       initPodGroups: 10
       podsPerGroup: 3
     featureGates:
       CompositePodGroup: true
-  - name: 5000Nodes_750Gangs_3000Pods
+  - name: 5000Nodes_50Racks_750Groups_3000Pods
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 750
       podsPerGroup: 4
-  - name: 5000Nodes_750Gangs_3000Pods_CompositePodGroupEnabled
+  - name: 5000Nodes_50Racks_750Groups_3000Pods_CompositePodGroupEnabled
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 750
       podsPerGroup: 4
     featureGates:
       CompositePodGroup: true
-  - name: 5000Nodes_1500Gangs_6000Pods
+  - name: 5000Nodes_50Racks_1500Groups_6000Pods
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 1500
       podsPerGroup: 4
-  - name: 5000Nodes_1500Gangs_6000Pods_CompositePodGroupEnabled
+  - name: 5000Nodes_50Racks_1500Groups_6000Pods_CompositePodGroupEnabled
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 1500
       podsPerGroup: 4
     featureGates:
       CompositePodGroup: true
-  - name: 5000Nodes_2250Gangs_9000Pods
+  - name: 5000Nodes_50Racks_2250Groups_9000Pods
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 2250
       podsPerGroup: 4
-  - name: 5000Nodes_2250Gangs_9000Pods_CompositePodGroupEnabled
+  - name: 5000Nodes_50Racks_2250Groups_9000Pods_CompositePodGroupEnabled
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 2250
       podsPerGroup: 4
     featureGates:
       CompositePodGroup: true
-  - name: 5000Nodes_3Gangs_3000Pods_1000PerGroup
+  - name: 5000Nodes_50Racks_3Groups_3000Pods_1000PerGroup
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 3
       podsPerGroup: 1000
-  - name: 5000Nodes_3Gangs_3000Pods_1000PerGroup_CompositePodGroupEnabled
+  - name: 5000Nodes_50Racks_3Groups_3000Pods_1000PerGroup_CompositePodGroupEnabled
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 3
       podsPerGroup: 1000
     featureGates:
       CompositePodGroup: true
-  - name: 5000Nodes_6Gangs_6000Pods_1000PerGroup
+  - name: 5000Nodes_50Racks_6Groups_6000Pods_1000PerGroup
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 6
       podsPerGroup: 1000
-  - name: 5000Nodes_6Gangs_6000Pods_1000PerGroup_CompositePodGroupEnabled
+  - name: 5000Nodes_50Racks_6Groups_6000Pods_1000PerGroup_CompositePodGroupEnabled
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 6
       podsPerGroup: 1000
     featureGates:
       CompositePodGroup: true
-  - name: 5000Nodes_9Gangs_9000Pods_1000PerGroup
+  - name: 5000Nodes_50Racks_9Groups_9000Pods_1000PerGroup
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 9
       podsPerGroup: 1000
-  - name: 5000Nodes_9Gangs_9000Pods_1000PerGroup_CompositePodGroupEnabled
+  - name: 5000Nodes_50Racks_9Groups_9000Pods_1000PerGroup_CompositePodGroupEnabled
     labels: [performance]
     params:
       initNodes: 5000
+      nodesPerRack: 100
       initPodGroups: 9
       podsPerGroup: 1000
     featureGates:
       CompositePodGroup: true
 
-
+- name: BasicTopologyAwareScheduling
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+    templateParams:
+      nodesPerRack: $nodesPerRack|100
+  - opcode: createNamespaces
+    prefix: tas-ns
+    count: 1
+  - opcode: createPodGroups
+    # Create pod groups, and wait for the scheduler's informer cache to reflect the newly created pod group objects.
+    # Each pod group is named basic-group-0, basic-group-1, ..., basic-group-(n-1), where n is the number of pod groups.
+    # Each group has basic policy and topology constraints specified in the pod group template.
+    countParam: $initPodGroups
+    namespace: tas-ns-0
+    templatePath: templates/basic-podgroup.yaml
+  - opcode: createPods
+    # Create pods with reference to the pod groups according to their indices (e.g., pods 0-2 → basic-group-0, pods 3-5 → basic-group-1, etc.).
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: tas-ns-0
+    podTemplatePath: templates/basic-pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  workloads:
+  - name: 10Nodes_5Racks_3Groups
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      nodesPerRack: 2
+      initPodGroups: 3
+      podsPerGroup: 3
+  - name: 100Nodes_10Racks_10Groups
+    labels: [integration-test]
+    params:
+      initNodes: 100
+      nodesPerRack: 10
+      initPodGroups: 10
+      podsPerGroup: 3
+  - name: 100Nodes_10Racks_10Groups_CompositePodGroupEnabled
+    labels: [integration-test]
+    params:
+      initNodes: 100
+      nodesPerRack: 10
+      initPodGroups: 10
+      podsPerGroup: 3
+    featureGates:
+      CompositePodGroup: true
+  - name: 5000Nodes_50Racks_750Groups_3000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 750
+      podsPerGroup: 4
+  - name: 5000Nodes_50Racks_750Groups_3000Pods_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 750
+      podsPerGroup: 4
+    featureGates:
+      CompositePodGroup: true
+  - name: 5000Nodes_50Racks_1500Groups_6000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 1500
+      podsPerGroup: 4
+  - name: 5000Nodes_50Racks_1500Groups_6000Pods_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 1500
+      podsPerGroup: 4
+    featureGates:
+      CompositePodGroup: true
+  - name: 5000Nodes_50Racks_2250Groups_9000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 2250
+      podsPerGroup: 4
+  - name: 5000Nodes_50Racks_2250Groups_9000Pods_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 2250
+      podsPerGroup: 4
+    featureGates:
+      CompositePodGroup: true
+  - name: 5000Nodes_50Racks_3Groups_3000Pods_1000PerGroup
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 3
+      podsPerGroup: 1000
+  - name: 5000Nodes_50Racks_3Groups_3000Pods_1000PerGroup_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 3
+      podsPerGroup: 1000
+    featureGates:
+      CompositePodGroup: true
+  - name: 5000Nodes_50Racks_6Groups_6000Pods_1000PerGroup
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 6
+      podsPerGroup: 1000
+  - name: 5000Nodes_50Racks_6Groups_6000Pods_1000PerGroup_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 6
+      podsPerGroup: 1000
+    featureGates:
+      CompositePodGroup: true
+  - name: 5000Nodes_50Racks_9Groups_9000Pods_1000PerGroup
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 9
+      podsPerGroup: 1000
+  - name: 5000Nodes_50Racks_9Groups_9000Pods_1000PerGroup_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      nodesPerRack: 100
+      initPodGroups: 9
+      podsPerGroup: 1000
+    featureGates:
+      CompositePodGroup: true
