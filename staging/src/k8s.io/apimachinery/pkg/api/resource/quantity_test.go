@@ -1976,19 +1976,6 @@ func BenchmarkQuantityString(b *testing.B) {
 	}
 }
 
-func BenchmarkQuantityStringPrecalc(b *testing.B) {
-	for _, q := range benchmarkQuantities() {
-		_ = q.String()
-		b.Run(q.String(), func(b *testing.B) {
-			for b.Loop() {
-				if len(q.String()) == 0 {
-					b.Fatal(q)
-				}
-			}
-		})
-	}
-}
-
 func BenchmarkQuantityStringBinarySI(b *testing.B) {
 	for _, q := range benchmarkQuantities() {
 		q.Format = BinarySI
@@ -2061,7 +2048,10 @@ func BenchmarkQuantityRoundUp(b *testing.B) {
 	for _, q := range benchmarkQuantities() {
 		b.Run(q.String(), func(b *testing.B) {
 			for b.Loop() {
-				copied := q
+				// Cannot use a shallow copy here, that would
+				// share state across iterations of the loop,
+				// depending on the test case.
+				copied := q.DeepCopy()
 				copied.RoundUp(-3)
 			}
 		})
