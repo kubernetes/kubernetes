@@ -118,16 +118,36 @@ type mockPreemptionManager struct {
 	fwk.PreemptionManager
 	fwk.PreemptionExecutor
 
-	candidate fwk.PreemptionCandidate
+	reprieveFilter fwk.ReprieveFilter
+	candidate      fwk.PreemptionCandidate
 }
 
 func (m *mockPreemptionManager) Executor() fwk.PreemptionExecutor {
 	return m
 }
 
+func (m *mockPreemptionManager) NewReprieveFilter(allVictims []fwk.PreemptionVictim) fwk.ReprieveFilter {
+	if m.reprieveFilter != nil {
+		return m.reprieveFilter
+	}
+	return m.PreemptionManager.NewReprieveFilter(allVictims)
+}
+
 func (m *mockPreemptionManager) ActuatePodGroupPreemption(_ context.Context, candidate fwk.PreemptionCandidate, _ fwk.PodGroupInfo, _ string) *fwk.Status {
 	m.candidate = candidate
 	return nil
+}
+
+type maxReprievesFilter struct {
+	remainingReprieves int
+}
+
+func (f *maxReprievesFilter) CanReprieveVictim(_ fwk.PreemptionVictim) bool {
+	return f.remainingReprieves > 0
+}
+
+func (f *maxReprievesFilter) OnVictimReprieved(_ fwk.PreemptionVictim) {
+	f.remainingReprieves--
 }
 
 func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
@@ -139,6 +159,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 		preemptor                      fwk.PodGroupInfo
 		pdbs                           []*policy.PodDisruptionBudget
 		nodeCapacities                 []nodeCapacity
+		reprieveFilter                 fwk.ReprieveFilter
 		expectedVictims                []string
 		expectedStatus                 *fwk.Status
 		expectedNumPodGroupDisruptions int
@@ -1179,6 +1200,40 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			expectedStatus:                 fwk.NewStatus(fwk.Success),
 			expectedNumPodGroupDisruptions: 1,
 		},
+		{
+			name: "ReprieveFilter: OnVictimReprieved is not called when a victim allowed by CanReprieveVictim fails Filter",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(10).Labels(map[string]string{"size": "1"}).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(20).Labels(map[string]string{"size": "1"}).Obj(),
+				// v3 is evaluated after v4 during reprieve and passes both the reprieveFilter and the filter for all preemptor pods.
+				// Remaining victims v1 and v2 will not be reprieved because reprieveFilter only allows for a single reprieved victim,
+				// even though the preemptor would fit with those pods restored.
+				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(30).Labels(map[string]string{"size": "1"}).Obj(),
+				// v4 has highest victim priority so it is evaluated first during reprieve.
+				// It fits with p1 (6+3 <= 10) but fails Filter when p2 is also placed (6+3+3 > 10),
+				// so it does not consume the reprieve allowance enforced by the reprieveFilter.
+				st.MakePod().Name("v4").UID("v4").Node("node1").Priority(40).Labels(map[string]string{"size": "6"}).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).MinCount(2).Obj(),
+				[]*v1.Pod{
+					st.MakePod().Name("p1").UID("p1").Priority(highPriority).Labels(map[string]string{"size": "3"}).Obj(),
+					st.MakePod().Name("p2").UID("p2").Priority(highPriority).Labels(map[string]string{"size": "3"}).Obj(),
+				},
+			),
+			nodeCapacities: []nodeCapacity{
+				{
+					nodeName: "node1",
+					capacity: 10,
+				},
+			},
+			reprieveFilter:  &maxReprievesFilter{remainingReprieves: 1},
+			expectedVictims: []string{"v4", "v2", "v1"},
+			expectedStatus:  fwk.NewStatus(fwk.Success),
+		},
 	}
 
 	for _, tt := range tests {
@@ -1215,7 +1270,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups, nil)
-			mockPreemptionManager := &mockPreemptionManager{}
+			mockPreemptionManager := &mockPreemptionManager{
+				reprieveFilter: tt.reprieveFilter,
+			}
 			f, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",

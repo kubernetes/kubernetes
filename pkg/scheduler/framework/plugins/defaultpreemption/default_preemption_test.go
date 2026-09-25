@@ -4393,8 +4393,9 @@ type mockPreemptionManager struct {
 	fwk.PreemptionManager
 	fwk.PreemptionExecutor
 
-	victims   []fwk.PreemptionVictim
-	candidate fwk.PreemptionCandidate
+	victims        []fwk.PreemptionVictim
+	reprieveFilter fwk.ReprieveFilter
+	candidate      fwk.PreemptionCandidate
 }
 
 func (m *mockPreemptionManager) GenerateVictims(_ context.Context, pgi fwk.PodGroupInfo) ([]fwk.PreemptionVictim, *fwk.Status) {
@@ -4405,9 +4406,28 @@ func (m *mockPreemptionManager) Executor() fwk.PreemptionExecutor {
 	return m
 }
 
+func (m *mockPreemptionManager) NewReprieveFilter(allVictims []fwk.PreemptionVictim) fwk.ReprieveFilter {
+	if m.reprieveFilter != nil {
+		return m.reprieveFilter
+	}
+	return m.PreemptionManager.NewReprieveFilter(allVictims)
+}
+
 func (m *mockPreemptionManager) ActuatePodGroupPreemption(_ context.Context, candidate fwk.PreemptionCandidate, _ fwk.PodGroupInfo, _ string) *fwk.Status {
 	m.candidate = candidate
 	return nil
+}
+
+type maxReprievesFilter struct {
+	remainingReprieves int
+}
+
+func (f *maxReprievesFilter) CanReprieveVictim(_ fwk.PreemptionVictim) bool {
+	return f.remainingReprieves > 0
+}
+
+func (f *maxReprievesFilter) OnVictimReprieved(_ fwk.PreemptionVictim) {
+	f.remainingReprieves--
 }
 
 func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing.T) {
@@ -4425,7 +4445,10 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 	node := st.MakeNode().Name("node1").Capacity(cpuResource(10)).Obj()
 	nodes := []*v1.Node{node}
 
-	preemptorPod := st.MakePod().Name("preemptor-pod").UID("preemptor-pod").Namespace(v1.NamespaceDefault).Req(cpuResource(6)).Obj()
+	preemptorPods := []*v1.Pod{
+		st.MakePod().Name("preemptor-pod-1").UID("preemptor-pod-1").Namespace(v1.NamespaceDefault).Req(cpuResource(3)).Obj(),
+		st.MakePod().Name("preemptor-pod-2").UID("preemptor-pod-2").Namespace(v1.NamespaceDefault).Req(cpuResource(3)).Obj(),
+	}
 
 	makeVictim := func(name string, cpu int) *v1.Pod {
 		return st.MakePod().Name(name).UID(name).Namespace(v1.NamespaceDefault).Node("node1").Req(cpuResource(cpu)).Obj()
@@ -4434,6 +4457,7 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 	tests := []struct {
 		name                string
 		initialVictims      [][]*v1.Pod
+		reprieveFilter      fwk.ReprieveFilter
 		expectedVictimNames []string
 		expectedStatus      *fwk.Status
 	}{
@@ -4487,6 +4511,29 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 			expectedVictimNames: []string{"victim-large"},
 		},
 		{
+			name: "custom ReprieveFilter limiting the number of reprieved victims",
+			initialVictims: [][]*v1.Pod{
+				{makeVictim("victim-1", 1)},
+				{makeVictim("victim-2", 1)},
+				{makeVictim("victim-3", 1)},
+				{makeVictim("victim-4", 1)},
+				{makeVictim("victim-5", 1)},
+			},
+			reprieveFilter:      &maxReprievesFilter{remainingReprieves: 2},
+			expectedVictimNames: []string{"victim-3", "victim-2", "victim-1"},
+		},
+		{
+			name: "no reprieveFilter doesn't limit the number of reprieved victims",
+			initialVictims: [][]*v1.Pod{
+				{makeVictim("victim-1", 1)},
+				{makeVictim("victim-2", 1)},
+				{makeVictim("victim-3", 1)},
+				{makeVictim("victim-4", 1)},
+				{makeVictim("victim-5", 1)},
+			},
+			expectedVictimNames: []string{"victim-1"},
+		},
+		{
 			name:           "empty victims results in unschedulable",
 			expectedStatus: fwk.NewStatus(fwk.Unschedulable),
 		},
@@ -4504,7 +4551,7 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 			}
 
 			pg := st.MakePodGroup().Name("preemptor-pg").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj()
-			pgInfo := newPGInfo(pg, preemptorPod)
+			pgInfo := newPGInfo(pg, preemptorPods...)
 
 			clientObjs := make([]runtime.Object, 0, len(allPods)+1)
 			clientObjs = append(clientObjs, pg)
@@ -4534,7 +4581,8 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 			}
 
 			manager := &mockPreemptionManager{
-				victims: victims,
+				victims:        victims,
+				reprieveFilter: tt.reprieveFilter,
 			}
 			registeredPlugins := []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -4567,20 +4615,20 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 			}
 
 			schedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
-				preemptorPodInfo, _ := framework.NewPodInfo(preemptorPod)
-				cs := framework.NewCycleState()
-				if _, s, _ := schedFwk.RunPreFilterPlugins(ctx, cs, preemptorPod); !s.IsSuccess() {
-					return nil, s
+				var assignments []fwk.ProposedAssignment
+				for _, preemptorPod := range preemptorPods {
+					cs := framework.NewCycleState()
+					if _, s, _ := schedFwk.RunPreFilterPlugins(ctx, cs, preemptorPod); !s.IsSuccess() {
+						return nil, s
+					}
+					preemptorPodInfo, _ := framework.NewPodInfo(preemptorPod)
+					assignments = append(assignments, &mockProposedAssignment{
+						nodeName:   node.Name,
+						podInfo:    preemptorPodInfo,
+						cycleState: cs,
+					})
 				}
-				return &fwk.PodGroupAssignments{
-					ProposedAssignments: []fwk.ProposedAssignment{
-						&mockProposedAssignment{
-							nodeName:   "node1",
-							podInfo:    preemptorPodInfo,
-							cycleState: cs,
-						},
-					},
-				}, nil
+				return &fwk.PodGroupAssignments{ProposedAssignments: assignments}, nil
 			}
 
 			state := framework.NewCycleState()
@@ -4614,13 +4662,17 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 				}
 			}
 
-			if postFilterResult == nil || len(postFilterResult.NominatingInfos) != 1 {
-				t.Fatalf("Expected 1 nominating info, got: %v", postFilterResult)
-			}
+			actualAssignments := map[string]string{}
 			for key, nomInfo := range postFilterResult.NominatingInfos {
-				if key.Name != "preemptor-pod" || nomInfo.NominatedNodeName != "node1" {
-					t.Errorf("Unexpected nominating info: %v -> %v, want node1", key, nomInfo)
-				}
+				actualAssignments[key.Name] = nomInfo.NominatedNodeName
+			}
+			expectedAssignments := map[string]string{}
+			for _, preemptorPod := range preemptorPods {
+				expectedAssignments[preemptorPod.Name] = node.Name
+			}
+
+			if diff := cmp.Diff(expectedAssignments, actualAssignments); diff != "" {
+				t.Fatalf("Unexpected assignments (-want, +got):\n%s", diff)
 			}
 		})
 	}

@@ -974,8 +974,23 @@ type PreemptionManager interface {
 	// The preemption algorithm attempts to reprieve victims in reverse order, from last to first.
 	// The preemption algorithm will pass through unsuccessful status to the caller.
 	GenerateVictims(ctx context.Context, pgInfo PodGroupInfo) ([]PreemptionVictim, *Status)
-	// Executor returns a PreemptionExecutor that can be used to actuate preemption or check preemption status.
+
+	// Executor returns a [PreemptionExecutor] that can be used to actuate preemption or check preemption status.
 	Executor() PreemptionExecutor
+
+	// NewReprieveFilter returns a [ReprieveFilter] that can be used to filter out reprieve candidates.
+	// Stateful implementations must return a fresh instance per evaluation.
+	NewReprieveFilter(allVictims []PreemptionVictim) ReprieveFilter
+}
+
+// ReprieveFilter controls whether candidate preemption victims can be reprieved during preemption evaluation.
+type ReprieveFilter interface {
+	// CanReprieveVictim is called before restoring the victim and running the fit check for the preemptor.
+	CanReprieveVictim(victim PreemptionVictim) bool
+
+	// OnVictimReprieved is called on successful victim reprieval.
+	// Stateful implementations can use this function to track the currently active victims.
+	OnVictimReprieved(victim PreemptionVictim)
 }
 
 // PreemptionVictim represents a preemption unit that abstracts individual Pods and PodGroups,
