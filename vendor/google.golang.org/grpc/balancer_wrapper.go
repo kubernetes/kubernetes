@@ -36,7 +36,6 @@ import (
 )
 
 var (
-	setConnectedAddress = internal.SetConnectedAddress.(func(*balancer.SubConnState, resolver.Address))
 	// noOpRegisterHealthListenerFn is used when client side health checking is
 	// disabled. It sends a single READY update on the registered listener.
 	noOpRegisterHealthListenerFn = func(_ context.Context, listener func(balancer.SubConnState)) func() {
@@ -305,7 +304,7 @@ func newHealthData(s connectivity.State) *healthData {
 
 // updateState is invoked by grpc to push a subConn state update to the
 // underlying balancer.
-func (acbw *acBalancerWrapper) updateState(s connectivity.State, curAddr resolver.Address, err error) {
+func (acbw *acBalancerWrapper) updateState(s connectivity.State, err error) {
 	acbw.ccb.serializer.TrySchedule(func(ctx context.Context) {
 		if ctx.Err() != nil || acbw.ccb.balancer == nil {
 			return
@@ -317,9 +316,6 @@ func (acbw *acBalancerWrapper) updateState(s connectivity.State, curAddr resolve
 		// opts.StateListener is set, so this cannot ever be nil.
 		// TODO: delete this comment when UpdateSubConnState is removed.
 		scs := balancer.SubConnState{ConnectivityState: s, ConnectionError: err}
-		if s == connectivity.Ready {
-			setConnectedAddress(&scs, curAddr)
-		}
 		// Invalidate the health listener by updating the healthData.
 		acbw.healthMu.Lock()
 		// A race may occur if a health listener is registered soon after the
@@ -450,13 +446,14 @@ func (acbw *acBalancerWrapper) healthListenerRegFn() func(context.Context, func(
 	if acbw.ccb.cc.dopts.disableHealthCheck {
 		return noOpRegisterHealthListenerFn
 	}
+	cfg := acbw.ac.cc.healthCheckConfig()
+	if cfg == nil {
+		return noOpRegisterHealthListenerFn
+	}
 	regHealthLisFn := internal.RegisterClientHealthCheckListener
 	if regHealthLisFn == nil {
 		// The health package is not imported.
-		return noOpRegisterHealthListenerFn
-	}
-	cfg := acbw.ac.cc.healthCheckConfig()
-	if cfg == nil {
+		channelz.Error(logger, acbw.ac.channelz, "Health check is requested but health package is not imported.")
 		return noOpRegisterHealthListenerFn
 	}
 	return func(ctx context.Context, listener func(balancer.SubConnState)) func() {
