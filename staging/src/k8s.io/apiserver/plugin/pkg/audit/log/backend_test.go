@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,8 @@ import (
 	"k8s.io/apiserver/pkg/apis/audit/install"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 func init() {
@@ -160,5 +163,26 @@ func TestLogEventsJson(t *testing.T) {
 				t.Errorf("The result event should be the same with the original one, \noriginal: \n%#v\n result: \n%#v, apiVersion: %s", event, result, version)
 			}
 		}
+	}
+}
+
+func TestProcessEventsIncrementsErrorMetricOnUnknownFormat(t *testing.T) {
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	var buf bytes.Buffer
+	backend := NewBackend(&buf, "invalid-format", auditv1.SchemeGroupVersion)
+	event := &auditinternal.Event{AuditID: types.UID(uuid.New().String())}
+	if backend.ProcessEvents(event) {
+		t.Fatal("expected ProcessEvents to fail for unknown format")
+	}
+
+	const expected = `
+# HELP apiserver_audit_error_total [BETA] Counter of audit events that failed to be audited properly. Plugin identifies the plugin affected by the error.
+# TYPE apiserver_audit_error_total counter
+apiserver_audit_error_total{plugin="log"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_audit_error_total"); err != nil {
+		t.Fatal(err)
 	}
 }
