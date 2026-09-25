@@ -29,9 +29,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	grpchealth "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	cert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/probe"
@@ -119,6 +122,22 @@ func (e errorNotServeServerMock) Watch(_ *grpchealth.HealthCheckRequest, stream 
 	return stream.Send(&grpchealth.HealthCheckResponse{
 		Status: grpchealth.HealthCheckResponse_NOT_SERVING,
 	})
+}
+
+// oversizedServerMock answers Check with SERVING plus an unknown field, so the
+// wire message is larger than maxHealthCheckResponseSize. Without the receive
+// cap the client ignores the unknown field and reports Success.
+type oversizedServerMock struct {
+	grpchealth.UnimplementedHealthServer
+	padding int
+}
+
+func (o oversizedServerMock) Check(context.Context, *grpchealth.HealthCheckRequest) (*grpchealth.HealthCheckResponse, error) {
+	resp := &grpchealth.HealthCheckResponse{Status: grpchealth.HealthCheckResponse_SERVING}
+	raw := protowire.AppendTag(nil, 100, protowire.BytesType)
+	raw = protowire.AppendBytes(raw, make([]byte, o.padding))
+	resp.ProtoReflect().SetUnknown(protoreflect.RawFields(raw))
+	return resp, nil
 }
 
 func TestGrpcProber_Probe(t *testing.T) {
@@ -215,6 +234,24 @@ func TestGrpcProber_Probe(t *testing.T) {
 		p, _, err := s.Probe("0.0.0.0", "", port, time.Second*2, ProbeOptions{})
 		assert.Equal(t, probe.Success, p)
 		assert.NoError(t, err)
+	})
+	t.Run("Should: fail when the health response is larger than the receive cap", func(t *testing.T) {
+		s := New()
+		lis, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("failed to listen: %v", err)
+		}
+		port := lis.Addr().(*net.TCPAddr).Port
+		grpcServer := grpc.NewServer()
+		defer grpcServer.Stop()
+		grpchealth.RegisterHealthServer(grpcServer, &oversizedServerMock{padding: maxHealthCheckResponseSize})
+		go func() {
+			_ = grpcServer.Serve(lis)
+		}()
+		p, o, err := s.Probe("127.0.0.1", "", port, time.Second*2, ProbeOptions{})
+		require.NoError(t, err)
+		assert.Equal(t, probe.Failure, p)
+		assert.Contains(t, o, "ResourceExhausted")
 	})
 }
 

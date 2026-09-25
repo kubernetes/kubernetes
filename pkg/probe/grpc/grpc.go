@@ -35,6 +35,12 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 )
 
+// maxHealthCheckResponseSize caps the health response the probe accepts.
+// grpc.health.v1.HealthCheckResponse holds one enum and is a few bytes on
+// the wire. The pod owns the probed server, so the kubelet must not accept
+// the grpc default of 4 MiB from it.
+const maxHealthCheckResponseSize = 4 << 10
+
 // ProbeOptions contains options for configuring a gRPC probe.
 type ProbeOptions struct {
 	UseTLS bool
@@ -73,6 +79,7 @@ func (p grpcProber) Probe(host, service string, port int, timeout time.Duration,
 		grpc.WithUserAgent(fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor)),
 		grpc.WithBlock(),
 		grpc.WithTransportCredentials(transportCreds),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxHealthCheckResponseSize)),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return probe.ProbeDialer().DialContext(ctx, "tcp", addr)
 		}),
