@@ -413,13 +413,6 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
 func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sentAt time.Time) {
-	watchEvent := c.convertToWatchEvent(event)
-	if watchEvent == nil {
-		// Watcher is not interested in that object.
-		return time.Time{}, time.Time{}
-	}
-	builtAt = c.clock.Now()
-
 	// We need to ensure that if we put event X to the c.result, all
 	// previous events were already put into it before, no matter whether
 	// c.done is close or not.
@@ -437,6 +430,13 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 		return time.Time{}, time.Time{}
 	default:
 	}
+
+	watchEvent := c.convertToWatchEvent(event)
+	if watchEvent == nil {
+		// Watcher is not interested in that object.
+		return time.Time{}, time.Time{}
+	}
+	builtAt = c.clock.Now()
 
 	select {
 	case c.result <- *watchEvent:
