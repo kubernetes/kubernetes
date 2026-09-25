@@ -143,9 +143,6 @@
       "github.com/flynn/go-shlex": [
         "github.com/coredns/caddy"
       ],
-      "github.com/gogo/protobuf": [
-        "k8s.io/code-generator"
-      ],
       "github.com/golang/protobuf": [
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "go.etcd.io/etcd/api/v3",
@@ -223,7 +220,6 @@
     },
     "unwantedVendored": [
       "github.com/davecgh/go-spew",
-      "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
       "github.com/google/btree",
       "golang.org/x/exp"
