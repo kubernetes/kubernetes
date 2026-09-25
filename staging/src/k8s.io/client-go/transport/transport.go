@@ -53,6 +53,11 @@ func New(config *Config) (http.RoundTripper, error) {
 
 	if config.Transport != nil {
 		rt = config.Transport
+	} else if config.ConnectionPool != nil && config.ConnectionPool.Size > 1 {
+		rt, err = newPoolTransport(config)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		rt, err = tlsCache.get(config)
 		if err != nil {
@@ -61,6 +66,19 @@ func New(config *Config) (http.RoundTripper, error) {
 	}
 
 	return HTTPWrappersForConfig(config, rt)
+}
+
+func newPoolTransport(config *Config) (http.RoundTripper, error) {
+	size := config.ConnectionPool.Size
+	transports := make([]http.RoundTripper, size)
+	for i := 0; i < size; i++ {
+		rt, err := tlsCache.getWithPoolIndex(config, i)
+		if err != nil {
+			return nil, err
+		}
+		transports[i] = rt
+	}
+	return NewPoolRoundTripper(transports, config.ConnectionPool.Strategy)
 }
 
 func isValidHolders(config *Config) bool {
