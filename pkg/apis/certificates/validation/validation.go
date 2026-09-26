@@ -68,10 +68,6 @@ type certificateValidationOptions struct {
 	// allow populating status.certificate
 	allowSettingCertificate bool
 
-	// allow Approved and Denied conditions to be exist.
-	// we tolerate this when the problem is already present in the persisted object for compatibility.
-	allowBothApprovedAndDenied bool
-
 	// The following are bad things we tolerate for compatibility reasons:
 	// * in requests made via the v1beta1 API
 	// * in update requests where the problem is already present in the persisted object
@@ -287,8 +283,6 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 	allErrs := field.ErrorList{}
 
 	seenTypes := map[certificates.RequestConditionType]bool{}
-	hasApproved := false
-	hasDenied := false
 
 	for i, c := range csr.Status.Conditions {
 
@@ -307,21 +301,6 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("status"), ""))
 		case !allowedStatusValues.Has(string(c.Status)):
 			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i).Child("status"), c.Status, allowedStatusValues.List()))
-		}
-
-		if !opts.allowBothApprovedAndDenied {
-			switch c.Type {
-			case certificates.CertificateApproved:
-				hasApproved = true
-				if hasDenied {
-					allErrs = append(allErrs, field.Invalid(fldPath, c.Type, "Approved and Denied conditions are mutually exclusive").WithOrigin("zeroOrOneOf").MarkCoveredByDeclarative())
-				}
-			case certificates.CertificateDenied:
-				hasDenied = true
-				if hasApproved {
-					allErrs = append(allErrs, field.Invalid(fldPath, c.Type, "Approved and Denied conditions are mutually exclusive").WithOrigin("zeroOrOneOf").MarkCoveredByDeclarative())
-				}
-			}
 		}
 
 		if !opts.allowDuplicateConditionTypes {
@@ -415,7 +394,6 @@ func findConditions(csr *certificates.CertificateSigningRequest, conditionType c
 func getValidationOptions(newCSR, oldCSR *certificates.CertificateSigningRequest) certificateValidationOptions {
 	return certificateValidationOptions{
 		allowResettingCertificate:    false,
-		allowBothApprovedAndDenied:   allowBothApprovedAndDenied(oldCSR),
 		allowLegacySignerName:        allowLegacySignerName(oldCSR),
 		allowDuplicateConditionTypes: allowDuplicateConditionTypes(oldCSR),
 		allowEmptyConditionType:      allowEmptyConditionType(oldCSR),
@@ -424,23 +402,6 @@ func getValidationOptions(newCSR, oldCSR *certificates.CertificateSigningRequest
 		allowUnknownUsages:           allowUnknownUsages(oldCSR),
 		allowMLDSASignedRequests:     allowMLDSASignedRequests(oldCSR),
 	}
-}
-
-func allowBothApprovedAndDenied(oldCSR *certificates.CertificateSigningRequest) bool {
-	if oldCSR == nil {
-		return false
-	}
-	approved := false
-	denied := false
-	for _, c := range oldCSR.Status.Conditions {
-		if c.Type == certificates.CertificateApproved {
-			approved = true
-		} else if c.Type == certificates.CertificateDenied {
-			denied = true
-		}
-	}
-	// compatibility with existing data
-	return approved && denied
 }
 
 func allowLegacySignerName(oldCSR *certificates.CertificateSigningRequest) bool {
