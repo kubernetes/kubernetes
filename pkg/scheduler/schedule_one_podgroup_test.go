@@ -1699,6 +1699,36 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			},
 		},
 		{
+			name:   "Node diagnosis is rendered for a partially placed gang",
+			status: fwk.NewStatus(fwk.Unschedulable, "pod group is unschedulable"),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": placedResult("node1"),
+				"p2": rejectedResult(3, map[string]*fwk.Status{
+					"node1": filterStatus("NodeResourcesFit", "Insufficient cpu"),
+					"node2": filterStatus("TaintToleration", "untolerated taint"),
+				}, absentAffinityStatus()),
+				"p3": rejectedResult(3, map[string]*fwk.Status{
+					"node1": filterStatus("NodeResourcesFit", "Insufficient cpu"),
+					"node2": filterStatus("TaintToleration", "untolerated taint"),
+				}, absentAffinityStatus()),
+			},
+			expectFailed: sets.New("p1", "p2", "p3"),
+			expectCondition: &metav1.Condition{
+				Type:   schedulingapi.PodGroupInitiallyScheduled,
+				Status: metav1.ConditionFalse,
+				Reason: schedulingapi.PodGroupReasonUnschedulable,
+				Message: `pod group is unschedulable
+1/3 pods placed in this cycle, 3 nodes in placement.
+
+Saturated nodes (1) - accepted some gang pods, rejected others:
+  node1: accepted 1, rejected 2 (Insufficient cpu)
+
+Excluded nodes (2) - rejected every pod:
+  1 node: node(s) didn't satisfy plugin(s) [NodeAffinity]
+  1 node: untolerated taint`,
+			},
+		},
+		{
 			name:   "All pods feasible, but podGroup unschedulable with podGroupFitError",
 			status: fwk.NewStatus(fwk.Unschedulable).WithError(newPodGroupFitError(fwk.NewStatus(fwk.Unschedulable, "not enough capacity for the gang"))),
 			podResultsByPodName: map[string]algorithmResult{
@@ -1939,6 +1969,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			boundPods := sets.New[string]()
 			preemptingPods := make(map[string]string)
 			failedPods := sets.New[string]()
+			failedPodMessages := make(map[string]string)
 
 			pg := testPodGroup
 			if tt.existingPodGroup != nil {
@@ -2008,6 +2039,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 					} else {
 						failedPods.Insert(p.Pod.Name)
 					}
+					failedPodMessages[p.Pod.Name] = status.Message()
 					lock.Unlock()
 					if err := schedulingQueue.AddUnschedulablePodIfNotPresent(logger, p, schedulingQueue.SchedulingCycle()); err != nil {
 						t.Fatalf("Unexpected error when adding an unschedulable pod %q to queue: %v", p.Pod.Name, err)
@@ -2102,6 +2134,15 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			cond := apimeta.FindStatusCondition(updatedPodGroup.Status.Conditions, schedulingapi.PodGroupInitiallyScheduled)
 			if diff := cmp.Diff(tt.expectCondition, cond, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
 				t.Errorf("Unexpected PodGroupInitiallyScheduled condition (-want +got):\n%s", diff)
+			}
+
+			// The node table belongs to the PodGroup condition alone. The group status is cloned
+			// into every pod's PodScheduled condition and FailedScheduling event, so rendering it
+			// there would duplicate kilobytes once per pod and weaken event deduplication.
+			for pod, message := range failedPodMessages {
+				if strings.Contains(message, "Saturated nodes") || strings.Contains(message, "Excluded nodes") {
+					t.Errorf("pod %q received the node table in its failure message: %q", pod, message)
+				}
 			}
 		})
 	}
@@ -7775,5 +7816,639 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+// filterStatus builds a rejection status attributed to a plugin, the shape RunFilterPlugins produces.
+func filterStatus(plugin, reason string) *fwk.Status {
+	return fwk.NewStatus(fwk.Unschedulable, reason).WithPlugin(plugin)
+}
+
+// absentAffinityStatus builds the absent status that findNodesThatFitPod installs when PreFilter
+// narrows the candidate set, which is what covers the nodes never handed to a Filter.
+func absentAffinityStatus() *fwk.Status {
+	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin(s) [NodeAffinity]").WithPlugin("NodeAffinity")
+}
+
+// rejectedResult builds the algorithmResult of a pod that ended the cycle with a FitError.
+func rejectedResult(numAllNodes int, explicit map[string]*fwk.Status, absent *fwk.Status) algorithmResult {
+	fitError := &framework.FitError{
+		NumAllNodes: numAllNodes,
+		Diagnosis:   framework.Diagnosis{NodeToStatus: framework.NewNodeToStatus(explicit, absent)},
+	}
+	return algorithmResult{status: fwk.NewStatus(fwk.Unschedulable).WithError(fitError)}
+}
+
+// placedResult builds the algorithmResult of a pod the cycle placed on a node.
+func placedResult(node string) algorithmResult {
+	return algorithmResult{
+		status:         fwk.NewStatus(fwk.Success),
+		scheduleResult: ScheduleResult{SuggestedHost: node},
+	}
+}
+
+func TestReasonKey(t *testing.T) {
+	tests := []struct {
+		name   string
+		status *fwk.Status
+		want   string
+	}{
+		{
+			name:   "plugin name is part of the key",
+			status: filterStatus("NodeResourcesFit", "Insufficient cpu"),
+			want:   "NodeResourcesFit\x00Insufficient cpu",
+		},
+		{
+			name:   "status without a plugin degrades to the bare reason",
+			status: fwk.NewStatus(fwk.Unschedulable, "Insufficient cpu"),
+			want:   "\x00Insufficient cpu",
+		},
+		{
+			name:   "nil status does not panic",
+			status: nil,
+			want:   "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := reasonKey(tt.status); got != tt.want {
+				t.Errorf("reasonKey() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+	if reasonKey(filterStatus("PluginA", "Insufficient cpu")) == reasonKey(filterStatus("PluginB", "Insufficient cpu")) {
+		t.Errorf("reasonKey merged two plugins that emit the same text for unrelated causes")
+	}
+}
+
+func TestClassifyNodes(t *testing.T) {
+	tests := []struct {
+		name          string
+		podResults    []algorithmResult
+		wantNumAll    int
+		wantNumFailed int
+		wantAccepted  map[string]int
+		wantExcluded  int
+		wantHistogram []reasonBucket
+		wantReasons   map[string]string
+	}{
+		{
+			name: "saturated and excluded are separated by whether the node accepted a pod",
+			podResults: []algorithmResult{
+				placedResult("node-a"), placedResult("node-a"), placedResult("node-a"),
+				rejectedResult(4, map[string]*fwk.Status{
+					"node-a": filterStatus("NodeResourcesFit", "Insufficient cpu"),
+					"node-b": filterStatus("TaintToleration", "untolerated taint"),
+				}, absentAffinityStatus()),
+				rejectedResult(4, map[string]*fwk.Status{
+					"node-a": filterStatus("NodeResourcesFit", "Insufficient cpu"),
+					"node-b": filterStatus("TaintToleration", "untolerated taint"),
+				}, absentAffinityStatus()),
+			},
+			wantNumAll:    4,
+			wantNumFailed: 2,
+			wantAccepted:  map[string]int{"node-a": 3},
+			wantExcluded:  3,
+			wantHistogram: []reasonBucket{
+				{nodes: 2, reason: "node(s) didn't satisfy plugin(s) [NodeAffinity]"},
+				{nodes: 1, reason: "untolerated taint"},
+			},
+			wantReasons: map[string]string{"node-a": "Insufficient cpu"},
+		},
+		{
+			// A PreFilter rejection leaves NodeToStatus empty and covers every node through
+			// absentNodesStatus. Summing that multiplier per pod would report 70 * 5000 nodes.
+			name: "pods failing at PreFilter do not multiply the excluded node count",
+			podResults: func() []algorithmResult {
+				preFilter := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for a ResourceClaim").WithPlugin("ResourceClaim")
+				results := make([]algorithmResult, 0, 70)
+				for i := 0; i < 70; i++ {
+					results = append(results, rejectedResult(5000, map[string]*fwk.Status{}, preFilter))
+				}
+				return results
+			}(),
+			wantNumAll:    5000,
+			wantNumFailed: 70,
+			wantAccepted:  map[string]int{},
+			wantExcluded:  5000,
+			wantHistogram: []reasonBucket{{nodes: 5000, reason: "waiting for a ResourceClaim"}},
+		},
+		{
+			name: "a node that accepted a pod is never also counted as excluded",
+			podResults: []algorithmResult{
+				placedResult("node-a"),
+				rejectedResult(1, map[string]*fwk.Status{
+					"node-a": filterStatus("NodeResourcesFit", "Insufficient cpu"),
+				}, nil),
+			},
+			wantNumAll:    1,
+			wantNumFailed: 1,
+			wantAccepted:  map[string]int{"node-a": 1},
+			wantExcluded:  0,
+			wantHistogram: nil,
+			wantReasons:   map[string]string{"node-a": "Insufficient cpu"},
+		},
+		{
+			name: "a group abandoned before any pod was evaluated carries no node data",
+			podResults: []algorithmResult{
+				{status: fwk.NewStatus(fwk.Unschedulable, "pod group is unschedulable"), notEvaluated: true},
+				{status: fwk.NewStatus(fwk.Unschedulable, "pod group is unschedulable"), notEvaluated: true},
+			},
+			wantNumAll:    0,
+			wantNumFailed: 0,
+			wantAccepted:  map[string]int{},
+			wantExcluded:  0,
+			wantHistogram: nil,
+		},
+		{
+			name: "interleaved rejection and acceptance still classifies the node as saturated",
+			podResults: []algorithmResult{
+				rejectedResult(2, map[string]*fwk.Status{"node-a": filterStatus("NodeResourcesFit", "Insufficient cpu")}, nil),
+				placedResult("node-a"),
+				rejectedResult(2, map[string]*fwk.Status{"node-a": filterStatus("NodeResourcesFit", "Insufficient memory")}, nil),
+			},
+			wantNumAll:    2,
+			wantNumFailed: 2,
+			wantAccepted:  map[string]int{"node-a": 1},
+			wantExcluded:  1,
+			wantHistogram: []reasonBucket{{nodes: 1, reason: unattributedReason}},
+			// Equal counts are broken by key so that the row is stable across cycles.
+			wantReasons: map[string]string{"node-a": "Insufficient cpu"},
+		},
+		{
+			name: "a nil status counts as a placement, matching fwk.Status.IsSuccess",
+			podResults: []algorithmResult{
+				{scheduleResult: ScheduleResult{SuggestedHost: "node-a"}},
+				rejectedResult(1, map[string]*fwk.Status{"node-a": filterStatus("NodeResourcesFit", "Insufficient cpu")}, nil),
+			},
+			wantNumAll:    1,
+			wantNumFailed: 1,
+			wantAccepted:  map[string]int{"node-a": 1},
+			wantExcluded:  0,
+			wantHistogram: nil,
+			wantReasons:   map[string]string{"node-a": "Insufficient cpu"},
+		},
+		{
+			// No pod was placed, so the saturated section is omitted entirely and the message
+			// reads as a structural problem that adding capacity will not fix.
+			name: "a gang with no placement renders only the excluded section",
+			podResults: []algorithmResult{
+				rejectedResult(3, map[string]*fwk.Status{
+					"node-a": filterStatus("TaintToleration", "untolerated taint"),
+					"node-b": filterStatus("NodeAffinity", "node affinity mismatch"),
+				}, absentAffinityStatus()),
+				rejectedResult(3, map[string]*fwk.Status{
+					"node-a": filterStatus("TaintToleration", "untolerated taint"),
+					"node-b": filterStatus("NodeAffinity", "node affinity mismatch"),
+				}, absentAffinityStatus()),
+			},
+			wantNumAll:    3,
+			wantNumFailed: 2,
+			wantAccepted:  map[string]int{},
+			wantExcluded:  3,
+			wantHistogram: []reasonBucket{
+				{nodes: 1, reason: "node affinity mismatch"},
+				{nodes: 1, reason: "node(s) didn't satisfy plugin(s) [NodeAffinity]"},
+				{nodes: 1, reason: "untolerated taint"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := classifyNodes(tt.podResults)
+			if got.numAllNodes != tt.wantNumAll {
+				t.Errorf("numAllNodes = %d, want %d", got.numAllNodes, tt.wantNumAll)
+			}
+			if got.numFailed != tt.wantNumFailed {
+				t.Errorf("numFailed = %d, want %d", got.numFailed, tt.wantNumFailed)
+			}
+			if diff := cmp.Diff(tt.wantAccepted, got.accepted, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("accepted nodes (-want,+got):\n%s", diff)
+			}
+			if gotExcluded := got.excludedCount(); gotExcluded != tt.wantExcluded {
+				t.Errorf("excludedCount() = %d, want %d", gotExcluded, tt.wantExcluded)
+			}
+			if diff := cmp.Diff(tt.wantHistogram, got.excludedNodeHistogram(), cmpopts.EquateEmpty(), cmp.AllowUnexported(reasonBucket{})); diff != "" {
+				t.Errorf("excludedNodeHistogram() (-want,+got):\n%s", diff)
+			}
+			for node, want := range tt.wantReasons {
+				if reason := got.nodeReason(node); reason != want {
+					t.Errorf("nodeReason(%q) = %q, want %q", node, reason, want)
+				}
+			}
+		})
+	}
+}
+
+func TestRenderPodGroupDiagnosis(t *testing.T) {
+	groupStatus := fwk.NewStatus(fwk.Unschedulable, "pod group is unschedulable", "minCount (2) is not yet satisfied: 1 scheduled, 1 remaining")
+
+	partialPlacement := []algorithmResult{
+		placedResult("node-a"),
+		rejectedResult(3, map[string]*fwk.Status{
+			"node-a": filterStatus("NodeResourcesFit", "Insufficient cpu"),
+			"node-b": filterStatus("TaintToleration", "untolerated taint"),
+		}, absentAffinityStatus()),
+	}
+
+	manySaturated := func() []algorithmResult {
+		results := make([]algorithmResult, 0, 13)
+		explicit := map[string]*fwk.Status{}
+		for i := 0; i < 12; i++ {
+			node := fmt.Sprintf("node-%02d", i)
+			results = append(results, placedResult(node))
+			explicit[node] = filterStatus("NodeResourcesFit", "Insufficient cpu")
+		}
+		results = append(results, rejectedResult(13, explicit, absentAffinityStatus()))
+		return results
+	}
+
+	manyReasons := func() []algorithmResult {
+		explicit := map[string]*fwk.Status{}
+		for i := 0; i < 7; i++ {
+			explicit[fmt.Sprintf("node-%d", i)] = filterStatus(fmt.Sprintf("Plugin%d", i), fmt.Sprintf("reason %d", i))
+		}
+		return []algorithmResult{rejectedResult(7, explicit, absentAffinityStatus())}
+	}
+
+	tests := []struct {
+		name       string
+		podResults []algorithmResult
+		want       string
+	}{
+		{
+			name: "a group rejected without any pod-level diagnosis keeps the existing message",
+			podResults: []algorithmResult{
+				{status: groupStatus.Clone(), notEvaluated: true},
+				{status: groupStatus.Clone(), notEvaluated: true},
+			},
+			want: "",
+		},
+		{
+			name:       "partial placement renders the node table",
+			podResults: partialPlacement,
+			want: `pod group is unschedulable, minCount (2) is not yet satisfied: 1 scheduled, 1 remaining
+1/2 pods placed in this cycle, 3 nodes in placement.
+
+Saturated nodes (1) - accepted some gang pods, rejected others:
+  node-a: accepted 1, rejected 1 (Insufficient cpu)
+
+Excluded nodes (2) - rejected every pod:
+  1 node: node(s) didn't satisfy plugin(s) [NodeAffinity]
+  1 node: untolerated taint`,
+		},
+		{
+			name:       "skipped pods are reported as not evaluated",
+			podResults: append(append([]algorithmResult{}, partialPlacement...), algorithmResult{status: groupStatus.Clone(), notEvaluated: true}),
+			want: `pod group is unschedulable, minCount (2) is not yet satisfied: 1 scheduled, 1 remaining
+1/3 pods placed in this cycle, 3 nodes in placement.
+Not evaluated: 1 pod skipped after the group became infeasible.
+
+Saturated nodes (1) - accepted some gang pods, rejected others:
+  node-a: accepted 1, rejected 1 (Insufficient cpu)
+
+Excluded nodes (2) - rejected every pod:
+  1 node: node(s) didn't satisfy plugin(s) [NodeAffinity]
+  1 node: untolerated taint`,
+		},
+		{
+			name:       "saturated rows are capped and the truncation is stated",
+			podResults: manySaturated(),
+			want: `pod group is unschedulable, minCount (2) is not yet satisfied: 1 scheduled, 1 remaining
+12/13 pods placed in this cycle, 13 nodes in placement.
+
+Saturated nodes (12) - accepted some gang pods, rejected others:
+  node-00: accepted 1, rejected 1 (Insufficient cpu)
+  node-01: accepted 1, rejected 1 (Insufficient cpu)
+  node-02: accepted 1, rejected 1 (Insufficient cpu)
+  node-03: accepted 1, rejected 1 (Insufficient cpu)
+  node-04: accepted 1, rejected 1 (Insufficient cpu)
+  node-05: accepted 1, rejected 1 (Insufficient cpu)
+  node-06: accepted 1, rejected 1 (Insufficient cpu)
+  node-07: accepted 1, rejected 1 (Insufficient cpu)
+  node-08: accepted 1, rejected 1 (Insufficient cpu)
+  node-09: accepted 1, rejected 1 (Insufficient cpu)
+  ... and 2 more saturated nodes
+
+Excluded nodes (1) - rejected every pod:
+  1 node: node(s) didn't satisfy plugin(s) [NodeAffinity]`,
+		},
+		{
+			name:       "reason buckets are capped and the truncation is stated",
+			podResults: manyReasons(),
+			want: `pod group is unschedulable, minCount (2) is not yet satisfied: 1 scheduled, 1 remaining
+0/1 pods placed in this cycle, 7 nodes in placement.
+
+Excluded nodes (7) - rejected every pod:
+  1 node: reason 0
+  1 node: reason 1
+  1 node: reason 2
+  1 node: reason 3
+  1 node: reason 4
+  ... and 2 more reasons`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := &podGroupAlgorithmResult{status: groupStatus.Clone(), podResults: tt.podResults}
+			if got := renderPodGroupDiagnosis(result); got != tt.want {
+				t.Errorf("renderPodGroupDiagnosis() (-want,+got):\n%s", cmp.Diff(tt.want, got))
+			}
+			// The diagnosis must not leak into the group status, which is cloned into every pod's
+			// condition and event.
+			if diff := cmp.Diff(groupStatus.Message(), result.status.Message()); diff != "" {
+				t.Errorf("group status message was mutated (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestBuildPodGroupDiagnosisGuards(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	registry := frameworkruntime.Registry{
+		queuesort.Name:     queuesort.New,
+		defaultbinder.Name: defaultbinder.New,
+	}
+	profileCfg := config.KubeSchedulerProfile{
+		SchedulerName: "test-scheduler",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queuesort.Name}}},
+			Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: defaultbinder.Name}}},
+		},
+	}
+	plainFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+	extenderFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
+		frameworkruntime.WithExtenders([]fwk.Extender{&tf.FakeExtender{
+			Predicates: []tf.FitPredicate{func(*v1.Pod, fwk.NodeInfo) *fwk.Status { return nil }},
+		}}))
+	if err != nil {
+		t.Fatalf("Failed to create framework with extenders: %v", err)
+	}
+
+	groupStatus := fwk.NewStatus(fwk.Unschedulable, "pod group is unschedulable")
+	podResults := []algorithmResult{
+		placedResult("node-a"),
+		rejectedResult(3, map[string]*fwk.Status{"node-a": filterStatus("NodeResourcesFit", "Insufficient cpu")}, absentAffinityStatus()),
+	}
+
+	// Establish that the input would render a node table if no guard intervened, so that the
+	// guarded cases below cannot pass by rendering nothing for an unrelated reason.
+	if got := renderPodGroupDiagnosis(&podGroupAlgorithmResult{status: groupStatus.Clone(), podResults: podResults}); !strings.Contains(got, "Saturated nodes (1)") {
+		t.Fatalf("baseline rendering produced no node table: %q", got)
+	}
+
+	tests := []struct {
+		name                string
+		schedFwk            framework.Framework
+		waitingOnPreemption bool
+	}{
+		{
+			// Preemption may still succeed, so a node table would read as a terminal verdict and
+			// would displace the PodGroupPostFilter message.
+			name:                "waiting on preemption keeps the existing message",
+			schedFwk:            plainFwk,
+			waitingOnPreemption: true,
+		},
+		{
+			// Extenders can leave nodes unscanned with an empty default reason, which would render
+			// as an excluded bucket blaming nodes that never saw the pod.
+			name:     "a filter extender keeps the existing message",
+			schedFwk: extenderFwk,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := &podGroupAlgorithmResult{
+				status:              groupStatus.Clone(),
+				waitingOnPreemption: tt.waitingOnPreemption,
+				podResults:          podResults,
+			}
+			if got := buildPodGroupDiagnosis(tt.schedFwk, result); got != "" {
+				t.Errorf("buildPodGroupDiagnosis() = %q, want empty so the caller keeps the group status message", got)
+			}
+			if diff := cmp.Diff(groupStatus.Message(), result.status.Message()); diff != "" {
+				t.Errorf("group status message was mutated (-want,+got):\n%s", diff)
+			}
+		})
+	}
+
+	t.Run("renders when no guard intervenes", func(t *testing.T) {
+		result := &podGroupAlgorithmResult{status: groupStatus.Clone(), podResults: podResults}
+		if got := buildPodGroupDiagnosis(plainFwk, result); !strings.Contains(got, "Saturated nodes (1)") {
+			t.Errorf("buildPodGroupDiagnosis() produced no node table: %q", got)
+		}
+	})
+}
+
+func TestTruncateDiagnosis(t *testing.T) {
+	if short := strings.Repeat("a", maxDiagnosisMessageLength); truncateDiagnosis(short) != short {
+		t.Errorf("truncateDiagnosis shortened a message already inside the budget")
+	}
+	long := strings.Repeat("a", maxDiagnosisMessageLength+100)
+	got := truncateDiagnosis(long)
+	if len(got) > maxDiagnosisMessageLength {
+		t.Errorf("truncateDiagnosis returned %d characters, want at most %d", len(got), maxDiagnosisMessageLength)
+	}
+	if !strings.HasSuffix(got, "... diagnosis truncated") {
+		t.Errorf("truncation is not stated in the text: %q", got[len(got)-40:])
+	}
+}
+
+func TestCompletePodGroupAlgorithmResultMarksNotEvaluated(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	pods := []*v1.Pod{
+		st.MakePod().Name("p1").Namespace("default").UID("p1").Obj(),
+		st.MakePod().Name("p2").Namespace("default").UID("p2").Obj(),
+		st.MakePod().Name("p3").Namespace("default").UID("p3").Obj(),
+	}
+	queuedPodInfos := make([]*framework.QueuedPodInfo, 0, len(pods))
+	for _, pod := range pods {
+		queuedPodInfos = append(queuedPodInfos, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}})
+	}
+
+	// Only p1 reached the algorithm; the group was abandoned afterwards, so p2 and p3 are filled in
+	// with a clone of the group status. Without the explicit flag they would be indistinguishable
+	// from pods that were evaluated and rejected for that same group-level reason.
+	result := &podGroupAlgorithmResult{
+		status: fwk.NewStatus(fwk.Unschedulable, "pod group is unschedulable"),
+		podResults: []algorithmResult{{
+			podInfo: queuedPodInfos[0],
+			podCtx:  initPodSchedulingContext(ctx, pods[0], framework.NewCycleState()),
+			status:  fwk.NewStatus(fwk.Success),
+		}},
+	}
+
+	completePodGroupAlgorithmResult(ctx, queuedPodInfos, framework.NewCycleState(), result)
+
+	if len(result.podResults) != len(queuedPodInfos) {
+		t.Fatalf("got %d pod results, want %d", len(result.podResults), len(queuedPodInfos))
+	}
+	for i, want := range []bool{false, true, true} {
+		if got := result.podResults[i].notEvaluated; got != want {
+			t.Errorf("podResults[%d].notEvaluated = %v, want %v", i, got, want)
+		}
+	}
+}
+
+// A plugin that interpolates the node name into its reason defeats clustering in phase 1: every node
+// lands in a bucket of its own and the histogram degenerates to one line per node. A stable
+// machine-readable rejection code would restore the folding; until then this test pins the
+// limitation rather than assuming it away.
+func TestExcludedNodeHistogramDegradesWhenReasonContainsNodeName(t *testing.T) {
+	const numNodes = 6
+	explicit := map[string]*fwk.Status{}
+	for i := 0; i < numNodes; i++ {
+		node := fmt.Sprintf("node-%d", i)
+		explicit[node] = filterStatus("NodeResourcesFit", fmt.Sprintf("Insufficient cpu on %s", node))
+	}
+
+	buckets := classifyNodes([]algorithmResult{rejectedResult(numNodes, explicit, nil)}).excludedNodeHistogram()
+
+	if len(buckets) != numNodes {
+		t.Fatalf("expected the histogram to degenerate to one bucket per node, got %d buckets: %+v", len(buckets), buckets)
+	}
+	for _, bucket := range buckets {
+		if bucket.nodes != 1 {
+			t.Errorf("bucket %q holds %d nodes, want 1", bucket.reason, bucket.nodes)
+		}
+	}
+}
+
+// TestPodGroupDiagnosisDoesNotFanOutToPods drives the real handleSchedulingFailure rather than a test
+// double, so it covers the PodScheduled condition and the FailedScheduling event that the pods
+// actually receive. The node table is kilobytes wide; if it reached podGroupResult.status it would be
+// cloned into every pod of the gang and would defeat event deduplication by message.
+func TestPodGroupDiagnosisDoesNotFanOutToPods(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	logger, ctx := ktesting.NewTestContext(t)
+
+	testNode := st.MakeNode().Name("node1").UID("node1").Obj()
+	p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	pg := st.MakePodGroup().Name("pg").Namespace("default").Obj()
+
+	client := clientsetfake.NewClientset(testNode, pg, p1, p2)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	recorder := events.NewFakeRecorder(100)
+	registry := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+	}
+	schedFwk, err := tf.NewFramework(ctx, registry, "test-scheduler",
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(recorder),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+
+	cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
+	cache.AddNode(logger, testNode)
+	gpg := fwk.NewGenericPodGroup(pg)
+	cache.AddGenericPodGroup(gpg)
+
+	schedulingQueue := internalqueue.NewTestQueue(ctx, schedFwk.QueueSortFunc())
+	schedFwk.SetPodNominator(schedulingQueue)
+	sched := &Scheduler{
+		client:           client,
+		Cache:            cache,
+		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+		Profiles:         profile.Map{"test-scheduler": schedFwk},
+		SchedulingQueue:  schedulingQueue,
+	}
+	sched.FailureHandler = sched.handleSchedulingFailure
+	initTestAlgorithm(t, sched)
+
+	schedulingQueue.AddGenericPodGroup(logger, gpg)
+	schedulingQueue.Add(ctx, p1)
+	schedulingQueue.Add(ctx, p2)
+	entity, err := schedulingQueue.Pop(logger)
+	if err != nil {
+		t.Fatalf("Failed to pop pod group: %v", err)
+	}
+	podGroupInfo := entity.(*framework.QueuedPodGroupInfo)
+	podGroupInfo.PodGroup = pg
+
+	queuedPodInfos := podGroupInfo.PodInfosForGroup(podGroupInfo.PodGroupInfo.GetKey())
+	if len(queuedPodInfos) != 2 {
+		t.Fatalf("got %d queued pods, want 2", len(queuedPodInfos))
+	}
+
+	groupStatus := fwk.NewStatus(fwk.Unschedulable).WithError(
+		newPodGroupFitError(fwk.NewStatus(fwk.Unschedulable, "minCount (2) cannot be satisfied: 1 scheduled, 0 remaining")))
+	podGroupCycleState := framework.NewCycleState()
+	podResults := make([]algorithmResult, 0, 2)
+	for _, queuedPodInfo := range queuedPodInfos {
+		state := framework.NewCycleState()
+		state.SetPodGroupCycleState(podGroupCycleState)
+		result := rejectedResult(3, map[string]*fwk.Status{
+			"node1": filterStatus("NodeResourcesFit", "Insufficient cpu"),
+			"node2": filterStatus("TaintToleration", "untolerated taint"),
+		}, absentAffinityStatus())
+		if queuedPodInfo.Pod.Name == "p1" {
+			result = placedResult("node1")
+		}
+		result.podInfo = queuedPodInfo
+		result.podCtx = initPodSchedulingContext(ctx, queuedPodInfo.Pod, state)
+		podResults = append(podResults, result)
+	}
+
+	podGroupResult := &podGroupAlgorithmResult{
+		podGroupInfo: podGroupInfo.PodGroupInfo,
+		status:       groupStatus,
+		podResults:   podResults,
+	}
+	sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, podGroupInfo,
+		map[fwk.EntityKey]*podGroupAlgorithmResult{podGroupInfo.PodGroupInfo.GetKey(): podGroupResult}, time.Now(), groupStatus)
+
+	updatedPodGroup, err := client.SchedulingV1beta1().PodGroups("default").Get(ctx, "pg", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get PodGroup: %v", err)
+	}
+	cond := apimeta.FindStatusCondition(updatedPodGroup.Status.Conditions, schedulingapi.PodGroupInitiallyScheduled)
+	if cond == nil {
+		t.Fatalf("PodGroupInitiallyScheduled condition was not set")
+	}
+	if !strings.Contains(cond.Message, "Saturated nodes (1)") || !strings.Contains(cond.Message, "Excluded nodes (2)") {
+		t.Errorf("PodGroup condition does not carry the node table:\n%s", cond.Message)
+	}
+
+	for _, pod := range []string{"p1", "p2"} {
+		updatedPod, err := client.CoreV1().Pods("default").Get(ctx, pod, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get pod %s: %v", pod, err)
+		}
+		var scheduled *v1.PodCondition
+		for i := range updatedPod.Status.Conditions {
+			if updatedPod.Status.Conditions[i].Type == v1.PodScheduled {
+				scheduled = &updatedPod.Status.Conditions[i]
+			}
+		}
+		if scheduled == nil {
+			t.Errorf("pod %s has no PodScheduled condition", pod)
+			continue
+		}
+		if strings.Contains(scheduled.Message, "Saturated nodes") || strings.Contains(scheduled.Message, "Excluded nodes") {
+			t.Errorf("pod %s received the node table in its PodScheduled condition:\n%s", pod, scheduled.Message)
+		}
+	}
+
+	close(recorder.Events)
+	var sawEvent bool
+	for event := range recorder.Events {
+		sawEvent = true
+		if strings.Contains(event, "Saturated nodes") || strings.Contains(event, "Excluded nodes") {
+			t.Errorf("FailedScheduling event carries the node table: %s", event)
+		}
+	}
+	if !sawEvent {
+		t.Errorf("no FailedScheduling event was recorded, so the event path was not exercised")
 	}
 }

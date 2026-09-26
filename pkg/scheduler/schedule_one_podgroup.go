@@ -18,11 +18,15 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"maps"
 	"math/rand"
+	"sort"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	v1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -579,9 +583,10 @@ func completePodGroupAlgorithmResult(ctx context.Context, queuedPodInfos []*fram
 		placementCycleState := framework.NewCycleState()
 		placementCycleState.SetPodGroupCycleState(podGroupState)
 		newResults[i] = algorithmResult{
-			podInfo: pInfo,
-			podCtx:  initPodSchedulingContext(ctx, pInfo.Pod, placementCycleState),
-			status:  podGroupResult.status.Clone(),
+			podInfo:      pInfo,
+			podCtx:       initPodSchedulingContext(ctx, pInfo.Pod, placementCycleState),
+			status:       podGroupResult.status.Clone(),
+			notEvaluated: true,
 		}
 	}
 	podGroupResult.podResults = newResults
@@ -764,11 +769,17 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			logger.V(2).Info("Successfully scheduled a pod group", "podGroup", klog.KObj(pgi), "scheduledPods", scheduledPods, "unschedulablePods", unschedulablePods)
 
 		case podGroupResult.status.IsRejected():
+			// The diagnosis is attached to the condition rather than to podGroupResult.status,
+			// which is cloned into every pod's condition and event.
+			message := podGroupResult.status.Message()
+			if diagnosis := buildPodGroupDiagnosis(schedFwk, podGroupResult); diagnosis != "" {
+				message = diagnosis
+			}
 			condition = &metav1.Condition{
 				Type:    schedulingapi.PodGroupInitiallyScheduled,
 				Status:  metav1.ConditionFalse,
 				Reason:  schedulingapi.PodGroupReasonUnschedulable,
-				Message: podGroupResult.status.Message(),
+				Message: message,
 			}
 			if podGroupResult.waitingOnPreemption {
 				logger.V(2).Info("Pod group is waiting for preemption", "podGroup", klog.KObj(pgi), "unschedulablePods", unschedulablePods, "err", podGroupResult.status.Message())
@@ -1420,4 +1431,353 @@ func successfulLeafResults(root *framework.PodGroupInfo, results map[fwk.EntityK
 		}
 		walk(root)
 	}
+}
+
+// Pod group scheduling diagnosis.
+//
+// The helpers below summarize one failed pod group scheduling cycle along the node dimension for
+// the PodGroup condition.
+
+const (
+	// maxSaturatedNodeLines bounds the per-node lines rendered for saturated nodes. Those nodes are
+	// already bounded by the number of placed pods, but a large gang can place hundreds of pods, so
+	// the bound is what keeps the condition message inside its budget.
+	maxSaturatedNodeLines = 10
+	// maxExcludedReasonBuckets bounds the reason buckets rendered for excluded nodes.
+	maxExcludedReasonBuckets = 5
+	// maxDiagnosisMessageLength is the budget for a single layer of the diagnosis. It stays well
+	// below the 32768 character limit on metav1.Condition.Message so that an ancestor composite pod
+	// group can prepend its own propagation prefix without exceeding the limit.
+	maxDiagnosisMessageLength = 16384
+	// unattributedReason labels a bucket whose nodes carry no reason text at all.
+	unattributedReason = "no reason recorded"
+)
+
+// reasonBucket is a set of excluded nodes that share one rejection reason.
+type reasonBucket struct {
+	// nodes is the number of distinct nodes in the bucket.
+	nodes int
+	// reason is the human-readable rejection reason shared by those nodes.
+	reason string
+}
+
+// nodeEntry accumulates what the failed pods of a gang observed on a single node.
+type nodeEntry struct {
+	// reasons counts failed pods per reason key.
+	reasons map[string]int
+	// reasonText maps a reason key back to its human-readable form.
+	reasonText map[string]string
+}
+
+// nodeClassification is the node-dimension view of one failed pod group scheduling cycle.
+type nodeClassification struct {
+	// numAllNodes is the size of the placement the cycle ran against.
+	numAllNodes int
+	// numFailed is the number of pods that ended the cycle carrying node-level diagnosis.
+	numFailed int
+	// accepted maps a node name to the number of gang pods placed on it.
+	accepted map[string]int
+	// entries maps a node name to what the failed pods recorded on it.
+	entries map[string]*nodeEntry
+	// absentKey and absentReason identify the dominant status covering the nodes that no failed pod
+	// recorded explicitly. Both are empty when no failed pod carried an absent status, in which case
+	// those nodes are reported as unattributed rather than folded into an unrelated bucket.
+	absentKey    string
+	absentReason string
+}
+
+// reasonKey builds the clustering key for a rejection status. The plugin name is part of the key
+// because two plugins may emit the same text for unrelated causes, and merging them would attribute
+// a rejection to the wrong plugin.
+func reasonKey(status *fwk.Status) string {
+	if status == nil {
+		return ""
+	}
+	return status.Plugin() + "\x00" + status.Message()
+}
+
+// classifyNodes builds the node-dimension view of a failed pod group scheduling cycle.
+//
+// Only failed pods contribute rejection counts: SchedulePod discards the diagnosis of a pod it
+// placed, so the rejections that pod observed are not recoverable. "rejected" therefore counts
+// failed pods rather than all pods.
+//
+// Every node in the placement rejected every failed pod, because a pod ending with a FitError has
+// no feasible node, so each node is either recorded explicitly in NodeToStatus or falls through to
+// absentNodesStatus, which is itself a rejection. The rejected count is consequently numFailed for
+// every node and needs no accumulation, and classification reduces to whether a node accepted any
+// gang pod. Only reason attribution requires per-node work, which costs one pass over the entries
+// the filter phase already wrote.
+//
+// Nodes that no failed pod recorded explicitly cannot be enumerated by name without re-reading the
+// snapshot, which the caller must not do because a later cycle may already be mutating it. They are
+// counted as a remainder and attributed the dominant absent reason. That is exact for a homogeneous
+// gang and an approximation for a heterogeneous one, where pods have different PreFilter candidate
+// sets; partitioning the gang by PodSignature removes the approximation.
+func classifyNodes(podResults []algorithmResult) nodeClassification {
+	classification := nodeClassification{
+		accepted: map[string]int{},
+		entries:  map[string]*nodeEntry{},
+	}
+	absentCounts := map[string]int{}
+	absentText := map[string]string{}
+	for i := range podResults {
+		result := &podResults[i]
+		// A nil status means Success, matching fwk.Status.IsSuccess.
+		if result.status.IsSuccess() {
+			if node := result.GetNodeName(); node != "" {
+				classification.accepted[node]++
+			}
+			continue
+		}
+		var fitError *framework.FitError
+		if !errors.As(result.status.AsError(), &fitError) || fitError == nil || fitError.Diagnosis.NodeToStatus == nil {
+			continue
+		}
+		if fitError.NumAllNodes > classification.numAllNodes {
+			classification.numAllNodes = fitError.NumAllNodes
+		}
+		classification.numFailed++
+		nodeToStatus := fitError.Diagnosis.NodeToStatus
+		nodeToStatus.ForEachExplicitNode(func(node string, status *fwk.Status) {
+			entry := classification.entries[node]
+			if entry == nil {
+				entry = &nodeEntry{reasons: map[string]int{}, reasonText: map[string]string{}}
+				classification.entries[node] = entry
+			}
+			key := reasonKey(status)
+			entry.reasons[key]++
+			if status != nil {
+				entry.reasonText[key] = status.Message()
+			}
+		})
+		if absent := nodeToStatus.AbsentNodesStatus(); absent != nil {
+			key := reasonKey(absent)
+			absentCounts[key]++
+			absentText[key] = absent.Message()
+		}
+	}
+	classification.absentKey, classification.absentReason = dominantReason(absentCounts, absentText)
+	return classification
+}
+
+// dominantReason returns the most frequent key together with its text, breaking ties by key so that
+// the rendering is stable across cycles observing the same cluster state. It serves both the
+// per-node reason choice and the choice of a representative absent reason.
+func dominantReason(counts map[string]int, text map[string]string) (key, reason string) {
+	best := -1
+	for _, candidate := range sortedKeys(counts) {
+		if counts[candidate] > best {
+			key, best = candidate, counts[candidate]
+		}
+	}
+	if best < 0 {
+		return "", ""
+	}
+	return key, text[key]
+}
+
+func sortedKeys(counts map[string]int) []string {
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// saturatedNodes returns the nodes that accepted at least one gang pod, ordered by descending
+// accepted count and then by name so that the rendering is deterministic.
+func (nc nodeClassification) saturatedNodes() []string {
+	nodes := make([]string, 0, len(nc.accepted))
+	for node := range nc.accepted {
+		nodes = append(nodes, node)
+	}
+	sort.Slice(nodes, func(i, j int) bool {
+		if nc.accepted[nodes[i]] != nc.accepted[nodes[j]] {
+			return nc.accepted[nodes[i]] > nc.accepted[nodes[j]]
+		}
+		return nodes[i] < nodes[j]
+	})
+	return nodes
+}
+
+// nodeReason returns the representative rejection reason for a node, falling back to the absent
+// reason for a node that accepted gang pods but was never explicitly rejected by a failed one.
+// A node can be rejected for different reasons by pods of different shapes; taking the dominant one
+// keeps the row to a single reason until PodSignature partitioning makes the choice unnecessary.
+func (nc nodeClassification) nodeReason(node string) string {
+	if entry, ok := nc.entries[node]; ok {
+		if _, reason := dominantReason(entry.reasons, entry.reasonText); reason != "" {
+			return reason
+		}
+	}
+	return nc.absentReason
+}
+
+// excludedCount returns the number of placement nodes that accepted no gang pod.
+func (nc nodeClassification) excludedCount() int {
+	if nc.numAllNodes <= len(nc.accepted) {
+		return 0
+	}
+	return nc.numAllNodes - len(nc.accepted)
+}
+
+// excludedNodeHistogram buckets the nodes that accepted no gang pod by their representative
+// rejection reason. Bucket counts are distinct nodes and never (node, pod) pairs: reusing the
+// per-pod absent multiplier from FitError.Error would count a node once per failed pod, so a gang
+// of 70 pods failing PreFilter in a 5000 node cluster would report 350000 excluded nodes.
+func (nc nodeClassification) excludedNodeHistogram() []reasonBucket {
+	excluded := nc.excludedCount()
+	if excluded == 0 {
+		return nil
+	}
+	counts := map[string]int{}
+	text := map[string]string{}
+	nodes := make([]string, 0, len(nc.entries))
+	for node := range nc.entries {
+		nodes = append(nodes, node)
+	}
+	sort.Strings(nodes)
+	explicit := 0
+	for _, node := range nodes {
+		if _, accepted := nc.accepted[node]; accepted {
+			continue
+		}
+		explicit++
+		entry := nc.entries[node]
+		key, reason := dominantReason(entry.reasons, entry.reasonText)
+		counts[key]++
+		if reason != "" {
+			text[key] = reason
+		}
+	}
+	if remainder := excluded - explicit; remainder > 0 {
+		counts[nc.absentKey] += remainder
+		if _, ok := text[nc.absentKey]; !ok {
+			text[nc.absentKey] = nc.absentReason
+		}
+	}
+	buckets := make([]reasonBucket, 0, len(counts))
+	for _, key := range sortedKeys(counts) {
+		reason := text[key]
+		if reason == "" {
+			reason = unattributedReason
+		}
+		buckets = append(buckets, reasonBucket{nodes: counts[key], reason: reason})
+	}
+	sort.SliceStable(buckets, func(i, j int) bool {
+		if buckets[i].nodes != buckets[j].nodes {
+			return buckets[i].nodes > buckets[j].nodes
+		}
+		return buckets[i].reason < buckets[j].reason
+	})
+	return buckets
+}
+
+// buildPodGroupDiagnosis renders the node-dimension diagnosis for a failed pod group scheduling
+// cycle. It returns an empty string when the cycle carries nothing node-level to report, in which
+// case the caller keeps the existing group status message.
+//
+// The result belongs in the PodGroup condition only and must not be written back into
+// podGroupResult.status. That status is cloned into every pod's PodScheduled condition and
+// FailedScheduling event, so a multi-kilobyte node table would be duplicated once per pod and would
+// defeat event deduplication by message.
+func buildPodGroupDiagnosis(schedFwk framework.Framework, podGroupResult *podGroupAlgorithmResult) string {
+	if podGroupResult.waitingOnPreemption {
+		// Preemption may still succeed, so a node table would read as a terminal verdict and would
+		// displace the PodGroupPostFilter message describing what is being preempted.
+		return ""
+	}
+	if hasExtenderFilters(schedFwk) {
+		// Extenders reject nodes outside the framework's reason system, and the scan can stop early
+		// once enough framework-feasible nodes are found only for the extenders to discard all of
+		// them. The nodes left unscanned would be attributed an empty default reason.
+		return ""
+	}
+	return renderPodGroupDiagnosis(podGroupResult)
+}
+
+// renderPodGroupDiagnosis builds the node table for a cycle that carries node-level information. It
+// returns an empty string when there is nothing to report, in which case the caller keeps the
+// existing group status message.
+func renderPodGroupDiagnosis(podGroupResult *podGroupAlgorithmResult) string {
+	classification := classifyNodes(podGroupResult.podResults)
+	if classification.numFailed == 0 {
+		// Either every pod was placed, or the group was abandoned before any pod reached the node
+		// scan. The group status message already distinguishes the two.
+		return ""
+	}
+
+	var notEvaluated, placed int
+	for i := range podGroupResult.podResults {
+		if podGroupResult.podResults[i].notEvaluated {
+			notEvaluated++
+		}
+	}
+	for _, count := range classification.accepted {
+		placed += count
+	}
+
+	var message strings.Builder
+	message.WriteString(podGroupResult.status.Message())
+	fmt.Fprintf(&message, "\n%d/%d pods placed in this cycle", placed, len(podGroupResult.podResults))
+	if classification.numAllNodes > 0 {
+		fmt.Fprintf(&message, ", %d nodes in placement", classification.numAllNodes)
+	}
+	message.WriteString(".")
+	if notEvaluated > 0 {
+		fmt.Fprintf(&message, "\nNot evaluated: %s skipped after the group became infeasible.", countLabel(notEvaluated, "pod"))
+	}
+
+	saturated := classification.saturatedNodes()
+	if len(saturated) > 0 {
+		fmt.Fprintf(&message, "\n\nSaturated nodes (%d) - accepted some gang pods, rejected others:", len(saturated))
+		for i, node := range saturated {
+			if i == maxSaturatedNodeLines {
+				fmt.Fprintf(&message, "\n  ... and %d more saturated nodes", len(saturated)-i)
+				break
+			}
+			fmt.Fprintf(&message, "\n  %s: accepted %d, rejected %d", node, classification.accepted[node], classification.numFailed)
+			if reason := classification.nodeReason(node); reason != "" {
+				fmt.Fprintf(&message, " (%s)", reason)
+			}
+		}
+	}
+
+	if buckets := classification.excludedNodeHistogram(); len(buckets) > 0 {
+		fmt.Fprintf(&message, "\n\nExcluded nodes (%d) - rejected every pod:", classification.excludedCount())
+		for i, bucket := range buckets {
+			if i == maxExcludedReasonBuckets {
+				fmt.Fprintf(&message, "\n  ... and %d more reasons", len(buckets)-i)
+				break
+			}
+			fmt.Fprintf(&message, "\n  %s: %s", countLabel(bucket.nodes, "node"), bucket.reason)
+		}
+	}
+	return truncateDiagnosis(message.String())
+}
+
+// countLabel pluralizes a count with its noun. Every line of the diagnosis states a count, and a
+// message that reads "1 nodes" invites the reader to distrust the rest of it.
+func countLabel(count int, noun string) string {
+	if count == 1 {
+		return "1 " + noun
+	}
+	return fmt.Sprintf("%d %ss", count, noun)
+}
+
+// truncateDiagnosis enforces the message budget. Truncation is stated in the text so that a
+// truncated message never reads as a complete one.
+func truncateDiagnosis(message string) string {
+	if len(message) <= maxDiagnosisMessageLength {
+		return message
+	}
+	const marker = "\n... diagnosis truncated"
+	cut := maxDiagnosisMessageLength - len(marker)
+	// Back off to a rune boundary so the truncated message is still valid UTF-8.
+	for cut > 0 && !utf8.RuneStart(message[cut]) {
+		cut--
+	}
+	return message[:cut] + marker
 }
