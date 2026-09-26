@@ -2393,8 +2393,9 @@ func defaultPodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 // It also filters the candidates set, removing any resource for which not all containers have limits specified.
 func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.ResourceName], v1Pod *apiv1.Pod) apiv1.ResourceList {
 	// For a resource limit to be defaulted at the pod level, all containers (including init containers
-	// and sidecars) must specify a limit for that resource.
-	VisitContainers(spec, AllContainers, func(ctr *api.Container, _ ContainerType) bool {
+	// and sidecars) must specify a limit for that resource. Ephemeral containers are excluded here, matching
+	// v1Pod above: they cannot specify resources and do not contribute to QoS or pod-level resource defaulting.
+	VisitContainers(spec, InitContainers|Containers, func(ctr *api.Container, _ ContainerType) bool {
 		for resName := range candidates {
 			if _, ok := ctr.Resources.Limits[resName]; !ok {
 				candidates.Delete(resName)
