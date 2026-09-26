@@ -1011,6 +1011,7 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 		}
 
 		defer func() { v.hasTerminated = true }()
+		contextCanceled := t.ExitCode == 128 && t.Reason == "StartError" && strings.Contains(t.Message, context.Canceled.Error())
 		switch {
 		case t.ExitCode == 1:
 			// expected
@@ -1024,6 +1025,12 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 		case t.ExitCode == 128 && (t.Reason == "StartError" || t.Reason == "ContainerCannotRun") && reBug88766.MatchString(t.Message):
 			// pod volume teardown races with container start in CRI, which reports a failure
 			framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766", pod.Name, pod.Spec.NodeName)
+		case contextCanceled:
+			// Deleting the pod can cancel an in-flight CRI start. Such a
+			// container must never have been reported as started.
+			if status.Started != nil && *status.Started {
+				return fmt.Errorf("pod %s on node %s container was reported as started despite context cancellation: %#v", pod.Name, pod.Spec.NodeName, status)
+			}
 		default:
 			data, _ := json.MarshalIndent(pod.Status, "", "  ")
 			framework.Logf("pod %s on node %s had incorrect final status:\n%s", pod.Name, pod.Spec.NodeName, string(data))
@@ -1033,8 +1040,8 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 		case v.duration > time.Hour:
 			// problem with status reporting
 			return fmt.Errorf("pod %s container %s on node %s had very long duration %s: start=%s end=%s", pod.Name, status.Name, pod.Spec.NodeName, v.duration, t.StartedAt, t.FinishedAt)
-		case hasNoStartTime:
-			// should never happen
+		case hasNoStartTime && !contextCanceled:
+			// should never happen unless CRI start was cancelled
 			return fmt.Errorf("pod %s container %s on node %s had finish time but not start time: end=%s", pod.Name, status.Name, pod.Spec.NodeName, t.FinishedAt)
 		}
 	}
