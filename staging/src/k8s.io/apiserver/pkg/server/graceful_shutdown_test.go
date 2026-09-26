@@ -28,8 +28,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"golang.org/x/net/http2"
 )
 
 var (
@@ -110,7 +108,7 @@ func TestGracefulShutdownForActiveHTTP2Streams(t *testing.T) {
 	}
 	backendServer.TLS = &tls.Config{
 		Certificates: []tls.Certificate{backendCert},
-		NextProtos:   []string{http2.NextProtoTLS},
+		NextProtos:   []string{"h2"},
 	}
 	backendServer.StartTLS()
 	defer backendServer.Close()
@@ -120,11 +118,15 @@ func TestGracefulShutdownForActiveHTTP2Streams(t *testing.T) {
 	clientCACertPool.AppendCertsFromPEM(backendCrt)
 	clientTLSConfig := &tls.Config{
 		RootCAs:    clientCACertPool,
-		NextProtos: []string{http2.NextProtoTLS},
+		NextProtos: []string{"h2"},
 	}
 	client := &http.Client{}
-	client.Transport = &http2.Transport{
+	// HTTP/2 only, as the x/net Transport was.
+	protocols := new(http.Protocols)
+	protocols.SetHTTP2(true)
+	client.Transport = &http.Transport{
 		TLSClientConfig: clientTLSConfig,
+		Protocols:       protocols,
 	}
 
 	// client request

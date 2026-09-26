@@ -31,7 +31,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/http2"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
@@ -540,13 +539,8 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 		nil,
 	))
 
-	http2Options := &http2.Server{}
-
-	if err := http2.ConfigureServer(s.Config, http2Options); err != nil {
-		t.Fatal(err)
-	}
-
-	s.TLS = s.Config.TLSConfig
+	// Offer both protocols, as the x/net ConfigureServer did.
+	s.TLS = &tls.Config{NextProtos: []string{"h2", "http/1.1"}}
 
 	s.StartTLS()
 	t.Cleanup(s.Close)
@@ -658,13 +652,13 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 				}
 
 				tr.MaxIdleConnsPerHost = 1 // allow http1 to have keep alive connections open
-				if nextProto == http2.NextProtoTLS {
+				if nextProto == "h2" {
 					// Disable connection pooling to avoid additional connections
 					// that cause the test to flake
 					tr.MaxIdleConnsPerHost = -1
-					if err := http2.ConfigureTransport(tr); err != nil {
-						t.Fatal(err)
-					}
+					tr.Protocols = new(http.Protocols)
+					tr.Protocols.SetHTTP1(true)
+					tr.Protocols.SetHTTP2(true)
 				}
 
 				client := &http.Client{
@@ -693,8 +687,8 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 				}
 			}
 
-			t.Run(http2.NextProtoTLS, func(t *testing.T) {
-				f(t, http2.NextProtoTLS, tc.expectConnections)
+			t.Run("h2", func(t *testing.T) {
+				f(t, "h2", tc.expectConnections)
 			})
 
 			// http1 connection reuse occasionally flakes on CI, skipping for now
