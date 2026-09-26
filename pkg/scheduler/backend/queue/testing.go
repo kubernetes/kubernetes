@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -61,4 +62,21 @@ func NewTestQueueWithInformerFactory(
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
 	return pq
+}
+
+// MarkInFlightForTest registers the entity's pods as in-flight so that tests can drive scheduling
+// and failure handling on entities that were built by hand rather than popped.
+// Unlike Pop, no in-flight events are tracked for these pods: that keeps Done off the event-pruning
+// path, which needs a metrics recorder that test queues often don't have.
+// Pods that are already in-flight are left untouched.
+func MarkInFlightForTest(q *PriorityQueue, entity framework.QueuedEntityInfo) {
+	aq := q.activeQ.(*activeQueue)
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
+	for pInfo := range entity.ForEachPodInfo() {
+		if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
+			continue
+		}
+		aq.inFlightPods[pInfo.Pod.UID] = &inFlightPodEntry{pod: pInfo.Pod}
+	}
 }
