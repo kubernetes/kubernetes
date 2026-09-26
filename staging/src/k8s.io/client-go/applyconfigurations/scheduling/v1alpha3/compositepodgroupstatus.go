@@ -38,17 +38,18 @@ type CompositePodGroupStatusApplyConfiguration struct {
 	// due to disruption such as preemption.
 	//
 	// Known reasons for the CompositePodGroupInitiallyScheduled condition:
-	// - "Unschedulable": The CompositePodGroup's subtree could not be placed due to resource constraints,
-	// affinity/anti-affinity, or topological constraints.
+	// - "Scheduled": All required child groups and pods under this CompositePodGroup have been successfully scheduled.
+	// - "Unschedulable": The CompositePodGroup's subtree could not be placed, for example due to unmet
+	// minGroupCount, placement constraints, or insufficient capacity for its child groups.
 	// - "SchedulerError": The CompositePodGroup cannot be scheduled due to some internal error
 	// that occurred during scheduling.
-	// - "Invalid": Set to True when kube-scheduler detects an invalid group layout during
-	// runtime validation. The `message` field details the specific layout violation (such as
+	// - "Invalid": The CompositePodGroup cannot be scheduled due to an invalid group layout
+	// detected during runtime validation. The `message` field details the specific layout violation (such as
 	// a detected cycle, exceeding the maximum depth of 4, or referencing multiple distinct Workloads).
 	//
 	// Known reasons for the DisruptionTarget condition:
-	// - "PreemptionByScheduler": The CompositePodGroup was targeted by the scheduler's preemption loop
-	// to free up capacity for higher-priority preemptors.
+	// - "PreemptionByScheduler": The CompositePodGroup was preempted by the scheduler to make room for
+	// higher-priority CompositePodGroups, PodGroups or Pods.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
