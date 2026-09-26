@@ -203,6 +203,12 @@ func updateConsumableCapacity(slice *resourceapi.ResourceSlice, deviceNum int, u
 	slice.Spec.Devices[deviceNum].Capacity["a"] = cap
 }
 
+// spellFirstValidValueTwice replaces option 10 with 5.0, a second spelling of the 5 before it, and moves the default to 5 because 10 is gone.
+func spellFirstValidValueTwice(cap *resourceapi.DeviceCapacity) {
+	cap.RequestPolicy.Default = new(resource.MustParse("5"))
+	cap.RequestPolicy.ValidValues[1] = resource.MustParse("5.0")
+}
+
 func consumeableCapacityPath(deviceNum int) *field.Path {
 	return field.NewPath("spec", "devices").Index(deviceNum).Child("capacity").Key("a")
 }
@@ -2188,6 +2194,46 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				return slice
 			}(),
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"consumable-capacity-valid-values-spelling-fractional-gate": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures:                       field.ErrorList{field.Duplicate(consumeableCapacityPath(0).Child("requestPolicy", "validValues").Index(1), "5")},
+			oldResourceSlice:                   testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, spellFirstValidValueTwice)
+				return slice
+			},
+		},
+		"consumable-capacity-valid-values-spelling-fractional-gate-okay-if-stored": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures:                       nil,
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+				updateConsumableCapacity(slice, 0, spellFirstValidValueTwice)
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				// Only metadata changes, so the stored pair is not validated again.
+				slice.Labels = map[string]string{"updated": "true"}
+				return slice
+			},
+		},
+		"consumable-capacity-valid-values-spelling-fractional-gate-rechecked": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures:                       field.ErrorList{field.Duplicate(consumeableCapacityPath(0).Child("requestPolicy", "validValues").Index(1), "5")},
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+				updateConsumableCapacity(slice, 0, spellFirstValidValueTwice)
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				// Changing the capacity validates it again, stored pair included.
+				slice.Spec.Devices[0].Capacity["b"] = resourceapi.DeviceCapacity{Value: resource.MustParse("1")}
+				return slice
+			},
 		},
 		"consumable-capacity-valid-range-out-of-int64-bound": {
 			consumableCapacityFeatureGate: true,
