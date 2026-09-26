@@ -565,3 +565,84 @@ func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
 		t.Errorf("expected OrderedListPrefix to be called once, got %d", snap.orderedListPrefixCalls)
 	}
 }
+
+func TestCacheIntervalLoadNext(t *testing.T) {
+	t.Run("lazySnapshot", func(t *testing.T) {
+		elem := makeTestStoreElement(makeTestPod("pod0", 1))
+		snap := &countingSnapshot{items: []interface{}{elem}}
+		wci := newCacheIntervalFromLazySnapshot(100, snap)
+
+		buf := &watchCacheEvent{}
+		ev, err := wci.LoadNext(buf)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ev != buf {
+			t.Fatalf("expected ev to point to buf, got %p vs %p", ev, buf)
+		}
+		if ev.Key != elem.Key || ev.ResourceVersion != 100 {
+			t.Errorf("unexpected event content: %+v", ev)
+		}
+
+		// Next call should return nil (end of items)
+		ev, err = wci.LoadNext(buf)
+		if err != nil || ev != nil {
+			t.Fatalf("expected nil at end of stream, got %v, %v", ev, err)
+		}
+	})
+
+	t.Run("storeSnapshot", func(t *testing.T) {
+		s := store.NewIndexer(nil)
+		elem := makeTestStoreElement(makeTestPod("pod0", 1))
+		if err := s.Add(elem); err != nil {
+			t.Fatal(err)
+		}
+		wci, err := newCacheIntervalFromStore(100, s, "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		buf := &watchCacheEvent{}
+		ev, err := wci.LoadNext(buf)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ev == nil || ev.Key != elem.Key {
+			t.Errorf("unexpected event content: %+v", ev)
+		}
+
+		ev, err = wci.LoadNext(buf)
+		if err != nil || ev != nil {
+			t.Fatalf("expected nil at end of stream, got %v, %v", ev, err)
+		}
+	})
+
+	t.Run("history", func(t *testing.T) {
+		origEvent := &watchCacheEvent{
+			Type:            watch.Added,
+			Key:             "pod0",
+			ResourceVersion: 100,
+		}
+		wci := newCacheInterval(
+			0, 1,
+			func(i int) *watchCacheEvent { return origEvent },
+			func(i int) bool { return true },
+			100,
+			&sync.Mutex{},
+		)
+
+		buf := &watchCacheEvent{}
+		ev, err := wci.LoadNext(buf)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ev != origEvent {
+			t.Fatalf("expected ev to return pointer to origEvent, got %p vs %p", ev, origEvent)
+		}
+
+		ev, err = wci.LoadNext(buf)
+		if err != nil || ev != nil {
+			t.Fatalf("expected nil at end of stream, got %v, %v", ev, err)
+		}
+	})
+}

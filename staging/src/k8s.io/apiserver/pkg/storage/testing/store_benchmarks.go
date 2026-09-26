@@ -20,6 +20,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	goruntime "runtime"
 	"slices"
 	"strconv"
 	"sync"
@@ -605,6 +606,177 @@ func PrepareBenchmarkData(namespaceCount, podPerNamespaceCount, nodeCount int) (
 	return data
 }
 
+func RunBenchmarkStoreWatch(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, useIndex bool) {
+	require.NoError(b, waitForConsistent(ctx, store))
+	const watchersCount = 10
+	for _, initMode := range []string{"SendInitialEvents", "RV0", "HistoryRV1"} {
+		b.Run(fmt.Sprintf("Mode=%s", initMode), func(b *testing.B) {
+			for _, scope := range []scope{cluster, node, namespace} {
+				b.Run(fmt.Sprintf("Scope=%s", scope), func(b *testing.B) {
+					runBenchmarkStoreWatch(ctx, b, store, watchersCount, initMode, scope, data, useIndex)
+				})
+			}
+		})
+	}
+}
+
+func runBenchmarkStoreWatch(ctx context.Context, b *testing.B, store storage.Interface, watchersCount int, initMode string, scope scope, data BenchmarkData, useIndex bool) {
+	var expectedElements int
+	switch scope {
+	case namespace:
+		expectedElements = len(data.Pods) / len(data.NamespaceNames)
+	case node:
+		expectedElements = len(data.Pods) / len(data.NodeNames)
+	case cluster:
+		expectedElements = len(data.Pods)
+	}
+
+	var totalEvents atomic.Uint64
+	var totalWatches atomic.Uint64
+
+	var memBefore, memAfter goruntime.MemStats
+	b.ReportAllocs()
+	b.ResetTimer()
+	goruntime.ReadMemStats(&memBefore)
+
+	for i := 0; i < b.N; i++ {
+		var wg sync.WaitGroup
+		wg.Add(watchersCount)
+		for wIdx := range watchersCount {
+			go func(wIdx int) {
+				defer wg.Done()
+
+				nodeName := data.NodeNames[wIdx%len(data.NodeNames)]
+				namespaceName := data.NamespaceNames[wIdx%len(data.NamespaceNames)]
+
+				opts := storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						GetAttrs: podAttr,
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+					},
+				}
+
+				switch initMode {
+				case "SendInitialEvents":
+					sendInitial := true
+					opts.SendInitialEvents = &sendInitial
+					opts.Predicate.AllowWatchBookmarks = true
+				case "RV0":
+					opts.ResourceVersion = "0"
+				case "HistoryRV1":
+					opts.ResourceVersion = "1"
+				default:
+					panic(fmt.Sprintf("unknown initMode: %s", initMode))
+				}
+
+				watchKey := "/pods/"
+				watchCtx := ctx
+				switch scope {
+				case cluster:
+				case node:
+					opts.Predicate.Field = fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
+					if useIndex {
+						opts.Predicate.IndexFields = []string{"spec.nodeName"}
+					}
+				case namespace:
+					watchKey = "/pods/" + namespaceName
+					if useIndex {
+						opts.Predicate.IndexFields = []string{"metadata.namespace"}
+						watchCtx = request.WithRequestInfo(ctx, &request.RequestInfo{Namespace: namespaceName})
+					}
+				}
+
+				w, err := store.Watch(watchCtx, watchKey, opts)
+				if err != nil {
+					b.Errorf("Watch failed: %v", err)
+					return
+				}
+				defer w.Stop()
+
+				received := 0
+				for received < expectedElements {
+					select {
+					case <-ctx.Done():
+						return
+					case ev, ok := <-w.ResultChan():
+						if !ok {
+							b.Errorf("Watch channel closed early after %d/%d events", received, expectedElements)
+							return
+						}
+						switch ev.Type {
+						case watch.Bookmark:
+							pod, ok := ev.Object.(*example.Pod)
+							if ok && pod.Annotations != nil && pod.Annotations[metav1.InitialEventsAnnotationKey] == "true" {
+								if received != expectedElements {
+									b.Errorf("InitialEvents bookmark received after %d events, expected %d", received, expectedElements)
+								}
+								totalEvents.Add(uint64(received))
+								totalWatches.Add(1)
+								return
+							}
+						case watch.Added, watch.Modified, watch.Deleted:
+							received++
+						case watch.Error:
+							b.Errorf("Unexpected watch error event: %#v", ev.Object)
+							return
+						}
+					}
+				}
+
+				if initMode == "SendInitialEvents" {
+					// Drain the initial-events-end bookmark as part of full initial stream delivery.
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case ev, ok := <-w.ResultChan():
+							if !ok {
+								return
+							}
+							if ev.Type == watch.Bookmark {
+								if pod, ok := ev.Object.(*example.Pod); ok && pod.Annotations != nil && pod.Annotations[metav1.InitialEventsAnnotationKey] == "true" {
+									totalEvents.Add(uint64(received))
+									totalWatches.Add(1)
+									return
+								}
+							}
+						}
+					}
+				}
+
+				totalEvents.Add(uint64(received))
+				totalWatches.Add(1)
+			}(wIdx)
+		}
+		wg.Wait()
+	}
+
+	goruntime.ReadMemStats(&memAfter)
+	b.StopTimer()
+
+	elapsedSeconds := b.Elapsed().Seconds()
+	watches := totalWatches.Load()
+	events := totalEvents.Load()
+	totalAllocs := memAfter.Mallocs - memBefore.Mallocs
+	totalBytes := memAfter.TotalAlloc - memBefore.TotalAlloc
+
+	if watches > 0 {
+		b.ReportMetric(float64(totalAllocs)/float64(watches), "allocs/watch")
+		b.ReportMetric(float64(totalBytes)/float64(watches), "B/watch")
+	}
+	if events > 0 {
+		b.ReportMetric(float64(totalAllocs)/float64(events), "allocs/event")
+	}
+	if b.N > 0 {
+		b.ReportMetric(elapsedSeconds*1000/float64(b.N), "ms/10-watches")
+	}
+	if elapsedSeconds > 0 {
+		b.ReportMetric(float64(events)/elapsedSeconds, "watch-events/s")
+	}
+}
+
 func PrecreateBenchmarkPods(ctx context.Context, store storage.Interface, data BenchmarkData) error {
 	podOut := &corev1.Pod{}
 	for _, pod := range data.Pods {
@@ -613,6 +785,41 @@ func PrecreateBenchmarkPods(ctx context.Context, store storage.Interface, data B
 		if err != nil && !storage.IsExist(err) {
 			return fmt.Errorf("unexpected error pre-creating pod %q: %w", key, err)
 		}
+	}
+	return nil
+}
+
+func PrecreateBenchmarkPodsParallel(ctx context.Context, store storage.Interface, data BenchmarkData) error {
+	const workers = 32
+	var wg sync.WaitGroup
+	errCh := make(chan error, workers)
+	var idx atomic.Int64
+
+	for range workers {
+		wg.Go(func() {
+			podOut := &example.Pod{}
+			for {
+				i := int(idx.Add(1) - 1)
+				if i >= len(data.Pods) {
+					return
+				}
+				pod := data.Pods[i]
+				key := computePodKey(pod)
+				err := store.Create(ctx, key, pod, podOut, 0)
+				if err != nil && !storage.IsExist(err) {
+					select {
+					case errCh <- fmt.Errorf("unexpected error pre-creating pod %q: %w", key, err):
+					default:
+					}
+					return
+				}
+			}
+		})
+	}
+	wg.Wait()
+	close(errCh)
+	if err := <-errCh; err != nil {
+		return err
 	}
 	return nil
 }
