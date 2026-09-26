@@ -124,7 +124,11 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 			// or the utilization target for targets higher than 100%
 			fallbackUtilization := int64(max(100, targetUtilization))
 			for podName := range missingPods {
-				metrics[podName] = metricsclient.PodMetric{Value: requests[podName] * fallbackUtilization / 100}
+				fallbackUsage, err := calculateFallbackUsage(requests[podName], fallbackUtilization)
+				if err != nil {
+					return 0, utilization, rawUtilization, time.Time{}, fmt.Errorf("unable to calculate fallback utilization for Pod %s: %w", podName, err)
+				}
+				metrics[podName] = metricsclient.PodMetric{Value: fallbackUsage}
 			}
 		} else if usageRatio > 1.0 {
 			// on a scale-up, treat missing pods as using 0% of the resource request
@@ -162,6 +166,18 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 	// return the result, where the number of replicas considered is
 	// however many replicas factored into our calculation
 	return newReplicas, utilization, rawUtilization, timestamp, nil
+}
+
+func calculateFallbackUsage(request, utilization int64) (int64, error) {
+	// Split the request before multiplying so values above MaxInt64/utilization
+	// are still accepted when the final request*utilization/100 result fits.
+	quotient, remainder := request/100, request%100
+	remainderProduct := remainder * utilization
+	remainderUsage := remainderProduct / 100
+	if quotient > (math.MaxInt64-remainderUsage)/utilization {
+		return 0, fmt.Errorf("fallback usage exceeds the int64 milli-unit range")
+	}
+	return quotient*utilization + remainderUsage, nil
 }
 
 // GetRawResourceReplicas calculates the desired replica count based on a target resource usage (as a raw milli-value)
@@ -503,7 +519,11 @@ func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, er
 	if !ok {
 		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
 	}
-	return podRequest.MilliValue(), nil
+	request, ok := podRequest.AsMilliInt64()
+	if !ok {
+		return 0, fmt.Errorf("pod-level request for %s in Pod %s exceeds the int64 milli-unit range", resource, pod.Name)
+	}
+	return request, nil
 }
 
 // calculatePodRequestsFromContainers computes the requests for the specified
@@ -524,7 +544,16 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 			if !ok {
 				return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
 			}
-			request += containerRequest.MilliValue()
+			containerValue, ok := containerRequest.AsMilliInt64()
+			if !ok {
+				return 0, fmt.Errorf("request for %s in container %s of Pod %s exceeds the int64 milli-unit range", resource, c.Name, pod.Name)
+			}
+			// Requests are non-negative. Check the sum as well as each conversion
+			// so an overflow cannot become a negative utilization denominator.
+			if containerValue > math.MaxInt64-request {
+				return 0, fmt.Errorf("total request for %s in Pod %s exceeds the int64 milli-unit range", resource, pod.Name)
+			}
+			request += containerValue
 		}
 		// container names are unique inside the pod
 		if container == c.Name {
