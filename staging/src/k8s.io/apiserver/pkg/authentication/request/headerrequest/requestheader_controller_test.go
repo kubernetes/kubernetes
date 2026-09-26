@@ -18,14 +18,22 @@ package headerrequest
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
+	"net/http"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -46,6 +54,9 @@ type expectedHeadersHolder struct {
 	groupHeaders        []string
 	extraHeaderPrefixes []string
 	allowedClientNames  []string
+	// nilSnapshot asserts that Snapshot returns nil instead of an empty snapshot,
+	// i.e. the state matches a configmap that never existed
+	nilSnapshot bool
 }
 
 func TestRequestHeaderAuthRequestController(t *testing.T) {
@@ -84,6 +95,11 @@ func TestRequestHeaderAuthRequestController(t *testing.T) {
 				return c
 			}(),
 			expectErr: true,
+			expectedHeader: expectedHeadersHolder{
+				// nothing was loaded before the invalid configmap, so the state
+				// stays identical to never-loaded
+				nilSnapshot: true,
+			},
 		},
 	}
 
@@ -246,6 +262,255 @@ func TestRequestHeaderAuthRequestControllerSyncOnce(t *testing.T) {
 	}
 }
 
+// expectedHeadersAfterDeletion is the state both sync and RunOnce must reach once the
+// configmap is gone: it is deliberately identical to the never-loaded state, where
+// Snapshot returns nil, including for AllowedClientNames.
+var expectedHeadersAfterDeletion = expectedHeadersHolder{nilSnapshot: true}
+
+func TestRequestHeaderAuthRequestControllerSyncClearsHeadersOnConfigMapDeletion(t *testing.T) {
+	target := newDefaultTarget()
+
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := indexer.Add(defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"})); err != nil {
+		t.Fatal(err)
+	}
+	target.configmapLister = corev1listers.NewConfigMapLister(indexer).ConfigMaps(defConfigMapNamespace)
+	if err := target.sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// the configmap is deleted, so the lister no longer has it
+	target.configmapLister = corev1listers.NewConfigMapLister(cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})).ConfigMaps(defConfigMapNamespace)
+	if err := target.sync(); err != nil {
+		t.Fatalf("sync should swallow the not found error, got %v", err)
+	}
+
+	validateExpectedHeaders(t, target, expectedHeadersAfterDeletion)
+}
+
+func TestRequestHeaderAuthRequestControllerDeletedStateMatchesNeverFoundState(t *testing.T) {
+	loaded := newDefaultTarget()
+
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := indexer.Add(defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"})); err != nil {
+		t.Fatal(err)
+	}
+	loaded.configmapLister = corev1listers.NewConfigMapLister(indexer).ConfigMaps(defConfigMapNamespace)
+	if err := loaded.sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// the configmap is deleted, so the lister no longer has it
+	loaded.configmapLister = corev1listers.NewConfigMapLister(cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})).ConfigMaps(defConfigMapNamespace)
+	if err := loaded.sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	fresh := newDefaultTarget()
+	for _, scenario := range []struct {
+		name   string
+		target *RequestHeaderAuthRequestController
+	}{
+		{name: "configmap never existed", target: fresh},
+		{name: "configmap was deleted", target: loaded},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			validateExpectedHeaders(t, scenario.target, expectedHeadersAfterDeletion)
+		})
+	}
+}
+
+func TestRequestHeaderAuthRequestControllerSyncKeepsHeadersOnMalformedConfigMap(t *testing.T) {
+	target := newDefaultTarget()
+
+	expected := expectedHeadersHolder{
+		usernameHeaders:     []string{"user-val"},
+		uidHeaders:          []string{"uid-val"},
+		groupHeaders:        []string{"group-val"},
+		extraHeaderPrefixes: []string{"extra-val"},
+		allowedClientNames:  []string{"names-val"},
+	}
+	cm := defaultConfigMap(t, expected.usernameHeaders, expected.uidHeaders, expected.groupHeaders, expected.extraHeaderPrefixes, expected.allowedClientNames)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := indexer.Add(cm); err != nil {
+		t.Fatal(err)
+	}
+	target.configmapLister = corev1listers.NewConfigMapLister(indexer).ConfigMaps(defConfigMapNamespace)
+	if err := target.sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// a malformed configmap is not a deletion, so the last good bundle has to survive
+	broken := cm.DeepCopy()
+	broken.Data[defUsernameHeadersKey] = "not-a-json-array"
+	brokenIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := brokenIndexer.Add(broken); err != nil {
+		t.Fatal(err)
+	}
+	target.configmapLister = corev1listers.NewConfigMapLister(brokenIndexer).ConfigMaps(defConfigMapNamespace)
+	if err := target.sync(); err == nil {
+		t.Fatal("expected sync to report the malformed configmap")
+	}
+
+	validateExpectedHeaders(t, target, expected)
+}
+
+func TestRequestHeaderAuthRequestControllerRunOnceClearsHeadersOnConfigMapDeletion(t *testing.T) {
+	target := newDefaultTarget()
+	if err := target.syncConfigMap(defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"})); err != nil {
+		t.Fatal(err)
+	}
+
+	target.client = fake.NewSimpleClientset()
+	if err := target.RunOnce(context.TODO()); err != nil {
+		t.Fatal(err)
+	}
+
+	validateExpectedHeaders(t, target, expectedHeadersAfterDeletion)
+}
+
+func TestRequestHeaderAuthRequestControllerRunOnceKeepsHeadersOnOtherAPIErrors(t *testing.T) {
+	target := newDefaultTarget()
+	expected := expectedHeadersHolder{
+		usernameHeaders:     []string{"user-val"},
+		uidHeaders:          []string{"uid-val"},
+		groupHeaders:        []string{"group-val"},
+		extraHeaderPrefixes: []string{"extra-val"},
+		allowedClientNames:  []string{"names-val"},
+	}
+	if err := target.syncConfigMap(defaultConfigMap(t, expected.usernameHeaders, expected.uidHeaders, expected.groupHeaders, expected.extraHeaderPrefixes, expected.allowedClientNames)); err != nil {
+		t.Fatal(err)
+	}
+
+	client := fake.NewSimpleClientset()
+	client.PrependReactor("get", "configmaps", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("temporary API error")
+	})
+	target.client = client
+
+	if err := target.RunOnce(context.TODO()); err == nil {
+		t.Fatal("expected RunOnce to return the API error")
+	}
+
+	validateExpectedHeaders(t, target, expected)
+}
+
+// staticVerifyOptionsCA is a dynamiccertificates.CAContentProvider whose VerifyOptions
+// are backed by a swappable function, so a test can simulate the CA half of the
+// configuration going away and coming back.
+type staticVerifyOptionsCA struct {
+	verifyOptionsFn func() (x509.VerifyOptions, bool)
+}
+
+func (s *staticVerifyOptionsCA) Name() string                                      { return "test-ca" }
+func (s *staticVerifyOptionsCA) CurrentCABundleContent() []byte                    { return nil }
+func (s *staticVerifyOptionsCA) AddListener(listener dynamiccertificates.Listener) {}
+
+func (s *staticVerifyOptionsCA) VerifyOptions() (x509.VerifyOptions, bool) {
+	return s.verifyOptionsFn()
+}
+
+var _ dynamiccertificates.CAContentProvider = &staticVerifyOptionsCA{}
+
+// TestRequestHeaderAuthRequestControllerFailsClosedDuringDeleteRecreateTransition covers the
+// window where the configmap is deleted and immediately recreated, which is what happens in a
+// real cluster because the kube-apiserver rewrites it. The two controllers consuming the
+// configmap sync independently, so during the transition one side can already serve restored
+// content while the other is still cleared, and every interleaving must reject requests until
+// both sides are live again.
+func TestRequestHeaderAuthRequestControllerFailsClosedDuringDeleteRecreateTransition(t *testing.T) {
+	target := newDefaultTarget()
+
+	configMap := defaultConfigMap(t, []string{"X-Remote-User"}, nil, nil, nil, []string{"front-proxy-client"})
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := indexer.Add(configMap); err != nil {
+		t.Fatal(err)
+	}
+	target.configmapLister = corev1listers.NewConfigMapLister(indexer).ConfigMaps(defConfigMapNamespace)
+	if err := target.sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	roots, clientCerts := newTestClientCertsFromSameCA(t, "front-proxy-client", "not-allowed-client")
+	allowedClientCert, disallowedClientCert := clientCerts[0], clientCerts[1]
+
+	// mirrors ConfigMapCAController.VerifyOptions across the transition: unavailable while
+	// the CA half is cleared, available again once it has synced the recreated configmap
+	caCleared := false
+	verifyOptionsFn := x509request.VerifyOptionFunc(func() (x509.VerifyOptions, bool) {
+		if caCleared {
+			return x509.VerifyOptions{}, false
+		}
+		return x509.VerifyOptions{
+			Roots:     roots,
+			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}, true
+	})
+	auth := NewSecure(target, &staticVerifyOptionsCA{verifyOptionsFn: verifyOptionsFn})
+
+	request := func(cert *x509.Certificate) bool {
+		req, err := http.NewRequest(http.MethodGet, "/", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("X-Remote-User", "user")
+		req.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{cert}}
+		_, ok, _ := auth.AuthenticateRequest(req)
+		return ok
+	}
+
+	// normal operation before the deletion
+	if !request(allowedClientCert) {
+		t.Fatal("expected authentication to succeed before the configmap is deleted")
+	}
+	if request(disallowedClientCert) {
+		t.Fatal("expected the disallowed common name to be rejected before the configmap is deleted")
+	}
+
+	// the configmap is deleted: both halves clear
+	caCleared = true
+	emptyLister := corev1listers.NewConfigMapLister(cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})).ConfigMaps(defConfigMapNamespace)
+	target.configmapLister = emptyLister
+	if err := target.sync(); err != nil {
+		t.Fatal(err)
+	}
+	validateExpectedHeaders(t, target, expectedHeadersAfterDeletion)
+	if request(allowedClientCert) {
+		t.Fatal("expected rejection while the configmap is deleted")
+	}
+
+	// recreated: the CA half reloads first, the header half has not seen the recreation yet
+	recreatedIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := recreatedIndexer.Add(configMap); err != nil {
+		t.Fatal(err)
+	}
+	recreatedLister := corev1listers.NewConfigMapLister(recreatedIndexer).ConfigMaps(defConfigMapNamespace)
+	caCleared = false
+	target.configmapLister = emptyLister
+	if request(allowedClientCert) {
+		t.Fatal("expected rejection until the header half resyncs the recreated configmap")
+	}
+
+	// the header half resynced instead, the CA half is still cleared
+	caCleared = true
+	target.configmapLister = recreatedLister
+	if err := target.sync(); err != nil {
+		t.Fatal(err)
+	}
+	if request(allowedClientCert) {
+		t.Fatal("expected rejection until the CA half reloads the recreated configmap")
+	}
+
+	// both halves live again
+	caCleared = false
+	if !request(allowedClientCert) {
+		t.Fatal("expected authentication to succeed once both controllers resynced the recreated configmap")
+	}
+	if request(disallowedClientCert) {
+		t.Fatal("expected the disallowed common name to stay rejected after the recreation")
+	}
+}
+
 func defaultConfigMap(t *testing.T, usernameHeaderVal, uidHeaderVal, groupHeadersVal, extraHeaderPrefixesVal, allowedClientNamesVal []string) *corev1.ConfigMap {
 	encode := func(val []string) string {
 		encodedVal, err := json.Marshal(val)
@@ -282,16 +547,29 @@ func newDefaultTarget() *RequestHeaderAuthRequestController {
 }
 
 func validateExpectedHeaders(t *testing.T, target *RequestHeaderAuthRequestController, expected expectedHeadersHolder) {
-	if !equality.Semantic.DeepEqual(target.UsernameHeaders(), expected.usernameHeaders) {
-		t.Fatalf("incorrect usernameHeaders, got %v, wanted %v", target.UsernameHeaders(), expected.usernameHeaders)
+	snapshot := target.Snapshot()
+	if expected.nilSnapshot {
+		if snapshot != nil {
+			t.Fatalf("expected a nil snapshot after deletion, got %v", *snapshot)
+		}
+		return
 	}
-	if !equality.Semantic.DeepEqual(target.GroupHeaders(), expected.groupHeaders) {
-		t.Fatalf("incorrect groupHeaders, got %v, wanted %v", target.GroupHeaders(), expected.groupHeaders)
+	if snapshot == nil {
+		t.Fatal("expected a non-nil snapshot, got nil")
 	}
-	if !equality.Semantic.DeepEqual(target.ExtraHeaderPrefixes(), expected.extraHeaderPrefixes) {
-		t.Fatalf("incorrect extraheaderPrefixes, got %v, wanted %v", target.ExtraHeaderPrefixes(), expected.extraHeaderPrefixes)
+	if !equality.Semantic.DeepEqual(snapshot.UsernameHeaders, expected.usernameHeaders) {
+		t.Fatalf("incorrect usernameHeaders, got %v, wanted %v", snapshot.UsernameHeaders, expected.usernameHeaders)
 	}
-	if !equality.Semantic.DeepEqual(target.AllowedClientNames(), expected.allowedClientNames) {
-		t.Fatalf("incorrect expectedAllowedClientNames, got %v, wanted %v", target.AllowedClientNames(), expected.allowedClientNames)
+	if !equality.Semantic.DeepEqual(snapshot.UIDHeaders, expected.uidHeaders) {
+		t.Fatalf("incorrect uidHeaders, got %v, wanted %v", snapshot.UIDHeaders, expected.uidHeaders)
+	}
+	if !equality.Semantic.DeepEqual(snapshot.GroupHeaders, expected.groupHeaders) {
+		t.Fatalf("incorrect groupHeaders, got %v, wanted %v", snapshot.GroupHeaders, expected.groupHeaders)
+	}
+	if !equality.Semantic.DeepEqual(snapshot.ExtraHeaderPrefixes, expected.extraHeaderPrefixes) {
+		t.Fatalf("incorrect extraheaderPrefixes, got %v, wanted %v", snapshot.ExtraHeaderPrefixes, expected.extraHeaderPrefixes)
+	}
+	if !equality.Semantic.DeepEqual(snapshot.AllowedClientNames, expected.allowedClientNames) {
+		t.Fatalf("incorrect expectedAllowedClientNames, got %v, wanted %v", snapshot.AllowedClientNames, expected.allowedClientNames)
 	}
 }

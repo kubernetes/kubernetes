@@ -25,6 +25,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -49,8 +50,10 @@ type ConfigMapCAController struct {
 	// configMapInformer is tracked so that we can start these on Run
 	configMapInformer cache.SharedIndexInformer
 
-	// caBundle is a caBundleAndVerifier that contains the last read, non-zero length content of the file
-	caBundle atomic.Value
+	// caBundle is a caBundleAndVerifier that contains the last read, non-zero length content of the file.
+	// It is nil when the configmap has never been read and nil again once the configmap is deleted,
+	// see loadCABundle, so those two states are indistinguishable.
+	caBundle atomic.Pointer[caBundleAndVerifier]
 
 	listeners []Listener
 
@@ -145,6 +148,19 @@ func (c *ConfigMapCAController) AddListener(listener Listener) {
 func (c *ConfigMapCAController) loadCABundle() error {
 	configMap, err := c.configmapLister.ConfigMaps(c.configmapNamespace).Get(c.configmapName)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// the configmap has been deleted, so stop verifying against a CA that no longer
+			// exists. nothing is stored when nothing was ever loaded: RunOnce reads this lister
+			// before Run starts the informer, so a cold start always lands here, and the
+			// periodic resync must not re-notify listeners on every pass.
+			if c.caBundle.Load() == nil {
+				return nil
+			}
+			c.storeAndNotify(nil)
+			klog.InfoS("Cleared CA bundle, configmap was deleted", "name", c.Name())
+
+			return nil
+		}
 		return err
 	}
 	caBundle := configMap.Data[c.configmapKey]
@@ -161,27 +177,29 @@ func (c *ConfigMapCAController) loadCABundle() error {
 	if err != nil {
 		return err
 	}
+	c.storeAndNotify(caBundleAndVerifier)
+
+	return nil
+}
+
+// storeAndNotify publishes the given bundle and wakes all listeners so dependent TLS
+// configuration can pick it up.
+func (c *ConfigMapCAController) storeAndNotify(caBundleAndVerifier *caBundleAndVerifier) {
 	c.caBundle.Store(caBundleAndVerifier)
 
 	for _, listener := range c.listeners {
 		listener.Enqueue()
 	}
-
-	return nil
 }
 
 // hasCAChanged returns true if the caBundle is different than the current.
 func (c *ConfigMapCAController) hasCAChanged(caBundle []byte) bool {
-	uncastExisting := c.caBundle.Load()
-	if uncastExisting == nil {
+	existing := c.caBundle.Load()
+	if existing == nil {
 		return true
 	}
 
 	// check to see if we have a change. If the values are the same, do nothing.
-	existing, ok := uncastExisting.(*caBundleAndVerifier)
-	if !ok {
-		return true
-	}
 	if !bytes.Equal(existing.caBundle, caBundle) {
 		return true
 	}
@@ -256,22 +274,23 @@ func (c *ConfigMapCAController) Name() string {
 
 // CurrentCABundleContent provides ca bundle byte content
 func (c *ConfigMapCAController) CurrentCABundleContent() []byte {
-	uncastObj := c.caBundle.Load()
-	if uncastObj == nil {
+	caBundle := c.caBundle.Load()
+	if caBundle == nil {
 		return nil // this can happen if we've been unable load data from the apiserver for some reason
 	}
-
-	return c.caBundle.Load().(*caBundleAndVerifier).caBundle
+	return caBundle.caBundle
 }
 
 // VerifyOptions provides verifyoptions compatible with authenticators
 func (c *ConfigMapCAController) VerifyOptions() (x509.VerifyOptions, bool) {
-	uncastObj := c.caBundle.Load()
-	if uncastObj == nil {
-		// This can happen if we've been unable load data from the apiserver for some reason.
-		// In this case, we should not accept any connections on the basis of this ca bundle.
+	caBundle := c.caBundle.Load()
+	if caBundle == nil {
+		// This covers both a configmap that was never loaded and one that has been deleted.
+		// A zero x509.VerifyOptions has nil Roots, which certificate verification treats as
+		// "use the host trust store", so returning it here would widen trust rather than
+		// remove it. Reporting unavailable makes verification fail closed instead.
 		return x509.VerifyOptions{}, false
 	}
 
-	return uncastObj.(*caBundleAndVerifier).verifyOptions, true
+	return caBundle.verifyOptions, true
 }

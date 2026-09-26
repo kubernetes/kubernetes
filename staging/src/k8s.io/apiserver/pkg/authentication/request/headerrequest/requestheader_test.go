@@ -17,9 +17,16 @@ limitations under the License.
 package headerrequest
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"math/big"
 	"net/http"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -307,4 +314,298 @@ func TestRequestHeader(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewSecure(t *testing.T) {
+	roots, clientCerts := newTestClientCertsFromSameCA(t, "front-proxy-client", "other-client")
+	allowedClientCert, disallowedClientCert := clientCerts[0], clientCerts[1]
+
+	config := &RequestHeaderConfig{
+		UsernameHeaders:     []string{"X-Remote-User"},
+		UIDHeaders:          []string{"X-Remote-Uid"},
+		GroupHeaders:        []string{"X-Remote-Group"},
+		ExtraHeaderPrefixes: []string{"X-Remote-Extra-"},
+		AllowedClientNames:  []string{"front-proxy-client"},
+	}
+
+	scenarios := []struct {
+		name           string
+		snapshot       *RequestHeaderConfig
+		cert           *x509.Certificate
+		requestHeaders http.Header
+		expectedUser   user.Info
+		expectedOk     bool
+		expectErr      bool
+	}{
+		{
+			name:      "nil snapshot fails closed",
+			snapshot:  nil,
+			cert:      allowedClientCert,
+			expectErr: false,
+		},
+		{
+			name:     "empty allowed names accepts any verified certificate",
+			snapshot: func() *RequestHeaderConfig { c := *config; c.AllowedClientNames = nil; return &c }(),
+			cert:     disallowedClientCert,
+			requestHeaders: http.Header{
+				"X-Remote-User": {"Bob"},
+			},
+			expectedUser: &user.DefaultInfo{Name: "Bob", Groups: []string{}, Extra: map[string][]string{}},
+			expectedOk:   true,
+		},
+		{
+			name:     "allowed common name is accepted",
+			snapshot: config,
+			cert:     allowedClientCert,
+			requestHeaders: http.Header{
+				"X-Remote-User": {"Bob"},
+			},
+			expectedUser: &user.DefaultInfo{Name: "Bob", Groups: []string{}, Extra: map[string][]string{}},
+			expectedOk:   true,
+		},
+		{
+			name:      "common name outside the allowlist is rejected",
+			snapshot:  config,
+			cert:      disallowedClientCert,
+			expectErr: true,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			provider := RequestHeaderConfigProviderFunc(func() *RequestHeaderConfig { return scenario.snapshot })
+			auth := NewSecure(provider, &staticVerifyOptionsCA{verifyOptionsFn: func() (x509.VerifyOptions, bool) {
+				return x509.VerifyOptions{Roots: roots, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}, true
+			}})
+
+			req, err := http.NewRequest(http.MethodGet, "/", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header = scenario.requestHeaders
+			if req.Header == nil {
+				req.Header = http.Header{}
+			}
+			req.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{scenario.cert}}
+
+			resp, ok, err := auth.AuthenticateRequest(req)
+			if scenario.expectErr != (err != nil) {
+				t.Fatalf("expected error %v, got %v", scenario.expectErr, err)
+			}
+			if scenario.expectedOk != ok {
+				t.Fatalf("expected ok %v, got %v", scenario.expectedOk, ok)
+			}
+			if !ok {
+				return
+			}
+			if e, a := scenario.expectedUser, resp.User; !reflect.DeepEqual(e, a) {
+				t.Errorf("expected %#v, got %#v", e, a)
+			}
+		})
+	}
+}
+
+// TestNewSecureUsesSingleSnapshotPerRequest forces Store(recreatedBundle) after Snapshot()
+// returns but before header processing. The request must continue using the original
+// snapshot for both CN validation and header extraction. Both client certificates are signed by
+// the same CA.
+func TestNewSecureUsesSingleSnapshotPerRequest(t *testing.T) {
+	roots, clientCerts := newTestClientCertsFromSameCA(t, "front-proxy-client", "attacker")
+	legitimateCert, attackerCert := clientCerts[0], clientCerts[1]
+
+	original := &RequestHeaderConfig{
+		UsernameHeaders:    []string{"X-Original-User"},
+		GroupHeaders:       []string{"X-Original-Group"},
+		AllowedClientNames: []string{"front-proxy-client"},
+	}
+	recreated := &RequestHeaderConfig{
+		UsernameHeaders:    []string{"X-New-User"},
+		GroupHeaders:       []string{"X-New-Group"},
+		AllowedClientNames: nil, // empty means accept any verified client certificate
+	}
+
+	target := newDefaultTarget()
+	target.exportedRequestHeaderConfig.Store(original)
+
+	var forcedStore bool
+	provider := RequestHeaderConfigProviderFunc(func() *RequestHeaderConfig {
+		snapshot := target.Snapshot()
+		if !forcedStore {
+			// simulate the controller loading the recreated configmap between this
+			// request's Snapshot() and its header processing
+			forcedStore = true
+			target.exportedRequestHeaderConfig.Store(recreated)
+		}
+		return snapshot
+	})
+
+	auth := NewSecure(provider, &staticVerifyOptionsCA{verifyOptionsFn: func() (x509.VerifyOptions, bool) {
+		return x509.VerifyOptions{Roots: roots, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}, true
+	}})
+
+	newRequest := func(cert *x509.Certificate) (*http.Request, error) {
+		req, err := http.NewRequest(http.MethodGet, "/", nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("X-New-User", "bob") // only present in the recreated configuration
+		req.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{cert}}
+		return req, nil
+	}
+
+	// The recreated header must not be honored on the first request, even when the client
+	// certificate is allowed by the original configuration.
+	req, err := newRequest(legitimateCert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, ok, err := auth.AuthenticateRequest(req)
+	if !forcedStore {
+		t.Fatal("expected the forcing provider to run during AuthenticateRequest")
+	}
+	if err != nil || ok {
+		t.Fatalf("expected the request to reject the recreated username header using the original snapshot, got resp=%v ok=%v err=%v", resp, ok, err)
+	}
+
+	// Repeat the forced interleaving to verify that the original allowlist also remains in
+	// effect for the request that observed it.
+	target.exportedRequestHeaderConfig.Store(original)
+	forcedStore = false
+	req, err = newRequest(attackerCert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, ok, err = auth.AuthenticateRequest(req)
+	if !forcedStore {
+		t.Fatal("expected the forcing provider to run during AuthenticateRequest")
+	}
+	if err == nil || ok {
+		t.Fatalf("expected the request to reject the attacker using the original snapshot's allowlist, got resp=%v ok=%v err=%v", resp, ok, err)
+	}
+
+	// a subsequent request observes the recreated configuration and authenticates against it
+	req, err = newRequest(legitimateCert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, ok, err = auth.AuthenticateRequest(req)
+	if err != nil || !ok {
+		t.Fatalf("expected authentication to succeed against the recreated configuration, got resp=%v ok=%v err=%v", resp, ok, err)
+	}
+	if e, a := "bob", resp.User.GetName(); e != a {
+		t.Errorf("expected user name %q, got %q", e, a)
+	}
+}
+
+func TestNewSecureUsesRequestContextSnapshot(t *testing.T) {
+	roots, clientCerts := newTestClientCertsFromSameCA(t, "front-proxy-client")
+	snapshot := &RequestHeaderConfig{
+		UsernameHeaders:    []string{"X-Remote-User"},
+		AllowedClientNames: []string{"front-proxy-client"},
+	}
+	providerCalls := 0
+	auth := NewSecure(RequestHeaderConfigProviderFunc(func() *RequestHeaderConfig {
+		providerCalls++
+		return nil
+	}), &staticVerifyOptionsCA{verifyOptionsFn: func() (x509.VerifyOptions, bool) {
+		return x509.VerifyOptions{Roots: roots, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}, true
+	}})
+
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Remote-User", "bob")
+	req.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{clientCerts[0]}}
+	req = req.WithContext(WithRequestHeaderConfig(req.Context(), snapshot))
+
+	resp, ok, err := auth.AuthenticateRequest(req)
+	if err != nil || !ok || resp.User.GetName() != "bob" {
+		t.Fatalf("expected authentication using the context snapshot, got resp=%v ok=%v err=%v", resp, ok, err)
+	}
+	if providerCalls != 0 {
+		t.Fatalf("expected NewSecure to use the context snapshot without loading the provider, got %d calls", providerCalls)
+	}
+}
+
+func TestClearAuthenticationHeadersFromConfig(t *testing.T) {
+	h := http.Header{
+		"X-Original-User":      {"bob"},
+		"X-Original-Extra-Foo": {"value"},
+		"X-Unrelated":          {"kept"},
+	}
+
+	ClearAuthenticationHeadersFromConfig(h, nil)
+	if len(h) != 3 {
+		t.Fatalf("expected a nil snapshot to be a no-op, got %v", h)
+	}
+
+	ClearAuthenticationHeadersFromConfig(h, &RequestHeaderConfig{
+		UsernameHeaders:     []string{"X-Original-User"},
+		ExtraHeaderPrefixes: []string{"X-Original-Extra-"},
+	})
+	want := http.Header{"X-Unrelated": {"kept"}}
+	if diff := cmp.Diff(want, h); len(diff) > 0 {
+		t.Errorf("unexpected final headers (-want +got):\n%s", diff)
+	}
+}
+
+// newTestClientCertsFromSameCA returns a root pool and one client certificate per given
+// common name, all signed by the same CA.
+func newTestClientCertsFromSameCA(t *testing.T, commonNames ...string) (*x509.CertPool, []*x509.Certificate) {
+	t.Helper()
+
+	notBefore := time.Now().Add(-time.Hour)
+	notAfter := time.Now().Add(time.Hour)
+
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "test-requestheader-ca"},
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caCert, err := x509.ParseCertificate(caDER)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var clientCerts []*x509.Certificate
+	for i, commonName := range commonNames {
+		clientKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			t.Fatal(err)
+		}
+		clientTemplate := &x509.Certificate{
+			SerialNumber: big.NewInt(int64(i + 2)),
+			Subject:      pkix.Name{CommonName: commonName},
+			NotBefore:    notBefore,
+			NotAfter:     notAfter,
+			KeyUsage:     x509.KeyUsageDigitalSignature,
+			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+		clientDER, err := x509.CreateCertificate(rand.Reader, clientTemplate, caCert, &clientKey.PublicKey, caKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		clientCert, err := x509.ParseCertificate(clientDER)
+		if err != nil {
+			t.Fatal(err)
+		}
+		clientCerts = append(clientCerts, clientCert)
+	}
+
+	roots := x509.NewCertPool()
+	roots.AddCert(caCert)
+	return roots, clientCerts
 }

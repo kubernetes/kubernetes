@@ -21,19 +21,15 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 )
 
+// RequestHeaderConfig wires request-header authentication's dynamic configuration and
+// client CA provider. The immutable configuration snapshot is headerrequest.RequestHeaderConfig.
 type RequestHeaderConfig struct {
-	// UsernameHeaders are the headers to check (in order, case-insensitively) for an identity. The first header with a value wins.
-	UsernameHeaders headerrequest.StringSliceProvider
-	// UsernameHeaders are the headers to check (in order, case-insensitively) for an identity UID. The first header with a value wins.
-	UIDHeaders headerrequest.StringSliceProvider
-	// GroupHeaders are the headers to check (case-insensitively) for a group names.  All values will be used.
-	GroupHeaders headerrequest.StringSliceProvider
-	// ExtraHeaderPrefixes are the head prefixes to check (case-insentively) for filling in
-	// the user.Info.Extra.  All values of all matching headers will be added.
-	ExtraHeaderPrefixes headerrequest.StringSliceProvider
-	// CAContentProvider the options for verifying incoming connections using mTLS.  Generally this points to CA bundle file which is used verify the identity of the front proxy.
+	// Config provides atomic point-in-time snapshots of the request header configuration,
+	// i.e. the headers to inspect and the allowed front-proxy client common names. It
+	// returns nil when no configuration is available, e.g. because the source configmap
+	// has never been read or has been deleted. Consumers must fail closed on a nil snapshot.
+	Config headerrequest.RequestHeaderConfigProvider
+	// CAContentProvider are the options for verifying incoming connections using mTLS.  Generally this points to CA bundle file which is used verify the identity of the front proxy.
 	//	It may produce different options at will.
 	CAContentProvider dynamiccertificates.CAContentProvider
-	// AllowedClientNames is a list of common names that may be presented by the authenticating front proxy.  Empty means: accept any.
-	AllowedClientNames headerrequest.StringSliceProvider
 }
