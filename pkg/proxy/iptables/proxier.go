@@ -709,6 +709,28 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					proxier.nfAcctCounters[name] = true
 				}
 			}
+
+			// The nfacct netlink subsystem can be available even when the
+			// corresponding iptables match is not. Probe the match before adding
+			// it to the atomic restore payload so an optional metric cannot prevent
+			// Service rules from being programmed.
+			for name, enabled := range proxier.nfAcctCounters {
+				if !enabled {
+					continue
+				}
+				args := []string{"-m", "nfacct", "--nfacct-name", name, "-j", "RETURN"}
+				added, err := proxier.iptables.EnsureRule(utiliptables.Append, utiliptables.TableFilter, kubeForwardChain, args...)
+				if err == nil && !added {
+					err = proxier.iptables.DeleteRule(utiliptables.TableFilter, kubeForwardChain, args...)
+				}
+				if err != nil {
+					proxier.logger.Error(err, "Failed to use iptables nfacct match; nfacct based metrics won't be available")
+					for counterName := range proxier.nfAcctCounters {
+						proxier.nfAcctCounters[counterName] = false
+					}
+				}
+				break
+			}
 		}
 	}
 
