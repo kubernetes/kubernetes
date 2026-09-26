@@ -35,6 +35,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -729,7 +730,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		ginkgo.It("must call NodeUnprepareResources again if it's in progress for one plugin when Kubelet restarts", func(ctx context.Context) {
 			kubeletPlugin1, kubeletPlugin2 := start(ctx)
 
-			unblockNodeUnprepareResources := kubeletPlugin2.BlockNodeUnprepareResources()
+			// Cleanup also unblocks, in case the test fails before the call below.
+			unblockNodeUnprepareResources := sync.OnceFunc(kubeletPlugin2.BlockNodeUnprepareResources())
+			ginkgo.DeferCleanup(unblockNodeUnprepareResources)
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{kubeletPlugin1Name, kubeletPlugin2Name})
 
 			ginkgo.By("wait for plugin1 NodePrepareResources call to succeed")
