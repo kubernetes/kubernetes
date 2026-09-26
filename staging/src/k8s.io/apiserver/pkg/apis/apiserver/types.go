@@ -168,6 +168,14 @@ type TracingConfiguration struct {
 type AuthenticationConfiguration struct {
 	metav1.TypeMeta
 
+	// UserValidationRules are rules that are applied to the authenticated user
+	// from any authenticator (x509, JWT, webhook, etc.) before completing
+	// authentication. The rules are logically ANDed together; all must return
+	// true for authentication to succeed. This allows blocking specific
+	// credentials regardless of the authentication method used.
+	// +optional
+	UserValidationRules []UserValidationRule
+
 	JWT []JWTAuthenticator
 
 	// If present --anonymous-auth must not be set
