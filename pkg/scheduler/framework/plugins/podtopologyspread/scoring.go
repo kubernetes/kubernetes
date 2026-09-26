@@ -19,14 +19,19 @@ package podtopologyspread
 import (
 	"context"
 	"fmt"
-	"k8s.io/klog/v2"
 	"math"
+	"os"
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/utils/ptr"
+	pointer "k8s.io/utils/ptr"
 )
 
 const preScoreStateKey = "PreScore" + Name
@@ -121,7 +126,6 @@ func (pl *PodTopologySpread) PreScore(
 	pod *v1.Pod,
 	filteredNodes []fwk.NodeInfo,
 ) *fwk.Status {
-
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
 		return fwk.AsStatus(fmt.Errorf("getting all nodes: %w", err))
@@ -132,10 +136,10 @@ func (pl *PodTopologySpread) PreScore(
 		return fwk.NewStatus(fwk.Skip)
 	}
 
-	logger := klog.FromContext(ctx)
 	state := &preScoreState{
 		IgnoredNodes: sets.New[string](),
 	}
+
 	// Only require that nodes have all the topology labels if using
 	// non-system-default spreading rules. This allows nodes that don't have a
 	// zone label to still have hostname spreading.
@@ -150,10 +154,60 @@ func (pl *PodTopologySpread) PreScore(
 		return fwk.NewStatus(fwk.Skip)
 	}
 
+	tphash := ""
+	hasTemplateHashInPod := false
+	enablePodTopologySpreadCache := os.Getenv("EnablePodTopologySpreadCache") == "true"
+	if enablePodTopologySpreadCache {
+		if tphash, hasTemplateHashInPod = pod.Annotations[apps.DefaultDeploymentUniqueLabelKey]; pl.cache != nil && hasTemplateHashInPod {
+			data := pl.cache.impl.Read(tphash)
+			if data != nil {
+				data.lock.RLock()
+				defer data.lock.RUnlock()
+				for k, v := range data.preCalRes {
+					if k >= len(state.TopologyValueToPodCounts) {
+						klog.ErrorS(nil, "preCalRes's length is not equal to TopologyValueToPodCounts's length", "preCalRes", data.preCalRes, "constraints", state.Constraints)
+						break
+					}
+					newMp := make(map[string]*int64, len(v))
+					for k1, v1 := range v {
+						newMp[k1] = ptr.To(*v1)
+					}
+					state.TopologyValueToPodCounts[k] = newMp
+				}
+				if len(allNodes) <= 100 {
+					res := ""
+					for k, v := range state.TopologyValueToPodCounts {
+						if len(allNodes) > 30 && len(state.Constraints) > k && state.Constraints[k].TopologyKey == "kubernetes.io/hostname" {
+							continue
+						}
+						for value, count := range v {
+							res += fmt.Sprintf("%v:%v:%v,", state.Constraints[k].TopologyKey, value, *count)
+						}
+					}
+					klog.V(3).Infof("preScoreState cache hit: %v", res)
+				}
+				cycleState.Write(preScoreStateKey, state)
+				return nil
+			}
+		}
+	}
+
 	// Ignore parsing errors for backwards compatibility.
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
-	processAllNode := func(n int) {
-		nodeInfo := allNodes[n]
+	var cacheState *PodTopologySpreadState
+	if enablePodTopologySpreadCache {
+		cacheState = &PodTopologySpreadState{
+			preCalRes:            make([]map[string]*int64, len(state.Constraints)),
+			cachedPods:           make(cachedPodsMap),
+			namespace:            pod.Namespace,
+			constraints:          state.Constraints,
+			requiredNodeAffinity: requiredNodeAffinity,
+			requireAllTopologies: requireAllTopologies,
+		}
+	}
+	caches := make([]cachedPodsMap, len(allNodes))
+	processAllNode := func(i int) {
+		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
 
 		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
@@ -168,10 +222,9 @@ func (pl *PodTopologySpread) PreScore(
 			return
 		}
 
-		for i, c := range state.Constraints {
+		for ci, c := range state.Constraints {
 			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-				!c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity,
-					pl.enableTaintTolerationComparisonOperators) {
+				!c.matchNodeInclusionPolicies(klog.Background(), pod, node, requiredNodeAffinity, false) {
 				continue
 			}
 
@@ -179,18 +232,75 @@ func (pl *PodTopologySpread) PreScore(
 			// If current topology pair is not associated with any candidate node,
 			// continue to avoid unnecessary calculation.
 			// Per-node counts are also skipped, as they are done during Score.
-			tpCount := state.TopologyValueToPodCounts[i][value]
+			tpCount := state.TopologyValueToPodCounts[ci][value]
 			if tpCount == nil {
 				continue
 			}
-			count := countPodsMatchSelector(nodeInfo.GetPods(), c.Selector, pod.Namespace)
+			caches[i] = make(cachedPodsMap)
+			count := countPodsMatchSelectorWithCache(nodeInfo.GetPods(), c.Selector, pod.Namespace, node.Name, value, ci, caches[i])
 			atomic.AddInt64(tpCount, int64(count))
 		}
 	}
 	pl.parallelizer.Until(ctx, len(allNodes), processAllNode, pl.Name())
 
+	if enablePodTopologySpreadCache {
+		cacheState.cachedPods.merge(caches...)
+		if len(cacheState.preCalRes) != len(state.Constraints) {
+			origin := cacheState.preCalRes
+			cacheState.preCalRes = make([]map[string]*int64, len(state.Constraints))
+			copy(cacheState.preCalRes, origin)
+		}
+		for _, pm := range caches {
+			for pn, s := range pm {
+				for index, pair := range s {
+					if index >= len(cacheState.preCalRes) {
+						preCal := []map[string]int64{}
+						for i, mp := range cacheState.preCalRes {
+							preCal = append(preCal, map[string]int64{})
+							for k, v := range mp {
+								preCal[i][k] = *v
+							}
+						}
+						klog.ErrorS(fmt.Errorf("index out of range"), "index out of range in cacheState.preCalRes",
+							"calculatedRes", s, "podName", pn, "preCalRes", cacheState.preCalRes, "cons", state.Constraints)
+						break
+					}
+					if len(cacheState.preCalRes[index]) == 0 {
+						cacheState.preCalRes[index] = map[string]*int64{}
+					}
+					if pair == "" {
+						continue
+					}
+					if _, ok := cacheState.preCalRes[index][pair]; ok {
+						*cacheState.preCalRes[index][pair]++
+					} else {
+						cacheState.preCalRes[index][pair] = pointer.To(int64(1))
+					}
+				}
+			}
+		}
+		pl.cache.impl.Write(tphash, cacheState)
+	}
 	cycleState.Write(preScoreStateKey, state)
 	return nil
+}
+
+func countPodsMatchSelectorWithCache(podInfos []fwk.PodInfo, selector labels.Selector, ns, node, value string, index int, cache cachedPodsMap) int {
+	if selector.Empty() {
+		return 0
+	}
+	count := 0
+	for _, p := range podInfos {
+		// Bypass terminating Pod (see #87621).
+		if p.GetPod().DeletionTimestamp != nil || p.GetPod().Namespace != ns {
+			continue
+		}
+		if selector.Matches(labels.Set(p.GetPod().Labels)) {
+			count++
+			cache.AddPod(p.GetPod().Name, ns, node, value, index)
+		}
+	}
+	return count
 }
 
 // Score invoked at the Score extension point.
@@ -217,6 +327,12 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState fwk.CycleStat
 			if c.TopologyKey == v1.LabelHostname {
 				cnt = int64(countPodsMatchSelector(nodeInfo.GetPods(), c.Selector, pod.Namespace))
 			} else {
+				if len(s.TopologyValueToPodCounts) <= i {
+					continue
+				}
+				if s.TopologyValueToPodCounts[i][tpVal] == nil {
+					continue
+				}
 				cnt = *s.TopologyValueToPodCounts[i][tpVal]
 			}
 			score += scoreForCount(cnt, c.MaxSkew, s.TopologyNormalizingWeight[i])
