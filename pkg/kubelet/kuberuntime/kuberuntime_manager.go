@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -206,6 +207,11 @@ type kubeGenericRuntimeManager struct {
 
 	// Records first initContainer start time and last initContainer finish time
 	podInitContainerTimeRecorder PodInitContainerTimeRecorder
+
+	// Lock and map to track pre-start container failure times so doBackOff can apply exponential backoff
+	// even when the container fails before an exited container status is recorded.
+	containerFailuresLock sync.RWMutex
+	containerFailures     map[string]time.Time
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and streaming runtime.
@@ -288,6 +294,7 @@ func NewKubeGenericRuntimeManager(
 		memoryReservationPolicy:      memoryReservationPolicy,
 		podLogsDirectory:             podLogsDirectory,
 		podInitContainerTimeRecorder: podInitContainerTimeRecorder,
+		containerFailures:            make(map[string]time.Time),
 	}
 
 	// Initialize swap controller availability check with lazy evaluation
@@ -1829,6 +1836,19 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		msg, err = m.startContainer(ctx, podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs, imageVolumes)
 		incrementImageVolumeMetrics(err, msg, spec.container, imageVolumes)
 		if err != nil {
+			// Pre-start failures (e.g. CRI container creation or hook failures) should trigger exponential backoff
+			// instead of continuously tight-loop retrying every pod sync cycle.
+			if !isImageError(err) {
+				now := time.Now()
+				if backOff != nil && backOff.Clock != nil {
+					now = backOff.Clock.Now()
+				}
+				key := GetBackoffKey(pod, spec.container)
+				m.recordFailureTime(key, now)
+				if backOff != nil && backOff.Get(key) == 0 {
+					backOff.Next(key, now)
+				}
+			}
 			// startContainer() returns well-defined error codes that have reasonable cardinality for metrics and are
 			// useful to cluster administrators to distinguish "server errors" from "user errors".
 			metrics.StartedContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
@@ -1846,6 +1866,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			}
 			return err
 		}
+
+		m.clearFailureTime(GetBackoffKey(pod, spec.container))
 		if typeName == "init container" {
 			// Don't measure restartable init containers (sidecars)
 			if !podutil.IsRestartableInitContainer(spec.container) {
@@ -2075,15 +2097,18 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 		}
 	}
 
-	if cStatus == nil {
+	key := GetBackoffKey(pod, container)
+	var ts time.Time
+	if cStatus != nil {
+		ts = cStatus.FinishedAt
+	} else if lastFail, ok := m.getFailureTime(key); ok {
+		ts = lastFail
+	} else {
 		return false, "", nil
 	}
 
 	logger.V(3).Info("Checking backoff for container in pod", "containerName", container.Name, "pod", klog.KObj(pod))
-	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
-	ts := cStatus.FinishedAt
-	// backOff requires a unique key to identify the container.
-	key := GetBackoffKey(pod, container)
+	// Use the finished time of the latest exited container (or pre-start failure time) as the start point to calculate whether to do back-off.
 	if backOff.IsInBackOffSince(key, ts) {
 		if containerRef, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 			m.recorder.WithLogger(logger).Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
@@ -2097,6 +2122,52 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 
 	backOff.Next(key, ts)
 	return false, "", nil
+}
+
+func (m *kubeGenericRuntimeManager) recordFailureTime(key string, ts time.Time) {
+	m.containerFailuresLock.Lock()
+	defer m.containerFailuresLock.Unlock()
+	if m.containerFailures == nil {
+		m.containerFailures = make(map[string]time.Time)
+	}
+	m.containerFailures[key] = ts
+}
+
+func (m *kubeGenericRuntimeManager) getFailureTime(key string) (time.Time, bool) {
+	m.containerFailuresLock.RLock()
+	defer m.containerFailuresLock.RUnlock()
+	if m.containerFailures == nil {
+		return time.Time{}, false
+	}
+	ts, ok := m.containerFailures[key]
+	return ts, ok
+}
+
+func (m *kubeGenericRuntimeManager) clearFailureTime(key string) {
+	m.containerFailuresLock.Lock()
+	defer m.containerFailuresLock.Unlock()
+	if m.containerFailures != nil {
+		delete(m.containerFailures, key)
+	}
+}
+
+func (m *kubeGenericRuntimeManager) cleanExpiredContainerFailures() {
+	m.containerFailuresLock.Lock()
+	defer m.containerFailuresLock.Unlock()
+	now := time.Now()
+	for k, ts := range m.containerFailures {
+		if now.Sub(ts) > 600*time.Second {
+			delete(m.containerFailures, k)
+		}
+	}
+}
+
+func isImageError(err error) bool {
+	return errors.Is(err, images.ErrImagePullBackOff) ||
+		errors.Is(err, images.ErrImagePull) ||
+		errors.Is(err, images.ErrImageNeverPull) ||
+		errors.Is(err, images.ErrImageInspect) ||
+		errors.Is(err, images.ErrInvalidImageName)
 }
 
 // KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
@@ -2292,6 +2363,8 @@ func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy
 			}
 		}
 	}
+
+	m.cleanExpiredContainerFailures()
 
 	return m.containerGC.GarbageCollect(ctx, gcPolicy, allSourcesReady, evictNonDeletedPods)
 }
