@@ -4844,6 +4844,45 @@ type PodSpec struct {
 	// +k8s:maxItems=10
 	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+	// restoreFrom specifies a PodCheckpoint in this Pod's namespace to restore
+	// this Pod from. When set, the Pod is restored from that checkpoint's archive
+	// instead of being created from scratch; the kubelet resolves the reference to
+	// the on-node archive via the PodCheckpoint's status.
+	// This field is immutable. Restoring from another checkpoint requires creating
+	// a new Pod; in-place restore of an existing Pod is not supported.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	// +k8s:optional
+	RestoreFrom *CheckpointReference `json:"restoreFrom,omitempty" protobuf:"bytes,45,opt,name=restoreFrom"`
+}
+
+// CheckpointReference identifies a PodCheckpoint and specifies options for
+// restoring a Pod from it.
+// +structType=atomic
+type CheckpointReference struct {
+	// name is the name of a PodCheckpoint in the Pod's namespace.
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-long-name
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// Options contains opaque runtime-specific options for this restore attempt.
+	// The kubelet passes these entries unchanged to RestorePodRequest.options. Keys
+	// and values must be documented by the runtime selected for this Pod.
+	// Unsupported entries cause the restore to fail. Options must not contain secrets.
+	//
+	// Restore options are independent of the options used to create the
+	// checkpoint and are not stored in the PodCheckpoint. Requirements intrinsic
+	// to the checkpoint are recorded in runtime-owned checkpoint data instead.
+	// At most 64 entries are allowed, with keys of at most 256 bytes and values
+	// of at most 4096 bytes.
+	// +optional
+	// +mapType=atomic
+	// +k8s:optional
+	// +k8s:maxProperties=64
+	// +k8s:eachKey=+k8s:maxBytes=256
+	// +k8s:eachVal=+k8s:maxBytes=4096
+	Options map[string]string `json:"options,omitempty" protobuf:"bytes,2,rep,name=options"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly
@@ -4942,6 +4981,33 @@ type PodExtendedResourceClaimStatus struct {
 	// resourceClaimName is the name of the ResourceClaim that was
 	// generated for the Pod in the namespace of the Pod.
 	ResourceClaimName string `json:"resourceClaimName" protobuf:"bytes,2,name=resourceClaimName"`
+}
+
+// PodRestoreState describes the lifecycle state of restoring a Pod from a
+// checkpoint. Restore is a one-time operation; once it completes, subsequent
+// container, sandbox, Pod, Kubelet, and node restarts use normal reconciliation.
+// +enum
+// +k8s:enum
+type PodRestoreState string
+
+const (
+	PodRestoreStateInProgress PodRestoreState = "InProgress"
+	PodRestoreStateCompleted  PodRestoreState = "Completed"
+	PodRestoreStateFailed     PodRestoreState = "Failed"
+)
+
+// PodRestoreStatus records the outcome of the one-time restore operation.
+type PodRestoreStatus struct {
+	// RestoreState is the current state of the restore operation.
+	// +required
+	// +k8s:required
+	RestoreState PodRestoreState `json:"restoreState" protobuf:"bytes,1,opt,name=restoreState,casttype=PodRestoreState"`
+	// Reason is a brief CamelCase reason for a failed restore.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
+	// Message explains the current restore state.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 }
 
 // ContainerExtendedResourceRequest has the mapping of container name,
@@ -5724,6 +5790,13 @@ type PodStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	Conditions []PodCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
+	// RestoreStatus records the one-time restore operation for a Pod created
+	// with spec.restoreFrom. Once Completed or Failed, this status is not reset.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	// +k8s:optional
+	// +k8s:update=NoUnset
+	RestoreStatus *PodRestoreStatus `json:"restoreStatus,omitempty" protobuf:"bytes,24,opt,name=restoreStatus"`
 	// A human readable message indicating details about why the pod is in this condition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
@@ -5906,6 +5979,7 @@ type Pod struct {
 	// spec is the specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
+	// +k8s:subfield(restoreFrom)=+k8s:immutable
 	Spec PodSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is the most recently observed status of the pod.

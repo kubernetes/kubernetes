@@ -1844,7 +1844,13 @@
         "name": "nameValue",
         "priority": 2
       }
-    ]
+    ],
+    "restoreFrom": {
+      "name": "nameValue",
+      "options": {
+        "optionsKey": "optionsValue"
+      }
+    }
   },
   "status": {
     "observedGeneration": 17,
@@ -1860,6 +1866,11 @@
         "message": "messageValue"
       }
     ],
+    "restoreStatus": {
+      "restoreState": "restoreStateValue",
+      "reason": "reasonValue",
+      "message": "messageValue"
+    },
     "message": "messageValue",
     "reason": "reasonValue",
     "nominatedNodeName": "nominatedNodeNameValue",

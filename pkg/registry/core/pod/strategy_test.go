@@ -5556,6 +5556,24 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 	}
 }
 
+func TestStatusPrepareForUpdateRestoreStatus(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		for _, state := range []api.PodRestoreState{api.PodRestoreStateInProgress, api.PodRestoreStateCompleted, api.PodRestoreStateFailed} {
+			t.Run(fmt.Sprintf("gate=%t/state=%s", enabled, state), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+				oldPod := podtest.MakePod("pod", podtest.SetRestoreFrom("checkpoint"))
+				oldPod.Status.RestoreStatus = &api.PodRestoreStatus{RestoreState: state, Reason: "Recorded", Message: "durable outcome"}
+				newPod := oldPod.DeepCopy()
+				newPod.Status.RestoreStatus = nil
+				StatusStrategy.PrepareForUpdate(genericapirequest.NewContext(), newPod, oldPod)
+				if diff := cmp.Diff(oldPod.Status.RestoreStatus, newPod.Status.RestoreStatus); diff != "" {
+					t.Errorf("restore status lost during preparation (-want +got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
 func TestWarningsOnUpdate(t *testing.T) {
 	tests := []struct {
 		name     string

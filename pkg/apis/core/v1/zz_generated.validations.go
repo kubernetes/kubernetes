@@ -270,6 +270,91 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Validate_CheckpointReference validates an instance of CheckpointReference according
+// to declarative validation rules in the API schema.
+func Validate_CheckpointReference(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.CheckpointReference) (errs field.ErrorList) {
+
+	{ // field corev1.CheckpointReference.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.CheckpointReference) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.CheckpointReference.Options
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxProperties(ctx, op, fldPath, obj, oldObj, 64).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 256)
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 4096)
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.CheckpointReference) map[string]string {
+				return oldObj.Options
+			})
+		errs = append(errs, fn(fldPath.Child("options"), obj.Options, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_ConfigMap validates an instance of ConfigMap according
 // to declarative validation rules in the API schema.
 func Validate_ConfigMap(
@@ -1258,6 +1343,18 @@ func Validate_Pod(
 					return nil
 				}
 			}
+			// call field-attached validations
+			func() { // cohort = "restoreFrom"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "restoreFrom",
+					func(o *corev1.PodSpec) *corev1.CheckpointReference { return o.RestoreFrom }, validate.SemanticDeepEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			// call the type's validation function
 			errs = append(errs, Validate_PodSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -1291,6 +1388,63 @@ func Validate_Pod(
 		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
 	}
 
+	return errs
+}
+
+var symbolsForPodRestoreState = sets.New(corev1.PodRestoreStateCompleted, corev1.PodRestoreStateFailed, corev1.PodRestoreStateInProgress)
+
+// Validate_PodRestoreState validates an instance of PodRestoreState according
+// to declarative validation rules in the API schema.
+func Validate_PodRestoreState(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodRestoreState) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForPodRestoreState, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_PodRestoreStatus validates an instance of PodRestoreStatus according
+// to declarative validation rules in the API schema.
+func Validate_PodRestoreStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodRestoreStatus) (errs field.ErrorList) {
+
+	{ // field corev1.PodRestoreStatus.RestoreState
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodRestoreState,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodRestoreState(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodRestoreStatus) *corev1.PodRestoreState {
+				return &oldObj.RestoreState
+			})
+		errs = append(errs, fn(fldPath.Child("restoreState"), &obj.RestoreState, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.PodRestoreStatus.Reason has no validation
+	// field corev1.PodRestoreStatus.Message has no validation
 	return errs
 }
 
@@ -1467,6 +1621,36 @@ func Validate_PodSpec(
 		errs = append(errs, fn(fldPath.Child("evictionResponders"), obj.EvictionResponders, oldVal, oldObj != nil)...)
 	}
 
+	{ // field corev1.PodSpec.RestoreFrom
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.CheckpointReference,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CheckpointReference(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) *corev1.CheckpointReference {
+				return oldObj.RestoreFrom
+			})
+		errs = append(errs, fn(fldPath.Child("restoreFrom"), obj.RestoreFrom, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -1479,6 +1663,41 @@ func Validate_PodStatus(
 	// field corev1.PodStatus.ObservedGeneration has no validation
 	// field corev1.PodStatus.Phase has no validation
 	// field corev1.PodStatus.Conditions has no validation
+
+	{ // field corev1.PodStatus.RestoreStatus
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodRestoreStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodRestoreStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodStatus) *corev1.PodRestoreStatus {
+				return oldObj.RestoreStatus
+			})
+		errs = append(errs, fn(fldPath.Child("restoreStatus"), obj.RestoreStatus, oldVal, oldObj != nil)...)
+	}
+
 	// field corev1.PodStatus.Message has no validation
 	// field corev1.PodStatus.Reason has no validation
 	// field corev1.PodStatus.NominatedNodeName has no validation
