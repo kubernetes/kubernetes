@@ -2543,17 +2543,35 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 						ClaimName: directClaimName,
 						PodUIDs:   sets.New("pod-direct-uid"),
 						DriverState: map[string]state.DriverState{
-							"test-driver": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-a"}}},
+							"test-driver-b": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-b"}}},
+							"test-driver-a": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-a"}}},
 						},
 					},
 				},
 			},
-			initialStatus: &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Name: "container1"}}},
+			initialStatus: &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{
+				Name: "container1",
+				AllocatedResourcesStatus: []v1.ResourceStatus{{
+					Name: "vendor.com/device",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "dev-b", Health: v1.ResourceHealthStatusHealthy},
+						{ResourceID: "dev-a", Health: v1.ResourceHealthStatusHealthy},
+					},
+				}},
+			}}},
 			expectedAllocatedResourcesStatus: []v1.ResourceStatus{
 				{
 					Name: "claim:claim1",
 					Resources: []v1.ResourceHealth{
-						{ResourceID: "test-driver/pool/dev-a", Health: v1.ResourceHealthStatusHealthy, Message: ptr.To("Device is operating normally")},
+						{ResourceID: "test-driver-a/pool/dev-a", Health: v1.ResourceHealthStatusHealthy, Message: ptr.To("Device is operating normally")},
+						{ResourceID: "test-driver-b/pool/dev-b", Health: v1.ResourceHealthStatusHealthy, Message: ptr.To("Device is operating normally")},
+					},
+				},
+				{
+					Name: "vendor.com/device",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "dev-a", Health: v1.ResourceHealthStatusHealthy},
+						{ResourceID: "dev-b", Health: v1.ResourceHealthStatusHealthy},
 					},
 				},
 			},
