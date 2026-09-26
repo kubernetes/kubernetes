@@ -4748,6 +4748,15 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: sidecar_restarts_during_termination_total
+  subsystem: kubelet
+  help: Number of sidecar restarts during graceful pod shutdown while other containers
+    still need them.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: sleep_action_terminated_early_total
   subsystem: kubelet
   help: The number of times lifecycle sleep handler got terminated before it finishes

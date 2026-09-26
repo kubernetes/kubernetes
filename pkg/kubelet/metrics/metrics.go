@@ -812,6 +812,16 @@ var (
 		},
 		[]string{"container_type", "exit_code", "reason"},
 	)
+	// SidecarRestartsDuringTerminationTotal counts sidecar restarts needed to
+	// keep other containers running during graceful pod shutdown.
+	SidecarRestartsDuringTerminationTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "sidecar_restarts_during_termination_total",
+			Help:           "Number of sidecar restarts during graceful pod shutdown while other containers still need them.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 	// StartedContainersTotal is a counter that tracks the number of errors creating containers
 	StartedContainersErrorsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -1504,6 +1514,7 @@ func Register() {
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
+		legacyregistry.MustRegister(SidecarRestartsDuringTerminationTotal)
 		legacyregistry.MustRegister(TerminatedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersTotal)

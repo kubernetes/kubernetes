@@ -130,6 +130,9 @@ func ShouldContainerBeRestarted(logger klog.Logger, container *v1.Container, pod
 // Then checks if any container from podStatus are exited with matching rules,
 // or any containers from apiPodStatus are exited with matching rules.
 func ShouldAllContainersRestart(pod *v1.Pod, podStatus *PodStatus, apiPodStatus *v1.PodStatus) bool {
+	if pod == nil || pod.DeletionTimestamp != nil {
+		return false
+	}
 	if apiPodStatus != nil {
 		for _, cond := range apiPodStatus.Conditions {
 			if cond.Type == v1.AllContainersRestarting && cond.Status == v1.ConditionTrue {

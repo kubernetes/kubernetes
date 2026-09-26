@@ -152,6 +152,8 @@ type podWork struct {
 
 	// Options contains the data to sync.
 	Options UpdatePodOptions
+	// TerminationDeadline bounds all reconciliation attempts for this pod.
+	TerminationDeadline time.Time
 }
 
 // PodWorkers is an abstract interface for testability.
@@ -161,7 +163,7 @@ type PodWorkers interface {
 	// pod will be passed to the syncPod method until either the pod is marked
 	// as deleted, it reaches a terminal phase (Succeeded/Failed), or the pod
 	// is evicted by the kubelet. Once that occurs the syncTerminatingPod method
-	// will be called until it exits successfully, and after that all further
+	// will be called until it reports completion, and after that all further
 	// UpdatePod() calls will be ignored for that pod until it has been forgotten
 	// due to significant time passing. A pod that is terminated will never be
 	// restarted.
@@ -268,13 +270,12 @@ type podSyncer interface {
 	// If an error is returned, the sync was not successful and should be rerun in the future. This
 	// is a long running method and should exit early with context.Canceled if the context is canceled.
 	SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error)
-	// SyncTerminatingPod attempts to ensure the pod's containers are no longer running and to collect
-	// any final status. This method is repeatedly invoked with diminishing grace periods until it exits
-	// without error. Once this method exits with no error other components are allowed to tear down
-	// supporting resources like volumes and devices. If the context is canceled, the method should
-	// return context.Canceled unless it has successfully finished, which may occur when a shorter
-	// grace period is detected.
-	SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
+	// SyncTerminatingPod stops containers and collects final status. It returns
+	// true only when every container has stopped. False without an error requests
+	// another reconciliation without failure backoff. Supporting resources must
+	// remain available until completion. The absolute deadline bounds all attempts;
+	// the context may be cancelled when a shorter grace period is requested.
+	SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, deadline time.Time, podStatusFn func(*v1.PodStatus)) (bool, error)
 	// SyncTerminatingRuntimePod is invoked when running containers are found that correspond to
 	// a pod that is no longer known to the kubelet to terminate those containers. It should not
 	// exit without error unless all containers are known to be stopped.
@@ -286,7 +287,7 @@ type podSyncer interface {
 }
 
 type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error)
-type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
+type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, deadline time.Time, podStatusFn func(*v1.PodStatus)) (bool, error)
 type syncTerminatingRuntimePodFnType func(ctx context.Context, runningPod *kubecontainer.Pod) error
 type syncTerminatedPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
 
@@ -312,8 +313,8 @@ var _ podSyncer = podSyncerFuncs{}
 func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
 	return f.syncPod(ctx, updateType, pod, mirrorPod, podStatus)
 }
-func (f podSyncerFuncs) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
-	return f.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, podStatusFn)
+func (f podSyncerFuncs) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, deadline time.Time, podStatusFn func(*v1.PodStatus)) (bool, error) {
+	return f.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, deadline, podStatusFn)
 }
 func (f podSyncerFuncs) SyncTerminatingRuntimePod(ctx context.Context, runningPod *kubecontainer.Pod) error {
 	return f.syncTerminatingRuntimePod(ctx, runningPod)
@@ -384,6 +385,8 @@ type podSyncStatus struct {
 	terminatedAt time.Time
 	// gracePeriod is the requested gracePeriod once terminatingAt is nonzero.
 	gracePeriod int64
+	// terminationDeadline can only move earlier after termination begins.
+	terminationDeadline time.Time
 	// notifyPostTerminating will be closed once the pod transitions to
 	// terminated. After the pod is in terminated state, nothing should be
 	// added to this list.
@@ -397,7 +400,8 @@ type podSyncStatus struct {
 	// startedTerminating is true once the pod worker has observed the request to
 	// stop a pod (exited syncPod and observed a podWork with WorkType
 	// TerminatingPod). Once this is set, it is safe for other components
-	// of the kubelet to assume that no other containers may be started.
+	// of the kubelet to stop normal pod setup. Sidecars may still restart until
+	// their termination turn when SidecarsRestartableDuringPodTermination is enabled.
 	startedTerminating bool
 	// deleted is true if the pod has been marked for deletion on the apiserver
 	// or has no configuration represented (was deleted before).
@@ -618,7 +622,7 @@ type podWorkers struct {
 	allocationManager allocation.Manager
 
 	// clock is used for testing timing
-	clock clock.PassiveClock
+	clock clock.Clock
 }
 
 func newPodWorkers(
@@ -693,7 +697,7 @@ func (p *podWorkers) ShouldPodContainersBeTerminating(uid types.UID) bool {
 	defer p.podLock.Unlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
 		// we wait until the pod worker goroutine observes the termination, which means syncPod will not
-		// be executed again, which means no new containers can be started
+		// be executed again. Termination reconciliation may still restart sidecars
 		return status.IsTerminationStarted()
 	}
 	// once we've synced, if the pod isn't known to the workers we should be tearing them
@@ -934,6 +938,9 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 
 		wasGracePeriodShortened = gracePeriodShortened
 		status.gracePeriod = gracePeriod
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarsRestartableDuringPodTermination) && kubetypes.HasRestartableInitContainer(pod) {
+			status.terminationDeadline = calculateTerminationDeadline(status, pod, gracePeriod, gracePeriodShortened, now)
+		}
 		// always set the grace period for syncTerminatingPod so we don't have to recalculate,
 		// will never be zero.
 		options.KillPodOptions.PodTerminationGracePeriodSecondsOverride = &gracePeriod
@@ -1002,6 +1009,25 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 		status.cancelFn()
 		return
 	}
+}
+
+// calculateTerminationDeadline preserves the budget across retries. A shorter
+// request gets its duration from now, capped by the existing deadline. The API
+// deletion timestamp also survives kubelet restarts and is already a deadline.
+func calculateTerminationDeadline(status *podSyncStatus, pod *v1.Pod, grace int64, shortened bool, now time.Time) time.Time {
+	deadline := status.terminationDeadline
+	if deadline.IsZero() {
+		deadline = status.terminatingAt.Add(time.Duration(grace) * time.Second)
+	} else if shortened {
+		candidate := now.Add(time.Duration(grace) * time.Second)
+		if candidate.Before(deadline) {
+			deadline = candidate
+		}
+	}
+	if pod.DeletionTimestamp != nil && pod.DeletionTimestamp.Time.Before(deadline) {
+		deadline = pod.DeletionTimestamp.Time
+	}
+	return deadline
 }
 
 // calculateEffectiveGracePeriod sets the initial grace period for a newly terminating pod or allows a
@@ -1153,7 +1179,15 @@ func (p *podWorkers) startPodSync(parentCtx context.Context, podUID types.UID) (
 	}
 
 	// consume the pending update
+	if status.IsTerminationRequested() && status.terminationDeadline.IsZero() &&
+		utilfeature.DefaultFeatureGate.Enabled(features.SidecarsRestartableDuringPodTermination) && status.pendingUpdate.Pod != nil && kubetypes.HasRestartableInitContainer(status.pendingUpdate.Pod) {
+		grace, _ := calculateEffectiveGracePeriod(status, status.pendingUpdate.Pod, status.pendingUpdate.KillPodOptions)
+		status.terminationDeadline = calculateTerminationDeadline(status, status.pendingUpdate.Pod, grace, false, p.clock.Now())
+	}
 	update.WorkType = status.WorkType()
+	if update.WorkType == TerminatingPod {
+		update.TerminationDeadline = status.terminationDeadline
+	}
 	update.Options = *status.pendingUpdate
 	status.pendingUpdate = nil
 	select {
@@ -1244,7 +1278,35 @@ func podUIDAndRefForUpdate(update UpdatePodOptions) (types.UID, klog.ObjectRef) 
 // queued immediately and no kubelet action is required.
 func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, podUpdates <-chan struct{}) {
 	var lastSyncTime time.Time
-	for range podUpdates {
+	var retryTimer clock.Timer
+	var retry <-chan time.Time
+	defer func() {
+		if retryTimer != nil {
+			retryTimer.Stop()
+		}
+	}()
+	for {
+		select {
+		case _, open := <-podUpdates:
+			if !open {
+				return
+			}
+		case <-retry:
+			retry = nil
+			// Removed pods no longer receive resyncs through podManager. Replay
+			// the worker's last spec so they also make progress without PLEG events.
+			p.podLock.Lock()
+			if status, ok := p.podSyncStatuses[podUID]; ok && status.WorkType() == TerminatingPod && !status.working {
+				p.requeueLastPodUpdate(podUID, status)
+			}
+			p.podLock.Unlock()
+			continue
+		}
+		if retryTimer != nil {
+			retryTimer.Stop()
+			retryTimer = nil
+			retry = nil
+		}
 		ctx, update, canStart, canEverStart, ok := p.startPodSync(parentCtx, podUID)
 		// If we had no update waiting, it means someone initialized the channel without filling out pendingUpdate.
 		if !ok {
@@ -1264,6 +1326,7 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 
 		logger.V(4).Info("Processing pod event", "pod", podRef, "podUID", podUID, "updateType", update.WorkType)
 		var isTerminal bool
+		terminationComplete := false
 		err := func() error {
 			// The worker is responsible for ensuring the sync method sees the appropriate
 			// status updates on resyncs (the result of the last sync), transitions to
@@ -1276,6 +1339,11 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 			case update.Options.RunningPod != nil:
 				// when we receive a running pod, we don't need status at all because we are
 				// guaranteed to be terminating and we skip updates to the pod
+			case update.WorkType == TerminatingPod && !update.TerminationDeadline.IsZero():
+				// Termination reconciles directly against the runtime. Waiting for
+				// PLEG here would prevent the worker timer from enforcing the deadline
+				// when the cache stops advancing.
+				status = &kubecontainer.PodStatus{ID: podUID}
 			default:
 				// wait until we see the next refresh from the PLEG via the cache (max 2s)
 				// TODO: this adds ~1s of latency on all transitions from sync to terminating
@@ -1312,7 +1380,7 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 				if update.Options.RunningPod != nil {
 					err = p.podSyncer.SyncTerminatingRuntimePod(ctx, update.Options.RunningPod)
 				} else {
-					err = p.podSyncer.SyncTerminatingPod(ctx, update.Options.Pod, status, gracePeriod, podStatusFn)
+					terminationComplete, err = p.podSyncer.SyncTerminatingPod(ctx, update.Options.Pod, status, gracePeriod, update.TerminationDeadline, podStatusFn)
 				}
 
 			default:
@@ -1356,7 +1424,10 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 				logger.V(4).Info("Processing pod event done", "pod", podRef, "podUID", podUID, "updateType", update.WorkType)
 				return
 			}
-			// otherwise we move to the terminating phase
+			if !terminationComplete {
+				break
+			}
+			// All containers have stopped; resources may now be released.
 			p.completeTerminating(logger, podUID)
 			phaseTransition = true
 
@@ -1368,7 +1439,11 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 		}
 
 		// queue a retry if necessary, then put the next event in the channel if any
-		p.completeWork(logger, podUID, phaseTransition, err)
+		retryAfter := p.completeWork(logger, podUID, phaseTransition, err, update.TerminationDeadline)
+		if !phaseTransition && !update.TerminationDeadline.IsZero() {
+			retryTimer = p.clock.NewTimer(retryAfter)
+			retry = retryTimer.C()
+		}
 		if start := update.Options.StartTime; !start.IsZero() {
 			metrics.PodWorkerDuration.WithLabelValues(update.Options.UpdateType.String()).Observe(metrics.SinceInSeconds(start))
 		}
@@ -1377,8 +1452,8 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 }
 
 // acknowledgeTerminating sets the terminating flag on the pod status once the pod worker sees
-// the termination state so that other components know no new containers will be started in this
-// pod. It then returns the status function, if any, that applies to this pod.
+// the termination state so other components can stop normal pod setup. Sidecar
+// restarts remain possible until their ordered turn. It returns the status callback.
 func (p *podWorkers) acknowledgeTerminating(logger klog.Logger, podUID types.UID) PodStatusFunc {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
@@ -1521,17 +1596,18 @@ func (p *podWorkers) completeTerminated(logger klog.Logger, podUID types.UID) {
 
 // completeWork requeues on error or the next sync interval and then immediately executes any pending
 // work.
-func (p *podWorkers) completeWork(logger klog.Logger, podUID types.UID, phaseTransition bool, syncErr error) {
+func (p *podWorkers) completeWork(logger klog.Logger, podUID types.UID, phaseTransition bool, syncErr error, terminationDeadline time.Time) time.Duration {
+	var delay time.Duration
 	// Requeue the last update if the last sync returned error.
 	switch {
 	case phaseTransition:
-		p.workQueue.Enqueue(podUID, 0)
+		delay = 0
 	case syncErr == nil:
 		// No error; requeue at the regular resync interval.
-		p.workQueue.Enqueue(podUID, wait.Jitter(p.resyncInterval, workerResyncIntervalJitterFactor))
+		delay = wait.Jitter(p.resyncInterval, workerResyncIntervalJitterFactor)
 	case strings.Contains(syncErr.Error(), NetworkNotReadyErrorMsg):
 		// Network is not ready; back off for short period of time and retry as network might be ready soon.
-		p.workQueue.Enqueue(podUID, wait.Jitter(backOffOnTransientErrorPeriod, workerBackOffPeriodJitterFactor))
+		delay = wait.Jitter(backOffOnTransientErrorPeriod, workerBackOffPeriodJitterFactor)
 	default:
 		// Error occurred during the sync; back off and then retry. If the error includes a backoff expiration,
 		// wait until then instead of the default to avoid adding extra time to the backoff.
@@ -1544,8 +1620,22 @@ func (p *podWorkers) completeWork(logger klog.Logger, podUID types.UID, phaseTra
 		} else if backoff > p.resyncInterval {
 			backoff = p.resyncInterval
 		}
-		p.workQueue.Enqueue(podUID, wait.Jitter(backoff, workerBackOffPeriodJitterFactor))
+		delay = wait.Jitter(backoff, workerBackOffPeriodJitterFactor)
 	}
+
+	if !phaseTransition && !terminationDeadline.IsZero() {
+		// CRI completions and grace expiry need a retry even without a PLEG event.
+		if syncErr == nil {
+			delay = time.Second
+		}
+		remaining := terminationDeadline.Sub(p.clock.Now())
+		if remaining > 0 {
+			delay = min(delay, remaining)
+		} else {
+			delay = min(delay, time.Second)
+		}
+	}
+	p.workQueue.Enqueue(podUID, delay)
 
 	// if there is a pending update for this worker, requeue immediately, otherwise
 	// clear working status
@@ -1563,6 +1653,7 @@ func (p *podWorkers) completeWork(logger klog.Logger, podUID types.UID, phaseTra
 			status.working = false
 		}
 	}
+	return delay
 }
 
 // SyncKnownPods will purge any fully terminated pods that are not in the desiredPods
