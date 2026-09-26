@@ -317,7 +317,7 @@ func (o *LabelOptions) RunLabel() error {
 			}
 			for _, label := range o.removeLabels {
 				if _, ok := accessor.GetLabels()[label]; !ok {
-					fmt.Fprintf(o.Out, "label %q not found.\n", label)
+					fmt.Fprintf(o.ErrOut, "label %q not found.\n", label)
 				}
 			}
 
