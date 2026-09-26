@@ -1787,3 +1787,24 @@ func TestFilterPodsByOwner(t *testing.T) {
 		})
 	}
 }
+
+func TestPodIsRejectedFinished(t *testing.T) {
+	finished := PodIsRejectedFinished(buildPod())
+	if !finished {
+		t.Errorf("PodIsRejectedFinished returned false")
+	}
+}
+
+func buildPod() *v1.Pod {
+	return &v1.Pod{
+		Status: v1.PodStatus{
+			Phase: v1.PodFailed,
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodRejected,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+}
