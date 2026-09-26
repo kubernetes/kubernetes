@@ -4640,6 +4640,29 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 	}
 }
 
+// TestPodResizeStrategyValidateUpdate proves, through the real ResizeStrategy.ValidateUpdate path
+// (not just the isolated apis/core/validation unit tests), that a container's unchanged stored
+// resource quantity is ratcheted during a resize: this is the actual production entry point, and
+// it must build PodValidationOptions the same way the unit tests assume it does.
+func TestPodResizeStrategyValidateUpdate(t *testing.T) {
+	fractionalGPULimit := podtest.SetContainerResources(api.ResourceRequirements{
+		Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+		Limits: api.ResourceList{
+			api.ResourceCPU:                     resource.MustParse("100m"),
+			api.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m"),
+		},
+	})
+	oldPod := podtest.MakePod("test-pod", podtest.SetResourceVersion("1"), podtest.SetContainers(podtest.MakeContainer("container1", fractionalGPULimit)))
+	newPod := oldPod.DeepCopy()
+	newPod.Spec.Containers[0].Resources.Requests[api.ResourceCPU] = resource.MustParse("200m")
+	newPod.Spec.Containers[0].Resources.Limits[api.ResourceCPU] = resource.MustParse("200m")
+
+	errs := ResizeStrategy.ValidateUpdate(genericapirequest.NewContext(), newPod, oldPod)
+	if len(errs) != 0 {
+		t.Errorf("unexpected errors from the real resize strategy path: %v", errs)
+	}
+}
+
 func TestPodGenerationPrepareForCreate(t *testing.T) {
 	testCases := []struct {
 		pod                *api.Pod

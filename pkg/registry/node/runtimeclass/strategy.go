@@ -25,6 +25,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodeapi "k8s.io/kubernetes/pkg/api/node"
+	"k8s.io/kubernetes/pkg/apis/core"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/node/validation"
 )
@@ -70,7 +72,7 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 // Validate validates a new RuntimeClass. Validation must check for a correct signature.
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	runtimeClass := obj.(*node.RuntimeClass)
-	return validation.ValidateRuntimeClass(runtimeClass)
+	return validation.ValidateRuntimeClass(runtimeClass, corevalidation.PodValidationOptions{})
 }
 
 // DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
@@ -92,8 +94,25 @@ func (strategy) Canonicalize(obj runtime.Object) {
 // ValidateUpdate is the default update validation for an end user.
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newObj := obj.(*node.RuntimeClass)
-	errorList := validation.ValidateRuntimeClass(newObj)
-	errorList = append(errorList, validation.ValidateRuntimeClassUpdate(newObj, old.(*node.RuntimeClass))...)
+	oldObj := old.(*node.RuntimeClass)
+	var oldOverhead core.ResourceList
+	if oldObj.Overhead != nil {
+		oldOverhead = oldObj.Overhead.PodFixed
+	}
+	// an overhead value the stored object already carries was accepted when it was written; see
+	// kubernetes/kubernetes#141166. The key must match the location validateOverhead uses
+	// ("overhead", giving the lookup "overhead/limits"). This also covers a stored indivisible
+	// hugepages value: validateResourceQuantityHugePageValue ratchets an exact (location, name,
+	// quantity) match the same way, so a per-value StoredResourceQuantities hit is enough here
+	// without the coarser, whole-overhead AllowIndivisibleHugePagesValues flag pods use, which
+	// would let a changed or unrelated new hugepages entry through too.
+	opts := corevalidation.PodValidationOptions{
+		StoredResourceQuantities: corevalidation.StoredResourceQuantitiesOfLocatedLists(map[string]core.ResourceList{
+			"overhead/limits": oldOverhead,
+		}),
+	}
+	errorList := validation.ValidateRuntimeClass(newObj, opts)
+	errorList = append(errorList, validation.ValidateRuntimeClassUpdate(newObj, oldObj)...)
 	return errorList
 }
 

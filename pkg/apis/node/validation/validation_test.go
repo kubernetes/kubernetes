@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/utils/ptr"
 
@@ -51,7 +52,7 @@ func TestValidateRuntimeClass(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			errs := ValidateRuntimeClass(&test.rc)
+			errs := ValidateRuntimeClass(&test.rc, corevalidation.PodValidationOptions{})
 			if test.expectError {
 				assert.NotEmpty(t, errs)
 			} else {
@@ -136,7 +137,7 @@ func TestValidateOverhead(t *testing.T) {
 			Handler:    "bar",
 			Overhead:   tc.overhead,
 		}
-		if errs := ValidateRuntimeClass(rc); len(errs) != 0 {
+		if errs := ValidateRuntimeClass(rc, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("%q unexpected error: %v", tc.Name, errs)
 		}
 	}
@@ -173,7 +174,7 @@ func TestValidateOverhead(t *testing.T) {
 			Handler:    "bar",
 			Overhead:   tc.overhead,
 		}
-		if errs := ValidateRuntimeClass(rc); len(errs) == 0 {
+		if errs := ValidateRuntimeClass(rc, corevalidation.PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("%q expected error", tc.Name)
 		}
 	}
@@ -257,7 +258,7 @@ func TestValidateScheduling(t *testing.T) {
 				Handler:    "bar",
 				Scheduling: test.scheduling,
 			}
-			assert.Len(t, ValidateRuntimeClass(rc), test.expectErrs)
+			assert.Len(t, ValidateRuntimeClass(rc, corevalidation.PodValidationOptions{}), test.expectErrs)
 		})
 	}
 }
