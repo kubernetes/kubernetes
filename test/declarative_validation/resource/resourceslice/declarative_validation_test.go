@@ -64,6 +64,20 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid": {
 					input: mkResourceSliceWithDevices(),
 				},
+				// spec.driver
+				"invalid: empty driver": {
+					input: mkResourceSliceWithDevices(tweakDriver("")),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "driver"), "").MarkAlpha(),
+					},
+				},
+				// spec.pool.name
+				"invalid: empty pool name": {
+					input: mkResourceSliceWithDevices(tweakPoolName("")),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "pool", "name"), "").MarkAlpha(),
+					},
+				},
 				// spec.devices[%d].bindingConditions
 				"valid: one binding condition": {
 					input: mkResourceSliceWithDevices(tweakBindingConditions(1)),
@@ -606,6 +620,52 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					old:    mkResourceSliceWithDevices(),
 					update: mkResourceSliceWithDevices(),
 				},
+				// spec.driver
+				"invalid update: driver changed": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDriver("other.driver.io")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "driver"), "other.driver.io", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"invalid update: driver set from unset": {
+					old:    mkResourceSliceWithDevices(tweakDriver("")),
+					update: mkResourceSliceWithDevices(),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "driver"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"invalid update: driver unset from set": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDriver("")),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "driver"), "").MarkAlpha(),
+						field.Invalid(field.NewPath("spec", "driver"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				// spec.pool.name
+				"invalid update: pool name changed": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakPoolName("other-pool")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "pool", "name"), "other-pool", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"invalid update: pool name set from unset": {
+					old:    mkResourceSliceWithDevices(tweakPoolName("")),
+					update: mkResourceSliceWithDevices(),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "pool", "name"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"invalid update: pool name unset from set": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakPoolName("")),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "pool", "name"), "").MarkAlpha(),
+						field.Invalid(field.NewPath("spec", "pool", "name"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
 				// spec.devices[%d].bindingConditions
 				"valid update: at limit binding conditions": {
 					old:    mkResourceSliceWithDevices(),
@@ -958,6 +1018,18 @@ func tweakBindingConditions(count int) func(*resource.ResourceSlice) {
 		for i := 0; i < count; i++ {
 			rs.Spec.Devices[0].BindingConditions = append(rs.Spec.Devices[0].BindingConditions, fmt.Sprintf("condition-%d", i))
 		}
+	}
+}
+
+func tweakPoolName(name string) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.Pool.Name = name
+	}
+}
+
+func tweakDriver(driver string) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.Driver = driver
 	}
 }
 
