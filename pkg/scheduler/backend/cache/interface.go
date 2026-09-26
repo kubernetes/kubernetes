@@ -146,11 +146,14 @@ type Cache interface {
 	// RemoveGenericPodGroup removes a generic pod group object from the cache.
 	RemoveGenericPodGroup(logger klog.Logger, gpg *fwk.GenericPodGroup)
 
-	// BuildHierarchySnapshotFromPod returns a snapshot of the pod group hierarchy for the given pod.
-	BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error)
+	// FindRootKeyForGroup returns the root *EntityKey of the hierarchy for the given EntityKey,
+	// or nil if the root group was not found (i.e. does not exist).
+	FindRootKeyForGroup(key fwk.EntityKey) (*fwk.EntityKey, error)
 
-	// GetRootKeyForGroup returns the root key of the given EntityKey.
-	GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error)
+	// FindRootGroup returns the *RootGroup containing the root key, PodGroup/PodGroupState (if root is a PodGroup),
+	// or CompositePodGroup/CompositePodGroupState (if root is a CompositePodGroup) for the given EntityKey,
+	// or nil if the root group was not found.
+	FindRootGroup(key fwk.EntityKey) (*fwk.RootGroup, error)
 }
 
 // Dump is a dump of the cache state.
