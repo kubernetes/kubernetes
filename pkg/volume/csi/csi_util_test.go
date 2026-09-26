@@ -287,6 +287,26 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 		}
 	})
 
+	t.Run("follows a reference under globalmount, as ceph-csi RBD publishes", func(t *testing.T) {
+		plug, podLocalDir, globalDataDir := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
+			// ceph-csi RBD publishes from a per-volume subdirectory of
+			// globalmount, so the pod-local mount is bound to
+			// globalmount/<volID>, not globalmount itself.
+			return []mount.MountPoint{
+				{Device: device, Path: filepath.Join(globalMount, "0001-0024-abcdef")},
+				{Device: device, Path: podMount},
+			}
+		})
+
+		dir, data, err := findGlobalMountDataFromPodMount(plug.host, podLocalDir, "staged-pv")
+		if err != nil {
+			t.Fatalf("findGlobalMountDataFromPodMount: %v", err)
+		}
+		if dir != globalDataDir || data[volDataKey.volHandle] != volHandle {
+			t.Errorf("got %q with handle %q, want %q with handle %q", dir, data[volDataKey.volHandle], globalDataDir, volHandle)
+		}
+	})
+
 	t.Run("an inline volume does not pair with a PV of the same name", func(t *testing.T) {
 		// The staged PV is named "data". So is an inline ephemeral volume in
 		// some pod, which is legal: one name is a PV name, the other an entry

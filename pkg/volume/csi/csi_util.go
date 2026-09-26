@@ -115,15 +115,23 @@ func findGlobalMountDataFromPodMount(host volume.VolumeHost, mountPath, specVolI
 	var unnamedData map[string]string
 	unnamed := 0
 	for _, ref := range refs {
-		if filepath.Base(ref) != globalMountInGlobalPath {
+		// vol_data.json sits beside the globalmount directory MountDevice
+		// stages into, so a reference named globalmount is found through its
+		// parent. A driver that publishes from a subdirectory of globalmount,
+		// as ceph-csi RBD does with globalmount/<volID>, is found through its
+		// grandparent. Checking the contents rather than the path prefix keeps
+		// this correct when the kubelet root is reached through a symlink,
+		// where the mount table reports the resolved path and GetPluginDir does
+		// not.
+		var dir string
+		switch {
+		case filepath.Base(ref) == globalMountInGlobalPath:
+			dir = filepath.Dir(ref)
+		case filepath.Base(filepath.Dir(ref)) == globalMountInGlobalPath:
+			dir = filepath.Dir(filepath.Dir(ref))
+		default:
 			continue
 		}
-		// A directory named globalmount that carries a vol_data.json with both
-		// keys MountDevice writes is a CSI global mount. Checking the contents
-		// rather than the path prefix keeps this correct when the kubelet root
-		// is reached through a symlink, where the mount table reports the
-		// resolved path and GetPluginDir does not.
-		dir := filepath.Dir(ref)
 		data, err := loadVolumeData(dir, volDataFileName)
 		if err != nil {
 			klog.V(4).Info(log("skipping mount reference %s with no readable volume data: %v", ref, err))
