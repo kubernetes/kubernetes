@@ -17,6 +17,7 @@ limitations under the License.
 package limitranger
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -298,23 +299,108 @@ func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.Resourc
 	}
 }
 
-// exceedsAllowed reports whether limit is greater than request times ratio.
+// exceedsAllowed reports whether limit is greater than request times ratio,
+// comparing magnitudes.
 // Quantity has no multiply and inf.Dec.Mul adds the two scales as an int32, so
-// the product is formed here with the scale kept in int64 and handed to Cmp.
+// the product is formed here with the scale kept in int64.
 func exceedsAllowed(limit, request, ratio resource.Quantity) bool {
-	requestDec, ratioDec := request.AsDec(), ratio.AsDec()
+	// The ratio of a negative pair is the one between its magnitudes.
+	limit, request = magnitude(limit), magnitude(request)
+	limitDec, requestDec, ratioDec := limit.AsDec(), request.AsDec(), ratio.AsDec()
 	scale := int64(requestDec.Scale()) + int64(ratioDec.Scale())
-	// Quantity keeps at most nano precision, so the summed scale can only fall
-	// below inf.Scale, and only for operands whose product already exceeds
-	// every representable limit.
+	productUnscaled := new(big.Int).Mul(requestDec.UnscaledBig(), ratioDec.UnscaledBig())
 	if scale < math.MinInt32 {
-		return false
+		// The product has no representable scale, so compare it as digits and a scale.
+		return cmpScaled(limitDec.UnscaledBig(), int64(limitDec.Scale()), productUnscaled, scale) > 0
 	}
 	product := new(inf.Dec)
-	product.SetUnscaledBig(new(big.Int).Mul(requestDec.UnscaledBig(), ratioDec.UnscaledBig()))
+	product.SetUnscaledBig(productUnscaled)
 	product.SetScale(inf.Scale(scale))
 	allowed := resource.NewDecimalQuantity(*product, resource.DecimalSI)
 	return limit.Cmp(*allowed) > 0
+}
+
+// magnitude returns q without a negative sign, leaving q unchanged.
+func magnitude(q resource.Quantity) resource.Quantity {
+	if q.Sign() >= 0 {
+		return q
+	}
+	q = q.DeepCopy()
+	q.Neg()
+	return q
+}
+
+// cmpScaled compares a*10^-sa with b*10^-sb for a non-negative a.
+// A scale past inf.Scale has no Quantity for Cmp to take.
+func cmpScaled(a *big.Int, sa int64, b *big.Int, sb int64) int {
+	if a.Sign() <= 0 || b.Sign() <= 0 {
+		return cmp.Compare(a.Sign(), b.Sign())
+	}
+	// 10^(ea-1) <= a*10^-sa < 10^ea, and likewise for b.
+	ea := int64(len(a.Text(10))) - sa
+	eb := int64(len(b.Text(10))) - sb
+	if c := cmp.Compare(ea, eb); c != 0 {
+		return c
+	}
+	// Equal exponents mean sb-sa is the digit-count difference, a small shift.
+	if shift := sb - sa; shift >= 0 {
+		a = mulPow10(a, shift)
+	} else {
+		b = mulPow10(b, -shift)
+	}
+	return a.Cmp(b)
+}
+
+const (
+	// ratioScale is the six decimals the ratio message has always shown.
+	ratioScale inf.Scale = 6
+	// ratioFoldLimit is the scale difference past which QuoRound would build
+	// the whole exponent.
+	ratioFoldLimit int64 = 40
+)
+
+// ratioString formats the magnitude of limit over request to six decimals,
+// of the mantissa once it uses an exponent.
+func ratioString(limit, request resource.Quantity) string {
+	limit, request = magnitude(limit), magnitude(request)
+	limitDec, requestDec := limit.AsDec(), request.AsDec()
+	exp := int64(requestDec.Scale()) - int64(limitDec.Scale())
+	if exp >= -ratioFoldLimit && exp <= ratioFoldLimit {
+		return new(inf.Dec).QuoRound(limitDec, requestDec, ratioScale, inf.RoundHalfEven).String()
+	}
+	// The ratio is the coefficient quotient times ten to the exp. Bring that
+	// quotient into [1,10) first, or one below the six decimals reads as zero.
+	num, den := limitDec.UnscaledBig(), requestDec.UnscaledBig()
+	shift := int64(len(den.Text(10)) - len(num.Text(10)))
+	if shift >= 0 {
+		num = mulPow10(num, shift)
+	} else {
+		den = mulPow10(den, -shift)
+	}
+	if num.Cmp(den) < 0 {
+		num = new(big.Int).Mul(num, big.NewInt(10))
+		shift++
+	}
+	mantissa := new(inf.Dec).QuoRound(
+		new(inf.Dec).SetUnscaledBig(num),
+		new(inf.Dec).SetUnscaledBig(den),
+		ratioScale, inf.RoundHalfEven)
+	// Rounding can carry the mantissa to ten. Dividing it back moves the
+	// opposite way from the shift above, so the exponent goes up by one.
+	if ten := inf.NewDec(10, 0); mantissa.Cmp(ten) >= 0 {
+		mantissa = new(inf.Dec).QuoRound(mantissa, ten, ratioScale, inf.RoundHalfEven)
+		shift--
+	}
+	exp -= shift
+	if exp == 0 {
+		return mantissa.String()
+	}
+	return fmt.Sprintf("%se%d", mantissa, exp)
+}
+
+// mulPow10 returns a new big.Int holding x times ten to the n, for n >= 0.
+func mulPow10(x *big.Int, n int64) *big.Int {
+	return new(big.Int).Mul(x, new(big.Int).Exp(big.NewInt(10), big.NewInt(n), nil))
 }
 
 // minConstraint enforces the min constraint over the specified resource
@@ -378,8 +464,7 @@ func limitRequestRatioConstraint(limitType string, resourceName string, enforced
 	}
 
 	if exceedsAllowed(lim, req, enforced) {
-		observedRatio := lim.AsApproximateFloat64() / req.AsApproximateFloat64()
-		return fmt.Errorf("%s max limit to request ratio per %s is %s, but provided ratio is %f", resourceName, limitType, enforced.String(), observedRatio)
+		return fmt.Errorf("%s max limit to request ratio per %s is %s, but provided ratio is %s", resourceName, limitType, enforced.String(), ratioString(lim, req))
 	}
 
 	return nil
