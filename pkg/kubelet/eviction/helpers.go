@@ -695,7 +695,13 @@ func exceedMemoryRequests(stats statsFunc) cmpFunc {
 		p1Stats, p1Found := stats(p1)
 		p2Stats, p2Found := stats(p2)
 		if !p1Found || !p2Found {
-			// prioritize evicting the pod for which no stats were found
+			// Known usage above a request is stronger evidence of pressure than missing stats.
+			if p1Found && memoryUsage(p1Stats.Memory).Cmp(v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)) == 1 {
+				return -1
+			}
+			if p2Found && memoryUsage(p2Stats.Memory).Cmp(v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)) == 1 {
+				return 1
+			}
 			return cmpBool(!p1Found, !p2Found)
 		}
 
@@ -754,7 +760,21 @@ func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskRes
 		p1Stats, p1Found := stats(p1)
 		p2Stats, p2Found := stats(p2)
 		if !p1Found || !p2Found {
-			// prioritize evicting the pod for which no stats were found
+			// Prefer measured usage above a request before evicting a pod with no stats.
+			if p1Found {
+				usage, err := podDiskUsage(p1Stats, p1, fsStatsToMeasure)
+				measured := usage[diskResource]
+				if err == nil && measured.Cmp(v1resource.GetResourceRequestQuantity(p1, diskResource)) == 1 {
+					return -1
+				}
+			}
+			if p2Found {
+				usage, err := podDiskUsage(p2Stats, p2, fsStatsToMeasure)
+				measured := usage[diskResource]
+				if err == nil && measured.Cmp(v1resource.GetResourceRequestQuantity(p2, diskResource)) == 1 {
+					return 1
+				}
+			}
 			return cmpBool(!p1Found, !p2Found)
 		}
 
