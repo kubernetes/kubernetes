@@ -25,6 +25,7 @@ import (
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/utils/ptr"
 )
 
@@ -295,7 +296,7 @@ func computeShareableSummary(in poolViewInput) (*resourcev1alpha3.ShareableSumma
 	for _, key := range keys {
 		t := total[key]
 		cons := resource.Quantity{}
-		if q, ok := in.consumedCapacity[key]; ok {
+		if q, ok := draapi.LookupByQualifiedName(in.consumedCapacity, key, in.driver); ok {
 			cons = q.DeepCopy()
 		}
 		avail := nonNegativeDiff(t, cons)
