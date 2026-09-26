@@ -2048,6 +2048,16 @@ func (m *DeviceTaintSelector) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.All != nil {
+		i--
+		if *m.All {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x30
+	}
 	if m.Device != nil {
 		i -= len(*m.Device)
 		copy(dAtA[i:], *m.Device)
@@ -3822,6 +3832,9 @@ func (m *DeviceTaintSelector) Size() (n int) {
 		l = len(*m.Device)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.All != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -4751,6 +4764,7 @@ func (this *DeviceTaintSelector) String() string {
 		`Driver:` + valueToStringGenerated(this.Driver) + `,`,
 		`Pool:` + valueToStringGenerated(this.Pool) + `,`,
 		`Device:` + valueToStringGenerated(this.Device) + `,`,
+		`All:` + valueToStringGenerated(this.All) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -10974,6 +10988,27 @@ func (m *DeviceTaintSelector) Unmarshal(dAtA []byte) error {
 			s := string(dAtA[iNdEx:postIndex])
 			m.Device = &s
 			iNdEx = postIndex
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field All", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.All = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

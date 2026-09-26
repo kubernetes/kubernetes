@@ -391,6 +391,7 @@ var map_DeviceTaintSelector = map[string]string{
 	"driver": "driver is the driver name. If driver is set, only devices from that driver are selected. This fields corresponds to slice.spec.driver.",
 	"pool":   "pool is the pool name. If pool is set, only devices in that pool are selected.\n\nAlso setting the driver name may be useful to avoid ambiguity when different drivers use the same pool name, but this is not required because selecting pools from different drivers may also be useful, for example when drivers with node-local devices use the node name as their pool name.",
 	"device": "device is the device name. If device is set, only devices with that name are selected. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
+	"all":    "all, if set to true, explicitly selects every device from every driver in the cluster. It must not be combined with driver, pool, or device: those must all be unset when all is true.\n\nLeaving driver, pool, and device all unset also selects every device, for historical reasons, but doing so without setting all is deprecated and may be rejected in a future release. Set all explicitly instead.",
 }
 
 func (DeviceTaintSelector) SwaggerDoc() map[string]string {

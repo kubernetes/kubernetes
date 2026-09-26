@@ -2335,6 +2335,18 @@ type DeviceTaintSelector struct {
 	//
 	// +optional
 	Device *string
+
+	// all, if set to true, explicitly selects every device from every
+	// driver in the cluster. It must not be combined with driver, pool,
+	// or device: those must all be unset when all is true.
+	//
+	// Leaving driver, pool, and device all unset also selects every
+	// device, for historical reasons, but doing so without setting all
+	// is deprecated and may be rejected in a future release. Set all
+	// explicitly instead.
+	//
+	// +optional
+	All *bool
 }
 
 // DeviceTaintRuleStatus provides information about an on-going pod eviction.

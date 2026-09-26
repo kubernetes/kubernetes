@@ -1915,6 +1915,15 @@ func validateDeviceTaintSelector(filter, oldFilter *resource.DeviceTaintSelector
 	if filter.Device != nil {
 		allErrs = append(allErrs, validateDeviceName(*filter.Device, fldPath.Child("device"))...)
 	}
+	if filter.All != nil {
+		if !*filter.All {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("all"), *filter.All,
+				"must be either unset or set to true"))
+		} else if filter.Driver != nil || filter.Pool != nil || filter.Device != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("all"), *filter.All,
+				"must not be combined with `driver`, `pool`, or `device`"))
+		}
+	}
 
 	return allErrs
 }

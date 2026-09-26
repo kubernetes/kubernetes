@@ -209,6 +209,33 @@ func TestValidateDeviceTaint(t *testing.T) {
 				return taintRule
 			}(),
 		},
+		"all-true": {
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
+					All: ptr.To(true),
+				}
+				return taintRule
+			}(),
+		},
+		"all-false": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "deviceSelector", "all"), false, "must be either unset or set to true")},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
+					All: ptr.To(false),
+				}
+				return taintRule
+			}(),
+		},
+		"all-true-combined-with-driver": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "deviceSelector", "all"), true, "must not be combined with `driver`, `pool`, or `device`")},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector.All = ptr.To(true)
+				return taintRule
+			}(),
+		},
 		// Minimal tests for DeviceTaint. Full coverage of validateDeviceTaint is in ResourceSlice test.
 		"valid-taint": {
 			taintRule: func() *resourceapi.DeviceTaintRule {
