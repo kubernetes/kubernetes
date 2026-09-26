@@ -1064,7 +1064,7 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 			},
 		},
 		{
-			name: "split due to non-unique#1: update single item for multiple items should have separate batch",
+			name: "non-split due to non-unique#1: update single item for multiple items should be bundled after initial list",
 			initialItems: []testFifoObject{
 				obj1,
 			},
@@ -1075,8 +1075,7 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 			batchSize: unlimitedBatchSize,
 			expectedBatches: [][]Delta{
 				{{Replaced, obj1}},
-				{{Updated, obj1}},
-				{{Updated, obj1}},
+				{{Updated, obj1}, {Updated, obj1}},
 			},
 		},
 		{
