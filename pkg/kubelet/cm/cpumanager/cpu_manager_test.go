@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/utils/cpuset"
@@ -826,7 +827,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			})
 
 			logger, _ := ktesting.NewTestContext(t)
-			mgr, err := NewManager(logger, testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger))
+			mgr, err := NewManager(logger, testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger), nil)
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -1735,7 +1736,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			})
 
 			logger, _ := ktesting.NewTestContext(t)
-			_, err = NewManager(logger, testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger))
+			_, err = NewManager(logger, testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger), nil)
 			if err == nil {
 				t.Errorf("Expected error, but NewManager succeeded")
 			}
@@ -1966,5 +1967,133 @@ func TestCPUManagerAddResize(t *testing.T) {
 					testStep.operation, testStep.description, testStep.expDefaultCPUSet, mgr.state.GetDefaultCPUSet())
 			}
 		}
+	}
+}
+
+func TestCPUManagerSharedPoolOnly(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
+
+	allCPUs := cpuset.New(0, 1, 2, 3)
+	topo := &topology.CPUTopology{
+		NumCPUs:    4,
+		NumSockets: 1,
+		NumCores:   4,
+		CPUDetails: map[int]topology.CPUInfo{
+			0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			1: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+			2: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			3: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+		},
+	}
+
+	testCases := []struct {
+		name string
+		// sharedPoolOnly is the predicate given to the manager.
+		sharedPoolOnly SharedPoolOnlyFunc
+		// held is the exclusive cpuset the container already holds in the
+		// checkpoint, e.g. from before the pod became shared pool only.
+		held cpuset.CPUSet
+		// allocatePod exercises the pod scope instead of the container scope.
+		allocatePod  bool
+		wantAssigned bool
+		// wantDefault is only checked for shared pool only pods. Which CPUs a
+		// pinned pod gets is up to the policy.
+		wantDefault     cpuset.CPUSet
+		wantHints       bool
+		wantIsolation   cmqos.ResourceIsolationLevel
+		wantLastUpdated bool
+	}{
+		{
+			name:          "nil predicate keeps pinning guaranteed pods",
+			wantAssigned:  true,
+			wantHints:     true,
+			wantIsolation: cmqos.ResourceIsolationContainer,
+		},
+		{
+			name:           "predicate not matching the pod keeps pinning it",
+			sharedPoolOnly: func(*v1.Pod) bool { return false },
+			wantAssigned:   true,
+			wantHints:      true,
+			wantIsolation:  cmqos.ResourceIsolationContainer,
+		},
+		{
+			name:           "shared pool only pod gets no exclusive CPUs",
+			sharedPoolOnly: func(*v1.Pod) bool { return true },
+			wantDefault:    allCPUs,
+			wantIsolation:  cmqos.ResourceIsolationHost,
+		},
+		{
+			name:           "exclusive CPUs held from before are handed back",
+			sharedPoolOnly: func(*v1.Pod) bool { return true },
+			held:           cpuset.New(1, 2),
+			wantDefault:    allCPUs,
+			wantIsolation:  cmqos.ResourceIsolationHost,
+		},
+		{
+			name:           "exclusive CPUs held from before are handed back in pod scope",
+			sharedPoolOnly: func(*v1.Pod) bool { return true },
+			held:           cpuset.New(1, 2),
+			allocatePod:    true,
+			wantDefault:    allCPUs,
+			wantIsolation:  cmqos.ResourceIsolationHost,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			policy, err := NewStaticPolicy(logger, topo, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			require.NoError(t, err)
+
+			pod := makePod("fakePod", "fakeContainer", "2", "2")
+			container := &pod.Spec.Containers[0]
+
+			st := state.NewMemoryState(logger)
+			lastUpdate := state.NewMemoryState(logger)
+			st.SetDefaultCPUSet(allCPUs.Difference(tc.held))
+			if !tc.held.IsEmpty() {
+				st.SetCPUSet(string(pod.UID), container.Name, tc.held)
+				lastUpdate.SetCPUSet(string(pod.UID), container.Name, tc.held)
+			}
+
+			mgr := &manager{
+				policy:            policy,
+				reconcilePeriod:   10 * time.Second,
+				state:             st,
+				lastUpdateState:   lastUpdate,
+				containerRuntime:  mockRuntimeService{},
+				containerMap:      containermap.NewContainerMap(),
+				podStatusProvider: mockPodStatusProvider{},
+				sourcesReady:      &sourcesReadyStub{},
+				activePods:        func() []*v1.Pod { return []*v1.Pod{pod} },
+				sharedPoolOnly:    tc.sharedPoolOnly,
+			}
+			mgr.containerMap.Add(string(pod.UID), container.Name, "fakeID")
+
+			hints := mgr.GetTopologyHints(logger, pod, container, lifecycle.AddOperation)
+			require.Equal(t, tc.wantHints, len(hints) > 0, "topology hints: %v", hints)
+
+			if tc.allocatePod {
+				require.NoError(t, mgr.AllocatePod(logger, pod, lifecycle.AddOperation))
+			} else {
+				require.NoError(t, mgr.Allocate(tCtx, pod, container, lifecycle.AddOperation))
+			}
+
+			assignedCPUs, assigned := mgr.state.GetCPUSet(string(pod.UID), container.Name)
+			require.Equal(t, tc.wantAssigned, assigned, "exclusive assignment in state")
+			wantDefault := tc.wantDefault
+			if assigned {
+				require.Equal(t, 2, assignedCPUs.Size(), "exclusive CPUs: %v", assignedCPUs)
+				wantDefault = allCPUs.Difference(assignedCPUs)
+			}
+			require.True(t, wantDefault.Equals(mgr.state.GetDefaultCPUSet()), "default cpuset: want %v, got %v", wantDefault, mgr.state.GetDefaultCPUSet())
+			require.Equal(t, tc.wantIsolation, mgr.GetResourceIsolationLevel(pod, container))
+
+			_, lastUpdated := mgr.lastUpdateState.GetCPUSet(string(pod.UID), container.Name)
+			require.Equal(t, tc.wantLastUpdated, lastUpdated, "assignment in lastUpdateState")
+			// The reconcile loop needs the container to move it onto the shared pool.
+			_, _, err = mgr.containerMap.GetContainerRef("fakeID")
+			require.NoError(t, err, "containerMap entry must survive the release")
+		})
 	}
 }

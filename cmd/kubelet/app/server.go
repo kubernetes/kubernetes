@@ -889,6 +889,21 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("--system-reserved value failed to parse: %w", err)
 		}
 
+		var systemPartition *cm.SystemPartitionConfig
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSystemPartition) {
+			onlineCPUs := func() (cpuset.CPUSet, error) {
+				topo, err := topology.Discover(logger, machineInfo)
+				if err != nil {
+					return cpuset.New(), fmt.Errorf("unable to discover CPU topology info: %w", err)
+				}
+				return topo.CPUDetails.CPUs(), nil
+			}
+			systemPartition, err = parseSystemPartition(s.SystemPartition, onlineCPUs)
+			if err != nil {
+				return fmt.Errorf("systemPartition in kubelet config failed to parse: %w", err)
+			}
+		}
+
 		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
 		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
@@ -958,6 +973,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				TopologyManagerPolicy:        s.TopologyManagerPolicy,
 				TopologyManagerScope:         s.TopologyManagerScope,
 				TopologyManagerPolicyOptions: topologyManagerPolicyOptions,
+				SystemPartition:              systemPartition,
 			},
 			s.FailSwapOn,
 			kubeDeps.Recorder,
@@ -1440,6 +1456,43 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		}
 	}
 	return rl, nil
+}
+
+// parseSystemPartition parses the system partition section of the kubelet
+// configuration into its internal form. onlineCPUs is only called when a cpuset
+// is configured, so nodes without one never pay for topology discovery.
+func parseSystemPartition(sp *kubeletconfiginternal.SystemPartitionConfiguration, onlineCPUs func() (cpuset.CPUSet, error)) (*cm.SystemPartitionConfig, error) {
+	if sp == nil {
+		return nil, nil
+	}
+	parsed := &cm.SystemPartitionConfig{
+		Namespaces: sets.New(sp.Namespaces...),
+	}
+	if sp.MemoryLimit != "" {
+		q, err := resource.ParseQuantity(sp.MemoryLimit)
+		if err != nil {
+			return nil, fmt.Errorf("memoryLimit %q: %w", sp.MemoryLimit, err)
+		}
+		limit := q.Value()
+		parsed.MemoryLimit = &limit
+	}
+	if sp.CPUSet != "" {
+		cpus, err := cpuset.Parse(sp.CPUSet)
+		if err != nil {
+			return nil, fmt.Errorf("cpuset %q: %w", sp.CPUSet, err)
+		}
+		// Config validation can't see the node's CPUs, so catch a cpuset with
+		// missing CPUs here rather than as a cgroup write error.
+		online, err := onlineCPUs()
+		if err != nil {
+			return nil, fmt.Errorf("cpuset %q: %w", sp.CPUSet, err)
+		}
+		if !cpus.IsSubsetOf(online) {
+			return nil, fmt.Errorf("cpuset %q is not a subset of online CPUs %q, CPUs %s are not online", sp.CPUSet, online.String(), cpus.Difference(online))
+		}
+		parsed.CPUSet = cpus
+	}
+	return parsed, nil
 }
 
 func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, error) {

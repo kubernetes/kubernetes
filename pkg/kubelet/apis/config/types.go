@@ -489,6 +489,11 @@ type KubeletConfiguration struct {
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
 	// This option overwrites CPUs provided by system-reserved and kube-reserved.
 	ReservedSystemCPUs string
+	// SystemPartition configures a dedicated "system" partition under the kubepods
+	// cgroup root for system Pods.
+	// +featureGate=NodeSystemPartition
+	// +optional
+	SystemPartition *SystemPartitionConfiguration
 	// The previous version for which you want to show hidden metrics.
 	// Only the previous minor version is meaningful, other values will not be allowed.
 	// The format is <major>.<minor>, e.g.: '1.16'.
@@ -886,6 +891,24 @@ type ShutdownGracePeriodByPodPriority struct {
 	Priority int32
 	// shutdownGracePeriodSeconds is the shutdown grace period in seconds
 	ShutdownGracePeriodSeconds int64
+}
+
+// SystemPartitionConfiguration describes the node's system partition: a
+// resource-bounded area of the node dedicated to running system Pods.
+type SystemPartitionConfiguration struct {
+	// MemoryLimit is the hard memory limit applied to the system partition cgroup root.
+	// +featureGate=NodeSystemPartition
+	// +optional
+	MemoryLimit string
+	// CPUSet is the set of CPUs dedicated to system partition Pods, in Linux CPU list format.
+	// +featureGate=NodeSystemPartition
+	// +optional
+	CPUSet string
+	// Namespaces lists the namespaces whose Pods are placed into the system partition.
+	// It must not be empty: it is the only thing that gives the partition members.
+	// +featureGate=NodeSystemPartition
+	// +required
+	Namespaces []string
 }
 
 type MemorySwapConfiguration struct {
