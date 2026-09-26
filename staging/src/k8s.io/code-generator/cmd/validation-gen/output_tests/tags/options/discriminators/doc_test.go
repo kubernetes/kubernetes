@@ -17,9 +17,9 @@ limitations under the License.
 package discriminators
 
 import (
-	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
@@ -32,11 +32,11 @@ func Test(t *testing.T) {
 	st.Value(&Struct{
 		DiscriminatorField: Discriminator{
 			Discriminator: "A",
-			FieldB:        ptr.To("invalid"), // invalid because discriminator is A
+			FieldB:        new("invalid"), // invalid because discriminator is A
 		},
 		DiscriminatorFieldDisabled: DiscriminatorDisabled{
 			Discriminator: "A",
-			FieldB:        ptr.To("invalid"), // invalid because discriminator is A
+			FieldB:        new("invalid"), // invalid because discriminator is A
 		},
 	}).Opts(map[string]bool{"FeatureZ": false}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
@@ -46,11 +46,11 @@ func Test(t *testing.T) {
 	st.Value(&Struct{
 		DiscriminatorField: Discriminator{
 			Discriminator: "A",
-			FieldB:        ptr.To("invalid"), // invalid because discriminator is A
+			FieldB:        new("invalid"), // invalid because discriminator is A
 		},
 		DiscriminatorFieldDisabled: DiscriminatorDisabled{
 			Discriminator: "A",
-			FieldB:        ptr.To("invalid"), // invalid because discriminator is A
+			FieldB:        new("invalid"), // invalid because discriminator is A
 		},
 	}).Opts(map[string]bool{"FeatureZ": true}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),

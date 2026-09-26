@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -148,8 +147,8 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		PtrKeyItems: []PtrKeyItem{
-			{Key: ptr.To("a"), Data: "d1"},
-			{Key: ptr.To("target-ptr"), Data: "d2"},
+			{Key: new("a"), Data: "d1"},
+			{Key: new("target-ptr"), Data: "d2"},
 			{Key: nil, Data: "d3"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
@@ -160,8 +159,8 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		PtrKeyItems: []PtrKeyItem{
-			{Key: ptr.To("a"), Data: "d1"},
-			{Key: ptr.To("b"), Data: "d2"},
+			{Key: new("a"), Data: "d1"},
+			{Key: new("b"), Data: "d2"},
 			{Key: nil, Data: "d3"},
 		},
 	}).ExpectValid()
