@@ -1054,6 +1054,13 @@ func areGroupsEqual(group1, group2 []int) bool {
 func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	machineState := s.GetMachineState()
 	memoryAssignments := s.GetMemoryAssignments()
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		for podUID := range s.GetPodMemoryAssignments() {
+			if len(memoryAssignments[podUID]) == 0 {
+				return fmt.Errorf("[memorymanager] pod %q has a pod memory assignment but no container memory assignments", podUID)
+			}
+		}
+	}
 
 	if len(machineState) == 0 {
 		// Machine state cannot be empty when assignments exist
