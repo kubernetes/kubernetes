@@ -19,6 +19,7 @@ package noderesources
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -584,6 +585,148 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 
 			if diff := cmp.Diff(test.expectedScores, gotScores); diff != "" {
 				t.Errorf("Unexpected nodescore list (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRequestedToCapacityRatioScorerOverflow(t *testing.T) {
+	linearScorer := buildRequestedToCapacityRatioScorerFunction(
+		[]helper.FunctionShapePoint{{Utilization: 0, Score: 0}, {Utilization: 100, Score: 100}},
+		[]config.ResourceSpec{{Name: string(v1.ResourceCPU), Weight: 1}},
+	)
+	// Steep shape: flat 0 for utilizations 0-99, full score only at 100.
+	// (Score values are passed in already-scaled form: 10 * MaxScore/10.)
+	steepScorer := buildRequestedToCapacityRatioScorerFunction(
+		[]helper.FunctionShapePoint{{Utilization: 0, Score: 0}, {Utilization: 99, Score: 0}, {Utilization: 100, Score: 100}},
+		[]config.ResourceSpec{{Name: string(v1.ResourceCPU), Weight: 1}},
+	)
+	tests := []struct {
+		name      string
+		scorer    func([]int64, []int64, []int64) int64
+		requested int64
+		capacity  int64
+		want      int64
+	}{
+		{
+			name:      "requested above the multiplication overflow threshold",
+			scorer:    linearScorer,
+			requested: math.MaxInt64/100 + 1,
+			capacity:  math.MaxInt64,
+			want:      1,
+		},
+		{
+			name:      "saturated requested and capacity",
+			scorer:    linearScorer,
+			requested: math.MaxInt64,
+			capacity:  math.MaxInt64,
+			want:      100,
+		},
+		{
+			name:      "no requested",
+			scorer:    linearScorer,
+			requested: 0,
+			capacity:  math.MaxInt64,
+			want:      0,
+		},
+		{
+			name:      "steep shape stays at 0 for utilization 99",
+			scorer:    steepScorer,
+			requested: 999999999999999999,
+			capacity:  1000000000000000000,
+			want:      0,
+		},
+		{
+			name:      "steep shape full score at utilization 100",
+			scorer:    steepScorer,
+			requested: 1000000000000000000,
+			capacity:  1000000000000000000,
+			want:      100,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.scorer([]int64{tt.requested}, nil, []int64{tt.capacity})
+			if got != tt.want {
+				t.Errorf("scorer() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestScaledFraction(t *testing.T) {
+	const max = int64(100)
+	tests := []struct {
+		name  string
+		part  int64
+		whole int64
+		want  int64
+	}{
+		{
+			name:  "negative part from wrapped totals",
+			part:  -500,
+			whole: 1000,
+			want:  0,
+		},
+		{
+			name:  "zero part",
+			part:  0,
+			whole: 1000,
+			want:  0,
+		},
+		{
+			name:  "zero whole",
+			part:  500,
+			whole: 0,
+			want:  0,
+		},
+		{
+			name:  "negative whole",
+			part:  500,
+			whole: -1000,
+			want:  0,
+		},
+		{
+			name:  "part at whole",
+			part:  1000,
+			whole: 1000,
+			want:  max,
+		},
+		{
+			name:  "part above whole",
+			part:  2000,
+			whole: 1000,
+			want:  max,
+		},
+		{
+			name:  "part far above whole avoids Div64 panic",
+			part:  math.MaxInt64,
+			whole: 1,
+			want:  max,
+		},
+		{
+			name:  "normal range",
+			part:  250,
+			whole: 1000,
+			want:  25,
+		},
+		{
+			name:  "exact in the math/bits path",
+			part:  999999999999999999,
+			whole: 1000000000000000000,
+			want:  99,
+		},
+		{
+			name:  "math/bits path just below whole",
+			part:  math.MaxInt64 - 1,
+			whole: math.MaxInt64,
+			want:  99,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := scaledFraction(tt.part, tt.whole, max); got != tt.want {
+				t.Errorf("scaledFraction(%d, %d, %d) = %d, want %d", tt.part, tt.whole, max, got, tt.want)
 			}
 		})
 	}
