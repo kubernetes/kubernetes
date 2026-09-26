@@ -2214,6 +2214,20 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: stalled_watchers
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Number of unsynced watchers (their input buffer was full when an event was
+    dispatched, so they are served from the watch cache history until they catch up),
+    broken by resource type.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: watcher_catchup_events
   subsystem: watch_cache
   namespace: apiserver
@@ -2256,6 +2270,21 @@
   namespace: apiserver
   help: Counter of events delivered to unsynced watchers from the watch cache history
     by sync passes, broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watcher_skipped_events_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of object events the live dispatch path skipped for a watcher because
+    the event's resourceVersion was at or below the watcher's position, i.e. a sync
+    pass already delivered it; a non-zero value means the resync point sits ahead
+    of the dispatched stream.
   type: Counter
   stabilityLevel: ALPHA
   labels:

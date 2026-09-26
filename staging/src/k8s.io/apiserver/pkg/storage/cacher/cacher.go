@@ -416,6 +416,9 @@ type cacherStall struct {
 	// unsynced holds the watchers the live path skips; sync passes serve
 	// them until they catch up, expire or stop.
 	unsynced map[*cacheWatcher]struct{}
+	// reported is this Cacher's current contribution to the stalled
+	// watchers gauge: the size of unsynced when it was last reported.
+	reported int
 	// syncCursor is where the last pass stopped scanning; the next pass
 	// prefers a lead at or above it so one lead keeps tracking the history.
 	syncCursor uint64
@@ -1107,6 +1110,10 @@ func (c *Cacher) dispatchEvents() {
 		c.stall.passTimer = c.clock.NewTimer(syncPassPeriod)
 		c.stall.passTimer.Stop()
 		defer c.stall.passTimer.Stop()
+		// A stopped Cacher (a deleted CRD storage) must not leave its last
+		// count in the gauge until the process restarts; withdrawing only
+		// its own contribution leaves a sibling's intact.
+		defer c.reportStalledWatchers(0)
 		dispatcherHook = c.stall.dispatcherHook
 	}
 	for {
@@ -1236,9 +1243,11 @@ func (c *Cacher) armSyncTimer() <-chan time.Time {
 // the whole pass.
 // A member that accepted everything it was offered and whose cohort read
 // the history to its end is synced again; one whose position aged out of
-// the history is expired with an in-stream 410. Runs on the dispatcher
-// goroutine between dispatches; it never holds the Cacher lock while taking
-// the watch cache lock, because Watch holds the latter across the former.
+// the history is expired with an in-stream 410. The pass also reports the
+// size of the unsynced set as the stalled watchers gauge. Runs on the
+// dispatcher goroutine between dispatches; it never holds the Cacher lock
+// while taking the watch cache lock, because Watch holds the latter across
+// the former.
 func (c *Cacher) syncPass(now time.Time) (served, expired int) {
 	s := c.stall
 	s.lastPass = now
@@ -1278,6 +1287,7 @@ func (c *Cacher) syncPass(now time.Time) (served, expired int) {
 		}
 	}
 	c.Unlock()
+	c.reportStalledWatchers(len(s.unsynced))
 
 	// forget takes the Cacher lock itself; with dispatching set the stop
 	// is deferred to finishDispatching, and in drain mode the watcher
@@ -1383,6 +1393,7 @@ func (c *Cacher) syncPass(now time.Time) (served, expired int) {
 		m.w.catchupEvents = 0
 	}
 	c.Unlock()
+	c.reportStalledWatchers(len(s.unsynced))
 	c.finishDispatching()
 
 	clear(s.members)
@@ -1392,6 +1403,22 @@ func (c *Cacher) syncPass(now time.Time) (served, expired int) {
 	// ran out.
 	s.passPeriod = nextPassPeriod(served, expired, blocked || pushBudgetSpent, c.clock.Since(now))
 	return served, expired
+}
+
+// reportStalledWatchers moves this Cacher's contribution to the stalled
+// watchers gauge to n, the size of its unsynced set. The gauge child is
+// keyed by group and resource, which several live Cachers can share (one
+// per served CRD version), so a Cacher never writes the child with Set: it
+// adds only its own delta, the child is the exact sum over the siblings,
+// and a stopping Cacher removes what it added instead of zeroing the child
+// under them. Runs on the dispatcher goroutine only, which owns reported.
+func (c *Cacher) reportStalledWatchers(n int) {
+	s := c.stall
+	if n == s.reported {
+		return
+	}
+	s.metrics.StalledWatchers.Add(float64(n - s.reported))
+	s.reported = n
 }
 
 // nextPassPeriod picks the period until the next pass from what this one
@@ -1778,10 +1805,18 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		if c.stall != nil {
 			// Never wait for a slow watcher and never terminate it here: a
 			// watcher whose input is full becomes unsynced and the sync
-			// passes serve it from the history. Events at or below the
-			// position were already pushed by a pass.
+			// passes serve it from the history.
+			stalled := false
 			for _, watcher := range c.watchersBuffer {
-				if watcher.unsynced || event.ResourceVersion <= watcher.position {
+				if watcher.unsynced {
+					continue
+				}
+				if event.ResourceVersion <= watcher.position {
+					// A pass pushed this event from the history before
+					// the dispatcher reached it in c.incoming, so the
+					// synced watcher has it already; counted so the
+					// duplicate suppression is visible.
+					c.stall.metrics.SkippedEvents.Inc()
 					continue
 				}
 				if watcher.nonblockingAdd(event) {
@@ -1796,6 +1831,10 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 				c.stall.unsynced[watcher] = struct{}{}
 				c.stall.stalled = true
 				c.stall.metrics.Stalls.Inc()
+				stalled = true
+			}
+			if stalled {
+				c.reportStalledWatchers(len(c.stall.unsynced))
 			}
 			return
 		}
