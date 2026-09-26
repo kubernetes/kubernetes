@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
@@ -41,10 +42,20 @@ func NewCacheDelegator(cacher *Cacher, storage storage.Interface) *CacheDelegato
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DetectCacheInconsistency) || consistency.PanicOnCacheInconsistency {
 		d.checker = consistency.NewChecker(cacher.resourcePrefix, cacher.groupResource, cacher.newListFunc, cacher, storage)
-		d.wg.Add(1)
+		// There is nothing to check once the resource is no longer cached.
+		checkerStopCh := make(chan struct{})
+		d.wg.Add(2)
 		go func() {
 			defer d.wg.Done()
-			d.checker.Run(d.stopCh)
+			defer close(checkerStopCh)
+			select {
+			case <-d.stopCh:
+			case <-cacher.bypassedCh:
+			}
+		}()
+		go func() {
+			defer d.wg.Done()
+			d.checker.Run(checkerStopCh)
 		}()
 	}
 	return d
@@ -78,7 +89,14 @@ func (c *CacheDelegator) EnableResourceSizeEstimation(keys storage.KeysFunc) err
 	return c.storage.EnableResourceSizeEstimation(keys)
 }
 
+func (c *CacheDelegator) DisableResourceSizeEstimation() {
+	c.storage.DisableResourceSizeEstimation()
+}
+
 func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+	if c.cacher.isBypassed() {
+		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, cachedExistingObject, opts)
+	}
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
 	if elem, exists, err := c.cacher.watchCache.storage.GetByKey(key); err != nil {
@@ -104,6 +122,9 @@ func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.Lis
 	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
 		opts.SendInitialEvents = nil
 	}
+	if c.cacher.isBypassed() {
+		return c.storage.Watch(ctx, key, opts)
+	}
 	return c.cacher.Watch(ctx, key, opts)
 }
 
@@ -111,6 +132,10 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 	if opts.ResourceVersion == "" {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility).
+		return c.storage.Get(ctx, key, opts, objPtr)
+	}
+
+	if c.cacher.isBypassed() {
 		return c.storage.Get(ctx, key, opts, objPtr)
 	}
 
@@ -125,10 +150,22 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 	if _, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
 		return err
 	}
-	return c.cacher.Get(ctx, key, opts, objPtr)
+	err := c.cacher.Get(ctx, key, opts, objPtr)
+	if c.cacher.isBypassed() {
+		// The resource was taken out of the watch cache while this request was
+		// being served, so the cache may have been released before it was read.
+		if err := runtime.SetZeroValue(objPtr); err != nil {
+			return err
+		}
+		return c.storage.Get(ctx, key, opts, objPtr)
+	}
+	return err
 }
 
 func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	if c.cacher.isBypassed() {
+		return c.storage.GetList(ctx, key, opts, listObj)
+	}
 	_, _, err := storage.ValidateListOptions(c.cacher.resourcePrefix, c.cacher.versioner, opts)
 	if err != nil {
 		return err
@@ -151,6 +188,13 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 	err = c.cacher.GetList(ctx, key, opts, listObj)
+	if c.cacher.isBypassed() {
+		// As in Get. Storage appends to the list's items, so drop those first.
+		if err := meta.SetList(listObj, nil); err != nil {
+			return err
+		}
+		return c.storage.GetList(ctx, key, opts, listObj)
+	}
 	success := "true"
 	fallback := "false"
 	if err != nil {
@@ -191,6 +235,9 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 }
 
 func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	if c.cacher.isBypassed() {
+		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
+	}
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
 	if elem, exists, err := c.cacher.watchCache.storage.GetByKey(key); err != nil {
@@ -210,6 +257,9 @@ func (c *CacheDelegator) Stats(ctx context.Context) (storage.Stats, error) {
 }
 
 func (c *CacheDelegator) ReadinessCheck() error {
+	if c.cacher.isBypassed() {
+		return nil
+	}
 	if !c.cacher.Ready() {
 		return storage.ErrStorageNotReady
 	}
@@ -221,7 +271,7 @@ func (c *CacheDelegator) RequestWatchProgress(ctx context.Context) error {
 }
 
 func (c *CacheDelegator) CompactRevision() int64 {
-	if c.cacher.compactor == nil {
+	if c.cacher.compactor == nil || c.cacher.isBypassed() {
 		return c.storage.CompactRevision()
 	}
 	return c.cacher.compactor.Revision()

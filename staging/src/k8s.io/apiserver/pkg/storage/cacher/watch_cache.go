@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -622,6 +623,22 @@ func (w *watchCache) SetOnReplace(onReplace func()) {
 	w.Lock()
 	defer w.Unlock()
 	w.onReplace = onReplace
+}
+
+// Release drops every object and event held by the watch cache, so that their
+// memory can be reclaimed while the watch cache itself is still referenced. It
+// is only meant for a watch cache whose reflector has been stopped for good.
+func (w *watchCache) Release() {
+	w.Lock()
+	defer w.Unlock()
+	w.releaseLocked()
+}
+
+func (w *watchCache) releaseLocked() {
+	w.history.ResetLocked()
+	if err := w.storage.ReplaceLocked(nil, strconv.FormatUint(w.resourceVersion, 10), w.resourceVersion); err != nil {
+		klog.ErrorS(err, "Failed to release watch cache contents", "groupResource", w.config.groupResource)
+	}
 }
 
 func (w *watchCache) Resync() error {

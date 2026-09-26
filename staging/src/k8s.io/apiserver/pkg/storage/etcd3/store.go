@@ -223,10 +223,7 @@ func (s *store) Versioner() storage.Versioner {
 }
 
 func (s *store) Close() {
-	stats := s.getResourceSizeEstimator()
-	if stats != nil {
-		stats.Close()
-	}
+	s.DisableResourceSizeEstimation()
 }
 
 func (s *store) getResourceSizeEstimator() *resourceSizeEstimator {
@@ -689,6 +686,16 @@ func (s *store) EnableResourceSizeEstimation(getKeys storage.KeysFunc) error {
 	}
 	s.resourceSizeEstimator = newResourceSizeEstimator(s.pathPrefix, getKeys)
 	return nil
+}
+
+func (s *store) DisableResourceSizeEstimation() {
+	s.collectorMux.Lock()
+	estimator := s.resourceSizeEstimator
+	s.resourceSizeEstimator = nil
+	s.collectorMux.Unlock()
+	if estimator != nil {
+		estimator.Close()
+	}
 }
 
 // TestOnlyResetResourceSizeEstimator clears the resource size estimator so a
