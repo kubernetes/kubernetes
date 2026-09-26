@@ -19,6 +19,7 @@ package cm
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -228,7 +229,7 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 			UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
 		})
 		if request, found := req[v1.ResourceCPU]; found {
-			burstablePodCPURequest += request.MilliValue()
+			burstablePodCPURequest = saturatingAdd(burstablePodCPURequest, request.MilliValue())
 		}
 	}
 
@@ -266,12 +267,39 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 			UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
 		})
 		if request, found := req[v1.ResourceMemory]; found {
-			podMemoryRequest += request.Value()
+			podMemoryRequest = saturatingAdd(podMemoryRequest, request.Value())
 		}
-		qosMemoryRequests[qosClass] += podMemoryRequest
+		qosMemoryRequests[qosClass] = saturatingAdd(qosMemoryRequests[qosClass], podMemoryRequest)
 	}
 
 	return qosMemoryRequests
+}
+
+// saturatingAdd returns a+b, clamped to the int64 rails instead of wrapping.
+//
+// The quantity accessors these sums are built from saturate rather than wrap, so a
+// single oversized request already arrives as MaxInt64. Adding it to a running total
+// would wrap to a negative value, which then flows into a cgroup limit.
+func saturatingAdd(a, b int64) int64 {
+	switch {
+	case b > 0 && a > math.MaxInt64-b:
+		return math.MaxInt64
+	case b < 0 && a < math.MinInt64-b:
+		return math.MinInt64
+	default:
+		return a + b
+	}
+}
+
+// percentOf returns value*percent/100 without overflowing the intermediate product.
+//
+// Writing it as value*percent first overflows once value exceeds MaxInt64/percent, and
+// the wrapped product bears no relation to the input: at MaxInt64 and 50% the direct
+// expression yields 0, so the reservation vanishes and the derived limit is wrong.
+// Splitting value into hundreds and remainder keeps both products in range and gives
+// the same result as the direct expression wherever that expression does not overflow.
+func percentOf(value, percent int64) int64 {
+	return value/100*percent + value%100*percent/100
 }
 
 // setMemoryReserve sums the memory limits of all pods in a QOS class,
@@ -297,8 +325,8 @@ func (m *qosContainerManagerImpl) setMemoryReserve(logger klog.Logger, configs m
 	}
 
 	// Calculate QOS memory limits
-	burstableLimit := allocatable - (qosMemoryRequests[v1.PodQOSGuaranteed] * percentReserve / 100)
-	bestEffortLimit := burstableLimit - (qosMemoryRequests[v1.PodQOSBurstable] * percentReserve / 100)
+	burstableLimit := allocatable - percentOf(qosMemoryRequests[v1.PodQOSGuaranteed], percentReserve)
+	bestEffortLimit := burstableLimit - percentOf(qosMemoryRequests[v1.PodQOSBurstable], percentReserve)
 	configs[v1.PodQOSBurstable].ResourceParameters.Memory = &burstableLimit
 	configs[v1.PodQOSBestEffort].ResourceParameters.Memory = &bestEffortLimit
 }
