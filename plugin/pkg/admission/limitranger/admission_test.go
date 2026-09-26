@@ -992,6 +992,31 @@ func TestLimitRangerValidatePodResize(t *testing.T) {
 			wantErr:    true,
 		},
 		{
+			name:       "unchanged over-max limit is not checked when only the request changes",
+			limitRange: containerMaxCPUAndMemory,
+			old:        new(pod(cpuAndMemory("500m", "500m", "500Mi", "2Gi"))),
+			pod:        pod(cpuAndMemory("500m", "500m", "800Mi", "2Gi")),
+		},
+		{
+			name:       "a request that itself exceeds the max is rejected even though the limit is unchanged",
+			limitRange: containerMaxCPUAndMemory,
+			old:        new(pod(cpuAndMemory("500m", "500m", "500Mi", "2Gi"))),
+			pod:        pod(cpuAndMemory("500m", "500m", "2Gi", "2Gi")),
+			wantErr:    true,
+		},
+		{
+			name:       "unchanged under-min request is not checked when only the limit changes",
+			limitRange: containerMinCPU,
+			old:        new(pod(cpu("100m", "1"))),
+			pod:        pod(cpu("100m", "2")),
+		},
+		{
+			name:       "unchanged pod-level over-max memory limit is not checked when only the pod-level request changes",
+			limitRange: podMaxMemory,
+			old:        new(validPodWithPodLevelResources("pod", 1, cpu("500m", "500m"), cpuAndMemory("500m", "500m", "500Mi", "2Gi"))),
+			pod:        validPodWithPodLevelResources("pod", 1, cpu("500m", "500m"), cpuAndMemory("500m", "500m", "800Mi", "2Gi")),
+		},
+		{
 			name:       "create is checked in full",
 			limitRange: containerMaxCPU,
 			pod:        pod(cpu("2", "2")),
