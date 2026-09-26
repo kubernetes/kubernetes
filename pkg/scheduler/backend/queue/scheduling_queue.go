@@ -1744,7 +1744,7 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 				if err != nil {
 					utilruntime.HandleErrorWithLogger(logger, err, "Failed to get pod for PodGroup lookup", "pod", nn)
 				} else if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
-					if rootLookup, hasRoot := p.workloadForest.getRootLookupInfoForPod(pod); hasRoot {
+					if rootLookup, hasRoot := p.workloadForest.getRootLookupInfoForPod(logger, pod); hasRoot {
 						if entity := p.unschedulableEntities.get(rootLookup); entity != nil {
 							if rootKey := queuedEntityKeyFunc(entity); !seen[rootKey] {
 								seen[rootKey] = true
