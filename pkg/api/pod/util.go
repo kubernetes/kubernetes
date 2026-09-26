@@ -314,48 +314,6 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 	return !isEqual
 }
 
-func hasIndivisibleHugePagesValue(list api.ResourceList) bool {
-	for resourceName, quantity := range list {
-		if helper.IsHugePageResourceName(resourceName) && !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func checkContainerUseIndivisibleHugePagesValues(container api.Container) bool {
-	return hasIndivisibleHugePagesValue(container.Resources.Limits) ||
-		hasIndivisibleHugePagesValue(container.Resources.Requests)
-}
-
-// usesIndivisibleHugePagesValues returns true if the pod spec asks for a non-integer
-// multiple of huge page unit size anywhere validation checks for one.
-func usesIndivisibleHugePagesValues(podSpec *api.PodSpec) bool {
-	foundIndivisibleHugePagesValue := false
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		if checkContainerUseIndivisibleHugePagesValues(*c) {
-			foundIndivisibleHugePagesValue = true
-		}
-		return !foundIndivisibleHugePagesValue // continue visiting if we haven't seen an invalid value yet
-	})
-
-	if foundIndivisibleHugePagesValue {
-		return true
-	}
-
-	// Pod-level resources go through the same check, so an old pod carrying an
-	// indivisible one has to stay updatable.
-	if podSpec.Resources != nil {
-		if hasIndivisibleHugePagesValue(podSpec.Resources.Limits) ||
-			hasIndivisibleHugePagesValue(podSpec.Resources.Requests) {
-			return true
-		}
-	}
-
-	return hasIndivisibleHugePagesValue(podSpec.Overhead)
-}
-
 // hasInvalidTopologySpreadConstraintLabelSelector return true if spec.TopologySpreadConstraints have any entry with invalid labelSelector
 func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 	for _, constraint := range spec.TopologySpreadConstraints {
@@ -447,9 +405,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
 
 	if oldPodSpec != nil {
-		// if old spec used non-integer multiple of huge page unit size, we must allow it
-		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
-
 		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
 		opts.AllowInvalidLabelValueInRequiredNodeAffinity = hasInvalidLabelValueInRequiredNodeAffinity(oldPodSpec)
 		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
@@ -465,6 +420,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		}
 		// if old spec has an invalid projected token volume path, we must allow it
 		opts.AllowNonLocalProjectedTokenPath = hasNonLocalProjectedTokenPath(oldPodSpec)
+		// a resource quantity the stored spec already holds was accepted when it was written
+		opts.StoredResourceQuantities = apivalidation.StoredResourceQuantitiesOf(oldPodSpec)
 
 		// if old spec has invalid sysctl with hostNet or hostIPC, we must allow it when update
 		if oldPodSpec.SecurityContext != nil && len(oldPodSpec.SecurityContext.Sysctls) != 0 {

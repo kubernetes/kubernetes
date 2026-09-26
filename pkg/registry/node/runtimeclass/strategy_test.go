@@ -60,9 +60,8 @@ func TestValidateUpdate(t *testing.T) {
 			},
 		},
 	}, {
-		// TODO(#141166): An unchanged stored overhead must pass on update. Expect no errors.
 		name:        "unchanged overhead example.com/gpu 18446744073709551616m",
-		expectError: true,
+		expectError: false,
 		old: node.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Handler:    "bar",
@@ -85,8 +84,59 @@ func TestValidateUpdate(t *testing.T) {
 			},
 		},
 	}, {
-		// TODO(#141166): An unchanged stored overhead must pass on update. Expect no errors.
 		name:        "unchanged overhead hugepages-2Mi 18446744073709551616",
+		expectError: false,
+		old: node.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Handler:    "bar",
+			Overhead: &node.Overhead{
+				PodFixed: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("10G"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+				},
+			},
+		},
+		new: node.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "bar"},
+			},
+			Handler: "bar",
+			Overhead: &node.Overhead{
+				PodFixed: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("10G"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+				},
+			},
+		},
+	}, {
+		name:        "changed hugepages-2Mi value must not ratchet off a different stored indivisible one",
+		expectError: true,
+		old: node.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Handler:    "bar",
+			Overhead: &node.Overhead{
+				PodFixed: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("10G"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+				},
+			},
+		},
+		new: node.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "bar"},
+			},
+			Handler: "bar",
+			Overhead: &node.Overhead{
+				PodFixed: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("10G"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("3Mi"),
+				},
+			},
+		},
+	}, {
+		name:        "new hugepages-1Gi entry must not ratchet off an unrelated stored indivisible hugepages-2Mi",
 		expectError: true,
 		old: node.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -108,6 +158,7 @@ func TestValidateUpdate(t *testing.T) {
 				PodFixed: core.ResourceList{
 					core.ResourceMemory: resource.MustParse("10G"),
 					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("3Mi"),
 				},
 			},
 		},
