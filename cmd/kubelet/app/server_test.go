@@ -17,6 +17,12 @@ limitations under the License.
 package app
 
 import (
+	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/mldsa"
+	"crypto/rsa"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -29,6 +35,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -609,4 +616,68 @@ func TestMarshalKubeletConfigForLog(t *testing.T) {
 
 	// The helper must not mutate the caller's config when masking.
 	require.Equal(t, []string{"Bearer super-secret-token"}, kc.StaticPodURLHeader["Authorization"])
+}
+
+// describePublicKey names the exact key a certificate carries, so that P-256
+// and P-384 (both x509.ECDSA) and the three ML-DSA variants stay distinct.
+func describePublicKey(pub crypto.PublicKey) string {
+	switch k := pub.(type) {
+	case *ecdsa.PublicKey:
+		return "ECDSA " + k.Curve.Params().Name
+	case *rsa.PublicKey:
+		return fmt.Sprintf("RSA %d", k.N.BitLen())
+	case *mldsa.PublicKey:
+		switch k.Parameters() {
+		case mldsa.MLDSA44():
+			return "ML-DSA-44"
+		case mldsa.MLDSA65():
+			return "ML-DSA-65"
+		case mldsa.MLDSA87():
+			return "ML-DSA-87"
+		}
+		return "ML-DSA unknown parameters"
+	}
+	return fmt.Sprintf("unrecognized key type %T", pub)
+}
+
+func TestInitializeTLSSelfSignedKeyAlgorithm(t *testing.T) {
+	ecdsaP384 := kubeletconfiginternal.CertificateKeyAlgorithmECDSAP384
+	rsa4096 := kubeletconfiginternal.CertificateKeyAlgorithmRSA4096
+	mldsa65 := kubeletconfiginternal.CertificateKeyAlgorithmMLDSA65
+
+	testCases := []struct {
+		name      string
+		algorithm *kubeletconfiginternal.CertificateKeyAlgorithmType
+		wantKey   string
+	}{
+		{name: "unset uses the documented ECDSA-P256 default", algorithm: nil, wantKey: "ECDSA P-256"},
+		{name: "ECDSA-P384", algorithm: &ecdsaP384, wantKey: "ECDSA P-384"},
+		{name: "RSA-4096", algorithm: &rsa4096, wantKey: "RSA 4096"},
+		{name: "ML-DSA-65", algorithm: &mldsa65, wantKey: "ML-DSA-65"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kf := &options.KubeletFlags{
+				CertDirectory:    t.TempDir(),
+				HostnameOverride: "test-node",
+			}
+			kc := &kubeletconfiginternal.KubeletConfiguration{
+				TLSMinVersion:                 "VersionTLS13",
+				ServerCertificateKeyAlgorithm: tc.algorithm,
+			}
+
+			if _, err := InitializeTLS(context.Background(), kf, kc); err != nil {
+				t.Fatalf("InitializeTLS() failed: %v", err)
+			}
+
+			certs, err := certutil.CertsFromFile(kc.TLSCertFile)
+			if err != nil {
+				t.Fatalf("reading the generated cert: %v", err)
+			}
+			if got := describePublicKey(certs[0].PublicKey); got != tc.wantKey {
+				t.Errorf("generated cert key = %s, want %s", got, tc.wantKey)
+			}
+		})
+	}
 }
