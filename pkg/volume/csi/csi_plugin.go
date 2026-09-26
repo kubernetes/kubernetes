@@ -565,12 +565,9 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 		// unmount operation is never generated, the pod is never dropped from
 		// the actual state of the world, and the global mount it was rescued
 		// from stays orphaned, which is the leak this feature exists to close.
-		globalDir, fallbackData, fallbackErr := findGlobalMountDataFromPodMount(p.host, dataDir)
+		globalDir, fallbackData, fallbackErr := findGlobalMountDataFromPodMount(p.host, dataDir, specName)
 		if fallbackErr != nil {
 			return nil, errors.New(log("unmounter failed to load volume data file [%s]: %v (global mount fallback also failed: %v)", dir, err, fallbackErr))
-		}
-		if got := fallbackData[volDataKey.specVolID]; got != "" && got != specName {
-			return nil, errors.New(log("unmounter failed to load volume data file [%s]: %v (global mount %s belongs to volume %q, not %q)", dir, err, globalDir, got, specName))
 		}
 		klog.V(2).Info(log("unmounter recovered vol_data from global mount %s", globalDir))
 		data = fallbackData
@@ -594,25 +591,17 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.Re
 		// global mount data that MountDevice wrote, found through the mount
 		// reference the pod-local bind mount still holds. Prevents orphaned
 		// global mounts on failed reconstruction (issue #101791).
-		globalDir, fallbackData, fallbackErr := findGlobalMountDataFromPodMount(p.host, mountPath)
+		globalDir, fallbackData, fallbackErr := findGlobalMountDataFromPodMount(p.host, mountPath, volumeName)
 		if fallbackErr != nil {
 			return volume.ReconstructedVolume{}, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v (global mount fallback also failed: %v)", mountPath, err, fallbackErr))
 		}
 		volData = fallbackData
-		switch got := volData[volDataKey.specVolID]; {
-		case got == "":
+		if volData[volDataKey.specVolID] == "" {
 			// A global vol_data.json written by a kubelet older than this
 			// feature carries only volHandle and driverName. volumeName is the
 			// name of the pod directory, which is the same value SetUpAt would
 			// have stored, so the reconstructed spec is not left unnamed.
 			volData[volDataKey.specVolID] = volumeName
-		case got != volumeName:
-			// Mount references are matched by superblock and root, so a driver
-			// that stages several volumes from one export can offer more than
-			// one global mount here. Reconstructing the wrong volume is worse
-			// than not reconstructing at all: its handle would end up in
-			// volumesInUse and be unstaged on its owner's behalf.
-			return volume.ReconstructedVolume{}, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v (global mount %s belongs to volume %q, not %q)", mountPath, err, globalDir, got, volumeName))
 		}
 		klog.V(2).Info(log("plugin.ConstructVolumeSpec recovered vol_data from global mount %s", globalDir))
 	}
