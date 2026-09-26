@@ -28,8 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/http2"
-
 	netutils "k8s.io/utils/net"
 )
 
@@ -170,12 +168,10 @@ func TestIsConnectionReset(t *testing.T) {
 	if !ok {
 		t.Fatalf("failed to assert *http.Transport")
 	}
-	t2, err := http2.ConfigureTransports(transport)
-	if err != nil {
-		t.Fatalf("failed to configure *http.Transport: %+v", err)
-	}
-	t2.ReadIdleTimeout = time.Second
-	t2.PingTimeout = time.Second
+	transport.Protocols = new(http.Protocols)
+	transport.Protocols.SetHTTP1(true)
+	transport.Protocols.SetHTTP2(true)
+	transport.HTTP2 = &http.HTTP2Config{SendPingTimeout: time.Second, PingTimeout: time.Second}
 	resp, err := c.Get("https://" + lb.ln.Addr().String())
 	if err != nil {
 		t.Fatalf("unexpected error: %+v", err)
