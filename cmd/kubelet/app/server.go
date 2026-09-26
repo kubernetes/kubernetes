@@ -105,6 +105,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap"
+	"k8s.io/kubernetes/pkg/kubelet/certificate/keyalgorithm"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -1201,7 +1202,10 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 			if err != nil {
 				return nil, err
 			}
-			cert, key, err := certutil.GenerateSelfSignedCertKey(hostName, nil, nil)
+			cert, key, err := certutil.GenerateSelfSignedCertKeyWithOptions(certutil.SelfSignedCertKeyOptions{
+				Host:        hostName,
+				GenerateKey: keyalgorithm.KeyGeneratorFunc(kc.ServerCertificateKeyAlgorithm),
+			})
 			if err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %w", err)
 			}
