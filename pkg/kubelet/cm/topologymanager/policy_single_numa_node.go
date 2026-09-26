@@ -42,7 +42,9 @@ func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return hint.Preferred
 }
 
-// Return hints that have valid bitmasks with exactly one bit set.
+// Return hints that have valid bitmasks with exactly one bit set. One entry is
+// returned per entry of allResourcesHints, in the same order, so the result
+// stays parallel to the resource names filterProvidersHints returned.
 func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
 	var filteredResourcesHints [][]TopologyHint
 	for _, oneResourceHints := range allResourcesHints {
@@ -61,15 +63,15 @@ func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint 
 }
 
 func (p *singleNumaNodePolicy) Merge(logger klog.Logger, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
-	filteredHints := filterProvidersHints(logger, providersHints)
+	filteredHints, resourceNames := filterProvidersHints(logger, providersHints)
 	// Filter to only include don't cares and hints with a single NUMA node.
 	singleNumaHints := filterSingleNumaHints(filteredHints)
 
-	merger := NewHintMerger(p.numaInfo, singleNumaHints, p.Name(), p.opts)
-	bestHint := merger.Merge()
+	merger := NewHintMerger(p.numaInfo, singleNumaHints, resourceNames, p.Name(), p.opts)
+	bestHint := merger.Merge(logger)
 
 	if bestHint.NUMANodeAffinity.IsEqual(p.numaInfo.DefaultAffinityMask()) {
-		bestHint = TopologyHint{nil, bestHint.Preferred}
+		bestHint = TopologyHint{NUMANodeAffinity: nil, Preferred: bestHint.Preferred}
 	}
 
 	admit := p.canAdmitPodResult(&bestHint)

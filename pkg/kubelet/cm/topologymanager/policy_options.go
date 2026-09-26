@@ -19,6 +19,7 @@ package topologymanager
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -29,14 +30,54 @@ import (
 const (
 	PreferClosestNUMANodes string = "prefer-closest-numa-nodes"
 	MaxAllowableNUMANodes  string = "max-allowable-numa-nodes"
+	NUMAAllocationStrategy string = "numa-allocation-strategy"
+	NUMAScoreWeights       string = "numa-score-weights"
+)
+
+// Bounds for the per-resource weights accepted by the NUMAScoreWeights policy
+// option, matching the range kube-scheduler's NodeResourcesFit plugin uses for
+// its own per-resource weights.
+const (
+	minNUMAScoreWeight = 0
+	maxNUMAScoreWeight = 100
+)
+
+// defaultNUMAScoreWeight is the weight given to a resource the weight string
+// does not name. It is also the smallest weight an operator can explicitly
+// assign, so naming a resource can only raise its influence relative to the
+// others, never lower it. Dropping a resource from scoring therefore requires
+// an explicit weight of 0.
+const defaultNUMAScoreWeight = 1
+
+// Values accepted by the NUMAAllocationStrategy policy option.
+const (
+	// NUMAAllocationStrategyNone keeps the pre-existing hint selection, which
+	// disregards how much of each NUMA node is already allocated. This is the
+	// default.
+	NUMAAllocationStrategyNone string = "none"
+	// NUMAAllocationStrategyMostAllocated prefers the NUMA nodes which are
+	// already the most allocated, packing workloads together.
+	NUMAAllocationStrategyMostAllocated string = "most-allocated"
+	// NUMAAllocationStrategyLeastAllocated prefers the NUMA nodes which are
+	// the least allocated, spreading workloads apart.
+	NUMAAllocationStrategyLeastAllocated string = "least-allocated"
 )
 
 var (
-	alphaOptions  = sets.New[string]()
+	alphaOptions = sets.New[string](
+		NUMAAllocationStrategy,
+		NUMAScoreWeights,
+	)
 	betaOptions   = sets.New[string]()
 	stableOptions = sets.New[string](
 		PreferClosestNUMANodes,
 		MaxAllowableNUMANodes,
+	)
+
+	numaAllocationStrategies = sets.New[string](
+		NUMAAllocationStrategyNone,
+		NUMAAllocationStrategyMostAllocated,
+		NUMAAllocationStrategyLeastAllocated,
 	)
 )
 
@@ -57,8 +98,63 @@ func CheckPolicyOptionAvailable(option string) error {
 }
 
 type PolicyOptions struct {
-	PreferClosestNUMA     bool
-	MaxAllowableNUMANodes int
+	PreferClosestNUMA      bool
+	MaxAllowableNUMANodes  int
+	NUMAAllocationStrategy string
+	// NUMAScoreWeights maps a resource name to the weight its score carries
+	// when hint scores are aggregated. It is nil unless the user asked for
+	// weights, and a resource missing from it sits at defaultNUMAScoreWeight.
+	NUMAScoreWeights map[string]int
+}
+
+// parseNUMAScoreWeights turns the comma-separated resource=weight form of the
+// NUMAScoreWeights policy option into the map the aggregation consumes, e.g.
+// "cpu=3,memory=1,nvidia.com/gpu=6" into
+// map[string]int{"cpu": 3, "memory": 1, "nvidia.com/gpu": 6}.
+//
+// Resource names are not checked against the providers present on the node.
+// The set of providers that can contribute a score is a property of the pod
+// being admitted rather than of the node, so a name matching nothing on the
+// node is indistinguishable from one a given pod simply does not request.
+func parseNUMAScoreWeights(raw string) (map[string]int, error) {
+	weights := make(map[string]int)
+	for pair := range strings.SplitSeq(raw, ",") {
+		pair = strings.TrimSpace(pair)
+		// Tolerate empty entries so a trailing comma, or the empty string
+		// itself, means "no weights" rather than a startup failure.
+		if pair == "" {
+			continue
+		}
+		resource, rawWeight, found := strings.Cut(pair, "=")
+		if !found {
+			return nil, fmt.Errorf("invalid weight entry %q: expected resource=weight", pair)
+		}
+		resource = strings.TrimSpace(resource)
+		if resource == "" {
+			return nil, fmt.Errorf("empty resource name in weight entry %q", pair)
+		}
+		weight, err := strconv.Atoi(strings.TrimSpace(rawWeight))
+		if err != nil {
+			return nil, fmt.Errorf("invalid weight value for %q: %w", resource, err)
+		}
+		weights[resource] = weight
+	}
+	return weights, nil
+}
+
+// validateNUMAScoreWeights rejects weights outside the accepted range. A weight
+// of 0 is valid and excludes the resource from scoring altogether.
+//
+// There is deliberately no check on the sum: the aggregation divides by the
+// total applicable weight, so only the ratios between weights matter and
+// "cpu=30,memory=10" behaves exactly like "cpu=3,memory=1".
+func validateNUMAScoreWeights(weights map[string]int) error {
+	for _, resource := range sets.List(sets.KeySet(weights)) {
+		if weight := weights[resource]; weight < minNUMAScoreWeight || weight > maxNUMAScoreWeight {
+			return fmt.Errorf("weight for %q must be in range [%d, %d], got %d", resource, minNUMAScoreWeight, maxNUMAScoreWeight, weight)
+		}
+	}
+	return nil
 }
 
 func NewPolicyOptions(logger klog.Logger, policyOptions map[string]string) (PolicyOptions, error) {
@@ -66,6 +162,9 @@ func NewPolicyOptions(logger klog.Logger, policyOptions map[string]string) (Poli
 		// Set MaxAllowableNUMANodes to the default. This will be overwritten
 		// if the user has specified a policy option for MaxAllowableNUMANodes.
 		MaxAllowableNUMANodes: defaultMaxAllowableNUMANodes,
+		// Likewise, allocation state does not take part in hint selection
+		// unless the user asks for it.
+		NUMAAllocationStrategy: NUMAAllocationStrategyNone,
 	}
 
 	for name, value := range policyOptions {
@@ -94,6 +193,25 @@ func NewPolicyOptions(logger klog.Logger, policyOptions map[string]string) (Poli
 				logger.Info("WARNING: the value of max-allowable-numa-nodes is more than the default recommended value", "max-allowable-numa-nodes", optValue, "defaultMaxAllowableNUMANodes", defaultMaxAllowableNUMANodes)
 			}
 			opts.MaxAllowableNUMANodes = optValue
+		case NUMAAllocationStrategy:
+			// an empty value means the same as "none", so the option can be
+			// neutralized without removing the key.
+			if value == "" {
+				value = NUMAAllocationStrategyNone
+			}
+			if !numaAllocationStrategies.Has(value) {
+				return opts, fmt.Errorf("bad value for option %q: %q must be one of %q", name, value, sets.List(numaAllocationStrategies))
+			}
+			opts.NUMAAllocationStrategy = value
+		case NUMAScoreWeights:
+			weights, err := parseNUMAScoreWeights(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			if err := validateNUMAScoreWeights(weights); err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.NUMAScoreWeights = weights
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.
