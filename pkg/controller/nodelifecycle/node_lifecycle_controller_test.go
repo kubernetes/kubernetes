@@ -2295,6 +2295,67 @@ func TestMonitorNodeHealthMarkPodsNotReadyWithWorkerSize(t *testing.T) {
 	}
 }
 
+func TestMonitorNodeHealthRemovesDeletedNodeHealth(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: fakeNow,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node1",
+					CreationTimestamp: fakeNow,
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&v1.PodList{}),
+	}
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		tCtx,
+		fakeNodeHandler,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod)
+	nodeController.now = func() metav1.Time { return fakeNow }
+	nodeController.recorder = testutil.NewFakeRecorder()
+	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
+
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, name := range []string{"node0", "node1"} {
+		if nodeController.nodeHealthMap.getDeepCopy(name) == nil {
+			t.Fatalf("expected node health of %s to be recorded", name)
+		}
+	}
+
+	fakeNodeHandler.Existing = fakeNodeHandler.Existing[:1]
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if nodeController.nodeHealthMap.getDeepCopy("node0") == nil {
+		t.Errorf("expected node health of node0 to be kept")
+	}
+	if nodeController.nodeHealthMap.getDeepCopy("node1") != nil {
+		t.Errorf("expected node health of deleted node1 to be removed")
+	}
+}
+
 func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 	type nodeIteration struct {
 		timeToPass time.Duration
