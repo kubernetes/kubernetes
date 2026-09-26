@@ -53,7 +53,7 @@ func (c *APICache) BindPod(binding *v1.Binding) (<-chan error, error) {
 }
 
 // WaitOnFinish blocks until the result of an API call is sent to the given onFinish channel
-// (returned by methods BindPod or PreemptPod).
+// (returned by methods PatchPodStatus or BindPod).
 //
 // It returns the error received from the channel.
 // It also returns nil if the call was skipped or overwritten,
