@@ -64,12 +64,17 @@ type NodeDeclaredFeatures struct {
 
 var _ fwk.PreFilterPlugin = &NodeDeclaredFeatures{}
 var _ fwk.FilterPlugin = &NodeDeclaredFeatures{}
+var _ fwk.NodeLocalFilterPlugin = &NodeDeclaredFeatures{}
 var _ fwk.EnqueueExtensions = &NodeDeclaredFeatures{}
 var _ fwk.SignPlugin = &NodeDeclaredFeatures{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeDeclaredFeatures) Name() string {
 	return Name
+}
+
+func (pl *NodeDeclaredFeatures) IsNodeLocal() bool {
+	return true
 }
 
 // New initializes a new plugin and returns it.

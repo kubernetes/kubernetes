@@ -36,6 +36,7 @@ type DeferredPodScheduling struct {
 
 var _ fwk.PreFilterPlugin = &DeferredPodScheduling{}
 var _ fwk.FilterPlugin = &DeferredPodScheduling{}
+var _ fwk.NodeLocalFilterPlugin = &DeferredPodScheduling{}
 var _ fwk.EnqueueExtensions = &DeferredPodScheduling{}
 var _ fwk.PermitPlugin = &DeferredPodScheduling{}
 
@@ -46,6 +47,10 @@ const (
 
 func (pl *DeferredPodScheduling) Name() string {
 	return Name
+}
+
+func (pl *DeferredPodScheduling) IsNodeLocal() bool {
+	return true
 }
 
 // EventsToRegister returns the possible events that may make a Pod
