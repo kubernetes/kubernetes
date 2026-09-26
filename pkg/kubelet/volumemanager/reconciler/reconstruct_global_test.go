@@ -80,6 +80,15 @@ func (p *listerWithoutMapper) ListGlobalVolumes() ([]volume.GlobalVolume, error)
 	return p.staged, nil
 }
 
+// notDeviceMountable lists global mounts it cannot device mount.
+type notDeviceMountable struct {
+	*volumetesting.FakeVolumePlugin
+}
+
+func (notDeviceMountable) CanDeviceMount(*volume.Spec) (bool, error) {
+	return false, nil
+}
+
 // TestReconstructGlobalVolumes covers reconstruction of a volume that is still
 // staged on the node but has no pod directory naming it, the state a node drain
 // and reboot leaves behind (issue #121937). Kubelet finds it by asking each
@@ -282,4 +291,17 @@ func TestReconstructGlobalVolumes(t *testing.T) {
 			t.Errorf("volume %q did not reach the actual state of world with the gate on", volumeName)
 		}
 	})
+
+	t.Run("skips a volume its plugin cannot device mount", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		staged := stagedVolume("staged-pv", "fake-device1")
+		rc, fakePlugin := setup(t)
+
+		rc.reconstructGlobalVolume(logger, notDeviceMountable{fakePlugin}, staged)
+
+		if volumeName := uniqueName(t, fakePlugin, staged); rc.actualStateOfWorld.VolumeExists(volumeName) || len(rc.volumesNeedUpdateFromNodeStatus) != 0 {
+			t.Errorf("volume %q was registered although its plugin cannot device mount it", volumeName)
+		}
+	})
+
 }
