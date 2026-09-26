@@ -30,6 +30,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -180,6 +181,20 @@ func configureHTTP2Transport(t *http.Transport) {
 		t.Protocols.SetHTTP1(true)
 	}
 	t.Protocols.SetHTTP2(true)
+	// x/net's ConfigureTransports created an empty TLSClientConfig and put
+	// h2 and http/1.1 in NextProtos. net/http does the same, but only on
+	// the first round trip. Do it here so that code that reads
+	// TLSClientConfig before then, such as TLSClientConfig() and
+	// proxy.DialURL, sees the same config as before.
+	if t.TLSClientConfig == nil {
+		t.TLSClientConfig = &tls.Config{}
+	}
+	if !slices.Contains(t.TLSClientConfig.NextProtos, http2.NextProtoTLS) {
+		t.TLSClientConfig.NextProtos = append([]string{http2.NextProtoTLS}, t.TLSClientConfig.NextProtos...)
+	}
+	if !slices.Contains(t.TLSClientConfig.NextProtos, "http/1.1") {
+		t.TLSClientConfig.NextProtos = append(t.TLSClientConfig.NextProtos, "http/1.1")
+	}
 	// The following enables the HTTP/2 connection health check added in
 	// https://github.com/golang/net/pull/55. The health check detects and
 	// closes broken transport layer connections. Without the health check,
