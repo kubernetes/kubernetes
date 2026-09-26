@@ -700,6 +700,54 @@ func TestSyncPod(t *testing.T) {
 	}
 }
 
+func TestSyncPodPreStartFailureBackOff(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	assert.NoError(t, err)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "fail-create",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// Make container creation fail
+	fakeRuntime.InjectError("CreateContainer", fmt.Errorf("resource limit below runtime floor"))
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	backOff := flowcontrol.NewFakeBackOff(time.Second, time.Minute, fakeClock)
+
+	// First sync attempts to start container, fails at CreateContainer, and registers backoff
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+	assert.Error(t, result.Error())
+	assert.Len(t, fakeRuntime.Containers, 0)
+
+	// Second sync immediately after should be in backoff without attempting CreateContainer again
+	result2 := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+	assert.Error(t, result2.Error())
+	assert.ErrorIs(t, result2.Error(), kubecontainer.ErrCrashLoopBackOff)
+	assert.Len(t, fakeRuntime.Containers, 0)
+
+	// Advance clock past the backoff window
+	fakeClock.Step(2 * time.Second)
+
+	// Third sync should now retry container creation and succeed
+	result3 := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+	assert.NoError(t, result3.Error())
+	assert.Len(t, fakeRuntime.Containers, 1)
+}
+
 func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
@@ -6350,6 +6398,7 @@ func TestDoBackOff(t *testing.T) {
 		name              string
 		podStatus         *kubecontainer.PodStatus
 		backoff           *flowcontrol.Backoff
+		managerSetupFn    func(*testing.T, *kubeGenericRuntimeManager, *v1.Pod, *v1.Container)
 		backoffUpdateFn   func(*flowcontrol.Backoff, *v1.Pod, *kubecontainer.PodStatus)
 		expectedInBackOff bool
 		expectedError     error
@@ -6400,6 +6449,39 @@ func TestDoBackOff(t *testing.T) {
 			expectedInBackOff: true,
 			expectedError:     kubecontainer.NewBackoffError(kubecontainer.ErrCrashLoopBackOff, fakeClock.Now().Add(time.Second)),
 		},
+		{
+			name: "in backoff after pre-start container failure without exited container status",
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{},
+			},
+			backoff: flowcontrol.NewFakeBackOff(time.Second, time.Minute, fakeClock),
+			managerSetupFn: func(t *testing.T, m *kubeGenericRuntimeManager, pod *v1.Pod, container *v1.Container) {
+				key := GetBackoffKey(pod, container)
+				m.recordFailureTime(key, fakeClock.Now())
+			},
+			backoffUpdateFn: func(backoff *flowcontrol.Backoff, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+				key := GetBackoffKey(pod, &pod.Spec.Containers[0])
+				backoff.Next(key, fakeClock.Now())
+			},
+			expectedInBackOff: true,
+			expectedError:     kubecontainer.NewBackoffError(kubecontainer.ErrCrashLoopBackOff, fakeClock.Now().Add(time.Second)),
+		},
+		{
+			name: "not in backoff after pre-start container failure when backoff window elapsed",
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{},
+			},
+			backoff: flowcontrol.NewFakeBackOff(time.Second, time.Minute, fakeClock),
+			managerSetupFn: func(t *testing.T, m *kubeGenericRuntimeManager, pod *v1.Pod, container *v1.Container) {
+				key := GetBackoffKey(pod, container)
+				m.recordFailureTime(key, fakeClock.Now().Add(-2*time.Second))
+			},
+			backoffUpdateFn: func(backoff *flowcontrol.Backoff, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+				key := GetBackoffKey(pod, &pod.Spec.Containers[0])
+				backoff.Next(key, fakeClock.Now().Add(-2*time.Second))
+			},
+			expectedInBackOff: false,
+		},
 	}
 
 	for _, tc := range tests {
@@ -6424,6 +6506,10 @@ func TestDoBackOff(t *testing.T) {
 				},
 			}
 			container := &pod.Spec.Containers[0]
+
+			if tc.managerSetupFn != nil {
+				tc.managerSetupFn(t, m, pod, container)
+			}
 
 			if tc.backoffUpdateFn != nil {
 				tc.backoffUpdateFn(tc.backoff, pod, tc.podStatus)
