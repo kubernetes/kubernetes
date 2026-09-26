@@ -460,12 +460,15 @@ func deletePods(testCtx *testutils.TestContext, ns string, podNames []string) er
 
 func updatePod(testCtx *testutils.TestContext, ns string, update *UpdatePod) error {
 	cs := testCtx.ClientSet
-	p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, update.PodName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get pod %s for update: %w", update.PodName, err)
-	}
-	update.ModifyFn(p)
-	_, err = cs.CoreV1().Pods(ns).Update(testCtx.Ctx, p, metav1.UpdateOptions{})
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, update.PodName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		update.ModifyFn(p)
+		_, err = cs.CoreV1().Pods(ns).Update(testCtx.Ctx, p, metav1.UpdateOptions{})
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("failed to update pod %s: %w", update.PodName, err)
 	}
