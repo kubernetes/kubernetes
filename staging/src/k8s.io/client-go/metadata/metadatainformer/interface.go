@@ -31,6 +31,13 @@ type SharedInformerFactory interface {
 	// ForResource gives generic access to a shared informer of the matching type.
 	ForResource(gvr schema.GroupVersionResource) informers.GenericInformer
 
+	// Release records that one ForResource caller no longer needs the informer for gvr. Every
+	// ForResource call must be paired with exactly one Release: the informer is stopped and
+	// dropped once every caller released it, so a later ForResource builds a fresh one. Use it
+	// when the server no longer serves gvr; releasing a resource that is still served only makes
+	// the next ForResource start a new informer.
+	Release(gvr schema.GroupVersionResource) bool
+
 	// WaitForCacheSync blocks until all started informers' caches were synced
 	// or the stop channel gets closed.
 	WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool
