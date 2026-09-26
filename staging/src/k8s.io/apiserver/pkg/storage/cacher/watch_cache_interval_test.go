@@ -17,6 +17,7 @@ limitations under the License.
 package cacher
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
@@ -436,30 +438,85 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	}
 }
 
-// TestCacheIntervalFromStoreSorted verifies newCacheIntervalFromStore returns
-// events sorted by Key for both indexer backends.
+// TestCacheIntervalFromStoreSorted verifies intervals built from WatchCacheStorage
+// (btree, ordered list, and index snapshots) return events sorted by Key.
 func TestCacheIntervalFromStoreSorted(t *testing.T) {
+	nodeIndexers := &cache.Indexers{
+		"f:spec.nodeName": func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return nil, fmt.Errorf("not a pod %#v", obj)
+			}
+			return []string{pod.Spec.NodeName}, nil
+		},
+	}
 	cases := []struct {
-		name    string
-		indexer *store.WatchCacheStorage
+		name         string
+		indexer      *store.WatchCacheStorage
+		makeInterval func(t *testing.T, rv uint64, s *store.WatchCacheStorage) (*watchCacheInterval, error)
 	}{
-		{"btree", store.NewWatchCacheStorage(nil, nil)},
+		{
+			name:    "btree",
+			indexer: store.NewWatchCacheStorage(nil, nil),
+			makeInterval: func(_ *testing.T, rv uint64, s *store.WatchCacheStorage) (*watchCacheInterval, error) {
+				return newCacheIntervalFromStore(rv, s, "", false)
+			},
+		},
+		{
+			name:    "btree lazy snapshot",
+			indexer: store.NewWatchCacheStorage(nil, nil),
+			makeInterval: func(t *testing.T, rv uint64, s *store.WatchCacheStorage) (*watchCacheInterval, error) {
+				snap, ok := s.LatestSnapshotLocked()
+				if !ok {
+					t.Fatal("expected LatestSnapshotLocked to succeed")
+				}
+				return newCacheIntervalFromLazySnapshot(rv, snap, ""), nil
+			},
+		},
+		{
+			name:    "ordered list lazy snapshot",
+			indexer: store.NewWatchCacheStorage(nil, nil),
+			makeInterval: func(t *testing.T, rv uint64, s *store.WatchCacheStorage) (*watchCacheInterval, error) {
+				s.MarkConsistent(false)
+				if _, ok := s.LatestSnapshotLocked(); ok {
+					t.Fatal("expected LatestSnapshotLocked to be false when inconsistent")
+				}
+				snap, err := s.GetLatestSnapshotOrBuildLocked("", "")
+				if err != nil {
+					return nil, err
+				}
+				return newCacheIntervalFromLazySnapshot(rv, snap, ""), nil
+			},
+		},
+		{
+			name:    "indexed lazy snapshot",
+			indexer: store.NewWatchCacheStorage(nil, nodeIndexers),
+			makeInterval: func(_ *testing.T, rv uint64, s *store.WatchCacheStorage) (*watchCacheInterval, error) {
+				snap, err := s.GetByIndexSnapshot("f:spec.nodeName", "some-node")
+				if err != nil {
+					return nil, err
+				}
+				return newCacheIntervalFromLazySnapshot(rv, snap, ""), nil
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			const n = 50
-			// Insert in reverse-key order so any code path that returns
-			// items in insertion order trivially fails the sorted check below.
+			// Insert in reverse-key order with increasing resourceVersions so
+			// snapshots are recorded and any code path that returns items in
+			// insertion order fails the sorted check below.
 			for i := n - 1; i >= 0; i-- {
+				rv := uint64(n - i)
 				key := fmt.Sprintf("pod-%08d", i)
-				elem := makeTestStoreElement(makeTestPod(key, uint64(i)))
-				_, err := tc.indexer.Add(elem)
+				elem := makeTestStoreElement(makeTestPod(key, rv))
+				_, err := tc.indexer.UpdateStoreLocked(watch.Added, elem, rv)
 				if err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			wci, err := newCacheIntervalFromStore(n, tc.indexer, "", false)
+			wci, err := tc.makeInterval(t, n, tc.indexer)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -480,48 +537,179 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 }
 
 // TestCacheIntervalSourceSelection verifies that getIntervalFromStoreLocked builds the
-// interval from the lazy snapshot source when snapshotting is enabled and falls back to the
-// eager snapshot source when it is disabled.
+// interval from the lazy snapshot source when not matching a single key (supporting
+// snapshotting, index prefiltering, and key prefix scoping) and falls back to the
+// eager snapshot source when matching a single key.
 func TestCacheIntervalSourceSelection(t *testing.T) {
+	makeNamespacedPod := func(namespace, name string, rv uint64, nodeName string) *v1.Pod {
+		pod := makeTestPodDetails(name, rv, nodeName, nil)
+		pod.Namespace = namespace
+		return pod
+	}
+
 	cases := []struct {
 		name             string
 		snapshottingOn   bool
+		key              string
+		matchesSingle    bool
+		matchValues      []storage.MatchValue
 		wantLazySnapshot bool
+		wantKeys         []string
 	}{
 		{
 			name:             "snapshotting enabled serves from lazy snapshot",
 			snapshottingOn:   true,
+			key:              "/prefix/",
 			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns1/pod1", "/prefix/ns1/pod2", "/prefix/ns2/pod3"},
 		},
 		{
-			name:             "snapshotting disabled falls back to eager snapshot",
+			name:             "snapshotting disabled serves from lazy snapshot",
 			snapshottingOn:   false,
+			key:              "/prefix/",
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns1/pod1", "/prefix/ns1/pod2", "/prefix/ns2/pod3"},
+		},
+		{
+			name:             "snapshotting disabled with key prefix scopes lazy snapshot",
+			snapshottingOn:   false,
+			key:              "/prefix/ns1/",
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns1/pod1", "/prefix/ns1/pod2"},
+		},
+		{
+			name:             "indexed matchValues serves matching items from lazy snapshot",
+			snapshottingOn:   true,
+			key:              "/prefix/",
+			matchValues:      []storage.MatchValue{{IndexName: "f:spec.nodeName", Value: "node1"}},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns1/pod1", "/prefix/ns2/pod3"},
+		},
+		{
+			name:             "indexed matchValues with snapshotting disabled serves matching items from lazy snapshot",
+			snapshottingOn:   false,
+			key:              "/prefix/",
+			matchValues:      []storage.MatchValue{{IndexName: "f:spec.nodeName", Value: "node1"}},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns1/pod1", "/prefix/ns2/pod3"},
+		},
+		{
+			name:             "indexed matchValues with key prefix scopes to prefix",
+			snapshottingOn:   true,
+			key:              "/prefix/ns1/",
+			matchValues:      []storage.MatchValue{{IndexName: "f:spec.nodeName", Value: "node1"}},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns1/pod1"},
+		},
+		{
+			name:             "indexed matchValues with zero matching items returns empty",
+			snapshottingOn:   true,
+			key:              "/prefix/",
+			matchValues:      []storage.MatchValue{{IndexName: "f:spec.nodeName", Value: "node-empty"}},
+			wantLazySnapshot: true,
+			wantKeys:         nil,
+		},
+		{
+			name:             "non-existent index falls back to full snapshot with prefix",
+			snapshottingOn:   true,
+			key:              "/prefix/ns1/",
+			matchValues:      []storage.MatchValue{{IndexName: "f:nonexistent", Value: "val"}},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns1/pod1", "/prefix/ns1/pod2"},
+		},
+		{
+			name:           "multiple matchValues skips missing index and uses matching index",
+			snapshottingOn: true,
+			key:            "/prefix/",
+			matchValues: []storage.MatchValue{
+				{IndexName: "f:nonexistent", Value: "val"},
+				{IndexName: "f:spec.nodeName", Value: "node2"},
+			},
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns1/pod2"},
+		},
+		{
+			name:             "key prefix scopes lazy snapshot",
+			snapshottingOn:   true,
+			key:              "/prefix/ns1/",
+			wantLazySnapshot: true,
+			wantKeys:         []string{"/prefix/ns1/pod1", "/prefix/ns1/pod2"},
+		},
+		{
+			name:             "single key match serves from eager snapshot",
+			snapshottingOn:   true,
+			key:              "/prefix/ns1/pod1",
+			matchesSingle:    true,
 			wantLazySnapshot: false,
+			wantKeys:         []string{"/prefix/ns1/pod1"},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, tc.snapshottingOn)
-			wc := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
+			wc := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{
+				"f:spec.nodeName": func(obj interface{}) ([]string, error) {
+					pod, ok := obj.(*v1.Pod)
+					if !ok {
+						return nil, fmt.Errorf("not a pod %#v", obj)
+					}
+					return []string{pod.Spec.NodeName}, nil
+				},
+			})
 			defer wc.Stop()
-			if err := wc.Add(makeTestPod("pod1", 100)); err != nil {
+			if err := wc.Add(makeNamespacedPod("ns1", "pod1", 100, "node1")); err != nil {
+				t.Fatal(err)
+			}
+			if err := wc.Add(makeNamespacedPod("ns1", "pod2", 101, "node2")); err != nil {
+				t.Fatal(err)
+			}
+			if err := wc.Add(makeNamespacedPod("ns2", "pod3", 102, "node1")); err != nil {
 				t.Fatal(err)
 			}
 
 			wc.Lock()
-			wci, err := wc.getIntervalFromStoreLocked("", false)
+			wci, err := wc.getIntervalFromStoreLocked(context.Background(), tc.key, tc.matchesSingle, tc.matchValues)
 			wc.Unlock()
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
+			var lazySrc *lazySnapshotCacheIntervalSource
 			if tc.wantLazySnapshot {
-				if _, ok := wci.source.(*lazySnapshotCacheIntervalSource); !ok {
-					t.Errorf("expected *lazySnapshotCacheIntervalSource, got %T", wci.source)
+				var ok bool
+				lazySrc, ok = wci.source.(*lazySnapshotCacheIntervalSource)
+				if !ok {
+					t.Fatalf("expected *lazySnapshotCacheIntervalSource, got %T", wci.source)
+				}
+				if lazySrc.snapshot == nil {
+					t.Errorf("expected snapshot to be set before first Next() call")
 				}
 			} else {
 				if _, ok := wci.source.(*snapshotCacheIntervalSource); !ok {
 					t.Errorf("expected *snapshotCacheIntervalSource, got %T", wci.source)
+				}
+			}
+
+			var gotKeys []string
+			for {
+				ev, err := wci.Next()
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if ev == nil {
+					break
+				}
+				gotKeys = append(gotKeys, ev.Key)
+			}
+			if !reflect.DeepEqual(gotKeys, tc.wantKeys) {
+				t.Errorf("expected keys %v, got %v", tc.wantKeys, gotKeys)
+			}
+			if lazySrc != nil {
+				if lazySrc.snapshot != nil {
+					t.Errorf("expected snapshot reference to be cleared after loading")
+				}
+				if lazySrc.items != nil {
+					t.Errorf("expected items slice to be cleared after exhaustion")
 				}
 			}
 		})
@@ -550,7 +738,7 @@ func (s *countingSnapshot) RangePrefix(_, _ string) store.Range {
 // no events, and that repeated calls still read the snapshot only once.
 func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
 	snap := &countingSnapshot{}
-	wci := newCacheIntervalFromLazySnapshot(100, snap)
+	wci := newCacheIntervalFromLazySnapshot(100, snap, "")
 
 	for range 2 {
 		event, err := wci.Next()
