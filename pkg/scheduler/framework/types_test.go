@@ -4048,7 +4048,7 @@ func TestUnrollWildCardResource_WithGenericWorkload(t *testing.T) {
 	}
 }
 
-func TestPodGroupInfoGetChildrenSorting(t *testing.T) {
+func TestPodGroupInfo_SortChildren(t *testing.T) {
 	now := time.Now()
 	pgInfo := func(name, namespace string, creationTime time.Time) *PodGroupInfo {
 		return &PodGroupInfo{
@@ -4079,11 +4079,12 @@ func TestPodGroupInfoGetChildrenSorting(t *testing.T) {
 		Children: []*PodGroupInfo{pgInfo1, pgInfo2, pgInfo3, pgInfo4},
 	}
 
-	expectedOrder := []*PodGroupInfo{pgInfo3, pgInfo1, pgInfo4, pgInfo2}
-	gotOrder := pgi.GetChildGroups()
+	pgi.SortChildren()
+	expectedOrder := []fwk.PodGroupInfo{pgInfo3, pgInfo1, pgInfo4, pgInfo2}
+	gotOrder := pgi.GetChildren()
 
 	if diff := cmp.Diff(expectedOrder, gotOrder); diff != "" {
-		t.Errorf("GetChildGroups() returned diff (-want +got):\n%s", diff)
+		t.Errorf("SortChildren() resulted in unexpected children order (-want +got):\n%s", diff)
 	}
 }
 
@@ -4187,11 +4188,11 @@ func TestQueuedPodGroupInfo_AddCompositePodGroup(t *testing.T) {
 				if len(qpgi.PodGroupInfo.Children) != 2 {
 					t.Fatalf("Expected 2 children under root CPG, got %d", len(qpgi.PodGroupInfo.Children))
 				}
-				if qpgi.PodGroupInfo.Children[0].GetType() != fwk.PodGroupKeyType || qpgi.PodGroupInfo.Children[0].GetName() != "shared-name" {
-					t.Errorf("First child should be PG shared-name")
+				if qpgi.PodGroupInfo.Children[0].GetType() != fwk.CompositePodGroupKeyType || qpgi.PodGroupInfo.Children[0].GetName() != "shared-name" {
+					t.Errorf("First child should be CPG shared-name")
 				}
-				if qpgi.PodGroupInfo.Children[1].GetType() != fwk.CompositePodGroupKeyType || qpgi.PodGroupInfo.Children[1].GetName() != "shared-name" {
-					t.Errorf("Second child should be CPG shared-name")
+				if qpgi.PodGroupInfo.Children[1].GetType() != fwk.PodGroupKeyType || qpgi.PodGroupInfo.Children[1].GetName() != "shared-name" {
+					t.Errorf("Second child should be PG shared-name")
 				}
 			},
 		},

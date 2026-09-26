@@ -1530,6 +1530,140 @@ func TestPriorityQueue_Pop(t *testing.T) {
 	}
 }
 
+func TestPriorityQueue_QueuedPodGroupInfoChildrenSorted(t *testing.T) {
+	rootCompositePodGroup := st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns1").Obj()
+	childCompositePodGroup1 := st.MakeCompositePodGroup().Name("child1").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	childPodGroup1 := st.MakePodGroup().Name("child1").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	childPodGroup2 := st.MakePodGroup().Name("child2").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	childPodGroup3 := st.MakePodGroup().Name("child3").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	grandChildPodGroup1 := st.MakePodGroup().Name("grand-child1").Namespace("ns1").ParentCompositePodGroup("child1").Obj()
+	grandChildPodGroup2 := st.MakePodGroup().Name("grand-child2").Namespace("ns1").ParentCompositePodGroup("child1").Obj()
+	pod1 := st.MakePod().Name("pod-1").Namespace("ns1").UID("pod-1-uid").PodGroupName("child1").Obj()
+	pod2 := st.MakePod().Name("pod-2").Namespace("ns1").UID("pod-2-uid").PodGroupName("child2").Obj()
+
+	var getChildren func(children []*framework.PodGroupInfo) []fwk.EntityKey
+	getChildren = func(children []*framework.PodGroupInfo) []fwk.EntityKey {
+		var order []fwk.EntityKey
+		for _, child := range children {
+			order = append(order, child.GetKey())
+			order = append(order, getChildren(child.Children)...)
+		}
+		return order
+	}
+
+	tests := []struct {
+		name                string
+		cpgs                []*schedulingv1alpha3.CompositePodGroup
+		podGroups           []*schedulingv1beta1.PodGroup
+		pods                []*v1.Pod
+		actions             func(t *testing.T, ctx context.Context, q *PriorityQueue)
+		wantOrderedChildren []fwk.EntityKey
+	}{
+		{
+			name:      "children added before root is queued",
+			cpgs:      []*schedulingv1alpha3.CompositePodGroup{childCompositePodGroup1},
+			podGroups: []*schedulingv1beta1.PodGroup{childPodGroup3, childPodGroup1, grandChildPodGroup2, grandChildPodGroup1},
+			pods:      []*v1.Pod{pod1},
+			wantOrderedChildren: []fwk.EntityKey{
+				fwk.CompositePodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "grand-child1"),
+				fwk.PodGroupKey("ns1", "grand-child2"),
+				fwk.PodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "child3"),
+			},
+		},
+		{
+			name:      "child added while root is already in active queue",
+			cpgs:      []*schedulingv1alpha3.CompositePodGroup{childCompositePodGroup1},
+			podGroups: []*schedulingv1beta1.PodGroup{childPodGroup3, childPodGroup1, grandChildPodGroup2, grandChildPodGroup1},
+			pods:      []*v1.Pod{pod1},
+			actions: func(t *testing.T, ctx context.Context, q *PriorityQueue) {
+				q.AddGenericPodGroup(klog.FromContext(ctx), fwk.NewGenericPodGroup(childPodGroup2))
+			},
+			wantOrderedChildren: []fwk.EntityKey{
+				fwk.CompositePodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "grand-child1"),
+				fwk.PodGroupKey("ns1", "grand-child2"),
+				fwk.PodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "child2"),
+				fwk.PodGroupKey("ns1", "child3"),
+			},
+		},
+		{
+			name:      "child added after root is popped and then requeued back",
+			cpgs:      []*schedulingv1alpha3.CompositePodGroup{childCompositePodGroup1},
+			podGroups: []*schedulingv1beta1.PodGroup{childPodGroup3, childPodGroup1, grandChildPodGroup2, grandChildPodGroup1},
+			pods:      []*v1.Pod{pod1},
+			actions: func(t *testing.T, ctx context.Context, q *PriorityQueue) {
+				logger := klog.FromContext(ctx)
+				popped, err := q.Pop(logger)
+				if err != nil {
+					t.Fatalf("Pop() returned unexpected error: %v", err)
+				}
+				poppedGroup := popped.(*framework.QueuedPodGroupInfo)
+				q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(childPodGroup2))
+				q.Add(ctx, pod2)
+				if err := q.AddAttemptedPodGroupIfNeeded(logger, poppedGroup, q.SchedulingCycle(), fwk.NewStatus(fwk.Unschedulable)); err != nil {
+					t.Fatalf("AddAttemptedPodGroupIfNeeded() returned unexpected error: %v", err)
+				}
+			},
+			wantOrderedChildren: []fwk.EntityKey{
+				fwk.CompositePodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "grand-child1"),
+				fwk.PodGroupKey("ns1", "grand-child2"),
+				fwk.PodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "child2"),
+				fwk.PodGroupKey("ns1", "child3"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               true,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			q := NewTestQueue(ctx, newDefaultQueueSort())
+			defer q.Close()
+
+			q.AddGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(rootCompositePodGroup))
+			for _, cpg := range tt.cpgs {
+				q.AddGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(cpg))
+			}
+			for _, pg := range tt.podGroups {
+				q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg))
+			}
+			for _, pod := range tt.pods {
+				q.Add(ctx, pod)
+			}
+
+			if tt.actions != nil {
+				tt.actions(t, ctx, q)
+			}
+
+			rootLookup := newCompositePodGroupInfoForLookup("ns1", "cpg-root")
+			var gotOrderedChildren []fwk.EntityKey
+			q.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
+				entity := q.getEntityFromAnyQueue(unlockedActiveQ, rootLookup)
+				if entity == nil {
+					t.Fatalf("expected cpg-root to be present in queue")
+				}
+				gotOrderedChildren = getChildren(entity.(*framework.QueuedPodGroupInfo).Children)
+			})
+			if diff := cmp.Diff(tt.wantOrderedChildren, gotOrderedChildren); diff != "" {
+				t.Errorf("unexpected children order in queue (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestPriorityQueue_Update(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
 

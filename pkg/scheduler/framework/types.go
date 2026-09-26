@@ -1052,7 +1052,7 @@ func (pgqi *QueuedPodGroupInfo) SetFlushTimestamp(t time.Time) {
 	pgqi.FlushTimestamp = t
 }
 
-// AddSubtree adds a subtree to the queued pod group info hierarchy.
+// AddSubtree adds a subtree to the queued pod group info hierarchy and maintains its order.
 // It shouldn't be called when the QueuedPodGroupInfo's root is a PodGroup (not CompositePodGroup).
 func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 	parentKey, ok := subtree.GetParentKey()
@@ -1068,6 +1068,7 @@ func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 			}
 		}
 		parent.Children = append(parent.Children, subtree)
+		parent.SortChildren()
 	}
 }
 
@@ -1175,22 +1176,22 @@ func (pgi *PodGroupInfo) GetChildren() []fwk.PodGroupInfo {
 		return nil
 	}
 	children := make([]fwk.PodGroupInfo, len(pgi.Children))
-	for i, child := range pgi.GetChildGroups() {
+	for i, child := range pgi.Children {
 		children[i] = child
 	}
 	return children
 }
 
-func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
+// SortChildren sorts the children of this composite pod group
+// in-place by creation timestamp, name, and entity type.
+func (pgi *PodGroupInfo) SortChildren() {
 	if pgi.CompositePodGroup == nil {
 		// Only CompositePodGroups have children groups.
-		return nil
+		return
 	}
-	result := make([]*PodGroupInfo, len(pgi.Children))
-	copy(result, pgi.Children)
 	// Sort the children by creation timestamp. If timestamps are equal, compare the child groups
 	// by their names, and then entity type to have a tie-breaker that enforces deterministic order.
-	slices.SortFunc(result, func(a, b *PodGroupInfo) int {
+	slices.SortFunc(pgi.Children, func(a, b *PodGroupInfo) int {
 		aTime := a.GetCreationTimestamp()
 		bTime := b.GetCreationTimestamp()
 		if aTime.Before(bTime) {
@@ -1211,7 +1212,6 @@ func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
 		}
 		return 0
 	})
-	return result
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
