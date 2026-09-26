@@ -834,6 +834,313 @@ func TestWatchCacheBypass(t *testing.T) {
 	}
 }
 
+type trackingMockStorage struct {
+	cachertesting.MockStorage
+	mu    sync.Mutex
+	calls map[string]int
+}
+
+func (s *trackingMockStorage) record(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.calls == nil {
+		s.calls = make(map[string]int)
+	}
+	s.calls[name]++
+}
+
+func (s *trackingMockStorage) getCallCount(name string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls[name]
+}
+
+func (s *trackingMockStorage) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	s.record("Get")
+	return nil
+}
+
+func (s *trackingMockStorage) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	s.record("GetList")
+	if s.GetListFn != nil {
+		return s.GetListFn(ctx, key, opts, listObj)
+	}
+	return nil
+}
+
+func (s *trackingMockStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	s.record("Watch")
+	return cachertesting.NewMockWatch(), nil
+}
+
+func (s *trackingMockStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+	s.record("Delete")
+	return nil
+}
+
+func (s *trackingMockStorage) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	s.record("GuaranteedUpdate")
+	return nil
+}
+
+func (s *trackingMockStorage) Stats(ctx context.Context) (storage.Stats, error) {
+	s.record("Stats")
+	return storage.Stats{ObjectCount: 42}, nil
+}
+
+func (s *trackingMockStorage) ReadinessCheck() error {
+	s.record("ReadinessCheck")
+	return nil
+}
+
+func (s *trackingMockStorage) CompactRevision() int64 {
+	s.record("CompactRevision")
+	return 100
+}
+
+func (s *trackingMockStorage) DisableResourceSizeEstimation() {
+	s.record("DisableResourceSizeEstimation")
+}
+
+func (s *trackingMockStorage) resetCalls() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls = make(map[string]int)
+}
+
+func TestWatchCacheByteBudgetBypassDelegator(t *testing.T) {
+	backingStorage := &trackingMockStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
+
+	// Initially not bypassed
+	if cacher.Bypassed() {
+		t.Fatalf("expected cacher not to be bypassed initially")
+	}
+
+	// Trigger bypass (as happens when exceeding byte budget)
+	cacher.stopCachingOnBypass()
+
+	if !cacher.Bypassed() {
+		t.Errorf("expected cacher to report bypassed")
+	}
+
+	// Verify reflector was stopped
+	select {
+	case <-cacher.reflectorStopCh:
+	default:
+		t.Errorf("expected reflectorStopCh to be closed on bypass")
+	}
+
+	// Verify size estimation was disabled
+	if count := backingStorage.getCallCount("DisableResourceSizeEstimation"); count != 1 {
+		t.Errorf("expected 1 call to DisableResourceSizeEstimation, got %d", count)
+	}
+
+	// Wait briefly for reflector goroutine to fully stop before resetting calls
+	time.Sleep(50 * time.Millisecond)
+
+	// Reset calls so we only assert calls made by delegator methods below
+	backingStorage.resetCalls()
+
+	// 1. Get should delegate directly to storage
+	pod := &example.Pod{}
+	if err := delegator.Get(context.TODO(), "/pods/ns/foo", storage.GetOptions{ResourceVersion: "1"}, pod); err != nil {
+		t.Errorf("Get failed: %v", err)
+	}
+	if count := backingStorage.getCallCount("Get"); count != 1 {
+		t.Errorf("expected 1 call to backingStorage.Get, got %d", count)
+	}
+
+	// 2. GetList should delegate directly to storage
+	list := &example.PodList{}
+	if err := delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{}, list); err != nil {
+		t.Errorf("GetList failed: %v", err)
+	}
+	if count := backingStorage.getCallCount("GetList"); count != 1 {
+		t.Errorf("expected 1 call to backingStorage.GetList, got %d", count)
+	}
+
+	// 3. Watch should delegate directly to storage
+	w, err := delegator.Watch(context.TODO(), "/pods/ns", storage.ListOptions{})
+	if err != nil {
+		t.Errorf("expected Watch to delegate to storage: %v", err)
+	}
+	if w != nil {
+		w.Stop()
+	}
+	if count := backingStorage.getCallCount("Watch"); count != 1 {
+		t.Errorf("expected 1 call to backingStorage.Watch, got %d", count)
+	}
+
+	// 4. Delete should delegate directly to storage
+	if err := delegator.Delete(context.TODO(), "/pods/ns/foo", pod, nil, nil, nil, storage.DeleteOptions{}); err != nil {
+		t.Errorf("Delete failed: %v", err)
+	}
+	if count := backingStorage.getCallCount("Delete"); count != 1 {
+		t.Errorf("expected 1 call to backingStorage.Delete, got %d", count)
+	}
+
+	// 5. GuaranteedUpdate should delegate directly to storage
+	if err := delegator.GuaranteedUpdate(context.TODO(), "/pods/ns/foo", pod, true, nil, func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		return input, nil, nil
+	}, nil); err != nil {
+		t.Errorf("GuaranteedUpdate failed: %v", err)
+	}
+	if count := backingStorage.getCallCount("GuaranteedUpdate"); count != 1 {
+		t.Errorf("expected 1 call to backingStorage.GuaranteedUpdate, got %d", count)
+	}
+
+	// 6. CompactRevision should delegate directly to storage
+	if rev := delegator.CompactRevision(); rev != 100 {
+		t.Errorf("expected CompactRevision 100, got %d", rev)
+	}
+	if count := backingStorage.getCallCount("CompactRevision"); count != 1 {
+		t.Errorf("expected 1 call to backingStorage.CompactRevision, got %d", count)
+	}
+
+	// 7. ReadinessCheck should succeed and delegate to storage
+	if err := delegator.ReadinessCheck(); err != nil {
+		t.Errorf("ReadinessCheck failed: %v", err)
+	}
+	if count := backingStorage.getCallCount("ReadinessCheck"); count != 1 {
+		t.Errorf("expected 1 call to backingStorage.ReadinessCheck, got %d", count)
+	}
+
+	// 8. Stats should delegate directly to storage
+	stats, err := delegator.Stats(context.TODO())
+	if err != nil {
+		t.Errorf("Stats failed: %v", err)
+	}
+	if stats.ObjectCount != 42 {
+		t.Errorf("expected ObjectCount 42, got %d", stats.ObjectCount)
+	}
+	if count := backingStorage.getCallCount("Stats"); count != 1 {
+		t.Errorf("expected 1 call to backingStorage.Stats, got %d", count)
+	}
+}
+
+func TestWatchCachePrePopulateProbe(t *testing.T) {
+	backingStorage := &trackingMockStorage{}
+	backingStorage.GetListFn = func(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+		podList, ok := listObj.(*example.PodList)
+		if ok {
+			podList.Items = []example.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "default"}},
+			}
+		}
+		return nil
+	}
+
+	prefix := "/pods/"
+	cacher, err := NewCacherFromConfig(Config{
+		Storage:             backingStorage,
+		Versioner:           storage.APIObjectVersioner{},
+		GroupResource:       schema.GroupResource{Resource: "pods"},
+		EventsHistoryWindow: DefaultEventFreshDuration,
+		ResourcePrefix:      prefix,
+		KeyFunc:             func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
+		GetAttrsFunc:        storage.DefaultNamespaceScopedAttr,
+		NewFunc:             func() runtime.Object { return &example.Pod{} },
+		NewListFunc:         func() runtime.Object { return &example.PodList{} },
+		Codec:               codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:               clock.RealClock{},
+		MaxBytes:            1, // Tiny budget so probe trips
+	})
+	if err != nil {
+		t.Fatalf("Failed to create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Wait for startCaching to execute probe
+	require.Eventually(t, func() bool {
+		return cacher.Bypassed()
+	}, 3*time.Second, 50*time.Millisecond)
+
+	// Reflector should be stopped immediately without running ListAndWatch
+	select {
+	case <-cacher.reflectorStopCh:
+	default:
+		t.Errorf("expected reflectorStopCh to be closed by probe bypass")
+	}
+
+	// Cacher should be marked ready immediately so requests don't hang
+	if !cacher.Ready() {
+		t.Errorf("expected cacher to be ready after bypass")
+	}
+}
+
+func TestWatchCacheByteBudgetWithEtcd(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	defer server.Terminate(t)
+
+	// Add 3 pods to etcd
+	for i := 0; i < 3; i++ {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("etcd-pod-%d", i), Namespace: "test-ns"}}
+		out := &example.Pod{}
+		key := computePodKey(pod)
+		if err := etcdStorage.Create(context.Background(), key, pod, out, 0); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+	}
+
+	prefix := "/pods/"
+	cacher, err := NewCacherFromConfig(Config{
+		Storage:             etcdStorage,
+		Versioner:           storage.APIObjectVersioner{},
+		GroupResource:       schema.GroupResource{Resource: "pods"},
+		EventsHistoryWindow: DefaultEventFreshDuration,
+		ResourcePrefix:      prefix,
+		KeyFunc:             func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
+		GetAttrsFunc:        storage.DefaultNamespaceScopedAttr,
+		NewFunc:             func() runtime.Object { return &example.Pod{} },
+		NewListFunc:         func() runtime.Object { return &example.PodList{} },
+		Codec:               codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:               clock.RealClock{},
+		MaxBytes:            1, // Tiny budget to trigger probe/bypass
+	})
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	delegator := NewCacheDelegator(cacher, etcdStorage)
+	defer delegator.Stop()
+
+	// Wait for bypass
+	require.Eventually(t, func() bool {
+		return cacher.Bypassed()
+	}, 5*time.Second, 50*time.Millisecond)
+
+	// 1. Stats() should return exact object count (3) from etcd
+	stats, err := delegator.Stats(context.Background())
+	if err != nil {
+		t.Fatalf("Stats failed: %v", err)
+	}
+	if stats.ObjectCount != 3 {
+		t.Errorf("expected ObjectCount 3 from etcd, got %d", stats.ObjectCount)
+	}
+
+	// 2. ReadinessCheck should succeed
+	if err := delegator.ReadinessCheck(); err != nil {
+		t.Errorf("ReadinessCheck failed: %v", err)
+	}
+
+	// 3. GetList should return 3 pods from etcd
+	list := &example.PodList{}
+	if err := delegator.GetList(context.Background(), prefix, storage.ListOptions{Predicate: storage.Everything, Recursive: true}, list); err != nil {
+		t.Fatalf("GetList failed: %v", err)
+	}
+	if len(list.Items) != 3 {
+		t.Errorf("expected 3 items from etcd GetList, got %d", len(list.Items))
+	}
+}
+
 func TestEmptyWatchEventCache(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
