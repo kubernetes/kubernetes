@@ -1877,11 +1877,19 @@ func waitForCondition(interval time.Duration, fn wait.ConditionFunc) error {
 func testForceDetachMetric(t *testing.T, inputForceDetachMetricCounter int, reason string) {
 	t.Helper()
 
-	actualForceDetachMericCounter, err := metricstestutil.GetCounterMetricValue(metrics.ForceDetachMetricCounter.WithLabelValues(reason))
+	// The reconciler records the metric after DetachVolume returns, but the
+	// detach itself runs in its own goroutine, so the fake detacher can be
+	// called before the counter is incremented.
+	var actualForceDetachMericCounter float64
+	err := waitForCondition(5*time.Millisecond, func() (bool, error) {
+		var err error
+		actualForceDetachMericCounter, err = metricstestutil.GetCounterMetricValue(metrics.ForceDetachMetricCounter.WithLabelValues(reason))
+		if err != nil {
+			return false, err
+		}
+		return actualForceDetachMericCounter == float64(inputForceDetachMetricCounter), nil
+	})
 	if err != nil {
-		t.Errorf("Error getting actualForceDetachMericCounter")
-	}
-	if actualForceDetachMericCounter != float64(inputForceDetachMetricCounter) {
-		t.Errorf("Expected desiredForceDetachMericCounter to be %d, got %v", inputForceDetachMetricCounter, actualForceDetachMericCounter)
+		t.Errorf("Expected desiredForceDetachMericCounter to be %d, got %v: %v", inputForceDetachMetricCounter, actualForceDetachMericCounter, err)
 	}
 }
