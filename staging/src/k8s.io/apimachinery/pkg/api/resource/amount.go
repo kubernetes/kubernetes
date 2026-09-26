@@ -346,15 +346,29 @@ func (a int64Amount) AsScale(scale Scale) (int64Amount, bool) {
 
 // AsCanonicalBytes accepts a buffer to write the base-10 string value of this field to, and returns
 // either that buffer or a larger buffer and the current exponent of the value. The value is adjusted
-// until the exponent is a multiple of 3 - i.e. 1.1e5 would return "110", 3.
+// until the exponent is a multiple of 3 when the supported exponent range permits it. For example,
+// 1.1e5 returns "110", 3.
 func (a int64Amount) AsCanonicalBytes(out []byte) (result []byte, exponent int32) {
 	mantissa := a.value
 	exponent = int32(a.scale)
 
 	amount, times := removeInt64Factors(mantissa, 10)
-	exponent += int32(times)
+	// Keep the exponent representable by shifting any excess back into the mantissa.
+	for int64(times) > int64(math.MaxInt32)-int64(exponent) {
+		var ok bool
+		amount, ok = int64MultiplyScale10(amount)
+		if !ok {
+			return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
+		}
+		times--
+	}
+	exponent += times
 
-	// make sure exponent is a multiple of 3
+	// Make sure exponent is a multiple of 3, unless lowering it would take it
+	// below -MaxInt32: it would wrap, and the parser rejects anything smaller.
+	if down := (exponent%3 + 3) % 3; int64(exponent)-int64(down) < -math.MaxInt32 {
+		return strconv.AppendInt(out, amount, 10), exponent
+	}
 	var ok bool
 	switch exponent % 3 {
 	case 1, -2:
@@ -401,16 +415,26 @@ func (a infDecAmount) AsScale(scale Scale) (infDecAmount, bool) {
 
 // AsCanonicalBytes accepts a buffer to write the base-10 string value of this field to, and returns
 // either that buffer or a larger buffer and the current exponent of the value. The value is adjusted
-// until the exponent is a multiple of 3 - i.e. 1.1e5 would return "110", 3.
+// until the exponent is a multiple of 3 when the supported exponent range permits it. For example,
+// 1.1e5 returns "110", 3.
 func (a infDecAmount) AsCanonicalBytes(out []byte) (result []byte, exponent int32) {
 	mantissa := a.Dec.UnscaledBig()
 	exponent = int32(-a.Dec.Scale())
 	amount := big.NewInt(0).Set(mantissa)
 	// move all factors of 10 into the exponent for easy reasoning
 	amount, times := removeBigIntFactors(amount, bigTen)
+	// Keep the exponent representable by shifting any excess back into the mantissa.
+	for int64(times) > int64(math.MaxInt32)-int64(exponent) {
+		amount.Mul(amount, bigTen)
+		times--
+	}
 	exponent += times
 
-	// make sure exponent is a multiple of 3
+	// Make sure exponent is a multiple of 3, unless lowering it would take it
+	// below -MaxInt32: it would wrap, and the parser rejects anything smaller.
+	if down := (exponent%3 + 3) % 3; int64(exponent)-int64(down) < -math.MaxInt32 {
+		return append(out, amount.String()...), exponent
+	}
 	for exponent%3 != 0 {
 		amount.Mul(amount, bigTen)
 		exponent--
