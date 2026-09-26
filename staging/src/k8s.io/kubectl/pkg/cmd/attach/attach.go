@@ -122,7 +122,7 @@ func (flags *AttachFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args 
 
 	getPodTimeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
-		return nil, cmdutil.UsageErrorf(cmd, "%s", err.Error())
+		return nil, err
 	}
 
 	config, err := f.ToRESTConfig()
