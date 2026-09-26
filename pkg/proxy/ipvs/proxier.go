@@ -837,9 +837,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			serv.Flags |= utilipvs.FlagPersistent
 			serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 		}
-		// Set the source hash flag needed for the distribution method "mh"
+		// Set the source hash flag with fallback option needed for the distribution method "mh"
 		if proxier.ipvsScheduler == "mh" {
-			serv.Flags |= utilipvs.FlagSourceHash
+			serv.Flags |= utilipvs.FlagSourceHash | utilipvs.FlagFallBack
 		}
 		// We need to bind ClusterIP to dummy interface, so set `bindAddr` parameter to `true` in syncService()
 		if err := proxier.syncService(svcPortNameString, serv, true, alreadyBoundAddrs); err == nil {
@@ -894,9 +894,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				serv.Flags |= utilipvs.FlagPersistent
 				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 			}
-			// Set the source hash flag needed for the distribution method "mh"
+			// Set the source hash flag with fallback option needed for the distribution method "mh"
 			if proxier.ipvsScheduler == "mh" {
-				serv.Flags |= utilipvs.FlagSourceHash
+				serv.Flags |= utilipvs.FlagSourceHash | utilipvs.FlagFallBack
 			}
 			// We must not add the address to the dummy device if it exist on another interface
 			shouldBind := !nodeAddressSet.Has(serv.Address.String())
@@ -1003,9 +1003,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				serv.Flags |= utilipvs.FlagPersistent
 				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 			}
-			// Set the source hash flag needed for the distribution method "mh"
+			// Set the source hash flag with fallback option needed for the distribution method "mh"
 			if proxier.ipvsScheduler == "mh" {
-				serv.Flags |= utilipvs.FlagSourceHash
+				serv.Flags |= utilipvs.FlagSourceHash | utilipvs.FlagFallBack
 			}
 			// We must not add the address to the dummy device if it exist on another interface
 			shouldBind := !nodeAddressSet.Has(serv.Address.String())
@@ -1128,9 +1128,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					serv.Flags |= utilipvs.FlagPersistent
 					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 				}
-				// Set the source hash flag needed for the distribution method "mh"
+				// Set the source hash flag with fallback option needed for the distribution method "mh"
 				if proxier.ipvsScheduler == "mh" {
-					serv.Flags |= utilipvs.FlagSourceHash
+					serv.Flags |= utilipvs.FlagSourceHash | utilipvs.FlagFallBack
 				}
 				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
 				if err := proxier.syncService(svcPortNameString, serv, false, alreadyBoundAddrs); err == nil {
