@@ -1,0 +1,18 @@
+# revive configuration used by codefactor.io.
+#
+# This is redundant with .golangci.yml, since revive is part of golangci-lint,
+# but we need to configure it to remain consistent across reporting tools.
+
+ignore-generated-header = false
+severity = "warning"
+confidence = 0.8
+error-code = 0
+warning-code = 0
+enable-default-rules = true
+
+[rule.exported]
+disabled = true
+[rule.cyclomatic]
+arguments = [25]
+[rule.cognitive-complexity]
+arguments = [25]
