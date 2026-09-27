@@ -20,7 +20,27 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"k8s.io/klog/v2/ktesting"
 )
+
+// An error stream that ends without any data is an error for v4 and v5, whose
+// servers write the status before closing it, and a success for v2 and v3,
+// whose error stream carries raw text.
+func TestEmptyErrorStream(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	if err := <-watchErrorStream(logger, strings.NewReader(""), &errorDecoderV4{}); err == nil {
+		t.Error("v4: an empty error stream was read as success")
+	} else if !strings.Contains(err.Error(), "before the command's status was received") {
+		t.Errorf("v4: unexpected error: %v", err)
+	}
+	if err := <-watchErrorStream(logger, strings.NewReader(""), &errorDecoderV2{}); err != nil {
+		t.Errorf("v2: an empty error stream is success, got %v", err)
+	}
+	if err := <-watchErrorStream(logger, strings.NewReader(""), &errorDecoderV3{}); err != nil {
+		t.Errorf("v3: an empty error stream is success, got %v", err)
+	}
+}
 
 func TestV4ErrorDecoder(t *testing.T) {
 	dec := errorDecoderV4{}
