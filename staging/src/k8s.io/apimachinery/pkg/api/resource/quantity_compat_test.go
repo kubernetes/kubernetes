@@ -18,6 +18,7 @@ package resource
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -29,6 +30,7 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 		wantValue   int64
 		wantFitsI64 bool
 		wantString  string
+		want        *Quantity
 	}{
 		{in: "1e4294967296", wantValue: 1, wantFitsI64: true, wantString: "1e4294967296"},
 		{in: "1e4294967297", wantValue: 10, wantFitsI64: true, wantString: "10"},
@@ -38,11 +40,11 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 
 		// Fraction digits move the scale off the exponent, so these are the
 		// spellings at 2147483648 that a <=1.37 apiserver could write. None
-		// of them fits an int64, so only the spelling has to survive.
-		{in: "1.25e2147483648", wantString: "1.25e2147483648"},
-		{in: "1.5e2147483648", wantString: "150e2147483646"},
-		{in: "1.25e-2147483648", wantString: "1.25e-2147483648"},
-		{in: "0.5e2147483648", wantString: "50e2147483646"},
+		// of them fits an int64, so their value is compared with what 1.37 parsed.
+		{in: "1.25e2147483648", wantString: "1.25e2147483648", want: NewScaledQuantity(125, 2147483646)},
+		{in: "1.5e2147483648", wantString: "150e2147483646", want: NewScaledQuantity(15, 2147483647)},
+		{in: "1.25e-2147483648", wantString: "1.25e-2147483648", want: NewScaledQuantity(125, 2147483646)},
+		{in: "0.5e2147483648", wantString: "50e2147483646", want: NewScaledQuantity(5, 2147483647)},
 	}
 
 	for _, tc := range testCases {
@@ -59,6 +61,9 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 			if got := q.String(); got != tc.wantString {
 				t.Errorf("String() = %q, want %q", got, tc.wantString)
 			}
+			if tc.want != nil && q.Cmp(*tc.want) != 0 {
+				t.Errorf("value = %s, want %s", rawValue(&q), rawValue(tc.want))
+			}
 
 			// Decoding is the path that matters: the spelling below is what a
 			// 1.37 apiserver wrote into etcd.
@@ -68,6 +73,9 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 			}
 			if got, ok := fromJSON.AsInt64(); ok != tc.wantFitsI64 || (ok && got != tc.wantValue) {
 				t.Errorf("after json decode: AsInt64() = (%d, %v), want (%d, %v)", got, ok, tc.wantValue, tc.wantFitsI64)
+			}
+			if tc.want != nil && fromJSON.Cmp(*tc.want) != 0 {
+				t.Errorf("after json decode: value = %s, want %s", rawValue(&fromJSON), rawValue(tc.want))
 			}
 
 			// Re-encoding must not rewrite what is already stored.
@@ -91,8 +99,19 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 			if got, ok := fromProto.AsInt64(); ok != tc.wantFitsI64 || (ok && got != tc.wantValue) {
 				t.Errorf("after proto decode: AsInt64() = (%d, %v), want (%d, %v)", got, ok, tc.wantValue, tc.wantFitsI64)
 			}
+			if tc.want != nil && fromProto.Cmp(*tc.want) != 0 {
+				t.Errorf("after proto decode: value = %s, want %s", rawValue(&fromProto), rawValue(tc.want))
+			}
 		})
 	}
+}
+
+// rawValue formats the value by hand: String() can return the parsed input unchanged.
+func rawValue(q *Quantity) string {
+	if q.d.Dec != nil {
+		return fmt.Sprintf("%ve%d", q.d.Dec.UnscaledBig(), -int64(q.d.Dec.Scale()))
+	}
+	return fmt.Sprintf("%de%d", q.i.value, q.i.scale)
 }
 
 // 1.37 parsed these as zero and wrote them as "0".
