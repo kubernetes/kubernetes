@@ -64,7 +64,7 @@ github.com/cenkalti/backoff/v5
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/chai2010/gettext-go v1.0.2
+# github.com/chai2010/gettext-go v1.0.3
 ## explicit; go 1.14
 github.com/chai2010/gettext-go
 github.com/chai2010/gettext-go/mo
@@ -86,7 +86,7 @@ github.com/containerd/log
 # github.com/containerd/ttrpc v1.2.10
 ## explicit; go 1.25.0
 github.com/containerd/ttrpc
-# github.com/coredns/caddy v1.1.1
+# github.com/coredns/caddy v1.1.4
 ## explicit; go 1.13
 github.com/coredns/caddy/caddyfile
 # github.com/coredns/corefile-migration v1.0.35
