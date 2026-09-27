@@ -64,9 +64,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/signals"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -301,7 +301,7 @@ is checked every 20 seconds (also configurable with a flag).`,
 			}
 
 			// set up signal context for kubelet shutdown
-			ctx := genericapiserver.SetupSignalContext()
+			ctx := signals.SetupSignalContext()
 
 			utilfeature.DefaultMutableFeatureGate.AddMetrics()
 			// run the kubelet
