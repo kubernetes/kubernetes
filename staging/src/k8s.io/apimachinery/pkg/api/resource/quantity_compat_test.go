@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"testing"
+	"time"
 )
 
 func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
@@ -89,6 +90,48 @@ func TestQuantityOutOfInt32ExponentCompatibility(t *testing.T) {
 			}
 			if got, ok := fromProto.AsInt64(); ok != tc.wantFitsI64 || (ok && got != tc.wantValue) {
 				t.Errorf("after proto decode: AsInt64() = (%d, %v), want (%d, %v)", got, ok, tc.wantValue, tc.wantFitsI64)
+			}
+		})
+	}
+}
+
+// 1.37 parsed these as zero and wrote them as "0".
+func TestQuantityOutOfInt32ExponentZero(t *testing.T) {
+	for _, in := range []string{"0e2147483648", "-0e2147483648", "0e-2147483648", "0.000000000000000000000e2147483648"} {
+		t.Run(in, func(t *testing.T) {
+			q, err := ParseQuantity(in)
+			if err != nil {
+				t.Fatalf("ParseQuantity(%q) failed: %v", in, err)
+			}
+			if !q.IsZero() || q.String() != "0" || q.Format != DecimalExponent {
+				t.Errorf("ParseQuantity(%q) = %s (%s), want 0 (%s)", in, q.String(), q.Format, DecimalExponent)
+			}
+			var fromJSON Quantity
+			if err := json.Unmarshal([]byte(strconv.Quote(in)), &fromJSON); err != nil {
+				t.Fatalf("json.Unmarshal(%q) failed: %v", in, err)
+			}
+			if !fromJSON.IsZero() || fromJSON.String() != "0" {
+				t.Errorf("after json decode: %s, want 0", fromJSON.String())
+			}
+			// With the exponent left at MinInt32, Add panics or does not return.
+			sum := make(chan string, 1)
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						sum <- fmt.Sprintf("panic: %v", r)
+					}
+				}()
+				q := q.DeepCopy()
+				q.Add(MustParse("1"))
+				sum <- q.String()
+			}()
+			select {
+			case got := <-sum:
+				if got != "1" {
+					t.Errorf("Add(1) = %s, want 1", got)
+				}
+			case <-time.After(5 * time.Second):
+				t.Errorf("Add(1) did not return within 5s")
 			}
 		})
 	}
