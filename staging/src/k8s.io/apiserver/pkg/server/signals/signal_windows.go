@@ -1,5 +1,3 @@
-//go:build !windows
-
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -16,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package signals
 
 import (
 	"os"
-	"syscall"
 )
 
-var shutdownSignals = []os.Signal{os.Interrupt, syscall.SIGTERM}
+var shutdownSignals = []os.Signal{os.Interrupt}
