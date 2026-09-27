@@ -50,7 +50,7 @@ import (
 )
 
 func TestFeatureGateAPIRequirementsWellFormed(t *testing.T) {
-	registeredFeatures := utilfeature.DefaultMutableFeatureGate.GetAllVersioned()
+	registeredFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAllVersioned()
 
 	tests := []struct {
 		name         string

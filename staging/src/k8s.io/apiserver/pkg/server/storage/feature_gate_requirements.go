@@ -44,11 +44,11 @@ type VersionedAPIRequirements []APIRequirement
 
 // atVersion returns the resources that apply at emulationVersion.
 func (v VersionedAPIRequirements) atVersion(emulationVersion *version.Version) []schema.GroupResource {
-	for i := len(v) - 1; i >= 0; i-- {
-		if v[i].Version.GreaterThan(emulationVersion) {
+	for _, requirement := range slices.Backward(v) {
+		if requirement.Version.GreaterThan(emulationVersion) {
 			continue
 		}
-		return v[i].Resources
+		return requirement.Resources
 	}
 	return nil
 }
