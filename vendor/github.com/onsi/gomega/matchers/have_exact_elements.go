@@ -79,7 +79,7 @@ func (matcher *HaveExactElementsMatcher) Match(actual any) (success bool, err er
 		if i >= lenMatchers {
 			matcher.extraIndex = i
 			success = false
-			continue
+			return
 		}
 
 		if i >= lenValues {
@@ -110,10 +110,10 @@ func (matcher *HaveExactElementsMatcher) Match(actual any) (success bool, err er
 
 func (matcher *HaveExactElementsMatcher) FailureMessage(actual any) (message string) {
 	message = format.Message(actual, "to have exact elements with", presentable(matcher.Elements))
-	if matcher.missingIndex > 0 {
+	if matcher.missingIndex >= 0 {
 		message = fmt.Sprintf("%s\nthe missing elements start from index %d", message, matcher.missingIndex)
 	}
-	if matcher.extraIndex > 0 {
+	if matcher.extraIndex >= 0 {
 		message = fmt.Sprintf("%s\nthe extra elements start from index %d", message, matcher.extraIndex)
 	}
 	if len(matcher.mismatchFailures) != 0 {
@@ -131,6 +131,7 @@ func (matcher *HaveExactElementsMatcher) NegatedFailureMessage(actual any) (mess
 
 func (matcher *HaveExactElementsMatcher) resetState() {
 	matcher.mismatchFailures = nil
-	matcher.missingIndex = 0
-	matcher.extraIndex = 0
+	// -1 means "no missing/extra elements"; 0 is a valid starting index
+	matcher.missingIndex = -1
+	matcher.extraIndex = -1
 }
