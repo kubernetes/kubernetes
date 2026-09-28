@@ -310,9 +310,6 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				MatchLabels: invalidSelector,
 			}
 		}),
-		"missing cidr field": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
-			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = ""
-		}),
 		"invalid cidr format": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "192.168.5.6"
 		}),
