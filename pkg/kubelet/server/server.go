@@ -274,12 +274,17 @@ func ListenAndServePodResources(ctx context.Context, endpoint string, providers 
 // ListenAndServePodsServer initializes an HTTP server to serve the Pod API.
 func ListenAndServePodsServer(ctx context.Context, endpoint string, srv podsv1alpha1.PodsServer) {
 	logger := klog.FromContext(ctx)
+	limiter := rate.NewLimiter(rate.Limit(pods.DefaultQPS), int(pods.DefaultBurstTokens))
 	server := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			apisgrpc.LimiterUnaryServerInterceptor(rate.NewLimiter(rate.Limit(pods.DefaultQPS), int(pods.DefaultBurstTokens))),
+			apisgrpc.LimiterUnaryServerInterceptor(limiter),
 			pods.MetricsUnaryServerInterceptor,
 		),
-		grpc.StreamInterceptor(pods.MetricsStreamServerInterceptor),
+		grpc.ChainStreamInterceptor(
+			apisgrpc.LimiterStreamServerInterceptor(limiter),
+			pods.MetricsStreamServerInterceptor,
+		),
+		grpc.MaxConcurrentStreams(pods.DefaultMaxConcurrentStreams),
 	)
 
 	podsv1alpha1.RegisterPodsServer(server, srv)
