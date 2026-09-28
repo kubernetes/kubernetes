@@ -45,6 +45,7 @@ import (
 	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 
+	"k8s.io/kubernetes/pkg/controlplane/apirequirements"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	_ "k8s.io/kubernetes/pkg/features"
@@ -167,7 +168,7 @@ func Run(ctx context.Context, opts options.CompletedOptions) error {
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
-func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregator, error) {
+func CreateServerChain(config CompletedConfig) (aggregator *aggregatorapiserver.APIAggregator, retErr error) {
 	// 1. CRDs
 	notFoundHandler := notfoundhandler.New(config.ControlPlane.Generic.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
 	apiExtensionsServer, err := config.APIExtensions.New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
@@ -181,6 +182,14 @@ func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregat
 	if err != nil {
 		return nil, fmt.Errorf("failed to create generic controlplane apiserver: %w", err)
 	}
+	// Once storage is installed, Destroy is the only way to release it. Run would do that on
+	// shutdown, but a server that fails to construct is never run.
+	defer func() {
+		if retErr != nil {
+			nativeAPIs.GenericAPIServer.Destroy()
+		}
+	}()
+
 	client, err := kubernetes.NewForConfig(config.ControlPlane.Generic.LoopbackClientConfig)
 	if err != nil {
 		return nil, err
@@ -191,6 +200,9 @@ func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregat
 	}
 	if err := nativeAPIs.InstallAPIs(storageProviders...); err != nil {
 		return nil, fmt.Errorf("failed to install APIs: %w", err)
+	}
+	if err := nativeAPIs.ValidateFeatureGateAPIRequirements(apirequirements.DefaultForGenericControlPlane()); err != nil {
+		return nil, err
 	}
 
 	// 3. Aggregator for APIServices, discovery and OpenAPI
