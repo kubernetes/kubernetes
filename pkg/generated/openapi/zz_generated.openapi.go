@@ -13423,7 +13423,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref common.Re
 					},
 					"authorizationOptions": {
 						SchemaProps: spec.SchemaProps{
-							Description: "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compability. Requires the ConditionalAuthorization feature to be enabled.",
+							Description: "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compatibility. Requires the ConditionalAuthorization feature to be enabled.",
 							Ref:         ref(authorizationv1.AuthorizationOptions{}.OpenAPIModelName()),
 						},
 					},
@@ -13634,7 +13634,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 					},
 					"authorizationOptions": {
 						SchemaProps: spec.SchemaProps{
-							Description: "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compability. Requires the ConditionalAuthorization feature to be enabled.",
+							Description: "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compatibility. Requires the ConditionalAuthorization feature to be enabled.",
 							Ref:         ref(authorizationv1.AuthorizationOptions{}.OpenAPIModelName()),
 						},
 					},
@@ -13684,7 +13684,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 					},
 					"conditionalDecision": {
 						SchemaProps: spec.SchemaProps{
-							Description: "conditionalDecision represents a conditional decision returned by the authorizer. Mutually exclusive with allowed=true and denied=true. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.authorizationOptions.handledDecisionTypes includes `ConditionsMap` and `Union`. Requires the ConditionalAuthorization feature to be enabled.",
+							Description: "conditionalDecision represents a conditional decision returned by the authorizer. When conditionalDecision is set, allowed, denied, reason and evaluationError must have their zero values. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.authorizationOptions.handledDecisionTypes includes `ConditionsMap` and `Union`. Requires the ConditionalAuthorization feature to be enabled.",
 							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
 						},
 					},

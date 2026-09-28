@@ -414,7 +414,7 @@ message SelfSubjectAccessReviewSpec {
   optional NonResourceAttributes nonResourceAttributes = 2;
 
   // authorizationOptions contains options for specifying the client's authorization abilities.
-  // If unset, only unconditional authorization is supported, for backwards-compability.
+  // If unset, only unconditional authorization is supported, for backwards-compatibility.
   // Requires the ConditionalAuthorization feature to be enabled.
   // +optional
   // +featureGate=ConditionalAuthorization
@@ -506,7 +506,7 @@ message SubjectAccessReviewSpec {
   optional string uid = 6;
 
   // authorizationOptions contains options for specifying the client's authorization abilities.
-  // If unset, only unconditional authorization is supported, for backwards-compability.
+  // If unset, only unconditional authorization is supported, for backwards-compatibility.
   // Requires the ConditionalAuthorization feature to be enabled.
   // +optional
   // +featureGate=ConditionalAuthorization
@@ -540,7 +540,7 @@ message SubjectAccessReviewStatus {
   optional string evaluationError = 3;
 
   // conditionalDecision represents a conditional decision returned by the authorizer.
-  // Mutually exclusive with allowed=true and denied=true.
+  // When conditionalDecision is set, allowed, denied, reason and evaluationError must have their zero values.
   // The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or
   // ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented
   // with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone.

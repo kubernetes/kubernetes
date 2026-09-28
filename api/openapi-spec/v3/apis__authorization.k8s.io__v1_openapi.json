@@ -5,7 +5,7 @@
         "description": "AuthorizationOptions contains options for specifying the client's authorization abilities.",
         "properties": {
           "handledDecisionTypes": {
-            "description": "handledDecisionTypes specifies what decision types the client can handle in the context it is in. Currently valid values are: - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or - [Allow, Deny, NoOpinion, ConditionsMap, Union] (for conditions-aware clients) If the authorizer would like to return conditions, but the client does not opt in to handle those here,\n  the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()\n  (Deny if any Deny conditions were present, otherwise NoOpinion).\nOrder does not matter in this slice; set semantics should be used. The server should not reject unrecognized decision types (hence the k8s:opaqueType), but focus on whether the client supports a mode that the server does. All clients must support \"classic\", conditions-unaware authorization.",
+            "description": "handledDecisionTypes specifies what decision types the client can handle in the context it is in. Currently valid values are: - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or - [Allow, Deny, NoOpinion, ConditionsMap, Union, ...] (for conditions-aware clients) If the authorizer would like to return conditions, but the client does not opt in to handle those here,\n  the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()\n  (Deny if any Deny conditions were present, otherwise NoOpinion).\nOrder does not matter in this slice; set semantics should be used. The server should not reject unrecognized decision types (hence the k8s:opaqueType), but focus on whether the client supports a mode that the server does. All clients must support \"classic\", conditions-unaware authorization.",
             "items": {
               "type": "string"
             },
@@ -35,7 +35,7 @@
             "type": "string"
           },
           "type": {
-            "description": "type describes the type of the condition, if there are multiple possibilities. Should be formatted as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use. Optional. Can be omitted if the authorizer already knows how to evaluate the condition.",
+            "description": "type describes the type of the condition, if there are multiple possibilities. Should be formatted as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use. authorizer.kubernetes.io/cel is a conditions type for CEL, handled by kube-apiserver. Optional. Can be omitted if the authorizer already knows how to evaluate the condition.",
             "type": "string"
           }
         },
@@ -85,7 +85,7 @@
             "type": "string"
           },
           "union": {
-            "description": "union forms an ordered tree of decisions, where the union decision is represented by an internal node, and all other decision types are leaf nodes. During evaluation, the leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found. The order of the decisions must match exactly the order of the authorizers in the union authorizer. At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially reduced to just a single Allow/Deny/NoOpinion.\n\nMust have at least one element when type == \"Union\", otherwise this field must be unset.",
+            "description": "union forms an ordered tree of decisions, where the union decision is represented by an internal node, and all other decision types are leaf nodes. During evaluation, the leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found. The order of the decisions should match the order of the authorizers in the union authorizer for interpretability, but the authorizerName is the map key. At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially reduced to just a single Allow/Deny/NoOpinion.\n\nMust have at least one element when type == \"Union\", otherwise this field must be unset.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NamedConditionsAwareDecision"
             },
@@ -435,7 +435,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.AuthorizationOptions"
               }
             ],
-            "description": "authorizationOptions contains options for specifying the client's authorization abilities. Requires the ConditionalAuthorization feature to be enabled."
+            "description": "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compatibility. Requires the ConditionalAuthorization feature to be enabled."
           },
           "nonResourceAttributes": {
             "allOf": [
@@ -580,7 +580,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.AuthorizationOptions"
               }
             ],
-            "description": "authorizationOptions contains options for specifying the client's authorization abilities. Requires the ConditionalAuthorization feature to be enabled."
+            "description": "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compatibility. Requires the ConditionalAuthorization feature to be enabled."
           },
           "extra": {
             "additionalProperties": {
@@ -641,7 +641,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ConditionsAwareDecision"
               }
             ],
-            "description": "conditionalDecision represents a conditional decision returned by the authorizer. Mutually exclusive with allowed=true and denied=true. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.conditionalAuthorization is non-null. Requires the ConditionalAuthorization feature to be enabled."
+            "description": "conditionalDecision represents a conditional decision returned by the authorizer. When conditionalDecision is set, allowed, denied, reason and evaluationError must have their zero values. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.authorizationOptions.handledDecisionTypes includes `ConditionsMap` and `Union`. Requires the ConditionalAuthorization feature to be enabled."
           },
           "denied": {
             "description": "denied is optional. True if the action would be denied, otherwise false If allowed is false, denied is false, and conditionalDecision is unset, then the authorizer has no opinion on whether to authorize the action. denied=true is mutually exclusive with allowed=true and conditionalDecision != nil.",
