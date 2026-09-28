@@ -1308,7 +1308,7 @@ func (s *store) prepareKey(key string, recursive bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// New requires a leading '/' in resourcePrefix, which PrepareKey enforces on key.
+	// key starts with '/' because PrepareKey checks it against the validated resourcePrefix.
 	return s.pathPrefix + key, nil
 }
 
