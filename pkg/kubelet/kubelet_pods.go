@@ -33,6 +33,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
 
@@ -366,22 +367,41 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 				volumePath := hostPath
 				hostPath = filepath.Join(volumePath, subPath)
 
-				if subPathExists, err := hu.PathExists(hostPath); err != nil {
+				subPathExists, err := hu.PathExists(hostPath)
+				if err != nil {
 					logger.Error(nil, "Could not determine if subPath exists, will not attempt to change its permissions", "path", hostPath)
-				} else if !subPathExists {
-					// Create the sub path now because if it's auto-created later when referenced, it may have an
-					// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
-					// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
-					// later auto-create it with the incorrect mode 0750
-					// Make extra care not to escape the volume!
-					perm, err := hu.GetMode(volumePath)
-					if err != nil {
-						return nil, cleanupAction, err
+				} else {
+					var isDir bool
+					if subPathExists {
+						if fileType, err := hu.GetFileType(hostPath); err == nil {
+							isDir = (fileType == hostutil.FileTypeDirectory)
+						}
 					}
-					if err := subpather.SafeMakeDir(subPath, volumePath, perm); err != nil && !goerrors.Is(err, os.ErrExist) {
-						// Don't pass detailed error back to the user because it could give information about host filesystem
-						logger.Error(nil, "Failed to create subPath directory for volumeMount of the container", "containerName", container.Name, "volumeMountName", mount.Name)
-						return nil, cleanupAction, fmt.Errorf("failed to create subPath directory for volumeMount %q of container %q", mount.Name, container.Name)
+					if !subPathExists || (isDir && !vol.Mounter.GetAttributes().ReadOnly) {
+						// Create the sub path now because if it's auto-created later when referenced, it may have an
+						// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
+						// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
+						// later auto-create it with the incorrect mode 0750.
+						// If the directory already exists, ensure its permissions are correctly applied in case a previous
+						// attempt was interrupted (e.g. kubelet restarted after mkdir but before chmod).
+						// Make extra care not to escape the volume!
+						perm, err := hu.GetMode(volumePath)
+						if err != nil {
+							if !subPathExists {
+								return nil, cleanupAction, err
+							}
+							logger.V(4).Info("Could not get mode of volumePath to verify subPath permissions", "volumePath", volumePath, "err", err)
+						} else {
+							if err := subpather.SafeMakeDir(subPath, volumePath, perm); err != nil && !goerrors.Is(err, os.ErrExist) {
+								if subPathExists && goerrors.Is(err, syscall.EROFS) {
+									logger.V(4).Info("SubPath directory already exists on read-only filesystem, will not change permissions", "path", hostPath)
+								} else {
+									// Don't pass detailed error back to the user because it could give information about host filesystem
+									logger.Error(nil, "Failed to create or verify subPath directory for volumeMount of the container", "containerName", container.Name, "volumeMountName", mount.Name)
+									return nil, cleanupAction, fmt.Errorf("failed to create subPath directory for volumeMount %q of container %q", mount.Name, container.Name)
+								}
+							}
+						}
 					}
 				}
 				var subpathCleanup func()

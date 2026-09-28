@@ -27,6 +27,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -9591,9 +9592,10 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 // called. This is used to verify that makeMounts accumulates all
 // cleanup actions rather than overwriting them.
 type trackingSubpath struct {
-	cleanedSubPaths []string
-	errorOnSubPath  string // SubPath name to fail on; empty means no error
-	safeMakeDirErr  error
+	cleanedSubPaths  []string
+	errorOnSubPath   string // SubPath name to fail on; empty means no error
+	safeMakeDirErr   error
+	safeMakeDirCalls []string
 }
 
 func (ts *trackingSubpath) PrepareSafeSubpath(sub subpath.Subpath) (string, func(), error) {
@@ -9612,6 +9614,7 @@ func (ts *trackingSubpath) CleanSubPaths(podDir string, volumeName string) error
 }
 
 func (ts *trackingSubpath) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	ts.safeMakeDirCalls = append(ts.safeMakeDirCalls, pathname)
 	return ts.safeMakeDirErr
 }
 
@@ -9723,6 +9726,103 @@ func TestMakemountsSubpathCleanupAccumulation(t *testing.T) {
 
 			require.ElementsMatch(t, tc.expectedCleanedSubPaths, tracker.cleanedSubPaths,
 				"expected cleaned subpaths %v but got %v", tc.expectedCleanedSubPaths, tracker.cleanedSubPaths)
+		})
+	}
+}
+
+func TestMakeMountsSubPathDirPermissions(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	podDir := t.TempDir()
+	volPath := filepath.Join(podDir, "volumes", "disk")
+	require.NoError(t, os.MkdirAll(volPath, 0755))
+
+	// sub-dir exists as a directory
+	subDir := filepath.Join(volPath, "sub-dir")
+	require.NoError(t, os.MkdirAll(subDir, 0755))
+
+	// sub-file exists as a file
+	subFile := filepath.Join(volPath, "sub-file")
+	require.NoError(t, os.WriteFile(subFile, []byte("content"), 0644))
+
+	tests := []struct {
+		name                string
+		subPath             string
+		readOnlyVolume      bool
+		safeMakeDirErr      error
+		expectedSafeMakeDir bool
+		expectErr           bool
+	}{
+		{
+			name:                "existing subpath directory calls SafeMakeDir to verify/correct permissions",
+			subPath:             "sub-dir",
+			expectedSafeMakeDir: true,
+		},
+		{
+			name:                "existing subpath file does not call SafeMakeDir",
+			subPath:             "sub-file",
+			expectedSafeMakeDir: false,
+		},
+		{
+			name:                "non-existing subpath directory calls SafeMakeDir to create it",
+			subPath:             "sub-nonexist",
+			expectedSafeMakeDir: true,
+		},
+		{
+			name:                "existing subpath directory on read-only volume does not call SafeMakeDir",
+			subPath:             "sub-dir",
+			readOnlyVolume:      true,
+			expectedSafeMakeDir: false,
+		},
+		{
+			name:                "existing subpath directory on read-only filesystem (EROFS) does not fail",
+			subPath:             "sub-dir",
+			safeMakeDirErr:      syscall.EROFS,
+			expectedSafeMakeDir: true,
+			expectErr:           false,
+		},
+		{
+			name:                "non-existing subpath directory on read-only filesystem (EROFS) fails",
+			subPath:             "sub-nonexist",
+			safeMakeDirErr:      syscall.EROFS,
+			expectedSafeMakeDir: true,
+			expectErr:           true,
+		},
+	}
+
+	hu := hostutil.NewHostUtil()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tracker := &trackingSubpath{
+				safeMakeDirErr: tc.safeMakeDirErr,
+			}
+			container := v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{MountPath: "/mnt/test", Name: "disk", SubPath: tc.subPath},
+				},
+			}
+			podVolumes := kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{
+					path:       volPath,
+					attributes: volume.Attributes{ReadOnly: tc.readOnlyVolume},
+				}},
+			}
+			pod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "test-pod-uid"},
+			}
+
+			_, _, err := makeMounts(logger, &pod, podDir, &container, "fakepod", "", []string{""}, podVolumes, hu, tracker, nil, false, nil)
+			if tc.expectErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tc.expectedSafeMakeDir {
+				assert.Contains(t, tracker.safeMakeDirCalls, tc.subPath)
+			} else {
+				assert.NotContains(t, tracker.safeMakeDirCalls, tc.subPath)
+			}
 		})
 	}
 }
