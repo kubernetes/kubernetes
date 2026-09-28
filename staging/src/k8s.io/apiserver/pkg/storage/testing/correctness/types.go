@@ -148,3 +148,9 @@ type WatchResponse struct {
 	Events []watch.Event
 	Err    error
 }
+
+// WatchOperation captures a recorded watch operation with its request and response.
+type WatchOperation struct {
+	Request  WatchRequest
+	Response WatchResponse
+}
