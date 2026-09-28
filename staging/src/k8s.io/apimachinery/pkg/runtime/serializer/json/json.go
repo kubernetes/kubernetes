@@ -17,7 +17,6 @@ limitations under the License.
 package json
 
 import (
-	"bytes"
 	"encoding/json"
 	jsonv2 "encoding/json/v2"
 	"io"
@@ -241,16 +240,11 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	}
 
 	if s.options.Pretty {
-		data, err := jsonv2.Marshal(obj, json.DefaultOptionsV1())
+		data, err := json.MarshalIndent(obj, "", "  ")
 		if err != nil {
 			return err
 		}
-		// Retain the legacy indentation of custom marshaler output.
-		var indented bytes.Buffer
-		if err := json.Indent(&indented, data, "", "  "); err != nil {
-			return err
-		}
-		_, err = w.Write(indented.Bytes())
+		_, err = w.Write(data)
 		return err
 	}
 	if s.options.StreamingCollectionsEncoding {

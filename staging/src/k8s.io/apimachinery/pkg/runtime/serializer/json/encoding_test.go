@@ -240,8 +240,8 @@ func TestEncodeErrors(t *testing.T) {
 	}
 }
 
-// TestEncodeConcurrent verifies that parallel calls sharing one serializer and
-// its pooled buffers remain isolated and retain encoding/json-compatible output.
+// TestEncodeConcurrent verifies that parallel calls sharing one serializer
+// remain isolated and retain encoding/json-compatible output.
 func TestEncodeConcurrent(t *testing.T) {
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{})
 	for i := range 16 {

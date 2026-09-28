@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestCollectionsEncoding(t *testing.T) {
@@ -804,6 +806,34 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 	})
 }
 
+type benchmarkIntOrStringItem struct {
+	metav1.TypeMeta `json:""`
+	Ports           []intstr.IntOrString `json:"ports"`
+}
+
+func (in *benchmarkIntOrStringItem) DeepCopyObject() runtime.Object {
+	out := *in
+	out.Ports = append([]intstr.IntOrString(nil), in.Ports...)
+	return &out
+}
+
+type benchmarkIntOrStringList struct {
+	metav1.TypeMeta `json:""`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []benchmarkIntOrStringItem `json:"items"`
+}
+
+func (in *benchmarkIntOrStringList) DeepCopyObject() runtime.Object {
+	out := *in
+	out.Items = append([]benchmarkIntOrStringItem(nil), in.Items...)
+	for i := range out.Items {
+		out.Items[i].Ports = append([]intstr.IntOrString(nil), in.Items[i].Ports...)
+	}
+	return &out
+}
+
+// BenchmarkStreamEncodeCollections compares typed and unstructured lists, including
+// IntOrString custom marshalers and one oversized item to expose buffer growth.
 func BenchmarkStreamEncodeCollections(b *testing.B) {
 	disableFuzzFieldsV1 := func(field *metav1.FieldsV1, c randfill.Continue) {}
 	fuzzMap := func(kvs map[string]interface{}, c randfill.Continue) {
@@ -836,34 +866,47 @@ func BenchmarkStreamEncodeCollections(b *testing.B) {
 		}
 		unstructuredList.Items[i] = unstructured.Unstructured{Object: unstrMap}
 	}
-	b.Run("CarpList", func(b *testing.B) {
-		var buf bytes.Buffer
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			buf.Reset()
-			ok, err := streamEncodeCollections(carpList, &buf)
-			if err != nil {
-				b.Fatal(err)
+	intOrStringList := &benchmarkIntOrStringList{
+		TypeMeta: metav1.TypeMeta{Kind: "IntOrStringList", APIVersion: "v1"},
+		Items:    make([]benchmarkIntOrStringItem, 1000),
+	}
+	ports := []intstr.IntOrString{
+		intstr.FromInt32(80),
+		intstr.FromString("http"),
+		intstr.FromInt32(443),
+		intstr.FromString("https"),
+		intstr.FromInt32(8080),
+		intstr.FromString("metrics"),
+	}
+	for i := range intOrStringList.Items {
+		intOrStringList.Items[i].Ports = ports
+	}
+	carpListWithLargeItem := carpList.DeepCopy()
+	carpListWithLargeItem.Items[len(carpListWithLargeItem.Items)/2].Spec.NodeSelector = map[string]string{"payload": strings.Repeat("x", 1<<20)}
+
+	for _, tc := range []struct {
+		name string
+		list runtime.Object
+	}{
+		{name: "CarpList", list: carpList},
+		{name: "UnstructuredList", list: unstructuredList},
+		{name: "IntOrStringList", list: intOrStringList},
+		{name: "CarpListWithLargeItem", list: carpListWithLargeItem},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			var buf bytes.Buffer
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				buf.Reset()
+				ok, err := streamEncodeCollections(tc.list, &buf)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if !ok {
+					b.Fatal("not ok")
+				}
 			}
-			if !ok {
-				b.Fatal("not ok")
-			}
-		}
-	})
-	b.Run("UnstructuredList", func(b *testing.B) {
-		var buf bytes.Buffer
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			buf.Reset()
-			ok, err := streamEncodeCollections(unstructuredList, &buf)
-			if err != nil {
-				b.Fatal(err)
-			}
-			if !ok {
-				b.Fatal("not ok")
-			}
-		}
-	})
+		})
+	}
 }

@@ -26,7 +26,16 @@ import (
 
 // BenchmarkEncode measures compact serializer encoding across representative object sizes.
 func BenchmarkEncode(b *testing.B) {
-	serializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{})
+	benchmarkEncode(b, json.SerializerOptions{})
+}
+
+// BenchmarkEncodePretty measures the pretty-print path across representative object sizes.
+func BenchmarkEncodePretty(b *testing.B) {
+	benchmarkEncode(b, json.SerializerOptions{Pretty: true})
+}
+
+func benchmarkEncode(b *testing.B, options json.SerializerOptions) {
+	serializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, options)
 	for _, size := range []struct {
 		name  string
 		bytes int

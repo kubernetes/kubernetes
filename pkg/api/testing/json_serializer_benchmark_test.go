@@ -34,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+// BenchmarkJSONSerializerEncode compares compact, pretty, and streaming
+// serialization for realistic lists, including custom and mixed-size payloads.
 func BenchmarkJSONSerializerEncode(b *testing.B) {
 	payloads := map[string]func() runtime.Object{
 		"SmallPodList500": sync.OnceValue(func() runtime.Object { return podList(500, smallPod) }),
@@ -71,6 +73,8 @@ func BenchmarkJSONSerializerEncode(b *testing.B) {
 	}
 }
 
+// BenchmarkJSONSerializerPretty measures pretty serialization for a pod and
+// growing pod lists.
 func BenchmarkJSONSerializerPretty(b *testing.B) {
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{Pretty: true})
 	for _, c := range []struct {
@@ -128,7 +132,7 @@ const fieldsApply = `{"f:metadata":{"f:annotations":{"f:kubectl.kubernetes.io/la
 
 const fieldsFinalizer = `{"f:metadata":{"f:finalizers":{".":{},"v:\"example.com/cleanup\"":{}}}}`
 
-func fv1(s string) *metav1.FieldsV1 { return &metav1.FieldsV1{Raw: []byte(s)} }
+func fv1(s string) *metav1.FieldsV1 { return metav1.NewFieldsV1(s) }
 
 func q(s string) resource.Quantity { return resource.MustParse(s) }
 
@@ -364,8 +368,8 @@ func smallPod(i int) v1.Pod {
 			Labels:          map[string]string{"app": "nginx", "pod-template-hash": "7c79c4bf97"},
 			OwnerReferences: []metav1.OwnerReference{{APIVersion: "apps/v1", Kind: "ReplicaSet", Name: "nginx-deployment-7c79c4bf97", UID: "5d2e5c1a-1111-2222-3333-444455556666"}},
 			ManagedFields: []metav1.ManagedFieldsEntry{
-				{Manager: "kube-controller-manager", Operation: metav1.ManagedFieldsOperationUpdate, APIVersion: "v1", Time: &now, FieldsType: "FieldsV1", FieldsV1: &metav1.FieldsV1{Raw: []byte(raw)}},
-				{Manager: "kubelet", Operation: metav1.ManagedFieldsOperationUpdate, APIVersion: "v1", Time: &now, FieldsType: "FieldsV1", FieldsV1: &metav1.FieldsV1{Raw: []byte(statusRaw)}, Subresource: "status"},
+				{Manager: "kube-controller-manager", Operation: metav1.ManagedFieldsOperationUpdate, APIVersion: "v1", Time: &now, FieldsType: "FieldsV1", FieldsV1: fv1(raw)},
+				{Manager: "kubelet", Operation: metav1.ManagedFieldsOperationUpdate, APIVersion: "v1", Time: &now, FieldsType: "FieldsV1", FieldsV1: fv1(statusRaw), Subresource: "status"},
 			},
 		},
 		Spec: v1.PodSpec{
@@ -402,11 +406,11 @@ func nginxPod() *v1.Pod {
 			ManagedFields: []metav1.ManagedFieldsEntry{{
 				Manager: "kube-controller-manager", Operation: metav1.ManagedFieldsOperationUpdate, APIVersion: "v1",
 				Time: new(metav1.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)), FieldsType: "FieldsV1",
-				FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:generateName":{},"f:labels":{".":{},"f:app":{},"f:controller-revision-hash":{},"f:statefulset.kubernetes.io/pod-name":{}},"f:ownerReferences":{".":{},"k:{\"uid\":\"0b7c\"}":{}}},"f:spec":{"f:containers":{"k:{\"name\":\"nginx\"}":{".":{},"f:image":{},"f:imagePullPolicy":{},"f:name":{},"f:ports":{".":{},"k:{\"containerPort\":80,\"protocol\":\"TCP\"}":{".":{},"f:containerPort":{},"f:name":{},"f:protocol":{}}},"f:resources":{},"f:terminationMessagePath":{},"f:terminationMessagePolicy":{},"f:volumeMounts":{".":{},"k:{\"mountPath\":\"/usr/share/nginx/html\"}":{".":{},"f:mountPath":{},"f:name":{}}}}},"f:dnsPolicy":{},"f:enableServiceLinks":{},"f:hostname":{},"f:restartPolicy":{},"f:schedulerName":{},"f:securityContext":{},"f:subdomain":{},"f:terminationGracePeriodSeconds":{},"f:volumes":{".":{},"k:{\"name\":\"www\"}":{".":{},"f:name":{},"f:persistentVolumeClaim":{".":{},"f:claimName":{}}}}}}`)},
+				FieldsV1: fv1(`{"f:metadata":{"f:generateName":{},"f:labels":{".":{},"f:app":{},"f:controller-revision-hash":{},"f:statefulset.kubernetes.io/pod-name":{}},"f:ownerReferences":{".":{},"k:{\"uid\":\"0b7c\"}":{}}},"f:spec":{"f:containers":{"k:{\"name\":\"nginx\"}":{".":{},"f:image":{},"f:imagePullPolicy":{},"f:name":{},"f:ports":{".":{},"k:{\"containerPort\":80,\"protocol\":\"TCP\"}":{".":{},"f:containerPort":{},"f:name":{},"f:protocol":{}}},"f:resources":{},"f:terminationMessagePath":{},"f:terminationMessagePolicy":{},"f:volumeMounts":{".":{},"k:{\"mountPath\":\"/usr/share/nginx/html\"}":{".":{},"f:mountPath":{},"f:name":{}}}}},"f:dnsPolicy":{},"f:enableServiceLinks":{},"f:hostname":{},"f:restartPolicy":{},"f:schedulerName":{},"f:securityContext":{},"f:subdomain":{},"f:terminationGracePeriodSeconds":{},"f:volumes":{".":{},"k:{\"name\":\"www\"}":{".":{},"f:name":{},"f:persistentVolumeClaim":{".":{},"f:claimName":{}}}}}}`),
 			}, {
 				Manager: "kubelet", Operation: metav1.ManagedFieldsOperationUpdate, APIVersion: "v1", Subresource: "status",
 				Time: new(metav1.Date(2026, 9, 24, 12, 0, 5, 0, time.UTC)), FieldsType: "FieldsV1",
-				FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:status":{"f:conditions":{"k:{\"type\":\"ContainersReady\"}":{".":{},"f:lastProbeTime":{},"f:lastTransitionTime":{},"f:status":{},"f:type":{}},"k:{\"type\":\"Initialized\"}":{".":{},"f:lastProbeTime":{},"f:lastTransitionTime":{},"f:status":{},"f:type":{}},"k:{\"type\":\"PodScheduled\"}":{".":{},"f:lastProbeTime":{},"f:lastTransitionTime":{},"f:status":{},"f:type":{}},"k:{\"type\":\"Ready\"}":{".":{},"f:lastProbeTime":{},"f:lastTransitionTime":{},"f:status":{},"f:type":{}}},"f:containerStatuses":{},"f:hostIP":{},"f:phase":{},"f:podIP":{},"f:podIPs":{".":{},"k:{\"ip\":\"10.244.0.5\"}":{".":{},"f:ip":{}}},"f:startTime":{}}}`)},
+				FieldsV1: fv1(`{"f:status":{"f:conditions":{"k:{\"type\":\"ContainersReady\"}":{".":{},"f:lastProbeTime":{},"f:lastTransitionTime":{},"f:status":{},"f:type":{}},"k:{\"type\":\"Initialized\"}":{".":{},"f:lastProbeTime":{},"f:lastTransitionTime":{},"f:status":{},"f:type":{}},"k:{\"type\":\"PodScheduled\"}":{".":{},"f:lastProbeTime":{},"f:lastTransitionTime":{},"f:status":{},"f:type":{}},"k:{\"type\":\"Ready\"}":{".":{},"f:lastProbeTime":{},"f:lastTransitionTime":{},"f:status":{},"f:type":{}}},"f:containerStatuses":{},"f:hostIP":{},"f:phase":{},"f:podIP":{},"f:podIPs":{".":{},"k:{\"ip\":\"10.244.0.5\"}":{".":{},"f:ip":{}}},"f:startTime":{}}}`),
 			}},
 		},
 		Spec: v1.PodSpec{
