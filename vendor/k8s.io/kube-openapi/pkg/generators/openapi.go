@@ -44,6 +44,13 @@ const tagOptional = "optional"
 const tagRequired = "required"
 const tagDefault = "default"
 
+// Declarative validation spells requiredness with the "k8s:" prefix. These tags
+// are equivalent to +optional and +required, and are expected to eventually
+// replace them. Until then a member may carry both spellings, so they are
+// treated as aliases rather than as separate signals.
+const tagK8sOptional = "k8s:optional"
+const tagK8sRequired = "k8s:required"
+
 // Known values for the tag.
 const (
 	tagValueTrue  = "true"
@@ -82,14 +89,20 @@ func hasOpenAPITagValue(comments []string, value string) bool {
 	return false
 }
 
-// isOptional returns error if the member has +optional and +required in
-// its comments. If +optional is present it returns true. If +required is present
-// it returns false. Otherwise, it returns true if `omitempty` JSON tag is present
+// isOptional returns error if the member is marked both optional and required
+// in its comments. If +optional or +k8s:optional is present it returns true. If
+// +required or +k8s:required is present it returns false. Otherwise, it returns
+// true if `omitempty` JSON tag is present.
+//
+// A member may carry both the unprefixed and the "k8s:" prefixed spelling of
+// the same requiredness (e.g. both +optional and +k8s:optional). That is not a
+// conflict, and it does not change the generated schema.
 func isOptional(m *types.Member) (bool, error) {
-	hasOptionalCommentTag := gengo.ExtractCommentTags(
-		"+", m.CommentLines)[tagOptional] != nil
-	hasRequiredCommentTag := gengo.ExtractCommentTags(
-		"+", m.CommentLines)[tagRequired] != nil
+	commentTags := gengo.ExtractCommentTags("+", m.CommentLines)
+	hasOptionalCommentTag := commentTags[tagOptional] != nil ||
+		commentTags[tagK8sOptional] != nil
+	hasRequiredCommentTag := commentTags[tagRequired] != nil ||
+		commentTags[tagK8sRequired] != nil
 	if hasOptionalCommentTag && hasRequiredCommentTag {
 		return false, fmt.Errorf("member %s cannot be both optional and required", m.Name)
 	} else if hasRequiredCommentTag {
