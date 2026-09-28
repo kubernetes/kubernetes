@@ -197,7 +197,7 @@ func (wf *workloadForest) getLeafPodGroups(logger klog.Logger, rootLookupInfo *f
 
 // buildPodGroupInfo recursively constructs a PodGroupInfo representation for a given GenericPodGroup
 // and all its children, using the provided visited set to detect cycles in the hierarchy.
-// Children are sorted by SortChildren to keep their order deterministic.
+// Children get sorted within NewPodGroupInfo() to keep their order deterministic.
 func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *fwk.GenericPodGroup, visited sets.Set[fwk.EntityKey]) *framework.PodGroupInfo {
 	key := gpg.GetKey()
 	if visited.Has(key) {
@@ -206,24 +206,15 @@ func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *fwk.Generic
 	}
 	visited.Insert(key)
 
-	pgi := &framework.PodGroupInfo{
-		GenericPodGroup: gpg,
-		Children:        make([]*framework.PodGroupInfo, 0),
-	}
-
-	childrenSet, ok := wf.children[key]
-	if !ok {
-		return pgi
-	}
-	for childKey := range childrenSet {
+	var children []*framework.PodGroupInfo
+	for childKey := range wf.children[key] {
 		if childGPG, ok := wf.podGroups[childKey]; ok {
 			if childInfo := wf.buildPodGroupInfo(logger, childGPG, visited); childInfo != nil {
-				pgi.Children = append(pgi.Children, childInfo)
+				children = append(children, childInfo)
 			}
 		}
 	}
-	pgi.SortChildren()
-	return pgi
+	return framework.NewPodGroupInfo(gpg, children...)
 }
 
 // buildQueuedPodGroupInfo constructs a QueuedPodGroupInfo starting from the provided root lookup info,

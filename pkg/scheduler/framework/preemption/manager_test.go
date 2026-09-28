@@ -50,23 +50,23 @@ import (
 )
 
 func newTestPodGroupInfo(pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup, pods []*v1.Pod) fwk.PodGroupInfo {
-	pgi := &framework.PodGroupInfo{
-		GenericPodGroup: &fwk.GenericPodGroup{
-			PodGroup:          pg,
-			CompositePodGroup: cpg,
-		},
+	gpg := &fwk.GenericPodGroup{
+		PodGroup:          pg,
+		CompositePodGroup: cpg,
 	}
 	if pg != nil {
-		pgi.UnscheduledPods = pods
-	} else if cpg != nil && len(pods) > 0 {
-		pgi.Children = []*framework.PodGroupInfo{
-			{
-				GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("child-pg").Obj()),
-				UnscheduledPods: pods,
-			},
+		return &framework.PodGroupInfo{
+			GenericPodGroup: gpg,
+			UnscheduledPods: pods,
 		}
 	}
-	return pgi
+	if cpg != nil && len(pods) > 0 {
+		return framework.NewPodGroupInfo(gpg, &framework.PodGroupInfo{
+			GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("child-pg").Obj()),
+			UnscheduledPods: pods,
+		})
+	}
+	return framework.NewPodGroupInfo(gpg)
 }
 
 type wantVictim struct {

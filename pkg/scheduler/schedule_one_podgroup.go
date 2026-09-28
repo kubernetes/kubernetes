@@ -121,13 +121,13 @@ func (sched *Scheduler) reconcilePodGroupWithSnapshot(pgi *framework.PodGroupInf
 		if err != nil {
 			return err
 		}
-		cpgsChildren := cpgs.GetChildren()
-		if len(cpgsChildren) != len(pgi.Children) {
-			return fmt.Errorf("different number of children in composite pod group between snapshot (%d) and queued entity (%d)", len(cpgsChildren), len(pgi.Children))
+		snapshotChildren := cpgs.GetChildren()
+		queuedChildren := pgi.Children()
+		if len(snapshotChildren) != len(queuedChildren) {
+			return fmt.Errorf("different number of children in composite pod group between snapshot (%d) and queued entity (%d)", len(snapshotChildren), len(queuedChildren))
 		}
-		for i := range pgi.Children {
-			err := sched.reconcilePodGroupWithSnapshot(pgi.Children[i])
-			if err != nil {
+		for _, child := range queuedChildren {
+			if err := sched.reconcilePodGroupWithSnapshot(child); err != nil {
 				return err
 			}
 		}
@@ -193,7 +193,7 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 		Reason:  cpgReason,
 		Message: err.Error(),
 	})
-	for _, child := range pgi.Children {
+	for _, child := range pgi.Children() {
 		sched.updatePodGroupConditionWithError(ctx, child, err)
 	}
 }
@@ -319,7 +319,7 @@ func (sched *Scheduler) validatePodGroupSubtree(
 	}
 
 	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
-		for _, child := range podGroupInfo.Children {
+		for _, child := range podGroupInfo.Children() {
 			if err := sched.validatePodGroupSubtree(child, podGroupInfo, depth+1, validateChildPodGroup, validatePod); err != nil {
 				return err
 			}
@@ -685,7 +685,7 @@ func completeCompositePodGroupAlgorithmResultMap(ctx context.Context, podGroupIn
 		result.status = parentResult.status.Clone()
 	}
 	if podGroupInfo.CompositePodGroup != nil {
-		for _, child := range podGroupInfo.Children {
+		for _, child := range podGroupInfo.Children() {
 			completeCompositePodGroupAlgorithmResultMap(ctx, child, pgResults, result)
 		}
 	}
@@ -1523,7 +1523,7 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 	// Run PlacementFeasible plugins to check if the composite pod group can meet its constraints
 	// before even attempting to schedule any children.
 	placementProgress := fwk.PlacementProgress{
-		Remaining: len(podGroupInfo.Children),
+		Remaining: len(podGroupInfo.Children()),
 	}
 	proceed, placementFeasibleStatus := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
 	if !proceed {
@@ -1537,7 +1537,7 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 	}
 
 	anyScheduled := false
-	for _, childPGInfo := range podGroupInfo.Children {
+	for _, childPGInfo := range podGroupInfo.Children() {
 		childPodGroupState := framework.NewCycleState()
 		childPodGroupState.SetPlacementCycleState(placementCycleState)
 		childResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, childPodGroupState, root, childPGInfo, results)
@@ -1616,7 +1616,7 @@ func successfulLeafResults(root *framework.PodGroupInfo, results map[fwk.EntityK
 				return true
 			}
 
-			for _, child := range pgi.Children {
+			for _, child := range pgi.Children() {
 				if !walk(child) {
 					return false
 				}
