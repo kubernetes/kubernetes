@@ -24,31 +24,41 @@ func (matcher *HaveKeyMatcher) Match(actual any) (success bool, err error) {
 		keyMatcher = &EqualMatcher{Expected: matcher.Key}
 	}
 
+	// As with ContainElement, a key the key matcher accepts wins regardless of
+	// errors on other keys; the matcher's (last) error is only reported when
+	// no key matches.
+	var lastError error
 	if miter.IsSeq2(actual) {
-		var success bool
-		var err error
+		found := false
 		miter.IterateKV(actual, func(k, v reflect.Value) bool {
-			success, err = keyMatcher.Match(k.Interface())
+			success, err := keyMatcher.Match(k.Interface())
 			if err != nil {
-				err = fmt.Errorf("HaveKey's key matcher failed with:\n%s%s", format.Indent, err.Error())
-				return false
+				lastError = err
+				return true
 			}
-			return !success
+			found = success
+			return !found
 		})
-		return success, err
-	}
-
-	keys := reflect.ValueOf(actual).MapKeys()
-	for i := range keys {
-		success, err := keyMatcher.Match(keys[i].Interface())
-		if err != nil {
-			return false, fmt.Errorf("HaveKey's key matcher failed with:\n%s%s", format.Indent, err.Error())
-		}
-		if success {
+		if found {
 			return true, nil
 		}
+	} else {
+		keys := reflect.ValueOf(actual).MapKeys()
+		for i := range keys {
+			success, err := keyMatcher.Match(keys[i].Interface())
+			if err != nil {
+				lastError = err
+				continue
+			}
+			if success {
+				return true, nil
+			}
+		}
 	}
 
+	if lastError != nil {
+		return false, fmt.Errorf("HaveKey's key matcher failed with:\n%s%s", format.Indent, lastError.Error())
+	}
 	return false, nil
 }
 

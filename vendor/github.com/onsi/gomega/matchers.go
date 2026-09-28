@@ -291,6 +291,8 @@ func HaveSuffix(suffix string, args ...any) types.GomegaMatcher {
 // MatchJSON succeeds if actual is a string or stringer of JSON that matches
 // the expected JSON.  The JSONs are decoded and the resulting objects are compared via
 // reflect.DeepEqual so things like key-ordering and whitespace shouldn't matter.
+// Numbers are compared as float64s, except for integers too large to be represented
+// exactly by a float64 (beyond ±2^53), which are compared exactly.
 func MatchJSON(json any) types.GomegaMatcher {
 	return &matchers.MatchJSONMatcher{
 		JSONToMatch: json,
@@ -300,6 +302,8 @@ func MatchJSON(json any) types.GomegaMatcher {
 // MatchXML succeeds if actual is a string or stringer of XML that matches
 // the expected XML.  The XMLs are decoded and the resulting objects are compared via
 // reflect.DeepEqual so things like whitespaces shouldn't matter.
+// Namespace prefixes are ignored: element and attribute names are compared by
+// namespace URI, and the namespace URIs declared on each element must match.
 func MatchXML(xml any) types.GomegaMatcher {
 	return &matchers.MatchXMLMatcher{
 		XMLToMatch: xml,
@@ -309,6 +313,8 @@ func MatchXML(xml any) types.GomegaMatcher {
 // MatchYAML succeeds if actual is a string or stringer of YAML that matches
 // the expected YAML.  The YAML's are decoded and the resulting objects are compared via
 // reflect.DeepEqual so things like key-ordering and whitespace shouldn't matter.
+// Multi-document YAML streams are compared document by document; empty documents
+// (e.g. from a leading or trailing "---") are ignored.
 func MatchYAML(yaml any) types.GomegaMatcher {
 	return &matchers.MatchYAMLMatcher{
 		YAMLToMatch: yaml,
