@@ -790,7 +790,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 	allErrs := field.ErrorList{}
 
 	if params == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), "").MarkCoveredByDeclarative())
+		// parentRef is required, which is covered by declarative validation; exit early
 		return allErrs
 	}
 
@@ -802,19 +802,15 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 		}
 	}
 
-	// resource is required
-	if params.Resource == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), "").MarkCoveredByDeclarative())
-	} else {
+	// resource is required, which is covered by declarative validation
+	if params.Resource != "" {
 		for _, msg := range content.IsPathSegmentName(params.Resource) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("resource"), params.Resource, msg))
 		}
 	}
 
-	// name is required
-	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
-	} else {
+	// name is required, which is covered by declarative validation
+	if params.Name != "" {
 		for _, msg := range content.IsPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
 		}
@@ -831,9 +827,10 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 // ValidateIPAddressUpdate tests if an update to an IPAddress is valid.
 func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList {
+	// The spec immutable check is handled by declarative validation; its coverage
+	// lives in test/declarative_validation/networking/ipaddress/.
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef")).MarkCoveredByDeclarative().WithOrigin("immutable")...)
 	return allErrs
 }
 
