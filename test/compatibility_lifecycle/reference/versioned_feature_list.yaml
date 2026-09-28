@@ -1834,6 +1834,17 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: ServiceAccountTokenMLDSA
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
+    minCompatibilityVersion: "1.38"
 - name: ServiceCIDRStatusFieldWiping
   versionedSpecs:
   - default: false
