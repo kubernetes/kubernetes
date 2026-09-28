@@ -37,14 +37,17 @@ type PodGroupStatusApplyConfiguration struct {
 	// due to disruption such as preemption.
 	//
 	// Known reasons for the PodGroupInitiallyScheduled condition:
+	// - "Scheduled": All required pods in the PodGroup have been successfully scheduled.
 	// - "Unschedulable": The PodGroup cannot be scheduled due to resource constraints,
 	// affinity/anti-affinity rules, or insufficient capacity for the gang.
 	// - "SchedulerError": The PodGroup cannot be scheduled due to some internal error
 	// that happened during scheduling, for example due to nodeAffinity parsing errors.
+	// - "Invalid": The PodGroup cannot be scheduled due to an invalid group configuration
+	// detected during runtime validation (such as conflicting scheduler names, or priority/preemption policy conflicts).
 	//
 	// Known reasons for the DisruptionTarget condition:
 	// - "PreemptionByScheduler": The PodGroup was preempted by the scheduler to make room for
-	// higher-priority PodGroups or Pods.
+	// higher-priority CompositePodGroups, PodGroups or Pods.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 	// resourceClaimStatuses is status of resource claims.
 	ResourceClaimStatuses []PodGroupResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
