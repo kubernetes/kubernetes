@@ -51,10 +51,11 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 // making this the variant that is used when any of those
 // are enabled.
 var SupportedFeatures = internal.Features{
-	AdminAccess:          true,
-	PrioritizedList:      true,
-	PartitionableDevices: true,
-	DeviceTaints:         true,
+	AdminAccess:            true,
+	PrioritizedList:        true,
+	PartitionableDevices:   true,
+	DeviceTaints:           true,
+	DeviceBindingAndStatus: true,
 }
 
 type Allocator struct {
@@ -300,6 +301,10 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				AdminAccess: internal.adminAccess,
 				Tolerations: internal.lookupRequest(claim).tolerations(),
 			}
+			if a.features.DeviceBindingAndStatus {
+				allocationResult.Devices.Results[i].BindingConditions = internal.BindingConditions
+				allocationResult.Devices.Results[i].BindingFailureConditions = internal.BindingFailureConditions
+			}
 		}
 
 		// Populate configs.
@@ -412,7 +417,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		}
 
 		// Determine node selector.
-		nodeSelector, err := alloc.createNodeSelector(internalResult.devices)
+		nodeSelector, err := alloc.createNodeSelector(internalResult.devices, node.Name)
 		if err != nil {
 			return nil, fmt.Errorf("create NodeSelector for claim %s: %w", claim.Name, err)
 		}
@@ -1449,7 +1454,7 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
 // otherwise it returns nil.
-func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.NodeSelector, error) {
+func (alloc *allocator) createNodeSelector(result []internalDeviceResult, targetNodeName string) (*v1.NodeSelector, error) {
 	// Selector with one term. That term gets extended with additional
 	// requirements from the different devices.
 	ns := &v1.NodeSelector{
@@ -1467,15 +1472,15 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 			nodeName = slice.Spec.NodeName
 			nodeSelector = slice.Spec.NodeSelector
 		}
-		if nodeName != nil {
-			// At least one device is local to one node. This
-			// restricts the allocation to that node.
+		if nodeName != nil || result[i].BindsToNode {
+			// At least one device is local to one node or binds to a node,
+			// so we need to restrict the allocation to that node.
 			return &v1.NodeSelector{
 				NodeSelectorTerms: []v1.NodeSelectorTerm{{
 					MatchFields: []v1.NodeSelectorRequirement{{
 						Key:      "metadata.name",
 						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{*nodeName},
+						Values:   []string{targetNodeName},
 					}},
 				}},
 			}, nil
