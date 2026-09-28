@@ -179,7 +179,6 @@ type callInfo struct {
 	contentSubtype              string
 	codec                       baseCodec
 	maxRetryRPCBufferSize       int
-	onFinish                    []func(err error)
 	authority                   string
 	acceptedResponseCompressors []string
 }
@@ -394,8 +393,7 @@ type OnFinishCallOption struct {
 	OnFinish func(error)
 }
 
-func (o OnFinishCallOption) before(c *callInfo) error {
-	c.onFinish = append(c.onFinish, o.OnFinish)
+func (o OnFinishCallOption) before(*callInfo) error {
 	return nil
 }
 

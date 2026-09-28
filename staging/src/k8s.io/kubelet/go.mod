@@ -8,7 +8,7 @@ godebug default=go1.27
 
 require (
 	github.com/stretchr/testify v1.12.1
-	google.golang.org/grpc v1.84.0
+	google.golang.org/grpc v1.86.0-dev.0.20260928104945-bf88ff499261
 	google.golang.org/protobuf v1.36.12
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
