@@ -39,7 +39,7 @@ type placementNodes struct {
 	// placement is the placement object used to assume this placement.
 	placement *fwk.Placement
 	// nodeInfoSet contains the set of nodes in the placement.
-	// This is useful for quickly checking if a node belongs the the placement.
+	// This is useful for quickly checking if a node belongs to the placement.
 	nodeInfoSet sets.Set[string]
 }
 
