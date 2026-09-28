@@ -1633,6 +1633,46 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 3}).Obj(),
 			},
 		},
+		"drop-node-allocatable-resources-field": {
+			features: features{disableNodeAllocatableResources: true},
+			nodeUID:  nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{
+							Devices: []resourceapi.Device{{
+								Name: deviceName,
+								NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+									v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(resource.MustParse("1"))}},
+								},
+							}},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			expectedErrors: []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRANodeAllocatableResources`},
+		},
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -2044,12 +2084,13 @@ func sortResourceSlices(slices []resourceapi.ResourceSlice) {
 }
 
 type features struct {
-	disableBindingConditions      bool
-	disableDeviceTaints           bool
-	disablePartitionableDevices   bool
-	disableConsumableCapacity     bool
-	disableOptionalNodeOperations bool
-	disableCompatibilityGroups    bool
+	disableBindingConditions        bool
+	disableDeviceTaints             bool
+	disablePartitionableDevices     bool
+	disableConsumableCapacity       bool
+	disableOptionalNodeOperations   bool
+	disableCompatibilityGroups      bool
+	disableNodeAllocatableResources bool
 }
 
 func createTestClient(features features, timeAdded metav1.Time, objects ...runtime.Object) *fake.Clientset {
@@ -2139,6 +2180,11 @@ func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSl
 			for j := range resourceslice.Spec.Devices[i].ConsumesCounters {
 				resourceslice.Spec.Devices[i].ConsumesCounters[j].CompatibilityGroups = nil
 			}
+		}
+	}
+	if features.disableNodeAllocatableResources {
+		for i := range resourceslice.Spec.Devices {
+			resourceslice.Spec.Devices[i].NodeAllocatableResources = nil
 		}
 	}
 }

@@ -417,6 +417,14 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 		disabled = append(disabled, "DRAOptionalNodeOperations")
 	}
 
+	// NodeAllocatableResources is dropped when DRANodeAllocatableResources is disabled.
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+		if len(err.DesiredSlice.Spec.Devices[i].NodeAllocatableResources) > 0 && len(err.ActualSlice.Spec.Devices[i].NodeAllocatableResources) == 0 {
+			disabled = append(disabled, "DRANodeAllocatableResources")
+			break
+		}
+	}
+
 	// Compatibility groups are dropped from within a device counter consumption,
 	// so a shorter list there (while the consumption itself is preserved)
 	// indicates that the DRADeviceCompatibilityGroups feature is disabled.
