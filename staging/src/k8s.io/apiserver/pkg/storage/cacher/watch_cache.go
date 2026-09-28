@@ -246,7 +246,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		w.Lock()
 		defer w.Unlock()
 
-		previous, err := w.storage.UpdateStoreLocked(event.Type, elem, resourceVersion)
+		previous, err := w.storage.UpdateStore(event.Type, elem, resourceVersion)
 		if err != nil {
 			return err
 		}
@@ -571,7 +571,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		return err
 	}
 
-	toReplace := make([]interface{}, 0, len(objs))
+	toReplace := make([]*store.Element, 0, len(objs))
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
@@ -604,7 +604,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	// Empty the cyclic buffer, ensuring startIndex doesn't decrease.
 	w.history.ResetLocked()
 
-	if err := w.storage.Replace(toReplace, resourceVersion, version); err != nil {
+	if err := w.storage.Replace(toReplace, version); err != nil {
 		return err
 	}
 	w.resourceVersion = version
