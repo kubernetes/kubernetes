@@ -481,11 +481,24 @@ func (c *cacheWatcher) streamInterval(cacheInterval *watchCacheInterval, resourc
 	}
 }
 
-func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
-	defer utilruntime.HandleCrashWithContext(ctx)
-	defer close(c.result)
-	defer c.Stop()
+func handleCrash() {
+	utilruntime.HandleCrash()
+}
 
+func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
+	defer handleCrash()
+
+	if resourceVersion, ok := c.drainInterval(cacheInterval, resourceVersion); ok {
+		stop := context.AfterFunc(ctx, c.Stop)
+		c.process(ctx, resourceVersion)
+		stop()
+	}
+
+	close(c.result)
+	c.Stop()
+}
+
+func (c *cacheWatcher) drainInterval(cacheInterval *watchCacheInterval, resourceVersion uint64) (uint64, bool) {
 	// Check how long we are processing initEvents.
 	// As long as these are not processed, we are not processing
 	// any incoming events, so if it takes long, we may actually
@@ -526,7 +539,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		// custom clients, the cost of it is something that we
 		// are fully accepting.
 		klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
-		return
+		return resourceVersion, false
 	}
 
 	if initEventCount > 0 {
@@ -541,7 +554,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	if cacheInterval.initialEventsEndBookmark != nil {
 		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
 	}
-	c.process(ctx, resourceVersion)
+	return resourceVersion, true
 }
 
 func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
@@ -553,22 +566,17 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	//   process, but we're leaving this to the tuning phase.
 	utilflowcontrol.WatchInitialized(ctx)
 
-	for {
-		select {
-		case event, ok := <-c.input:
-			if !ok {
-				return
-			}
-			dequeuedAt := c.clock.Now()
-			// only send events newer than resourceVersion
-			// or a bookmark event with an RV equal to resourceVersion
-			// if we haven't sent one to the client
-			if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
-				builtAt, sentAt := c.sendWatchCacheEvent(event)
-				c.observeDispatchMetrics(event, dequeuedAt, builtAt, sentAt)
-			}
-		case <-ctx.Done():
+	for event := range c.input {
+		if ctx.Err() != nil {
 			return
+		}
+		dequeuedAt := c.clock.Now()
+		// only send events newer than resourceVersion
+		// or a bookmark event with an RV equal to resourceVersion
+		// if we haven't sent one to the client
+		if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
+			builtAt, sentAt := c.sendWatchCacheEvent(event)
+			c.observeDispatchMetrics(event, dequeuedAt, builtAt, sentAt)
 		}
 	}
 }
