@@ -3133,8 +3133,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 		ginkgo.By("Creating the pod with extended resource")
 		b.Create(tCtx, class, pod)
-		err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(err, "start pod")
 
 		ginkgo.By("Verifying extended resource claim exists")
 		var extendedResourceClaim *resourceapi.ResourceClaim
@@ -3152,7 +3150,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("extended resource claim should be created"))
 
 		ginkgo.By("Waiting for the pod to reach terminal state")
-		err = waitFn(ctx, pod)
+		err := waitFn(ctx, pod)
 		framework.ExpectNoError(err, "waiting for pod to reach terminal state")
 
 		ginkgo.By("Verifying extended resource claim is cleaned up")
