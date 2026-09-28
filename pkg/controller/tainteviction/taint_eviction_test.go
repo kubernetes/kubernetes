@@ -1070,6 +1070,72 @@ func TestAddConditionAndDeletePodNotFoundIsSuccess(t *testing.T) {
 	}
 }
 
+func TestDeletePodHandlerStatusPatchError(t *testing.T) {
+	testCases := []struct {
+		name           string
+		patchError     error
+		wantError      bool
+		wantPatchCalls int32
+		wantRetry      bool
+	}{
+		{
+			name:           "not found",
+			patchError:     apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "pod1"),
+			wantPatchCalls: 1,
+		},
+		{
+			name:           "other error",
+			patchError:     apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, "pod1", fmt.Errorf("status patch denied")),
+			wantError:      true,
+			wantPatchCalls: retries,
+			wantRetry:      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			pod := testutil.NewPod("pod1", "node1")
+			pod.UID = "pod1-uid"
+			fakeClientset := fake.NewSimpleClientset(pod)
+
+			var patchCalls atomic.Int32
+			fakeClientset.PrependReactor("patch", "pods", func(clienttesting.Action) (bool, runtime.Object, error) {
+				patchCalls.Add(1)
+				return true, nil, tc.patchError
+			})
+			var deleteCalls atomic.Int32
+			fakeClientset.PrependReactor("delete", "pods", func(clienttesting.Action) (bool, runtime.Object, error) {
+				deleteCalls.Add(1)
+				return true, nil, nil
+			})
+
+			controller, _, _ := setupNewController(ctx, fakeClientset)
+			controller.recorder = testutil.NewFakeRecorder()
+			t.Cleanup(controller.podEvictionQueue.ShutDown)
+
+			args := NewWorkArgsWithUID(pod.Name, pod.Namespace, pod.UID)
+			args.CreatedAt = time.Now()
+			err := controller.deletePodHandler()(ctx, args.CreatedAt, args)
+			if (err != nil) != tc.wantError {
+				t.Fatalf("deletePodHandler() error = %v, wantError = %v", err, tc.wantError)
+			}
+			if got := patchCalls.Load(); got != tc.wantPatchCalls {
+				t.Errorf("PatchPodStatus call count = %d, want %d", got, tc.wantPatchCalls)
+			}
+			if got := deleteCalls.Load(); got != 0 {
+				t.Errorf("Delete call count = %d, want 0", got)
+			}
+
+			podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+			_, gotRetry := currentPodEvictionRetry(controller, podNamespacedName)
+			if gotRetry != tc.wantRetry {
+				t.Errorf("durable retry registered = %v, want %v", gotRetry, tc.wantRetry)
+			}
+		})
+	}
+}
+
 func TestUpdatePod(t *testing.T) {
 	testCases := []struct {
 		description               string

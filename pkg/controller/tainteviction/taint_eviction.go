@@ -174,8 +174,9 @@ func (tc *Controller) deletePodHandler() func(ctx context.Context, fireAt time.T
 // deletes the pod identified by podRef. It returns (true, nil) when the pod
 // was successfully deleted, (false, nil) when the pod was already gone or
 // otherwise does not need deletion (wrong UID, already terminating), and
-// (false, err) on a retryable failure. A NotFound error on the Delete call
-// is treated as a clean success — a concurrent deletion raced us to it.
+// (false, err) on a retryable failure. A NotFound error on the status Patch or
+// Delete call is treated as a clean success — a concurrent deletion raced us
+// to it.
 func (tc *Controller) addConditionAndDeletePod(ctx context.Context, podRef NamespacedObject) (bool, error) {
 	pod, err := tc.client.CoreV1().Pods(podRef.Namespace).Get(ctx, podRef.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -201,6 +202,9 @@ func (tc *Controller) addConditionAndDeletePod(ctx context.Context, podRef Names
 	})
 	if updated {
 		if _, _, _, err := utilpod.PatchPodStatus(ctx, tc.client, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
 			return false, err
 		}
 	}
