@@ -253,25 +253,97 @@ func (w *WatchCacheStorage) Get(obj interface{}) (interface{}, bool, error) {
 	return w.get(&Element{Key: key, Object: object})
 }
 
+func (w *WatchCacheStorage) get(obj interface{}) (item interface{}, exists bool, err error) {
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+	return w.store.Get(obj)
+}
+
+// GetByKey returns pointer to <storeElement>.
+func (w *WatchCacheStorage) GetByKey(key string) (item interface{}, exists bool, err error) {
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+	return w.store.GetByKey(key)
+}
+
+func (w *WatchCacheStorage) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+	return w.store.OrderedListPrefix(prefix, continueKey)
+}
+
+func (w *WatchCacheStorage) ListKeys() []string {
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+	return w.store.ListKeys()
+}
+
+// List returns list of pointers to <Element> objects.
+func (w *WatchCacheStorage) List() []interface{} {
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+	return w.store.List()
+}
+
+func (w *WatchCacheStorage) ByIndex(indexName, indexValue string) ([]interface{}, error) {
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+	return w.indexer.ByIndex(indexName, indexValue)
+}
+
+func (w *WatchCacheStorage) Add(elem *Element) (*Element, error) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	return w.addOrUpdateLocked(elem)
+}
+
+func (w *WatchCacheStorage) Update(elem *Element) (*Element, error) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	return w.addOrUpdateLocked(elem)
+}
+
+func (w *WatchCacheStorage) addOrUpdateLocked(newElem *Element) (*Element, error) {
+	if newElem == nil {
+		return nil, fmt.Errorf("elem cannot be nil")
+	}
+	oldElem := w.store.addOrUpdateElem(newElem)
+	return oldElem, w.indexer.updateElem(newElem.Key, oldElem, newElem)
+}
+
+func (w *WatchCacheStorage) Delete(elem *Element) (*Element, error) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	return w.deleteLocked(elem)
+}
+
+func (w *WatchCacheStorage) deleteLocked(elem *Element) (*Element, error) {
+	if elem == nil {
+		return nil, fmt.Errorf("elem cannot be nil")
+	}
+	oldElem, existed := w.store.deleteElem(elem)
+	if !existed {
+		return nil, nil
+	}
+	return oldElem, w.indexer.updateElem(elem.Key, oldElem, nil)
+}
+
 // UpdateStoreLocked executes a mutation (Add, Update, Delete) on the underlying store.
 // It returns the element that was previously stored under the same key, if any.
 func (w *WatchCacheStorage) UpdateStoreLocked(eventType watch.EventType, elem *Element, resourceVersion uint64) (prev *Element, err error) {
-	// TODO: Remove taking a lock for second time
+	w.lock.Lock()
+	defer w.lock.Unlock()
 	switch eventType {
-	case watch.Added:
-		prev, err = w.Add(elem)
-	case watch.Modified:
-		prev, err = w.Update(elem)
+	case watch.Added, watch.Modified:
+		prev, err = w.addOrUpdateLocked(elem)
 	case watch.Deleted:
-		prev, err = w.Delete(elem)
+		prev, err = w.deleteLocked(elem)
 	default:
 		err = fmt.Errorf("unexpected event type: %v", eventType)
 	}
 	if err != nil {
 		return nil, err
 	}
-	w.lock.Lock()
-	defer w.lock.Unlock()
 	if w.snapshottingEnabled {
 		w.snapshots.Add(resourceVersion, w.store.Clone())
 	}
@@ -296,6 +368,14 @@ func (w *WatchCacheStorage) Replace(toReplace []interface{}, resourceVersion str
 	}
 	w.listResourceVersion = version
 	return nil
+}
+
+func (w *WatchCacheStorage) replaceLocked(objs []interface{}, resourceVersion string) error {
+	err := w.store.Replace(objs, resourceVersion)
+	if err != nil {
+		return err
+	}
+	return w.indexer.Replace(objs, resourceVersion)
 }
 
 // GetExactSnapshotLocked retrieves a snapshot less than or equal to the given resource version.
