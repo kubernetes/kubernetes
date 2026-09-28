@@ -230,7 +230,7 @@ type SubjectAccessReviewSpec struct {
 	UID string `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid"`
 
 	// authorizationOptions contains options for specifying the client's authorization abilities.
-	// If unset, only unconditional authorization is supported, for backwards-compability.
+	// If unset, only unconditional authorization is supported, for backwards-compatibility.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
 	// +featureGate=ConditionalAuthorization
@@ -263,7 +263,7 @@ type SelfSubjectAccessReviewSpec struct {
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
 
 	// authorizationOptions contains options for specifying the client's authorization abilities.
-	// If unset, only unconditional authorization is supported, for backwards-compability.
+	// If unset, only unconditional authorization is supported, for backwards-compatibility.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
 	// +featureGate=ConditionalAuthorization

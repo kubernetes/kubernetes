@@ -179,7 +179,7 @@ type SubjectAccessReviewSpec struct {
 	UID string
 
 	// AuthorizationOptions contains options for specifying the client's authorization abilities.
-	// If unset, only unconditional authorization is supported, for backwards-compability.
+	// If unset, only unconditional authorization is supported, for backwards-compatibility.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
 	// +featureGate=ConditionalAuthorization
@@ -199,7 +199,7 @@ type SelfSubjectAccessReviewSpec struct {
 	NonResourceAttributes *NonResourceAttributes
 
 	// AuthorizationOptions contains options for specifying the client's authorization abilities.
-	// If unset, only unconditional authorization is supported, for backwards-compability.
+	// If unset, only unconditional authorization is supported, for backwards-compatibility.
 	// Requires the ConditionalAuthorization feature to be enabled.
 	// +optional
 	// +featureGate=ConditionalAuthorization

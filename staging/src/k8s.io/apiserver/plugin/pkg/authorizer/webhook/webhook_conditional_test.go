@@ -1099,7 +1099,10 @@ func TestConditionsAwareAuthorize_V1beta1Downgrade(t *testing.T) {
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				rawBody, _ = io.ReadAll(r.Body)
 				w.Header().Set("Content-Type", "application/json")
-				fmt.Fprintf(w, `{"apiVersion":"authorization.k8s.io/v1beta1","kind":"SubjectAccessReview","status":%s}`, tc.sendStatusJSON)
+				_, err := fmt.Fprintf(w, `{"apiVersion":"authorization.k8s.io/v1beta1","kind":"SubjectAccessReview","status":%s}`, tc.sendStatusJSON)
+				if err != nil {
+					t.Fatal("unexpected error:", err)
+				}
 			}))
 			defer server.Close()
 
