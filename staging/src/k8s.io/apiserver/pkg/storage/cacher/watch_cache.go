@@ -516,6 +516,15 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 		return nil, 0, "", err
 	}
 	span.AddEvent("watchCache fresh enough")
+	snap, index, err = w.getLatestSnapshotLocked(ctx, key, continueKey, matchValues)
+	if err != nil {
+		return nil, 0, "", err
+	}
+	return snap, w.resourceVersion, index, nil
+}
+
+func (w *watchCache) getLatestSnapshotLocked(ctx context.Context, key, continueKey string, matchValues []storage.MatchValue) (snap store.Snapshot, index string, err error) {
+	span := tracing.SpanFromContext(ctx)
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
 	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
@@ -524,17 +533,17 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 		snap, err := w.storage.GetByIndexSnapshot(matchValue.IndexName, matchValue.Value)
 		if err == nil {
 			span.AddEvent("GetByIndexSnapshot success", attribute.String("index", matchValue.IndexName))
-			return snap, w.resourceVersion, matchValue.IndexName, nil
+			return snap, matchValue.IndexName, nil
 		}
 		span.AddEvent("GetByIndexSnapshot fail", attribute.String("index", matchValue.IndexName), attribute.String("error", err.Error()))
 	}
 	snap, err = w.storage.GetLatestSnapshotOrBuildLocked(key, continueKey)
 	if err != nil {
 		span.AddEvent("GetLatestSnapshotOrBuildLocked failed", attribute.String("error", err.Error()))
-		return nil, 0, "", err
+		return nil, "", err
 	}
 	span.AddEvent("GetLatestSnapshotOrBuildLocked success")
-	return snap, w.resourceVersion, "", nil
+	return snap, "", nil
 }
 
 func (w *watchCache) notFresh(resourceVersion uint64) bool {
@@ -644,11 +653,15 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
 // getAllEventsSinceLocked returns a watchCacheInterval that can be used to
 // retrieve events since a certain resourceVersion. This function assumes to
 // be called under the watchCache lock.
-func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
+func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
 	_, matchesSingle := opts.Predicate.MatchesSingle()
 	matchesSingle = matchesSingle && !opts.Recursive
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
-		return w.getIntervalFromStoreLocked(key, matchesSingle)
+		var matchValues []storage.MatchValue
+		if !matchesSingle {
+			matchValues = opts.Predicate.MatcherIndex(ctx)
+		}
+		return w.getIntervalFromStoreLocked(ctx, key, matchesSingle, matchValues)
 	}
 
 	if resourceVersion == 0 {
@@ -659,7 +672,11 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 			// current state and only then start watching from that point.
 			//
 			// TODO: In v2 api, we should stop returning the current state - #13969.
-			return w.getIntervalFromStoreLocked(key, matchesSingle)
+			var matchValues []storage.MatchValue
+			if !matchesSingle {
+				matchValues = opts.Predicate.MatcherIndex(ctx)
+			}
+			return w.getIntervalFromStoreLocked(ctx, key, matchesSingle, matchValues)
 		}
 		// SendInitialEvents = false and resourceVersion = 0
 		// means that the request would like to start watching
@@ -671,15 +688,19 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 }
 
 // getIntervalFromStoreLocked returns a watchCacheInterval
-// that covers the entire storage state.
+// that covers the storage state matching key and matchValues.
 // This function assumes to be called under the watchCache lock.
-func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) (*watchCacheInterval, error) {
-	// When not matching a single key, an immutable snapshot lets us
-	// defer the O(N) interval build off the watchCache lock.
+func (w *watchCache) getIntervalFromStoreLocked(ctx context.Context, key string, matchesSingle bool, matchValues []storage.MatchValue) (*watchCacheInterval, error) {
+	// When not matching a single key, obtain a store snapshot (prefiltered by index
+	// if a matching index exists, or from the latest B-tree snapshot / prefix list)
+	// and defer sorting, prefix filtering, and watchCacheEvent allocation to Next()
+	// after the watchCache lock is released.
 	if !matchesSingle {
-		if snapshot, ok := w.storage.LatestSnapshotLocked(); ok {
-			return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot), nil
+		snapshot, _, err := w.getLatestSnapshotLocked(ctx, key, "", matchValues)
+		if err != nil {
+			return nil, err
 		}
+		return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot, key), nil
 	}
 	return newCacheIntervalFromStore(w.resourceVersion, w.storage, key, matchesSingle)
 }
