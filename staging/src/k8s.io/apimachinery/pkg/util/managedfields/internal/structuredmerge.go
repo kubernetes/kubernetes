@@ -97,6 +97,18 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert live object (%v) to proper version: %v", objectGVKNN(liveObj), err)
 	}
+	// newObj has no managedFields by now, so the comparison would only report
+	// metadata.managedFields as removed. That changes no manager's set because
+	// metadata.managedFields cannot be owned by any manager (it is stripped by
+	// stripMetaManager). Temporarily clear managedFields on liveObjVersioned to
+	// skip converting it to smd typed, and restore it before returning in case
+	// toVersioned returned liveObj or shared underlying metadata storage.
+	if liveAccessor, err := meta.Accessor(liveObjVersioned); err == nil {
+		if liveManagedFields := liveAccessor.GetManagedFields(); len(liveManagedFields) > 0 {
+			liveAccessor.SetManagedFields(nil)
+			defer liveAccessor.SetManagedFields(liveManagedFields)
+		}
+	}
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned, typed.AllowDuplicates)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert new object (%v) to smd typed: %v", objectGVKNN(newObjVersioned), err)
