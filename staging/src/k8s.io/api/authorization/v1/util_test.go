@@ -19,10 +19,11 @@ package v1
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func TestAuthorizationOptions_Supports(t *testing.T) {
+func TestSupports(t *testing.T) {
 	tests := []struct {
 		name              string
 		ao                *AuthorizationOptions
@@ -96,17 +97,17 @@ func TestAuthorizationOptions_Supports(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.ao.SupportsConditionalAuthorization(); got != tt.wantConditional {
+			if got := SupportsConditionalAuthorization(tt.ao); got != tt.wantConditional {
 				t.Errorf("SupportsConditionalAuthorization() = %v, want %v", got, tt.wantConditional)
 			}
-			if got := tt.ao.SupportsUnconditionalAuthorization(); got != tt.wantUnconditional {
+			if got := SupportsUnconditionalAuthorization(tt.ao); got != tt.wantUnconditional {
 				t.Errorf("SupportsUnconditionalAuthorization() = %v, want %v", got, tt.wantUnconditional)
 			}
 		})
 	}
 }
 
-func TestAuthorizationOptions_GetHandledDecisionTypes(t *testing.T) {
+func TestGetHandledDecisionTypes(t *testing.T) {
 	tests := []struct {
 		name string
 		ao   *AuthorizationOptions
@@ -156,7 +157,7 @@ func TestAuthorizationOptions_GetHandledDecisionTypes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.ao.GetHandledDecisionTypes()
+			got := GetHandledDecisionTypes(tt.ao)
 			if !got.Equal(tt.want) {
 				t.Errorf("GetHandledDecisionTypes() = %v, want %v", got.UnsortedList(), tt.want.UnsortedList())
 			}
@@ -203,6 +204,50 @@ func TestDecisionTypeAccessorsReturnFreshCopies(t *testing.T) {
 			second := tt.fn()
 			if !second.Equal(tt.want) {
 				t.Errorf("second call = %v, want %v (returned set was not a fresh copy)", second.UnsortedList(), tt.want.UnsortedList())
+			}
+		})
+	}
+}
+
+func TestDecisionTypeListAccessorsReturnFreshCopies(t *testing.T) {
+	// Mutating the returned set must not affect the package-level constants
+	// or subsequent calls.
+	tests := []struct {
+		name string
+		fn   func() []ConditionsAwareDecisionType
+		want []ConditionsAwareDecisionType
+	}{
+		{
+			name: "ConditionalAuthorizationDecisionTypesList",
+			fn:   ConditionalAuthorizationDecisionTypesList,
+			want: []ConditionsAwareDecisionType{
+				ConditionsAwareDecisionTypeAllow,
+				ConditionsAwareDecisionTypeConditionsMap,
+				ConditionsAwareDecisionTypeDeny,
+				ConditionsAwareDecisionTypeNoOpinion,
+				ConditionsAwareDecisionTypeUnion,
+			},
+		},
+		{
+			name: "UnconditionalAuthorizationDecisionTypesList",
+			fn:   UnconditionalAuthorizationDecisionTypesList,
+			want: []ConditionsAwareDecisionType{
+				ConditionsAwareDecisionTypeAllow,
+				ConditionsAwareDecisionTypeDeny,
+				ConditionsAwareDecisionTypeNoOpinion,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			first := tt.fn()
+			if diff := cmp.Diff(first, tt.want); diff != "" {
+				t.Errorf("first call: got=%s, want=%s, diff=%s", first, tt.want, diff)
+			}
+			first[0] = ConditionsAwareDecisionType("bogus")
+			second := tt.fn()
+			if diff := cmp.Diff(second, tt.want); diff != "" {
+				t.Errorf("second call: got=%s, want=%s, diff=%s (returned slice was not a fresh copy)", second, tt.want, diff)
 			}
 		})
 	}

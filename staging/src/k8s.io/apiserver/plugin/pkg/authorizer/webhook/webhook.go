@@ -278,7 +278,7 @@ func (w *WebhookAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attr a
 		}
 	}
 	r.Spec.AuthorizationOptions = &authorizationv1.AuthorizationOptions{
-		HandledDecisionTypes: sets.List(authorizationv1.ConditionalAuthorizationDecisionTypes()),
+		HandledDecisionTypes: authorizationv1.ConditionalAuthorizationDecisionTypesList(),
 	}
 
 	if attr.IsResourceRequest() {

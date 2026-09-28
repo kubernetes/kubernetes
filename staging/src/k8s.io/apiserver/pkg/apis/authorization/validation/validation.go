@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -78,7 +77,7 @@ func validateAuthorizationOptions(ao *authorizationv1.AuthorizationOptions, fldP
 	allErrs := field.ErrorList{}
 	// Only run the validation for HandledDecisionTypes when it is set, declarative validation already covers the "handledDecisionTypes is required case"
 	if 0 < len(ao.HandledDecisionTypes) && len(ao.HandledDecisionTypes) <= 32 {
-		if !sets.New(ao.HandledDecisionTypes...).IsSuperset(authorizationv1.UnconditionalAuthorizationDecisionTypes()) {
+		if !authorizationv1.SupportsUnconditionalAuthorization(ao) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("handledDecisionTypes"), ao.HandledDecisionTypes, "set must at least contain {Allow, Deny, NoOpinion}"))
 		}
 	}
@@ -138,7 +137,7 @@ func ValidateSubjectAccessReviewStatus(status authorizationv1.SubjectAccessRevie
 // ErrorList with any errors.
 func ValidateSubjectAccessReview(sar *authorizationv1.SubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	allErrs = append(allErrs, ValidateSubjectAccessReviewStatus(sar.Status, sar.Spec.AuthorizationOptions.SupportsConditionalAuthorization(), field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateSubjectAccessReviewStatus(sar.Status, authorizationv1.SupportsConditionalAuthorization(sar.Spec.AuthorizationOptions), field.NewPath("status"))...)
 
 	objectMetaShallowCopy := sar.ObjectMeta
 	objectMetaShallowCopy.ManagedFields = nil
@@ -152,7 +151,7 @@ func ValidateSubjectAccessReview(sar *authorizationv1.SubjectAccessReview) field
 // ErrorList with any errors.
 func ValidateSelfSubjectAccessReview(sar *authorizationv1.SelfSubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSelfSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	allErrs = append(allErrs, ValidateSubjectAccessReviewStatus(sar.Status, sar.Spec.AuthorizationOptions.SupportsConditionalAuthorization(), field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateSubjectAccessReviewStatus(sar.Status, authorizationv1.SupportsConditionalAuthorization(sar.Spec.AuthorizationOptions), field.NewPath("status"))...)
 	objectMetaShallowCopy := sar.ObjectMeta
 	objectMetaShallowCopy.ManagedFields = nil
 	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
@@ -165,7 +164,7 @@ func ValidateSelfSubjectAccessReview(sar *authorizationv1.SelfSubjectAccessRevie
 // ErrorList with any errors.
 func ValidateLocalSubjectAccessReview(sar *authorizationv1.LocalSubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	allErrs = append(allErrs, ValidateSubjectAccessReviewStatus(sar.Status, sar.Spec.AuthorizationOptions.SupportsConditionalAuthorization(), field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateSubjectAccessReviewStatus(sar.Status, authorizationv1.SupportsConditionalAuthorization(sar.Spec.AuthorizationOptions), field.NewPath("status"))...)
 
 	objectMetaShallowCopy := sar.ObjectMeta
 	objectMetaShallowCopy.Namespace = ""

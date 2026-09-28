@@ -316,7 +316,7 @@ func TestConditionsAwareAuthorize(t *testing.T) {
 			}
 			if sarReviewer.received == nil {
 				t.Error("expected SAR to be called")
-			} else if !sarReviewer.received.Spec.AuthorizationOptions.SupportsConditionalAuthorization() {
+			} else if !authorizationv1.SupportsConditionalAuthorization(sarReviewer.received.Spec.AuthorizationOptions) {
 				t.Error("expected ConditionalAuthorization to be enabled in the outgoing SAR")
 			}
 		})
@@ -900,7 +900,7 @@ func TestConditionsAwareAuthorize_EndToEnd(t *testing.T) {
 			return
 		}
 
-		receivedConditionalAuth = sar.Spec.AuthorizationOptions.SupportsConditionalAuthorization()
+		receivedConditionalAuth = authorizationv1.SupportsConditionalAuthorization(sar.Spec.AuthorizationOptions)
 
 		resp := authorizationv1.SubjectAccessReview{
 			TypeMeta: metav1.TypeMeta{
