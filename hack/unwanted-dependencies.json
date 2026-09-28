@@ -154,6 +154,9 @@
         "google.golang.org/grpc",
         "google.golang.org/protobuf"
       ],
+      "github.com/google/btree": [
+        "github.com/peterbourgon/diskv/v3"
+      ],
       "github.com/google/s2a-go": [
         "google.golang.org/grpc"
       ],
