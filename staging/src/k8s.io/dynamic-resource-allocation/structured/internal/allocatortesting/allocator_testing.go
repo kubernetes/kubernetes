@@ -5527,7 +5527,7 @@ func TestAllocator(t *testing.T,
 			),
 			classes: objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(
-				sliceWithDevices(slice4, node1, resourcePool(pool1, 4), driverA,
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
 					device(device1).
 						withDeviceCounterConsumption(
 							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
@@ -5536,12 +5536,12 @@ func TestAllocator(t *testing.T,
 						).
 						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
 				),
-				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 4), driverA,
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
 					counterSet(counterSet1, map[string]resource.Quantity{
 						"memory": resource.MustParse("8Gi"),
 					}),
 				),
-				sliceWithDevices(slice2, node1, resourcePool(pool1, 4), driverA,
+				sliceWithDevices(slice3, node1, resourcePool(pool2, 2), driverA,
 					device(device2).
 						withDeviceCounterConsumption(
 							deviceCounterConsumption(counterSet2, map[string]resource.Quantity{
@@ -5549,7 +5549,7 @@ func TestAllocator(t *testing.T,
 							}),
 						),
 				),
-				sliceWithCounterSets(slice1, node1, resourcePool(pool1, 4), driverA,
+				sliceWithCounterSets(slice4, node1, resourcePool(pool2, 2), driverA,
 					counterSet(counterSet2, map[string]resource.Quantity{
 						"memory": resource.MustParse("8Gi"),
 					}),
@@ -5560,7 +5560,7 @@ func TestAllocator(t *testing.T,
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool2, device2, nil, nil),
 							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}),
 						},
 					},
@@ -5660,7 +5660,7 @@ func TestAllocator(t *testing.T,
 		},
 		"consumable-capacity-disabled-feature": {
 			features: Features{
-				DeviceBindingAndStatus: true, // add to forcefully use experimenting allocator
+				FractionalCapacityRange: true, // add to forcefully use experimenting allocator
 			},
 			claimsToAllocate: objects(
 				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)),
@@ -5673,8 +5673,8 @@ func TestAllocator(t *testing.T,
 		},
 		"consumable-capacity-disabled-feature-with-prioritized-list": {
 			features: Features{
-				PrioritizedList:        true,
-				DeviceBindingAndStatus: true, // add to forcefully use experimenting allocator
+				PrioritizedList:         true,
+				FractionalCapacityRange: true, // add to forcefully use experimenting allocator
 			},
 			claimsToAllocate: objects(
 				claim(claim0).withRequests(
