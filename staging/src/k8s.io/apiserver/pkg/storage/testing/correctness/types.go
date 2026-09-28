@@ -138,9 +138,20 @@ type Response struct {
 	Err    error
 }
 
+// Change is a write the model applied to a single key. PrevObject is nil for a
+// create and Object is nil for a delete. Like etcd3 and the cacher, deciding
+// what a watcher with a predicate receives requires both objects.
+type Change struct {
+	ResourceVersion uint64
+	Object          runtime.Object
+	PrevObject      runtime.Object
+}
+
 // WatchRequest contains parameters for a watch stream.
 type WatchRequest struct {
 	ResourceVersion string
+	// Predicate filters events. The zero value matches everything.
+	Predicate storage.SelectionPredicate
 }
 
 // WatchResponse contains the events and any terminal error received from a watch stream.
