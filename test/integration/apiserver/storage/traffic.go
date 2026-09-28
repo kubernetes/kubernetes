@@ -44,6 +44,9 @@ const (
 	RequestTypeDelete                 RequestType = "Delete"
 	RequestTypeDeleteUIDPrecondition  RequestType = "DeleteUIDPrecondition"
 	RequestTypeGet                    RequestType = "Get"
+	RequestTypeList                   RequestType = "List"
+	RequestTypeListNamespace          RequestType = "ListNamespace"
+	RequestTypeListNonRecursive       RequestType = "ListNonRecursive"
 	RequestTypeUpdate                 RequestType = "Update"
 	RequestTypeUpdateUIDPrecondition  RequestType = "UpdateUIDPrecondition"
 	RequestTypeUpdateNoOp             RequestType = "UpdateNoOp"
@@ -140,7 +143,7 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConf
 				start := time.Now()
 				response := runTraffic(ctx, store, request)
 				end := time.Now()
-				if response.Object != nil {
+				if response.Object != nil && request.Op != correctness.OpList {
 					cachedObj = response.Object
 				}
 
@@ -237,6 +240,30 @@ func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType],
 				Options: getOpts,
 			},
 		}
+	case RequestTypeList:
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{Predicate: storage.Everything, Recursive: true},
+			},
+		}
+	case RequestTypeListNamespace:
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/" + key.Namespace,
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{Predicate: storage.Everything, Recursive: true},
+			},
+		}
+	case RequestTypeListNonRecursive:
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: storageKey(key),
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{Predicate: storage.Everything},
+			},
+		}
 	case RequestTypeUpdate:
 		version := fmt.Sprintf("%d", rand.Intn(10000))
 		return &correctness.Request{
@@ -322,7 +349,7 @@ func storageKey(key types.NamespacedName) string {
 }
 
 func runTraffic(ctx context.Context, store storage.Interface, request *correctness.Request) correctness.Response {
-	out := &api.Pod{}
+	var out runtime.Object = &api.Pod{}
 	var err error
 	key := request.Key
 	switch request.Op {
@@ -332,6 +359,9 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		err = store.Delete(ctx, key, out, request.Delete.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 	case correctness.OpGet:
 		err = store.Get(ctx, key, request.Get.Options, out)
+	case correctness.OpList:
+		out = &api.PodList{}
+		err = store.GetList(ctx, key, request.List.Options, out)
 	case correctness.OpUpdate:
 		err = store.GuaranteedUpdate(ctx, key, out, request.Update.IgnoreNotFound, request.Update.Preconditions, request.Update.UpdateFunc, request.Update.CachedExistingObject)
 	default:
