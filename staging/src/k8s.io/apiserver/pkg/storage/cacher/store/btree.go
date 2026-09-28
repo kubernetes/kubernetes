@@ -38,7 +38,7 @@ type btreeStore struct {
 
 // Clone should not be called concurrently.
 // Ref: https://github.com/kubernetes/kubernetes/blob/4a8f617f3ca/vendor/k8s.io/utils/third_party/forked/golang/btree/btree.go#L586-L588
-func (s *btreeStore) Clone() Snapshot {
+func (s *btreeStore) Clone() *btreeStore {
 	return &btreeStore{
 		tree: s.tree.Clone(),
 	}

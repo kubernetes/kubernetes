@@ -482,8 +482,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 }
 
 // TestCacheIntervalSourceSelection verifies that getIntervalFromStoreLocked builds the
-// interval from the lazy snapshot source when snapshotting is enabled and falls back to the
-// eager snapshot source when it is disabled.
+// interval from the lazy snapshot source regardless of whether snapshotting is enabled.
 func TestCacheIntervalSourceSelection(t *testing.T) {
 	cases := []struct {
 		name             string
@@ -496,9 +495,9 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 			wantLazySnapshot: true,
 		},
 		{
-			name:             "snapshotting disabled falls back to eager snapshot",
+			name:             "snapshotting disabled still serves from lazy snapshot",
 			snapshottingOn:   false,
-			wantLazySnapshot: false,
+			wantLazySnapshot: true,
 		},
 	}
 	for _, tc := range cases {

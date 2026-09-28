@@ -75,29 +75,34 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestLatestSnapshotLocked(t *testing.T) {
+func TestLatestSnapshot(t *testing.T) {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return obj.(*mockObject).key, nil
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	// Latest snapshot is maintained even with snapshotting disabled.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
 
 	indexers := &cache.Indexers{}
 	s := NewWatchCacheStorage(keyFunc, indexers)
 
-	_, ok := s.LatestSnapshotLocked()
-	assert.False(t, ok, "expected no snapshot before any writes")
+	before := s.LatestSnapshot()
+	items, err := before.OrderedListPrefix("", "")
+	require.NoError(t, err)
+	assert.Empty(t, items, "expected empty snapshot before any writes")
 
 	elem := &Element{Key: "foo", Object: &mockObject{key: "foo", val: "100"}}
 	prev, err := s.UpdateStore(watch.Added, elem, 100)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
 
-	snap, ok := s.LatestSnapshotLocked()
-	require.True(t, ok, "expected snapshot after write")
-	items, err := snap.OrderedListPrefix("", "")
+	items, err = s.LatestSnapshot().OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, &mockObject{key: "foo", val: "100"}, items[0].(*Element).Object)
+
+	items, err = before.OrderedListPrefix("", "")
+	require.NoError(t, err)
+	assert.Empty(t, items, "snapshot taken before the write must not change")
 }
 
 func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {

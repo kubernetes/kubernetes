@@ -498,14 +498,14 @@ func (w *watchCache) waitAndListConsistent(ctx context.Context, key, continueKey
 }
 
 func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
-	snap, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, minResourceVersion, key, continueKey, matchValues)
+	snap, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, minResourceVersion, matchValues)
 	if err != nil {
 		return listResp{}, "", err
 	}
 	return listResp{ResourceVersion: resourceVersion, Range: snap.RangePrefix(key, continueKey)}, index, nil
 }
 
-func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
+func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVersion uint64, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
 	consistentReadSupported := delegator.ConsistentReadSupported()
 	span := tracing.SpanFromContext(ctx)
 	w.RLock()
@@ -528,12 +528,8 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 		}
 		span.AddEvent("GetByIndexSnapshot fail", attribute.String("index", matchValue.IndexName), attribute.String("error", err.Error()))
 	}
-	snap, err = w.storage.GetLatestSnapshotOrBuildLocked(key, continueKey)
-	if err != nil {
-		span.AddEvent("GetLatestSnapshotOrBuildLocked failed", attribute.String("error", err.Error()))
-		return nil, 0, "", err
-	}
-	span.AddEvent("GetLatestSnapshotOrBuildLocked success")
+	snap = w.storage.LatestSnapshot()
+	span.AddEvent("LatestSnapshot success")
 	return snap, w.resourceVersion, "", nil
 }
 
@@ -677,9 +673,7 @@ func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) 
 	// When not matching a single key, an immutable snapshot lets us
 	// defer the O(N) interval build off the watchCache lock.
 	if !matchesSingle {
-		if snapshot, ok := w.storage.LatestSnapshotLocked(); ok {
-			return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot), nil
-		}
+		return newCacheIntervalFromLazySnapshot(w.resourceVersion, w.storage.LatestSnapshot()), nil
 	}
 	return newCacheIntervalFromStore(w.resourceVersion, w.storage, key, matchesSingle)
 }
