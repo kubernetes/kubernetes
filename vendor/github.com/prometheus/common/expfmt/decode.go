@@ -72,13 +72,15 @@ func ResponseFormat(h http.Header) Format {
 
 // NewDecoder returns a new decoder based on the given input format. Metric
 // names are validated based on the provided Format -- if the format requires
-// escaping, raditional Prometheues validity checking is used. Otherwise, names
+// escaping, traditional Prometheus validity checking is used. Otherwise, names
 // are checked for UTF-8 validity. Supported formats include delimited protobuf
-// and Prometheus text format.  For historical reasons, this decoder fallbacks
-// to classic text decoding for any other format. This decoder does not fully
-// support OpenMetrics although it may often succeed due to the similarities
-// between the formats. This decoder may not support the latest features of
-// Prometheus text format and is not intended for high-performance applications.
+// and Prometheus text format. For historical reasons, this decoder falls back
+// to classic text decoding for other legacy formats, but returns an error for
+// unsupported formats such as OpenMetrics 2.0. This decoder does not fully
+// support OpenMetrics although it may often succeed for OpenMetrics 1.0 due to
+// the similarities between the formats. This decoder may not support the latest
+// features of Prometheus text format and is not intended for high-performance
+// applications.
 // See: https://github.com/prometheus/common/issues/812
 func NewDecoder(r io.Reader, format Format) Decoder {
 	scheme := model.LegacyValidation
@@ -90,6 +92,11 @@ func NewDecoder(r io.Reader, format Format) Decoder {
 		return &protoDecoder{r: bufio.NewReader(r), s: scheme}
 	case TypeProtoText, TypeProtoCompact:
 		return &errDecoder{err: fmt.Errorf("format %s not supported for decoding", format)}
+	case TypeOpenMetrics:
+		_, params, err := mime.ParseMediaType(string(format))
+		if err == nil && params["version"] == OpenMetricsVersion_2_0_0 {
+			return &errDecoder{err: fmt.Errorf("format %s not supported for decoding", format)}
+		}
 	}
 	return &textDecoder{r: r, s: scheme}
 }
