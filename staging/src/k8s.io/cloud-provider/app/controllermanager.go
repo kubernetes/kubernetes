@@ -96,6 +96,9 @@ the cloud specific control loops shipped with Kubernetes.`,
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
 			}
+			// The gate is registered above, but histograms stay classic until this runs.
+			// Do it before Config builds clients and informers.
+			features.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 			cliflag.PrintFlags(cmd.Flags())
 
 			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, DisabledByDefaultWebhooks)
