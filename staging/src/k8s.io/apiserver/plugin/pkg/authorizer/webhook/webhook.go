@@ -400,16 +400,14 @@ func (w *WebhookAuthorizer) sendSARWebhook(ctx context.Context, r *authorization
 			return authorizationv1.SubjectAccessReviewStatus{}, err
 		}
 
-		// TODO: There is a discrepancy between the if and the else branch, else writes into the r pointer, if does not.
-		r.Status = result.Status
 		if shouldCache(attr) {
-			if r.Status.Allowed || (handlesConditional && r.Status.ConditionalDecision != nil) {
-				w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
+			if result.Status.Allowed || (handlesConditional && result.Status.ConditionalDecision != nil) {
+				w.responseCache.Add(string(key), result.Status, w.authorizedTTL)
 			} else {
-				w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
+				w.responseCache.Add(string(key), result.Status, w.unauthorizedTTL)
 			}
 		}
-		return r.Status, nil
+		return result.Status, nil
 	}
 }
 
