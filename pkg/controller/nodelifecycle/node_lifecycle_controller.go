@@ -209,6 +209,12 @@ func (n *nodeHealthMap) set(name string, data *nodeHealthData) {
 	n.nodeHealths[name] = data
 }
 
+func (n *nodeHealthMap) delete(name string) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	delete(n.nodeHealths, name)
+}
+
 type podUpdateItem struct {
 	namespace string
 	name      string
@@ -681,6 +687,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		logger.V(1).Info("Controller observed a Node deletion", "node", klog.KRef("", deleted[i].Name))
 		controllerutil.RecordNodeEvent(ctx, nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
 		delete(nc.knownNodeSet, deleted[i].Name)
+		nc.nodeHealthMap.delete(deleted[i].Name)
 	}
 
 	var zoneToNodeConditionsLock sync.Mutex
