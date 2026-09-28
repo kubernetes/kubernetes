@@ -97,22 +97,24 @@ func (il *itemList) isEmpty() bool {
 	return il.head == nil
 }
 
-// maxQueuedControlBufferItems is the maximum number of frames (other than
-// HEADERS and DATA) that we will buffer before preventing new reads from
-// occurring on the transport.  These are control frames sent in response to
-// client requests, or frames that result in work being scheduled, such as
-// RST_STREAM due to bad headers or settings acks.
-var maxQueuedControlBufferItems = int(envconfig.ControlBufferThrottleLimit)
+// maxQueuedTransportResponseFrames is the maximum number of "transport
+// response" frames that we will buffer before preventing new reads from
+// occurring on the transport. These are control frames sent in response to
+// peer requests, or frames that result in work being scheduled, such as
+// RST_STREAM due to bad headers, settings acks, or ping acks.
+var maxQueuedTransportResponseFrames = int(envconfig.ControlBufferThrottleLimit)
 
 type cbItem interface {
-	isThrottled() bool
+	isTransportResponseFrame() bool
 }
 
-// throttledItem represents every item in the controlBuffer to which the overall
-// throttling limit applies, other than outgoing HEADERS and DATA frames.
-type throttledItem struct{}
+// nonTransportResponseFrame represents items in the controlBuffer that are not
+// queued in response to peer control/reset frames (for example,
+// locally-initiated or flow-controlled items). These items are not counted
+// against the maxQueuedTransportResponseFrames limit.
+type nonTransportResponseFrame struct{}
 
-func (throttledItem) isThrottled() bool { return true }
+func (nonTransportResponseFrame) isTransportResponseFrame() bool { return false }
 
 // The following defines various control items which could flow through
 // the control buffer of transport. They represent different aspects of
@@ -120,12 +122,13 @@ func (throttledItem) isThrottled() bool { return true }
 
 // registerStream is used to register an incoming stream with loopy writer.
 type registerStream struct {
-	throttledItem
+	nonTransportResponseFrame
 	streamID uint32
 	wq       *writeQuota
 }
 
 type clientHeaders struct {
+	nonTransportResponseFrame
 	streamID   uint32
 	hf         []hpack.HeaderField
 	initStream func(uint32) error
@@ -134,9 +137,8 @@ type clientHeaders struct {
 	onOrphaned func(error)
 }
 
-func (*clientHeaders) isThrottled() bool { return false }
-
 type serverHeaders struct {
+	nonTransportResponseFrame
 	streamID  uint32
 	hf        []hpack.HeaderField
 	endStream bool
@@ -144,24 +146,30 @@ type serverHeaders struct {
 	cleanup   *cleanupStream
 }
 
-func (h *serverHeaders) isThrottled() bool { return false }
-
 type cleanupStream struct {
-	throttledItem
 	streamID uint32
 	rst      bool
 	rstCode  http2.ErrCode
 	onWrite  func()
 }
 
+// isTransportResponseFrame returns true since cleanupStream either results in a
+// RST_STREAM frame being sent on the wire or in non-trivial work being
+// performed when under a Rapid Reset attack.
+func (*cleanupStream) isTransportResponseFrame() bool { return true }
+
 type earlyAbortStream struct {
-	throttledItem
 	streamID uint32
 	rst      bool
 	hf       []hpack.HeaderField // Pre-built header fields
 }
 
+// isTransportResponseFrame returns true since earlyAbortStream results in a
+// HEADERS frame being sent on the wire, and possibly a RST_STREAM frame.
+func (*earlyAbortStream) isTransportResponseFrame() bool { return true }
+
 type dataFrame struct {
+	nonTransportResponseFrame
 	streamID   uint32
 	endStream  bool
 	h          []byte
@@ -172,36 +180,40 @@ type dataFrame struct {
 	onEachWrite func()
 }
 
-func (*dataFrame) isThrottled() bool { return false }
-
 type incomingWindowUpdate struct {
-	throttledItem
 	streamID  uint32
 	increment uint32
 }
 
+// isTransportResponseFrame returns true to prevent the server from a
+// WINDOW_UPDATE flood attack.
+func (*incomingWindowUpdate) isTransportResponseFrame() bool { return true }
+
 type outgoingWindowUpdate struct {
-	throttledItem
+	nonTransportResponseFrame
 	streamID  uint32
 	increment uint32
 }
 
 type incomingSettings struct {
-	throttledItem
 	ss []http2.Setting
 }
 
+// isTransportResponseFrame returns true since incomingSettings results in a
+// SETTINGS ACK frame being sent on the wire.
+func (*incomingSettings) isTransportResponseFrame() bool { return true }
+
 type outgoingSettings struct {
-	throttledItem
+	nonTransportResponseFrame
 	ss []http2.Setting
 }
 
 type incomingGoAway struct {
-	throttledItem
+	nonTransportResponseFrame
 }
 
 type goAway struct {
-	throttledItem
+	nonTransportResponseFrame
 	code      http2.ErrCode
 	debugData []byte
 	headsUp   bool
@@ -209,13 +221,14 @@ type goAway struct {
 }
 
 type ping struct {
-	throttledItem
 	ack  bool
 	data [8]byte
 }
 
+func (p *ping) isTransportResponseFrame() bool { return p.ack }
+
 type outFlowControlSizeRequest struct {
-	throttledItem
+	nonTransportResponseFrame
 	resp chan uint32
 }
 
@@ -225,7 +238,7 @@ type outFlowControlSizeRequest struct {
 // can inspect settled accounting values (such as bytesOutStanding) after loopyWriter
 // has run to completion without any data races.
 type outStreamRequestForTesting struct {
-	throttledItem
+	nonTransportResponseFrame
 	streamID uint32
 	resp     chan *outStream
 }
@@ -235,7 +248,7 @@ type outStreamRequestForTesting struct {
 // (by the client or server).  The transport itself will close after the reader
 // encounters the EOF caused by the connection closure.
 type closeConnection struct {
-	throttledItem
+	nonTransportResponseFrame
 }
 
 type outStreamState int
@@ -316,8 +329,9 @@ func (l *outStreamList) dequeue() *outStream {
 // shouldn't be confused with an HTTP2 frame, although some of the control
 // frames like dataFrame and headerFrame do go out on wire as HTTP2 frames.
 type controlBuffer struct {
-	wakeupCh chan struct{}   // Unblocks readers waiting for something to read.
-	done     <-chan struct{} // Closed when the transport is done.
+	wakeupCh         chan struct{}   // Unblocks readers waiting for something to read.
+	done             <-chan struct{} // Closed when the transport is done.
+	enableThrottling bool            // Indicates if throttling is enabled.
 
 	// Mutex guards all the fields below, except trfChan which can be read
 	// atomically without holding mu.
@@ -327,19 +341,21 @@ type controlBuffer struct {
 	list            *itemList // List of queued control frames.
 
 	// transportResponseFrames counts the number of queued items that represent
-	// the response of an action initiated by the peer.  trfChan is created
-	// when transportResponseFrames >= maxQueuedTransportResponseFrames and is
-	// closed and nilled when transportResponseFrames drops below the
-	// threshold.  Both fields are protected by mu.
+	// the response of an action initiated by the peer. When enableThrottling is
+	// true, trfChan is created when transportResponseFrames >=
+	// maxQueuedControlBufferItems and is closed and nilled when
+	// transportResponseFrames drops below the threshold. Both fields are
+	// protected by mu.
 	transportResponseFrames int
 	trfChan                 atomic.Pointer[chan struct{}]
 }
 
-func newControlBuffer(done <-chan struct{}) *controlBuffer {
+func newControlBuffer(done <-chan struct{}, enableThrottling bool) *controlBuffer {
 	return &controlBuffer{
-		wakeupCh: make(chan struct{}, 1),
-		list:     &itemList{},
-		done:     done,
+		wakeupCh:         make(chan struct{}, 1),
+		list:             &itemList{},
+		done:             done,
+		enableThrottling: enableThrottling,
 	}
 }
 
@@ -390,9 +406,9 @@ func (c *controlBuffer) executeAndPut(f func() bool, it cbItem) (bool, error) {
 		c.consumerWaiting = false
 	}
 	c.list.enqueue(it)
-	if it.isThrottled() {
+	if c.enableThrottling && it.isTransportResponseFrame() {
 		c.transportResponseFrames++
-		if c.transportResponseFrames == maxQueuedControlBufferItems {
+		if c.transportResponseFrames == maxQueuedTransportResponseFrames {
 			// We are adding the frame that puts us over the threshold; create
 			// a throttling channel.
 			ch := make(chan struct{})
@@ -447,8 +463,8 @@ func (c *controlBuffer) getOnceLocked() (any, error) {
 		return nil, nil
 	}
 	h := c.list.dequeue().(cbItem)
-	if h.isThrottled() {
-		if c.transportResponseFrames == maxQueuedControlBufferItems {
+	if c.enableThrottling && h.isTransportResponseFrame() {
+		if c.transportResponseFrames == maxQueuedTransportResponseFrames {
 			// We are removing the frame that put us over the
 			// threshold; close and clear the throttling channel.
 			ch := c.trfChan.Swap(nil)

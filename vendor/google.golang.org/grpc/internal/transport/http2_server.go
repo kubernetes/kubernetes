@@ -297,7 +297,7 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 	)
 	t.logger = prefixLoggerForServerTransport(t)
 
-	t.controlBuf = newControlBuffer(t.done)
+	t.controlBuf = newControlBuffer(t.done, true)
 	if !config.StaticWindowSize {
 		t.bdpEst = &bdpEstimator{
 			bdp:               initialWindowSize,
@@ -380,6 +380,11 @@ func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeade
 	defer t.maxStreamMu.Unlock()
 
 	streamID := frame.Header().StreamID
+	if streamID%2 != 1 || streamID <= t.maxStreamID {
+		// illegal gRPC stream id.
+		return fmt.Errorf("received an illegal stream id: %v. headers frame: %+v", streamID, frame)
+	}
+	t.maxStreamID = streamID
 
 	// frame.Truncated is set to true when framer detects that the current header
 	// list size hits MaxHeaderListSize limit.
@@ -392,12 +397,6 @@ func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeade
 		})
 		return nil
 	}
-
-	if streamID%2 != 1 || streamID <= t.maxStreamID {
-		// illegal gRPC stream id.
-		return fmt.Errorf("received an illegal stream id: %v. headers frame: %+v", streamID, frame)
-	}
-	t.maxStreamID = streamID
 
 	s := &ServerStream{
 		Stream: Stream{
@@ -1014,7 +1013,17 @@ func (t *http2Server) streamContextErr(s *ServerStream) error {
 		return ErrConnClosing
 	default:
 	}
-	return ContextErr(s.ctx.Err())
+	err := s.ctx.Err()
+	if err == nil {
+		// In closeStream and finishStream, the stream state is transitioned to
+		// streamDone before s.cancel() is invoked so that concurrent operations
+		// immediately observe the terminal state. A concurrent caller (such as
+		// write or writeHeader) can see streamDone and invoke streamContextErr
+		// before s.cancel() runs or propagates to s.ctx. Default to
+		// context.Canceled rather than passing nil to ContextErr.
+		err = context.Canceled
+	}
+	return ContextErr(err)
 }
 
 // WriteHeader sends the header metadata md back to the client.
@@ -1336,16 +1345,17 @@ func (t *http2Server) deleteStream(s *ServerStream, eosReceived bool) {
 
 // finishStream closes the stream and puts the trailing headerFrame into controlbuf.
 func (t *http2Server) finishStream(s *ServerStream, rst bool, rstCode http2.ErrCode, hdr *serverHeaders, eosReceived bool) {
-	// In case stream sending and receiving are invoked in separate
-	// goroutines (e.g., bi-directional streaming), cancel needs to be
-	// called to interrupt the potential blocking on other goroutines.
-	s.cancel()
 
 	oldState := s.swapState(streamDone)
 	if oldState == streamDone {
 		// If the stream was already done, return.
 		return
 	}
+
+	// In case stream sending and receiving are invoked in separate
+	// goroutines (e.g., bi-directional streaming), cancel needs to be
+	// called to interrupt the potential blocking on other goroutines.
+	s.cancel()
 
 	hdr.cleanup = &cleanupStream{
 		streamID: s.id,
@@ -1360,15 +1370,16 @@ func (t *http2Server) finishStream(s *ServerStream, rst bool, rstCode http2.ErrC
 
 // closeStream clears the footprint of a stream when the stream is not needed any more.
 func (t *http2Server) closeStream(s *ServerStream, rst bool, rstCode http2.ErrCode, eosReceived bool) {
+	// We can't return early even if the stream's state is "done" as the state
+	// might have been set by the `finishStream` method. Deleting the stream via
+	// `finishStream` can get blocked on flow control.
+	s.swapState(streamDone)
+
 	// In case stream sending and receiving are invoked in separate
 	// goroutines (e.g., bi-directional streaming), cancel needs to be
 	// called to interrupt the potential blocking on other goroutines.
 	s.cancel()
 
-	// We can't return early even if the stream's state is "done" as the state
-	// might have been set by the `finishStream` method. Deleting the stream via
-	// `finishStream` can get blocked on flow control.
-	s.swapState(streamDone)
 	t.deleteStream(s, eosReceived)
 
 	t.controlBuf.put(&cleanupStream{

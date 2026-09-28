@@ -386,7 +386,7 @@ func NewHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 	} else if md := imetadata.Get(addr); md != nil {
 		t.md = md
 	}
-	t.controlBuf = newControlBuffer(t.ctxDone)
+	t.controlBuf = newControlBuffer(t.ctxDone, false)
 	if opts.InitialWindowSize >= defaultWindowSize {
 		t.initialWindowSize = opts.InitialWindowSize
 	}
@@ -952,6 +952,7 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr, handler s
 			LocalAddr:   t.localAddr,
 			Compression: callHdr.SendCompress,
 			Header:      header,
+			Authority:   callHdr.Host,
 		})
 	}
 	if transportDrainRequired {
@@ -1726,9 +1727,16 @@ func (t *http2Client) reader(errCh chan<- error) {
 		atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
 	}
 
-	// loop to keep reading incoming messages on this transport.
+	// Loop to keep reading incoming messages on this transport. Never throttle
+	// the reader based on the number of items in the controlBuf. We do not
+	// expect the client to be vulnerable to a malicious server that causes the
+	// controlBuf to grow unbounded. Instead throttling the client can lead to a
+	// deadlock as the server may be throttling as well, and in that case,
+	// neither side will be able to make progress. The client is expected to be
+	// able to read incoming messages from the server at all times, and the
+	// controlBuf is expected to be drained by the loopyWriter in a timely
+	// manner.
 	for {
-		t.controlBuf.throttle()
 		frame, err := t.framer.readFrame()
 		if t.keepaliveEnabled {
 			atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())

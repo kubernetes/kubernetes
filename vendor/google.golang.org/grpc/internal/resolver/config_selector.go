@@ -54,7 +54,6 @@ type RPCConfig struct {
 	// policy or affect timeout or metadata.
 	Context      context.Context
 	MethodConfig serviceconfig.MethodConfig // configuration to use for this RPC
-	OnCommitted  func()                     // Called when the RPC has been committed (retries no longer possible)
 	Interceptor  any
 }
 
