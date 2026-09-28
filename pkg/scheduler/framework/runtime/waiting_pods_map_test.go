@@ -129,7 +129,7 @@ func TestWaitingPodConcurrentStop(t *testing.T) {
 	close(start)
 
 	succeeded := 0
-	for i := 0; i < callers; i++ {
+	for i := range callers {
 		if <-results {
 			succeeded++
 		}
