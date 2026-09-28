@@ -294,7 +294,7 @@ type SubjectAccessReviewStatus struct {
 	EvaluationError string `json:"evaluationError,omitempty" protobuf:"bytes,3,opt,name=evaluationError"`
 
 	// conditionalDecision represents a conditional decision returned by the authorizer.
-	// Mutually exclusive with allowed=true and denied=true.
+	// When conditionalDecision is set, allowed, denied, reason and evaluationError must have their zero values.
 	// The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or
 	// ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented
 	// with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone.
