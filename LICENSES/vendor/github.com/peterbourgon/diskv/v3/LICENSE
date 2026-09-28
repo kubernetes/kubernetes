@@ -1,4 +1,4 @@
-= vendor/github.com/peterbourgon/diskv licensed under: =
+= vendor/github.com/peterbourgon/diskv/v3 licensed under: =
 
 Copyright (c) 2011-2012 Peter Bourgon
 
@@ -20,4 +20,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-= vendor/github.com/peterbourgon/diskv/LICENSE f9f3e815fc84aa04c4f4db33c553eef9
+= vendor/github.com/peterbourgon/diskv/v3/LICENSE f9f3e815fc84aa04c4f4db33c553eef9
