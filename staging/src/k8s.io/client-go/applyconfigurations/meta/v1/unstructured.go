@@ -136,7 +136,9 @@ type gvkParserCache struct {
 	paths map[string]openapi.GroupVersion
 	// lastChecked is the last time paths was refreshed
 	lastChecked time.Time
-	// parsers hold one gvParser per downloaded group-version
+	// parsers hold one gvParser per downloaded group-version. Every entry
+	// matches the current paths listing: entries of group-versions that
+	// disappeared or whose schema changed are dropped when paths is refreshed.
 	parsers map[schema.GroupVersion]gvkParserCacheEntry
 }
 
@@ -156,6 +158,24 @@ func gvPathKey(gv schema.GroupVersion) string {
 	return "apis/" + gv.Group + "/" + gv.Version
 }
 
+// refreshPaths re-fetches the OpenAPI v3 discovery listing and drops the
+// parsers it invalidates: those of group-versions no longer served, and those
+// built from a schema whose hash has since changed. The caller must hold c.mu.
+func (c *gvkParserCache) refreshPaths() error {
+	paths, err := c.client.Paths()
+	if err != nil {
+		return fmt.Errorf("failed to list openapi v3 group versions: %w", err)
+	}
+	c.paths = paths
+	c.lastChecked = time.Now()
+	for gv, entry := range c.parsers {
+		if gvPath, ok := paths[gvPathKey(gv)]; !ok || entry.serverRelativeURL != gvPath.ServerRelativeURL() {
+			delete(c.parsers, gv)
+		}
+	}
+	return nil
+}
+
 // objectTypeForGVK retrieves the typed.ParseableType for a given gvk from the cache
 func (c *gvkParserCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error) {
 	c.mu.Lock()
@@ -163,19 +183,16 @@ func (c *gvkParserCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.P
 	// if the ttl on the discovery listing has expired,
 	// regenerate it to observe schema updates
 	if time.Since(c.lastChecked) > openAPISchemaTTL {
-		paths, err := c.client.Paths()
-		if err != nil {
-			return nil, fmt.Errorf("failed to list openapi v3 group versions: %w", err)
+		if err := c.refreshPaths(); err != nil {
+			return nil, err
 		}
-		c.paths = paths
-		c.lastChecked = time.Now()
 	}
 	gv := gvk.GroupVersion()
 	gvPath, ok := c.paths[gvPathKey(gv)]
 	if !ok {
 		return nil, fmt.Errorf("no openapi v3 schema found for %v", gv)
 	}
-	if entry, ok := c.parsers[gv]; ok && entry.serverRelativeURL == gvPath.ServerRelativeURL() {
+	if entry, ok := c.parsers[gv]; ok {
 		return entry.parser.typeForGVK(gvk)
 	}
 	data, err := gvPath.Schema("application/json")
