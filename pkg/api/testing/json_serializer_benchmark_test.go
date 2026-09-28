@@ -322,7 +322,8 @@ func configText(seed, n int) string {
 	var sb strings.Builder
 	sb.Grow(n + 128)
 	for line := 0; sb.Len() < n; line++ {
-		fmt.Fprintf(&sb, "service.%d.endpoint.%d = \"https://svc-%d.internal/path?a=1&b=<%d>\"  # tuned value %08x\n", seed, line, (seed*131+line)%9973, line%17, (seed+1)*(line+7)*2654435761%4294967296)
+		tunedValue := uint32(seed+1) * uint32(line+7) * uint32(2654435761)
+		fmt.Fprintf(&sb, "service.%d.endpoint.%d = \"https://svc-%d.internal/path?a=1&b=<%d>\"  # tuned value %08x\n", seed, line, (seed*131+line)%9973, line%17, tunedValue)
 	}
 	return sb.String()
 }
