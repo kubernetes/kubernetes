@@ -137,10 +137,8 @@ func TestPodGroupSchedulingWithPodAntiAffinity(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Unschedulable",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg",
-						ConditionStatus: metav1.ConditionFalse,
-						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						PodGroups: []string{"pg"},
 					},
 				},
 			},
