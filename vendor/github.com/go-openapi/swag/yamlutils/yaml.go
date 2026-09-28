@@ -248,7 +248,7 @@ func yamlScalar(node *yaml.Node) (any, error) {
 
 func yamlStringScalarC(node *yaml.Node) (string, error) {
 	if node.Kind != yaml.ScalarNode {
-		return "", fmt.Errorf("expecting a string scalar but got %q: %w", node.Kind, ErrYAML)
+		return "", fmt.Errorf("expecting a string scalar but got node.Kind(%d): %w", node.Kind, ErrYAML)
 	}
 	switch node.LongTag() {
 	case yamlStringScalar, yamlIntScalar, yamlFloatScalar:

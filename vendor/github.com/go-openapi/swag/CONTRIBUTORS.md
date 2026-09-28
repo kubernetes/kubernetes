@@ -4,11 +4,11 @@
 
 | Total Contributors | Total Contributions |
 | --- | --- |
-| 24  | 251  |
+| 24  | 272  |
 
 | Username | All Time Contribution Count | All Commits |
 | --- | --- | --- |
-| @fredbi | 121 | <https://github.com/go-openapi/swag/commits?author=fredbi> |
+| @fredbi | 142 | <https://github.com/go-openapi/swag/commits?author=fredbi> |
 | @casualjim | 98 | <https://github.com/go-openapi/swag/commits?author=casualjim> |
 | @alexandear | 4 | <https://github.com/go-openapi/swag/commits?author=alexandear> |
 | @orisano | 3 | <https://github.com/go-openapi/swag/commits?author=orisano> |
