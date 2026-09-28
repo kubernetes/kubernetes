@@ -51,10 +51,12 @@ import (
 )
 
 const (
+	acceptHeader           = "Accept"
 	contentTypeHeader      = "Content-Type"
 	contentEncodingHeader  = "Content-Encoding"
 	acceptEncodingHeader   = "Accept-Encoding"
 	processStartTimeHeader = "Process-Start-Time-Unix"
+	varyHeader             = "Vary"
 )
 
 // Compression represents the content encodings handlers support for the HTTP
@@ -70,9 +72,8 @@ const (
 func defaultCompressionFormats() []Compression {
 	if internal.NewZstdWriter != nil {
 		return []Compression{Identity, Gzip, Zstd}
-	} else {
-		return []Compression{Identity, Gzip}
 	}
+	return []Compression{Identity, Gzip}
 }
 
 var gzipPool = sync.Pool{
@@ -315,11 +316,20 @@ func HandlerForTransactional(reg prometheus.TransactionalGatherer, opts HandlerO
 			}
 		}
 
-		var contentType expfmt.Format
-		if opts.EnableOpenMetrics {
-			contentType = expfmt.NegotiateIncludingOpenMetrics(req.Header)
-		} else {
-			contentType = expfmt.Negotiate(req.Header)
+		var (
+			contentType     expfmt.Format
+			acceptedFormats = opts.AcceptedFormats
+		)
+		if len(acceptedFormats) == 0 {
+			acceptedFormats = expfmt.DefaultAcceptedFormats()
+			if opts.EnableOpenMetrics {
+				acceptedFormats = expfmt.DefaultOpenMetricsAcceptedFormats()
+			}
+		}
+		contentType = expfmt.NegotiateAccept(req.Header, acceptedFormats...)
+		rsp.Header().Add(varyHeader, acceptHeader)
+		if len(compressions) > 0 {
+			rsp.Header().Add(varyHeader, acceptEncodingHeader)
 		}
 		rsp.Header().Set(contentTypeHeader, string(contentType))
 
@@ -372,12 +382,15 @@ func HandlerForTransactional(reg prometheus.TransactionalGatherer, opts HandlerO
 			return false
 		}
 
-		// Build metric name filter set from query params (if any)
+		// Build metric name filter set from query params (if any). The URL
+		// can be nil on hand-constructed requests.
 		var metricFilter map[string]struct{}
-		if metricNames := req.URL.Query()["name[]"]; len(metricNames) > 0 {
-			metricFilter = make(map[string]struct{}, len(metricNames))
-			for _, name := range metricNames {
-				metricFilter[name] = struct{}{}
+		if req.URL != nil {
+			if metricNames := req.URL.Query()["name[]"]; len(metricNames) > 0 {
+				metricFilter = make(map[string]struct{}, len(metricNames))
+				for _, name := range metricNames {
+					metricFilter[name] = struct{}{}
+				}
 			}
 		}
 
@@ -595,6 +608,8 @@ type HandlerOpts struct {
 	// a trailing ".0" if they would otherwise look like integer numbers
 	// (which changes the identity of the resulting series on the Prometheus
 	// server).
+	//
+	// Note that setting AcceptedFormats overrides this option.
 	EnableOpenMetrics bool
 	// EnableOpenMetricsTextCreatedSamples specifies if this handler should add, extra, synthetic
 	// Created Timestamps for counters, histograms and summaries, which for the current
@@ -619,6 +634,18 @@ type HandlerOpts struct {
 	// NOTE: This feature is experimental and not covered by OpenMetrics or Prometheus
 	// exposition format.
 	ProcessStartTime time.Time
+	// AcceptedFormats allows customizing the formats the handler will negotiate
+	// with the client based on the request's Accept header.
+	// The client's Accept header and q-values take precedence, but the order of
+	// formats in AcceptedFormats specifies the server's preference order used as a
+	// tie-breaker (e.g. for wildcard "*/*" requests or equal q-values) and fallback.
+	// If empty, the default set is used (expfmt.DefaultAcceptedFormats()).
+	// If empty and EnableOpenMetrics is true, stable OpenMetrics formats are negotiated
+	// (expfmt.DefaultOpenMetricsAcceptedFormats()).
+	// This is useful for testing experimental formats (e.g. OpenMetrics 2.0)
+	// or restricting the formats you want to allow.
+	// Using EnableOpenMetrics with an empty AcceptedFormats is still the recommended option for the majority of cases.
+	AcceptedFormats []expfmt.Format
 }
 
 // httpError removes any content-encoding header and then calls http.Error with

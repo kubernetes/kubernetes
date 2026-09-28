@@ -20,7 +20,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // A NetSockstat contains the output of /proc/net/sockstat{,6} for IPv4 or IPv6,
@@ -60,7 +60,7 @@ func (fs FS) NetSockstat6() (*NetSockstat, error) {
 // readSockstat opens and parses a NetSockstat from the input file.
 func readSockstat(name string) (*NetSockstat, error) {
 	// This file is small and can be read with one syscall.
-	b, err := util.ReadFileNoStat(name)
+	b, err := parsers.ReadFileNoStat(name)
 	if err != nil {
 		// Do not wrap this error so the caller can detect os.IsNotExist and
 		// similar conditions.
@@ -124,7 +124,7 @@ func parseSockstatKVs(kvs []string) (map[string]int, error) {
 	// Iterate two values at a time to gather key/value pairs.
 	out := make(map[string]int, len(kvs)/2)
 	for i := 0; i < len(kvs); i += 2 {
-		vp := util.NewValueParser(kvs[i+1])
+		vp := parsers.NewValueParser(kvs[i+1])
 		out[kvs[i]] = vp.Int()
 
 		if err := vp.Err(); err != nil {
