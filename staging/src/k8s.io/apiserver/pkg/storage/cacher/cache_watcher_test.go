@@ -299,7 +299,9 @@ func TestResourceVersionAfterInitEvents(t *testing.T) {
 
 	for i := 0; i < numObjects; i++ {
 		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod-%d", i), uint64(i)))
-		store.Add(elem)
+		if _, err := store.UpdateStore(watch.Added, elem, uint64(i)); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	wci, err := newCacheIntervalFromStore(numObjects, store, "", false)

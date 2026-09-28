@@ -79,16 +79,11 @@ func (s *btreeStore) GetByKey(key string) (item interface{}, exists bool, err er
 	return s.getByKey(key)
 }
 
-func (s *btreeStore) Replace(objs []interface{}, _ string) error {
+func (s *btreeStore) Replace(objs []*Element) {
 	s.tree.Clear(false)
-	for _, obj := range objs {
-		storeElem, ok := obj.(*Element)
-		if !ok {
-			return fmt.Errorf("obj not a storeElement: %#v", obj)
-		}
+	for _, storeElem := range objs {
 		s.addOrUpdateElem(storeElem)
 	}
-	return nil
 }
 
 // addOrUpdateLocked assumes a lock is held and is used for Add

@@ -56,13 +56,9 @@ func (i *indexer) ByIndex(indexName, indexValue string) ([]interface{}, error) {
 	return list, nil
 }
 
-func (i *indexer) Replace(objs []interface{}, resourceVersion string) error {
+func (i *indexer) Replace(objs []*Element) error {
 	i.indices = map[string]map[string]map[string]*Element{}
-	for _, obj := range objs {
-		storeElem, ok := obj.(*Element)
-		if !ok {
-			return fmt.Errorf("obj not a storeElement: %#v", obj)
-		}
+	for _, storeElem := range objs {
 		err := i.updateElem(storeElem.Key, nil, storeElem)
 		if err != nil {
 			return err

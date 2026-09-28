@@ -21,17 +21,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 func TestStoreListOrdered(t *testing.T) {
 	store := NewWatchCacheStorage(nil, nil)
-	prev, err := store.Add(testStorageElement("foo3", "bar3", 1))
+	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo3", "bar3", 1), 1)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
-	prev, err = store.Add(testStorageElement("foo1", "bar2", 2))
+	prev, err = store.UpdateStore(watch.Added, testStorageElement("foo1", "bar2", 2), 2)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
-	prev, err = store.Add(testStorageElement("foo2", "bar1", 3))
+	prev, err = store.UpdateStore(watch.Added, testStorageElement("foo2", "bar1", 3), 3)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
 	assert.Equal(t, []interface{}{
@@ -43,16 +45,16 @@ func TestStoreListOrdered(t *testing.T) {
 
 func TestStoreListPrefix(t *testing.T) {
 	store := NewWatchCacheStorage(nil, nil)
-	prev, err := store.Add(testStorageElement("foo3", "bar3", 1))
+	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo3", "bar3", 1), 1)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
-	prev, err = store.Add(testStorageElement("foo1", "bar2", 2))
+	prev, err = store.UpdateStore(watch.Added, testStorageElement("foo1", "bar2", 2), 2)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
-	prev, err = store.Add(testStorageElement("foo2", "bar1", 3))
+	prev, err = store.UpdateStore(watch.Added, testStorageElement("foo2", "bar1", 3), 3)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
-	prev, err = store.Add(testStorageElement("bar", "baz", 4))
+	prev, err = store.UpdateStore(watch.Added, testStorageElement("bar", "baz", 4), 4)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
 

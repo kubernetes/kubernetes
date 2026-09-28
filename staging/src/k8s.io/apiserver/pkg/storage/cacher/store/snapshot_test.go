@@ -21,6 +21,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 func TestSnapshotListPrefix(t *testing.T) {
@@ -44,8 +46,8 @@ func TestSnapshotListPrefix(t *testing.T) {
 			name: "Indexer",
 			newSnapshot: func(t *testing.T) Snapshot {
 				indexer := NewWatchCacheStorage(nil, nil)
-				for _, elem := range elements {
-					prev, err := indexer.Add(elem)
+				for i, elem := range elements {
+					prev, err := indexer.UpdateStore(watch.Added, elem, uint64(i+1))
 					require.NoError(t, err)
 					assert.Nil(t, prev)
 				}

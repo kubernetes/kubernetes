@@ -400,7 +400,9 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 			Key:             elem.Key,
 			ResourceVersion: rv,
 		}
-		store.Add(elem)
+		if _, err := store.UpdateStore(watch.Added, elem, rv); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	wci, err := newCacheIntervalFromStore(rv, store, "", false)
@@ -453,7 +455,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 			for i := n - 1; i >= 0; i-- {
 				key := fmt.Sprintf("pod-%08d", i)
 				elem := makeTestStoreElement(makeTestPod(key, uint64(i)))
-				_, err := tc.indexer.Add(elem)
+				_, err := tc.indexer.UpdateStore(watch.Added, elem, uint64(i))
 				if err != nil {
 					t.Fatal(err)
 				}
