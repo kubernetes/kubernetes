@@ -1,0 +1,127 @@
+# Benchmark suite for Preemption Queue Stress and sustained multi-victim churn testing.
+# Evaluates scheduler activeQ, backoffQ, and unschedulablePods stability,
+# memory allocation profiles, heap stability, and queue latency under continuous preemption load.
+#
+# Labels:
+# - integration-test: test cases to run as fast integration tests (small scale, e.g. 5 nodes).
+# - performance: test cases to run in full scale benchmarks (100 to 1000 nodes).
+# - short: short execution time test cases.
+
+- name: PreemptionQueueChurnStress
+  metricsCollectorConfig:
+    metrics:
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+      scheduler_queue_incoming_pods_total:
+      - label: event
+        values: [ScheduleAttemptFailure, AssignedPodAdd, BackoffComplete, UnscheduledPodAdd, ForceActivate]
+      - label: queue
+        values: [active, backoff, unschedulable]
+      scheduler_framework_extension_point_duration_seconds:
+      - label: extension_point
+        values: [PreFilter, Filter, PostFilter, Permit]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: churn-stress
+    count: 1
+  - opcode: createPods
+    countParam: $victimPods
+    podTemplatePath: templates/pod-victim.yaml
+    namespace: churn-stress-0
+  - opcode: churn
+    mode: recreate
+    number: 600
+    intervalMilliseconds: 100
+    namespace: churn-stress-0
+    templatePaths:
+    - templates/pod-churn.yaml
+  - opcode: createPods
+    countParam: $preemptorPods
+    podTemplatePath: templates/pod-preemptor.yaml
+    namespace: churn-stress-0
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes_SustainedChurn
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      victimPods: 20
+      preemptorPods: 5
+  - name: 100Nodes_SustainedChurn
+    labels: [performance]
+    params:
+      initNodes: 100
+      victimPods: 400
+      preemptorPods: 100
+  - name: 500Nodes_SustainedChurn
+    labels: [performance]
+    params:
+      initNodes: 500
+      victimPods: 2000
+      preemptorPods: 500
+  - name: 1000Nodes_SustainedChurn
+    labels: [performance]
+    params:
+      initNodes: 1000
+      victimPods: 4000
+      preemptorPods: 1000
+
+- name: PreemptionMultiVictimWaveStress
+  metricsCollectorConfig:
+    metrics:
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+      scheduler_queue_incoming_pods_total:
+      - label: event
+        values: [ScheduleAttemptFailure, AssignedPodAdd, BackoffComplete, UnscheduledPodAdd, ForceActivate]
+      - label: queue
+        values: [active, backoff, unschedulable]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: wave-stress
+    count: 1
+  - opcode: createPods
+    countParam: $victimPods
+    podTemplatePath: templates/pod-victim.yaml
+    namespace: wave-stress-0
+  - opcode: createPods
+    countParam: $preemptorPods
+    podTemplatePath: templates/pod-preemptor.yaml
+    namespace: wave-stress-0
+    collectMetrics: true
+  - opcode: createPods
+    countParam: $victimPods
+    podTemplatePath: templates/pod-victim.yaml
+    namespace: wave-stress-0
+  - opcode: createPods
+    countParam: $preemptorPods
+    podTemplatePath: templates/pod-preemptor.yaml
+    namespace: wave-stress-0
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes_MultiVictimWaves
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      victimPods: 20
+      preemptorPods: 5
+  - name: 100Nodes_MultiVictimWaves
+    labels: [performance]
+    params:
+      initNodes: 100
+      victimPods: 400
+      preemptorPods: 100
+  - name: 500Nodes_MultiVictimWaves
+    labels: [performance]
+    params:
+      initNodes: 500
+      victimPods: 2000
+      preemptorPods: 500
