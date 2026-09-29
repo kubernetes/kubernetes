@@ -1891,7 +1891,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			baselineCPUs:  cpuset.New(7),
 			numCPUs:       3,
 			expErr:        "",
-			expResult:     mustParseCPUSet(t, "0,1,7"),
+			expResult:     mustParseCPUSet(t, "0,3,7"),
 		},
 		{
 			description:   "Scale-up: 1 to 3 CPUs with spread, distribute across cores in the socket with availableCPUs from dual socket with HT",
@@ -1902,7 +1902,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			baselineCPUs:  cpuset.New(11),
 			numCPUs:       3,
 			expErr:        "",
-			expResult:     mustParseCPUSet(t, "1,3,11"),
+			expResult:     mustParseCPUSet(t, "1,5,11"),
 		},
 		{
 			description:   "Scale-up: 1 to 6 CPUs with spread, take the full socket with availableCPUs from dual socket with HT",
@@ -1949,7 +1949,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			baselineCPUs:  cpuset.New(39),
 			numCPUs:       8,
 			expErr:        "",
-			expResult:     mustParseCPUSet(t, "20-26,39"),
+			expResult:     mustParseCPUSet(t, "20-25,39,79"),
 		},
 		// Socket 0 (NUMA0+NUMA1) is fully available.
 		// Socket 1 (NUMA2+NUMA3) has allocatedCPUs CPU 39. NUMA3 is partially consumed (CPUs 70-79 unavailable).
@@ -1981,7 +1981,23 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			baselineCPUs:  cpuset.New(60),
 			numCPUs:       4,
 			expErr:        "",
-			expResult:     mustParseCPUSet(t, "3,4,11,60"),
+			expResult:     mustParseCPUSet(t, "51,52,60,120"),
+		},
+		// topoTripleSocketHT is enumerated core-major (sibling threads are adjacent):
+		// core0={0,1}, core1={2,3}, core2={4,5} in socket1; core3={6,7}, core4={8,9},
+		// core5={10,11} in socket0; core6={12,13}, core7={14,15}, core8={16,17} in socket2.
+		// Retain full core2 ({4,5}) in socket1 and scale up by 2 CPUs with spread: the 2 new CPUs
+		// must land on two distinct cores (0 from core0, 2 from core1).
+		{
+			description:   "Scale-up: 2 to 4 CPUs with spread, distribute across distinct cores on core-major triple socket with HT",
+			topo:          topoTripleSocketHT,
+			opts:          StaticPolicyOptions{DistributeCPUsAcrossCores: true},
+			availableCPUs: mustParseCPUSet(t, "0-17"),
+			allocatedCPUs: cpuset.New(4, 5),
+			baselineCPUs:  cpuset.New(4, 5),
+			numCPUs:       4,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "0,2,4,5"),
 		},
 		// PreferAlignByUncoreCacheOption for resize:
 		// Step 1: Take full UncoreCaches - prefer the UncoreCache containing allocatedCPUs first, then other full UncoreCaches
@@ -2133,7 +2149,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			baselineCPUs:  cpuset.New(0),
 			numCPUs:       3,
 			expErr:        "",
-			expResult:     cpuset.New(0, 2, 3),
+			expResult:     cpuset.New(0, 2, 4),
 		},
 		{
 			description:   "Scale-down: 6 to 4 CPUs, take baselineCPUs first, other CPUs distribute across cores from dual socket with HT, spread",
