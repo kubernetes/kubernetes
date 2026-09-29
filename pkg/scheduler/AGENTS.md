@@ -118,6 +118,8 @@ The scheduling framework (`pkg/scheduler/framework/`) provides an extension poin
 ## 5. Backend Subsystem Details
 
 ### 5.1 Scheduling Queue (`pkg/scheduler/backend/queue/`)
+*For detailed queuing architecture, lock discipline, move request triggers, and testing strategies, see [queue/AGENTS.md](backend/queue/AGENTS.md).*
+
 - **`activeQ`**: Heap storing pods ready to be scheduled, sorted by `QueueSortPlugin.Less`.
 - **`backoffQ`**: Heap storing pods that failed scheduling, waiting for their backoff duration (`DefaultPodInitialBackoffDuration` to `DefaultPodMaxBackoffDuration`).
 - **`unschedulablePods`**: Map of pods waiting for cluster events (e.g., node added, pod finished, PVC created).
