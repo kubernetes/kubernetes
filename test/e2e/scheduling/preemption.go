@@ -30,12 +30,14 @@ import (
 	"github.com/google/uuid"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -308,6 +310,171 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 		if !podPreempted {
 			framework.Failf("expected pod to be preempted, instead got pod %+v and error %v", preemptedPod, err)
 		}
+	})
+
+	/*
+		Testname: Scheduler, PodDisruptionBudget compliance with empty selector across namespaces
+		Description: When an empty selector PodDisruptionBudget protects all workloads in a namespace,
+		including unlabeled pods, the scheduler MUST respect disruption budgets during preemption:
+		1. When budget is exhausted (minAvailable == total), lower-priority pods covered by the empty selector
+		   PDB must not be disrupted, and higher-priority workloads in other namespaces without PDBs are preempted instead.
+		2. When disruption budget becomes available, preemption proceeds against the lower-priority unlabeled pods.
+	*/
+	framework.It("validates PodDisruptionBudget compliance and empty selector protection across namespaces during preemption", func(ctx context.Context) {
+		ginkgo.By("Selecting a node and advertising extended resources")
+		node := nodeList.Items[0]
+		e2enode.AddExtendedResource(ctx, cs, node.Name, testExtendedResource, resource.MustParse("10"))
+
+		nsA := f.Namespace.Name
+		nsBObj, err := f.CreateNamespace(ctx, f.BaseName+"-pdb-b", nil)
+		framework.ExpectNoError(err)
+		nsB := nsBObj.Name
+
+		testNodeAffinity := &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchFields: []v1.NodeSelectorRequirement{
+								{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		twoRes := v1.ResourceList{testExtendedResource: resource.MustParse("2")}
+		twoResReq := &v1.ResourceRequirements{Requests: twoRes, Limits: twoRes}
+
+		ginkgo.By("Creating 2 unlabeled low-priority pods in namespace A")
+		lowPodA1 := createPausePod(ctx, f, pausePodConfig{
+			Name:              "unlabeled-low-pod-a1",
+			Namespace:         nsA,
+			PriorityClassName: lowPriorityClassName,
+			Resources:         twoResReq,
+			Affinity:          testNodeAffinity,
+		})
+		lowPodA2 := createPausePod(ctx, f, pausePodConfig{
+			Name:              "unlabeled-low-pod-a2",
+			Namespace:         nsA,
+			PriorityClassName: lowPriorityClassName,
+			Resources:         twoResReq,
+			Affinity:          testNodeAffinity,
+		})
+
+		ginkgo.By("Creating 2 medium-priority pods in namespace B")
+		midPodB1 := createPausePod(ctx, f, pausePodConfig{
+			Name:              "mid-pod-b1",
+			Namespace:         nsB,
+			PriorityClassName: mediumPriorityClassName,
+			Resources:         twoResReq,
+			Affinity:          testNodeAffinity,
+		})
+		midPodB2 := createPausePod(ctx, f, pausePodConfig{
+			Name:              "mid-pod-b2",
+			Namespace:         nsB,
+			PriorityClassName: mediumPriorityClassName,
+			Resources:         twoResReq,
+			Affinity:          testNodeAffinity,
+		})
+
+		ginkgo.By("Creating 1 high-priority filler pod in namespace A to exhaust node capacity")
+		fillerPod := createPausePod(ctx, f, pausePodConfig{
+			Name:              "filler-pod",
+			Namespace:         nsA,
+			PriorityClassName: highPriorityClassName,
+			Resources:         twoResReq,
+			Affinity:          testNodeAffinity,
+		})
+
+		ginkgo.By("Waiting for existing pods to be running")
+		for _, p := range []*v1.Pod{lowPodA1, lowPodA2, midPodB1, midPodB2, fillerPod} {
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, p))
+		}
+
+		ginkgo.By("Creating an empty selector PodDisruptionBudget in namespace A with minAvailable=3")
+		minAvail3 := intstr.FromInt32(3)
+		pdbA := &policyv1.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "empty-selector-pdb-a",
+				Namespace: nsA,
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				MinAvailable: &minAvail3,
+				Selector:     &metav1.LabelSelector{},
+			},
+		}
+		pdbA, err = cs.PolicyV1().PodDisruptionBudgets(nsA).Create(ctx, pdbA, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for PDB status to reflect 3 healthy pods and 0 disruptions allowed")
+		err = wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
+			curPDB, err := cs.PolicyV1().PodDisruptionBudgets(nsA).Get(ctx, pdbA.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return curPDB.Status.CurrentHealthy == 3 && curPDB.Status.DisruptionsAllowed == 0, nil
+		})
+		framework.ExpectNoError(err, "PDB in namespace A failed to stabilize with 0 disruptions allowed")
+
+		ginkgo.By("Creating high-priority preemptor1 in namespace A; it should preempt a medium-priority pod from namespace B rather than violate PDB on lower-priority pods in namespace A")
+		preemptor1 := createPausePod(ctx, f, pausePodConfig{
+			Name:              "preemptor1",
+			Namespace:         nsA,
+			PriorityClassName: highPriorityClassName,
+			Resources:         twoResReq,
+			Affinity:          testNodeAffinity,
+		})
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, preemptor1))
+
+		ginkgo.By("Verifying low-priority pods in namespace A were protected and not preempted")
+		for _, pod := range []*v1.Pod{lowPodA1, lowPodA2, fillerPod} {
+			livePod, err := cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil(), fmt.Sprintf("expected pod %s/%s to remain un-preempted", pod.Namespace, pod.Name))
+		}
+
+		ginkgo.By("Verifying at least one medium-priority pod in namespace B was preempted")
+		b1, err1 := cs.CoreV1().Pods(nsB).Get(ctx, midPodB1.Name, metav1.GetOptions{})
+		b2, err2 := cs.CoreV1().Pods(nsB).Get(ctx, midPodB2.Name, metav1.GetOptions{})
+		b1Preempted := (err1 != nil && apierrors.IsNotFound(err1)) || (err1 == nil && b1.DeletionTimestamp != nil)
+		b2Preempted := (err2 != nil && apierrors.IsNotFound(err2)) || (err2 == nil && b2.DeletionTimestamp != nil)
+		gomega.Expect(b1Preempted || b2Preempted).To(gomega.BeTrue(), "expected at least one medium-priority pod in namespace B to be preempted")
+
+		ginkgo.By("Updating PDB in namespace A to minAvailable=2 so disruption budget becomes available")
+		curPDB, err := cs.PolicyV1().PodDisruptionBudgets(nsA).Get(ctx, pdbA.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		minAvail2 := intstr.FromInt32(2)
+		curPDB.Spec.MinAvailable = &minAvail2
+		_, err = cs.PolicyV1().PodDisruptionBudgets(nsA).Update(ctx, curPDB, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+
+		err = wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
+			p, err := cs.PolicyV1().PodDisruptionBudgets(nsA).Get(ctx, pdbA.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return p.Status.DisruptionsAllowed >= 1, nil
+		})
+		framework.ExpectNoError(err, "PDB in namespace A failed to reflect available disruption budget")
+
+		ginkgo.By("Creating high-priority preemptor2 in namespace A; it should now preempt a low-priority unlabeled pod in namespace A")
+		preemptor2 := createPausePod(ctx, f, pausePodConfig{
+			Name:              "preemptor2",
+			Namespace:         nsA,
+			PriorityClassName: highPriorityClassName,
+			Resources:         twoResReq,
+			Affinity:          testNodeAffinity,
+		})
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, preemptor2))
+
+		ginkgo.By("Verifying that a low-priority pod in namespace A was preempted")
+		a1, errA1 := cs.CoreV1().Pods(nsA).Get(ctx, lowPodA1.Name, metav1.GetOptions{})
+		a2, errA2 := cs.CoreV1().Pods(nsA).Get(ctx, lowPodA2.Name, metav1.GetOptions{})
+		a1Preempted := (errA1 != nil && apierrors.IsNotFound(errA1)) || (errA1 == nil && a1.DeletionTimestamp != nil)
+		a2Preempted := (errA2 != nil && apierrors.IsNotFound(errA2)) || (errA2 == nil && a2.DeletionTimestamp != nil)
+		gomega.Expect(a1Preempted || a2Preempted).To(gomega.BeTrue(), "expected at least one low-priority pod in namespace A to be preempted when PDB budget is available")
 	})
 
 	/*

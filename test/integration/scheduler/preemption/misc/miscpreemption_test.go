@@ -25,10 +25,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	policy "k8s.io/api/policy/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -608,6 +610,36 @@ func mkMinAvailablePDB(name, namespace string, uid types.UID, minAvailable int, 
 	}
 }
 
+func mkEmptySelectorMinAvailablePDB(name, namespace string, uid types.UID, minAvailable int) *policy.PodDisruptionBudget {
+	intMinAvailable := intstr.FromInt32(int32(minAvailable))
+	return &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       uid,
+		},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MinAvailable: &intMinAvailable,
+			Selector:     &metav1.LabelSelector{},
+		},
+	}
+}
+
+func mkEmptySelectorMaxUnavailablePDB(name, namespace string, uid types.UID, maxUnavailable int) *policy.PodDisruptionBudget {
+	intMaxUnavailable := intstr.FromInt32(int32(maxUnavailable))
+	return &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       uid,
+		},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MaxUnavailable: &intMaxUnavailable,
+			Selector:       &metav1.LabelSelector{},
+		},
+	}
+}
+
 func addPodConditionReady(pod *v1.Pod) {
 	pod.Status = v1.PodStatus{
 		Phase: v1.PodRunning,
@@ -799,6 +831,163 @@ func TestPDBInPreemption(t *testing.T) {
 			// The third node is chosen because PDB is not violated for node 3 and the victims have lower priority than node-2.
 			preemptedPodIndexes: map[int]struct{}{4: {}, 5: {}, 6: {}},
 		},
+		{
+			name:    "Preemption prefers non-violating pod over unlabeled pods protected by empty selector PDB when budget is exhausted",
+			nodeCnt: 1,
+			pdbs: []*policy.PodDisruptionBudget{
+				mkEmptySelectorMinAvailablePDB("empty-pdb-1", testCtx.NS.Name, types.UID("empty-pdb-1-uid"), 2),
+			},
+			pdbPodNum: []int32{2},
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "unlabeled-low-pod1",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "unlabeled-low-pod2",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "other-ns-mid-pod3",
+					Namespace: testCtx.NS.Name + "-other",
+					Priority:  &mediumPriority,
+					Resources: defaultPodRes,
+				}),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: testCtx.NS.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{2: {}},
+		},
+		{
+			name:    "Preemption proceeds against unlabeled pods when empty selector PDB has available disruption budget",
+			nodeCnt: 1,
+			pdbs: []*policy.PodDisruptionBudget{
+				mkEmptySelectorMinAvailablePDB("empty-pdb-avail", testCtx.NS.Name, types.UID("empty-pdb-avail-uid"), 1),
+			},
+			pdbPodNum: []int32{2},
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "unlabeled-low-pod1",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+					},
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "unlabeled-low-pod2",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+					},
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "other-ns-mid-pod3",
+					Namespace: testCtx.NS.Name + "-other",
+					Priority:  &mediumPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+					},
+				}),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: testCtx.NS.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{0: {}},
+		},
+		{
+			name:    "A node without empty selector PDB violating unlabeled pods is preferred for preemption",
+			nodeCnt: 2,
+			pdbs: []*policy.PodDisruptionBudget{
+				mkEmptySelectorMinAvailablePDB("empty-pdb-node", testCtx.NS.Name, types.UID("empty-pdb-node-uid"), 1),
+			},
+			pdbPodNum: []int32{1},
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "unlabeled-low-pod1",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+					NodeName:  "node-1",
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "other-ns-mid-pod2",
+					Namespace: testCtx.NS.Name + "-other",
+					Priority:  &mediumPriority,
+					NodeName:  "node-2",
+					Resources: defaultPodRes,
+				}),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: testCtx.NS.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{1: {}},
+		},
+		{
+			name:    "Preemption honors maxUnavailable: 0 empty selector PDB protecting all unlabeled pods in namespace",
+			nodeCnt: 1,
+			pdbs: []*policy.PodDisruptionBudget{
+				mkEmptySelectorMaxUnavailablePDB("empty-pdb-max-unavail", testCtx.NS.Name, types.UID("empty-pdb-max-unavail-uid"), 0),
+			},
+			pdbPodNum: []int32{2},
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "unlabeled-low-pod1",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "unlabeled-low-pod2",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "other-ns-mid-pod3",
+					Namespace: testCtx.NS.Name + "-other",
+					Priority:  &mediumPriority,
+					Resources: defaultPodRes,
+				}),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: testCtx.NS.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{2: {}},
+		},
 	}
 
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
@@ -809,6 +998,25 @@ func TestPDBInPreemption(t *testing.T) {
 						features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
 						features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
 					})
+
+					namespaces := sets.New[string](testCtx.NS.Name)
+					for _, p := range test.existingPods {
+						if p.Namespace != "" {
+							namespaces.Insert(p.Namespace)
+						}
+					}
+					for _, pdb := range test.pdbs {
+						if pdb.Namespace != "" {
+							namespaces.Insert(pdb.Namespace)
+						}
+					}
+					for ns := range namespaces {
+						if ns != testCtx.NS.Name {
+							if _, err := cs.CoreV1().Namespaces().Create(testCtx.Ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+								t.Fatalf("Failed to create namespace %v: %v", ns, err)
+							}
+						}
+					}
 
 					for i := 1; i <= test.nodeCnt; i++ {
 						nodeName := fmt.Sprintf("node-%v", i)
@@ -827,7 +1035,11 @@ func TestPDBInPreemption(t *testing.T) {
 						}
 						// Add pod condition ready so that PDB is updated.
 						addPodConditionReady(p)
-						if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, p, metav1.UpdateOptions{}); err != nil {
+						ns := p.Namespace
+						if ns == "" {
+							ns = testCtx.NS.Name
+						}
+						if _, err := testCtx.ClientSet.CoreV1().Pods(ns).UpdateStatus(testCtx.Ctx, p, metav1.UpdateOptions{}); err != nil {
 							t.Fatal(err)
 						}
 					}
@@ -838,7 +1050,11 @@ func TestPDBInPreemption(t *testing.T) {
 
 					// Create PDBs.
 					for _, pdb := range test.pdbs {
-						_, err := testCtx.ClientSet.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).Create(testCtx.Ctx, pdb, metav1.CreateOptions{})
+						ns := pdb.Namespace
+						if ns == "" {
+							ns = testCtx.NS.Name
+						}
+						_, err := testCtx.ClientSet.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx.Ctx, pdb, metav1.CreateOptions{})
 						if err != nil {
 							t.Fatalf("Failed to create PDB: %v", err)
 						}
@@ -876,8 +1092,10 @@ func TestPDBInPreemption(t *testing.T) {
 					// Cleanup
 					pods = append(pods, preemptor)
 					testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
-					if err := cs.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
-						t.Errorf("error while deleting PDBs, error: %v", err)
+					for ns := range namespaces {
+						if err := cs.PolicyV1().PodDisruptionBudgets(ns).DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+							t.Errorf("error while deleting PDBs in %s, error: %v", ns, err)
+						}
 					}
 					if err := cs.CoreV1().Nodes().DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
 						t.Errorf("error whiling deleting nodes, error: %v", err)
