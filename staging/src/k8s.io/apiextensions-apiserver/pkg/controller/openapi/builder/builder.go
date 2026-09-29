@@ -546,7 +546,7 @@ func (b *builder) getOpenAPIConfig() *common.Config {
 				},
 			},
 		},
-		GetOperationIDAndTags: openapi.GetOperationIDAndTags,
+		GetOperationIDAndTagsFromRoute: openapi.GetOperationIDAndTagsFromRoute,
 		GetDefinitionName: func(name string) (string, spec.Extensions) {
 			buildDefinitions.Do(generateBuildDefinitionsFunc)
 			return namer.GetDefinitionName(name)
@@ -580,7 +580,7 @@ func (b *builder) getOpenAPIV3Config() *common.OpenAPIV3Config {
 				},
 			},
 		},
-		GetOperationIDAndTags: openapi.GetOperationIDAndTags,
+		GetOperationIDAndTagsFromRoute: openapi.GetOperationIDAndTagsFromRoute,
 		GetDefinitionName: func(name string) (string, spec.Extensions) {
 			buildDefinitions.Do(generateBuildDefinitionsFunc)
 			return namer.GetDefinitionName(name)
