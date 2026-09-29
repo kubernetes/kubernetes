@@ -7645,3 +7645,229 @@ exit 0
 		})
 	})
 })
+
+var _ = SIGDescribe("Parallel Container Operations", framework.WithFeatureGate(features.KubeletParallelContainerOps), func() {
+	f := framework.NewDefaultFramework("parallel-container-ops-test")
+	addAfterEachForCleaningUpPods(f)
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.It("should start regular containers in parallel with slow PostStart hooks while preserving InitContainer start/stop ordering", func(ctx context.Context) {
+		init1 := "init-1"
+		init2 := "init-2"
+		sidecar1 := "sidecar-1"
+		regular1 := "regular-1"
+		regular2 := "regular-2"
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "parallel-startup-with-init-and-sidecar",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				InitContainers: []v1.Container{
+					{
+						Name:  init1,
+						Image: defaultImage,
+						Command: ExecCommand(init1, execCommand{
+							Delay:    1,
+							ExitCode: 0,
+						}),
+					},
+					{
+						Name:  init2,
+						Image: defaultImage,
+						Command: ExecCommand(init2, execCommand{
+							Delay:    1,
+							ExitCode: 0,
+						}),
+					},
+					{
+						Name:          sidecar1,
+						Image:         defaultImage,
+						RestartPolicy: &containerRestartPolicyAlways,
+						Command: ExecCommand(sidecar1, execCommand{
+							Delay:    30,
+							ExitCode: 0,
+						}),
+						Lifecycle: &v1.Lifecycle{
+							PostStart: &v1.LifecycleHandler{
+								Exec: &v1.ExecAction{
+									Command: ExecCommand(prefixedName(PostStartPrefix, sidecar1), execCommand{
+										Delay:         2,
+										ExitCode:      0,
+										ContainerName: sidecar1,
+									}),
+								},
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  regular1,
+						Image: defaultImage,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:    15,
+							ExitCode: 0,
+						}),
+						Lifecycle: &v1.Lifecycle{
+							PostStart: &v1.LifecycleHandler{
+								Exec: &v1.ExecAction{
+									Command: ExecCommand(prefixedName(PostStartPrefix, regular1), execCommand{
+										Delay:         10,
+										ExitCode:      0,
+										ContainerName: regular1,
+									}),
+								},
+							},
+						},
+					},
+					{
+						Name:  regular2,
+						Image: defaultImage,
+						Command: ExecCommand(regular2, execCommand{
+							Delay:    2,
+							ExitCode: 0,
+						}),
+					},
+				},
+			},
+		}
+
+		preparePod(pod)
+
+		client := e2epod.NewPodClient(f)
+		pod = client.Create(ctx, pod)
+
+		ginkgo.By("Waiting for the pod to finish")
+		err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, 2*time.Minute)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Parsing container lifecycle output")
+		pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		results := parseOutput(ctx, f, pod)
+
+		ginkgo.By("Verifying guaranteed sequential startup ordering of InitContainers and sidecars")
+		framework.ExpectNoError(results.StartsBefore(init1, init2))
+		framework.ExpectNoError(results.ExitsBefore(init1, init2))
+		framework.ExpectNoError(results.StartsBefore(init2, sidecar1))
+		framework.ExpectNoError(results.ExitsBefore(init2, sidecar1))
+		framework.ExpectNoError(results.ExitsBefore(prefixedName(PostStartPrefix, sidecar1), regular1))
+		framework.ExpectNoError(results.ExitsBefore(prefixedName(PostStartPrefix, sidecar1), regular2))
+
+		ginkgo.By("Verifying regular-2 starts and finishes in parallel while regular-1 PostStart is still running")
+		framework.ExpectNoError(results.RunTogether(prefixedName(PostStartPrefix, regular1), regular2))
+		framework.ExpectNoError(results.ExitsBefore(regular2, prefixedName(PostStartPrefix, regular1)))
+
+		ginkgo.By("Verifying regular containers exit before sidecar container terminates")
+		framework.ExpectNoError(results.ExitsBefore(regular1, sidecar1))
+		framework.ExpectNoError(results.ExitsBefore(regular2, sidecar1))
+	})
+
+	ginkgo.It("should terminate and restart containers in parallel with slow PreStop hooks and sidecar restarts", func(ctx context.Context) {
+		sidecar1 := "sidecar-1"
+		regular1 := "regular-1"
+		regular2 := "regular-2"
+		updatedImage := alternateImage
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "parallel-termination-prestop-and-sidecar-restart",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				InitContainers: []v1.Container{
+					{
+						Name:          sidecar1,
+						Image:         defaultImage,
+						RestartPolicy: &containerRestartPolicyAlways,
+						Command: ExecCommand(sidecar1, execCommand{
+							Delay:    60,
+							ExitCode: 0,
+						}),
+						Lifecycle: &v1.Lifecycle{
+							PostStart: startedPostStartGate(),
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  regular1,
+						Image: defaultImage,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:    60,
+							ExitCode: 0,
+						}),
+						Lifecycle: &v1.Lifecycle{
+							PostStart: startedPostStartGate(),
+							PreStop: &v1.LifecycleHandler{
+								Exec: &v1.ExecAction{
+									Command: ExecCommand(prefixedName(PreStopPrefix, regular1), execCommand{
+										Delay:         5,
+										ExitCode:      0,
+										ContainerName: regular1,
+									}),
+								},
+							},
+						},
+					},
+					{
+						Name:  regular2,
+						Image: defaultImage,
+						Command: ExecCommand(regular2, execCommand{
+							Delay:    60,
+							ExitCode: 0,
+						}),
+						Lifecycle: &v1.Lifecycle{
+							PostStart: startedPostStartGate(),
+							PreStop: &v1.LifecycleHandler{
+								Exec: &v1.ExecAction{
+									Command: ExecCommand(prefixedName(PreStopPrefix, regular2), execCommand{
+										Delay:         5,
+										ExitCode:      0,
+										ContainerName: regular2,
+									}),
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		preparePod(pod)
+
+		client := e2epod.NewPodClient(f)
+		pod = client.Create(ctx, pod)
+
+		ginkgo.By("Waiting for the pod to be running")
+		err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Updating images of sidecar and regular containers to trigger simultaneous termination and restart")
+		client.Update(ctx, pod.Name, func(pod *v1.Pod) {
+			pod.Spec.InitContainers[0].Image = updatedImage
+			pod.Spec.Containers[0].Image = updatedImage
+			pod.Spec.Containers[1].Image = updatedImage
+		})
+
+		ginkgo.By("Waiting for sidecar and regular containers to restart")
+		err = WaitForPodInitContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, 1, 2*time.Minute)
+		framework.ExpectNoError(err)
+		err = WaitForPodContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, 1, 2*time.Minute)
+		framework.ExpectNoError(err)
+		err = WaitForPodContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 1, 1, 2*time.Minute)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Parsing results and verifying PreStop hooks executed in parallel")
+		pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		results := parseOutput(ctx, f, pod)
+
+		framework.ExpectNoError(results.RunTogether(prefixedName(PreStopPrefix, regular1), prefixedName(PreStopPrefix, regular2)))
+		framework.ExpectNoError(results.HasRestarted(sidecar1))
+		framework.ExpectNoError(results.HasRestarted(regular1))
+		framework.ExpectNoError(results.HasRestarted(regular2))
+	})
+})
