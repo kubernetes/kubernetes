@@ -18,8 +18,9 @@ package controller
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
-	"sync"
+	"maps"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -79,20 +80,58 @@ func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
 	c.broadcaster.StartRecordingToSink(stopCh)
 	defer c.broadcaster.Shutdown()
 
-	var once sync.Once
-	wait.Until(func() {
-		if err := c.runOnce(); err != nil {
+	ctx := wait.ContextForChannel(stopCh)
+	// The default repair interval exceeds the post-start hook's one-minute timeout.
+	if err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		if err := c.runOnce(ctx); err != nil {
 			runtime.HandleError(err)
-			return
+			return false, nil
 		}
-		once.Do(onFirstSuccess)
-	}, c.interval, stopCh)
+		return true, nil
+	}); err != nil {
+		return
+	}
+	onFirstSuccess()
+
+	// Wait a full interval before counting another observation toward leak cleanup.
+	timer := time.NewTimer(c.interval)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return
+	case <-timer.C:
+	}
+	wait.UntilWithContext(ctx, func(ctx context.Context) {
+		if err := c.runOnce(ctx); err != nil {
+			runtime.HandleError(err)
+		}
+	}, c.interval)
+}
+
+func isRetriableError(err error) bool {
+	// IsProbableEOF does not unwrap the errors returned by doRunOnce.
+	for ; err != nil; err = goerrors.Unwrap(err) {
+		if errors.IsConflict(err) ||
+			errors.IsTooManyRequests(err) ||
+			errors.IsServerTimeout(err) ||
+			errors.IsTimeout(err) ||
+			errors.IsServiceUnavailable(err) ||
+			errors.IsInternalError(err) ||
+			net.IsProbableEOF(err) ||
+			net.IsConnectionReset(err) {
+			return true
+		}
+	}
+	return false
 }
 
 // runOnce verifies the state of the port allocations and returns an error if an unrecoverable problem occurs.
-func (c *Repair) runOnce() error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		err := c.doRunOnce()
+func (c *Repair) runOnce(ctx context.Context) error {
+	return retry.OnError(retry.DefaultBackoff, isRetriableError, func() error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		err := c.doRunOnce(ctx)
 		if err != nil {
 			nodePortRepairReconcileErrors.Inc()
 		}
@@ -101,7 +140,7 @@ func (c *Repair) runOnce() error {
 }
 
 // doRunOnce verifies the state of the port allocations and returns an error if an unrecoverable problem occurs.
-func (c *Repair) doRunOnce() error {
+func (c *Repair) doRunOnce(ctx context.Context) error {
 	// TODO: (per smarterclayton) if Get() or ListServices() is a weak consistency read,
 	// or if they are executed against different leaders,
 	// the ordering guarantee required to ensure no port is allocated twice is violated.
@@ -113,7 +152,7 @@ func (c *Repair) doRunOnce() error {
 	// important when we start apiserver and etcd at the same time.
 	var snapshot *api.RangeAllocation
 	var err error
-	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		snapshot, err = c.alloc.Get()
 		if err != nil {
 			runtime.HandleError(fmt.Errorf("unable to refresh the port allocations: %w", err))
@@ -139,11 +178,13 @@ func (c *Repair) doRunOnce() error {
 	// the service collection. The caching layer keeps per-collection RVs,
 	// and this is proper, since in theory the collections could be hosted
 	// in separate etcd (or even non-etcd) instances.
-	list, err := c.serviceClient.Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	list, err := c.serviceClient.Services(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("unable to refresh the port block: %v", err)
+		return fmt.Errorf("unable to refresh the port block: %w", err)
 	}
 
+	// Failed attempts must not advance leak cleanup when the repair is retried.
+	leaks := maps.Clone(c.leaks)
 	rebuilt, err := portallocator.NewInMemory(c.portRange)
 	if err != nil {
 		return fmt.Errorf("unable to create port allocator: %v", err)
@@ -168,7 +209,7 @@ func (c *Repair) doRunOnce() error {
 					c.recorder.Eventf(svc, nil, corev1.EventTypeWarning, "PortNotAllocated", "PortAllocation", "Port %d is not allocated; repairing", port)
 					runtime.HandleError(fmt.Errorf("the node port %d for service %s/%s is not allocated; repairing", port, svc.Name, svc.Namespace))
 				}
-				delete(c.leaks, port) // it is used, so it can't be leaked
+				delete(leaks, port) // it is used, so it can't be leaked
 			case portallocator.ErrAllocated:
 				// port is duplicate, reallocate
 				nodePortRepairPortErrors.WithLabelValues("duplicate").Inc()
@@ -194,7 +235,7 @@ func (c *Repair) doRunOnce() error {
 
 	// Check for ports that are left in the old set.  They appear to have been leaked.
 	stored.ForEach(func(port int) {
-		count, found := c.leaks[port]
+		count, found := leaks[port]
 		switch {
 		case !found:
 			// flag it to be cleaned up after any races (hopefully) are gone
@@ -203,7 +244,7 @@ func (c *Repair) doRunOnce() error {
 			fallthrough
 		case count > 0:
 			// pretend it is still in use until count expires
-			c.leaks[port] = count - 1
+			leaks[port] = count - 1
 			if err := rebuilt.Allocate(port); err != nil {
 				// do not increment the metric here, if it is a leak it will be detected once the counter gets to 0
 				runtime.HandleError(fmt.Errorf("the node port %d may have leaked, but can not be allocated: %v", port, err))
@@ -221,11 +262,9 @@ func (c *Repair) doRunOnce() error {
 	}
 
 	if err := c.alloc.CreateOrUpdate(snapshot); err != nil {
-		if errors.IsConflict(err) {
-			return err
-		}
-		return fmt.Errorf("unable to persist the updated port allocations: %v", err)
+		return fmt.Errorf("unable to persist the updated port allocations: %w", err)
 	}
+	c.leaks = leaks
 	return nil
 }
 
