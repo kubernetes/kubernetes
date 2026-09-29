@@ -48,6 +48,10 @@ const (
 
 	// Reasons for pod features admission failure
 	PodFeatureUnsupported = "PodFeatureUnsupported"
+
+	// SecurityProfileOCIUnsupportedReason is the reason for rejecting pods
+	// with OCI security profiles on nodes whose runtime does not support them.
+	SecurityProfileOCIUnsupportedReason = "SecurityProfileOCIUnsupported"
 )
 
 type handlerRunner struct {
@@ -210,6 +214,32 @@ func (a *appArmorAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttribute
 		Admit:   false,
 		Reason:  AppArmorNotAdmittedReason,
 		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
+	}
+}
+
+// NewSecurityProfileOCIAdmitHandler returns a PodAdmitHandler which rejects
+// pods with OCI security profiles if the container runtime does not report
+// support for them. The runtime features are unknown until the runtime
+// reported its status, which is treated as no support.
+func NewSecurityProfileOCIAdmitHandler(runtimeFeatures func() *kubecontainer.RuntimeFeatures) PodAdmitHandler {
+	return &securityProfileOCIAdmitHandler{runtimeFeatures: runtimeFeatures}
+}
+
+type securityProfileOCIAdmitHandler struct {
+	runtimeFeatures func() *kubecontainer.RuntimeFeatures
+}
+
+func (h *securityProfileOCIAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
+	if len(kubecontainer.SecurityProfileOCIRefs(attrs.Pod)) == 0 {
+		return PodAdmitResult{Admit: true}
+	}
+	if features := h.runtimeFeatures(); features != nil && features.SeccompProfileOCI {
+		return PodAdmitResult{Admit: true}
+	}
+	return PodAdmitResult{
+		Admit:   false,
+		Reason:  SecurityProfileOCIUnsupportedReason,
+		Message: "The container runtime does not support seccomp profiles of type OCI",
 	}
 }
 

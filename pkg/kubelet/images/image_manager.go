@@ -63,8 +63,13 @@ type imageManager struct {
 	prevPullErrMsg   sync.Map
 
 	// It will check the presence of the image, and report the 'image pulling', image pulled' events correspondingly.
-	puller      imagePuller
-	nodeKeyring credentialprovider.DockerKeyring
+	puller imagePuller
+	// securityProfilePuller pulls security profiles with the same limits as
+	// puller, but in its own queue, so that checks for present profiles do
+	// not wait for image pulls. It does not use the registry QPS limit,
+	// because most calls do not contact the registry.
+	securityProfilePuller imagePuller
+	nodeKeyring           credentialprovider.DockerKeyring
 
 	podPullingTimeRecorder ImagePodPullingTimeRecorder
 }
@@ -85,21 +90,23 @@ func NewImageManager(
 	podPullingTimeRecorder ImagePodPullingTimeRecorder,
 ) ImageManager {
 
+	newPuller := func(imageService kubecontainer.ImageService) imagePuller {
+		if serialized {
+			return newSerialImagePuller(imageService)
+		}
+		return newParallelImagePuller(imageService, maxParallelImagePulls)
+	}
+	securityProfilePuller := newPuller(imageService)
 	imageService = throttleImagePulling(imageService, qps, burst)
 
-	var puller imagePuller
-	if serialized {
-		puller = newSerialImagePuller(imageService)
-	} else {
-		puller = newParallelImagePuller(imageService, maxParallelImagePulls)
-	}
 	return &imageManager{
 		recorder:               recorder,
 		imageService:           imageService,
 		imagePullManager:       imagePullManager,
 		nodeKeyring:            nodeKeyring,
 		backOff:                imageBackOff,
-		puller:                 puller,
+		puller:                 newPuller(imageService),
+		securityProfilePuller:  securityProfilePuller,
 		podPullingTimeRecorder: podPullingTimeRecorder,
 	}
 }
