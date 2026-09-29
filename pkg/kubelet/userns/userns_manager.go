@@ -21,6 +21,7 @@ package userns
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -48,6 +49,11 @@ const (
 	// userNsUnitLength is the unit length of UserNS
 	userNsUnitLength = 65536
 )
+
+// errOutOfRange reports a persisted user namespace outside the IDs the kubelet
+// can assign, which happens when its subordinate ID range changes while the
+// pod exists.
+var errOutOfRange = errors.New("the kubelet's user namespace IDs changed since the pod was created, recreate the pod")
 
 type UsernsManager struct {
 	used    *allocator.AllocationBitmap
@@ -185,7 +191,16 @@ func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int6
 	for _, podUID := range found {
 		logger.V(5).Info("reading pod from disk for user namespace", "podUID", podUID)
 		if err := m.recordPodMappings(logger, podUID); err != nil {
-			return nil, fmt.Errorf("record pod mappings for existing pod %q: %w", podUID, err)
+			path := filepath.Join(kl.GetPodDir(podUID), mappingsFile)
+			// A range outside the current one can't overlap any range
+			// allocated from it, so only this pod is affected: it fails
+			// when it next needs its user namespace. Other errors could
+			// hide a range still in use, which must never be reallocated.
+			if errors.Is(err, errOutOfRange) {
+				logger.Error(err, "Pod user namespace is outside the kubelet's range", "podUID", podUID, "path", path)
+				continue
+			}
+			return nil, fmt.Errorf("record pod mappings for existing pod %q from %q: %w", podUID, path, err)
 		}
 	}
 
@@ -251,7 +266,9 @@ func (m *UsernsManager) record(logger klog.Logger, pod types.UID, from, length u
 	}
 	index := int(from/m.userNsLength) - m.off
 	if index < 0 || index >= m.len {
-		return fmt.Errorf("id %v is out of range", from)
+		first := uint64(m.off) * uint64(m.userNsLength)
+		end := first + uint64(m.len)*uint64(m.userNsLength)
+		return fmt.Errorf("id %v is out of range [%v, %v): %w", from, first, end, errOutOfRange)
 	}
 	// if the pod wasn't found then verify the range is free.
 	if !found && m.used.Has(index) {

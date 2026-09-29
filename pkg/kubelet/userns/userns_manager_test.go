@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,6 +50,7 @@ const (
 
 type testUserNsPodsManager struct {
 	podDir         string
+	podDirs        map[types.UID]string
 	podList        []types.UID
 	userns         bool
 	maxPods        int
@@ -58,6 +60,9 @@ type testUserNsPodsManager struct {
 }
 
 func (m *testUserNsPodsManager) GetPodDir(podUID types.UID) string {
+	if dir, ok := m.podDirs[podUID]; ok {
+		return dir
+	}
 	if m.podDir == "" {
 		return "/tmp/non-existent-dir.This-is-not-used-in-tests"
 	}
@@ -505,6 +510,62 @@ func TestMakeUserNsManagerFailsListPod(t *testing.T) {
 	_, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "read pods from disk")
+}
+
+func TestMakeUserNsManagerAfterRangeChange(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
+
+	hostUsers := false
+	oldPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "old-pod"}, Spec: v1.PodSpec{HostUsers: &hostUsers}}
+	newPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "new-pod"}, Spec: v1.PodSpec{HostUsers: &hostUsers}}
+	podDirs := map[types.UID]string{oldPod.UID: t.TempDir(), newPod.UID: t.TempDir()}
+
+	// The kubelet first gets the IDs of blocks 16 to 143...
+	m, err := MakeUserNsManager(logger, &testUserNsPodsManager{
+		podDirs:        podDirs,
+		userns:         true,
+		mappingFirstID: 16 * testUserNsLength,
+		mappingLen:     128 * testUserNsLength,
+	}, nil)
+	require.NoError(t, err)
+	_, err = m.GetOrCreateUserNamespaceMappings(logger, oldPod, "")
+	require.NoError(t, err)
+
+	// ...and after a restart, those of blocks 256 to 383, so the pod on disk is out of range.
+	m, err = MakeUserNsManager(logger, &testUserNsPodsManager{
+		podDirs:        podDirs,
+		podList:        []types.UID{oldPod.UID},
+		userns:         true,
+		mappingFirstID: 256 * testUserNsLength,
+		mappingLen:     128 * testUserNsLength,
+	}, nil)
+	require.NoError(t, err)
+	assert.False(t, m.podAllocated(oldPod.UID))
+
+	_, err = m.GetOrCreateUserNamespaceMappings(logger, oldPod, "")
+	require.ErrorIs(t, err, errOutOfRange)
+
+	userNs, err := m.GetOrCreateUserNamespaceMappings(logger, newPod, "")
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, userNs.Uids[0].HostId, 256*testUserNsLength)
+}
+
+func TestMakeUserNsManagerInvalidMappingsFile(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
+
+	podDir := t.TempDir()
+	path := filepath.Join(podDir, mappingsFile)
+	require.NoError(t, os.WriteFile(path, []byte("{"), 0o600))
+
+	_, err := MakeUserNsManager(logger, &testUserNsPodsManager{
+		podDir:  podDir,
+		podList: []types.UID{"pod-1"},
+	}, nil)
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, errOutOfRange)
+	assert.ErrorContains(t, err, path)
 }
 
 func TestRecordBounds(t *testing.T) {
