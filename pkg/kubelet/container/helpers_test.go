@@ -1679,3 +1679,27 @@ func TestShouldAllContainersRestart(t *testing.T) {
 		})
 	}
 }
+
+func TestSecurityProfileOCIRefs(t *testing.T) {
+	oci := func(ref string) *v1.SeccompProfile {
+		return &v1.SeccompProfile{Type: v1.SeccompProfileTypeOCI, OCI: &v1.SecurityProfileOCI{Ref: ref}}
+	}
+	pod := &v1.Pod{Spec: v1.PodSpec{
+		SecurityContext: &v1.PodSecurityContext{SeccompProfile: oci("a")},
+		InitContainers:  []v1.Container{{Name: "init", SecurityContext: &v1.SecurityContext{SeccompProfile: oci("b")}}},
+		Containers: []v1.Container{
+			{Name: "c1", SecurityContext: &v1.SecurityContext{SeccompProfile: oci("a")}},
+			{Name: "c2", SecurityContext: &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}},
+			{Name: "c3"},
+		},
+		EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{
+			Name: "debug", SecurityContext: &v1.SecurityContext{SeccompProfile: oci("c")},
+		}}},
+	}}
+	if got, want := SecurityProfileOCIRefs(pod), []string{"a", "b", "c"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("SecurityProfileOCIRefs() = %v, want %v", got, want)
+	}
+	if got := SecurityProfileOCIRefs(&v1.Pod{}); got != nil {
+		t.Errorf("SecurityProfileOCIRefs() of an empty pod = %v, want nil", got)
+	}
+}
