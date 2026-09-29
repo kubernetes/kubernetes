@@ -67,6 +67,7 @@ var (
 	waitForPDBsStable               = testutils.WaitForPDBsStable
 	waitForPodToScheduleWithTimeout = testutils.WaitForPodToScheduleWithTimeout
 	waitForPodUnschedulable         = testutils.WaitForPodUnschedulable
+	waitForPodSchedulingGated       = testutils.WaitForPodSchedulingGated
 )
 
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
@@ -2315,6 +2316,546 @@ func TestPodOverheadPreemptionFit(t *testing.T) {
 				}
 
 				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pVictim, preemptorPod})
+			})
+		})
+	}
+}
+
+// TestGatedPreemptorEventReevaluation tests FM-101 / PR #139162:
+// Verifies that gated preemptor pods residing in the unschedulable queue are correctly
+// re-evaluated upon wildcard cluster events (such as StorageClass creation and Node updates/additions)
+// and move to activeQ to preempt lower-priority victims as soon as scheduling gates are removed.
+func TestGatedPreemptorEventReevaluation(t *testing.T) {
+	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+	}
+	defaultNodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "500m",
+		v1.ResourceMemory: "500",
+	}
+
+	for _, asyncPreemptionEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("AsyncPreemptionEnabled_%v", asyncPreemptionEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SchedulerAsyncPreemption: asyncPreemptionEnabled,
+			})
+
+			// Subtest 1: Gated preemptor in unschedulable queue re-evaluated on wildcard cluster events and preempts upon gate removal
+			t.Run("Gated preemptor wildcard event re-evaluation and preemption on ungate", func(t *testing.T) {
+				testCtx := initTest(t, "gated-reeval")
+				cs := testCtx.ClientSet
+
+				node, err := createNode(cs, st.MakeNode().Name("node-gated-1").Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Error creating node: %v", err)
+				}
+
+				victim := initPausePod(&testutils.PausePodConfig{
+					Name:      "victim-low",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  node.Name,
+					Resources: defaultPodRes,
+				})
+				victim.Spec.TerminationGracePeriodSeconds = ptr.To(int64(0))
+				pVictim, err := runPausePod(cs, victim)
+				if err != nil {
+					t.Fatalf("Error running victim: %v", err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{pVictim}); err != nil {
+					t.Fatalf("Pod not stable in cache: %v", err)
+				}
+
+				gateName := "example.com/preemption-gate"
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      "gated-preemptor",
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					Resources: defaultPodRes,
+				})
+				preemptor.Spec.SchedulingGates = []v1.PodSchedulingGate{{Name: gateName}}
+
+				pGated, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Error creating gated preemptor: %v", err)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pVictim, pGated})
+
+				if err := waitForPodSchedulingGated(testCtx.Ctx, cs, pGated, 30*time.Second); err != nil {
+					t.Fatalf("Pod %s did not enter SchedulingGated state: %v", pGated.Name, err)
+				}
+
+				// Trigger wildcard cluster events while pod is gated:
+				// Event 1: StorageClass creation
+				sc := st.MakeStorageClass().Name(fmt.Sprintf("sc-wildcard-%v", asyncPreemptionEnabled)).Provisioner("kubernetes.io/no-provisioner").Obj()
+				if _, err := cs.StorageV1().StorageClasses().Create(testCtx.Ctx, sc, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Error creating StorageClass: %v", err)
+				}
+
+				// Event 2: Node status/label update
+				latestNode, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, node.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get node: %v", err)
+				}
+				if latestNode.Labels == nil {
+					latestNode.Labels = make(map[string]string)
+				}
+				latestNode.Labels["re-eval-trigger"] = "true"
+				if _, err := cs.CoreV1().Nodes().Update(testCtx.Ctx, latestNode, metav1.UpdateOptions{}); err != nil {
+					t.Fatalf("Failed to update node: %v", err)
+				}
+
+				// Verify victim has not been evicted yet since preemptor is gated
+				gotVictim, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pVictim.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get victim pod: %v", err)
+				}
+				if gotVictim.DeletionTimestamp != nil {
+					t.Fatalf("Victim pod was prematurely evicted while preemptor was gated")
+				}
+
+				// Remove scheduling gate to trigger activeQ enqueueing and preemption
+				patch := []byte(`{"spec": {"schedulingGates": null}}`)
+				if _, err := cs.CoreV1().Pods(testCtx.NS.Name).Patch(testCtx.Ctx, pGated.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}); err != nil {
+					t.Fatalf("Failed to patch scheduling gates: %v", err)
+				}
+
+				// Preemptor must now preempt victim and schedule
+				if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, pGated, 30*time.Second); err != nil {
+					t.Fatalf("Ungated preemptor failed to schedule/preempt: %v", err)
+				}
+
+				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pVictim, pGated})
+			})
+
+			// Subtest 2: Multiple gated preemptors re-evaluated on node additions and ungate
+			t.Run("Multiple gated preemptors scheduled across nodes upon gate removal", func(t *testing.T) {
+				testCtx := initTest(t, "gated-multi")
+				cs := testCtx.ClientSet
+
+				node1, err := createNode(cs, st.MakeNode().Name("node-multi-gated-1").Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Error creating node1: %v", err)
+				}
+
+				victim1 := initPausePod(&testutils.PausePodConfig{
+					Name:      "victim-multi-1",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  node1.Name,
+					Resources: defaultPodRes,
+				})
+				victim1.Spec.TerminationGracePeriodSeconds = ptr.To(int64(0))
+				pVictim1, err := runPausePod(cs, victim1)
+				if err != nil {
+					t.Fatalf("Error running victim1: %v", err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{pVictim1}); err != nil {
+					t.Fatalf("Pod not stable in cache: %v", err)
+				}
+
+				gateName := "example.com/multi-gate"
+				preemptor1 := initPausePod(&testutils.PausePodConfig{
+					Name:      "gated-p1",
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					Resources: defaultPodRes,
+				})
+				preemptor1.Spec.SchedulingGates = []v1.PodSchedulingGate{{Name: gateName}}
+
+				pGated1, err := createPausePod(cs, preemptor1)
+				if err != nil {
+					t.Fatalf("Failed to create gated-p1: %v", err)
+				}
+
+				preemptor2 := initPausePod(&testutils.PausePodConfig{
+					Name:      "gated-p2",
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					Resources: defaultPodRes,
+				})
+				preemptor2.Spec.SchedulingGates = []v1.PodSchedulingGate{{Name: gateName}}
+
+				pGated2, err := createPausePod(cs, preemptor2)
+				if err != nil {
+					t.Fatalf("Failed to create gated-p2: %v", err)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pVictim1, pGated1, pGated2})
+
+				if err := waitForPodSchedulingGated(testCtx.Ctx, cs, pGated1, 30*time.Second); err != nil {
+					t.Fatalf("pGated1 did not enter SchedulingGated: %v", err)
+				}
+				if err := waitForPodSchedulingGated(testCtx.Ctx, cs, pGated2, 30*time.Second); err != nil {
+					t.Fatalf("pGated2 did not enter SchedulingGated: %v", err)
+				}
+
+				// Add second node to trigger node add cluster event
+				_, err = createNode(cs, st.MakeNode().Name("node-multi-gated-2").Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Error creating node2: %v", err)
+				}
+
+				// Ungate both pods
+				patch := []byte(`{"spec": {"schedulingGates": null}}`)
+				for _, p := range []*v1.Pod{pGated1, pGated2} {
+					if _, err := cs.CoreV1().Pods(testCtx.NS.Name).Patch(testCtx.Ctx, p.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}); err != nil {
+						t.Fatalf("Failed to remove gate from %s: %v", p.Name, err)
+					}
+				}
+
+				if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, pGated1, 30*time.Second); err != nil {
+					t.Fatalf("pGated1 failed to schedule: %v", err)
+				}
+				if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, pGated2, 30*time.Second); err != nil {
+					t.Fatalf("pGated2 failed to schedule: %v", err)
+				}
+
+				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pVictim1, pGated1, pGated2})
+			})
+		})
+	}
+}
+
+// TestWasFlushedFromUnschedulablePreemptionLifecycle tests FM-103 / PR #139330:
+// Verifies that when a preemptor pod moves from the unschedulable queue through the active queue
+// and back into unschedulable upon a failed preemption cycle, the WasFlushedFromUnschedulable flag
+// is properly reset so future legitimate flushes and scheduling attempts are not skipped or corrupted.
+func TestWasFlushedFromUnschedulablePreemptionLifecycle(t *testing.T) {
+	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+	}
+	defaultNodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "500m",
+		v1.ResourceMemory: "500",
+	}
+
+	for _, asyncPreemptionEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("AsyncPreemptionEnabled_%v", asyncPreemptionEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SchedulerAsyncPreemption: asyncPreemptionEnabled,
+			})
+
+			// Subtest 1: Failed preemption cycle clears WasFlushedFromUnschedulable and allows subsequent legitimate flushes
+			t.Run("Failed preemption clears WasFlushedFromUnschedulable and enables future flush scheduling", func(t *testing.T) {
+				testCtx := initTest(t, "flush-lifecycle",
+					scheduler.WithPodMaxInUnschedulablePodsDuration(2*time.Second),
+					scheduler.WithPodInitialBackoffSeconds(1),
+					scheduler.WithPodMaxBackoffSeconds(2),
+				)
+				cs := testCtx.ClientSet
+
+				_, err := createNode(cs, st.MakeNode().Name("node-lifecycle-1").Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Error creating node: %v", err)
+				}
+
+				// Run a protected victim pod with higher priority (highPriority = 300)
+				protectedVictim := initPausePod(&testutils.PausePodConfig{
+					Name:      "protected-victim",
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					NodeName:  "node-lifecycle-1",
+					Resources: defaultPodRes,
+				})
+				protectedVictim.Spec.TerminationGracePeriodSeconds = ptr.To(int64(0))
+				pProtected, err := runPausePod(cs, protectedVictim)
+				if err != nil {
+					t.Fatalf("Error running protected victim: %v", err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{pProtected}); err != nil {
+					t.Fatalf("Pod not stable in cache: %v", err)
+				}
+
+				// Preemptor with medium priority (mediumPriority = 200) cannot preempt protected-victim
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      "preemptor-retry",
+					Namespace: testCtx.NS.Name,
+					Priority:  &mediumPriority,
+					Resources: defaultPodRes,
+				})
+				pPreemptor, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Error creating preemptor: %v", err)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pProtected, pPreemptor})
+
+				if err := waitForPodUnschedulable(testCtx.Ctx, cs, pPreemptor); err != nil {
+					t.Fatalf("Preemptor was expected to be unschedulable initially: %v", err)
+				}
+
+				// Allow time for flushUnschedulableEntitiesLeftover to trigger (exceeding 2s duration)
+				// The pod moves to activeQ, fails preemption again, and returns to unschedulable queue.
+				// On return to unschedulable queue, WasFlushedFromUnschedulable must be reset to false.
+				time.Sleep(3 * time.Second)
+
+				// Now add a second node so preemptor-retry can be scheduled upon event/flush
+				_, err = createNode(cs, st.MakeNode().Name("node-lifecycle-2").Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Error creating node 2: %v", err)
+				}
+
+				// On the next flush or queue evaluation, preemptor-retry must successfully schedule!
+				if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, pPreemptor, 30*time.Second); err != nil {
+					t.Fatalf("Preemptor failed to schedule after state reset: %v", err)
+				}
+
+				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pProtected, pPreemptor})
+			})
+
+			// Subtest 2: Gated pod flushed during unschedulable timeout clears WasFlushedFromUnschedulable upon gate removal
+			t.Run("Gated pod flushed during unschedulable timeout schedules cleanly upon ungate", func(t *testing.T) {
+				testCtx := initTest(t, "flush-gated",
+					scheduler.WithPodMaxInUnschedulablePodsDuration(2*time.Second),
+					scheduler.WithPodInitialBackoffSeconds(1),
+					scheduler.WithPodMaxBackoffSeconds(2),
+				)
+				cs := testCtx.ClientSet
+
+				_, err := createNode(cs, st.MakeNode().Name("node-lifecycle-2").Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Error creating node: %v", err)
+				}
+
+				victim := initPausePod(&testutils.PausePodConfig{
+					Name:      "victim-gated-flush",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  "node-lifecycle-2",
+					Resources: defaultPodRes,
+				})
+				victim.Spec.TerminationGracePeriodSeconds = ptr.To(int64(0))
+				pVictim, err := runPausePod(cs, victim)
+				if err != nil {
+					t.Fatalf("Error running victim: %v", err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{pVictim}); err != nil {
+					t.Fatalf("Pod not stable in cache: %v", err)
+				}
+
+				gateName := "example.com/flush-lifecycle-gate"
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      "preemptor-gated-flush",
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					Resources: defaultPodRes,
+				})
+				preemptor.Spec.SchedulingGates = []v1.PodSchedulingGate{{Name: gateName}}
+
+				pGated, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Error creating gated pod: %v", err)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pVictim, pGated})
+
+				if err := waitForPodSchedulingGated(testCtx.Ctx, cs, pGated, 30*time.Second); err != nil {
+					t.Fatalf("Pod did not enter SchedulingGated: %v", err)
+				}
+
+				// Wait past the 2s flush duration while pod is gated
+				time.Sleep(3 * time.Second)
+
+				// Ungate pod
+				patch := []byte(`{"spec": {"schedulingGates": null}}`)
+				if _, err := cs.CoreV1().Pods(testCtx.NS.Name).Patch(testCtx.Ctx, pGated.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}); err != nil {
+					t.Fatalf("Failed to remove scheduling gates: %v", err)
+				}
+
+				if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, pGated, 30*time.Second); err != nil {
+					t.Fatalf("Ungated pod failed to schedule after flush interval: %v", err)
+				}
+
+				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pVictim, pGated})
+			})
+		})
+	}
+}
+
+// TestEqualFlushFrequencyEnforcement tests FM-102 / PR #139331:
+// Verifies that unschedulable pods with high preemption retry counts are not subjected to
+// flush frequency starvation and are flushed at uniform intervals determined by FlushTimestamp.
+func TestEqualFlushFrequencyEnforcement(t *testing.T) {
+	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+	}
+	defaultNodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "500m",
+		v1.ResourceMemory: "500",
+	}
+
+	for _, asyncPreemptionEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("AsyncPreemptionEnabled_%v", asyncPreemptionEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SchedulerAsyncPreemption: asyncPreemptionEnabled,
+			})
+
+			// Subtest 1: Preemptor with high retry count is flushed at uniform intervals without starvation compared to fresh unschedulable pods
+			t.Run("High retry preemptor is flushed uniformly and not starved vs fresh pod", func(t *testing.T) {
+				testCtx := initTest(t, "flush-freq",
+					scheduler.WithPodMaxInUnschedulablePodsDuration(2*time.Second),
+					scheduler.WithPodInitialBackoffSeconds(1),
+					scheduler.WithPodMaxBackoffSeconds(2),
+				)
+				cs := testCtx.ClientSet
+
+				_, err := createNode(cs, st.MakeNode().Name("node-freq-1").Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Error creating node: %v", err)
+				}
+
+				// Run non-preemptible blocking pod (priority 300)
+				blocker := initPausePod(&testutils.PausePodConfig{
+					Name:      "blocking-pod",
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					NodeName:  "node-freq-1",
+					Resources: defaultPodRes,
+				})
+				blocker.Spec.TerminationGracePeriodSeconds = ptr.To(int64(0))
+				pBlocker, err := runPausePod(cs, blocker)
+				if err != nil {
+					t.Fatalf("Error running blocker: %v", err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{pBlocker}); err != nil {
+					t.Fatalf("Pod not stable in cache: %v", err)
+				}
+
+				// Create high-retry preemptor (mediumPriority = 200)
+				highRetryPreemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      "high-retry-preemptor",
+					Namespace: testCtx.NS.Name,
+					Priority:  &mediumPriority,
+					Resources: defaultPodRes,
+				})
+				pHighRetry, err := createPausePod(cs, highRetryPreemptor)
+				if err != nil {
+					t.Fatalf("Error creating high-retry preemptor: %v", err)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pBlocker, pHighRetry})
+
+				if err := waitForPodUnschedulable(testCtx.Ctx, cs, pHighRetry); err != nil {
+					t.Fatalf("High retry preemptor was expected to be unschedulable: %v", err)
+				}
+
+				// Let highRetryPreemptor accumulate multiple failed scheduling/flush cycles (> 5s)
+				time.Sleep(5 * time.Second)
+
+				// Create fresh unschedulable pod (0 retry count)
+				freshPreemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      "fresh-preemptor",
+					Namespace: testCtx.NS.Name,
+					Priority:  &mediumPriority,
+					Resources: defaultPodRes,
+				})
+				pFresh, err := createPausePod(cs, freshPreemptor)
+				if err != nil {
+					t.Fatalf("Error creating fresh preemptor: %v", err)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pFresh})
+
+				if err := waitForPodUnschedulable(testCtx.Ctx, cs, pFresh); err != nil {
+					t.Fatalf("Fresh preemptor was expected to be unschedulable: %v", err)
+				}
+
+				// Now expand cluster capacity by adding node-freq-2 and node-freq-3 so both can schedule
+				_, err = createNode(cs, st.MakeNode().Name("node-freq-2").Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Error creating node2: %v", err)
+				}
+				_, err = createNode(cs, st.MakeNode().Name("node-freq-3").Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Error creating node3: %v", err)
+				}
+
+				// Both pods must be scheduled without high-retry pod being starved
+				if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, pHighRetry, 30*time.Second); err != nil {
+					t.Fatalf("High retry preemptor was starved or failed to schedule: %v", err)
+				}
+				if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, pFresh, 30*time.Second); err != nil {
+					t.Fatalf("Fresh preemptor failed to schedule: %v", err)
+				}
+
+				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pBlocker, pHighRetry, pFresh})
+			})
+
+			// Subtest 2: Multiple unschedulable preemptor pods under churn are flushed uniformly
+			t.Run("Multiple saturated unschedulable pods maintain uniform flush and scheduling", func(t *testing.T) {
+				testCtx := initTest(t, "flush-churn",
+					scheduler.WithPodMaxInUnschedulablePodsDuration(2*time.Second),
+					scheduler.WithPodInitialBackoffSeconds(1),
+					scheduler.WithPodMaxBackoffSeconds(2),
+				)
+				cs := testCtx.ClientSet
+
+				node, err := createNode(cs, st.MakeNode().Name("node-churn-1").Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Error creating node: %v", err)
+				}
+
+				blocker := initPausePod(&testutils.PausePodConfig{
+					Name:      "blocker-churn",
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					NodeName:  node.Name,
+					Resources: defaultPodRes,
+				})
+				blocker.Spec.TerminationGracePeriodSeconds = ptr.To(int64(0))
+				pBlocker, err := runPausePod(cs, blocker)
+				if err != nil {
+					t.Fatalf("Error running blocker: %v", err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{pBlocker}); err != nil {
+					t.Fatalf("Pod not stable in cache: %v", err)
+				}
+
+				var preemptors []*v1.Pod
+				for i := 1; i <= 3; i++ {
+					p := initPausePod(&testutils.PausePodConfig{
+						Name:      fmt.Sprintf("preemptor-churn-%d", i),
+						Namespace: testCtx.NS.Name,
+						Priority:  &mediumPriority,
+						Resources: defaultPodRes,
+					})
+					pod, err := createPausePod(cs, p)
+					if err != nil {
+						t.Fatalf("Error creating churn preemptor %d: %v", i, err)
+					}
+					preemptors = append(preemptors, pod)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, append([]*v1.Pod{pBlocker}, preemptors...))
+
+				for _, p := range preemptors {
+					if err := waitForPodUnschedulable(testCtx.Ctx, cs, p); err != nil {
+						t.Fatalf("Pod %s was expected to be unschedulable: %v", p.Name, err)
+					}
+				}
+
+				// Allow some flush churn cycles
+				time.Sleep(3 * time.Second)
+
+				// Delete blocker pod and add 2 more nodes so all 3 preemptors can schedule
+				if err := cs.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, pBlocker.Name, metav1.DeleteOptions{}); err != nil {
+					t.Fatalf("Failed to delete blocker: %v", err)
+				}
+				for i := 2; i <= 3; i++ {
+					_, err := createNode(cs, st.MakeNode().Name(fmt.Sprintf("node-churn-%d", i)).Capacity(defaultNodeRes).Obj())
+					if err != nil {
+						t.Fatalf("Error creating node %d: %v", i, err)
+					}
+				}
+
+				for _, p := range preemptors {
+					if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, p, 30*time.Second); err != nil {
+						t.Fatalf("Pod %s failed to schedule during uniform flush: %v", p.Name, err)
+					}
+				}
+
+				testutils.CleanupPods(testCtx.Ctx, cs, t, append([]*v1.Pod{pBlocker}, preemptors...))
 			})
 		})
 	}
