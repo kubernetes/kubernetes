@@ -383,6 +383,13 @@ var (
 	// Marks tests of the asynchronous preemption (KEP-4832) that require the `SchedulerAsyncPreemption` feature gate.
 	SchedulerAsyncPreemption = framework.WithFeature(framework.ValidFeatures.Add("SchedulerAsyncPreemption"))
 
+	// Owner: sig-node
+	// KEP: https://kep.k8s.io/6061
+	// Marks tests of seccomp profiles of type OCI, which require the
+	// `SecurityProfileOCI` feature gate and a container runtime that supports
+	// the PullSecurityProfile CRI call.
+	SecurityProfileOCI = framework.WithFeature(framework.ValidFeatures.Add("SecurityProfileOCI"))
+
 	// Owner: sig-storage
 	// KEP: https://kep.k8s.io/3314
 	// Tests marked with this feature require:
