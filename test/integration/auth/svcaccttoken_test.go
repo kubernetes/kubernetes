@@ -2212,7 +2212,7 @@ func checkExpiration(t *testing.T, treq *authenticationv1.TokenRequest, expected
 		t.Errorf("unexpected nil expiration seconds.")
 	}
 	if *treq.Spec.ExpirationSeconds != expectedExpiration {
-		t.Errorf("unexpected expiration seconds.\nsaw:\t%d\nwant:\t%d", treq.Spec.ExpirationSeconds, expectedExpiration)
+		t.Errorf("unexpected expiration seconds.\nsaw:\t%d\nwant:\t%d", *treq.Spec.ExpirationSeconds, expectedExpiration)
 	}
 }
 
