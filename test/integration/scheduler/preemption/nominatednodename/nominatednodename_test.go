@@ -229,6 +229,25 @@ func TestNominatedNode(t *testing.T) {
 			},
 			outOfTreeRegistry: frameworkruntime.Registry{alwaysFailPlugin: newAlwaysFail},
 		},
+		{
+			name:         "mid-priority pod preempts low-priority pod with multiple nodes, nominatedNodeName is set and cleared on schedule",
+			initNodes:    []*v1.Node{st.MakeNode().Name("node-extra").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()},
+			nodeCapacity: map[v1.ResourceName]string{v1.ResourceCPU: "1"},
+			podsToCreate: [][]*v1.Pod{
+				{
+					st.MakePod().Name("low-extra").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node-extra").Obj(),
+					st.MakePod().Name("low").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+				{
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+			},
+			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
+				testutils.WaitForPodToSchedule,
+				testutils.WaitForNominatedNodeName,
+			},
+			podNamesToDelete: []string{"low"},
+		},
 	}
 
 	for _, asyncPreemptionEnabled := range []bool{true, false} {

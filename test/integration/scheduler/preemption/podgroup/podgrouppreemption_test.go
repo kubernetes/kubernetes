@@ -3582,6 +3582,171 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "ongoing preemption detection (FM-406): gang preemption actively evicting victims keeps gang in queue across scheduling iterations without premature rejection",
+			Steps: []asyncframework.Step{
+				{
+					Name:       "create Node",
+					CreateNode: "node",
+				},
+				{
+					Name: "create scheduled victim Pods",
+					CreatePod: &asyncframework.CreatePod{
+						Pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						Count: new(2),
+					},
+				},
+				{
+					Name: "create pod group for preemptor",
+					CreatePodGroup: &asyncframework.CreatePodGroup{
+						PodGroup: st.MakePodGroup().Name("pg-preemptor").MinCount(2).Priority(100).Obj(),
+					},
+				},
+				{
+					Name: "create first preemptor Pod",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
+					},
+				},
+				{
+					Name: "create second preemptor Pod",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
+					},
+				},
+				{
+					Name: "initial scheduling attempt triggers async preemption and nominates node",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
+						ExpectUnschedulable: true,
+					},
+				},
+				{
+					Name: "verify preemptor-1 nominated node name",
+					VerifyNominatedNodeName: &asyncframework.VerifyNominatedNodeName{
+						PodName:          "preemptor-1",
+						ExpectedNodeName: "node",
+					},
+				},
+				{
+					Name: "verify preemptor-2 nominated node name",
+					VerifyNominatedNodeName: &asyncframework.VerifyNominatedNodeName{
+						PodName:          "preemptor-2",
+						ExpectedNodeName: "node",
+					},
+				},
+				{
+					Name:            "check preemptor-1 is gated in queue while preemption is in flight",
+					PodGatedInQueue: "preemptor-1",
+				},
+				{
+					Name:            "check preemptor-2 is gated in queue while preemption is in flight",
+					PodGatedInQueue: "preemptor-2",
+				},
+				{
+					Name:                 "verify preemption API calls are running",
+					PodRunningPreemption: new(2),
+				},
+				{
+					Name: "complete preemption API calls (victims evicted and pods un-gated)",
+					CompletePreemption: "pg-preemptor",
+				},
+				{
+					Name: "subsequent scheduling iteration successfully schedules gang after eviction completes",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
+						ExpectSuccess: true,
+					},
+				},
+			},
+		},
+		{
+			Name: "multi-node gang NNN propagation (PR #138967 / PR #139280): multi-pod gang preemption across distinct nodes propagates and maintains NominatedNodeName on all pods",
+			Steps: []asyncframework.Step{
+				{
+					Name:       "create first Node",
+					CreateNode: "node-1",
+				},
+				{
+					Name:       "create second Node",
+					CreateNode: "node-2",
+				},
+				{
+					Name: "create scheduled victim Pod on node-1",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("victim-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Node("node-1").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					},
+				},
+				{
+					Name: "create scheduled victim Pod on node-2",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("victim-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Node("node-2").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					},
+				},
+				{
+					Name: "create pod group for preemptor",
+					CreatePodGroup: &asyncframework.CreatePodGroup{
+						PodGroup: st.MakePodGroup().Name("pg-preemptor").MinCount(2).Priority(100).Obj(),
+					},
+				},
+				{
+					Name: "create first preemptor Pod requiring full node capacity",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
+					},
+				},
+				{
+					Name: "create second preemptor Pod requiring full node capacity",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
+					},
+				},
+				{
+					Name: "schedule preemptor gang triggering multi-node preemption",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
+						ExpectUnschedulable: true,
+					},
+				},
+				{
+					Name: "verify preemptor-1 nominated node name is set to node-1",
+					VerifyNominatedNodeName: &asyncframework.VerifyNominatedNodeName{
+						PodName:          "preemptor-1",
+						ExpectedNodeName: "node-1",
+					},
+				},
+				{
+					Name: "verify preemptor-2 nominated node name is set to node-2",
+					VerifyNominatedNodeName: &asyncframework.VerifyNominatedNodeName{
+						PodName:          "preemptor-2",
+						ExpectedNodeName: "node-2",
+					},
+				},
+				{
+					Name:            "check preemptor-1 is gated in queue",
+					PodGatedInQueue: "preemptor-1",
+				},
+				{
+					Name:            "check preemptor-2 is gated in queue",
+					PodGatedInQueue: "preemptor-2",
+				},
+				{
+					Name:                 "verify preemption API calls are running",
+					PodRunningPreemption: new(2),
+				},
+				{
+					Name: "complete preemption on both nodes",
+					CompletePreemption: "pg-preemptor",
+				},
+				{
+					Name: "schedule gang pods to their respective nominated nodes",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
+						ExpectSuccess: true,
+					},
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
