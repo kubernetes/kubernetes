@@ -78,21 +78,12 @@ func TestValidateScale(t *testing.T) {
 		}
 	}
 
+	// spec.replicas minimum is covered by declarative validation; see
+	// test/declarative_validation/{autoscaling,apps}/scale.
 	errorCases := []struct {
 		scale autoscaling.Scale
 		msg   string
 	}{{
-		scale: autoscaling.Scale{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "frontend",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: autoscaling.ScaleSpec{
-				Replicas: -1,
-			},
-		},
-		msg: "must be greater than or equal to 0",
-	}, {
 		scale: autoscaling.Scale{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "frontend",
