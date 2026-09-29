@@ -112,3 +112,31 @@ func BenchmarkRandomStringGeneration(b *testing.B) {
 		b.Fatal(s)
 	}
 }
+
+func TestSafeEncodeString(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{name: "empty", input: ""},
+		{name: "ASCII", input: "abc"},
+		{name: "kubernetes text", input: "kube-system-controller-manager"},
+		{name: "accented", input: "é"},
+		{name: "CJK", input: "日本語"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SafeEncodeString(tt.input)
+			inputRunes := []rune(tt.input)
+			gotRunes := []rune(got)
+			if len(gotRunes) != len(inputRunes) {
+				t.Errorf("rune count mismatch: input has %d runes, output has %d (output=%q)", len(inputRunes), len(gotRunes), got)
+			}
+			for i, c := range got {
+				if !strings.ContainsRune(alphanums, c) {
+					t.Errorf("output[%d] = %q, not in alphanums", i, string(c))
+				}
+			}
+		})
+	}
+}
