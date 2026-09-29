@@ -31,7 +31,7 @@ pkg/scheduler/
 ├── framework_init.go              # Default framework and plugin registry setup
 ├── types.go                       # Internal scheduler types and revert functions
 ├── apis/
-│   └── config/                    # KubeSchedulerConfiguration (v1, internal, validation, defaults)
+│   └── config/                    # KubeSchedulerConfiguration (see apis/config/AGENTS.md)
 ├── backend/
 │   ├── cache/                     # Scheduler cache (nodes, assumed/real pods, snapshotting)
 │   ├── queue/                     # PriorityQueue (activeQ, backoffQ, unschedulablePods)
