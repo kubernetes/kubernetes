@@ -40,6 +40,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/cpuset"
 
@@ -1578,6 +1579,73 @@ func numaAllocationStrategyOptions(strategy string) map[string]string {
 	return map[string]string{topologymanager.NUMAAllocationStrategy: strategy}
 }
 
+// numaScoreSelectionMetric is the alpha counter reporting how many NUMA node
+// selections numa-allocation-strategy changed the outcome of.
+const numaScoreSelectionMetric = kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.TopologyManagerNUMAScoreSelectionTotalKey
+
+// numaAllocationStrategies lists every value the kubelet can label
+// numaScoreSelectionMetric with.
+var numaAllocationStrategies = []string{
+	topologymanager.NUMAAllocationStrategyMostAllocated,
+	topologymanager.NUMAAllocationStrategyLeastAllocated,
+}
+
+// numaScoreSelectionCounts reads numaScoreSelectionMetric for every strategy.
+//
+// A strategy with no series yet reads as zero. The kubelet only creates one
+// once that strategy has actually changed a selection, so an absent series is
+// the state a run which changed nothing is expected to leave behind, not a
+// scrape failure.
+func numaScoreSelectionCounts(ctx context.Context) map[string]float64 {
+	ginkgo.GinkgoHelper()
+
+	kubeletMetrics, err := getKubeletMetrics(ctx)
+	framework.ExpectNoError(err)
+
+	counts := make(map[string]float64, len(numaAllocationStrategies))
+	for _, strategy := range numaAllocationStrategies {
+		count, err := getCounterMetricValue(kubeletMetrics, numaScoreSelectionMetric, map[string]string{
+			kubeletmetrics.TopologyManagerNUMAAllocationStrategyLabelKey: strategy,
+		})
+		if err != nil && !errors.Is(err, ErrMetricNotFound) {
+			framework.ExpectNoError(err)
+		}
+		counts[strategy] = count
+	}
+	return counts
+}
+
+// withNUMAScoreSelectionCheck runs a fixture and asserts what
+// numaScoreSelectionMetric did while it ran.
+//
+// expectedStrategy names the strategy the counter has to have moved under, or
+// "" when the fixture expected the strategy to change no selection at all.
+// Every other strategy has to stay put either way: the kubelet only ever
+// increments the label it is running, so a count turning up elsewhere is a
+// mislabelled metric rather than a placement the fixture missed.
+//
+// The assertion is on the direction, not the amount. How many merges a fixture
+// puts through the strategy depends on the topology manager scope and on how
+// many of the pods it sets the machine up with the strategy also moved, so
+// pinning the number down would restate the fixture rather than check the
+// metric.
+func withNUMAScoreSelectionCheck(ctx context.Context, expectedStrategy string, runFixture func()) {
+	ginkgo.GinkgoHelper()
+
+	before := numaScoreSelectionCounts(ctx)
+	runFixture()
+	after := numaScoreSelectionCounts(ctx)
+
+	for _, strategy := range numaAllocationStrategies {
+		delta := after[strategy] - before[strategy]
+		if strategy == expectedStrategy {
+			gomega.Expect(delta).To(gomega.BeNumerically(">", 0), "%s should have reported at least one selection changed by %s", numaScoreSelectionMetric, strategy)
+		} else {
+			gomega.Expect(delta).To(gomega.BeZero(), "%s should not have moved under %s, it went up by %v", numaScoreSelectionMetric, strategy, delta)
+		}
+	}
+}
+
 func numaScoreWeightsOptions(strategy, weights string) map[string]string {
 	return map[string]string{
 		topologymanager.NUMAAllocationStrategy: strategy,
@@ -1782,23 +1850,50 @@ func runNUMAAllocationStrategyTests(f *framework.Framework) {
 		for _, scope := range []string{containerScopeTopology, podScopeTopology} {
 			ginkgo.By(fmt.Sprintf("running the numa-allocation-strategy tests with the %s topology manager scope", scope))
 
+			// Every fixture below also asserts the alpha selection counter,
+			// which is what an operator has to go on to tell that the option is
+			// not merely configured but actually steering placement. Asserting
+			// it here rather than in a suite of its own keeps the counter tied
+			// to a placement the fixture has already checked: a counter moving
+			// while the pod did not, or the other way round, is a failure.
 			updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaAllocationStrategyOptions(topologymanager.NUMAAllocationStrategyLeastAllocated), true), true)
-			runNUMASpreadingTest(ctx, f, env, true)
-			runNUMAScopeSpreadingTest(ctx, f, env, scope)
+			withNUMAScoreSelectionCheck(ctx, topologymanager.NUMAAllocationStrategyLeastAllocated, func() {
+				runNUMASpreadingTest(ctx, f, env, true)
+			})
+			// Under the pod scope the two containers are merged as one against
+			// a machine whose NUMA nodes are all still idle, so the scores tie
+			// and the strategy changes nothing. The counter has to say the same
+			// thing the placement does.
+			scopeSpreadingStrategy := topologymanager.NUMAAllocationStrategyLeastAllocated
+			if scope == podScopeTopology {
+				scopeSpreadingStrategy = ""
+			}
+			withNUMAScoreSelectionCheck(ctx, scopeSpreadingStrategy, func() {
+				runNUMAScopeSpreadingTest(ctx, f, env, scope)
+			})
 
 			updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaAllocationStrategyOptions(topologymanager.NUMAAllocationStrategyMostAllocated), true), true)
-			runNUMAPackingTest(ctx, f, env, true)
-			runNUMAScopePackingTest(ctx, f, env)
+			withNUMAScoreSelectionCheck(ctx, topologymanager.NUMAAllocationStrategyMostAllocated, func() {
+				runNUMAPackingTest(ctx, f, env, true)
+			})
+			withNUMAScoreSelectionCheck(ctx, topologymanager.NUMAAllocationStrategyMostAllocated, func() {
+				runNUMAScopePackingTest(ctx, f, env)
+			})
 
 			// Both fixtures must fall back to the default placement when the
-			// strategy is none, and when the alpha policy options are gated off.
+			// strategy is none, and when the alpha policy options are gated
+			// off, and the counter must stay where it is in both cases.
 			updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaAllocationStrategyOptions(topologymanager.NUMAAllocationStrategyNone), true), true)
-			runNUMASpreadingTest(ctx, f, env, false)
-			runNUMAPackingTest(ctx, f, env, false)
+			withNUMAScoreSelectionCheck(ctx, "", func() {
+				runNUMASpreadingTest(ctx, f, env, false)
+				runNUMAPackingTest(ctx, f, env, false)
+			})
 
 			updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, map[string]string{}, false), true)
-			runNUMASpreadingTest(ctx, f, env, false)
-			runNUMAPackingTest(ctx, f, env, false)
+			withNUMAScoreSelectionCheck(ctx, "", func() {
+				runNUMASpreadingTest(ctx, f, env, false)
+				runNUMAPackingTest(ctx, f, env, false)
+			})
 		}
 	})
 
@@ -1835,13 +1930,22 @@ func runNUMAScoreWeightsTests(f *framework.Framework) {
 		// enough here. The scope coverage lives with the strategy tests.
 		scope := containerScopeTopology
 
+		// The selection counter is asserted alongside each fixture: weights
+		// which leave the strategy nothing to act on have to leave the counter
+		// at zero too, even though the strategy itself is configured and the
+		// alpha options are on. That is the case the counter exists to tell
+		// apart from a working one.
 		ginkgo.By("checking that weighting cpu at 0 leaves least-allocated with nothing to spread on")
 		updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaScoreWeightsOptions(topologymanager.NUMAAllocationStrategyLeastAllocated, "cpu=0"), true), true)
-		runNUMASpreadingTest(ctx, f, env, false)
+		withNUMAScoreSelectionCheck(ctx, "", func() {
+			runNUMASpreadingTest(ctx, f, env, false)
+		})
 
 		ginkgo.By("checking that weighting cpu at 0 leaves most-allocated with nothing to pack on")
 		updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaScoreWeightsOptions(topologymanager.NUMAAllocationStrategyMostAllocated, "cpu=0"), true), true)
-		runNUMAPackingTest(ctx, f, env, false)
+		withNUMAScoreSelectionCheck(ctx, "", func() {
+			runNUMAPackingTest(ctx, f, env, false)
+		})
 
 		// A weight which does not exclude cpu leaves a single contributor
 		// normalized against itself, which is the equal-weight average the
@@ -1850,7 +1954,9 @@ func runNUMAScoreWeightsTests(f *framework.Framework) {
 		// does with no weights configured at all.
 		ginkgo.By("checking that weights which do not exclude cpu leave least-allocated alone")
 		updateKubeletConfig(ctx, f, configureNUMAAllocationInKubelet(oldCfg, scope, numaScoreWeightsOptions(topologymanager.NUMAAllocationStrategyLeastAllocated, "cpu=50,memory=50"), true), true)
-		runNUMASpreadingTest(ctx, f, env, true)
+		withNUMAScoreSelectionCheck(ctx, topologymanager.NUMAAllocationStrategyLeastAllocated, func() {
+			runNUMASpreadingTest(ctx, f, env, true)
+		})
 	})
 
 	ginkgo.AfterEach(func(ctx context.Context) {
