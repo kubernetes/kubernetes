@@ -52,6 +52,12 @@ const (
 	BackOffPullImage        = "BackOff"
 )
 
+// Security profile event reason list
+const (
+	PulledSecurityProfile       = "SecurityProfilePulled"
+	FailedToPullSecurityProfile = "SecurityProfilePullFailed"
+)
+
 // kubelet event reason list
 const (
 	NodeReady                            = "NodeReady"
