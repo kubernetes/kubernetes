@@ -1928,9 +1928,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// currently: "container", "init container" or "ephemeral container"
 	// metricLabel is the label used to describe this type of container in monitoring metrics.
 	// currently: "container", "init_container" or "ephemeral_container"
+	var resultMutex sync.Mutex
 	startWithInitState := func(ctx context.Context, typeName, metricLabel string, spec *startSpec, podSandboxConfig *runtimeapi.PodSandboxConfig, imageVolumePullResults imageVolumePulls) error {
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, spec.container.Name)
+		resultMutex.Lock()
 		result.AddSyncResult(startContainerResult)
+		resultMutex.Unlock()
 
 		isInBackOff, msg, err := m.doBackOff(ctx, pod, spec.container, podStatus, backOff)
 		if isInBackOff {
@@ -2022,13 +2025,27 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// These are started "prior" to init containers to allow running ephemeral containers even when there
 	// are errors starting an init container. In practice init containers will start first since ephemeral
 	// containers cannot be specified on pod creation.
-	for _, idx := range podContainerChanges.EphemeralContainersToStart {
+	if len(podContainerChanges.EphemeralContainersToStart) > 0 {
 		start := lazyStart()
 		if start == nil {
 			return
 		}
-
-		start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+			var wg sync.WaitGroup
+			for _, idx := range podContainerChanges.EphemeralContainersToStart {
+				wg.Add(1)
+				go func(idx int) {
+					defer wg.Done()
+					defer utilruntime.HandleCrashWithContext(ctx)
+					_ = start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
+				}(idx)
+			}
+			wg.Wait()
+		} else {
+			for _, idx := range podContainerChanges.EphemeralContainersToStart {
+				_ = start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
+			}
+		}
 	}
 
 	// Step 8: start init containers.
@@ -2069,13 +2086,27 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	// Step 9: start containers in podContainerChanges.ContainersToStart.
-	for _, idx := range podContainerChanges.ContainersToStart {
+	if len(podContainerChanges.ContainersToStart) > 0 {
 		start := lazyStart()
 		if start == nil {
 			return
 		}
-
-		start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+			var wg sync.WaitGroup
+			for _, idx := range podContainerChanges.ContainersToStart {
+				wg.Add(1)
+				go func(idx int) {
+					defer wg.Done()
+					defer utilruntime.HandleCrashWithContext(ctx)
+					_ = start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
+				}(idx)
+			}
+			wg.Wait()
+		} else {
+			for _, idx := range podContainerChanges.ContainersToStart {
+				_ = start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
+			}
+		}
 	}
 
 	return result

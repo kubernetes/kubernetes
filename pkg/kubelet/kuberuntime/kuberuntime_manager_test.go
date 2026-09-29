@@ -7378,3 +7378,97 @@ func TestGetImageVolumesParallel(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, pulls, 2)
 }
+
+func TestSyncPodParallelContainerStarts(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletParallelContainerOps, true)
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	var (
+		enteredWg sync.WaitGroup
+		releaseCh = make(chan struct{})
+	)
+	enteredWg.Add(3)
+	go func() {
+		enteredWg.Wait()
+		close(releaseCh)
+	}()
+
+	m.runtimeService = &barrierRuntimeService{
+		FakeRuntimeService: fakeRuntime,
+		onCreateContainer: func(ctx context.Context, _ string, config *runtimeapi.ContainerConfig, _ *runtimeapi.PodSandboxConfig) error {
+			if config.Metadata.Name == "fail-container" {
+				enteredWg.Done()
+				<-releaseCh
+				return errors.New("injected create failure")
+			}
+			enteredWg.Done()
+			<-releaseCh
+			return nil
+		},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "parallel-start-uid",
+			Name:      "parallel-start-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "c1", Image: "busybox", ImagePullPolicy: v1.PullIfNotPresent},
+				{Name: "fail-container", Image: "busybox", ImagePullPolicy: v1.PullIfNotPresent},
+				{Name: "c2", Image: "alpine", ImagePullPolicy: v1.PullIfNotPresent},
+			},
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+	// SyncPod returns an error because fail-container failed, but c1 and c2 must still be created and started concurrently.
+	require.Error(t, result.Error())
+	assert.Len(t, fakeRuntime.Containers, 2)
+	for _, c := range fakeRuntime.Containers {
+		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
+	}
+}
+
+func TestSyncPodParallelEphemeralContainerStarts(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletParallelContainerOps, true)
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod, podStatus := makeBasePodAndStatus()
+	pod.Spec.EphemeralContainers = []v1.EphemeralContainer{
+		{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "eph1", Image: "busybox", ImagePullPolicy: v1.PullIfNotPresent}},
+		{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "eph2", Image: "alpine", ImagePullPolicy: v1.PullIfNotPresent}},
+	}
+
+	var (
+		enteredWg sync.WaitGroup
+		releaseCh = make(chan struct{})
+	)
+	enteredWg.Add(2)
+	go func() {
+		enteredWg.Wait()
+		close(releaseCh)
+	}()
+
+	m.runtimeService = &barrierRuntimeService{
+		FakeRuntimeService: fakeRuntime,
+		onCreateContainer: func(ctx context.Context, _ string, _ *runtimeapi.ContainerConfig, _ *runtimeapi.PodSandboxConfig) error {
+			enteredWg.Done()
+			<-releaseCh
+			return nil
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+	assert.Len(t, fakeRuntime.Containers, 2)
+}
