@@ -180,14 +180,17 @@ func NewEmptySnapshot() *Snapshot {
 }
 
 // NewSnapshot initializes a Snapshot struct and returns it.
+// Nodes are listed in the order of nodes, followed by the node names that only
+// appear in pods, in pod order.
 // It should be used only in the tests.
 func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
-	nodeInfoMap := createNodeInfoMap(pods, nodes)
+	nodeInfoMap, nodeNames := createNodeInfoMap(pods, nodes)
 	nodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithRequiredAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
-	for _, v := range nodeInfoMap {
+	for _, nodeName := range nodeNames {
+		v := nodeInfoMap[nodeName]
 		nodeInfoList = append(nodeInfoList, v)
 		if len(v.PodsWithAffinity) > 0 {
 			havePodsWithAffinityNodeInfoList = append(havePodsWithAffinityNodeInfoList, v)
@@ -315,27 +318,33 @@ func (s *Snapshot) EndMutations() error {
 
 // createNodeInfoMap obtains a list of pods and pivots that list into a map
 // where the keys are node names and the values are the aggregated information
-// for that node.
-func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.NodeInfo {
+// for that node. It also returns the map's keys in the order of nodes, followed
+// by the node names that only appear in pods, in pod order.
+func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) (map[string]*framework.NodeInfo, []string) {
 	nodeNameToInfo := make(map[string]*framework.NodeInfo)
-	for _, pod := range pods {
-		nodeName := pod.Spec.NodeName
-		if _, ok := nodeNameToInfo[nodeName]; !ok {
-			nodeNameToInfo[nodeName] = framework.NewNodeInfo()
+	nodeNames := make([]string, 0, len(nodes))
+	// getOrCreate is the only place that adds to nodeNameToInfo, so nodeNames
+	// holds each of its keys exactly once.
+	getOrCreate := func(nodeName string) *framework.NodeInfo {
+		nodeInfo, ok := nodeNameToInfo[nodeName]
+		if !ok {
+			nodeInfo = framework.NewNodeInfo()
+			nodeNameToInfo[nodeName] = nodeInfo
+			nodeNames = append(nodeNames, nodeName)
 		}
-		nodeNameToInfo[nodeName].AddPod(pod)
+		return nodeInfo
 	}
-	imageExistenceMap := createImageExistenceMap(nodes)
 
+	imageExistenceMap := createImageExistenceMap(nodes)
 	for _, node := range nodes {
-		if _, ok := nodeNameToInfo[node.Name]; !ok {
-			nodeNameToInfo[node.Name] = framework.NewNodeInfo()
-		}
-		nodeInfo := nodeNameToInfo[node.Name]
+		nodeInfo := getOrCreate(node.Name)
 		nodeInfo.SetNode(node)
 		nodeInfo.ImageStates = getNodeImageStates(node, imageExistenceMap)
 	}
-	return nodeNameToInfo
+	for _, pod := range pods {
+		getOrCreate(pod.Spec.NodeName).AddPod(pod)
+	}
+	return nodeNameToInfo, nodeNames
 }
 
 func createUsedPVCRefCounts(nodeInfoMap map[string]*framework.NodeInfo) map[string]int {
