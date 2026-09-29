@@ -32,7 +32,7 @@ type PodSpecTestcase struct {
 }
 
 func InvalidPodSpecTestcases(fldPath *field.Path) []PodSpecTestcase {
-	return []PodSpecTestcase{
+	testcases := []PodSpecTestcase{
 		{
 			ID:     "containers_required",
 			Tweaks: []podtest.Tweak{podtest.SetContainers()},
@@ -41,4 +41,5 @@ func InvalidPodSpecTestcases(fldPath *field.Path) []PodSpecTestcase {
 			},
 		},
 	}
+	return append(testcases, securityProfileOCITestcases(fldPath)...)
 }

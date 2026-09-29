@@ -837,7 +837,14 @@
               "procMount": "procMountValue",
               "seccompProfile": {
                 "type": "typeValue",
-                "localhostProfile": "localhostProfileValue"
+                "localhostProfile": "localhostProfileValue",
+                "oci": {
+                  "ref": "refValue",
+                  "baseProfile": {
+                    "type": "typeValue",
+                    "localhostProfile": "localhostProfileValue"
+                  }
+                }
               },
               "appArmorProfile": {
                 "type": "typeValue",
@@ -1162,7 +1169,14 @@
               "procMount": "procMountValue",
               "seccompProfile": {
                 "type": "typeValue",
-                "localhostProfile": "localhostProfileValue"
+                "localhostProfile": "localhostProfileValue",
+                "oci": {
+                  "ref": "refValue",
+                  "baseProfile": {
+                    "type": "typeValue",
+                    "localhostProfile": "localhostProfileValue"
+                  }
+                }
               },
               "appArmorProfile": {
                 "type": "typeValue",
@@ -1487,7 +1501,14 @@
               "procMount": "procMountValue",
               "seccompProfile": {
                 "type": "typeValue",
-                "localhostProfile": "localhostProfileValue"
+                "localhostProfile": "localhostProfileValue",
+                "oci": {
+                  "ref": "refValue",
+                  "baseProfile": {
+                    "type": "typeValue",
+                    "localhostProfile": "localhostProfileValue"
+                  }
+                }
               },
               "appArmorProfile": {
                 "type": "typeValue",
@@ -1545,7 +1566,14 @@
           "fsGroupChangePolicy": "fsGroupChangePolicyValue",
           "seccompProfile": {
             "type": "typeValue",
-            "localhostProfile": "localhostProfileValue"
+            "localhostProfile": "localhostProfileValue",
+            "oci": {
+              "ref": "refValue",
+              "baseProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            }
           },
           "appArmorProfile": {
             "type": "typeValue",

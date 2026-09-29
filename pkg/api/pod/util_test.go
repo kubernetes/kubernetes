@@ -7362,3 +7362,78 @@ func TestGetValidationOptionsAllowMLDSAPodCertificateKeyTypes(t *testing.T) {
 		})
 	}
 }
+
+// TestSecurityProfileOCIValidationOption checks that nothing drops the oci
+// field and that the option follows the gate or the old pod's use of OCI.
+func TestSecurityProfileOCIValidationOption(t *testing.T) {
+	ociProfile := func() *api.SeccompProfile {
+		return &api.SeccompProfile{
+			Type: api.SeccompProfileTypeOCI,
+			OCI:  &api.SecurityProfileOCI{Ref: "registry.example.com/profile@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		}
+	}
+	podWithPodOCI := func() *api.Pod {
+		return &api.Pod{Spec: api.PodSpec{
+			SecurityContext: &api.PodSecurityContext{SeccompProfile: ociProfile()},
+			Containers:      []api.Container{{Name: "c"}},
+		}}
+	}
+	podWithContainerOCI := func() *api.Pod {
+		return &api.Pod{Spec: api.PodSpec{
+			InitContainers: []api.Container{{Name: "init", SecurityContext: &api.SecurityContext{SeccompProfile: ociProfile()}}},
+			Containers:     []api.Container{{Name: "c", SecurityContext: &api.SecurityContext{SeccompProfile: ociProfile()}}},
+		}}
+	}
+	podWithoutOCI := func() *api.Pod {
+		return &api.Pod{Spec: api.PodSpec{
+			SecurityContext: &api.PodSecurityContext{SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}},
+			Containers:      []api.Container{{Name: "c"}},
+		}}
+	}
+
+	pods := map[string]struct {
+		pod    func() *api.Pod
+		hasOCI bool
+	}{
+		"pod-level OCI":       {pod: podWithPodOCI, hasOCI: true},
+		"container-level OCI": {pod: podWithContainerOCI, hasOCI: true},
+		"no OCI":              {pod: podWithoutOCI},
+		"nil":                 {pod: func() *api.Pod { return nil }},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for oldName, oldInfo := range pods {
+			for newName, newInfo := range pods {
+				if newName == "nil" {
+					continue
+				}
+				t.Run(fmt.Sprintf("enabled=%v, old=%s, new=%s", enabled, oldName, newName), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SecurityProfileOCI, enabled)
+
+					oldPod := oldInfo.pod()
+					newPod := newInfo.pod()
+					DropDisabledPodFields(newPod, oldPod)
+
+					// The old pod is never changed.
+					if oldPod != nil && !reflect.DeepEqual(oldPod, oldInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldInfo.pod(), oldPod))
+					}
+
+					if !reflect.DeepEqual(newPod, newInfo.pod()) {
+						t.Errorf("new pod changed: %v", cmp.Diff(newInfo.pod(), newPod))
+					}
+					keep := enabled || oldInfo.hasOCI
+
+					var oldSpec *api.PodSpec
+					if oldPod != nil {
+						oldSpec = &oldPod.Spec
+					}
+					opts := GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, oldSpec, nil, nil)
+					if opts.AllowSecurityProfileOCI != keep {
+						t.Errorf("expected AllowSecurityProfileOCI=%v, got %v", keep, opts.AllowSecurityProfileOCI)
+					}
+				})
+			}
+		}
+	}
+}

@@ -435,6 +435,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
 		AllowSysAdminWhenPrivilegeEscalationFalse:               false,
 		AllowMLDSAPodCertificateKeyTypes:                        utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateMLDSA),
+		AllowSecurityProfileOCI:                                 utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -494,6 +495,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		// If old spec has a projected pod certificate requesting an ML-DSA key type, allow it
 		opts.AllowMLDSAPodCertificateKeyTypes = opts.AllowMLDSAPodCertificateKeyTypes || hasMLDSAPodCertificateProjection(oldPodSpec.Volumes)
+
+		// If old spec uses a seccomp profile of type OCI, allow it
+		opts.AllowSecurityProfileOCI = opts.AllowSecurityProfileOCI || seccompProfileOCIInUse(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -1398,6 +1402,29 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 		return true
 	})
 
+	return inUse
+}
+
+// seccompProfileOCIInUse returns true if the pod spec or any of its containers
+// uses a seccomp profile of type OCI.
+func seccompProfileOCIInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	usesOCI := func(p *api.SeccompProfile) bool {
+		return p != nil && p.Type == api.SeccompProfileTypeOCI
+	}
+	if podSpec.SecurityContext != nil && usesOCI(podSpec.SecurityContext.SeccompProfile) {
+		return true
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.SecurityContext != nil && usesOCI(c.SecurityContext.SeccompProfile) {
+			inUse = true
+			return false
+		}
+		return true
+	})
 	return inUse
 }
 

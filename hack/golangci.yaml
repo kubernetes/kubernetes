@@ -365,6 +365,12 @@ linters:
       # EvictionResponder.Priority reserves priorities 0-999 for *.k8s.io responders.
       - text: 'forbiddenmarkers: field EvictionResponder.Priority has forbidden marker "k8s:customValidation"'
         path: "staging/src/k8s.io/api/core/v1/types.go"
+      # SecurityProfileOCI.Ref must be a canonical, digest-pinned OCI reference without a tag.
+      - text: 'forbiddenmarkers: field SecurityProfileOCI.Ref has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      # SecurityProfileOCIBase.LocalhostProfile must be a relative path without ".." elements.
+      - text: 'forbiddenmarkers: field SecurityProfileOCIBase.LocalhostProfile has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
       # EvictionRequestSpec.Requester has the same reserved-domain rule as EvictionResponder.Name.
       - text: 'forbiddenmarkers: field EvictionRequestSpec.Requester has forbidden marker "k8s:customValidation"'
         path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"

@@ -1072,6 +1072,16 @@ func (in SecurityContext) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SecurityProfileOCI) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.SecurityProfileOCI"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SecurityProfileOCIBase) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.SecurityProfileOCIBase"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in SerializedReference) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.SerializedReference"
 }
