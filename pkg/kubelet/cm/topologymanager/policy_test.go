@@ -1612,7 +1612,7 @@ func TestCompareHintsNarrowest(t *testing.T) {
 			merger := NewHintMerger(numaInfo, nil, PolicyBestEffort, PolicyOptions{})
 			merger.BestNonPreferredAffinityCount = tc.bestNonPreferredAffinityCount
 
-			result := merger.compare(tc.current, tc.candidate)
+			result := merger.compare(merger.CompareNUMAAffinityMasks, tc.current, tc.candidate)
 			if result != tc.current && result != tc.candidate {
 				t.Errorf("Expected result to be either 'current' or 'candidate' hint")
 			}
@@ -2018,7 +2018,7 @@ func TestCompareWinnerUnchangedByScore(t *testing.T) {
 			if tc.expectCurrent {
 				expected = tc.current
 			}
-			result := merger.compare(tc.current, tc.candidate)
+			result := merger.compare(merger.CompareNUMAAffinityMasks, tc.current, tc.candidate)
 			if result != expected {
 				t.Errorf("expected hint %v (Score %d) to win, got %v (Score %d)",
 					expected.NUMANodeAffinity, expected.Score, result.NUMANodeAffinity, result.Score)
