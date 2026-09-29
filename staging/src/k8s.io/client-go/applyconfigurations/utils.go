@@ -980,6 +980,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.SecretVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("SecurityContext"):
 		return &applyconfigurationscorev1.SecurityContextApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("SecurityProfileOCI"):
+		return &applyconfigurationscorev1.SecurityProfileOCIApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("SecurityProfileOCIBase"):
+		return &applyconfigurationscorev1.SecurityProfileOCIBaseApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("SELinuxOptions"):
 		return &applyconfigurationscorev1.SELinuxOptionsApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Service"):

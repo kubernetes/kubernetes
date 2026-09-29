@@ -34,12 +34,22 @@ type SeccompProfileApplyConfiguration struct {
 	// Localhost - a profile defined in a file on the node should be used.
 	// RuntimeDefault - the container runtime default profile should be used.
 	// Unconfined - no profile should be applied.
+	// OCI - a profile pulled from an OCI registry should be used, merged with the
+	// container runtime's configured baseline. Privileged containers cannot use
+	// it, whether it is set on the container or inherited from the pod. This is
+	// an alpha value and requires enabling the SecurityProfileOCI feature gate.
 	Type *corev1.SeccompProfileType `json:"type,omitempty"`
 	// localhostProfile indicates a profile defined in a file on the node should be used.
 	// The profile must be preconfigured on the node to work.
 	// Must be a descending path, relative to the kubelet's configured seccomp profile location.
 	// Must be set if type is "Localhost". Must NOT be set for any other type.
 	LocalhostProfile *string `json:"localhostProfile,omitempty"`
+	// oci specifies a seccomp profile stored as an artifact in an OCI registry.
+	// The container runtime merges the profile with its configured baseline, so
+	// the effective profile permits an operation only if all inputs permit it.
+	// Must be set if type is "OCI". Must NOT be set for any other type.
+	// This is an alpha field and requires enabling the SecurityProfileOCI feature gate.
+	OCI *SecurityProfileOCIApplyConfiguration `json:"oci,omitempty"`
 }
 
 // SeccompProfileApplyConfiguration constructs a declarative configuration of the SeccompProfile type for use with
@@ -61,5 +71,13 @@ func (b *SeccompProfileApplyConfiguration) WithType(value corev1.SeccompProfileT
 // If called multiple times, the LocalhostProfile field is set to the value of the last call.
 func (b *SeccompProfileApplyConfiguration) WithLocalhostProfile(value string) *SeccompProfileApplyConfiguration {
 	b.LocalhostProfile = &value
+	return b
+}
+
+// WithOCI sets the OCI field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the OCI field is set to the value of the last call.
+func (b *SeccompProfileApplyConfiguration) WithOCI(value *SecurityProfileOCIApplyConfiguration) *SeccompProfileApplyConfiguration {
+	b.OCI = value
 	return b
 }

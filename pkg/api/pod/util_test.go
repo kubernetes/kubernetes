@@ -8245,3 +8245,86 @@ func TestGetValidationOptionsAllowMLDSAPodCertificateKeyTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestDropDisabledSeccompProfileOCI(t *testing.T) {
+	ociProfile := func() *api.SeccompProfile {
+		return &api.SeccompProfile{
+			Type: api.SeccompProfileTypeOCI,
+			OCI:  &api.SecurityProfileOCI{Ref: "registry.example.com/profile@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		}
+	}
+	podWithPodOCI := func() *api.Pod {
+		return &api.Pod{Spec: api.PodSpec{
+			SecurityContext: &api.PodSecurityContext{SeccompProfile: ociProfile()},
+			Containers:      []api.Container{{Name: "c"}},
+		}}
+	}
+	podWithContainerOCI := func() *api.Pod {
+		return &api.Pod{Spec: api.PodSpec{
+			InitContainers: []api.Container{{Name: "init", SecurityContext: &api.SecurityContext{SeccompProfile: ociProfile()}}},
+			Containers:     []api.Container{{Name: "c", SecurityContext: &api.SecurityContext{SeccompProfile: ociProfile()}}},
+		}}
+	}
+	podWithoutOCI := func() *api.Pod {
+		return &api.Pod{Spec: api.PodSpec{
+			SecurityContext: &api.PodSecurityContext{SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}},
+			Containers:      []api.Container{{Name: "c"}},
+		}}
+	}
+	hasOCIField := func(pod *api.Pod) bool {
+		found := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil && pod.Spec.SecurityContext.SeccompProfile.OCI != nil
+		VisitContainers(&pod.Spec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+			if c.SecurityContext != nil && c.SecurityContext.SeccompProfile != nil && c.SecurityContext.SeccompProfile.OCI != nil {
+				found = true
+			}
+			return true
+		})
+		return found
+	}
+
+	pods := map[string]struct {
+		pod    func() *api.Pod
+		hasOCI bool
+	}{
+		"pod-level OCI":       {pod: podWithPodOCI, hasOCI: true},
+		"container-level OCI": {pod: podWithContainerOCI, hasOCI: true},
+		"no OCI":              {pod: podWithoutOCI},
+		"nil":                 {pod: func() *api.Pod { return nil }},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for oldName, oldInfo := range pods {
+			for newName, newInfo := range pods {
+				if newName == "nil" {
+					continue
+				}
+				t.Run(fmt.Sprintf("enabled=%v, old=%s, new=%s", enabled, oldName, newName), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SecurityProfileOCI, enabled)
+
+					oldPod := oldInfo.pod()
+					newPod := newInfo.pod()
+					DropDisabledPodFields(newPod, oldPod)
+
+					// The old pod is never changed.
+					if oldPod != nil && !reflect.DeepEqual(oldPod, oldInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldInfo.pod(), oldPod))
+					}
+
+					keep := enabled || oldInfo.hasOCI
+					if want := newInfo.hasOCI && keep; hasOCIField(newPod) != want {
+						t.Errorf("expected oci field present=%v, got %v", want, hasOCIField(newPod))
+					}
+
+					var oldSpec *api.PodSpec
+					if oldPod != nil {
+						oldSpec = &oldPod.Spec
+					}
+					opts := GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, oldSpec, nil, nil)
+					if opts.AllowSecurityProfileOCI != keep {
+						t.Errorf("expected AllowSecurityProfileOCI=%v, got %v", keep, opts.AllowSecurityProfileOCI)
+					}
+				})
+			}
+		}
+	}
+}
