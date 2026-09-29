@@ -205,7 +205,7 @@ func (m *kubeGenericRuntimeManager) getPodRuntimeHandler(pod *v1.Pod) (podRuntim
 
 // startContainer starts a container and returns a message indicates why it is failed on error.
 // It starts the container through the following steps:
-// * pull the image
+// * pull the security profile and the image
 // * create the container
 // * start the container
 // * run the post start lifecycle hooks (if applicable)
@@ -213,7 +213,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	logger := klog.FromContext(ctx)
 	container := spec.container
 
-	// Step 1: pull the image.
+	// Step 1: pull the security profile and the image.
 	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
 	if err != nil {
 		return "", err
@@ -222,6 +222,11 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		logger.Error(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod), "containerName", container.Name)
+	}
+
+	if msg, err := m.ensureContainerSecurityProfile(ctx, ref, pod, container, pullSecrets, podSandboxConfig, podRuntimeHandler); err != nil {
+		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", msg)
+		return msg, err
 	}
 
 	imageRef, msg, err := m.imagePuller.EnsureImageExists(ctx, ref, pod, container.Image, pullSecrets, podSandboxConfig, podRuntimeHandler, container.ImagePullPolicy)

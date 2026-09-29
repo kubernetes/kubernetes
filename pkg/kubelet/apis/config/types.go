@@ -281,6 +281,8 @@ type KubeletConfiguration struct {
 	// ImageMaximumGCAge is the maximum age an image can be unused before it is garbage collected.
 	// The default of this field is "0s", which disables this field--meaning images won't be garbage
 	// collected based on being unused for too long.
+	// It also applies to the seccomp profiles of type OCI that the kubelet pulled (SecurityProfileOCI
+	// feature gate), which are removed once no pod has referenced them for this long.
 	ImageMaximumGCAge metav1.Duration
 	// imageGCHighThresholdPercent is the percent of disk usage after which
 	// image garbage collection is always run. The percent is calculated as
