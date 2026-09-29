@@ -86,14 +86,6 @@ func (s *snapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
 	return result.snapshot, true
 }
 
-func (s *snapshotter) Latest() (Snapshot, bool) {
-	max, ok := s.snapshots.Max()
-	if !ok {
-		return nil, false
-	}
-	return max.snapshot, true
-}
-
 func (s *snapshotter) Add(rv uint64, snapshot Snapshot) {
 	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: snapshot})
 }
