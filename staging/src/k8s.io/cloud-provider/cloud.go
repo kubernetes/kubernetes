@@ -329,7 +329,17 @@ type InstanceMetadata struct {
 	Region string
 
 	// AdditionalLabels is a map of additional labels provided by the cloud provider.
-	// When provided, they will be applied to the node and enable cloud providers
-	// to labels nodes with information that may be valuable to that provider.
+	// When provided, they are applied during node initialization. If the
+	// CloudNodeAdditionalLabelsReconciliation feature gate is enabled, missing
+	// labels and changed values are also reconciled when the cloud node controller
+	// starts and every node status update interval afterwards (five minutes by
+	// default, configurable via --node-status-update-frequency). This feature gate
+	// is disabled by default. When enabled, provider values overwrite changes to
+	// the same labels made by other actors. Labels that are no longer returned by
+	// the cloud provider are not removed.
+	//
+	// The cloud node controller only reads this map. Providers must ensure it is
+	// not modified while the controller consumes it. Providers with mutable cached
+	// labels should return a copy made under their own synchronization.
 	AdditionalLabels map[string]string
 }
