@@ -106,7 +106,7 @@ type Runtime interface {
 	GarbageCollect(ctx context.Context, gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// SyncPod syncs the running pod into the desired pod.
 	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) PodSyncResult
-	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
+	// KillPod kills all the containers of a pod. pod must not be nil.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
 	// only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
