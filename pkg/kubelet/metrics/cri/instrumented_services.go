@@ -317,6 +317,33 @@ func (in instrumentedImageManagerService) PullImage(ctx context.Context, image *
 	return imageRef, err
 }
 
+func (in instrumentedImageManagerService) PullSecurityProfile(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (*runtimeapi.PullSecurityProfileResponse, error) {
+	const operation = "pull_security_profile"
+	defer recordOperation(operation, time.Now())
+
+	resp, err := in.service.PullSecurityProfile(ctx, image, auth, podSandboxConfig, kind)
+	recordError(operation, err)
+	return resp, err
+}
+
+func (in instrumentedImageManagerService) ListSecurityProfiles(ctx context.Context) ([]*runtimeapi.SecurityProfileInfo, error) {
+	const operation = "list_security_profiles"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.ListSecurityProfiles(ctx)
+	recordError(operation, err)
+	return out, err
+}
+
+func (in instrumentedImageManagerService) RemoveSecurityProfile(ctx context.Context, digest string) error {
+	const operation = "remove_security_profile"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.RemoveSecurityProfile(ctx, digest)
+	recordError(operation, err)
+	return err
+}
+
 func (in instrumentedImageManagerService) RemoveImage(ctx context.Context, image *runtimeapi.ImageSpec) error {
 	const operation = "remove_image"
 	defer recordOperation(operation, time.Now())
