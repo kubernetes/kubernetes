@@ -23,8 +23,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -1135,5 +1137,899 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected pod to be removed from both cache and queue after deletion: %v", err)
 		}
+	})
+}
+
+func updatePodToDeferredResize(ctx context.Context, cs clientset.Interface, pod *v1.Pod, allocatedCPU, allocatedMem string) (*v1.Pod, error) {
+	pod.Status.Phase = v1.PodRunning
+	pod.Status.Conditions = []v1.PodCondition{
+		{
+			Type:   v1.PodScheduled,
+			Status: v1.ConditionTrue,
+		},
+		{
+			Type:   v1.PodResizePending,
+			Status: v1.ConditionTrue,
+			Reason: v1.PodReasonDeferred,
+		},
+	}
+	pod.Status.ContainerStatuses = []v1.ContainerStatus{
+		{
+			Name: pod.Name,
+			AllocatedResources: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse(allocatedCPU),
+				v1.ResourceMemory: resource.MustParse(allocatedMem),
+			},
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(allocatedCPU),
+					v1.ResourceMemory: resource.MustParse(allocatedMem),
+				},
+			},
+		},
+	}
+	return cs.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+}
+
+func addPodReadyCondition(pod *v1.Pod) {
+	pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{
+		Type:   v1.PodReady,
+		Status: v1.ConditionTrue,
+	})
+}
+
+func TestDeferredResizePodPreemption_PDBCompliance(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.InPlacePodVerticalScaling:                    true,
+		features.InPlacePodVerticalScalingSchedulerPreemption: true,
+	})
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: new(v1.DefaultSchedulerName),
+		}},
+	})
+
+	t.Run("prefer non-PDB violating pod over lower priority PDB protected pod", func(t *testing.T) {
+		testCtx := testutils.InitTestSchedulerWithOptions(t,
+			testutils.InitTestAPIServer(t, "def-resize-pdb-1", nil),
+			0,
+			scheduler.WithProfiles(cfg.Profiles...))
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		testutils.InitDisruptionController(t, testCtx)
+		cs := testCtx.ClientSet
+		ns := testCtx.NS.Name
+
+		nodeName := "pdb-node-1"
+		node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "400m",
+			v1.ResourceMemory: "400Mi",
+		}).Label("node", nodeName).Obj()
+		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+		defer func() {
+			_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+		}()
+
+		// victim-pdb: priority Low (0), requests 100m CPU, protected by PDB minAvailable=1
+		victimPDB := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-pdb",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Labels:    map[string]string{"app": "pdb-app"},
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		victimPDB.Spec.NodeName = nodeName
+		victimPDB, err := runPausePod(cs, victimPDB)
+		if err != nil {
+			t.Fatalf("Failed to run victim-pdb: %v", err)
+		}
+		addPodReadyCondition(victimPDB)
+		if _, err := cs.CoreV1().Pods(ns).UpdateStatus(testCtx.Ctx, victimPDB, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("Failed to update status for victim-pdb: %v", err)
+		}
+
+		// victim-non-pdb: priority Mid (200), requests 200m CPU, not covered by PDB
+		victimNonPDB := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-non-pdb",
+			Namespace: ns,
+			Priority:  &asyncframework.MediumPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		victimNonPDB.Spec.NodeName = nodeName
+		victimNonPDB, err = runPausePod(cs, victimNonPDB)
+		if err != nil {
+			t.Fatalf("Failed to run victim-non-pdb: %v", err)
+		}
+		addPodReadyCondition(victimNonPDB)
+		if _, err := cs.CoreV1().Pods(ns).UpdateStatus(testCtx.Ctx, victimNonPDB, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("Failed to update status for victim-non-pdb: %v", err)
+		}
+
+		if err := testutils.WaitCachedPodsStable(testCtx, []*v1.Pod{victimPDB, victimNonPDB}); err != nil {
+			t.Fatalf("Pods not stable in cache: %v", err)
+		}
+
+		// Create PDB protecting victim-pdb (minAvailable: 1)
+		minAvailable := intstr.FromInt32(1)
+		pdb := &policyv1.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pdb-protect",
+				Namespace: ns,
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				MinAvailable: &minAvailable,
+				Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"app": "pdb-app"}},
+			},
+		}
+		if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx.Ctx, pdb, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create PDB: %v", err)
+		}
+
+		if err := testutils.WaitForPDBsStable(testCtx, []*policyv1.PodDisruptionBudget{pdb}, []int32{1}); err != nil {
+			t.Fatalf("PDB not stable: %v", err)
+		}
+
+		// Preemptor pod requesting resize from 100m to 300m CPU (needs 200m additional CPU)
+		preemptorPod := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-pod",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptorPod.Spec.NodeName = nodeName
+		preemptorPod, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptorPod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor pod: %v", err)
+		}
+		preemptorPod, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptorPod, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor to deferred resize: %v", err)
+		}
+
+		// Preemption should evict victim-non-pdb (200m freed) without violating PDB
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+			podIsGettingEvicted(cs, ns, "victim-non-pdb"))
+		if err != nil {
+			t.Fatalf("Expected victim-non-pdb to be evicted, got: %v", err)
+		}
+
+		// Ensure victim-pdb was NOT evicted
+		liveVictimPDB, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "victim-pdb", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get victim-pdb: %v", err)
+		}
+		if liveVictimPDB.DeletionTimestamp != nil {
+			t.Errorf("victim-pdb should NOT have been evicted")
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{victimPDB, victimNonPDB, preemptorPod})
+	})
+
+	t.Run("preempt lower priority pod even if it violates PDB when no non-violating alternative exists", func(t *testing.T) {
+		testCtx := testutils.InitTestSchedulerWithOptions(t,
+			testutils.InitTestAPIServer(t, "def-resize-pdb-2", nil),
+			0,
+			scheduler.WithProfiles(cfg.Profiles...))
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		testutils.InitDisruptionController(t, testCtx)
+		cs := testCtx.ClientSet
+		ns := testCtx.NS.Name
+
+		nodeName := "pdb-node-2"
+		node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "300m",
+			v1.ResourceMemory: "300Mi",
+		}).Label("node", nodeName).Obj()
+		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+		defer func() {
+			_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+		}()
+
+		// victim-pdb: only available victim on node, requests 200m CPU, protected by PDB minAvailable=1
+		victimPDB := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-pdb",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Labels:    map[string]string{"app": "pdb-app-only"},
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		victimPDB.Spec.NodeName = nodeName
+		victimPDB, err := runPausePod(cs, victimPDB)
+		if err != nil {
+			t.Fatalf("Failed to run victim-pdb: %v", err)
+		}
+		addPodReadyCondition(victimPDB)
+		if _, err := cs.CoreV1().Pods(ns).UpdateStatus(testCtx.Ctx, victimPDB, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("Failed to update status for victim-pdb: %v", err)
+		}
+
+		if err := testutils.WaitCachedPodsStable(testCtx, []*v1.Pod{victimPDB}); err != nil {
+			t.Fatalf("Pods not stable in cache: %v", err)
+		}
+
+		minAvailable := intstr.FromInt32(1)
+		pdb := &policyv1.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pdb-protect-only",
+				Namespace: ns,
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				MinAvailable: &minAvailable,
+				Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"app": "pdb-app-only"}},
+			},
+		}
+		if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx.Ctx, pdb, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create PDB: %v", err)
+		}
+
+		if err := testutils.WaitForPDBsStable(testCtx, []*policyv1.PodDisruptionBudget{pdb}, []int32{1}); err != nil {
+			t.Fatalf("PDB not stable: %v", err)
+		}
+
+		// Preemptor pod requesting resize from 100m to 300m CPU (needs 200m additional CPU)
+		preemptorPod := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-pod",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptorPod.Spec.NodeName = nodeName
+		preemptorPod, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptorPod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor pod: %v", err)
+		}
+		preemptorPod, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptorPod, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor to deferred resize: %v", err)
+		}
+
+		// Since no non-violating victim exists, preemption proceeds and evicts victim-pdb
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+			podIsGettingEvicted(cs, ns, "victim-pdb"))
+		if err != nil {
+			t.Fatalf("Expected victim-pdb to be evicted when no non-violating victim exists: %v", err)
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{victimPDB, preemptorPod})
+	})
+
+	t.Run("preemption allowed when PDB allows disruptions", func(t *testing.T) {
+		testCtx := testutils.InitTestSchedulerWithOptions(t,
+			testutils.InitTestAPIServer(t, "def-resize-pdb-3", nil),
+			0,
+			scheduler.WithProfiles(cfg.Profiles...))
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		testutils.InitDisruptionController(t, testCtx)
+		cs := testCtx.ClientSet
+		ns := testCtx.NS.Name
+
+		nodeName := "pdb-node-3"
+		node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "400m",
+			v1.ResourceMemory: "400Mi",
+		}).Label("node", nodeName).Obj()
+		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+		defer func() {
+			_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+		}()
+
+		// Two low priority pods matching the same PDB
+		v1Pod := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-1",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Labels:    map[string]string{"app": "pdb-group"},
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		v1Pod.Spec.NodeName = nodeName
+		v1Pod, err := runPausePod(cs, v1Pod)
+		if err != nil {
+			t.Fatalf("Failed to run victim-1: %v", err)
+		}
+		addPodReadyCondition(v1Pod)
+		if _, err := cs.CoreV1().Pods(ns).UpdateStatus(testCtx.Ctx, v1Pod, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("Failed to update status for victim-1: %v", err)
+		}
+
+		v2Pod := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-2",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Labels:    map[string]string{"app": "pdb-group"},
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		v2Pod.Spec.NodeName = nodeName
+		v2Pod, err = runPausePod(cs, v2Pod)
+		if err != nil {
+			t.Fatalf("Failed to run victim-2: %v", err)
+		}
+		addPodReadyCondition(v2Pod)
+		if _, err := cs.CoreV1().Pods(ns).UpdateStatus(testCtx.Ctx, v2Pod, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("Failed to update status for victim-2: %v", err)
+		}
+
+		if err := testutils.WaitCachedPodsStable(testCtx, []*v1.Pod{v1Pod, v2Pod}); err != nil {
+			t.Fatalf("Pods not stable in cache: %v", err)
+		}
+
+		// minAvailable=1 with 2 pods ready -> disruptionsAllowed = 1
+		minAvailable := intstr.FromInt32(1)
+		pdb := &policyv1.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pdb-group",
+				Namespace: ns,
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				MinAvailable: &minAvailable,
+				Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"app": "pdb-group"}},
+			},
+		}
+		if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx.Ctx, pdb, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create PDB: %v", err)
+		}
+
+		if err := testutils.WaitForPDBsStable(testCtx, []*policyv1.PodDisruptionBudget{pdb}, []int32{2}); err != nil {
+			t.Fatalf("PDB not stable: %v", err)
+		}
+
+		// Preemptor pod requesting resize from 200m to 300m CPU (needs 100m additional CPU)
+		preemptorPod := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-pod",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptorPod.Spec.NodeName = nodeName
+		preemptorPod, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptorPod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor pod: %v", err)
+		}
+		preemptorPod, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptorPod, "200m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor to deferred resize: %v", err)
+		}
+
+		// Preemption should evict exactly 1 victim
+		var evictedCount int
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			evictedCount = 0
+			for _, name := range []string{"victim-1", "victim-2"} {
+				p, err := cs.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+				if err == nil && p.DeletionTimestamp != nil {
+					evictedCount++
+				}
+			}
+			return evictedCount >= 1, nil
+		})
+		if err != nil {
+			t.Fatalf("Expected at least 1 victim to be evicted, got %d evictions: %v", evictedCount, err)
+		}
+
+		// Wait briefly and verify only 1 was evicted (no over-eviction violating PDB)
+		time.Sleep(300 * time.Millisecond)
+		evictedCount = 0
+		for _, name := range []string{"victim-1", "victim-2"} {
+			p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, name, metav1.GetOptions{})
+			if err == nil && p.DeletionTimestamp != nil {
+				evictedCount++
+			}
+		}
+		if evictedCount != 1 {
+			t.Errorf("Expected exactly 1 pod evicted to respect PDB disruption budget, but got %d", evictedCount)
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{v1Pod, v2Pod, preemptorPod})
+	})
+}
+
+func TestDeferredResizePodPreemption_ConcurrentDeferredResizes(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.InPlacePodVerticalScaling:                    true,
+		features.InPlacePodVerticalScalingSchedulerPreemption: true,
+	})
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: new(v1.DefaultSchedulerName),
+		}},
+	})
+
+	t.Run("higher priority resizing pod preempts before lower priority resizing pod", func(t *testing.T) {
+		testCtx := testutils.InitTestSchedulerWithOptions(t,
+			testutils.InitTestAPIServer(t, "def-resize-concurrent-1", nil),
+			0,
+			scheduler.WithProfiles(cfg.Profiles...))
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		cs := testCtx.ClientSet
+		ns := testCtx.NS.Name
+
+		nodeName := "concurrent-node-1"
+		node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "500m",
+			v1.ResourceMemory: "500Mi",
+		}).Label("node", nodeName).Obj()
+		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+		defer func() {
+			_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+		}()
+
+		// Victim pod requesting 200m CPU (low priority: 0)
+		victim := initPausePod(&testutils.PausePodConfig{
+			Name:      "low-victim",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		victim.Spec.NodeName = nodeName
+		victim, err := runPausePod(cs, victim)
+		if err != nil {
+			t.Fatalf("Failed to run low-victim: %v", err)
+		}
+
+		// Preemptor 1: High priority (300), allocated 100m, requests 300m (needs 200m additional CPU)
+		highPreemptor := initPausePod(&testutils.PausePodConfig{
+			Name:      "high-preemptor",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		highPreemptor.Spec.NodeName = nodeName
+		highPreemptor, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, highPreemptor, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create high-preemptor: %v", err)
+		}
+
+		// Preemptor 2: Mid priority (200), allocated 100m, requests 200m (needs 100m additional CPU)
+		midPreemptor := initPausePod(&testutils.PausePodConfig{
+			Name:      "mid-preemptor",
+			Namespace: ns,
+			Priority:  &asyncframework.MediumPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		midPreemptor.Spec.NodeName = nodeName
+		midPreemptor, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, midPreemptor, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create mid-preemptor: %v", err)
+		}
+
+		// Transition both preemptors to deferred resize state concurrently
+		highPreemptor, err = updatePodToDeferredResize(testCtx.Ctx, cs, highPreemptor, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update high-preemptor status: %v", err)
+		}
+		midPreemptor, err = updatePodToDeferredResize(testCtx.Ctx, cs, midPreemptor, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update mid-preemptor status: %v", err)
+		}
+
+		// Low-victim should be evicted by the scheduler
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+			podIsGettingEvicted(cs, ns, "low-victim"))
+		if err != nil {
+			t.Fatalf("Expected low-victim to be evicted: %v", err)
+		}
+
+		// High preemptor is prioritized; mid-preemptor cannot preempt high-preemptor and remains deferred
+		time.Sleep(300 * time.Millisecond)
+		liveHigh, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "high-preemptor", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get high-preemptor: %v", err)
+		}
+		if liveHigh.DeletionTimestamp != nil {
+			t.Errorf("high-preemptor should NOT be evicted")
+		}
+
+		liveMid, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "mid-preemptor", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get mid-preemptor: %v", err)
+		}
+		if liveMid.DeletionTimestamp != nil {
+			t.Errorf("mid-preemptor should NOT be evicted")
+		}
+
+		// mid-preemptor should remain queued in the scheduler
+		_, found := testCtx.Scheduler.SchedulingQueue.GetPod(testCtx.Ctx, midPreemptor.Name, midPreemptor.Namespace, nil)
+		if !found {
+			t.Errorf("Expected mid-preemptor pod to remain in scheduling queue")
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{victim, highPreemptor, midPreemptor})
+	})
+
+	t.Run("concurrent resizing pods preempt distinct victims without over-eviction", func(t *testing.T) {
+		testCtx := testutils.InitTestSchedulerWithOptions(t,
+			testutils.InitTestAPIServer(t, "def-resize-concurrent-2", nil),
+			0,
+			scheduler.WithProfiles(cfg.Profiles...))
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		cs := testCtx.ClientSet
+		ns := testCtx.NS.Name
+
+		nodeName := "concurrent-node-2"
+		// Node capacity: 500m CPU
+		node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "500m",
+			v1.ResourceMemory: "500Mi",
+		}).Label("node", nodeName).Obj()
+		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+		defer func() {
+			_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+		}()
+
+		// 3 victim pods (100m CPU each, priority 0)
+		var victims []*v1.Pod
+		for i := 1; i <= 3; i++ {
+			v := initPausePod(&testutils.PausePodConfig{
+				Name:      fmt.Sprintf("victim-%d", i),
+				Namespace: ns,
+				Priority:  &asyncframework.LowPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+				}},
+			})
+			v.Spec.NodeName = nodeName
+			v, err := runPausePod(cs, v)
+			if err != nil {
+				t.Fatalf("Failed to run victim-%d: %v", i, err)
+			}
+			victims = append(victims, v)
+		}
+
+		// 2 resizing pods (allocated 100m CPU each, requesting 200m CPU each -> each needs 100m CPU)
+		// Total extra CPU needed = 200m CPU -> exactly 2 victims should be evicted, leaving 1 untouched.
+		preemptor1 := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-1",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptor1.Spec.NodeName = nodeName
+		preemptor1, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor1, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor-1: %v", err)
+		}
+
+		preemptor2 := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-2",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptor2.Spec.NodeName = nodeName
+		preemptor2, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor2, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor-2: %v", err)
+		}
+
+		preemptor1, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptor1, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor-1 status: %v", err)
+		}
+		preemptor2, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptor2, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor-2 status: %v", err)
+		}
+
+		// Wait for 2 victims to be evicted
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			evictedCount := 0
+			for _, v := range victims {
+				p, err := cs.CoreV1().Pods(ns).Get(ctx, v.Name, metav1.GetOptions{})
+				if err == nil && p.DeletionTimestamp != nil {
+					evictedCount++
+				}
+			}
+			return evictedCount >= 2, nil
+		})
+		if err != nil {
+			t.Fatalf("Expected at least 2 victims to be evicted: %v", err)
+		}
+
+		// Verify that exactly 2 victims are evicted and not all 3 (no over-eviction)
+		time.Sleep(300 * time.Millisecond)
+		evictedCount := 0
+		for _, v := range victims {
+			p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, v.Name, metav1.GetOptions{})
+			if err == nil && p.DeletionTimestamp != nil {
+				evictedCount++
+			}
+		}
+		if evictedCount != 2 {
+			t.Errorf("Expected exactly 2 victims evicted, but got %d", evictedCount)
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, append(victims, preemptor1, preemptor2))
+	})
+}
+
+func TestDeferredResizePodPreemption_PodGroupVictims(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.InPlacePodVerticalScaling:                    true,
+		features.InPlacePodVerticalScalingSchedulerPreemption: true,
+		features.GenericWorkload:                              true,
+	})
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: new(v1.DefaultSchedulerName),
+		}},
+	})
+
+	t.Run("disruption mode all evicts all podgroup members across nodes", func(t *testing.T) {
+		testCtx := testutils.InitTestSchedulerWithOptions(t,
+			testutils.InitTestAPIServer(t, "def-resize-podgroup-1", nil),
+			0,
+			scheduler.WithProfiles(cfg.Profiles...))
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		cs := testCtx.ClientSet
+		ns := testCtx.NS.Name
+
+		// Create two nodes
+		for _, nodeName := range []string{"pg-node1-1", "pg-node2-1"} {
+			node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+				v1.ResourcePods:   "32",
+				v1.ResourceCPU:    "400m",
+				v1.ResourceMemory: "400Mi",
+			}).Label("node", nodeName).Obj()
+			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create node %s: %v", nodeName, err)
+			}
+			nodeName := nodeName
+			defer func() {
+				_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+			}()
+		}
+
+		// Create PodGroup with DisruptionModeAll
+		pg := st.MakePodGroup().Name("pg-all").Namespace(ns).Priority(asyncframework.LowPriority).BasicPolicy().DisruptionModeAll().Obj()
+		if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create PodGroup pg-all: %v", err)
+		}
+
+		// Pod 1 on pg-node1-1
+		pgMember1 := initPausePod(&testutils.PausePodConfig{
+			Name:         "pg-member-1",
+			Namespace:    ns,
+			Priority:     &asyncframework.LowPriority,
+			PodGroupName: "pg-all",
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		pgMember1.Spec.NodeName = "pg-node1-1"
+		pgMember1, err := runPausePod(cs, pgMember1)
+		if err != nil {
+			t.Fatalf("Failed to run pg-member-1: %v", err)
+		}
+
+		// Pod 2 on pg-node2-1
+		pgMember2 := initPausePod(&testutils.PausePodConfig{
+			Name:         "pg-member-2",
+			Namespace:    ns,
+			Priority:     &asyncframework.LowPriority,
+			PodGroupName: "pg-all",
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		pgMember2.Spec.NodeName = "pg-node2-1"
+		pgMember2, err = runPausePod(cs, pgMember2)
+		if err != nil {
+			t.Fatalf("Failed to run pg-member-2: %v", err)
+		}
+
+		// Preemptor pod on pg-node1-1: requests resize from 100m to 300m CPU (needs 200m additional CPU on pg-node1-1)
+		preemptorPod := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-pod",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptorPod.Spec.NodeName = "pg-node1-1"
+		preemptorPod, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptorPod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor-pod: %v", err)
+		}
+		preemptorPod, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptorPod, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor-pod status: %v", err)
+		}
+
+		// Preemption on pg-node1-1 should evict BOTH pg-member-1 (on node 1) AND pg-member-2 (on node 2)
+		for _, victimName := range []string{"pg-member-1", "pg-member-2"} {
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+				podIsGettingEvicted(cs, ns, victimName))
+			if err != nil {
+				t.Fatalf("Expected pod %s in DisruptionModeAll PodGroup to be evicted, got: %v", victimName, err)
+			}
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pgMember1, pgMember2, preemptorPod})
+	})
+
+	t.Run("disruption mode single evicts only target node podgroup member", func(t *testing.T) {
+		testCtx := testutils.InitTestSchedulerWithOptions(t,
+			testutils.InitTestAPIServer(t, "def-resize-podgroup-2", nil),
+			0,
+			scheduler.WithProfiles(cfg.Profiles...))
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		cs := testCtx.ClientSet
+		ns := testCtx.NS.Name
+
+		// Create two nodes
+		for _, nodeName := range []string{"pg-node1-2", "pg-node2-2"} {
+			node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+				v1.ResourcePods:   "32",
+				v1.ResourceCPU:    "400m",
+				v1.ResourceMemory: "400Mi",
+			}).Label("node", nodeName).Obj()
+			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create node %s: %v", nodeName, err)
+			}
+			nodeName := nodeName
+			defer func() {
+				_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+			}()
+		}
+
+		// Create PodGroup with DisruptionModeSingle
+		pg := st.MakePodGroup().Name("pg-single").Namespace(ns).Priority(asyncframework.LowPriority).BasicPolicy().DisruptionModeSingle().Obj()
+		if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create PodGroup pg-single: %v", err)
+		}
+
+		// Pod 1 on pg-node1-2
+		pgMember1 := initPausePod(&testutils.PausePodConfig{
+			Name:         "pg-member-1",
+			Namespace:    ns,
+			Priority:     &asyncframework.LowPriority,
+			PodGroupName: "pg-single",
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		pgMember1.Spec.NodeName = "pg-node1-2"
+		pgMember1, err := runPausePod(cs, pgMember1)
+		if err != nil {
+			t.Fatalf("Failed to run pg-member-1: %v", err)
+		}
+
+		// Pod 2 on pg-node2-2
+		pgMember2 := initPausePod(&testutils.PausePodConfig{
+			Name:         "pg-member-2",
+			Namespace:    ns,
+			Priority:     &asyncframework.LowPriority,
+			PodGroupName: "pg-single",
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		pgMember2.Spec.NodeName = "pg-node2-2"
+		pgMember2, err = runPausePod(cs, pgMember2)
+		if err != nil {
+			t.Fatalf("Failed to run pg-member-2: %v", err)
+		}
+
+		// Preemptor pod on pg-node1-2: requests resize from 100m to 300m CPU (needs 200m additional CPU on pg-node1-2)
+		preemptorPod := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-pod",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptorPod.Spec.NodeName = "pg-node1-2"
+		preemptorPod, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptorPod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor-pod: %v", err)
+		}
+		preemptorPod, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptorPod, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor-pod status: %v", err)
+		}
+
+		// Preemption on pg-node1-2 should evict pg-member-1 (on node 1)
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+			podIsGettingEvicted(cs, ns, "pg-member-1"))
+		if err != nil {
+			t.Fatalf("Expected pg-member-1 on target node to be evicted: %v", err)
+		}
+
+		// pg-member-2 on pg-node2-2 must NOT be evicted because of DisruptionModeSingle
+		time.Sleep(300 * time.Millisecond)
+		liveMember2, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "pg-member-2", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get pg-member-2: %v", err)
+		}
+		if liveMember2.DeletionTimestamp != nil {
+			t.Errorf("pg-member-2 on other node should NOT be evicted in DisruptionModeSingle")
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pgMember1, pgMember2, preemptorPod})
 	})
 }
