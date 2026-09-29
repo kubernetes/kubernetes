@@ -37,7 +37,7 @@ import (
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kube-scheduler/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/utils/ktesting"

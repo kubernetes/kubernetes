@@ -25,7 +25,7 @@ import (
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kube-scheduler/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/ptr"
 )
