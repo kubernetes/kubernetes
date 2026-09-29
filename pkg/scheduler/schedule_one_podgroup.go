@@ -978,19 +978,22 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	// usually set by a previous preemption cycle and is the placement the pod group is
 	// expected to land on, so if the gang is feasible there we use it and skip the rest.
 	//
-	// This fast path is limited to standalone PodGroups. A PodGroup that is part of a
-	// CompositePodGroup defers its feasibility verdict to the CPG root, where a Success status
-	// with nothing scheduled is still meaningful. Short-circuiting on it (or dropping it) here
-	// could wrongly report the whole CPG Unschedulable and stop sibling groups from being
-	// evaluated, so CPG children use the regular placement search. The hierarchy-level fast path
-	// lives in compositePodGroupSchedulingPlacementAlgorithm, where a placement spans the whole
-	// subtree and a nomination can therefore be honored without moving a sibling.
-	// See kubernetes/kubernetes#140863.
+	// A PodGroup that is a child of a CompositePodGroup takes this fast path too. Its placement
+	// is a sub-domain of the one its parent picked, and the preemption that nominated the pod
+	// already paid for the disruption on that sub-domain, so honoring it is what makes that
+	// disruption useful instead of stranding the capacity it freed.
+	//
+	// What a child must not do is lose its verdict on the way. A child that already meets its
+	// minCount returns Success without scheduling any new pod, and that Success still counts
+	// towards the parent's minGroupCount. Reporting it the way a standalone PodGroup would - as
+	// a placement failure - stops its siblings from being evaluated, so below it stays a
+	// candidate instead of being rewritten. See kubernetes/kubernetes#140863.
+	//
+	// A nested CompositePodGroup is not handled here: it goes through
+	// compositePodGroupSchedulingPlacementAlgorithm, and its placement spans a subtree rather
+	// than a single group's pods.
 	nominatedFeasible := false
-	var nominated *fwk.Placement
-	if queuedPodGroupInfo.GetType() == fwk.PodGroupKeyType {
-		nominated = nominatedPlacement(placements, podGroupInfo, queuedPodGroupInfo)
-	}
+	nominated := nominatedPlacement(placements, podGroupInfo, queuedPodGroupInfo)
 	if nominated != nil {
 		result := sched.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, nominated)
 		if result.status.IsError() {
@@ -1005,9 +1008,16 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		// check prevents short-circuiting when the placement is feasible only because minCount pods
 		// were already scheduled in previous cycles (for example minCount=3 with 3 pods already
 		// running), but we failed to place any newly arriving pods on the nominated placement.
-		if result.status.IsSuccess() && result.anyScheduled {
-			successfulResults[nominated] = result
-			nominatedFeasible = true
+		if result.status.IsSuccess() {
+			// Keep the placement as a candidate even when it placed no new pod, as long as the
+			// verdict belongs to a CompositePodGroup hierarchy: there the Success is the child's
+			// contribution to the parent's minGroupCount and dropping it would fail the whole
+			// group. A standalone PodGroup gets the specific reason from the no-candidate path
+			// below instead.
+			if result.anyScheduled || queuedPodGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
+				successfulResults[nominated] = result
+			}
+			nominatedFeasible = result.anyScheduled
 		}
 	}
 

@@ -3359,6 +3359,9 @@ func TestNominatedPlacementOrderIndependent(t *testing.T) {
 // TestPodGroupSchedulingPlacementAlgorithm_NominatedNode covers the NominatedNodeName path:
 // the placement matching the pods' NNN is evaluated first, short-circuits scoring when the
 // gang is feasible there, and otherwise falls through to normal score-based selection.
+// A PodGroup that is a child of a CompositePodGroup takes the same path, with one difference:
+// a Success that placed no new pod stays a candidate there, because the parent's minGroupCount
+// is made of exactly those verdicts.
 func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.TopologyAwareWorkloadScheduling: true,
@@ -3376,9 +3379,11 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 		placementFeasibleStatuses [][]fwk.Code
 		// nominatedNodeName is written to the pod's status before scheduling.
 		nominatedNodeName string
-		// rootIsCPG makes the scheduling root a CompositePodGroup, which gates off the NNN fast path.
+		// rootIsCPG makes the pod group under test a child of a CompositePodGroup rather than a
+		// standalone root.
 		rootIsCPG bool
-		// expectedHost is the node the gang should land on. Empty means unschedulable.
+		// expectedHost is the node the gang should land on. Empty means nothing is expected to
+		// land, and only the status is asserted.
 		expectedHost   string
 		expectedStatus *fwk.Status
 		expectError    bool
@@ -3446,7 +3451,7 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 			nominatedNodeName: nodes[1].Name,
 			expectError:       true,
 		},
-		"CPG root skips the nominated fast path and scores every placement": {
+		"CPG child honors its nominated placement even though it scores lower": {
 			placementPlugin: fakePlacementPlugin{
 				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
 					podGroupKey: {
@@ -3454,9 +3459,10 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 						"placement2": {nodes[1].Name},
 					},
 				},
-				// Same setup as the short-circuit case: placement1 scores higher and the
-				// nomination points at node2. Because the root is a CompositePodGroup, the NNN
-				// fast path is disabled and the higher-scored placement1 (node1) must win.
+				// Same setup as the standalone short-circuit case: placement1 scores higher and
+				// the nomination points at node2. A child's placement is a sub-domain of the one
+				// its parent picked, and the nomination was already paid for by a previous
+				// preemption, so placement2 (node2) must win here too.
 				scorePlacementsResult: map[fwk.EntityKey]map[string]int64{
 					podGroupKey: {
 						"placement1": 2,
@@ -3465,6 +3471,74 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 				},
 			},
 			nominatedNodeName: nodes[1].Name,
+			rootIsCPG:         true,
+			expectedHost:      nodes[1].Name,
+		},
+		"CPG child keeps its Success when the nominated placement places no new pod": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+					podGroupKey: {
+						"placement2": {nodes[1].Name},
+					},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+			// PlacementFeasible reports Success the way it does for a group whose minCount is
+			// already met by pods scheduled in previous cycles, so the pending pod stays
+			// unplaced. That Success is the child's whole contribution to the parent's
+			// minGroupCount: reporting Unschedulable here instead would fail the CompositePodGroup
+			// and stop its sibling groups from being evaluated. The standalone equivalent of this
+			// case stays Unschedulable and reports the actionable reason.
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success}},
+			nominatedNodeName:         nodes[1].Name,
+			rootIsCPG:                 true,
+			expectedHost:              "",
+		},
+		"CPG child falls back to scoring when its nominated placement is infeasible": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+					podGroupKey: {
+						"placement1": {nodes[0].Name},
+						"placement2": {nodes[1].Name},
+					},
+				},
+				scorePlacementsResult: map[fwk.EntityKey]map[string]int64{
+					podGroupKey: {
+						"placement1": 1,
+						"placement2": 2,
+					},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+			// The nominated placement2 is evaluated first and its gang is infeasible there, so it
+			// drops out of the candidates and the gang lands on placement1 despite scoring lower.
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Unschedulable}, {fwk.Success}},
+			nominatedNodeName:         nodes[1].Name,
+			rootIsCPG:                 true,
+			expectedHost:              nodes[0].Name,
+		},
+		"CPG child with a nomination outside every placement scores normally": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+					podGroupKey: {
+						"placement1": {nodes[0].Name},
+						"placement2": {nodes[1].Name},
+					},
+				},
+				scorePlacementsResult: map[fwk.EntityKey]map[string]int64{
+					podGroupKey: {
+						"placement1": 2,
+						"placement2": 1,
+					},
+				},
+			},
+			// A nomination left over from a preemption that no longer applies - the node is gone
+			// or belongs to another domain - must not disturb the child's placement choice.
+			nominatedNodeName: "node3",
 			rootIsCPG:         true,
 			expectedHost:      nodes[0].Name,
 		},
@@ -3616,6 +3690,10 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 			}
 			if result.status != nil && !result.status.IsSuccess() {
 				t.Fatalf("expected the gang to be scheduled, got status %v", result.status)
+			}
+			if tt.expectedHost == "" {
+				// Nothing was expected to land; the status check above is the assertion.
+				return
 			}
 			if got := result.podResults[0].scheduleResult.SuggestedHost; got != tt.expectedHost {
 				t.Fatalf("gang landed on %q, want %q", got, tt.expectedHost)
@@ -8878,13 +8956,14 @@ func TestCPGSchedulingPlacementAlgorithm_NominatedNodeName(t *testing.T) {
 		},
 		"sibling without queued pods does not block the fast path": {
 			// pg1 is already satisfied and schedules nothing; pg2 still lands inside the
-			// nominated placement, so the hierarchy as a whole made progress and the fast path
-			// applies. pg1 reserves no node here, so pg2 is free to take the better scoring
-			// node4 - what matters is that it stays in placement2 rather than moving to the
-			// higher scoring placement1.
+			// nominated placement, so the hierarchy as a whole made progress and the root fast
+			// path applies. Within it pg2 is a leaf group and honors p2's own nomination, so p2
+			// lands on node3 rather than the higher scoring node4. What this case pins is that
+			// pg1 contributing no queued pod does not stop the hierarchy from short-circuiting
+			// onto placement2.
 			nominations:   map[string]string{"p2": nodes[2].Name},
 			unqueuedPods:  []string{"p1"},
-			expectedHosts: map[string]string{"p2": nodes[3].Name},
+			expectedHosts: map[string]string{"p2": nodes[2].Name},
 		},
 	}
 
