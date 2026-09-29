@@ -264,6 +264,7 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 			SupplementalGroupsPolicy:  features.SupplementalGroupsPolicy,
 			UserNamespacesHostNetwork: features.UserNamespacesHostNetwork,
 			MountOptions:              features.MountOptions,
+			SecurityProfileOCI:        features.SecurityProfileOci,
 		}
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers, Features: retFeatures}
@@ -298,6 +299,11 @@ func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallba
 			}, nil
 		}
 		return nil, fmt.Errorf("localhostProfile must be set if seccompProfile type is Localhost")
+	case v1.SeccompProfileTypeOCI:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) {
+			return nil, fmt.Errorf("seccompProfile type %q requires the %s feature gate", scmp.Type, features.SecurityProfileOCI)
+		}
+		return fieldSeccompProfileOCI(scmp.OCI, profileRootPath)
 	default:
 		return nil, fmt.Errorf(
 			"unsupported seccompProfile type %q (supported: %s, %s, %s)",
@@ -307,6 +313,39 @@ func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallba
 			v1.SeccompProfileTypeLocalhost,
 		)
 	}
+}
+
+// fieldSeccompProfileOCI converts an OCI seccomp profile into its CRI
+// representation. The profile is pulled before the sandbox is created, so the
+// CRI runtime finds it by its reference.
+func fieldSeccompProfileOCI(oci *v1.SecurityProfileOCI, profileRootPath string) (*runtimeapi.SecurityProfile, error) {
+	if oci == nil || len(oci.Ref) == 0 {
+		return nil, fmt.Errorf("oci.ref must be set if seccompProfile type is OCI")
+	}
+	profile := &runtimeapi.SecurityProfile{
+		ProfileType: runtimeapi.SecurityProfile_OCI,
+		OciRef:      oci.Ref,
+	}
+	if base := oci.BaseProfile; base != nil {
+		switch base.Type {
+		case v1.SecurityProfileOCIBaseTypeRuntimeDefault:
+			profile.BaseProfile = &runtimeapi.SecurityProfileBase{
+				Type: runtimeapi.SecurityProfileBase_RuntimeDefault,
+			}
+		case v1.SecurityProfileOCIBaseTypeLocalhost:
+			if base.LocalhostProfile == nil || len(*base.LocalhostProfile) == 0 {
+				return nil, fmt.Errorf("oci.baseProfile.localhostProfile must be set if the base profile type is Localhost")
+			}
+			profile.BaseProfile = &runtimeapi.SecurityProfileBase{
+				Type:         runtimeapi.SecurityProfileBase_Localhost,
+				LocalhostRef: filepath.Join(profileRootPath, *base.LocalhostProfile),
+			}
+		default:
+			return nil, fmt.Errorf("unsupported oci.baseProfile type %q (supported: %s, %s)",
+				base.Type, v1.SecurityProfileOCIBaseTypeRuntimeDefault, v1.SecurityProfileOCIBaseTypeLocalhost)
+		}
+	}
+	return profile, nil
 }
 
 func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]string, containerName string,

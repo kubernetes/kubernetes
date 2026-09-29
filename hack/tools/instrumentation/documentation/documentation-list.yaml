@@ -4740,6 +4740,37 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: security_profile_pull_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds to pull a security profile.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - cached
+  buckets:
+  - 0.001
+  - 0.004
+  - 0.016
+  - 0.064
+  - 0.256
+  - 1.024
+  - 4.096
+  - 16.384
+  - 65.536
+  - 262.144
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: security_profile_pull_errors_total
+  subsystem: kubelet
+  help: Cumulative number of failed security profile pulls by the Kubelet.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - reason
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: server_expiration_renew_errors
   subsystem: kubelet
   help: Counter of certificate renewal errors.

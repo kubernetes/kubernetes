@@ -153,6 +153,10 @@ const (
 	// Max amount of time to wait for the container runtime to come up.
 	maxWaitForContainerRuntime = 30 * time.Second
 
+	// securityProfileRejectedReason is the reason for failing a pod whose OCI
+	// security profile the container runtime rejected permanently.
+	securityProfileRejectedReason = "SecurityProfileRejected"
+
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
 
@@ -262,6 +266,8 @@ var (
 		lifecycle.OutOfPods,
 		lifecycle.PodLevelResourcesNotAdmittedReason,
 		lifecycle.PodFeatureUnsupported,
+		lifecycle.SecurityProfileOCIUnsupportedReason,
+		securityProfileRejectedReason,
 		tainttoleration.ErrReasonNotMatch,
 		eviction.Reason,
 		sysctl.ForbiddenReason,
@@ -1162,6 +1168,10 @@ func NewMainKubelet(ctx context.Context,
 	}
 
 	handlers = append(handlers, lifecycle.NewPodFeaturesAdmitHandler())
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) {
+		handlers = append(handlers, lifecycle.NewSecurityProfileOCIAdmitHandler(klet.runtimeState.runtimeFeatures))
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
 		handlers = append(handlers, lifecycle.NewDeclaredFeaturesAdmitHandler(klet.nodeDeclaredFeaturesFramework, klet.nodeDeclaredFeaturesSet, klet.version))
@@ -2261,6 +2271,29 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Fetch the pull secrets for the pod
 	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(logger, pod)
 
+	// Pull the OCI security profiles before the runtime prepares resources or
+	// creates the sandbox, so that a failed pull needs no cleanup.
+	var securityProfileErr error
+	if utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) {
+		if err := kl.containerRuntime.EnsureSecurityProfiles(ctx, pod, podStatus, pullSecrets); err != nil {
+			podStarted := podStatus != nil && !isPodStatusCacheTerminal(podStatus)
+			switch {
+			case !podStarted && errors.Is(err, images.ErrSecurityProfileRejected):
+				kl.rejectPod(ctx, pod, securityProfileRejectedReason, err.Error())
+				recordAdmissionRejection(securityProfileRejectedReason)
+				return true, nil, nil
+			case !podStarted:
+				logger.Error(err, "Unable to pull security profiles for pod; skipping pod", "pod", klog.KObj(pod))
+				return false, nil, err
+			default:
+				// Keep managing the containers of a started pod. Containers
+				// that need a missing profile fail when they are created.
+				logger.Error(err, "Unable to pull security profiles for running pod", "pod", klog.KObj(pod))
+				securityProfileErr = err
+			}
+		}
+	}
+
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(ctx, pod)
 
@@ -2333,7 +2366,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	err = result.Error()
+	err = errors.Join(securityProfileErr, result.Error())
 	if len(result.SyncResults) > 0 && err == nil {
 		postSync = func() {
 			kl.RequestPodRelist(klog.FromContext(ctx), pod.UID)

@@ -931,3 +931,36 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestSecurityProfileOCIAdmitHandler(t *testing.T) {
+	ociPod := &v1.Pod{Spec: v1.PodSpec{
+		Containers: []v1.Container{{Name: "c", SecurityContext: &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{
+			Type: v1.SeccompProfileTypeOCI,
+			OCI:  &v1.SecurityProfileOCI{Ref: "registry.example.com/profile@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		}}}},
+	}}
+	plainPod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c"}}}}
+
+	for _, tc := range []struct {
+		name     string
+		pod      *v1.Pod
+		features *kubecontainer.RuntimeFeatures
+		admit    bool
+	}{
+		{name: "pod without OCI profile", pod: plainPod, admit: true},
+		{name: "runtime supports OCI profiles", pod: ociPod, features: &kubecontainer.RuntimeFeatures{SecurityProfileOCI: true}, admit: true},
+		{name: "runtime without support", pod: ociPod, features: &kubecontainer.RuntimeFeatures{}},
+		{name: "runtime features unknown", pod: ociPod},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := NewSecurityProfileOCIAdmitHandler(func() *kubecontainer.RuntimeFeatures { return tc.features })
+			result := handler.Admit(context.Background(), &PodAdmitAttributes{Pod: tc.pod})
+			if result.Admit != tc.admit {
+				t.Fatalf("Admit() = %v, want %v", result.Admit, tc.admit)
+			}
+			if !tc.admit && result.Reason != SecurityProfileOCIUnsupportedReason {
+				t.Errorf("unexpected reason %q", result.Reason)
+			}
+		})
+	}
+}
