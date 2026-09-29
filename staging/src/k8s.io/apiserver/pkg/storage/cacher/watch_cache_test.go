@@ -91,13 +91,9 @@ func (w *testWatchCache) getAllEventsSince(resourceVersion uint64, opts storage.
 	}
 
 	result := []*watchCacheEvent{}
-	for {
-		event, err := cacheInterval.Next()
+	for event, err := range cacheInterval.All() {
 		if err != nil {
 			return nil, err
-		}
-		if event == nil {
-			break
 		}
 		result = append(result, event)
 	}
