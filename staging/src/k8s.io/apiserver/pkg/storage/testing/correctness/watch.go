@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
@@ -47,11 +48,29 @@ func (v WatchValidator) ValidateWatch(request WatchRequest, response WatchRespon
 	if response.Err != nil {
 		return fmt.Errorf("watch %+v: unexpected error: %w", request, response.Err)
 	}
+	if err := validateMaybeLastEventError(response.Events); err != nil {
+		return fmt.Errorf("watch %+v: Broke error %w", request, err)
+	}
 	if err := v.validateReliable(request, response); err != nil {
 		return fmt.Errorf("watch %+v: Broke reliable %w", request, err)
 	}
 	if err := v.validateBookmarks(response.Events); err != nil {
 		return fmt.Errorf("watch %+v: Broke bookmarks %w", request, err)
+	}
+	return nil
+}
+
+func validateMaybeLastEventError(events []watch.Event) error {
+	for i, ev := range events {
+		if ev.Type != watch.Error {
+			continue
+		}
+		if _, ok := ev.Object.(*metav1.Status); !ok {
+			return fmt.Errorf("expected *metav1.Status in watch.Error event, got %T", ev.Object)
+		}
+		if i != len(events)-1 {
+			return fmt.Errorf("watch.Error at index %d is not the last event (total %d)", i, len(events))
+		}
 	}
 	return nil
 }
@@ -73,7 +92,7 @@ func (v WatchValidator) validateReliable(request WatchRequest, response WatchRes
 	if err != nil {
 		return err
 	}
-	gotEvents := filterOutBookmarks(response.Events)
+	gotEvents := filterOutBookmarksAndErrors(response.Events)
 	gotRefs, err := v.toEventReference(gotEvents)
 	if err != nil {
 		return err
@@ -93,6 +112,9 @@ func (v WatchValidator) validateReliable(request WatchRequest, response WatchRes
 func (v WatchValidator) validateBookmarks(events []watch.Event) error {
 	lastBookmarkRV := uint64(0)
 	for _, ev := range events {
+		if ev.Type == watch.Error {
+			continue
+		}
 		rv, err := objectRV(ev.Object, v.versioner)
 		if err != nil {
 			return err
@@ -193,6 +215,9 @@ func watchRevisionRange(versioner storage.Versioner, request WatchRequest, event
 	minRV := uint64(math.MaxUint64)
 	maxRV := uint64(0)
 	for _, ev := range events {
+		if ev.Type == watch.Error {
+			continue
+		}
 		rv, err := objectRV(ev.Object, versioner)
 		if err != nil {
 			return nil, err
@@ -232,10 +257,10 @@ func objectRV(obj runtime.Object, versioner storage.Versioner) (uint64, error) {
 	return rv, nil
 }
 
-func filterOutBookmarks(events []watch.Event) []watch.Event {
+func filterOutBookmarksAndErrors(events []watch.Event) []watch.Event {
 	filtered := make([]watch.Event, 0, len(events))
 	for _, event := range events {
-		if event.Type == watch.Bookmark {
+		if event.Type == watch.Bookmark || event.Type == watch.Error {
 			continue
 		}
 		filtered = append(filtered, event)
