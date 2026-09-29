@@ -87,7 +87,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 0 /* expectedCallCount */, fakePlugin)
@@ -141,7 +141,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -196,7 +196,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -286,7 +286,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -370,7 +370,7 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -452,7 +452,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 2 /* expectedCallCount */, fakePlugin)
@@ -548,7 +548,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -632,7 +632,7 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	dsw.AddNode(nodeName2)
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Add the pod in which the volume is attached to the uncertain node
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
@@ -753,7 +753,7 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	dsw.AddNode(nodeName2)
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Add the pod in which the volume is attached to the FailDetachNode
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
@@ -834,7 +834,7 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	dsw.AddNode(nodeName2)
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Add the pod in which the volume is attached to the timeout node
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
@@ -934,7 +934,7 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -1021,7 +1021,7 @@ func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -1113,7 +1113,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -1236,7 +1236,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -1874,6 +1874,24 @@ func waitForCondition(interval time.Duration, fn wait.ConditionFunc) error {
 }
 
 // verifies the force detach metric with reason
+// runReconciler runs the reconciler until the test ends and waits for it to
+// return. The force detach metric is global, so a reconciler still running
+// after its test returns could change it under the next test.
+func runReconciler(ctx context.Context, t *testing.T, rc Reconciler) {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		rc.Run(ctx)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+}
+
 func testForceDetachMetric(t *testing.T, inputForceDetachMetricCounter int, reason string) {
 	t.Helper()
 
