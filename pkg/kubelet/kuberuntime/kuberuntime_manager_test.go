@@ -25,6 +25,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -4378,6 +4379,7 @@ func TestUpdatePodContainerResources(t *testing.T) {
 // records every container ID it was called with.
 type failingRuntimeService struct {
 	*apitest.FakeRuntimeService
+	mu sync.Mutex
 	// maps container to the error to return for that container.
 	errs map[string]error
 	// list of containers passed to UpdateContainerResources
@@ -4385,8 +4387,10 @@ type failingRuntimeService struct {
 }
 
 func (f *failingRuntimeService) UpdateContainerResources(ctx context.Context, containerID string, resources *runtimeapi.ContainerResources) error {
+	f.mu.Lock()
 	f.attempted = append(f.attempted, containerID)
 	err := f.errs[containerID]
+	f.mu.Unlock()
 	if err != nil {
 		return err
 	}
@@ -4427,22 +4431,22 @@ func TestUpdatePodContainerResources_Failures(t *testing.T) {
 		{
 			name:            "one of two memory decreases fails",
 			failing:         []string{"down-1"},
-			expectAttempted: []string{"down-1"},
-			expectUpdated:   []string{},
+			expectAttempted: []string{"down-1", "down-2"},
+			expectUpdated:   []string{"down-2"},
 			expectErrorsFor: []string{"down-1"},
 		},
 		{
 			name:            "both memory decreases fail",
 			failing:         []string{"down-1", "down-2"},
-			expectAttempted: []string{"down-1"},
+			expectAttempted: []string{"down-1", "down-2"},
 			expectUpdated:   []string{},
-			expectErrorsFor: []string{"down-1"},
+			expectErrorsFor: []string{"down-1", "down-2"},
 		},
 		{
 			name:            "one of two memory increases fails",
 			failing:         []string{"up-1"},
-			expectAttempted: []string{"down-1", "down-2", "up-1"},
-			expectUpdated:   []string{"down-1", "down-2"},
+			expectAttempted: []string{"down-1", "down-2", "up-1", "up-2"},
+			expectUpdated:   []string{"down-1", "down-2", "up-2"},
 			expectErrorsFor: []string{"up-1"},
 		},
 	} {
@@ -4519,6 +4523,103 @@ func TestUpdatePodContainerResources_Failures(t *testing.T) {
 					assert.False(t, actuated, "actuated resources should not be recorded for %s", name)
 				}
 			}
+		})
+	}
+}
+
+func TestContainerToUpdateInfoIsDecrease(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		resource v1.ResourceName
+		current  resourceRequirements
+		desired  resourceRequirements
+		want     bool
+	}{
+		{
+			name:     "memory limit and request decrease",
+			resource: v1.ResourceMemory,
+			current:  resourceRequirements{memoryLimit: 200, memoryRequest: 200},
+			desired:  resourceRequirements{memoryLimit: 100, memoryRequest: 100},
+			want:     true,
+		},
+		{
+			name:     "memory limit and request increase",
+			resource: v1.ResourceMemory,
+			current:  resourceRequirements{memoryLimit: 100, memoryRequest: 100},
+			desired:  resourceRequirements{memoryLimit: 200, memoryRequest: 200},
+			want:     false,
+		},
+		{
+			name:     "memory limit decreases and request increases",
+			resource: v1.ResourceMemory,
+			current:  resourceRequirements{memoryLimit: 200, memoryRequest: 100},
+			desired:  resourceRequirements{memoryLimit: 150, memoryRequest: 150},
+			want:     true,
+		},
+		{
+			name:     "memory limit increases and request decreases",
+			resource: v1.ResourceMemory,
+			current:  resourceRequirements{memoryLimit: 200, memoryRequest: 150},
+			desired:  resourceRequirements{memoryLimit: 300, memoryRequest: 100},
+			want:     false,
+		},
+		{
+			name:     "memory limit is unchanged, request decreases",
+			resource: v1.ResourceMemory,
+			current:  resourceRequirements{memoryLimit: 200, memoryRequest: 200},
+			desired:  resourceRequirements{memoryLimit: 200, memoryRequest: 100},
+			want:     true,
+		},
+		{
+			name:     "memory limit is unchanged, request increases",
+			resource: v1.ResourceMemory,
+			current:  resourceRequirements{memoryLimit: 200, memoryRequest: 100},
+			desired:  resourceRequirements{memoryLimit: 200, memoryRequest: 150},
+			want:     false,
+		},
+		{
+			name:     "cpu limit decreases and request increases",
+			resource: v1.ResourceCPU,
+			current:  resourceRequirements{cpuLimit: 200, cpuRequest: 100},
+			desired:  resourceRequirements{cpuLimit: 150, cpuRequest: 150},
+			want:     true,
+		},
+		{
+			name:     "cpu limit is unchanged, request decreases",
+			resource: v1.ResourceCPU,
+			current:  resourceRequirements{cpuLimit: 200, cpuRequest: 200},
+			desired:  resourceRequirements{cpuLimit: 200, cpuRequest: 100},
+			want:     true,
+		},
+		{
+			name:     "cpu limit is unchanged, request increases",
+			resource: v1.ResourceCPU,
+			current:  resourceRequirements{cpuLimit: 200, cpuRequest: 100},
+			desired:  resourceRequirements{cpuLimit: 200, cpuRequest: 150},
+			want:     false,
+		},
+		{
+			name:     "ignore cpu resize if resource is memory",
+			resource: v1.ResourceMemory,
+			current:  resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 200, cpuRequest: 200},
+			desired:  resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 100, cpuRequest: 100},
+			want:     false,
+		},
+		{
+			name:     "ignore memory resize if resource is cpu",
+			resource: v1.ResourceCPU,
+			current:  resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 200, cpuRequest: 200},
+			desired:  resourceRequirements{memoryLimit: 100, memoryRequest: 100, cpuLimit: 200, cpuRequest: 200},
+			want:     false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			current := tc.current
+			info := containerToUpdateInfo{
+				desiredContainerResources: tc.desired,
+				currentContainerResources: &current,
+			}
+			assert.Equal(t, tc.want, info.isDecrease(tc.resource))
 		})
 	}
 }
@@ -4740,7 +4841,7 @@ func TestDoPodResizeAction(t *testing.T) {
 			expectPodCgroupUpdates:    1,
 			runtimeErrors:             map[string][]error{"UpdateContainerResources": {fmt.Errorf("error updating container resources")}},
 			expectedError:             "ResizePodInPlaceError",
-			expectedErrorMessage:      "error updating container resources",
+			expectedErrorMessage:      "failed to update memory resources for container \"foo1\" with ID testRuntime://foo_foo-ns_12345678_0_foo1_0: error updating container resources",
 			expectedPodLevelResources: &cm.ResourceConfig{
 				CPUShares: ptr.To[uint64](409),
 				CPUQuota:  ptr.To[int64](40000),

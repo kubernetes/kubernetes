@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -597,6 +598,25 @@ type containerToUpdateInfo struct {
 	currentContainerResources *resourceRequirements
 }
 
+// isDecrease retuns whether this update decreases resource type resourceName. The resource
+// limit decides the direction if it changes, otherwise the request does.
+func (c *containerToUpdateInfo) isDecrease(resourceName v1.ResourceName) bool {
+	switch resourceName {
+	case v1.ResourceMemory:
+		if c.desiredContainerResources.memoryLimit != c.currentContainerResources.memoryLimit {
+			return c.desiredContainerResources.memoryLimit < c.currentContainerResources.memoryLimit
+		}
+		return c.desiredContainerResources.memoryRequest < c.currentContainerResources.memoryRequest
+	case v1.ResourceCPU:
+		if c.desiredContainerResources.cpuLimit != c.currentContainerResources.cpuLimit {
+			return c.desiredContainerResources.cpuLimit < c.currentContainerResources.cpuLimit
+		}
+		return c.desiredContainerResources.cpuRequest < c.currentContainerResources.cpuRequest
+	default:
+		return false
+	}
+}
+
 // containerToRemoveInfo contains necessary information to update a container's resources.
 type containerToRemoveInfo struct {
 	// The ID of the container.
@@ -777,7 +797,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 		// If a resource policy isn't set, the implicit default is NotRequired.
 		return true, false
 	}
-	markContainerForUpdate := func(rName v1.ResourceName, desiredValue, currentValue int64) {
+	markContainerForUpdate := func(rName v1.ResourceName) {
 		cUpdateInfo := containerToUpdateInfo{
 			container:                 &container,
 			containerType:             containerType,
@@ -785,15 +805,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 			desiredContainerResources: desiredResources,
 			currentContainerResources: &currentResources,
 		}
-		// Order the container updates such that resource decreases are applied before increases
-		switch {
-		case desiredValue > currentValue: // append
-			changes.ContainersToUpdate[rName] = append(changes.ContainersToUpdate[rName], cUpdateInfo)
-		case desiredValue < currentValue: // prepend
-			changes.ContainersToUpdate[rName] = append(changes.ContainersToUpdate[rName], containerToUpdateInfo{})
-			copy(changes.ContainersToUpdate[rName][1:], changes.ContainersToUpdate[rName])
-			changes.ContainersToUpdate[rName][0] = cUpdateInfo
-		}
+		changes.ContainersToUpdate[rName] = append(changes.ContainersToUpdate[rName], cUpdateInfo)
 	}
 	resizeMemLim, restartMemLim := determineContainerResize(v1.ResourceMemory, desiredResources.memoryLimit, currentResources.memoryLimit)
 	resizeMemReq, restartMemReq := determineContainerResize(v1.ResourceMemory, desiredResources.memoryRequest, currentResources.memoryRequest)
@@ -816,15 +828,11 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 		changes.UpdatePodResources = true
 		return false
 	} else {
-		if resizeMemLim {
-			markContainerForUpdate(v1.ResourceMemory, desiredResources.memoryLimit, currentResources.memoryLimit)
-		} else if resizeMemReq {
-			markContainerForUpdate(v1.ResourceMemory, desiredResources.memoryRequest, currentResources.memoryRequest)
+		if resizeMemLim || resizeMemReq {
+			markContainerForUpdate(v1.ResourceMemory)
 		}
-		if resizeCPULim {
-			markContainerForUpdate(v1.ResourceCPU, desiredResources.cpuLimit, currentResources.cpuLimit)
-		} else if resizeCPUReq {
-			markContainerForUpdate(v1.ResourceCPU, desiredResources.cpuRequest, currentResources.cpuRequest)
+		if resizeCPULim || resizeCPUReq {
+			markContainerForUpdate(v1.ResourceCPU)
 		}
 	}
 	return true
@@ -1074,7 +1082,9 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	// Memory and CPU are updated separately because memory resizes may be ordered differently than CPU resizes.
 	// If resize results in net pod resource increase, set pod cgroup config before resizing containers.
 	// If resize results in net pod resource decrease, set pod cgroup config after resizing containers.
-	// If an error occurs at any point, abort. Let future syncpod iterations retry the unfinished stuff.
+	// If an error occurs in any step, abort the remaining steps. Let future syncpod iterations retry the unfinished stuff.
+	// Within a step, container updates are applied concurrently (all decreases first, then all increases).
+	// A failure does not prevent the others in the same group from being attempted.
 	updateVolumeSize := func(volumes []v1.Volume) error {
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 			for _, vol := range volumes {
@@ -1269,7 +1279,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Updating container resources", "pod", klog.KObj(pod))
 
-	for _, cInfo := range containersToUpdate {
+	updateOneContainer := func(cInfo containerToUpdateInfo) error {
 		container := cInfo.container.DeepCopy()
 		// If updating memory limit, use most recently configured CPU request and limit values.
 		// If updating CPU request and limit, use most recently configured memory request and limit values.
@@ -1294,15 +1304,19 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 			}
 		}
 		if err := m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID, cInfo.containerType); err != nil {
-			// Log error and abort as container updates need to succeed in the order determined by computePodResizeAction.
-			// The recovery path is for SyncPod to keep retrying at later times until it succeeds.
-			logger.Error(err, "updateContainerResources failed", "container", container.Name, "cID", cInfo.kubeContainerID,
-				"pod", format.Pod(pod), "resourceName", resourceName)
-			return err
+			// Return the error. Other containers in the same group are still attempted; the caller
+			// skips the remaining resize steps, and a future SyncPod retries the containers whose
+			// actuated resources were not updated.
+			return fmt.Errorf("failed to update %s resources for container %q with ID %s: %w",
+				resourceName, container.Name, cInfo.kubeContainerID.String(), err)
 		}
 
 		// If UpdateContainerResources is error-free, it means desired values for 'resourceName' was accepted by runtime.
 		// So we update currentContainerResources for 'resourceName', which is our view of most recently configured resources.
+		// A container's memory and CPU entries share this currentContainerResources pointer
+		// (see computePodResizeAction), which is how the CPU step sees the memory values applied
+		// here. Writing without a lock is safe because each container appears at most once per
+		// resource list, and the memory and CPU steps run one after the other.
 		// Note: We can't rely on GetPodStatus as runtime may lag in actuating the resource values it just accepted.
 		switch resourceName {
 		case v1.ResourceMemory:
@@ -1312,8 +1326,34 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 			cInfo.currentContainerResources.cpuLimit = cInfo.desiredContainerResources.cpuLimit
 			cInfo.currentContainerResources.cpuRequest = cInfo.desiredContainerResources.cpuRequest
 		}
+		return nil
 	}
-	return nil
+
+	// Order the container updates such that resource decreases are applied before increases
+	var downsize, upsize []containerToUpdateInfo
+	for _, cInfo := range containersToUpdate {
+		if cInfo.isDecrease(resourceName) {
+			downsize = append(downsize, cInfo)
+		} else {
+			upsize = append(upsize, cInfo)
+		}
+	}
+	resizeBatch := func(batch []containerToUpdateInfo) error {
+		var wg sync.WaitGroup
+		errs := make([]error, len(batch))
+		for i, cInfo := range batch {
+			wg.Go(func() {
+				defer utilruntime.HandleCrashWithContext(ctx)
+				errs[i] = updateOneContainer(cInfo)
+			})
+		}
+		wg.Wait()
+		return utilerrors.NewAggregate(errs)
+	}
+	if err := resizeBatch(downsize); err != nil {
+		return err
+	}
+	return resizeBatch(upsize)
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
