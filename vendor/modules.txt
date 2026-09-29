@@ -183,45 +183,21 @@ github.com/go-openapi/jsonpointer/jsonname
 ## explicit; go 1.26.0
 github.com/go-openapi/jsonreference
 github.com/go-openapi/jsonreference/internal
-# github.com/go-openapi/swag v0.29.2
-## explicit; go 1.26.0
-github.com/go-openapi/swag
-# github.com/go-openapi/swag/cmdutils v0.29.2
-## explicit; go 1.26.0
-github.com/go-openapi/swag/cmdutils
 # github.com/go-openapi/swag/conv v0.29.2
 ## explicit; go 1.26.0
 github.com/go-openapi/swag/conv
-# github.com/go-openapi/swag/fileutils v0.29.2
-## explicit; go 1.26.0
-github.com/go-openapi/swag/fileutils
 # github.com/go-openapi/swag/jsonutils v0.29.2
 ## explicit; go 1.26.0
 github.com/go-openapi/swag/jsonutils
 github.com/go-openapi/swag/jsonutils/adapters
 github.com/go-openapi/swag/jsonutils/adapters/ifaces
 github.com/go-openapi/swag/jsonutils/adapters/stdlib/json
-# github.com/go-openapi/swag/loading v0.29.2
-## explicit; go 1.26.0
-github.com/go-openapi/swag/loading
-# github.com/go-openapi/swag/mangling v0.29.2
-## explicit; go 1.26.0
-github.com/go-openapi/swag/mangling
-# github.com/go-openapi/swag/netutils v0.29.2
-## explicit; go 1.26.0
-github.com/go-openapi/swag/netutils
 # github.com/go-openapi/swag/pools v0.29.2
 ## explicit; go 1.26.0
 github.com/go-openapi/swag/pools
-# github.com/go-openapi/swag/stringutils v0.29.2
-## explicit; go 1.26.0
-github.com/go-openapi/swag/stringutils
 # github.com/go-openapi/swag/typeutils v0.29.2
 ## explicit; go 1.26.0
 github.com/go-openapi/swag/typeutils
-# github.com/go-openapi/swag/yamlutils v0.29.2
-## explicit; go 1.26.0
-github.com/go-openapi/swag/yamlutils
 # github.com/go-task/slim-sprig/v3 v3.0.0
 ## explicit; go 1.20
 github.com/go-task/slim-sprig/v3
@@ -1121,7 +1097,7 @@ k8s.io/klog/v2/textlogger
 ## explicit; go 1.27.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.27.0
-# k8s.io/kube-openapi v0.0.0-20260927153434-4ef312c1c17d
+# k8s.io/kube-openapi v0.0.0-20260929181212-2cfbdf149b9a
 ## explicit; go 1.27.0
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args

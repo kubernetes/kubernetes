@@ -20,7 +20,7 @@ import (
 	jsonv2 "encoding/json/v2"
 	"net/url"
 
-	"github.com/go-openapi/swag"
+	"github.com/go-openapi/jsonpointer/jsonname"
 
 	"k8s.io/kube-openapi/pkg/internal"
 )
@@ -537,7 +537,7 @@ func (s *Schema) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	delete(x.Extensions, "$ref")
 	delete(x.Extensions, "$schema")
 
-	for _, pn := range swag.DefaultJSONNameProvider.GetJSONNames(s) {
+	for _, pn := range jsonname.DefaultJSONNameProvider.GetJSONNames(s) {
 		delete(x.Extensions, pn)
 	}
 	if len(x.Extensions) == 0 {
