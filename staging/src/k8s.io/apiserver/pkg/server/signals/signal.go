@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+// Package signals installs the shared SIGTERM and SIGINT shutdown handler.
+// It depends only on the standard library.
+package signals
 
 import (
 	"context"
