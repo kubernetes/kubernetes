@@ -632,6 +632,31 @@ func TestSortAvailableUncoreCaches(t *testing.T) {
 	}
 }
 
+func TestSortAvailableUncoreCachesForResizeNoDuplicate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	// topoDualSocketSubNumaPerSocketHTMonolithicUncore has UncoreCacheID=0 spanning NUMA 0 and NUMA 1 (both in socket 0)
+	topo := topoDualSocketSubNumaPerSocketHTMonolithicUncore
+	availableCPUs := mustParseCPUSet(t, "0-239")
+	currentlyAllocatedCPUs := mustParseCPUSet(t, "0")
+	numCPUs := 5 // scale-up: 1 -> 5 (4 new)
+
+	acc := newCPUAccumulatorForResize(logger, topo, availableCPUs, numCPUs, CPUSortingStrategyPacked, currentlyAllocatedCPUs, cpuset.New())
+
+	result := acc.sortAvailableUncoreCachesForResize()
+
+	// Count occurrences of each UncoreCache ID.
+	seen := map[int]int{}
+	for _, id := range result {
+		seen[id]++
+	}
+
+	for id, count := range seen {
+		if count > 1 {
+			t.Errorf("UncoreCache %d appears %d times in result %v; expected exactly 1", id, count, result)
+		}
+	}
+}
+
 func TestCPUAccumulatorTake(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
