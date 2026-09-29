@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/mldsa"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
@@ -85,6 +86,38 @@ func loadECDSAKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *j
 func loadECDSAPrivKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
 	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
 		return x509.ParseECPrivateKey(b)
+	})
+}
+
+func loadMLDSAKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
+	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
+		key, err := x509.ParsePKCS8PrivateKey(b)
+		if err != nil {
+			return nil, err
+		}
+
+		mldsaKey, ok := key.(*mldsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("loaded key is not an ML-DSA private key, got %T", key)
+		}
+
+		return mldsaKey.PublicKey(), nil
+	})
+}
+
+func loadMLDSAPrivKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
+	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
+		key, err := x509.ParsePKCS8PrivateKey(b)
+		if err != nil {
+			return nil, err
+		}
+
+		mldsaKey, ok := key.(*mldsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("loaded key is not an ML-DSA private key, got %T", key)
+		}
+
+		return mldsaKey, nil
 	})
 }
 
@@ -2007,6 +2040,39 @@ func TestToken(t *testing.T) {
 			pubKeys: []*jose.JSONWebKey{
 				loadECDSAKey(t, "testdata/ecdsa_1.pem", jose.ES512),
 				loadECDSAKey(t, "testdata/ecdsa_2.pem", jose.ES512),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "mldsa-44",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: ptr.To(""),
+						},
+					},
+				},
+				SupportedSigningAlgs: []string{"ML-DSA-44"},
+				now:                  func() time.Time { return now },
+			},
+			signingKey: loadMLDSAPrivKey(t, "testdata/mldsa_2.pem", jose.ML_DSA_44),
+			pubKeys: []*jose.JSONWebKey{
+				loadMLDSAKey(t, "testdata/mldsa_1.pem", jose.ML_DSA_44),
+				loadMLDSAKey(t, "testdata/mldsa_2.pem", jose.ML_DSA_44),
 			},
 			claims: fmt.Sprintf(`{
 				"iss": "https://auth.example.com",

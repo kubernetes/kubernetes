@@ -26,4 +26,8 @@ for N in $(seq 1 3); do
     ssh-keygen -t ecdsa -b 521 -f ecdsa_"$N".pem -N ''
 done
 
+for N in $(seq 1 3); do
+    openssl genpkey -algorithm ML-DSA-44 -provparam ml-dsa.output_formats=seed-only -out mldsa_"$N".pem
+done
+
 rm ./*.pub

@@ -43,6 +43,7 @@ type Signer interface {
 //
 // Key must have one of these types:
 //   - ed25519.PrivateKey
+//   - *mldsa.PrivateKey (requires Go 1.27 or later)
 //   - *ecdsa.PrivateKey
 //   - *rsa.PrivateKey
 //   - *JSONWebKey
@@ -130,8 +131,6 @@ type payloadVerifier interface {
 	verifyPayload(payload []byte, signature []byte, alg SignatureAlgorithm) error
 }
 
-var errInvalidVerificationKey = errors.New("go-jose/go-jose: invalid verification key")
-
 type genericSigner struct {
 	recipients   []recipientSigInfo
 	nonceSource  NonceSource
@@ -190,23 +189,14 @@ func NewMultiSigner(sigs []SigningKey, opts *SignerOptions) (Signer, error) {
 func newVerifier(verificationKey interface{}) (payloadVerifier, error) {
 	switch verificationKey := verificationKey.(type) {
 	case ed25519.PublicKey:
-		if len(verificationKey) == 0 {
-			return nil, errInvalidVerificationKey
-		}
 		return &edEncrypterVerifier{
 			publicKey: verificationKey,
 		}, nil
 	case *rsa.PublicKey:
-		if verificationKey == nil {
-			return nil, errInvalidVerificationKey
-		}
 		return &rsaEncrypterVerifier{
 			publicKey: verificationKey,
 		}, nil
 	case *ecdsa.PublicKey:
-		if verificationKey == nil {
-			return nil, errInvalidVerificationKey
-		}
 		return &ecEncrypterVerifier{
 			publicKey: verificationKey,
 		}, nil
@@ -217,13 +207,13 @@ func newVerifier(verificationKey interface{}) (payloadVerifier, error) {
 	case JSONWebKey:
 		return newVerifier(verificationKey.Key)
 	case *JSONWebKey:
-		if verificationKey == nil {
-			return nil, errInvalidVerificationKey
-		}
 		return newVerifier(verificationKey.Key)
 	case OpaqueVerifier:
 		return &opaqueVerifier{verifier: verificationKey}, nil
 	default:
+		if verifier, ok, err := mldsaVerifier(verificationKey); ok {
+			return verifier, err
+		}
 		return nil, ErrUnsupportedKeyType
 	}
 }
@@ -255,6 +245,9 @@ func makeJWSRecipient(alg SignatureAlgorithm, signingKey interface{}) (recipient
 	case OpaqueSigner:
 		return newOpaqueSigner(alg, signingKey)
 	default:
+		if recipient, ok, err := mldsaSigner(alg, signingKey); ok {
+			return recipient, err
+		}
 		return recipientSigInfo{}, ErrUnsupportedKeyType
 	}
 }
@@ -300,6 +293,12 @@ func (ctx *genericSigner) Sign(payload []byte) (*JSONWebSignature, error) {
 			//
 			// See https://github.com/square/go-jose/issues/157 for more context.
 			if ctx.embedJWK {
+				// MarshalJSON can fail for a semantically inconsistent key (an AKP
+				// key whose Algorithm contradicts its parameter set). Surface that
+				// as an error rather than letting mustSerializeJSON panic below.
+				if _, err := recipientPubKey.MarshalJSON(); err != nil {
+					return nil, err
+				}
 				protected[headerJWK] = recipientPubKey
 			} else {
 				keyID := recipientPubKey.KeyID
@@ -378,6 +377,7 @@ func (ctx *genericSigner) Options() SignerOptions {
 //
 // The verificationKey argument must have one of these types:
 //   - ed25519.PublicKey
+//   - *mldsa.PublicKey (requires Go 1.27 or later)
 //   - *ecdsa.PublicKey
 //   - *rsa.PublicKey
 //   - *JSONWebKey

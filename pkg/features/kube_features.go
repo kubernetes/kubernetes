@@ -1055,6 +1055,12 @@ const (
 	// recorded into the audit log for future requests made by these tokens.
 	ServiceAccountTokenJTI featuregate.Feature = "ServiceAccountTokenJTI"
 
+	// owner: @everettraven
+	// issue: https://github.com/kubernetes/kubernetes/issues/141838
+	//
+	// Adds support for using ML-DSA private keys for generating service account tokens and adding support for ML-DSA signing algorithms for service account external JWT.
+	ServiceAccountTokenMLDSA featuregate.Feature = "ServiceAccountTokenMLDSA"
+
 	// owner: @munnerz
 	// kep: http://kep.k8s.io/4193
 	//
@@ -2025,6 +2031,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	ServiceAccountTokenMLDSA: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.38")},
+	},
+
 	ServiceAccountTokenNodeBinding: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2702,6 +2713,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ServiceAccountNodeAudienceRestriction: {},
 
 	ServiceAccountTokenJTI: {},
+
+	ServiceAccountTokenMLDSA: {},
 
 	ServiceAccountTokenNodeBinding: {ServiceAccountTokenNodeBindingValidation},
 
