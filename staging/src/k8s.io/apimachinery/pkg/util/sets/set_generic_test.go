@@ -84,6 +84,49 @@ func TestSetDeleteMultiples(t *testing.T) {
 
 }
 
+func TestSetPopAny(t *testing.T) {
+	s := sets.New("a", "b", "c")
+	original := s.Clone()
+
+	// PopAny must return an element that was in the set and remove it.
+	v, ok := s.PopAny()
+	if !ok {
+		t.Fatal("PopAny on non-empty set returned false")
+	}
+	if !original.Has(v) {
+		t.Errorf("PopAny returned %q which was not in the original set", v)
+	}
+	if s.Has(v) {
+		t.Errorf("PopAny did not remove %q from the set", v)
+	}
+	if s.Len() != 2 {
+		t.Errorf("expected len=2 after one pop, got %d", s.Len())
+	}
+
+	// Drain the rest.
+	for s.Len() > 0 {
+		v, ok = s.PopAny()
+		if !ok {
+			t.Fatal("PopAny returned false on non-empty set")
+		}
+		if !original.Has(v) {
+			t.Errorf("PopAny returned %q which was not in the original set", v)
+		}
+	}
+	if s.Len() != 0 {
+		t.Errorf("expected empty set after draining, got len=%d", s.Len())
+	}
+
+	// PopAny on empty set.
+	v, ok = s.PopAny()
+	if ok {
+		t.Errorf("PopAny on empty set reported an element: %q", v)
+	}
+	if v != "" {
+		t.Errorf("PopAny on empty set returned %q, expected zero value", v)
+	}
+}
+
 func TestSetClear(t *testing.T) {
 	s := sets.Set[string]{}
 	s.Insert("a", "b", "c")
