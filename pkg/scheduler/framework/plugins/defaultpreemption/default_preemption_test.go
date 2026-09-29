@@ -2440,8 +2440,10 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 		name                string
 		pod                 *v1.Pod
 		pods                []*v1.Pod
-		podGroups           []*v1beta1.PodGroup
-		compositePodGroups  []*v1alpha3.CompositePodGroup
+		podGroups               []*v1beta1.PodGroup
+		cachePodGroups          []*v1beta1.PodGroup
+		compositePodGroups      []*v1alpha3.CompositePodGroup
+		cacheCompositePodGroups []*v1alpha3.CompositePodGroup
 		nodes               []string
 		features            feature.Features
 		nominatedNodeStatus *fwk.Status
@@ -2560,6 +2562,60 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
 			expected: false,
 		},
+		{
+			name: "Snapshot consistency (FM-403): victim PodGroup priority modified in mutable cache to higher priority does not affect snapshot evaluation",
+			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
+					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
+			},
+			podGroups: []*v1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").Priority(lowPriority).Obj(),
+			},
+			cachePodGroups: []*v1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").Priority(veryHighPriority).Obj(),
+			},
+			nodes:    []string{"node1"},
+			features: feature.Features{EnableGenericWorkload: true},
+			expected: false,
+		},
+		{
+			name: "Snapshot consistency (FM-403): victim PodGroup priority modified in mutable cache to lower priority does not affect snapshot evaluation",
+			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(lowPriority).PodGroupName("pg1").Terminating().
+					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
+			},
+			podGroups: []*v1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").Priority(veryHighPriority).Obj(),
+			},
+			cachePodGroups: []*v1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").Priority(lowPriority).Obj(),
+			},
+			nodes:    []string{"node1"},
+			features: feature.Features{EnableGenericWorkload: true},
+			expected: true,
+		},
+		{
+			name: "Snapshot consistency (FM-403): victim CompositePodGroup priority modified in mutable cache does not affect snapshot evaluation",
+			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
+					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
+			},
+			podGroups: []*v1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
+			},
+			compositePodGroups: []*v1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").Namespace("ns2").Priority(lowPriority).Obj(),
+			},
+			cacheCompositePodGroups: []*v1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").Namespace("ns2").Priority(veryHighPriority).Obj(),
+			},
+			nodes:    []string{"node1"},
+			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
+			expected: false,
+		},
 	}
 
 	for _, test := range tests {
@@ -2599,10 +2655,18 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			cache := internalcache.New(ctx, nil, test.features.EnableGenericWorkload, test.features.EnableCompositePodGroup)
-			for _, pg := range test.podGroups {
+			cachePGs := test.cachePodGroups
+			if cachePGs == nil {
+				cachePGs = test.podGroups
+			}
+			for _, pg := range cachePGs {
 				cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg))
 			}
-			for _, cpg := range test.compositePodGroups {
+			cacheCPGs := test.cacheCompositePodGroups
+			if cacheCPGs == nil {
+				cacheCPGs = test.compositePodGroups
+			}
+			for _, cpg := range cacheCPGs {
 				cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
 			}
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(test.pods, nodes, test.podGroups, test.compositePodGroups)
