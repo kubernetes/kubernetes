@@ -208,6 +208,9 @@ type DRAPlugin interface {
 	// and then to exit the process if the error is fatal.
 	// Ideally the process should shut down gracefully, which can be
 	// achieved by canceling the main context of the DRA driver.
+	// HandleError may call [Helper.PublishResources] to replace the
+	// resources. It must not call [Helper.Stop], which may wait for
+	// HandleError to return.
 	//
 	// Fatal errors can be distinguished from recoverable errors via
 	//    errors.Is(err, kubeletplugin.ErrRecoverable)
@@ -1173,10 +1176,12 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		d.pluginServer.stop()
 		d.registrar.stop()
 
-		// d.resourceSliceController is set concurrently.
+		// d.resourceSliceController is set concurrently. Stop waits for
+		// HandleError, which may call PublishResources and lock d.mutex.
 		d.mutex.Lock()
-		d.resourceSliceController.Stop()
+		controller := d.resourceSliceController
 		d.mutex.Unlock()
+		controller.Stop()
 	}()
 
 	return d, nil
