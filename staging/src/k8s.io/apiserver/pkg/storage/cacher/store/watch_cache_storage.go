@@ -107,10 +107,15 @@ func (w *WatchCacheStorage) LatestSnapshot() Snapshot {
 
 // listSnapshot serves an unordered index bucket.
 type listSnapshot struct {
-	Items []interface{}
+	Items           []interface{}
+	resourceVersion uint64
 }
 
 var _ Snapshot = (*listSnapshot)(nil)
+
+func (l listSnapshot) ResourceVersion() uint64 {
+	return l.resourceVersion
+}
 
 func (l listSnapshot) GetByKey(key string) (interface{}, bool, error) {
 	for _, item := range l.Items {
@@ -188,14 +193,11 @@ func (w *WatchCacheStorage) UpdateStore(eventType watch.EventType, elem *Element
 	defer w.lock.Unlock()
 	switch eventType {
 	case watch.Added, watch.Modified:
-		prev = w.store.addOrUpdateElem(elem)
-		err = w.indexer.updateElem(elem.Key, prev, elem)
+		prev = w.store.addOrUpdateElem(elem, resourceVersion)
+		err = w.indexer.updateElem(elem.Key, prev, elem, resourceVersion)
 	case watch.Deleted:
-		var existed bool
-		prev, existed = w.store.deleteElem(elem)
-		if existed {
-			err = w.indexer.updateElem(elem.Key, prev, nil)
-		}
+		prev = w.store.deleteElem(elem, resourceVersion)
+		err = w.indexer.updateElem(elem.Key, prev, nil, resourceVersion)
 	default:
 		err = fmt.Errorf("unexpected event type: %v", eventType)
 	}
@@ -210,6 +212,14 @@ func (w *WatchCacheStorage) UpdateStore(eventType watch.EventType, elem *Element
 	return prev, nil
 }
 
+func (w *WatchCacheStorage) UpdateResourceVersion(resourceVersion uint64) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	w.store.resourceVersion = resourceVersion
+	w.indexer.resourceVersion = resourceVersion
+	w.latestSnapshot.Store(w.store.Clone())
+}
+
 // CompactSnapshotsLocked prunes snapshots older than the oldest history version.
 func (w *WatchCacheStorage) CompactSnapshotsLocked(oldestRV uint64) {
 	w.Compact(oldestRV)
@@ -219,8 +229,8 @@ func (w *WatchCacheStorage) CompactSnapshotsLocked(oldestRV uint64) {
 func (w *WatchCacheStorage) Replace(toReplace []*Element, version uint64) error {
 	w.lock.Lock()
 	defer w.lock.Unlock()
-	w.store.Replace(toReplace)
-	if err := w.indexer.Replace(toReplace); err != nil {
+	w.store.Replace(toReplace, version)
+	if err := w.indexer.Replace(toReplace, version); err != nil {
 		return err
 	}
 	w.snapshots.Reset()
@@ -251,11 +261,11 @@ func (w *WatchCacheStorage) GetExactSnapshotLocked(resourceVersion uint64) (Snap
 func (w *WatchCacheStorage) GetByIndexSnapshot(indexName, value string) (Snapshot, error) {
 	w.lock.RLock()
 	defer w.lock.RUnlock()
-	result, err := w.indexer.ByIndex(indexName, value)
+	result, resourceVersion, err := w.indexer.ByIndex(indexName, value)
 	if err != nil {
 		return nil, err
 	}
-	return listSnapshot{Items: result}, nil
+	return listSnapshot{Items: result, resourceVersion: resourceVersion}, nil
 }
 
 // ListResourceVersion returns the list resource version.

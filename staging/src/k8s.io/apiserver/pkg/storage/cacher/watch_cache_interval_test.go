@@ -548,6 +548,10 @@ func (s *countingSnapshot) RangePrefix(_, _ string) store.Range {
 	return store.EmptyRange()
 }
 
+func (s *countingSnapshot) ResourceVersion() uint64 {
+	return 0
+}
+
 func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
 	snap := &countingSnapshot{}
 	wci := newCacheIntervalFromLazySnapshot(100, snap)

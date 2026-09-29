@@ -81,6 +81,7 @@ func TestLatestSnapshot(t *testing.T) {
 	s := NewWatchCacheStorage(indexers)
 
 	before := s.LatestSnapshot()
+	assert.Equal(t, uint64(0), before.ResourceVersion())
 	items, err := before.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Empty(t, items, "expected empty snapshot before any writes")
@@ -90,7 +91,9 @@ func TestLatestSnapshot(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, prev)
 
-	items, err = s.LatestSnapshot().OrderedListPrefix("", "")
+	snap := s.LatestSnapshot()
+	assert.Equal(t, uint64(100), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, &mockObject{key: "foo", val: "100"}, items[0].(*Element).Object)
@@ -98,6 +101,21 @@ func TestLatestSnapshot(t *testing.T) {
 	items, err = before.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Empty(t, items, "snapshot taken before the write must not change")
+	assert.Equal(t, uint64(0), before.ResourceVersion(), "snapshot taken before the write must not change")
+
+	s.UpdateResourceVersion(150)
+	snap = s.LatestSnapshot()
+	assert.Equal(t, uint64(150), snap.ResourceVersion(), "resourceVersion update must advance the latest snapshot")
+	items, err = snap.OrderedListPrefix("", "")
+	require.NoError(t, err)
+	assert.Len(t, items, 1, "resourceVersion update must not change content")
+
+	require.NoError(t, s.Replace(nil, 200))
+	snap = s.LatestSnapshot()
+	assert.Equal(t, uint64(200), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("", "")
+	require.NoError(t, err)
+	assert.Empty(t, items)
 }
 
 func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
@@ -298,11 +316,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 func TestStoreSingleKey(t *testing.T) {
 	store := NewWatchCacheStorage(testStoreIndexers())
-	testStoreSingleKey(t, store)
-}
-
-func testStoreSingleKey(t *testing.T, store *WatchCacheStorage) {
-	assertStoreEmpty(t, store, "foo")
+	assertStoreEmpty(t, store, "foo", 0)
 
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo", "bar", 1), 1)
 	require.NoError(t, err)
@@ -325,27 +339,36 @@ func testStoreSingleKey(t *testing.T, store *WatchCacheStorage) {
 	prev, err = store.UpdateStore(watch.Deleted, testStorageElement("foo", "", 0), 5)
 	require.NoError(t, err)
 	assert.Equal(t, testStorageElement("foo", "bar", 4), prev)
-	assertStoreEmpty(t, store, "foo")
+	assertStoreEmpty(t, store, "foo", 5)
 
 	prev, err = store.UpdateStore(watch.Deleted, testStorageElement("foo", "", 0), 6)
 	require.NoError(t, err)
 	assert.Nil(t, prev, "deleting a missing key removes nothing")
+	assertStoreEmpty(t, store, "foo", 6)
+
+	store.UpdateResourceVersion(7)
+	assertStoreEmpty(t, store, "foo", 7)
+
+	require.NoError(t, store.Replace(nil, 8))
+	assertStoreEmpty(t, store, "foo", 8)
 }
 
 func TestStoreIndexerSingleKey(t *testing.T) {
 	store := NewWatchCacheStorage(testStoreIndexers())
-	testStoreIndexerSingleKey(t, store)
-}
-
-func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
-	items, err := store.indexer.ByIndex("by_val", "bar")
+	snap, err := store.GetByIndexSnapshot("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(0), snap.ResourceVersion())
+	items, err := snap.OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Empty(t, items)
 
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo", "bar", 1), 1)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
-	items, err = store.indexer.ByIndex("by_val", "bar")
+	snap, err = store.GetByIndexSnapshot("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(1), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo", "bar", 1),
@@ -354,10 +377,16 @@ func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
 	prev, err = store.UpdateStore(watch.Modified, testStorageElement("foo", "baz", 2), 2)
 	require.NoError(t, err)
 	assert.Equal(t, testStorageElement("foo", "bar", 1), prev)
-	items, err = store.indexer.ByIndex("by_val", "bar")
+	snap, err = store.GetByIndexSnapshot("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(2), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Empty(t, items)
-	items, err = store.indexer.ByIndex("by_val", "baz")
+	snap, err = store.GetByIndexSnapshot("by_val", "baz")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(2), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo", "baz", 2),
@@ -366,10 +395,16 @@ func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
 	prev, err = store.UpdateStore(watch.Modified, testStorageElement("foo", "baz", 3), 3)
 	require.NoError(t, err)
 	assert.Equal(t, testStorageElement("foo", "baz", 2), prev)
-	items, err = store.indexer.ByIndex("by_val", "bar")
+	snap, err = store.GetByIndexSnapshot("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(3), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Empty(t, items)
-	items, err = store.indexer.ByIndex("by_val", "baz")
+	snap, err = store.GetByIndexSnapshot("by_val", "baz")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(3), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo", "baz", 3),
@@ -378,29 +413,67 @@ func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
 	require.NoError(t, store.Replace([]*Element{
 		testStorageElement("foo", "bar", 4),
 	}, 4))
-	items, err = store.indexer.ByIndex("by_val", "bar")
+	snap, err = store.GetByIndexSnapshot("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(4), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo", "bar", 4),
 	}, items)
-	items, err = store.indexer.ByIndex("by_val", "baz")
+	snap, err = store.GetByIndexSnapshot("by_val", "baz")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(4), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Empty(t, items)
 
 	prev, err = store.UpdateStore(watch.Deleted, testStorageElement("foo", "", 0), 5)
 	require.NoError(t, err)
 	assert.Equal(t, testStorageElement("foo", "bar", 4), prev)
-	items, err = store.indexer.ByIndex("by_val", "baz")
+	snap, err = store.GetByIndexSnapshot("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(5), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
+	require.NoError(t, err)
+	assert.Empty(t, items)
+	snap, err = store.GetByIndexSnapshot("by_val", "baz")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(5), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Empty(t, items)
 
 	prev, err = store.UpdateStore(watch.Deleted, testStorageElement("foo", "", 0), 6)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
+	snap, err = store.GetByIndexSnapshot("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(6), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
+	require.NoError(t, err)
+	assert.Empty(t, items)
+
+	store.UpdateResourceVersion(7)
+	snap, err = store.GetByIndexSnapshot("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(7), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
+	require.NoError(t, err)
+	assert.Empty(t, items)
+
+	require.NoError(t, store.Replace(nil, 8))
+	snap, err = store.GetByIndexSnapshot("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(8), snap.ResourceVersion())
+	items, err = snap.OrderedListPrefix("foo", "")
+	require.NoError(t, err)
+	assert.Empty(t, items)
 }
 
-func assertStoreEmpty(t *testing.T, store *WatchCacheStorage, nonExistingKey string) {
+func assertStoreEmpty(t *testing.T, store *WatchCacheStorage, nonExistingKey string, expectRV uint64) {
 	snap := store.LatestSnapshot()
+	assert.Equal(t, expectRV, snap.ResourceVersion())
 	item, ok, err := snap.GetByKey(nonExistingKey)
 	require.NoError(t, err)
 	assert.False(t, ok)
@@ -413,6 +486,7 @@ func assertStoreEmpty(t *testing.T, store *WatchCacheStorage, nonExistingKey str
 
 func assertStoreSingleKey(t *testing.T, store *WatchCacheStorage, expectKey, expectValue string, expectRV int) {
 	snap := store.LatestSnapshot()
+	assert.Equal(t, uint64(expectRV), snap.ResourceVersion())
 	item, ok, err := snap.GetByKey(expectKey)
 	require.NoError(t, err)
 	assert.True(t, ok)
