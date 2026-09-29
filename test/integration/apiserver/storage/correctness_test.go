@@ -64,8 +64,17 @@ var (
 		Choice: RequestTypeListNonRecursive,
 		Weight: 5,
 	}, {
+		Choice: RequestTypeListRVZero,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeListRVNotOlderThan,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeListRVExact,
+		Weight: 5,
+	}, {
 		Choice: RequestTypeUpdate,
-		Weight: 15,
+		Weight: 10,
 	}, {
 		Choice: RequestTypeUpdateUIDPrecondition,
 		Weight: 5,
@@ -190,29 +199,25 @@ func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string
 	linearizations := info.PartialLinearizations()
 	require.Len(t, linearizations, 1, "expected one partition")
 	require.Len(t, linearizations[0], 1, "expected one linearization")
-	history := changesFromLinearization(initialState, operations, linearizations[0][0])
-	validator := correctness.NewWatchValidator(versioner, cacheKeyFunc, history)
+	linearizedOps := orderByLinearization(operations, linearizations[0][0])
+	replay, err := correctness.NewReplay(initialState, linearizedOps)
+	require.NoError(t, err)
+	for _, op := range linearizedOps {
+		require.NoError(t, replay.Validate(op.Request, op.Response))
+	}
+	validator := correctness.NewWatchValidator(versioner, replay, cacheKeyFunc)
 	for _, w := range watches {
 		require.NoError(t, validator.ValidateWatch(w.Request, w.Response))
 	}
 	require.Positive(t, watchEvents, "expected at least one watch event across %d watches", len(watches))
 }
 
-func changesFromLinearization(initialState *correctness.Model, ops []correctness.Operation, linearization []int) []correctness.Change {
-	state := initialState.Clone()
-	var changes []correctness.Change
-	for _, i := range linearization {
-		op := ops[i]
-		ok, next, change := state.Step(op.Request, op.Response)
-		if !ok {
-			panic(fmt.Sprintf("linearized operation %d failed model step", i))
-		}
-		state = next
-		if change != nil {
-			changes = append(changes, *change)
-		}
+func orderByLinearization(ops []correctness.Operation, linearization []int) []correctness.Operation {
+	ordered := make([]correctness.Operation, len(linearization))
+	for i, idx := range linearization {
+		ordered[i] = ops[idx]
 	}
-	return changes
+	return ordered
 }
 
 // ToPorcupineModel maps a correctness.Model to porcupine.Model with an initial state.

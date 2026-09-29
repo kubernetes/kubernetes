@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
 )
@@ -116,6 +117,10 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model, chan
 	case OpGet:
 		expected = s.get(input.Key, input.Get.Options)
 	case OpList:
+		// Model only validates consistent reads, for stale reads we just validate RV and contents are validated later during replay.
+		if input.List.Options.ResourceVersion != "" {
+			return s.validateListRV(input.List.Options, output), s, nil
+		}
 		expected = s.list(input.Key, input.List.Options)
 	case OpUpdate:
 		next = s.Clone()
@@ -125,6 +130,52 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model, chan
 		return false, s, nil
 	}
 	return true, next, change
+}
+
+func (s *Model) validateListRV(opts storage.ListOptions, output Response) bool {
+	if opts.ResourceVersion == "" {
+		return true
+	}
+	reqRV, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return false
+	}
+	if output.Err != nil {
+		// RV from future must return error
+		if storage.IsTooLargeResourceVersion(output.Err) {
+			return output.Object == nil && reqRV > s.ResourceVersion
+		}
+		return false
+	}
+	if output.Object == nil {
+		return false
+	}
+	accessor, err := meta.ListAccessor(output.Object)
+	if err != nil {
+		return false
+	}
+	respRV, err := s.Versioner.ParseResourceVersion(accessor.GetResourceVersion())
+	if err != nil || respRV == 0 {
+		return false
+	}
+	// RV from future that didn't return error is invalid.
+	if respRV > s.ResourceVersion {
+		return false
+	}
+	switch opts.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchExact:
+		return reqRV > 0 && respRV == reqRV
+	case metav1.ResourceVersionMatchNotOlderThan:
+		return respRV >= reqRV
+	case "":
+		// Legacy exact match
+		if opts.Recursive && opts.Predicate.Limit > 0 && reqRV > 0 {
+			return respRV == reqRV
+		}
+		return respRV >= reqRV
+	default:
+		return false
+	}
 }
 
 func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) (Response, *Change) {

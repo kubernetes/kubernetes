@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -1018,6 +1019,98 @@ func correctnessTestSteps() []testStep {
 				{Object: nil, Err: nil},
 			},
 		},
+		{
+			Name: "45. List pods with Exact ResourceVersion=15 returns snapshot at RV=15",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("15", withRV(pod4, "14"), withRV(pod5, "15")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("14", withRV(pod4, "14"))},
+				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("15", withRV(pod4, "14"))},
+				{Object: newTestPodList("15", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(15, 18, 0)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "46. List pods with NotOlderThan ResourceVersion=15 returns snapshot at RV>=15",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            true,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("14", withRV(pod4, "14"))},
+				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("16", withRV(pod4, "14"), withRV(pod5, "15"))},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(15, 18, 0)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "47. List pods with ResourceVersion=0 returns snapshot at RV>=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "0",
+					Recursive:       true,
+					Predicate:       storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("14", withRV(pod4, "14")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("0")},
+				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("15", withRV(pod4, "14"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "48. List pods with future ResourceVersion=99 returns TooLargeResourceVersionError",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      wrongRV,
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            true,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    storage.NewTooLargeResourceVersionError(99, 18, 0),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("99", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/", 0)},
+				{Object: nil, Err: nil},
+			},
+		},
 	}
 }
 
@@ -1025,14 +1118,15 @@ func correctnessTestSteps() []testStep {
 // and validates that every transition matches the StorageModel specification.
 func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interface, storagePrefix string, keyFunc func(obj runtime.Object) (string, error)) {
 	versioner := store.Versioner()
-	model := NewEmptyModel(storagePrefix, func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
+	initialState := NewEmptyModel(storagePrefix, func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
+	model := initialState.Clone()
 
 	watchRequest := WatchRequest{ResourceVersion: "1"}
 	watcher, err := store.Watch(ctx, "/pods/", storage.ListOptions{ResourceVersion: watchRequest.ResourceVersion, Predicate: storage.Everything, Recursive: true})
 	require.NoError(t, err)
 	defer watcher.Stop()
 
-	var history []Change
+	var operations []Operation
 	for _, step := range correctnessTestSteps() {
 		var out runtime.Object = &example.Pod{}
 		var err error
@@ -1056,7 +1150,7 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 			respObj = out
 		}
 		resp := Response{Object: respObj, Err: err}
-		ok, next, change := model.Step(step.Request, resp)
+		ok, next, _ := model.Step(step.Request, resp)
 		if respObj != nil {
 			acc, _ := meta.CommonAccessor(respObj)
 			t.Logf("Step: %s, State RV before: %d, Response RV: %s, Obj: %+v, err: %v", step.Name, model.ResourceVersion, acc.GetResourceVersion(), respObj, err)
@@ -1064,14 +1158,18 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 			t.Logf("Step: %s, State RV before: %d, Response Err: %v", step.Name, model.ResourceVersion, err)
 		}
 		require.True(t, ok, "step %s failed to match model state transition: req=%+v resp=%+v", step.Name, step.Request, resp)
+		operations = append(operations, Operation{Request: step.Request, Response: resp})
 		model = next
-		if change != nil {
-			history = append(history, *change)
-		}
+	}
+
+	replay, err := NewReplay(initialState, operations)
+	require.NoError(t, err)
+	for _, op := range operations {
+		require.NoError(t, replay.Validate(op.Request, op.Response))
 	}
 
 	gotEvents := collectEventsTillRV(t, watcher, versioner, model.ResourceVersion)
-	validator := NewWatchValidator(versioner, keyFunc, history)
+	validator := NewWatchValidator(versioner, replay, keyFunc)
 	require.NoError(t, validator.ValidateWatch(watchRequest, WatchResponse{Events: gotEvents}))
 }
 

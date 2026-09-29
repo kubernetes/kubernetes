@@ -30,18 +30,17 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 )
 
-// WatchValidator checks watch streams against the changes the model derived
-// from the recorded operations.
+// WatchValidator checks watch streams against the replayed model history.
 type WatchValidator struct {
 	versioner storage.Versioner
 	keyFunc   func(runtime.Object) (string, error)
-	history   []Change
+	replay    *Replay
 }
 
 // NewWatchValidator returns a validator for the given history of changes.
 // keyFunc must be the same one the operations that produced history were keyed by.
-func NewWatchValidator(versioner storage.Versioner, keyFunc func(runtime.Object) (string, error), history []Change) WatchValidator {
-	return WatchValidator{versioner: versioner, keyFunc: keyFunc, history: history}
+func NewWatchValidator(versioner storage.Versioner, replay *Replay, keyFunc func(runtime.Object) (string, error)) WatchValidator {
+	return WatchValidator{versioner: versioner, replay: replay, keyFunc: keyFunc}
 }
 
 func (v WatchValidator) ValidateWatch(request WatchRequest, response WatchResponse) error {
@@ -84,7 +83,7 @@ func (v WatchValidator) validateReliable(request WatchRequest, response WatchRes
 	if err != nil {
 		return err
 	}
-	expected, err := v.filterEvents(request, rangeRV)
+	expected, err := v.replay.Events(request, rangeRV)
 	if err != nil {
 		return err
 	}
@@ -146,7 +145,7 @@ func (v WatchValidator) toEventReference(events []watch.Event) ([]eventReference
 		if err != nil {
 			return nil, err
 		}
-		rv, err := objectRV(event.Object, v.versioner)
+		rv, err := objectRV(event.Object, v.replay.versioner)
 		if err != nil {
 			return nil, err
 		}
@@ -157,23 +156,6 @@ func (v WatchValidator) toEventReference(events []watch.Event) ([]eventReference
 		})
 	}
 	return refs, nil
-}
-
-func (v WatchValidator) filterEvents(request WatchRequest, rvRange *ResourceVersionRange) ([]watch.Event, error) {
-	filtered := make([]watch.Event, 0, len(v.history))
-	for _, change := range v.history {
-		if change.ResourceVersion < rvRange.Min || change.ResourceVersion >= rvRange.Max {
-			continue
-		}
-		watchEvent, err := change.toWatchEvent(v.versioner, request.Predicate)
-		if err != nil {
-			return nil, err
-		}
-		if watchEvent != nil {
-			filtered = append(filtered, *watchEvent)
-		}
-	}
-	return filtered, nil
 }
 
 func (c Change) toWatchEvent(versioner storage.Versioner, pred storage.SelectionPredicate) (*watch.Event, error) {

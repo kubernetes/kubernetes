@@ -29,9 +29,16 @@ import (
 func TestCorrectness(t *testing.T) {
 	versioner := &storage.APIObjectVersioner{}
 	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
+	steps := correctnessTestSteps()
+	history := make([]Operation, len(steps))
+	for i, step := range steps {
+		history[i] = Operation{Request: step.Request, Response: step.CorrectResponse}
+	}
+	replay, err := NewReplay(model, history)
+	require.NoError(t, err)
 
 	var expectEvents, gotEvents []watch.Event
-	for _, step := range correctnessTestSteps() {
+	for _, step := range steps {
 		t.Run(step.Name, func(t *testing.T) {
 			if step.ExpectedEvent != nil {
 				expectEvents = append(expectEvents, *step.ExpectedEvent)
@@ -39,11 +46,15 @@ func TestCorrectness(t *testing.T) {
 
 			for i, invalidResponse := range step.InvalidResponses {
 				ok, _, _ := model.Step(step.Request, invalidResponse)
-				require.False(t, ok, "alternative response #%d should return ok=false: req=%+v resp=%+v", i, step.Request, invalidResponse)
+				if ok {
+					err := replay.Validate(step.Request, invalidResponse)
+					require.Error(t, err, "alternative response #%d should fail validation: req=%+v resp=%+v", i, step.Request, invalidResponse)
+				}
 			}
 
 			ok, next, change := model.Step(step.Request, step.CorrectResponse)
 			require.True(t, ok, "valid response should return ok=true: req=%+v resp=%+v", step.Request, step.CorrectResponse)
+			require.NoError(t, replay.Validate(step.Request, step.CorrectResponse))
 			model = next
 			if change != nil {
 				event, err := change.toWatchEvent(storage.APIObjectVersioner{}, storage.Everything)

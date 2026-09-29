@@ -441,7 +441,9 @@ func TestValidateWatch(t *testing.T) {
 		},
 	}
 
-	validator := NewWatchValidator(storage.APIObjectVersioner{}, getKey, history)
+	versioner := storage.APIObjectVersioner{}
+	replay := &Replay{versioner: versioner, changes: history}
+	validator := NewWatchValidator(versioner, replay, getKey)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, req := range tc.requests {
