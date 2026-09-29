@@ -47,6 +47,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	consistencyutil "k8s.io/client-go/util/consistency"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
@@ -56,7 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/metrics"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
-	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/features"
 )
 

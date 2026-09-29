@@ -36,6 +36,12 @@ func TestOwnerRecord_WroteAt(t *testing.T) {
 	grPod := schema.GroupResource{Group: "", Resource: "pods"}
 	grDs := schema.GroupResource{Group: "apps", Resource: "daemonsets"}
 
+	// Empty or malformed initial write is ignored
+	or.WroteAt(grPod, "")
+	assert.Empty(t, or.versions)
+	or.WroteAt(grPod, "invalid")
+	assert.Empty(t, or.versions)
+
 	// First write
 	or.WroteAt(grPod, "5")
 	assert.Equal(t, "5", or.versions[grPod])
@@ -46,6 +52,12 @@ func TestOwnerRecord_WroteAt(t *testing.T) {
 
 	// Third write (lower)
 	or.WroteAt(grPod, "8")
+	assert.Equal(t, "10", or.versions[grPod])
+
+	// Empty or malformed write does not overwrite existing valid RV
+	or.WroteAt(grPod, "")
+	assert.Equal(t, "10", or.versions[grPod])
+	or.WroteAt(grPod, "invalid")
 	assert.Equal(t, "10", or.versions[grPod])
 
 	// Write to different resource
@@ -66,7 +78,7 @@ func TestOwnerRecord_IsReady(t *testing.T) {
 		grDs:  dsStore,
 	}
 
-	store := NewConsistencyStore(resourceStores)
+	store := newConsistencyStore(resourceStores)
 
 	// Case 1: No writes. Should be ready.
 	require.NoError(t, or.EnsureReady(store), "Should be ready if no writes are recorded")
@@ -74,8 +86,13 @@ func TestOwnerRecord_IsReady(t *testing.T) {
 	// Add a write
 	or.WroteAt(grPod, "10")
 
-	// Case 2: Write exists, but no reads. Should stay ready.
-	require.NoError(t, or.EnsureReady(store), "Should stay ready if write exists and no read")
+	// Case 2: Write exists, but no reads observed yet (readRV == ""). Not ready (fails in safe direction).
+	var consistencyErr *ConsistencyError
+	err := or.EnsureReady(store)
+	require.ErrorAs(t, err, &consistencyErr, "Not ready if write exists and no read observed")
+	assert.Empty(t, consistencyErr.ReadRV)
+	assert.Equal(t, "10", consistencyErr.WroteRV)
+	assert.Equal(t, grPod, consistencyErr.GroupResource)
 
 	// Add a read, but it's lower
 	podStore.Bookmark("5")
@@ -100,7 +117,7 @@ func TestOwnerRecord_IsReady(t *testing.T) {
 	dsStore.Bookmark("50")
 
 	// Case 6: One resource ready, one not. Not ready.
-	require.Error(t, or.EnsureReady(store), "Not ready if one of multiple writes is not ready (no read)")
+	require.Error(t, or.EnsureReady(store), "Not ready if one of multiple writes is not ready")
 
 	// Make the second one ready
 	dsStore.Bookmark("100")
@@ -109,15 +126,67 @@ func TestOwnerRecord_IsReady(t *testing.T) {
 	require.NoError(t, or.EnsureReady(store), "Ready if all writes are ready")
 }
 
+func TestOwnerRecord_EnsureReady_MissingOrNilStore(t *testing.T) {
+	uid := types.UID("owner-uid-1")
+	or := newOwnerRecord(uid)
+	grPod := schema.GroupResource{Group: "", Resource: "pods"}
+	or.WroteAt(grPod, "10")
+
+	// Missing store in map
+	storeWithoutPod := newConsistencyStore(map[schema.GroupResource]LastSyncRVGetter{})
+	err := or.EnsureReady(storeWithoutPod)
+	require.ErrorContains(t, err, "no store registered for group resource pods")
+
+	// Nil store in map
+	storeWithNilPod := newConsistencyStore(map[schema.GroupResource]LastSyncRVGetter{
+		grPod: nil,
+	})
+	err = or.EnsureReady(storeWithNilPod)
+	require.ErrorContains(t, err, "no store registered for group resource pods")
+}
+
+func TestConsistencyError_Error(t *testing.T) {
+	gr := schema.GroupResource{Group: "apps", Resource: "statefulsets"}
+	errUnsynced := &ConsistencyError{
+		WroteRV:       "10",
+		ReadRV:        "",
+		GroupResource: gr,
+	}
+	assert.Equal(t, "read version is not synced (written version: 10) for group resource statefulsets.apps", errUnsynced.Error())
+
+	errStale := &ConsistencyError{
+		WroteRV:       "10",
+		ReadRV:        "5",
+		GroupResource: gr,
+	}
+	assert.Equal(t, "read version: 5 is not as new as written version: 10 for group resource statefulsets.apps", errStale.Error())
+}
+
 func TestConsistencyStore_New(t *testing.T) {
 	store := NewConsistencyStore(nil)
 	require.NotNil(t, store)
-	require.NotNil(t, store.writes)
-	assert.Empty(t, store.writes)
+	internalStore, ok := store.(*consistencyStore)
+	require.True(t, ok)
+	require.NotNil(t, internalStore.writes)
+	assert.Empty(t, internalStore.writes)
+}
+
+func TestNoopConsistencyStore(t *testing.T) {
+	store := NewNoopConsistencyStore()
+	require.NotNil(t, store)
+
+	owner := types.NamespacedName{Namespace: "default", Name: "owner1"}
+	uid := types.UID("uid-1")
+	grPod := schema.GroupResource{Group: "", Resource: "pods"}
+
+	store.WroteAt(owner, uid, grPod, "10")
+	require.NoError(t, store.EnsureReady(owner))
+	store.Clear(owner, uid)
+	require.NoError(t, store.EnsureReady(owner))
 }
 
 func TestConsistencyStore_EnsureWrittenRecord(t *testing.T) {
-	store := NewConsistencyStore(nil)
+	store := newConsistencyStore(nil)
 	owner := types.NamespacedName{Name: "owner1"}
 	uid1 := types.UID("uid-1")
 	uid2 := types.UID("uid-2")
@@ -147,7 +216,7 @@ func TestConsistencyStore_EnsureWrittenRecord(t *testing.T) {
 }
 
 func TestConsistencyStore_EnsureWrittenRecord_Concurrent(t *testing.T) {
-	store := NewConsistencyStore(nil)
+	store := newConsistencyStore(nil)
 	owner := types.NamespacedName{Name: "owner1"}
 	uid1 := types.UID("uid-1")
 	uid2 := types.UID("uid-2")
@@ -197,10 +266,14 @@ func TestConsistencyStore_EnsureWrittenRecord_Concurrent(t *testing.T) {
 }
 
 func TestConsistencyStore_WroteAt(t *testing.T) {
-	store := NewConsistencyStore(nil)
+	store := newConsistencyStore(nil)
 	owner := types.NamespacedName{Name: "owner1"}
 	uid1 := types.UID("uid-1")
 	grPod := schema.GroupResource{Group: "", Resource: "pods"}
+
+	// Empty RV allocates a record but does not add any versions
+	store.WroteAt(owner, uid1, grPod, "")
+	assert.Empty(t, store.getWrittenRecord(owner).versions[grPod])
 
 	store.WroteAt(owner, uid1, grPod, "10")
 
@@ -216,7 +289,7 @@ func TestConsistencyStore_WroteAt(t *testing.T) {
 }
 
 func TestConsistencyStore_Clear(t *testing.T) {
-	store := NewConsistencyStore(nil)
+	store := newConsistencyStore(nil)
 	owner1 := types.NamespacedName{Name: "owner1"}
 	owner2 := types.NamespacedName{Name: "owner2"}
 	uid1 := types.UID("uid-1")
@@ -262,28 +335,33 @@ func TestConsistencyStore_IsReady(t *testing.T) {
 		grPod: podStore,
 	}
 
-	store := NewConsistencyStore(resourceStores)
+	store := newConsistencyStore(resourceStores)
 
 	// Case 1: No record. Ready.
 	require.NoError(t, store.EnsureReady(owner1), "Ready if no record exists")
 
-	// Add a write and initial read rv
-	podStore.Bookmark("5")
+	// Add a write before any reads
 	store.WroteAt(owner1, uid1, grPod, "10")
 
-	// Case 2: Record exists, read < write. Not ready.
+	// Case 2: Record exists, but store has not synced any reads yet. Not ready.
+	require.Error(t, store.EnsureReady(owner1), "Not ready if readRV is empty")
+
+	// Add read, but lower
+	podStore.Bookmark("5")
+
+	// Case 3: Record exists, read < write. Not ready.
 	require.Error(t, store.EnsureReady(owner1), "Not ready if read < write")
 
 	// Add read, equal
 	podStore.Bookmark("10")
 
-	// Case 3: Record exists, read == write. Ready.
+	// Case 4: Record exists, read == write. Ready.
 	require.NoError(t, store.EnsureReady(owner1), "Ready if read == write")
 
 	// Add read, higher
 	podStore.Bookmark("15")
 
-	// Case 4: Record exists, read > write. Ready.
+	// Case 5: Record exists, read > write. Ready.
 	require.NoError(t, store.EnsureReady(owner1), "Ready if read > write")
 
 	// Assert that the record no longer exists, we no longer need to track the

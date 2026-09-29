@@ -14,6 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package consistency provides a store for tracking written resource versions and
+// ensuring that local informer caches have observed resource versions at least as new
+// as those written before reconciling owners.
+//
+// Tracking requires informer stores that implement LastSyncRVGetter (such as cache.Store
+// when the AtomicFIFO feature gate is enabled, which has been the default since v1.36).
 package consistency
 
 import (
@@ -25,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 )
 
+// ConsistencyStore allows tracking written resource versions for owned resources
+// and verifying that local informer stores have caught up to those versions.
 type ConsistencyStore interface {
 	// WroteAt records a written RV for an owned resource.
 	WroteAt(owner types.NamespacedName, ownerUID types.UID, resource schema.GroupResource, rv string)
@@ -33,28 +41,37 @@ type ConsistencyStore interface {
 	Clear(owner types.NamespacedName, ownerUID types.UID)
 	// EnsureReady queries the ConsistencyStore to check whether or not the
 	// stores records are up to date, returning an error if they are not.
+	// Must not be called concurrently with WroteAt for the same owner.
 	EnsureReady(owner types.NamespacedName) error
 }
 
 // ConsistencyError is an error type returned by EnsureReady with information
-// about the resource versions and GroupKind that caused the error.
+// about the resource versions and GroupResource that caused the error.
 type ConsistencyError struct {
 	ReadRV        string
 	WroteRV       string
 	GroupResource schema.GroupResource
 }
 
+// Error implements the error interface for a ConsistencyError.
 func (c *ConsistencyError) Error() string {
+	if c.ReadRV == "" {
+		return fmt.Sprintf("read version is not synced (written version: %s) for group resource %s", c.WroteRV, c.GroupResource.String())
+	}
 	return fmt.Sprintf("read version: %s is not as new as written version: %s for group resource %s", c.ReadRV, c.WroteRV, c.GroupResource.String())
 }
 
-var _ ConsistencyStore = &RealConsistencyStore{}
+var _ ConsistencyStore = &consistencyStore{}
 
+// LastSyncRVGetter is a minimal interface that provides the latest resource version observed by a store.
 type LastSyncRVGetter interface {
+	// LastStoreSyncResourceVersion returns the latest resource version that the store has seen.
 	LastStoreSyncResourceVersion() string
 }
 
-type RealConsistencyStore struct {
+// consistencyStore is a ConsistencyStore implementation that compares recorded
+// write resource versions against cache stores.
+type consistencyStore struct {
 	// writesLock guards reads/additions/deletions to the writes map.
 	// individual records are responsible for managing their own thread safety.
 	writesLock sync.RWMutex
@@ -64,15 +81,26 @@ type RealConsistencyStore struct {
 	stores map[schema.GroupResource]LastSyncRVGetter
 }
 
-func NewConsistencyStore(stores map[schema.GroupResource]LastSyncRVGetter) *RealConsistencyStore {
-	return &RealConsistencyStore{
+// NewConsistencyStore creates a new ConsistencyStore configured with stores
+// implementing LastSyncRVGetter for each tracked GroupResource.
+//
+// Note: This requires the AtomicFIFO feature gate to be enabled in client-go (default
+// since v1.36) so that stores can track and report their latest synced resource version via
+// LastStoreSyncResourceVersion. If AtomicFIFO is disabled, or if a store has not observed
+// any sync yet, EnsureReady will return a ConsistencyError.
+func NewConsistencyStore(stores map[schema.GroupResource]LastSyncRVGetter) ConsistencyStore {
+	return newConsistencyStore(stores)
+}
+
+func newConsistencyStore(stores map[schema.GroupResource]LastSyncRVGetter) *consistencyStore {
+	return &consistencyStore{
 		writes: map[types.NamespacedName]*ownerRecord{},
 		stores: stores,
 	}
 }
 
 // getWrittenRecord returns the record for the given owner, or nil if no record exists.
-func (c *RealConsistencyStore) getWrittenRecord(owner types.NamespacedName) *ownerRecord {
+func (c *consistencyStore) getWrittenRecord(owner types.NamespacedName) *ownerRecord {
 	c.writesLock.RLock()
 	defer c.writesLock.RUnlock()
 	return c.writes[owner]
@@ -81,7 +109,7 @@ func (c *RealConsistencyStore) getWrittenRecord(owner types.NamespacedName) *own
 // ensureWrittenRecord returns a ownerRecord for the given owner and ownerUID.
 // If there is no current record, one is created.
 // If there is a current record with a different ownerUID, it is replaced with an empty record for the specified ownerUID.
-func (c *RealConsistencyStore) ensureWrittenRecord(owner types.NamespacedName, ownerUID types.UID) *ownerRecord {
+func (c *consistencyStore) ensureWrittenRecord(owner types.NamespacedName, ownerUID types.UID) *ownerRecord {
 	// fast path, already exists
 	if record := c.getWrittenRecord(owner); record != nil && record.ownerUID == ownerUID {
 		return record
@@ -102,13 +130,13 @@ func (c *RealConsistencyStore) ensureWrittenRecord(owner types.NamespacedName, o
 
 // WroteAt writes the latest written RV if it is greater than the currently
 // written RV for the owner.
-func (c *RealConsistencyStore) WroteAt(owner types.NamespacedName, ownerUID types.UID, resource schema.GroupResource, rv string) {
+func (c *consistencyStore) WroteAt(owner types.NamespacedName, ownerUID types.UID, resource schema.GroupResource, rv string) {
 	c.ensureWrittenRecord(owner, ownerUID).WroteAt(resource, rv)
 }
 
 // Clear deletes the record for owner if it exists and matches the specified
 // ownerUID (or the specified ownerUID is empty)
-func (c *RealConsistencyStore) Clear(owner types.NamespacedName, ownerUID types.UID) {
+func (c *consistencyStore) Clear(owner types.NamespacedName, ownerUID types.UID) {
 	// deleted owners typically have an existing record, not worth checking the fast path for missing records
 	c.writesLock.Lock()
 	defer c.writesLock.Unlock()
@@ -120,7 +148,7 @@ func (c *RealConsistencyStore) Clear(owner types.NamespacedName, ownerUID types.
 // EnsureReady returns nil if observed resource versions are at least as new as
 // any recorded versions for the given owner, otherwise returning the error of
 // what happened. Must not be called concurrent with WroteAt for the same owner.
-func (c *RealConsistencyStore) EnsureReady(owner types.NamespacedName) error {
+func (c *consistencyStore) EnsureReady(owner types.NamespacedName) error {
 	record := c.getWrittenRecord(owner)
 	if record == nil {
 		return nil
@@ -151,11 +179,14 @@ func (w *ownerRecord) WroteAt(resource schema.GroupResource, rv string) {
 	w.versionsLock.Lock()
 	defer w.versionsLock.Unlock()
 	if _, ok := w.versions[resource]; !ok {
+		if _, err := resourceversion.CompareResourceVersion(rv, rv); err != nil {
+			return
+		}
 		w.versions[resource] = rv
 		return
 	}
 	cmp, err := resourceversion.CompareResourceVersion(w.versions[resource], rv)
-	if err == nil && cmp >= 0 {
+	if err != nil || cmp >= 0 {
 		return
 	}
 	w.versions[resource] = rv
@@ -163,19 +194,23 @@ func (w *ownerRecord) WroteAt(resource schema.GroupResource, rv string) {
 
 // EnsureReady checks whether or not the ownerRecord is ready compared to the
 // read resource versions in the consistency store.
-func (w *ownerRecord) EnsureReady(c *RealConsistencyStore) error {
+func (w *ownerRecord) EnsureReady(c *consistencyStore) error {
 	w.versionsLock.Lock()
 	defer w.versionsLock.Unlock()
 	for gr, wroteRV := range w.versions {
 		store, exists := c.stores[gr]
 		if !exists || store == nil {
-			continue
+			return fmt.Errorf("no store registered for group resource %s", gr.String())
 		}
 		readRV := store.LastStoreSyncResourceVersion()
 		if readRV == "" {
-			// Since we wait for the store to be ready, the only time "" is if the
-			// LastStoreSyncResourceVersion() feature is not enabled.
-			continue
+			// Store has not observed any sync or bookmark yet (e.g. cache not synced or
+			// AtomicFIFO disabled). Fail in the safe direction by reporting not ready.
+			return &ConsistencyError{
+				WroteRV:       wroteRV,
+				ReadRV:        readRV,
+				GroupResource: gr,
+			}
 		}
 		i, err := resourceversion.CompareResourceVersion(wroteRV, readRV)
 		if err != nil {
@@ -194,24 +229,24 @@ func (w *ownerRecord) EnsureReady(c *RealConsistencyStore) error {
 	return nil
 }
 
-// NoopConsistencyStore is a consistency store that stores nothing and always
-// returns IsReady as true. To be used when the associated feature gate is not
-// enabled.
-type NoopConsistencyStore struct{}
+type noopConsistencyStore struct{}
 
-var _ ConsistencyStore = &NoopConsistencyStore{}
+var _ ConsistencyStore = &noopConsistencyStore{}
 
-func (*NoopConsistencyStore) WroteAt(owner types.NamespacedName, ownerUID types.UID, resource schema.GroupResource, rv string) {
+func (*noopConsistencyStore) WroteAt(owner types.NamespacedName, ownerUID types.UID, resource schema.GroupResource, rv string) {
 }
 
-func (*NoopConsistencyStore) ReadAt(resource schema.GroupResource, rv string) {}
+func (*noopConsistencyStore) Clear(owner types.NamespacedName, ownerUID types.UID) {}
 
-func (*NoopConsistencyStore) Clear(owner types.NamespacedName, ownerUID types.UID) {}
-
-func (*NoopConsistencyStore) EnsureReady(owner types.NamespacedName) error {
+func (*noopConsistencyStore) EnsureReady(owner types.NamespacedName) error {
 	return nil
 }
 
-func NewNoopConsistencyStore() *NoopConsistencyStore {
-	return &NoopConsistencyStore{}
+// NewNoopConsistencyStore creates a ConsistencyStore that records nothing and always
+// returns nil from EnsureReady. It can be used when consistency tracking is disabled
+// (for example, behind a feature gate or configuration flag) or in unit tests where
+// informer stores are not wired up, allowing callers to invoke ConsistencyStore
+// methods unconditionally without nil checks.
+func NewNoopConsistencyStore() ConsistencyStore {
+	return &noopConsistencyStore{}
 }
