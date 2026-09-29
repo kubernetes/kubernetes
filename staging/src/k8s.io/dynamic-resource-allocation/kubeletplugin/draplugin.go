@@ -671,6 +671,10 @@ func HealthV1alpha1(enabled bool) Option {
 // This enables node-owned slices that remain cluster-visible via
 // NodeSelector or AllNodes.
 //
+// Other pools passed to [Helper.PublishResources] are reported through
+// [DRAPlugin.HandleError] and are not published. If the resources do not
+// have the pool with this name, its ResourceSlices get deleted.
+//
 // Beware that this has a performance impact on the cluster
 // because all nodes have to receive all ResourceSlices of
 // the driver. Without this option, each node only receives
