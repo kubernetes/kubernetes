@@ -232,8 +232,12 @@ type HintMerger struct {
 	// includes all of the NUMA nodes from the provider that requires the most
 	// NUMA nodes to satisfy its allocation.
 	BestNonPreferredAffinityCount int
-	CompareNUMAAffinityMasks      func(candidate *TopologyHint, current *TopologyHint) (best *TopologyHint)
+	CompareNUMAAffinityMasks      numaAffinityComparator
 }
+
+// numaAffinityComparator chooses between two hints which the surrounding
+// selection rates equally, and returns the one to keep.
+type numaAffinityComparator func(current *TopologyHint, candidate *TopologyHint) (best *TopologyHint)
 
 // compareHintScores returns the hint preferred by the given NUMA allocation
 // strategy, or nil if the strategy expresses no preference between the two
@@ -272,23 +276,15 @@ func compareHintScores(strategy string, current, candidate *TopologyHint) *Topol
 	return nil
 }
 
-func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, resourceNames []string, policyName string, opts PolicyOptions) HintMerger {
-	preferClosest := (policyName != PolicySingleNumaNode) && opts.PreferClosestNUMA
-
-	// The allocation strategy and the score weights are alpha-level policy
-	// options. NewPolicyOptions already refuses them while the alpha options are
-	// disabled; check the gate here as well so PolicyOptions values built by
-	// other means cannot turn the feature on behind the gate's back.
-	allocationStrategy := NUMAAllocationStrategyNone
-	var scoreWeights map[string]int
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManagerPolicyAlphaOptions) {
-		if opts.NUMAAllocationStrategy != "" {
-			allocationStrategy = opts.NUMAAllocationStrategy
-		}
-		scoreWeights = opts.NUMAScoreWeights
-	}
-
-	compareNumaAffinityMasks := func(current, candidate *TopologyHint) *TopologyHint {
+// newNUMAAffinityComparator returns the comparison between two affinity masks
+// the given policy options ask for.
+//
+// strategy is layered on top of the structural comparison rather than
+// replacing it, so NUMAAllocationStrategyNone yields the structural comparison
+// on its own. Callers which need to know what the strategy displaced can build
+// that comparator too and run the selection a second time with it.
+func newNUMAAffinityComparator(numaInfo *NUMAInfo, preferClosest bool, strategy string) numaAffinityComparator {
+	return func(current, candidate *TopologyHint) *TopologyHint {
 		// If current and candidate bitmasks are the same, prefer current hint.
 		if candidate.NUMANodeAffinity.IsEqual(current.NUMANodeAffinity) {
 			return current
@@ -298,9 +294,9 @@ func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, resourceNames []s
 		// only gets to decide between masks which Narrowest, respectively
 		// Closest, considers equally good and would otherwise separate with an
 		// arbitrary fallback.
-		if allocationStrategy != NUMAAllocationStrategyNone &&
+		if strategy != NUMAAllocationStrategyNone &&
 			numaInfo.equallyFit(current.NUMANodeAffinity, candidate.NUMANodeAffinity, preferClosest) {
-			if best := compareHintScores(allocationStrategy, current, candidate); best != nil {
+			if best := compareHintScores(strategy, current, candidate); best != nil {
 				return best
 			}
 		}
@@ -317,6 +313,23 @@ func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, resourceNames []s
 		}
 		return candidate
 	}
+}
+
+func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, resourceNames []string, policyName string, opts PolicyOptions) HintMerger {
+	preferClosest := (policyName != PolicySingleNumaNode) && opts.PreferClosestNUMA
+
+	// The allocation strategy and the score weights are alpha-level policy
+	// options. NewPolicyOptions already refuses them while the alpha options are
+	// disabled; check the gate here as well so PolicyOptions values built by
+	// other means cannot turn the feature on behind the gate's back.
+	allocationStrategy := NUMAAllocationStrategyNone
+	var scoreWeights map[string]int
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManagerPolicyAlphaOptions) {
+		if opts.NUMAAllocationStrategy != "" {
+			allocationStrategy = opts.NUMAAllocationStrategy
+		}
+		scoreWeights = opts.NUMAScoreWeights
+	}
 
 	merger := HintMerger{
 		NUMAInfo:                      numaInfo,
@@ -324,13 +337,21 @@ func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, resourceNames []s
 		ResourceNames:                 resourceNames,
 		ScoreWeights:                  scoreWeights,
 		BestNonPreferredAffinityCount: maxOfMinAffinityCounts(hints),
-		CompareNUMAAffinityMasks:      compareNumaAffinityMasks,
+		CompareNUMAAffinityMasks:      newNUMAAffinityComparator(numaInfo, preferClosest, allocationStrategy),
 	}
 
 	return merger
 }
 
 func (m HintMerger) compare(current *TopologyHint, candidate *TopologyHint) *TopologyHint {
+	return m.compareWith(m.CompareNUMAAffinityMasks, current, candidate)
+}
+
+// compareWith is compare with the comparison between equally rated affinity
+// masks supplied by the caller rather than taken from the merger, so that the
+// same selection can be run with a comparator the merger is not configured
+// with.
+func (m HintMerger) compareWith(compareNUMAAffinityMasks numaAffinityComparator, current *TopologyHint, candidate *TopologyHint) *TopologyHint {
 	// Only consider candidates that result in a NUMANodeAffinity > 0 to
 	// replace the current bestHint.
 	if candidate.NUMANodeAffinity.Count() == 0 {
@@ -359,7 +380,7 @@ func (m HintMerger) compare(current *TopologyHint, candidate *TopologyHint) *Top
 	// If the current bestHint and the candidate hint are both preferred,
 	// then only consider fitter NUMANodeAffinity
 	if current.Preferred && candidate.Preferred {
-		return m.CompareNUMAAffinityMasks(current, candidate)
+		return compareNUMAAffinityMasks(current, candidate)
 
 	}
 
@@ -421,14 +442,14 @@ func (m HintMerger) compare(current *TopologyHint, candidate *TopologyHint) *Top
 
 	// Case 1
 	if current.NUMANodeAffinity.Count() > m.BestNonPreferredAffinityCount {
-		return m.CompareNUMAAffinityMasks(current, candidate)
+		return compareNUMAAffinityMasks(current, candidate)
 	}
 	// Case 2
 	if current.NUMANodeAffinity.Count() == m.BestNonPreferredAffinityCount {
 		if candidate.NUMANodeAffinity.Count() != m.BestNonPreferredAffinityCount {
 			return current
 		}
-		return m.CompareNUMAAffinityMasks(current, candidate)
+		return compareNUMAAffinityMasks(current, candidate)
 	}
 	// Case 3a
 	if candidate.NUMANodeAffinity.Count() > m.BestNonPreferredAffinityCount {
@@ -449,7 +470,7 @@ func (m HintMerger) compare(current *TopologyHint, candidate *TopologyHint) *Top
 	}
 
 	// Case 3cc
-	return m.CompareNUMAAffinityMasks(current, candidate)
+	return compareNUMAAffinityMasks(current, candidate)
 
 }
 
