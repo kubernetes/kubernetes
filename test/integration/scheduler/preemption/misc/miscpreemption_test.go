@@ -17,11 +17,13 @@ limitations under the License.
 package miscpreemption
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1242,5 +1244,860 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+// TestDeterministicEqualTimestampVictimSelection verifies that when multiple candidate nodes
+// host victim pods with identical StartTime timestamps and identical priorities, the scheduler
+// deterministically selects the exact same candidate node and victim UID across repeated scheduling runs.
+func TestDeterministicEqualTimestampVictimSelection(t *testing.T) {
+	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+	}
+	defaultNodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "1000m",
+		v1.ResourceMemory: "1000",
+	}
+
+	fixedStartTime := metav1.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	for _, asyncPreemptionEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("AsyncPreemptionEnabled_%v", asyncPreemptionEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SchedulerAsyncPreemption: asyncPreemptionEnabled,
+			})
+
+			// Subtest 1: Repeated scheduling cycles maintain stable nominated node (avoiding cache thrashing)
+			t.Run("Multi-node identical victim pods deterministic nomination and cache stability", func(t *testing.T) {
+				testCtx := initTest(t, "det-multi-node")
+				cs := testCtx.ClientSet
+
+				var nodes []string
+				for i := 1; i <= 3; i++ {
+					nodeName := fmt.Sprintf("node-multi-%d", i)
+					_, err := createNode(cs, st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(defaultNodeRes).Obj())
+					if err != nil {
+						t.Fatalf("Error creating node %v: %v", nodeName, err)
+					}
+					nodes = append(nodes, nodeName)
+				}
+
+				var existingPods []*v1.Pod
+				for _, nodeName := range nodes {
+					for j := 1; j <= 2; j++ {
+						p := initPausePod(&testutils.PausePodConfig{
+							Name:      fmt.Sprintf("victim-%s-%d", nodeName, j),
+							Namespace: testCtx.NS.Name,
+							Priority:  &lowPriority,
+							NodeName:  nodeName,
+							Resources: defaultPodRes,
+						})
+						pod, err := runPausePod(cs, p)
+						if err != nil {
+							t.Fatalf("Error running pause pod: %v", err)
+						}
+						addPodConditionReady(pod)
+						pod.Status.StartTime = &fixedStartTime
+						if _, err := cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{}); err != nil {
+							t.Fatalf("Error updating pod status: %v", err)
+						}
+						existingPods = append(existingPods, pod)
+					}
+				}
+
+				if err := waitCachedPodsStable(testCtx, existingPods); err != nil {
+					t.Fatalf("Not all pods are stable in cache: %v", err)
+				}
+
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      "preemptor-multi",
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					},
+				})
+				preemptorPod, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Error creating preemptor: %v", err)
+				}
+
+				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptorPod); err != nil {
+					t.Fatalf("Preemptor .status.nominatedNodeName not set: %v", err)
+				}
+
+				updatedPreemptor, err := cs.CoreV1().Pods(preemptorPod.Namespace).Get(testCtx.Ctx, preemptorPod.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get preemptor: %v", err)
+				}
+				nominatedNode := updatedPreemptor.Status.NominatedNodeName
+				if nominatedNode == "" {
+					t.Fatalf("Expected nominatedNode to be non-empty")
+				}
+
+				// Verify that across consecutive scheduler reconciliations, the nominated node remains deterministically unchanged
+				for check := 0; check < 5; check++ {
+					time.Sleep(100 * time.Millisecond)
+					p, err := cs.CoreV1().Pods(preemptorPod.Namespace).Get(testCtx.Ctx, preemptorPod.Name, metav1.GetOptions{})
+					if err != nil {
+						t.Fatalf("Failed to get preemptor on check %d: %v", check, err)
+					}
+					if p.Status.NominatedNodeName != nominatedNode {
+						t.Errorf("Check %d: NominatedNodeName changed from %q to %q (cache thrashing detected)", check, nominatedNode, p.Status.NominatedNodeName)
+					}
+				}
+			})
+
+			// Subtest 2: Single node victim tie-breaking by UID determinism
+			t.Run("Single-node equal start time victim UID tie-breaking", func(t *testing.T) {
+				testCtx := initTest(t, "det-single-node")
+				cs := testCtx.ClientSet
+
+				nodeName := "node-single-uid"
+				_, err := createNode(cs, st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Failed to create node %v: %v", nodeName, err)
+				}
+
+				v1Pod := initPausePod(&testutils.PausePodConfig{
+					Name:      "equal-time-victim-1",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  nodeName,
+					Resources: defaultPodRes,
+				})
+				v2Pod := initPausePod(&testutils.PausePodConfig{
+					Name:      "equal-time-victim-2",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  nodeName,
+					Resources: defaultPodRes,
+				})
+
+				p1, err := runPausePod(cs, v1Pod)
+				if err != nil {
+					t.Fatalf("Error running p1: %v", err)
+				}
+				p2, err := runPausePod(cs, v2Pod)
+				if err != nil {
+					t.Fatalf("Error running p2: %v", err)
+				}
+				addPodConditionReady(p1)
+				addPodConditionReady(p2)
+				p1.Status.StartTime = &fixedStartTime
+				p2.Status.StartTime = &fixedStartTime
+				if _, err := cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, p1, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, p2, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{p1, p2}); err != nil {
+					t.Fatalf("Pods not stable in cache: %v", err)
+				}
+
+				// The pod with smaller UID is more important (reprieved / spared).
+				// The pod with larger UID is less important (evicted).
+				expectedEvictedName := p2.Name
+				expectedSparedName := p1.Name
+				if p2.UID < p1.UID {
+					expectedEvictedName = p1.Name
+					expectedSparedName = p2.Name
+				}
+
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      "preemptor-single-node",
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					NodeSelector: map[string]string{
+						"kubernetes.io/hostname": nodeName,
+					},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					},
+				})
+				preemptorPod, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Error creating preemptor: %v", err)
+				}
+
+				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptorPod); err != nil {
+					t.Fatalf("Preemptor .status.nominatedNodeName not set: %v", err)
+				}
+
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, wait.ForeverTestTimeout, false,
+					podIsGettingEvicted(cs, testCtx.NS.Name, expectedEvictedName)); err != nil {
+					t.Errorf("Expected pod %v to get evicted: %v", expectedEvictedName, err)
+				}
+
+				sparedPod, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, expectedSparedName, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Error fetching spared pod %v: %v", expectedSparedName, err)
+				}
+				if sparedPod.DeletionTimestamp != nil {
+					t.Errorf("Pod %v was unexpectedly evicted, expected %v to be evicted instead", sparedPod.Name, expectedEvictedName)
+				}
+			})
+
+			// Subtest 3: Unstarted pods (nil StartTime) tie-breaking by UID determinism
+			t.Run("Unstarted pods with nil StartTime tie-break by UID", func(t *testing.T) {
+				testCtx := initTest(t, "det-unstarted")
+				cs := testCtx.ClientSet
+
+				nodeName := "node-unstarted-uid"
+				_, err := createNode(cs, st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Failed to create node %v: %v", nodeName, err)
+				}
+
+				u1Pod := initPausePod(&testutils.PausePodConfig{
+					Name:      "unstarted-victim-1",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  nodeName,
+					Resources: defaultPodRes,
+				})
+				u2Pod := initPausePod(&testutils.PausePodConfig{
+					Name:      "unstarted-victim-2",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  nodeName,
+					Resources: defaultPodRes,
+				})
+
+				p1, err := runPausePod(cs, u1Pod)
+				if err != nil {
+					t.Fatalf("Error running p1: %v", err)
+				}
+				p2, err := runPausePod(cs, u2Pod)
+				if err != nil {
+					t.Fatalf("Error running p2: %v", err)
+				}
+				p1.Status.StartTime = nil
+				p2.Status.StartTime = nil
+				if _, err := cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, p1, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, p2, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{p1, p2}); err != nil {
+					t.Fatalf("Pods not stable in cache: %v", err)
+				}
+
+				expectedEvictedName := p2.Name
+				expectedSparedName := p1.Name
+				if p2.UID < p1.UID {
+					expectedEvictedName = p1.Name
+					expectedSparedName = p2.Name
+				}
+
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      "preemptor-unstarted",
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					NodeSelector: map[string]string{
+						"kubernetes.io/hostname": nodeName,
+					},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					},
+				})
+				preemptorPod, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Error creating preemptor: %v", err)
+				}
+
+				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptorPod); err != nil {
+					t.Fatalf("Preemptor .status.nominatedNodeName not set: %v", err)
+				}
+
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, wait.ForeverTestTimeout, false,
+					podIsGettingEvicted(cs, testCtx.NS.Name, expectedEvictedName)); err != nil {
+					t.Errorf("Expected unstarted pod %v to get evicted: %v", expectedEvictedName, err)
+				}
+
+				sparedPod, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, expectedSparedName, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Error fetching spared pod %v: %v", expectedSparedName, err)
+				}
+				if sparedPod.DeletionTimestamp != nil {
+					t.Errorf("Unstarted pod %v was unexpectedly evicted, expected %v to be evicted instead", sparedPod.Name, expectedEvictedName)
+				}
+			})
+		})
+	}
+}
+
+// TestEmptyPDBSelectorMultiNamespacePreemption tests that universal PDBs (selector: {})
+// protect unlabeled pods in multi-tenant environments without leaking across namespace boundaries.
+func TestEmptyPDBSelectorMultiNamespacePreemption(t *testing.T) {
+	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+	}
+	defaultNodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "500m",
+		v1.ResourceMemory: "500",
+	}
+
+	for _, asyncPreemptionEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("AsyncPreemption_%v", asyncPreemptionEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SchedulerAsyncPreemption: asyncPreemptionEnabled,
+			})
+
+			// Subtest 1: Multi-node cross-namespace isolation with universal PDB
+			t.Run("Universal PDB in nsA protects unlabeled pod on node-1, evicts unlabeled pod in nsB on node-2", func(t *testing.T) {
+				testCtx := initTest(t, "empty-pdb-multi-node")
+				cs := testCtx.ClientSet
+				initDisruptionController(t, testCtx)
+
+				nsA := testCtx.NS.Name
+				nsBObj, err := cs.CoreV1().Namespaces().Create(testCtx.Ctx, &v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{GenerateName: "tenant-b-"},
+				}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create tenant B namespace: %v", err)
+				}
+				nsB := nsBObj.Name
+
+				node1Name := "node-pdb-1"
+				node2Name := "node-pdb-2"
+				_, err = createNode(cs, st.MakeNode().Name(node1Name).Label("kubernetes.io/hostname", node1Name).Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Failed to create node-1: %v", err)
+				}
+				_, err = createNode(cs, st.MakeNode().Name(node2Name).Label("kubernetes.io/hostname", node2Name).Capacity(defaultNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Failed to create node-2: %v", err)
+				}
+
+				podA := initPausePod(&testutils.PausePodConfig{
+					Name:      "unlabeled-victim-ns-a",
+					Namespace: nsA,
+					Priority:  &lowPriority,
+					NodeName:  node1Name,
+					Resources: defaultPodRes,
+				})
+				podA, err = runPausePod(cs, podA)
+				if err != nil {
+					t.Fatalf("Failed to run podA: %v", err)
+				}
+				addPodConditionReady(podA)
+				if _, err := cs.CoreV1().Pods(nsA).UpdateStatus(testCtx.Ctx, podA, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+
+				podB := initPausePod(&testutils.PausePodConfig{
+					Name:      "unlabeled-victim-ns-b",
+					Namespace: nsB,
+					Priority:  &lowPriority,
+					NodeName:  node2Name,
+					Resources: defaultPodRes,
+				})
+				podB, err = runPausePod(cs, podB)
+				if err != nil {
+					t.Fatalf("Failed to run podB: %v", err)
+				}
+				addPodConditionReady(podB)
+				if _, err := cs.CoreV1().Pods(nsB).UpdateStatus(testCtx.Ctx, podB, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{podA, podB}); err != nil {
+					t.Fatalf("Pods not stable in cache: %v", err)
+				}
+
+				minAvail := intstr.FromInt32(1)
+				pdbA := &policy.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "universal-pdb-ns-a",
+						Namespace: nsA,
+					},
+					Spec: policy.PodDisruptionBudgetSpec{
+						MinAvailable: &minAvail,
+						Selector:     &metav1.LabelSelector{}, // Empty selector
+					},
+				}
+				createdPDBA, err := cs.PolicyV1().PodDisruptionBudgets(nsA).Create(testCtx.Ctx, pdbA, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create PDB in nsA: %v", err)
+				}
+				if err := waitForPDBsStable(testCtx, []*policy.PodDisruptionBudget{createdPDBA}, []int32{1}); err != nil {
+					t.Fatalf("PDB in nsA not stable: %v", err)
+				}
+
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      "preemptor-pod",
+					Namespace: nsA,
+					Priority:  &highPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					},
+				})
+				preemptorPod, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Failed to create preemptor pod: %v", err)
+				}
+
+				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptorPod); err != nil {
+					t.Fatalf("Preemptor .status.nominatedNodeName not set: %v", err)
+				}
+
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, wait.ForeverTestTimeout, false,
+					podIsGettingEvicted(cs, nsB, podB.Name)); err != nil {
+					t.Errorf("Expected podB in nsB to get evicted: %v", err)
+				}
+
+				gotPodA, err := cs.CoreV1().Pods(nsA).Get(testCtx.Ctx, podA.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get podA: %v", err)
+				}
+				if gotPodA.DeletionTimestamp != nil {
+					t.Errorf("podA in nsA was unexpectedly evicted despite being protected by universal PDB")
+				}
+			})
+
+			// Subtest 2: Single shared node with unlabeled pods from both namespaces
+			t.Run("Universal PDB in nsA protects unlabeled pod on shared node against nsB unlabeled pod", func(t *testing.T) {
+				testCtx := initTest(t, "empty-pdb-shared-node")
+				cs := testCtx.ClientSet
+				initDisruptionController(t, testCtx)
+
+				nsA := testCtx.NS.Name
+				nsBObj, err := cs.CoreV1().Namespaces().Create(testCtx.Ctx, &v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{GenerateName: "tenant-b-"},
+				}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create tenant B namespace: %v", err)
+				}
+				nsB := nsBObj.Name
+
+				sharedNodeRes := map[v1.ResourceName]string{
+					v1.ResourcePods:   "32",
+					v1.ResourceCPU:    "1000m",
+					v1.ResourceMemory: "1000",
+				}
+				sharedNodeName := "shared-node"
+				_, err = createNode(cs, st.MakeNode().Name(sharedNodeName).Label("kubernetes.io/hostname", sharedNodeName).Capacity(sharedNodeRes).Obj())
+				if err != nil {
+					t.Fatalf("Failed to create shared node: %v", err)
+				}
+
+				podA := initPausePod(&testutils.PausePodConfig{
+					Name:      "shared-victim-ns-a",
+					Namespace: nsA,
+					Priority:  &lowPriority,
+					NodeName:  sharedNodeName,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+					},
+				})
+				podB := initPausePod(&testutils.PausePodConfig{
+					Name:      "shared-victim-ns-b",
+					Namespace: nsB,
+					Priority:  &lowPriority,
+					NodeName:  sharedNodeName,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+					},
+				})
+				filler := initPausePod(&testutils.PausePodConfig{
+					Name:      "shared-filler",
+					Namespace: nsA,
+					Priority:  &highPriority,
+					NodeName:  sharedNodeName,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+					},
+				})
+
+				pA, err := runPausePod(cs, podA)
+				if err != nil {
+					t.Fatalf("Failed to run pA: %v", err)
+				}
+				pB, err := runPausePod(cs, podB)
+				if err != nil {
+					t.Fatalf("Failed to run pB: %v", err)
+				}
+				pF, err := runPausePod(cs, filler)
+				if err != nil {
+					t.Fatalf("Failed to run pF: %v", err)
+				}
+				addPodConditionReady(pA)
+				addPodConditionReady(pB)
+				addPodConditionReady(pF)
+				if _, err := cs.CoreV1().Pods(nsA).UpdateStatus(testCtx.Ctx, pA, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := cs.CoreV1().Pods(nsB).UpdateStatus(testCtx.Ctx, pB, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := cs.CoreV1().Pods(nsA).UpdateStatus(testCtx.Ctx, pF, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{pA, pB, pF}); err != nil {
+					t.Fatalf("Pods not stable in cache: %v", err)
+				}
+
+				minAvail2 := intstr.FromInt32(2)
+				pdbA2 := &policy.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "universal-pdb-shared-ns-a-2",
+						Namespace: nsA,
+					},
+					Spec: policy.PodDisruptionBudgetSpec{
+						MinAvailable: &minAvail2,
+						Selector:     &metav1.LabelSelector{},
+					},
+				}
+				createdPDBA2, err := cs.PolicyV1().PodDisruptionBudgets(nsA).Create(testCtx.Ctx, pdbA2, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create PDB: %v", err)
+				}
+				if err := waitForPDBsStable(testCtx, []*policy.PodDisruptionBudget{createdPDBA2}, []int32{2}); err != nil {
+					t.Fatalf("PDB in nsA not stable: %v", err)
+				}
+
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      "shared-preemptor",
+					Namespace: nsA,
+					Priority:  &mediumPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+					},
+				})
+				preemptorPod, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Failed to create preemptor: %v", err)
+				}
+
+				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptorPod); err != nil {
+					t.Fatalf("Preemptor .status.nominatedNodeName not set: %v", err)
+				}
+
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, wait.ForeverTestTimeout, false,
+					podIsGettingEvicted(cs, nsB, pB.Name)); err != nil {
+					t.Errorf("Expected podB in nsB to get evicted: %v", err)
+				}
+
+				gotPA, err := cs.CoreV1().Pods(nsA).Get(testCtx.Ctx, pA.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get pA: %v", err)
+				}
+				if gotPA.DeletionTimestamp != nil {
+					t.Errorf("pA in nsA was unexpectedly evicted despite PDB protection")
+				}
+			})
+		})
+	}
+}
+
+// TestPodOverheadPreemptionFit tests that pod overheads (spec.overhead) are properly
+// accounted for in preemption calculations for both preemptors and victims.
+func TestPodOverheadPreemptionFit(t *testing.T) {
+	testCtx := initTest(t, "pod-overhead-preempt")
+	cs := testCtx.ClientSet
+
+	nodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "1000m",
+		v1.ResourceMemory: "1000",
+	}
+
+	_, err := createNode(cs, st.MakeNode().Name("node-overhead").Label("kubernetes.io/hostname", "node-overhead").Capacity(nodeRes).Obj())
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	// Create RuntimeClasses with overheads
+	rc300 := &nodev1.RuntimeClass{
+		ObjectMeta: metav1.ObjectMeta{Name: "rc-overhead-300m"},
+		Handler:    "runc",
+		Overhead: &nodev1.Overhead{
+			PodFixed: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("300m"),
+			},
+		},
+	}
+	if _, err := cs.NodeV1().RuntimeClasses().Create(testCtx.Ctx, rc300, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create runtime class rc-overhead-300m: %v", err)
+	}
+
+	rc600 := &nodev1.RuntimeClass{
+		ObjectMeta: metav1.ObjectMeta{Name: "rc-overhead-600m"},
+		Handler:    "runc",
+		Overhead: &nodev1.Overhead{
+			PodFixed: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("600m"),
+			},
+		},
+	}
+	if _, err := cs.NodeV1().RuntimeClasses().Create(testCtx.Ctx, rc600, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create runtime class rc-overhead-600m: %v", err)
+	}
+
+	for _, asyncPreemptionEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("AsyncPreemption_%v", asyncPreemptionEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SchedulerAsyncPreemption: asyncPreemptionEnabled,
+			})
+
+			// Subtest 1: Preemptor with spec.overhead requires evicting multiple victims
+			t.Run("Preemptor with spec.overhead requires evicting multiple victims to fit", func(t *testing.T) {
+				v1Pod := initPausePod(&testutils.PausePodConfig{
+					Name:      fmt.Sprintf("victim-1-async-%v", asyncPreemptionEnabled),
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  "node-overhead",
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(300, resource.DecimalSI),
+					}},
+				})
+				v2Pod := initPausePod(&testutils.PausePodConfig{
+					Name:      fmt.Sprintf("victim-2-async-%v", asyncPreemptionEnabled),
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  "node-overhead",
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(300, resource.DecimalSI),
+					}},
+				})
+				v3Pod := initPausePod(&testutils.PausePodConfig{
+					Name:      fmt.Sprintf("victim-3-async-%v", asyncPreemptionEnabled),
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  "node-overhead",
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(300, resource.DecimalSI),
+					}},
+				})
+
+				p1, err := runPausePod(cs, v1Pod)
+				if err != nil {
+					t.Fatalf("Failed to run victim 1: %v", err)
+				}
+				p2, err := runPausePod(cs, v2Pod)
+				if err != nil {
+					t.Fatalf("Failed to run victim 2: %v", err)
+				}
+				p3, err := runPausePod(cs, v3Pod)
+				if err != nil {
+					t.Fatalf("Failed to run victim 3: %v", err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{p1, p2, p3}); err != nil {
+					t.Fatalf("Pods not stable in cache: %v", err)
+				}
+
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      fmt.Sprintf("preemptor-with-overhead-async-%v", asyncPreemptionEnabled),
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI),
+					}},
+				})
+				preemptor.Spec.RuntimeClassName = ptr.To("rc-overhead-300m")
+
+				preemptorPod, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Failed to create preemptor with overhead: %v", err)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{p1, p2, p3, preemptorPod})
+
+				var evictedPods []*v1.Pod
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+					evictedPods = nil
+					for _, p := range []*v1.Pod{p1, p2, p3} {
+						got, err := cs.CoreV1().Pods(p.Namespace).Get(ctx, p.Name, metav1.GetOptions{})
+						if err == nil && got.DeletionTimestamp != nil {
+							evictedPods = append(evictedPods, got)
+						}
+					}
+					return len(evictedPods) >= 2, nil
+				})
+				if err != nil {
+					t.Fatalf("Expected at least 2 victims to be evicted: %v", err)
+				}
+
+				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptorPod); err != nil {
+					t.Fatalf("Preemptor .status.nominatedNodeName not set: %v", err)
+				}
+
+				// Simulate victim termination by force deleting evicted pods
+				for _, ep := range evictedPods {
+					_ = cs.CoreV1().Pods(ep.Namespace).Delete(testCtx.Ctx, ep.Name, *metav1.NewDeleteOptions(0))
+				}
+
+				if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, preemptorPod, 30*time.Second); err != nil {
+					t.Fatalf("Preemptor with overhead failed to schedule after victims were deleted: %v", err)
+				}
+
+				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{p1, p2, p3, preemptorPod})
+			})
+
+			// Subtest 2: Victim with spec.overhead frees overhead + request upon preemption
+			t.Run("Victim with spec.overhead frees full overhead plus container request", func(t *testing.T) {
+				vOverhead := initPausePod(&testutils.PausePodConfig{
+					Name:      fmt.Sprintf("victim-has-overhead-async-%v", asyncPreemptionEnabled),
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  "node-overhead",
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI),
+					}},
+				})
+				vOverhead.Spec.RuntimeClassName = ptr.To("rc-overhead-300m")
+
+				vNoOverhead := initPausePod(&testutils.PausePodConfig{
+					Name:      fmt.Sprintf("victim-no-overhead-async-%v", asyncPreemptionEnabled),
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  "node-overhead",
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI),
+					}},
+				})
+
+				filler := initPausePod(&testutils.PausePodConfig{
+					Name:      fmt.Sprintf("filler-high-pri-async-%v", asyncPreemptionEnabled),
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					NodeName:  "node-overhead",
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI),
+					}},
+				})
+
+				pOverhead, err := runPausePod(cs, vOverhead)
+				if err != nil {
+					t.Fatalf("Failed to run pOverhead: %v", err)
+				}
+				pNoOverhead, err := runPausePod(cs, vNoOverhead)
+				if err != nil {
+					t.Fatalf("Failed to run pNoOverhead: %v", err)
+				}
+				pFiller, err := runPausePod(cs, filler)
+				if err != nil {
+					t.Fatalf("Failed to run pFiller: %v", err)
+				}
+				t1 := metav1.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+				t2 := metav1.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC)
+				pOverhead.Status.StartTime = &t1
+				pNoOverhead.Status.StartTime = &t2
+				if _, err := cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pOverhead, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pNoOverhead, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{pOverhead, pNoOverhead, pFiller}); err != nil {
+					t.Fatalf("Pods not stable in cache: %v", err)
+				}
+
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      fmt.Sprintf("preemptor-300m-async-%v", asyncPreemptionEnabled),
+					Namespace: testCtx.NS.Name,
+					Priority:  &mediumPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(300, resource.DecimalSI),
+					}},
+				})
+				preemptorPod, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Failed to create preemptor: %v", err)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pOverhead, pNoOverhead, pFiller, preemptorPod})
+
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, wait.ForeverTestTimeout, false,
+					podIsGettingEvicted(cs, testCtx.NS.Name, pOverhead.Name)); err != nil {
+					t.Errorf("Expected victimWithOverhead to get evicted: %v", err)
+				}
+
+				gotNoOverhead, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pNoOverhead.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get victimWithoutOverhead: %v", err)
+				}
+				if gotNoOverhead.DeletionTimestamp != nil {
+					t.Errorf("victimWithoutOverhead was unexpectedly evicted when victimWithOverhead was sufficient")
+				}
+
+				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptorPod); err != nil {
+					t.Fatalf("Preemptor .status.nominatedNodeName not set: %v", err)
+				}
+
+				// Simulate victim termination
+				_ = cs.CoreV1().Pods(pOverhead.Namespace).Delete(testCtx.Ctx, pOverhead.Name, *metav1.NewDeleteOptions(0))
+
+				if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, preemptorPod, 30*time.Second); err != nil {
+					t.Fatalf("Preemptor failed to schedule after victim with overhead was deleted: %v", err)
+				}
+
+				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pOverhead, pNoOverhead, pFiller, preemptorPod})
+			})
+
+			// Subtest 3: Preemptor whose request + spec.overhead exceeds node allocatable remains unschedulable
+			t.Run("Preemptor with overhead exceeding node capacity is unschedulable and triggers no evictions", func(t *testing.T) {
+				victim := initPausePod(&testutils.PausePodConfig{
+					Name:      fmt.Sprintf("victim-pod-async-%v", asyncPreemptionEnabled),
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					NodeName:  "node-overhead",
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI),
+					}},
+				})
+				pVictim, err := runPausePod(cs, victim)
+				if err != nil {
+					t.Fatalf("Failed to run victim: %v", err)
+				}
+				if err := waitCachedPodsStable(testCtx, []*v1.Pod{pVictim}); err != nil {
+					t.Fatalf("Pod not stable in cache: %v", err)
+				}
+
+				preemptor := initPausePod(&testutils.PausePodConfig{
+					Name:      fmt.Sprintf("oversized-preemptor-async-%v", asyncPreemptionEnabled),
+					Namespace: testCtx.NS.Name,
+					Priority:  &highPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(600, resource.DecimalSI),
+					}},
+				})
+				preemptor.Spec.RuntimeClassName = ptr.To("rc-overhead-600m")
+
+				preemptorPod, err := createPausePod(cs, preemptor)
+				if err != nil {
+					t.Fatalf("Failed to create oversized preemptor: %v", err)
+				}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pVictim, preemptorPod})
+
+				if err := waitForPodUnschedulable(testCtx.Ctx, cs, preemptorPod); err != nil {
+					t.Fatalf("Expected preemptor to be unschedulable: %v", err)
+				}
+
+				gotVictim, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pVictim.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get victim: %v", err)
+				}
+				if gotVictim.DeletionTimestamp != nil {
+					t.Errorf("Victim was evicted for a preemptor that cannot fit on node")
+				}
+
+				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pVictim, preemptorPod})
+			})
+		})
 	}
 }
