@@ -153,6 +153,10 @@ const (
 	// Max amount of time to wait for the container runtime to come up.
 	maxWaitForContainerRuntime = 30 * time.Second
 
+	// securityProfileRejectedReason is the reason for failing a pod whose OCI
+	// security profile the container runtime rejected permanently.
+	securityProfileRejectedReason = "SecurityProfileRejected"
+
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
 
@@ -231,6 +235,10 @@ const (
 	// ImageGCPeriod is the period for performing image garbage collection.
 	ImageGCPeriod = 5 * time.Minute
 
+	// SecurityProfileGCPeriod is the period for performing security profile
+	// garbage collection.
+	SecurityProfileGCPeriod = 5 * time.Minute
+
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
 
@@ -262,6 +270,8 @@ var (
 		lifecycle.OutOfPods,
 		lifecycle.PodLevelResourcesNotAdmittedReason,
 		lifecycle.PodFeatureUnsupported,
+		lifecycle.SecurityProfileOCIUnsupportedReason,
+		securityProfileRejectedReason,
 		tainttoleration.ErrReasonNotMatch,
 		eviction.Reason,
 		sysctl.ForbiddenReason,
@@ -935,6 +945,14 @@ func NewMainKubelet(ctx context.Context,
 	}
 	klet.imageManager = imageManager
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) {
+		securityProfileMaxAge := imageGCPolicy.MaxAge
+		if securityProfileMaxAge == 0 {
+			securityProfileMaxAge = images.DefaultSecurityProfileMaxAge
+		}
+		klet.securityProfileGCManager = images.NewSecurityProfileGCManager(klet.containerRuntime, klet.podManager.GetPods, securityProfileMaxAge)
+	}
+
 	if kubeDeps.TLSOptions != nil {
 		kubeDeps.TLSConfig = &tls.Config{}
 
@@ -1162,6 +1180,10 @@ func NewMainKubelet(ctx context.Context,
 	}
 
 	handlers = append(handlers, lifecycle.NewPodFeaturesAdmitHandler())
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) {
+		handlers = append(handlers, lifecycle.NewSecurityProfileOCIAdmitHandler(klet.runtimeState.runtimeFeatures))
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
 		handlers = append(handlers, lifecycle.NewDeclaredFeaturesAdmitHandler(klet.nodeDeclaredFeaturesFramework, klet.nodeDeclaredFeaturesSet, klet.version))
@@ -1405,6 +1427,10 @@ type Kubelet struct {
 
 	// Manager for image garbage collection.
 	imageManager images.ImageGCManager
+
+	// Manager for security profile garbage collection, nil if the
+	// SecurityProfileOCI feature gate is disabled.
+	securityProfileGCManager images.SecurityProfileGCManager
 
 	// Manager for container logs.
 	containerLogManager logs.ContainerLogManager
@@ -1749,6 +1775,20 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 			logger.V(int(vLevel)).Info("Container garbage collection succeeded")
 		}
 	}, ContainerGCPeriod)
+
+	if kl.securityProfileGCManager != nil {
+		go wait.UntilWithContext(ctx, func(ctx context.Context) {
+			// Runtimes without support have no security profiles to collect.
+			if features := kl.runtimeState.runtimeFeatures(); features == nil || !features.SeccompProfileOCI {
+				return
+			}
+			if err := kl.securityProfileGCManager.GarbageCollect(ctx); err != nil {
+				logger.Error(err, "Security profile garbage collection failed")
+				return
+			}
+			logger.V(4).Info("Security profile garbage collection succeeded")
+		}, SecurityProfileGCPeriod)
+	}
 
 	// when the high threshold is set to 100, and the max age is 0 (or the max age feature is disabled)
 	// stub the image GC manager
@@ -2261,6 +2301,29 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Fetch the pull secrets for the pod
 	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(logger, pod)
 
+	// Pull the OCI security profiles before the runtime prepares resources or
+	// creates the sandbox, so that a failed pull needs no cleanup.
+	var securityProfileErr error
+	if utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) {
+		if err := kl.containerRuntime.EnsureSecurityProfiles(ctx, pod, podStatus, pullSecrets); err != nil {
+			podStarted := podStatus != nil && !isPodStatusCacheTerminal(podStatus)
+			switch {
+			case !podStarted && errors.Is(err, images.ErrSecurityProfileRejected):
+				kl.rejectPod(ctx, pod, securityProfileRejectedReason, err.Error())
+				recordAdmissionRejection(securityProfileRejectedReason)
+				return true, nil, nil
+			case !podStarted:
+				logger.Error(err, "Unable to pull security profiles for pod; skipping pod", "pod", klog.KObj(pod))
+				return false, nil, err
+			default:
+				// Keep managing the containers of a started pod. Containers
+				// that need a missing profile fail when they are created.
+				logger.Error(err, "Unable to pull security profiles for running pod", "pod", klog.KObj(pod))
+				securityProfileErr = err
+			}
+		}
+	}
+
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(ctx, pod)
 
@@ -2333,7 +2396,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	err = result.Error()
+	err = errors.Join(securityProfileErr, result.Error())
 	if len(result.SyncResults) > 0 && err == nil {
 		postSync = func() {
 			kl.RequestPodRelist(klog.FromContext(ctx), pod.UID)

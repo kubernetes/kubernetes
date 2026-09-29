@@ -104,6 +104,9 @@ type Runtime interface {
 	// will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(ctx context.Context, gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
+	// EnsureSecurityProfiles pulls the OCI security profiles referenced by the
+	// pod. Permanent failures wrap images.ErrSecurityProfileRejected.
+	EnsureSecurityProfiles(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret) error
 	// SyncPod syncs the running pod into the desired pod.
 	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
@@ -179,6 +182,14 @@ type ImageService interface {
 	// that were used to pull the image. If the returned credentials are nil, the
 	// pull was anonymous.
 	PullImage(ctx context.Context, image ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error)
+	// PullSecurityProfile pulls a security profile from the network to the
+	// runtime's storage using the supplied secrets if necessary. It returns
+	// whether the profile was already present.
+	PullSecurityProfile(ctx context.Context, image ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (bool, error)
+	// ListSecurityProfiles lists the security profiles in the runtime's storage.
+	ListSecurityProfiles(ctx context.Context) ([]*runtimeapi.SecurityProfileInfo, error)
+	// RemoveSecurityProfile removes a security profile by its digest.
+	RemoveSecurityProfile(ctx context.Context, digest string) error
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(ctx context.Context, image ImageSpec) (string, error)
@@ -686,6 +697,7 @@ type RuntimeFeatures struct {
 	SupplementalGroupsPolicy  bool
 	UserNamespacesHostNetwork bool
 	MountOptions              bool
+	SeccompProfileOCI         bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -693,7 +705,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v MountOptions: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork, f.MountOptions)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v MountOptions: %v SeccompProfileOCI: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork, f.MountOptions, f.SeccompProfileOCI)
 }
 
 // Pods represents the list of pods
