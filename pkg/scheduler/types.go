@@ -33,12 +33,10 @@ import (
 // scheduling algorithm simulation.
 //
 // These functions are executed:
-//   - After the whole root is processed in the scheduling algorithm, to clean up the
-//     simulation state.
-//   - On failure in (composite) pod group algorithm, to immediately roll back partial
-//     modifications.
-//   - After each candidate placement is considered in the placement scheduling algorithm,
-//     to reset the state before evaluating the next candidate placement.
+//   - At the end of a (composite) pod group default algorithm evaluation, to reset
+//     the simulation state after evaluating a single pod group or candidate placement.
+//   - On failure when assuming a child subtree in the snapshot, to immediately roll
+//     back partial modifications.
 type revertFns []func()
 
 // append registers additional revert functions.

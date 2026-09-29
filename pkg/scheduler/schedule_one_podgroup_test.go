@@ -5486,7 +5486,7 @@ func TestCPGHierarchicalScheduling_RecursiveAlgorithm(t *testing.T) {
 
 	// Run podGroupSchedulingRecursiveAlgorithm
 	res := map[fwk.EntityKey]*podGroupAlgorithmResult{}
-	result, _ := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgRootInfo, cpgRootInfo.PodGroupInfo, res)
+	result := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgRootInfo, cpgRootInfo.PodGroupInfo, res)
 
 	status := result.status
 	if status.Code() != fwk.Success {
