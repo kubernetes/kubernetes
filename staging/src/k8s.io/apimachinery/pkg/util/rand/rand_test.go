@@ -101,6 +101,44 @@ func TestInt63nRange(t *testing.T) {
 	}
 }
 
+func TestIntnRangePanic(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		min, max int
+	}{
+		{name: "equal bounds", min: 5, max: 5},
+		{name: "min greater than max", min: 10, max: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if err := recover(); err == nil {
+					t.Errorf("IntnRange(%d, %d) should have panicked", tc.min, tc.max)
+				}
+			}()
+			IntnRange(tc.min, tc.max)
+		})
+	}
+}
+
+func TestInt63nRangePanic(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		min, max int64
+	}{
+		{name: "equal bounds", min: 5, max: 5},
+		{name: "min greater than max", min: 10, max: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if err := recover(); err == nil {
+					t.Errorf("Int63nRange(%d, %d) should have panicked", tc.min, tc.max)
+				}
+			}()
+			Int63nRange(tc.min, tc.max)
+		})
+	}
+}
+
 func BenchmarkRandomStringGeneration(b *testing.B) {
 	b.ResetTimer()
 	var s string
