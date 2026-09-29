@@ -1,0 +1,296 @@
+# Benchmark suite for In-Place Resize Preemption evaluating deferred resize preemption throughput,
+# scheduling latency, candidate victim evaluation overhead, and Kubelet notification / Permit handoff.
+#
+# Labels:
+# - integration-test: test cases to run as fast integration tests (small scale, e.g. 5 nodes).
+# - performance: test cases to run in full scale benchmarks (100 to 1000 nodes).
+# - short: short execution time test cases.
+
+- name: DeferredResizePreemptionInPlace
+  featureGates:
+    InPlacePodVerticalScaling: true
+    InPlacePodVerticalScalingSchedulerPreemption: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+      scheduler_queue_incoming_pods_total:
+      - label: event
+        values: [ScheduleAttemptFailure, AssignedPodAdd, BackoffComplete, UnscheduledPodAdd, ForceActivate]
+      - label: queue
+        values: [active, backoff, unschedulable]
+      scheduler_framework_extension_point_duration_seconds:
+      - label: extension_point
+        values: [PreFilter, Filter, PostFilter, Permit]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: resize-inplace
+    count: 1
+  - opcode: createPods
+    countParam: $victimPods
+    podTemplatePath: templates/pod-victim.yaml
+    namespace: resize-inplace-0
+  - opcode: createPods
+    countParam: $preemptorPods
+    podTemplatePath: templates/pod-preemptor-initial.yaml
+    namespace: resize-inplace-0
+  - opcode: startCollectingMetrics
+    name: resizePreemption
+    namespaces: [resize-inplace-0]
+  - opcode: updateAny
+    countParam: $preemptorPods
+    templatePath: templates/pod-preemptor-resize.yaml
+    namespace: resize-inplace-0
+    subresources:
+      - resize
+  - opcode: barrier
+    stageRequirement: Attempted
+    namespaces: [resize-inplace-0]
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      victimPods: 20
+      preemptorPods: 5
+  - name: 5Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      victimPods: 20
+      preemptorPods: 5
+  - name: 100Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 100
+      victimPods: 400
+      preemptorPods: 100
+  - name: 100Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    params:
+      initNodes: 100
+      victimPods: 400
+      preemptorPods: 100
+  - name: 500Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 500
+      victimPods: 2000
+      preemptorPods: 500
+  - name: 1000Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 1000
+      victimPods: 4000
+      preemptorPods: 1000
+  - name: 1000Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    params:
+      initNodes: 1000
+      victimPods: 4000
+      preemptorPods: 1000
+
+- name: DeferredResizePreemptionScale
+  featureGates:
+    InPlacePodVerticalScaling: true
+    InPlacePodVerticalScalingSchedulerPreemption: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+      scheduler_queue_incoming_pods_total:
+      - label: event
+        values: [ScheduleAttemptFailure, AssignedPodAdd, BackoffComplete, UnscheduledPodAdd, ForceActivate]
+      - label: queue
+        values: [active, backoff, unschedulable]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: resize-scale
+    count: 1
+  - opcode: createPods
+    countParam: $victimPods
+    podTemplatePath: templates/pod-victim.yaml
+    namespace: resize-scale-0
+  - opcode: createPods
+    countParam: $preemptorPods
+    podTemplatePath: templates/pod-preemptor-direct.yaml
+    namespace: resize-scale-0
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      victimPods: 20
+      preemptorPods: 5
+  - name: 5Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      victimPods: 20
+      preemptorPods: 5
+  - name: 100Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 100
+      victimPods: 400
+      preemptorPods: 100
+  - name: 500Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 500
+      victimPods: 2000
+      preemptorPods: 500
+  - name: 1000Nodes
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 1000
+      victimPods: 4000
+      preemptorPods: 1000
+
+- name: DeferredResizePreemptionVictimRatio
+  featureGates:
+    InPlacePodVerticalScaling: true
+    InPlacePodVerticalScalingSchedulerPreemption: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: resize-ratio
+    count: 1
+  - opcode: createPods
+    countParam: $victimPods
+    podTemplatePath: templates/pod-victim.yaml
+    namespace: resize-ratio-0
+  - opcode: createPods
+    countParam: $preemptorPods
+    podTemplatePath: templates/pod-preemptor-direct.yaml
+    namespace: resize-ratio-0
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes_1VictimRatio
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      victimPods: 5
+      preemptorPods: 5
+  - name: 5Nodes_2VictimRatio
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      victimPods: 10
+      preemptorPods: 5
+  - name: 5Nodes_4VictimRatio
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      victimPods: 20
+      preemptorPods: 5
+  - name: 100Nodes_1VictimRatio
+    labels: [performance]
+    params:
+      initNodes: 100
+      victimPods: 100
+      preemptorPods: 100
+  - name: 100Nodes_2VictimRatio
+    labels: [performance]
+    params:
+      initNodes: 100
+      victimPods: 200
+      preemptorPods: 100
+  - name: 100Nodes_4VictimRatio
+    labels: [performance]
+    params:
+      initNodes: 100
+      victimPods: 400
+      preemptorPods: 100
+  - name: 500Nodes_4VictimRatio
+    labels: [performance]
+    params:
+      initNodes: 500
+      victimPods: 2000
+      preemptorPods: 500
+
+- name: DeferredResizePreemptionHighDensity
+  featureGates:
+    InPlacePodVerticalScaling: true
+    InPlacePodVerticalScalingSchedulerPreemption: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: resize-density
+    count: 1
+  - opcode: createPods
+    countParam: $victimPods
+    podTemplatePath: templates/pod-victim-dense.yaml
+    namespace: resize-density-0
+  - opcode: createPods
+    countParam: $preemptorPods
+    podTemplatePath: templates/pod-preemptor-direct.yaml
+    namespace: resize-density-0
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes_20PodsPerNode
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      victimPods: 100
+      preemptorPods: 5
+  - name: 100Nodes_50PodsPerNode
+    labels: [performance]
+    params:
+      initNodes: 100
+      victimPods: 5000
+      preemptorPods: 100
+  - name: 500Nodes_50PodsPerNode
+    labels: [performance]
+    params:
+      initNodes: 500
+      victimPods: 25000
+      preemptorPods: 500

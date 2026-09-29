@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-preemptor-{{ .Index }}
+spec:
+  containers:
+  - name: pause
+    resources:
+      limits:
+        cpu: 3000m
+        memory: 500Mi
+      requests:
+        cpu: 3000m
+        memory: 500Mi
