@@ -1028,16 +1028,46 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	// If resize results in net pod resource increase, set pod cgroup config before resizing containers.
 	// If resize results in net pod resource decrease, set pod cgroup config after resizing containers.
 	// If an error occurs at any point, abort. Let future syncpod iterations retry the unfinished stuff.
+	resizeOneVolume := func(volume v1.Volume) error {
+		desiredSize := volume.EmptyDir.SizeLimit
+		if err := m.runtimeHelper.ResizeEphemeralVolume(pod, volume.Name, desiredSize); err != nil {
+			return fmt.Errorf("failed to resize volume %s: %w", volume.Name, err)
+		}
+		if err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, volume.Name, desiredSize); err != nil {
+			return fmt.Errorf("failed to update actuated emptyDir volume limit checkpoint for %s: %w", volume.Name, err)
+		}
+		return nil
+	}
+
 	updateVolumeSize := func(volumes []v1.Volume) error {
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+			return nil
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+			var wg sync.WaitGroup
+			results := make(chan error, len(volumes))
 			for _, vol := range volumes {
-				desiredSize := vol.EmptyDir.SizeLimit
-				if err := m.runtimeHelper.ResizeEphemeralVolume(pod, vol.Name, desiredSize); err != nil {
-					return fmt.Errorf("failed to resize volume %s: %w", vol.Name, err)
+				wg.Add(1)
+				go func(vol v1.Volume) {
+					defer wg.Done()
+					defer utilruntime.HandleCrashWithContext(ctx)
+					if err := resizeOneVolume(vol); err != nil {
+						results <- err
+					}
+				}(vol)
+			}
+			wg.Wait()
+			close(results)
+			for err := range results {
+				if err != nil {
+					return err
 				}
-				if err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, vol.Name, desiredSize); err != nil {
-					return fmt.Errorf("failed to update actuated emptyDir volume limit checkpoint for %s: %w", vol.Name, err)
-				}
+			}
+			return nil
+		}
+		for _, vol := range volumes {
+			if err := resizeOneVolume(vol); err != nil {
+				return err
 			}
 		}
 		return nil

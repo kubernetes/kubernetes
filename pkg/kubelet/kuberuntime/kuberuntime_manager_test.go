@@ -5179,6 +5179,7 @@ func TestDoPodResizeAction(t *testing.T) {
 
 type mockVolumeResizeRuntimeHelper struct {
 	containertest.FakeRuntimeHelper
+	mu          sync.Mutex
 	resizeCalls []mockResizeCall
 	resizeErr   error
 }
@@ -5189,6 +5190,8 @@ type mockResizeCall struct {
 }
 
 func (f *mockVolumeResizeRuntimeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.resizeCalls = append(f.resizeCalls, mockResizeCall{volumeName: volumeName, newSize: newSize})
 	return f.resizeErr
 }
@@ -5381,118 +5384,154 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			expectedActuated:  map[string]*resource.Quantity{},
 			expectedResultErr: true,
 		},
+		{
+			testName:          "Successful volume downsize and upsize with multiple volumes",
+			volumesToDownsize: []string{"down-vol", "down-vol-2"},
+			volumesToUpsize:   []string{"up-vol", "up-vol-2"},
+			expectedCalls: []mockResizeCall{
+				{volumeName: "down-vol", newSize: resource.NewQuantity(100, resource.BinarySI)},
+				{volumeName: "down-vol-2", newSize: resource.NewQuantity(100, resource.BinarySI)},
+				{volumeName: "up-vol", newSize: resource.NewQuantity(200, resource.BinarySI)},
+				{volumeName: "up-vol-2", newSize: resource.NewQuantity(200, resource.BinarySI)},
+			},
+			expectedActuated: map[string]*resource.Quantity{
+				"down-vol":   resource.NewQuantity(100, resource.BinarySI),
+				"down-vol-2": resource.NewQuantity(100, resource.BinarySI),
+				"up-vol":     resource.NewQuantity(200, resource.BinarySI),
+				"up-vol-2":   resource.NewQuantity(200, resource.BinarySI),
+			},
+		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, _, m, err := createTestRuntimeManager(tCtx)
-			require.NoError(t, err)
+			for _, parallelOps := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/parallel=%v", tc.testName, parallelOps), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletParallelContainerOps, parallelOps)
 
-			mockCM := cmtesting.NewMockContainerManager(t)
-			mockCM.EXPECT().PodHasExclusiveCPUs(mock.Anything, mock.Anything).Return(false).Maybe()
-			mockCM.EXPECT().ContainerHasExclusiveCPUs(mock.Anything, mock.Anything, mock.Anything).Return(false).Maybe()
-			m.containerManager = mockCM
-			mockPCM := cmtesting.NewMockPodContainerManager(t)
-			mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+					_, _, m, err := createTestRuntimeManager(tCtx)
+					require.NoError(t, err)
 
-			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{
-				Memory: new(int64(200)),
-			}, nil).Maybe()
-			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
-				CPUShares: new(cm.MilliCPUToShares(100)),
-				CPUQuota:  new(cm.MilliCPUToQuota(100, cm.QuotaPeriod)),
-			}, nil).Maybe()
+					mockCM := cmtesting.NewMockContainerManager(t)
+					mockCM.EXPECT().PodHasExclusiveCPUs(mock.Anything, mock.Anything).Return(false).Maybe()
+					mockCM.EXPECT().ContainerHasExclusiveCPUs(mock.Anything, mock.Anything, mock.Anything).Return(false).Maybe()
+					m.containerManager = mockCM
+					mockPCM := cmtesting.NewMockPodContainerManager(t)
+					mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
 
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					UID: "test-pod-uid",
-				},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
-						{
-							Name: "down-vol",
-							VolumeSource: v1.VolumeSource{
-								EmptyDir: &v1.EmptyDirVolumeSource{
-									Medium:    v1.StorageMediumMemory,
-									SizeLimit: resource.NewQuantity(100, resource.BinarySI),
+					mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{
+						Memory: new(int64(200)),
+					}, nil).Maybe()
+					mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
+						CPUShares: new(cm.MilliCPUToShares(100)),
+						CPUQuota:  new(cm.MilliCPUToQuota(100, cm.QuotaPeriod)),
+					}, nil).Maybe()
+
+					pod := &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							UID: "test-pod-uid",
+						},
+						Spec: v1.PodSpec{
+							Volumes: []v1.Volume{
+								{
+									Name: "down-vol",
+									VolumeSource: v1.VolumeSource{
+										EmptyDir: &v1.EmptyDirVolumeSource{
+											Medium:    v1.StorageMediumMemory,
+											SizeLimit: resource.NewQuantity(100, resource.BinarySI),
+										},
+									},
+								},
+								{
+									Name: "up-vol",
+									VolumeSource: v1.VolumeSource{
+										EmptyDir: &v1.EmptyDirVolumeSource{
+											Medium:    v1.StorageMediumMemory,
+											SizeLimit: resource.NewQuantity(200, resource.BinarySI),
+										},
+									},
+								},
+								{
+									Name: "down-vol-2",
+									VolumeSource: v1.VolumeSource{
+										EmptyDir: &v1.EmptyDirVolumeSource{
+											Medium:    v1.StorageMediumMemory,
+											SizeLimit: resource.NewQuantity(100, resource.BinarySI),
+										},
+									},
+								},
+								{
+									Name: "up-vol-2",
+									VolumeSource: v1.VolumeSource{
+										EmptyDir: &v1.EmptyDirVolumeSource{
+											Medium:    v1.StorageMediumMemory,
+											SizeLimit: resource.NewQuantity(200, resource.BinarySI),
+										},
+									},
 								},
 							},
 						},
-						{
-							Name: "up-vol",
-							VolumeSource: v1.VolumeSource{
-								EmptyDir: &v1.EmptyDirVolumeSource{
-									Medium:    v1.StorageMediumMemory,
-									SizeLimit: resource.NewQuantity(200, resource.BinarySI),
-								},
-							},
-						},
-					},
-				},
-			}
-
-			// Pre-seed initial state for both volumes so we can observe state changes
-			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "down-vol", resource.NewQuantity(300, resource.BinarySI)))
-			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "up-vol", resource.NewQuantity(50, resource.BinarySI)))
-
-			helper := &mockVolumeResizeRuntimeHelper{
-				resizeErr: tc.injectResizeError,
-			}
-			m.runtimeHelper = helper
-
-			var volumesToDownsize []v1.Volume
-			for _, name := range tc.volumesToDownsize {
-				for _, vol := range pod.Spec.Volumes {
-					if vol.Name == name {
-						volumesToDownsize = append(volumesToDownsize, vol)
 					}
-				}
-			}
-			var volumesToUpsize []v1.Volume
-			for _, name := range tc.volumesToUpsize {
-				for _, vol := range pod.Spec.Volumes {
-					if vol.Name == name {
-						volumesToUpsize = append(volumesToUpsize, vol)
+
+					// Pre-seed initial state for volumes so we can observe state changes
+					require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "down-vol", resource.NewQuantity(300, resource.BinarySI)))
+					require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "down-vol-2", resource.NewQuantity(300, resource.BinarySI)))
+					require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "up-vol", resource.NewQuantity(50, resource.BinarySI)))
+					require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "up-vol-2", resource.NewQuantity(50, resource.BinarySI)))
+
+					helper := &mockVolumeResizeRuntimeHelper{
+						resizeErr: tc.injectResizeError,
 					}
-				}
-			}
+					m.runtimeHelper = helper
 
-			podStatus := &kubecontainer.PodStatus{}
-			actions := podActions{
-				VolumesToDownsize: volumesToDownsize,
-				VolumesToUpsize:   volumesToUpsize,
-				SandboxID:         "sandbox-id",
-			}
+					var volumesToDownsize []v1.Volume
+					for _, name := range tc.volumesToDownsize {
+						for _, vol := range pod.Spec.Volumes {
+							if vol.Name == name {
+								volumesToDownsize = append(volumesToDownsize, vol)
+							}
+						}
+					}
+					var volumesToUpsize []v1.Volume
+					for _, name := range tc.volumesToUpsize {
+						for _, vol := range pod.Spec.Volumes {
+							if vol.Name == name {
+								volumesToUpsize = append(volumesToUpsize, vol)
+							}
+						}
+					}
 
-			result := m.doPodResizeAction(tCtx, pod, podStatus, actions)
+					podStatus := &kubecontainer.PodStatus{}
+					actions := podActions{
+						VolumesToDownsize: volumesToDownsize,
+						VolumesToUpsize:   volumesToUpsize,
+						SandboxID:         "sandbox-id",
+					}
 
-			if tc.expectedResultErr {
-				require.Error(t, result.Error)
-			} else {
-				require.NoError(t, result.Error)
-			}
+					result := m.doPodResizeAction(tCtx, pod, podStatus, actions)
 
-			require.Len(t, helper.resizeCalls, len(tc.expectedCalls), "number of ResizeEphemeralVolume calls")
-			for idx, expectedCall := range tc.expectedCalls {
-				actualCall := helper.resizeCalls[idx]
-				assert.Equal(t, expectedCall.volumeName, actualCall.volumeName)
-				if expectedCall.newSize == nil {
-					assert.Nil(t, actualCall.newSize)
-				} else {
-					require.NotNil(t, actualCall.newSize)
-					assert.Equal(t, expectedCall.newSize.Value(), actualCall.newSize.Value())
-				}
-			}
+					if tc.expectedResultErr {
+						require.Error(t, result.Error)
+					} else {
+						require.NoError(t, result.Error)
+					}
 
-			// Check final actuated state
-			for volName, expectedLimit := range tc.expectedActuated {
-				limit, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, volName)
-				require.True(t, found, "actuated state should exist for %s", volName)
-				assert.Equal(t, expectedLimit.Value(), limit.Value(), "actuated state for %s", volName)
-			}
-			// If downsize failed, upsize is not executed and up-vol stays at initial state (50)
-			if tc.expectedResultErr {
-				limit, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, "up-vol")
-				require.True(t, found)
-				assert.Equal(t, int64(50), limit.Value())
+					require.Len(t, helper.resizeCalls, len(tc.expectedCalls), "number of ResizeEphemeralVolume calls")
+					downCount := len(tc.volumesToDownsize)
+					assert.ElementsMatch(t, tc.expectedCalls[:downCount], helper.resizeCalls[:downCount], "downsize calls should happen first")
+					assert.ElementsMatch(t, tc.expectedCalls[downCount:], helper.resizeCalls[downCount:], "upsize calls should happen after downsize")
+
+					// Check final actuated state
+					for volName, expectedLimit := range tc.expectedActuated {
+						limit, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, volName)
+						require.True(t, found, "actuated state should exist for %s", volName)
+						assert.Equal(t, expectedLimit.Value(), limit.Value(), "actuated state for %s", volName)
+					}
+					// If downsize failed, upsize is not executed and up-vol stays at initial state (50)
+					if tc.expectedResultErr {
+						limit, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, "up-vol")
+						require.True(t, found)
+						assert.Equal(t, int64(50), limit.Value())
+					}
+				})
 			}
 		})
 	}
@@ -7059,4 +7098,115 @@ func TestSyncPodParallelContainerKills(t *testing.T) {
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
 	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
 	require.NoError(t, result.Error())
+}
+
+type barrierVolumeResizeHelper struct {
+	containertest.FakeRuntimeHelper
+	onResize func(volumeName string, newSize *resource.Quantity) error
+}
+
+func (b *barrierVolumeResizeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+	return b.onResize(volumeName, newSize)
+}
+
+func TestDoPodResizeActionVolumesParallel(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.InPlacePodVerticalScalingMemoryBackedVolumes: true,
+		features.KubeletParallelContainerOps:                  true,
+	})
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	mockCM := cmtesting.NewMockContainerManager(t)
+	mockCM.EXPECT().PodHasExclusiveCPUs(mock.Anything, mock.Anything).Return(false).Maybe()
+	mockCM.EXPECT().ContainerHasExclusiveCPUs(mock.Anything, mock.Anything, mock.Anything).Return(false).Maybe()
+	m.containerManager = mockCM
+	mockPCM := cmtesting.NewMockPodContainerManager(t)
+	mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+	mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{Memory: ptr.To(int64(200))}, nil).Maybe()
+	mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
+		CPUShares: ptr.To(cm.MilliCPUToShares(100)),
+		CPUQuota:  ptr.To(cm.MilliCPUToQuota(100, cm.QuotaPeriod)),
+	}, nil).Maybe()
+
+	var (
+		mu             sync.Mutex
+		downFinished   int
+		upStartedEarly bool
+		downWg         sync.WaitGroup
+		downReleaseCh  = make(chan struct{})
+		upWg           sync.WaitGroup
+		upReleaseCh    = make(chan struct{})
+	)
+	downWg.Add(2)
+	go func() {
+		downWg.Wait()
+		close(downReleaseCh)
+	}()
+	upWg.Add(2)
+	go func() {
+		upWg.Wait()
+		close(upReleaseCh)
+	}()
+
+	m.runtimeHelper = &barrierVolumeResizeHelper{
+		onResize: func(volumeName string, _ *resource.Quantity) error {
+			if strings.HasPrefix(volumeName, "down-") {
+				downWg.Done()
+				<-downReleaseCh
+				mu.Lock()
+				downFinished++
+				mu.Unlock()
+			} else {
+				mu.Lock()
+				if downFinished < 2 {
+					upStartedEarly = true
+				}
+				mu.Unlock()
+				upWg.Done()
+				<-upReleaseCh
+			}
+			return nil
+		},
+	}
+
+	vol := func(name string, size int64) v1.Volume {
+		return v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium:    v1.StorageMediumMemory,
+					SizeLimit: resource.NewQuantity(size, resource.BinarySI),
+				},
+			},
+		}
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "vol-resize-uid"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				vol("down-1", 100),
+				vol("down-2", 100),
+				vol("up-1", 300),
+				vol("up-2", 300),
+			},
+		},
+	}
+
+	actions := podActions{
+		VolumesToDownsize: []v1.Volume{pod.Spec.Volumes[0], pod.Spec.Volumes[1]},
+		VolumesToUpsize:   []v1.Volume{pod.Spec.Volumes[2], pod.Spec.Volumes[3]},
+		SandboxID:         "sandbox-id",
+	}
+
+	res := m.doPodResizeAction(tCtx, pod, &kubecontainer.PodStatus{}, actions)
+	require.NoError(t, res.Error)
+	assert.False(t, upStartedEarly, "volume upsizes must not start before all volume downsizes complete")
 }
