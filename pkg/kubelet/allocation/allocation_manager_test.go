@@ -3051,6 +3051,208 @@ func TestRetryPendingResizesDynamicContainersPodLevelExclusiveResources(t *testi
 	}
 }
 
+// TestRetryPendingResizesPodLevelResourcesExclusiveCPUs checks that a resize of a Guaranteed pod
+// with pod-level resources is infeasible if it changes the number of exclusive CPUs of the pod or
+// of any of its containers, since the static CPU manager policy skips the resizes of such pods.
+func TestRetryPendingResizesPodLevelResourcesExclusiveCPUs(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	resources := func(cpuRequest, cpuLimit, memoryRequest, memoryLimit string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpuRequest), v1.ResourceMemory: resource.MustParse(memoryRequest)},
+			Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpuLimit), v1.ResourceMemory: resource.MustParse(memoryLimit)},
+		}
+	}
+	setCPU := func(resources *v1.ResourceRequirements, request, limit string) {
+		resources.Requests[v1.ResourceCPU] = resource.MustParse(request)
+		resources.Limits[v1.ResourceCPU] = resource.MustParse(limit)
+	}
+	setMemory := func(resources *v1.ResourceRequirements, request, limit string) {
+		resources.Requests[v1.ResourceMemory] = resource.MustParse(request)
+		resources.Limits[v1.ResourceMemory] = resource.MustParse(limit)
+	}
+	// Indexes of the containers of the pod.
+	const (
+		// exclusive has exclusive CPUs: its CPU request is integral and its CPU and memory requests
+		// are equal to the limits.
+		exclusive = iota
+		// shared uses the shared pool, since its CPU request is not integral.
+		shared
+		// ineligible uses the shared pool despite its integral CPU request, since its CPU request
+		// is not equal to the limit.
+		ineligible
+	)
+
+	tests := []struct {
+		name string
+		// prepare changes the pod before it is allocated.
+		prepare func(pod *v1.Pod)
+		// change is the resize of the allocated pod.
+		change                           func(pod *v1.Pod)
+		podLevelResourceManagersDisabled bool
+		cpuManagerPolicyNone             bool
+		expectInfeasible                 bool
+	}{{
+		name:             "container with exclusive CPUs scaled up",
+		change:           func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[exclusive].Resources, "2", "2") },
+		expectInfeasible: true,
+	}, {
+		name:             "container with exclusive CPUs resized to a non-integral CPU request",
+		change:           func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[exclusive].Resources, "1500m", "1500m") },
+		expectInfeasible: true,
+	}, {
+		name:             "CPU limit of a container with exclusive CPUs raised above its request",
+		change:           func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[exclusive].Resources, "1", "2") },
+		expectInfeasible: true,
+	}, {
+		name:             "memory limit of a container with exclusive CPUs raised above its request",
+		change:           func(pod *v1.Pod) { setMemory(&pod.Spec.Containers[exclusive].Resources, "1Gi", "2Gi") },
+		expectInfeasible: true,
+	}, {
+		name:   "memory request and limit of a container with exclusive CPUs resized",
+		change: func(pod *v1.Pod) { setMemory(&pod.Spec.Containers[exclusive].Resources, "2Gi", "2Gi") },
+	}, {
+		name:             "container with shared CPUs resized to an integral CPU request",
+		change:           func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[shared].Resources, "1", "1") },
+		expectInfeasible: true,
+	}, {
+		name:   "container with shared CPUs resized to a non-integral CPU request",
+		change: func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[shared].Resources, "700m", "700m") },
+	}, {
+		name:    "CPU request added to a container without it",
+		prepare: func(pod *v1.Pod) { delete(pod.Spec.Containers[shared].Resources.Requests, v1.ResourceCPU) },
+		change: func(pod *v1.Pod) {
+			pod.Spec.Containers[shared].Resources.Requests[v1.ResourceCPU] = resource.MustParse("500m")
+		},
+	}, {
+		name:   "container with different CPU request and limit resized to another integral CPU request",
+		change: func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[ineligible].Resources, "2", "3") },
+	}, {
+		name:             "CPU limit of a container lowered to its integral request",
+		change:           func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[ineligible].Resources, "1", "1") },
+		expectInfeasible: true,
+	}, {
+		name:             "memory limit of a container with an integral CPU request lowered to its request",
+		prepare:          func(pod *v1.Pod) { setMemory(&pod.Spec.Containers[exclusive].Resources, "1Gi", "2Gi") },
+		change:           func(pod *v1.Pod) { setMemory(&pod.Spec.Containers[exclusive].Resources, "1Gi", "1Gi") },
+		expectInfeasible: true,
+	}, {
+		name: "restartable init container with exclusive CPUs scaled up",
+		prepare: func(pod *v1.Pod) {
+			pod.Spec.InitContainers = []v1.Container{{
+				Name: "sidecar", Image: "sidecar", RestartPolicy: ptr.To(v1.ContainerRestartPolicyAlways),
+				Resources: resources("1", "1", "500Mi", "500Mi"),
+			}}
+			pod.Spec.Containers = pod.Spec.Containers[:ineligible]
+		},
+		change:           func(pod *v1.Pod) { setCPU(&pod.Spec.InitContainers[0].Resources, "2", "2") },
+		expectInfeasible: true,
+	}, {
+		name:             "integral pod-level CPU request scaled down",
+		change:           func(pod *v1.Pod) { setCPU(pod.Spec.Resources, "3", "3") },
+		expectInfeasible: true,
+	}, {
+		name:             "integral pod-level CPU request resized to a non-integral one",
+		change:           func(pod *v1.Pod) { setCPU(pod.Spec.Resources, "3500m", "3500m") },
+		expectInfeasible: true,
+	}, {
+		name:             "non-integral pod-level CPU request resized to an integral one",
+		prepare:          func(pod *v1.Pod) { setCPU(pod.Spec.Resources, "3500m", "3500m") },
+		change:           func(pod *v1.Pod) { setCPU(pod.Spec.Resources, "4", "4") },
+		expectInfeasible: true,
+	}, {
+		name:    "non-integral pod-level CPU request resized to another non-integral one",
+		prepare: func(pod *v1.Pod) { setCPU(pod.Spec.Resources, "3500m", "3500m") },
+		change:  func(pod *v1.Pod) { setCPU(pod.Spec.Resources, "3700m", "3700m") },
+	}, {
+		// The container has exclusive CPUs unless the topology manager uses the pod scope.
+		name:             "container with exclusive CPUs scaled up with a non-integral pod-level CPU request",
+		prepare:          func(pod *v1.Pod) { setCPU(pod.Spec.Resources, "3500m", "3500m") },
+		change:           func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[exclusive].Resources, "2", "2") },
+		expectInfeasible: true,
+	}, {
+		name:    "container of a Burstable pod resized to an integral CPU request",
+		prepare: func(pod *v1.Pod) { setCPU(pod.Spec.Resources, "3", "4") },
+		change:  func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[shared].Resources, "1", "1") },
+	}, {
+		name: "container scaled up in a pod without pod-level resources",
+		prepare: func(pod *v1.Pod) {
+			pod.Spec.Resources = nil
+			pod.Spec.Containers = pod.Spec.Containers[:ineligible]
+		},
+		change: func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[exclusive].Resources, "2", "2") },
+	}, {
+		name:                             "container scaled up without PodLevelResourceManagers",
+		change:                           func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[exclusive].Resources, "2", "2") },
+		podLevelResourceManagersDisabled: true,
+	}, {
+		name:                 "container scaled up with the none CPU manager policy",
+		change:               func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[exclusive].Resources, "2", "2") },
+		cpuManagerPolicyNone: true,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PodLevelResourceManagers:               !tc.podLevelResourceManagersDisabled,
+				features.InPlacePodVerticalScalingExclusiveCPUs: true,
+			})
+			logger, tCtx := ktesting.NewTestContext(t)
+			metrics.Register()
+			metrics.PodInfeasibleResizes.Reset()
+			nodeConfig := cm.NodeConfig{}
+			if !tc.cpuManagerPolicyNone {
+				nodeConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+			}
+
+			podLevelResources := resources("4", "4", "4Gi", "4Gi")
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+				Spec: v1.PodSpec{
+					Resources: &podLevelResources,
+					Containers: []v1.Container{
+						exclusive:  {Name: "exclusive", Image: "i1", Resources: resources("1", "1", "1Gi", "1Gi")},
+						shared:     {Name: "shared", Image: "i2", Resources: resources("500m", "500m", "500Mi", "500Mi")},
+						ineligible: {Name: "ineligible", Image: "i3", Resources: resources("1", "2", "500Mi", "500Mi")},
+					},
+				},
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+			}
+			if tc.prepare != nil {
+				tc.prepare(pod)
+			}
+			allocatedPod := pod.DeepCopy()
+			tc.change(pod)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, &nodeConfig)
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
+			allocationManager.PushPendingAllocation(logger, pod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+			_, pending := allocationManager.UpdatePodFromAllocation(pod)
+			assert.Equal(t, tc.expectInfeasible, pending, "pending")
+			expectedMetrics := ""
+			if tc.expectInfeasible {
+				if assert.Len(t, conditions, 1, "conditions") {
+					assert.Equal(t, v1.PodResizePending, conditions[0].Type)
+					assert.Equal(t, v1.PodReasonInfeasible, conditions[0].Reason)
+					assert.Equal(t, "Resize of exclusive CPUs is infeasible for Guaranteed Pods with pod-level resources when CPU allocation mode is exclusive", conditions[0].Message)
+				}
+				expectedMetrics = `
+				# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="guaranteed_pod_level_resources_exclusive_cpus"} 1
+				`
+			}
+			assert.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_infeasible_resizes_total",
+			))
+		})
+	}
+}
+
 // TestRetryPendingAllocationsInfeasibleMetric checks that an infeasible rejection by another admit
 // handler is only counted as an infeasible resize if the change is a resize.
 func TestRetryPendingAllocationsInfeasibleMetric(t *testing.T) {

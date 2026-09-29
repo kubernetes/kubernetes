@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
@@ -29,6 +30,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -108,6 +110,11 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 				metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy").Inc()
 				return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 			}
+		} else if cpuMode := h.resourceManager.AllocationMode(v1.ResourceCPU); cpuMode == cm.ResourceAllocationModeExclusive && exclusiveCPUsResizeRequiredForPodLevelResources(pod, allocatedPod) {
+			msg := fmt.Sprintf("Resize of exclusive CPUs is infeasible for Guaranteed Pods with pod-level resources when CPU allocation mode is %s", cpuMode)
+			logger.V(3).Info(msg, "pod", format.Pod(pod))
+			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_level_resources_exclusive_cpus").Inc()
+			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 		}
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveMemory) {
 			memMode := h.resourceManager.AllocationMode(v1.ResourceMemory)
@@ -283,6 +290,57 @@ func (h *podResizesAdmitHandler) disallowContainerChangesForPodLevelExclusiveRes
 		}
 	}
 	return false, ""
+}
+
+// exclusiveCPUsResizeRequiredForPodLevelResources returns whether the resize changes the number of
+// exclusive CPUs of a Guaranteed pod with pod-level resources or of any of its containers, which
+// includes moving them between the shared and the exclusive pool. The static CPU manager policy
+// allocates exclusive CPUs for such a pod only when the pod is admitted and skips its resizes, so
+// the allocation would no longer match the pod.
+func exclusiveCPUsResizeRequiredForPodLevelResources(pod, allocatedPod *v1.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !resourcehelper.IsPodLevelResourcesSet(pod) {
+		return false
+	}
+	if podLevelExclusiveCPUs(pod) != podLevelExclusiveCPUs(allocatedPod) {
+		return true
+	}
+	for pair := range podutil.ContainerPairs(pod, allocatedPod, podutil.InitContainers|podutil.Containers) {
+		// Adding or removing a container is covered by disallowContainerChangesForPodLevelExclusiveResources.
+		if pair.New == nil || pair.Old == nil {
+			continue
+		}
+		if containerExclusiveCPUs(pair.New) != containerExclusiveCPUs(pair.Old) {
+			return true
+		}
+	}
+	return false
+}
+
+// podLevelExclusiveCPUs returns the number of exclusive CPUs that the static CPU manager policy
+// allocates to a Guaranteed pod for its pod-level resources, which it only does with the pod scope
+// of the topology manager.
+func podLevelExclusiveCPUs(pod *v1.Pod) int64 {
+	if pod.Spec.Resources == nil {
+		return 0
+	}
+	return integralCPUs(pod.Spec.Resources.Requests[v1.ResourceCPU])
+}
+
+// containerExclusiveCPUs returns the number of exclusive CPUs that the static CPU manager policy
+// allocates to a container of a Guaranteed pod with pod-level resources.
+func containerExclusiveCPUs(container *v1.Container) int64 {
+	if !cmqos.IsContainerEquivalentQOSGuaranteed(container) {
+		return 0
+	}
+	return integralCPUs(container.Resources.Requests[v1.ResourceCPU])
+}
+
+// integralCPUs returns the number of CPUs if it is integral, and 0 otherwise.
+func integralCPUs(cpus resource.Quantity) int64 {
+	if cpus.Value()*1000 != cpus.MilliValue() {
+		return 0
+	}
+	return cpus.Value()
 }
 
 func (h *podResizesAdmitHandler) guaranteedPodResourceResizeRequired(pod, allocatedPod *v1.Pod, resourceName v1.ResourceName) bool {
