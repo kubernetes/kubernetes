@@ -8606,10 +8606,13 @@ func TestCPGSchedulingPlacementAlgorithm_NominatedNodeName(t *testing.T) {
 			expectSatisfiedSiblingKept: true,
 		},
 		"nominated placement without progress falls back to one that schedules": {
-			// pg1 is already satisfied, so the fake PlacementFeasible reports the composite group
-			// as Success on the nominated placement even though pg2 fits nowhere in it. Without
-			// the anyScheduled guard the search would stop there and p2 would never be placed;
-			// with it the scheduler falls back to placement1, where p2 does fit.
+			// This test registers no PlacementFeasible plugin, so the composite group's status is
+			// Success unconditionally: a child that fits nowhere cannot make the root
+			// Unschedulable. Progress is therefore the only thing distinguishing the nominated
+			// placement from a usable one, and here there is none - pg1 is already satisfied and
+			// schedules nothing, and pg2 fits nowhere in the placement. Without the anyScheduled
+			// guard the search would stop there and p2 would never be placed; with it the
+			// scheduler falls back to placement1, where p2 does fit.
 			nominations:  map[string]string{"p2": nodes[2].Name},
 			unqueuedPods: []string{"p1"},
 			filterStatus: map[string]*fwk.Status{
