@@ -2011,8 +2011,14 @@ func TestCPGTopologyAwareSchedulingWorkloadAwarePreemption(t *testing.T) {
 // TestCPGTopologyAwareSchedulingNominatedNode covers NominatedNodeName handling for a
 // CompositePodGroup hierarchy. The hierarchy-level fast path differs from the standalone
 // PodGroup one (see TestTopologyAwareSchedulingNominatedNode): a placement only qualifies when
-// it can host every nominated node in the subtree, and a child group that already meets its
-// minCount keeps contributing to the parent's minGroupCount even when it schedules nothing.
+// it can host every nominated node in the subtree.
+//
+// The last scenario is not a fast path case: pg1's assigned pod pins the hierarchy to rack-2
+// (requiredDomain in TopologyPlacement.GeneratePlacements), leaving a single candidate
+// placement and nothing for a nomination to steer. It covers the quorum half of the change
+// instead - a satisfied child still counts towards minGroupCount when it schedules nothing -
+// which the in-tree generator cannot combine with a real placement choice; the unit case
+// "sibling without queued pods does not block the fast path" covers that combination.
 func TestCPGTopologyAwareSchedulingNominatedNode(t *testing.T) {
 	tests := []scenario{
 		{
@@ -2172,17 +2178,6 @@ func TestCPGTopologyAwareSchedulingNominatedNode(t *testing.T) {
 					CreatePods: []*v1.Pod{makePod("p2", "pg2")},
 				},
 				{
-					Name: "Nominate rack-2 for the pending sibling pod",
-					UpdatePodStatus: &stepsframework.UpdatePod{
-						PodName:  "p2",
-						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
-					},
-				},
-				{
-					Name:                 "Wait until the gated pod carries the nominated node",
-					WaitForPodsNominated: map[string]string{"p2": "node-rack2"},
-				},
-				{
 					Name:           "Create child PodGroup pg2, opening the gate",
 					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 1),
 				},
@@ -2191,7 +2186,7 @@ func TestCPGTopologyAwareSchedulingNominatedNode(t *testing.T) {
 					WaitForPodsScheduled: []string{"p2"},
 				},
 				{
-					Name: "Verify both children end up in the same rack",
+					Name: "Verify both children end up on rack-2, the only candidate placement once pg1's assigned pod pins the hierarchy there",
 					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2"},
 						Nodes: sets.New("node-rack2"),
