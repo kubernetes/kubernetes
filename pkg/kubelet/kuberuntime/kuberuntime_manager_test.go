@@ -7318,3 +7318,63 @@ func TestUpdatePodContainerResourcesParallelOrdering(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, upStartedEarly, "container upsizes must not start before all container downsizes complete")
 }
+
+type barrierImageService struct {
+	*apitest.FakeImageService
+	onPullImage func(ctx context.Context, image *runtimeapi.ImageSpec) error
+}
+
+func (b *barrierImageService) PullImage(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+	if b.onPullImage != nil {
+		if err := b.onPullImage(ctx, image); err != nil {
+			return "", err
+		}
+	}
+	return b.FakeImageService.PullImage(ctx, image, auth, podSandboxConfig)
+}
+
+func TestGetImageVolumesParallel(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ImageVolume:                 true,
+		features.KubeletParallelContainerOps: true,
+	})
+
+	_, fakeImage, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	var (
+		pullWg    sync.WaitGroup
+		releaseCh = make(chan struct{})
+	)
+	pullWg.Add(2)
+	go func() {
+		pullWg.Wait()
+		close(releaseCh)
+	}()
+
+	m.imageService = &barrierImageService{
+		FakeImageService: fakeImage,
+		onPullImage: func(ctx context.Context, _ *runtimeapi.ImageSpec) error {
+			pullWg.Done()
+			<-releaseCh
+			return nil
+		},
+	}
+
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{Name: "vol1", VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "img1:latest", PullPolicy: v1.PullAlways}}},
+				{Name: "vol2", VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "img2:latest", PullPolicy: v1.PullAlways}}},
+			},
+		},
+	}
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{Name: "pod", Namespace: "default", Uid: "uid"},
+	}
+
+	pulls, err := m.getImageVolumes(tCtx, pod, podSandboxConfig, nil)
+	require.NoError(t, err)
+	assert.Len(t, pulls, 2)
+}

@@ -2161,24 +2161,18 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 		return nil, err
 	}
 
-	res := make(imageVolumePulls)
-	for _, volume := range pod.Spec.Volumes {
-		if volume.Image == nil {
-			continue
-		}
-
-		objectRef, _ := ref.GetReference(legacyscheme.Scheme, pod) // objectRef can be nil, no error check required
+	objectRef, _ := ref.GetReference(legacyscheme.Scheme, pod) // objectRef can be nil, no error check required
+	pullVolume := func(volume v1.Volume) imageVolumePullResult {
 		ref, msg, err := m.imagePuller.EnsureImageExists(
 			ctx, objectRef, pod, volume.Image.Reference, pullSecrets, podSandboxConfig, podRuntimeHandler, volume.Image.PullPolicy,
 		)
 		if err != nil {
 			logger.Error(err, "Failed to ensure image", "pod", klog.KObj(pod))
-			res[volume.Name] = imageVolumePullResult{err: err, msg: msg}
-			continue
+			return imageVolumePullResult{err: err, msg: msg}
 		}
 
 		logger.V(4).Info("Pulled image", "ref", ref, "pod", klog.KObj(pod))
-		res[volume.Name] = imageVolumePullResult{spec: &runtimeapi.ImageSpec{
+		return imageVolumePullResult{spec: &runtimeapi.ImageSpec{
 			Image:              ref,
 			UserSpecifiedImage: volume.Image.Reference,
 			RuntimeHandler:     podRuntimeHandler,
@@ -2186,7 +2180,38 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 		}}
 	}
 
-	return res, nil
+	res := make(imageVolumePulls)
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+		var (
+			mu sync.Mutex
+			wg sync.WaitGroup
+		)
+		for _, volume := range pod.Spec.Volumes {
+			if volume.Image == nil {
+				continue
+			}
+			wg.Add(1)
+			go func(volume v1.Volume) {
+				defer wg.Done()
+				defer utilruntime.HandleCrashWithContext(ctx)
+				pullRes := pullVolume(volume)
+				mu.Lock()
+				res[volume.Name] = pullRes
+				mu.Unlock()
+			}(volume)
+		}
+		wg.Wait()
+		return res, nil
+	} else {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.Image == nil {
+				continue
+			}
+			res[volume.Name] = pullVolume(volume)
+		}
+
+		return res, nil
+	}
 }
 
 // If a container is still in backoff, the function will return a brief backoff error and
