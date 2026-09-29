@@ -939,11 +939,15 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 func collectEventsTillRV(t *testing.T, watcher watch.Interface, versioner storage.Versioner, targetRV uint64) []watch.Event {
 	events := []watch.Event{}
 	for e := range watcher.ResultChan() {
-		require.NotEqual(t, watch.Error, e.Type)
 		if cacheable, ok := e.Object.(runtime.CacheableObject); ok {
 			e.Object = cacheable.GetObject()
 		}
 		events = append(events, e)
+		if e.Type == watch.Error {
+			_, open := <-watcher.ResultChan()
+			require.False(t, open, "watch channel should be closed after watch.Error")
+			break
+		}
 		accessor, err := meta.Accessor(e.Object)
 		require.NoError(t, err)
 		rv, err := versioner.ParseResourceVersion(accessor.GetResourceVersion())

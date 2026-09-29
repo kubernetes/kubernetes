@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
@@ -389,6 +390,55 @@ func TestValidateWatch(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "watch ending with error event",
+			requests: []WatchRequest{
+				{ResourceVersion: ""},
+				{ResourceVersion: "0"},
+				{ResourceVersion: "1"},
+			},
+			events: []watch.Event{addPod1RV2, addPod2RV3, bluePod1RV4, newErrorEvent()},
+		},
+		{
+			name: "watch with only error event",
+			requests: []WatchRequest{
+				{ResourceVersion: ""},
+				{ResourceVersion: "0"},
+				{ResourceVersion: "1"},
+				{ResourceVersion: "3"},
+			},
+			events: []watch.Event{newErrorEvent()},
+		},
+		{
+			name: "event after error event",
+			requests: []WatchRequest{
+				{ResourceVersion: ""},
+				{ResourceVersion: "0"},
+				{ResourceVersion: "1"},
+			},
+			events:      []watch.Event{addPod1RV2, newErrorEvent(), addPod2RV3},
+			expectError: true,
+		},
+		{
+			name: "missing event before error event",
+			requests: []WatchRequest{
+				{ResourceVersion: ""},
+				{ResourceVersion: "0"},
+				{ResourceVersion: "1"},
+			},
+			events:      []watch.Event{addPod1RV2 /*addPod2RV3,*/, bluePod1RV4, newErrorEvent()},
+			expectError: true,
+		},
+		{
+			name: "error event with non-status object",
+			requests: []WatchRequest{
+				{ResourceVersion: ""},
+				{ResourceVersion: "0"},
+				{ResourceVersion: "1"},
+			},
+			events:      []watch.Event{addPod1RV2, {Type: watch.Error, Object: withRV(pod2, "3")}},
+			expectError: true,
+		},
 	}
 
 	validator := NewWatchValidator(storage.APIObjectVersioner{}, getKey, history)
@@ -408,4 +458,8 @@ func TestValidateWatch(t *testing.T) {
 
 func newBookmark(rv string) watch.Event {
 	return watch.Event{Type: watch.Bookmark, Object: newTestPod("", "", "", rv)}
+}
+
+func newErrorEvent() watch.Event {
+	return watch.Event{Type: watch.Error, Object: &metav1.Status{Status: metav1.StatusFailure, Message: "watch error"}}
 }

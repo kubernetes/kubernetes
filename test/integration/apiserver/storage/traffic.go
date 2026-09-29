@@ -443,6 +443,13 @@ func runWatch(ctx context.Context, store storage.Interface, req correctness.Watc
 				event.Object = cacheable.GetObject()
 			}
 			events = append(events, event)
+			if event.Type == watch.Error {
+				_, open := <-w.ResultChan()
+				if open {
+					return correctness.WatchResponse{Events: events, Err: errors.New("watch channel was not closed after watch.Error")}
+				}
+				return correctness.WatchResponse{Events: events}
+			}
 			if cfg.MaxEvents > 0 && len(events) >= cfg.MaxEvents {
 				return correctness.WatchResponse{Events: events}
 			}
