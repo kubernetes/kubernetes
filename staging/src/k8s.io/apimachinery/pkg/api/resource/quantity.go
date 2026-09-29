@@ -589,38 +589,12 @@ func (q *Quantity) AsInt64() (int64, bool) {
 		return 0, false
 	}
 
-	rawUnscaled := q.d.Dec.UnscaledBig()
 	scale := int64(q.d.Dec.Scale())
-	if scale <= 0 {
-		// Scale a whole number.
-		// The below Round() call can hang or panic when the scale is large.
-		return scaledValue(rawUnscaled, scale, 0)
-	}
-	if q.Format != BinarySI { // has a fractional part that cannot be represented as an int64
+	if scale > 0 && q.Format != BinarySI {
+		// has a fractional part that cannot be represented as an int64
 		return 0, false
 	}
-
-	// Attempt to scale to whole numbers without rounding.
-	// If the value cannot be represented as an integer, do not round.
-	unscaled := new(inf.Dec).Round(q.d.Dec, 0, inf.RoundExact)
-	if unscaled == nil {
-		return 0, false
-	}
-
-	unscaledBig := unscaled.UnscaledBig()
-	switch {
-	case unscaledBig.IsInt64():
-		return unscaledBig.Int64(), true
-	case unscaledBig.Sign() == 1:
-		// value saturates in the positive direction
-		return math.MaxInt64, false
-	case unscaledBig.Sign() == -1:
-		// value saturates in the negative direction
-		return math.MinInt64, false
-	default:
-		// should be impossible, but return 0, false here
-		return 0, false
-	}
+	return scaledValueExact(q.d.Dec.UnscaledBig(), scale, 0)
 }
 
 // ToDec promotes the quantity in place to use an inf.Dec representation and returns itself.

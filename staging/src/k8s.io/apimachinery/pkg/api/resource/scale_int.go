@@ -126,6 +126,53 @@ func scaledValue(unscaled *big.Int, scale, newScale int64) (int64, bool) {
 	return bigToInt64Saturated(quotient)
 }
 
+// scaledValueExact scales a unscaled value from scale to newScale and returns
+// it as an int64, or false if the result is not exact. If the result does not
+// fit in an int64, the result is saturated to mostNegative or mostPositive.
+func scaledValueExact(unscaled *big.Int, scale, newScale int64) (int64, bool) {
+	dif := scale - newScale
+	if dif <= 0 {
+		return scaledValue(unscaled, scale, newScale)
+	}
+
+	if unscaled.Sign() == 0 { // Handle 0 as a special case
+		return 0, true
+	}
+
+	// Fast path
+	if unscaled.IsInt64() && dif < log10MaxInt64 {
+		u := unscaled.Int64()
+		divide := int64(math.Pow10(int(dif)))
+		if u%divide != 0 {
+			return 0, false
+		}
+		return u / divide, true
+	}
+
+	if dif >= int64(unscaled.BitLen()) {
+		return 0, false
+	}
+
+	// Slow path
+	divisor := intPool.Get().(*big.Int)
+	exp := intPool.Get().(*big.Int)
+	quotient := intPool.Get().(*big.Int)
+	remainder := intPool.Get().(*big.Int)
+	defer func() {
+		intPool.Put(divisor)
+		intPool.Put(exp)
+		intPool.Put(quotient)
+		intPool.Put(remainder)
+	}()
+
+	divisor.Exp(bigTen, exp.SetInt64(dif), nil)
+	quotient.QuoRem(unscaled, divisor, remainder)
+	if remainder.Sign() != 0 {
+		return 0, false
+	}
+	return bigToInt64Saturated(quotient)
+}
+
 // bigToInt64Saturated returns v as an int64, saturating to mostNegative or
 // mostPositive when v does not fit. ok is false when saturation occurred.
 func bigToInt64Saturated(v *big.Int) (int64, bool) {

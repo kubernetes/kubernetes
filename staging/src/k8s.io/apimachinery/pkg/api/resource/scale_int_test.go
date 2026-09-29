@@ -87,6 +87,43 @@ func TestScaledValueInternal(t *testing.T) {
 	}
 }
 
+func TestScaledValueExact(t *testing.T) {
+	tests := []struct {
+		unscaled *big.Int
+		scale    int64
+		newScale int64
+
+		want   int64
+		wantOK bool
+	}{
+		{big.NewInt(1000), 0, 0, 1000, true},
+		{big.NewInt(1), 0, 3, 1000, true},
+		{big.NewInt(0), 3, 0, 0, true},
+		{big.NewInt(1000), 3, 0, 1, true},
+		{big.NewInt(-1000), 3, 0, -1, true},
+		{big.NewInt(999), 3, 0, 0, false},
+		{big.NewInt(1), 3, 0, 0, false},
+		{big.NewInt(0).Exp(big.NewInt(10), big.NewInt(19), nil), 19, 0, 1, true},
+		{big.NewInt(5), 19, 0, 0, false},
+		{new(big.Int).Mul(new(big.Int).Add(bigMostPositive, bigOne), bigTen), 1, 0, math.MaxInt64, false},
+		{new(big.Int).Mul(new(big.Int).Sub(bigMostNegative, bigOne), bigTen), 1, 0, math.MinInt64, false},
+		{big.NewInt(1), 1 << 30, 0, 0, false},
+		{big.NewInt(-1), 1 << 30, 0, 0, false},
+		{big.NewInt(0), 1 << 30, 0, 0, true},
+	}
+
+	for i, tt := range tests {
+		old := (&big.Int{}).Set(tt.unscaled)
+		got, ok := scaledValueExact(tt.unscaled, tt.scale, tt.newScale)
+		if got != tt.want || ok != tt.wantOK {
+			t.Errorf("#%d: got = (%v, %v), want (%v, %v)", i, got, ok, tt.want, tt.wantOK)
+		}
+		if tt.unscaled.Cmp(old) != 0 {
+			t.Errorf("#%d: unscaled = %v, want %v", i, tt.unscaled, old)
+		}
+	}
+}
+
 func BenchmarkScaledValueSmall(b *testing.B) {
 	s := big.NewInt(1000)
 	for i := 0; i < b.N; i++ {
