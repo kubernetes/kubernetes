@@ -44,10 +44,16 @@ var (
 		Weight: 10,
 	}, {
 		Choice: RequestTypeDeleteUIDPrecondition,
-		Weight: 10,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeDeleteRVPrecondition,
+		Weight: 5,
 	}, {
 		Choice: RequestTypeGet,
-		Weight: 10,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeGetIgnoreNotFound,
+		Weight: 5,
 	}, {
 		Choice: RequestTypeList,
 		Weight: 5,
@@ -59,15 +65,21 @@ var (
 		Weight: 5,
 	}, {
 		Choice: RequestTypeUpdate,
-		Weight: 20,
+		Weight: 15,
 	}, {
 		Choice: RequestTypeUpdateUIDPrecondition,
-		Weight: 10,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeUpdateRVPrecondition,
+		Weight: 5,
 	}, {
 		Choice: RequestTypeUpdateNoOp,
 		Weight: 5,
 	}, {
 		Choice: RequestTypeUpdateWithCachedObject,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeUpdateIgnoreNotFound,
 		Weight: 5,
 	}}
 
