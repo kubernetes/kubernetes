@@ -7129,10 +7129,10 @@ func TestDoPodResizeActionVolumesParallel(t *testing.T) {
 	m.containerManager = mockCM
 	mockPCM := cmtesting.NewMockPodContainerManager(t)
 	mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
-	mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{Memory: ptr.To(int64(200))}, nil).Maybe()
+	mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{Memory: new(int64(200))}, nil).Maybe()
 	mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
-		CPUShares: ptr.To(cm.MilliCPUToShares(100)),
-		CPUQuota:  ptr.To(cm.MilliCPUToQuota(100, cm.QuotaPeriod)),
+		CPUShares: new(cm.MilliCPUToShares(100)),
+		CPUQuota:  new(cm.MilliCPUToQuota(100, cm.QuotaPeriod)),
 	}, nil).Maybe()
 
 	var (
@@ -7209,4 +7209,112 @@ func TestDoPodResizeActionVolumesParallel(t *testing.T) {
 	res := m.doPodResizeAction(tCtx, pod, &kubecontainer.PodStatus{}, actions)
 	require.NoError(t, res.Error)
 	assert.False(t, upStartedEarly, "volume upsizes must not start before all volume downsizes complete")
+}
+
+func TestUpdatePodContainerResourcesParallelOrdering(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.InPlacePodVerticalScaling:   true,
+		features.KubeletParallelContainerOps: true,
+	})
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.machineInfo.MemoryCapacity = 17179860387
+	m.cpuCFSQuota = true
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "resize-pod-uid",
+			Name:      "resize-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "down1", Image: "busybox"},
+				{Name: "down2", Image: "busybox"},
+				{Name: "up1", Image: "busybox"},
+				{Name: "up2", Image: "busybox"},
+			},
+		},
+	}
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+
+	var (
+		mu             sync.Mutex
+		downFinished   int
+		upStartedEarly bool
+		downWg         sync.WaitGroup
+		downReleaseCh  = make(chan struct{})
+		upWg           sync.WaitGroup
+		upReleaseCh    = make(chan struct{})
+	)
+	downWg.Add(2)
+	go func() {
+		downWg.Wait()
+		close(downReleaseCh)
+	}()
+	upWg.Add(2)
+	go func() {
+		upWg.Wait()
+		close(upReleaseCh)
+	}()
+
+	downIDs := sets.New(fakeContainers[0].Id, fakeContainers[1].Id)
+	m.runtimeService = &barrierRuntimeService{
+		FakeRuntimeService: fakeRuntime,
+		onUpdateContainerResources: func(ctx context.Context, containerID string, _ *runtimeapi.ContainerResources) error {
+			if downIDs.Has(containerID) {
+				downWg.Done()
+				<-downReleaseCh
+				mu.Lock()
+				downFinished++
+				mu.Unlock()
+			} else {
+				mu.Lock()
+				if downFinished < 2 {
+					upStartedEarly = true
+				}
+				mu.Unlock()
+				upWg.Done()
+				<-upReleaseCh
+			}
+			return nil
+		},
+	}
+
+	containersToUpdate := []containerToUpdateInfo{
+		{
+			container:                 &pod.Spec.Containers[0],
+			kubeContainerID:           kubecontainer.ContainerID{Type: "fakeRuntime", ID: fakeContainers[0].Id},
+			desiredContainerResources: resourceRequirements{memoryLimit: 100, memoryRequest: 100, cpuLimit: 100, cpuRequest: 100},
+			currentContainerResources: &resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 100, cpuRequest: 100},
+		},
+		{
+			container:                 &pod.Spec.Containers[1],
+			kubeContainerID:           kubecontainer.ContainerID{Type: "fakeRuntime", ID: fakeContainers[1].Id},
+			desiredContainerResources: resourceRequirements{memoryLimit: 100, memoryRequest: 100, cpuLimit: 100, cpuRequest: 100},
+			currentContainerResources: &resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 100, cpuRequest: 100},
+		},
+		{
+			container:                 &pod.Spec.Containers[2],
+			kubeContainerID:           kubecontainer.ContainerID{Type: "fakeRuntime", ID: fakeContainers[2].Id},
+			desiredContainerResources: resourceRequirements{memoryLimit: 300, memoryRequest: 300, cpuLimit: 100, cpuRequest: 100},
+			currentContainerResources: &resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 100, cpuRequest: 100},
+		},
+		{
+			container:                 &pod.Spec.Containers[3],
+			kubeContainerID:           kubecontainer.ContainerID{Type: "fakeRuntime", ID: fakeContainers[3].Id},
+			desiredContainerResources: resourceRequirements{memoryLimit: 300, memoryRequest: 300, cpuLimit: 100, cpuRequest: 100},
+			currentContainerResources: &resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 100, cpuRequest: 100},
+		},
+	}
+
+	err = m.updatePodContainerResources(tCtx, pod, v1.ResourceMemory, containersToUpdate)
+	require.NoError(t, err)
+	assert.False(t, upStartedEarly, "container upsizes must not start before all container downsizes complete")
 }

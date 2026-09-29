@@ -1248,11 +1248,31 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	return nil
 }
 
+func (c *containerToUpdateInfo) isDecrease(resourceName v1.ResourceName) bool {
+	if c.currentContainerResources == nil {
+		return false
+	}
+	switch resourceName {
+	case v1.ResourceMemory:
+		if c.desiredContainerResources.memoryLimit != c.currentContainerResources.memoryLimit {
+			return c.desiredContainerResources.memoryLimit < c.currentContainerResources.memoryLimit
+		}
+		return c.desiredContainerResources.memoryRequest < c.currentContainerResources.memoryRequest
+	case v1.ResourceCPU:
+		if c.desiredContainerResources.cpuLimit != c.currentContainerResources.cpuLimit {
+			return c.desiredContainerResources.cpuLimit < c.currentContainerResources.cpuLimit
+		}
+		return c.desiredContainerResources.cpuRequest < c.currentContainerResources.cpuRequest
+	default:
+		return false
+	}
+}
+
 func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Context, pod *v1.Pod, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Updating container resources", "pod", klog.KObj(pod))
 
-	for _, cInfo := range containersToUpdate {
+	updateOneContainer := func(cInfo containerToUpdateInfo) error {
 		container := cInfo.container.DeepCopy()
 		// If updating memory limit, use most recently configured CPU request and limit values.
 		// If updating CPU request and limit, use most recently configured memory request and limit values.
@@ -1294,6 +1314,49 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 		case v1.ResourceCPU:
 			cInfo.currentContainerResources.cpuLimit = cInfo.desiredContainerResources.cpuLimit
 			cInfo.currentContainerResources.cpuRequest = cInfo.desiredContainerResources.cpuRequest
+		}
+		return nil
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+		var downsize, upsize []containerToUpdateInfo
+		for _, cInfo := range containersToUpdate {
+			if cInfo.isDecrease(resourceName) {
+				downsize = append(downsize, cInfo)
+			} else {
+				upsize = append(upsize, cInfo)
+			}
+		}
+		runBatch := func(batch []containerToUpdateInfo) error {
+			errCh := make(chan error, len(batch))
+			var wg sync.WaitGroup
+			for _, cInfo := range batch {
+				wg.Add(1)
+				go func(cInfo containerToUpdateInfo) {
+					defer wg.Done()
+					defer utilruntime.HandleCrashWithContext(ctx)
+					if err := updateOneContainer(cInfo); err != nil {
+						errCh <- err
+					}
+				}(cInfo)
+			}
+			wg.Wait()
+			close(errCh)
+			var errs []error
+			for err := range errCh {
+				errs = append(errs, err)
+			}
+			return utilerrors.NewAggregate(errs)
+		}
+		if err := runBatch(downsize); err != nil {
+			return err
+		}
+		return runBatch(upsize)
+	} else {
+		for _, cInfo := range containersToUpdate {
+			if err := updateOneContainer(cInfo); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
