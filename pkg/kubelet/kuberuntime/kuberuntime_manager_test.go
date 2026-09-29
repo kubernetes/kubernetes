@@ -25,6 +25,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -659,44 +660,49 @@ func TestKillPod(t *testing.T) {
 }
 
 func TestSyncPod(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
-	assert.NoError(t, err)
+	for _, parallelOps := range []bool{false, true} {
+		t.Run(fmt.Sprintf("KubeletParallelContainerOps=%v", parallelOps), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletParallelContainerOps, parallelOps)
+			tCtx := ktesting.Init(t)
+			fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
 
-	containers := []v1.Container{
-		{
-			Name:            "foo1",
-			Image:           "busybox",
-			ImagePullPolicy: v1.PullIfNotPresent,
-		},
-		{
-			Name:            "foo2",
-			Image:           "alpine",
-			ImagePullPolicy: v1.PullIfNotPresent,
-		},
-	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: containers,
-		},
-	}
+			containers := []v1.Container{
+				{
+					Name:            "foo1",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+				{
+					Name:            "foo2",
+					Image:           "alpine",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: containers,
+				},
+			}
 
-	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
-	assert.NoError(t, result.Error())
-	assert.Len(t, fakeRuntime.Containers, 2)
-	assert.Len(t, fakeImage.Images, 2)
-	assert.Len(t, fakeRuntime.Sandboxes, 1)
-	for _, sandbox := range fakeRuntime.Sandboxes {
-		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State)
-	}
-	for _, c := range fakeRuntime.Containers {
-		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+			require.NoError(t, result.Error())
+			assert.Len(t, fakeRuntime.Containers, 2)
+			assert.Len(t, fakeImage.Images, 2)
+			assert.Len(t, fakeRuntime.Sandboxes, 1)
+			for _, sandbox := range fakeRuntime.Sandboxes {
+				assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State)
+			}
+			for _, c := range fakeRuntime.Containers {
+				assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
+			}
+		})
 	}
 }
 
@@ -6977,4 +6983,80 @@ func TestSysctlFiltering(t *testing.T) {
 			}
 		})
 	}
+}
+
+type barrierRuntimeService struct {
+	*apitest.FakeRuntimeService
+	onCreateContainer          func(ctx context.Context, podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) error
+	onStopContainer            func(ctx context.Context, containerID string, timeout int64) error
+	onUpdateContainerResources func(ctx context.Context, containerID string, resources *runtimeapi.ContainerResources) error
+}
+
+func (b *barrierRuntimeService) CreateContainer(ctx context.Context, podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+	if b.onCreateContainer != nil {
+		if err := b.onCreateContainer(ctx, podSandboxID, config, sandboxConfig); err != nil {
+			return "", err
+		}
+	}
+	return b.FakeRuntimeService.CreateContainer(ctx, podSandboxID, config, sandboxConfig)
+}
+
+func (b *barrierRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64) error {
+	if b.onStopContainer != nil {
+		if err := b.onStopContainer(ctx, containerID, timeout); err != nil {
+			return err
+		}
+	}
+	return b.FakeRuntimeService.StopContainer(ctx, containerID, timeout)
+}
+
+func (b *barrierRuntimeService) UpdateContainerResources(ctx context.Context, containerID string, resources *runtimeapi.ContainerResources) error {
+	if b.onUpdateContainerResources != nil {
+		if err := b.onUpdateContainerResources(ctx, containerID, resources); err != nil {
+			return err
+		}
+	}
+	return b.FakeRuntimeService.UpdateContainerResources(ctx, containerID, resources)
+}
+
+func TestSyncPodParallelContainerKills(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletParallelContainerOps, true)
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod, _ := makeBasePodAndStatus()
+	makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+	runtimePod, err := m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+	require.NoError(t, err)
+	// Mutate hashes of all 3 containers so computePodActions marks all 3 in ContainersToKill.
+	for _, cs := range podStatus.ContainerStatuses {
+		cs.Hash = 999999
+	}
+
+	var (
+		stopWg    sync.WaitGroup
+		releaseCh = make(chan struct{})
+	)
+	stopWg.Add(3)
+	go func() {
+		stopWg.Wait()
+		close(releaseCh)
+	}()
+
+	m.runtimeService = &barrierRuntimeService{
+		FakeRuntimeService: fakeRuntime,
+		onStopContainer: func(ctx context.Context, _ string, _ int64) error {
+			stopWg.Done()
+			<-releaseCh
+			return nil
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
 }

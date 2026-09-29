@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -1610,14 +1611,46 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
-		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+		deleteContainer := func(containerID kubecontainer.ContainerID, containerInfo containerToKillInfo) *kubecontainer.SyncResult {
 			logger.V(3).Info("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
-			result.AddSyncResult(killContainerResult)
 			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 				logger.Error(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+			}
+			return killContainerResult
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+			var wg sync.WaitGroup
+			killResults := make(chan *kubecontainer.SyncResult, len(podContainerChanges.ContainersToKill))
+			for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+				wg.Add(1)
+				go func(containerID kubecontainer.ContainerID, containerInfo containerToKillInfo) {
+					defer wg.Done()
+					defer utilruntime.HandleCrashWithContext(ctx)
+					killResults <- deleteContainer(containerID, containerInfo)
+				}(containerID, containerInfo)
+			}
+			wg.Wait()
+			close(killResults)
+			var hasErr bool
+			for killResult := range killResults {
+				result.AddSyncResult(killResult)
+				if killResult.Error != nil {
+					hasErr = true
+				}
+			}
+			if hasErr {
 				return
+			}
+
+		} else {
+			for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+				killResult := deleteContainer(containerID, containerInfo)
+				result.AddSyncResult(killResult)
+				if killResult.Error != nil {
+					return
+				}
 			}
 		}
 
