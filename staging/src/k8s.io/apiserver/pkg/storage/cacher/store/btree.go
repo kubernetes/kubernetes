@@ -33,19 +33,27 @@ func newBtreeStore(degree int) btreeStore {
 }
 
 type btreeStore struct {
-	tree *btree.BTree[*Element]
+	tree            *btree.BTree[*Element]
+	resourceVersion uint64
 }
 
 // Clone should not be called concurrently.
 // Ref: https://github.com/kubernetes/kubernetes/blob/4a8f617f3ca/vendor/k8s.io/utils/third_party/forked/golang/btree/btree.go#L586-L588
 func (s *btreeStore) Clone() *btreeStore {
 	return &btreeStore{
-		tree: s.tree.Clone(),
+		tree:            s.tree.Clone(),
+		resourceVersion: s.resourceVersion,
 	}
 }
 
-func (s *btreeStore) deleteElem(storeElem *Element) (*Element, bool) {
-	return s.tree.Delete(storeElem)
+func (s *btreeStore) ResourceVersion() uint64 {
+	return s.resourceVersion
+}
+
+func (s *btreeStore) deleteElem(storeElem *Element, resourceVersion uint64) *Element {
+	s.resourceVersion = resourceVersion
+	oldObj, _ := s.tree.Delete(storeElem)
+	return oldObj
 }
 
 func (s *btreeStore) List() []interface{} {
@@ -79,16 +87,18 @@ func (s *btreeStore) GetByKey(key string) (item interface{}, exists bool, err er
 	return s.getByKey(key)
 }
 
-func (s *btreeStore) Replace(objs []*Element) {
+func (s *btreeStore) Replace(objs []*Element, resourceVersion uint64) {
 	s.tree.Clear(false)
+	s.resourceVersion = resourceVersion
 	for _, storeElem := range objs {
-		s.addOrUpdateElem(storeElem)
+		s.addOrUpdateElem(storeElem, resourceVersion)
 	}
 }
 
 // addOrUpdateLocked assumes a lock is held and is used for Add
 // and Update operations.
-func (s *btreeStore) addOrUpdateElem(storeElem *Element) *Element {
+func (s *btreeStore) addOrUpdateElem(storeElem *Element, resourceVersion uint64) *Element {
+	s.resourceVersion = resourceVersion
 	oldObj, _ := s.tree.ReplaceOrInsert(storeElem)
 	return oldObj
 }
