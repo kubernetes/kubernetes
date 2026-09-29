@@ -508,9 +508,9 @@ func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, de
 				Description: "Default Response.",
 			},
 		},
-		GetOperationIDAndTags: apiopenapi.GetOperationIDAndTags,
-		GetDefinitionName:     defNamer.GetDefinitionName,
-		GetDefinitions:        getDefinitions,
+		GetOperationIDAndTagsFromRoute: apiopenapi.GetOperationIDAndTagsFromRoute,
+		GetDefinitionName:              defNamer.GetDefinitionName,
+		GetDefinitions:                 getDefinitions,
 	}
 }
 
@@ -528,9 +528,9 @@ func DefaultOpenAPIV3Config(getDefinitions openapicommon.GetOpenAPIDefinitions, 
 				Description: "Default Response.",
 			},
 		},
-		GetOperationIDAndTags: apiopenapi.GetOperationIDAndTags,
-		GetDefinitionName:     defNamer.GetDefinitionName,
-		GetDefinitions:        getDefinitions,
+		GetOperationIDAndTagsFromRoute: apiopenapi.GetOperationIDAndTagsFromRoute,
+		GetDefinitionName:              defNamer.GetDefinitionName,
+		GetDefinitions:                 getDefinitions,
 	}
 	defaultConfig.Definitions = getDefinitions(func(name string) spec.Ref {
 		defName, _ := defaultConfig.GetDefinitionName(name)
