@@ -210,6 +210,29 @@ stuff: 1
 	}
 }
 
+func TestYAMLReaderFinalLineAtBufferBoundary(t *testing.T) {
+	const bufSize = 4096
+	for _, n := range []int{bufSize - 1, bufSize, bufSize + 1, 2 * bufSize, 4 * bufSize} {
+		t.Run(fmt.Sprintf("final line of %d bytes", n), func(t *testing.T) {
+			last := "b: " + strings.Repeat("x", n-3)
+			r := NewYAMLReader(bufio.NewReaderSize(strings.NewReader("a: 1\n---\n"+last), bufSize))
+			if _, err := r.Read(); err != nil {
+				t.Fatalf("first document: unexpected error: %v", err)
+			}
+			doc, err := r.Read()
+			if err != nil {
+				t.Fatalf("second document: unexpected error: %v", err)
+			}
+			if got := strings.TrimSuffix(string(doc), "\n"); got != last {
+				t.Fatalf("second document: got %d bytes, want %d", len(got), len(last))
+			}
+			if _, err := r.Read(); err != io.EOF { //nolint:errorlint
+				t.Fatalf("expected io.EOF, got %v", err)
+			}
+		})
+	}
+}
+
 func TestDecodeYAMLSeparatorValidation(t *testing.T) {
 	s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(`---
 stuff: 1
