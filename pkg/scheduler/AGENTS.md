@@ -46,7 +46,7 @@ pkg/scheduler/
 │   ├── autoscaler_contract/       # Contract definitions for cluster autoscaler integration
 │   └── api_calls/                 # Helper utilities for framework API interactions
 ├── metrics/                       # Prometheus metric definitions & resource collector
-├── profile/                       # Multi-profile manager (maps schedulerName to Framework instances)
+├── profile/                       # Multi-profile manager (see profile/AGENTS.md)
 └── util/
     └── assumecache/               # Assume cache data structure
 ```
