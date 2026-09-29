@@ -391,6 +391,22 @@ func quantityAccessorCases() []accessorCase {
 			wantFloat:  0,
 			wantString: "0",
 		},
+		{
+			name: "zero-at-positive-scale-via-binary-subtraction", load: func() Quantity {
+				a := MustParse("1.5Gi")
+				a.ToDec()
+				b := MustParse("1.5Gi")
+				a.Sub(b)
+				return a
+			},
+			wantSign:       0,
+			wantValue:      0,
+			wantMilli:      0,
+			wantScaledKilo: 0,
+			wantAsInt64:    0, wantAsInt64OK: true,
+			wantFloat:  0,
+			wantString: "0",
+		},
 
 		// Add promotes to inf.Dec and keeps the exact value; only the int64
 		// projections wrap. An accessor case, not a mutation bug.
